@@ -3923,6 +3923,10 @@
 
         shakeTime = 0; shakeMag = 0;
 
+        // Reset fixed-timestep loop timing
+        lastTime = performance.now();
+        accumulator = 0;
+
         initBackground();
         buildControlBar();
 
@@ -3942,7 +3946,16 @@
         animate();
     }
 
-    function animate() {
+    // --- FIXED-TIMESTEP GAME LOOP ---
+    // Logic runs at a constant 60 Hz, independent of the screen refresh rate,
+    // so the game feels identical on a 30 Hz, 60 Hz or 120 Hz phone.
+    const FIXED_STEP = 1000 / 60;   // ms per logic update (60 updates/sec)
+    const MAX_FRAME_TIME = 250;     // clamp big gaps (tab switch) -> no "spiral of death"
+    const MAX_STEPS = 5;            // cap catch-up updates per frame on slow devices
+    let lastTime = 0;
+    let accumulator = 0;
+
+    function animate(now) {
         if (isGameOver) {
             finalScoreText.innerText = score;
             gameOverScreen.style.display = 'block';
@@ -3951,8 +3964,27 @@
 
         requestAnimationFrame(animate);
 
-        // --- UPDATE PHASE (skipped while paused for level-up) ---
-        if (!isPaused) {
+        // requestAnimationFrame passes a timestamp; the very first call has none.
+        if (now === undefined) now = performance.now();
+        let frameTime = now - lastTime;
+        lastTime = now;
+        if (frameTime > MAX_FRAME_TIME) frameTime = MAX_FRAME_TIME;
+
+        // Consume the elapsed real time in fixed-size logic steps.
+        accumulator += frameTime;
+        let steps = 0;
+        while (accumulator >= FIXED_STEP && steps < MAX_STEPS) {
+            if (!isPaused) updateGame();
+            accumulator -= FIXED_STEP;
+            steps++;
+        }
+        if (steps >= MAX_STEPS) accumulator = 0; // fell behind: drop the backlog
+
+        renderGame();
+    }
+
+    // --- UPDATE PHASE: exactly one fixed logic step (skipped while paused) ---
+    function updateGame() {
             updateBackground();
             mothership.update();
             
@@ -4165,8 +4197,10 @@
             fleetShips = fleetShips.filter(f => !f.markedForDeletion);
 
             frameCount++;
-        }
+    }
 
+    // --- RENDER PHASE: runs every animation frame (even while paused) ---
+    function renderGame() {
         // --- RENDER PHASE (always, so the frozen scene shows behind overlays) ---
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
