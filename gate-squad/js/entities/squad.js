@@ -205,7 +205,7 @@ function fireBullet(game, sq, st, slot, shooters, regular) {
   b.gateRow = -1;
 
   // Mündungsfeuer am Schützen, gelegentlich eine Hülse (Partikel-Budget wird in emit geprüft).
-  if (Math.random() < 0.5) emit(game, 'flash', b.x, b.y - 2);
+  if (Math.random() < 0.12) emit(game, 'flash', b.x, b.y - 2, { size: 6 });
   if (Math.random() < 0.2) {
     emit(game, 'casing', b.x, sq.y - 10, {
       vx: 40 + Math.random() * 40,

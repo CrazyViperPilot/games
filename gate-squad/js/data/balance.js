@@ -33,7 +33,8 @@ export const BAL = {
   BOSS_AIM_LOCK: 0.45, // s vor dem Schuss wird das Ziel eingefroren
   BOSS_SHELL_SPEED: 650, // Granaten-Fluggeschwindigkeit (E/s)
   BOSS_TURRET_SPEED: 1.6, // rad/s
-  BOSS_BARREL: 0.75, // Rohrlänge relativ zur Boss-Höhe
+  BOSS_BARREL: 0.75, // Rohrlänge relativ zur Boss-Höhe (ab Turm-Mitte)
+  BOSS_TURRET_DY: -0.06, // Turm-Mitte relativ zur Boss-Mitte (× h)
   BOSS_VOLLEY_GAP: 0.3, // s zwischen Schüssen einer Salve
   BOSS_VOLLEY_SPREAD: 45, // seitlicher Versatz weiterer Schüsse // s nach Ankunft bis zur ersten Salve
   WAVE_COUNT_MULT: 1.4, // Wellengröße × (nicht für Scharfschützen/Fahrzeuge)

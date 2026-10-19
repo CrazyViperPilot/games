@@ -7,6 +7,7 @@
 import { CFG } from '../config.js';
 import { ATTACHMENTS } from '../data/attachments.js';
 import { SPECIALISTS } from '../data/specialists.js';
+import { BAL } from '../data/balance.js';
 
 const TAU = Math.PI * 2;
 
@@ -606,8 +607,8 @@ export function drawEnemy(ctx, e) {
 // ---------------------------------------------------------------- Boss (Kampfpanzer)
 
 const TURRET_R = 0.32; // Turmradius = TURRET_R · min(w, h)
-const TURRET_DY = -0.06; // Turm-Mitte relativ zu h (leicht oberhalb der Boss-Mitte)
-const BARREL_LEN = 0.75; // Rohrlänge = BARREL_LEN · h (ab Turm-Mitte)
+const TURRET_DY = BAL.BOSS_TURRET_DY; // Turm-Mitte relativ zu h (gemeinsam mit der Spiel-Logik)
+const BARREL_LEN = BAL.BOSS_BARREL; // Rohrlänge = BARREL_LEN · h (ab Turm-Mitte)
 const TRACK_PITCH = 4.5; // Abstand der Kettenglieder
 const BOSS_COL_FALLBACK = '#5d6b4e';
 
@@ -814,7 +815,7 @@ export function drawBoss(ctx, boss) {
 
   // 5. Treffer-Überzug (weiß)
   if (boss.flash > 0) {
-    ctx.globalAlpha = Math.min(1, boss.flash) * 0.6;
+    ctx.globalAlpha = Math.min(1, boss.flash) * 0.2;
     ctx.fillStyle = '#ffffff';
     hullPath(ctx, cx, cy, hw, hh, tw);
     ctx.fill();

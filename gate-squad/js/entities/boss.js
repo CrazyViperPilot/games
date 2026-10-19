@@ -47,11 +47,15 @@ export function spawnBoss(game) {
 export function bossMuzzle(b, out) {
   const len = b.h * BAL.BOSS_BARREL;
   out.x = b.x + Math.cos(b.turret) * len;
-  out.y = b.y + Math.sin(b.turret) * len;
+  out.y = turretY(b) + Math.sin(b.turret) * len;
   return out;
 }
 
 const _m = { x: 0, y: 0 };
+
+function turretY(b) {
+  return b.y + BAL.BOSS_TURRET_DY * b.h;
+}
 
 // Kleinster Winkelabstand a − b im Bereich (−π, π].
 function angleDiff(a, b) {
@@ -140,7 +144,7 @@ function updateFiring(game, b, dt) {
     b.aimX = sq.x;
     b.aimY = game.SQUAD_Y;
   }
-  const want = Math.atan2(b.aimY - b.y, b.aimX - b.x);
+  const want = Math.atan2(b.aimY - turretY(b), b.aimX - b.x);
   if (b.shellTimer >= def.shellInterval && Math.abs(angleDiff(want, b.turret)) < 0.12) {
     b.shellTimer = 0;
     b.aiming = 0;
@@ -190,7 +194,7 @@ export function updateBoss(game, dt) {
   const locked = b.aiming > 0 || b.volleyLeft > 0;
   const tx = locked ? b.aimX : sq.x;
   const ty = locked ? b.aimY : game.SQUAD_Y;
-  const diff = angleDiff(Math.atan2(ty - b.y, tx - b.x), b.turret);
+  const diff = angleDiff(Math.atan2(ty - turretY(b), tx - b.x), b.turret);
   const step = BAL.BOSS_TURRET_SPEED * dt;
   b.turret += diff > step ? step : diff < -step ? -step : diff;
 
