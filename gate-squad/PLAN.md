@@ -332,3 +332,16 @@ Finale Kurven: `hpMult(L) = 1 + 0.3·(L−1)` (ab 21: ×1.07/Level), Wellen ×1.
 Ergebnis (Level 1–10): Profi-Bot gewinnt alle im ersten Versuch (Bosskampf 9–17 s);
 Gelegenheits-Bot gewinnt L1–7 sicher, L8 knapp, L9/L10 erst nach Fehlversuchen + Shop-Upgrades –
 d. h. ab Level 8 muss man Tore bewusst wählen/anschießen bzw. Upgrades kaufen.
+
+### Nachtrag Level 11–20 und Endlos (Node-Simulation mit `game.js` + Bot, headless)
+
+* Boss-Basis-HP: bis L10 ×1,11/Level, danach ×1,06 (`bossBase(L)`), gleiche Formel für Endlos.
+* Waffentore: L11–15: 5, L16–20: 6; Endlos mindestens 5 (Procgen wandelt Tor-Paare um),
+  Procgen-Gewichtung Wellen 50 % / Tore 32 % / Waffe 10 % / Kiste 8 %.
+* Shop „Startwaffe“: 300·2,2^n (vorher 400·2,5^n).
+* Ergebnis: Profi mit mittleren Upgrades gewinnt L12/15/18/20; Gelegenheitsspieler verliert diese,
+  solange er Waffentore nicht gezielt freischießt – mit voll ausgebautem Shop gewinnt er sie aber
+  (Grind-Pfad, erreicht M82 in L20). Endlos mit vollem Shop: bis ≈ L28 schaffbar, danach Rekordjagd.
+
+Die Level-Daten in `levels.js` wurden aus den handgebauten Vorlagen mit diesen Regeln
+(Start-Tor, Waffentor-Anzahl, x2 erst ab L6, x3 erst ab L8, Mindestabstand 150) überarbeitet.

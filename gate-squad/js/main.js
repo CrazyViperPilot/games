@@ -184,7 +184,7 @@ function isTyping(e) {
 // ---------- Debug ----------
 
 function setupDebug() {
-  window.__gs = { game, save: () => save, ui, startLevel, loop };
+  window.__gs = { renderer, game, save: () => save, ui, startLevel, loop };
 
   const btn = document.createElement('button');
   btn.type = 'button';

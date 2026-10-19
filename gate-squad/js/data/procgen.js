@@ -65,6 +65,8 @@ function makeCrate(rng, d) {
   return { d, t: 'crate', x: Math.round(randRange(rng, 0.15, 0.85) * 100) / 100 };
 }
 
+const MIN_WEAPON_GATES = 5;
+
 export function generateLevel(n) {
   const rng = mulberry32(n * 9973 + 17);
   const length = 4400 + Math.min(2000, 60 * (n - 20));
@@ -85,11 +87,25 @@ export function generateLevel(n) {
       continue;
     }
     const r = rng() * 100;
-    if (r < 60) events.push(makeWave(rng, n, d));
-    else if (r < 85) events.push(makeGates(rng, n, d));
+    if (r < 50) events.push(makeWave(rng, n, d));
+    else if (r < 82) events.push(makeGates(rng, n, d));
     else if (r < 92) events.push(makeWeapon(rng, n, d));
     else events.push(makeCrate(rng, d));
     d += randInt(rng, 200, 300);
+  }
+
+  // Mindestens MIN_WEAPON_GATES Waffentore: zufällige Tor-Paare umwandeln (Waffenkette bis M82).
+  let weapons = events.filter((e) => e.t === 'weapon').length;
+  for (let guard = 0; weapons < MIN_WEAPON_GATES && guard < 50; guard++) {
+    const e = events[randInt(rng, 1, events.length - 1)];
+    if (e.t !== 'gates') continue;
+    const other = rng() < 0.5 ? e.right : e.left;
+    e.t = 'weapon';
+    e.side = other === e.right ? 'left' : 'right';
+    e.other = other;
+    delete e.left;
+    delete e.right;
+    weapons++;
   }
 
   // Starkes positives Tor-Paar zur Boss-Vorbereitung.

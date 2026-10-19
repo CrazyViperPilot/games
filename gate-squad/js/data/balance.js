@@ -30,7 +30,6 @@ export const BAL = {
   SNIPER_TELEGRAPH: 1.2,
   SNIPER_INTERVAL: 3.5,
   ENEMY_BULLET_SPEED: 420,
-  SQUAD_MOVE_MAX: 900,
   FORMATION_SPACING: 11,
   GRENADE_INTERVAL: 2.5,
   GRENADE_RADIUS: 55,
@@ -88,7 +87,11 @@ export function applyAddGate(n, v) {
 }
 
 // Basis-HP des Endlos-Bosses vor hpMult (PLAN.md §5: 3500·(1+0.35(L−1))/1.6).
-// Gleiche Kurve wie die handgebauten Level (levels.js: bossHp = 4000·1.11^(L−1)).
+// Boss-Basis-HP für alle Level (levels.js ist mit derselben Formel erzeugt):
+// bis L10 ×1.11 pro Level, danach ×1.06 (Feuerkraft der Spieler wächst später langsamer).
+export function bossBase(L) {
+  return 4000 * Math.pow(1.11, Math.min(L, 10) - 1) * Math.pow(1.06, Math.max(0, L - 10));
+}
 export function endlessBossBase(L) {
-  return 4000 * Math.pow(1.11, L - 1);
+  return bossBase(L);
 }
