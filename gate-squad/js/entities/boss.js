@@ -5,7 +5,7 @@ import { audio } from '../core/audio.js';
 import { burst, emit } from './particles.js';
 
 const SHELL_SLOTS = 6;
-const ENTER_SPEED = 60;
+const ENTER_SPEED = 140;
 const SHELL_SPREAD = 40;
 const CONTACT_TICK = 0.5;
 
@@ -27,10 +27,10 @@ export function spawnBoss(game) {
     maxHp: hp,
     dir: 1,
     entering: true,
-    shellTimer: 0,
+    shellTimer: def.shellInterval - BAL.BOSS_FIRST_SHOT,
     shells,
     flash: 0,
-    turret: 0,
+    turret: Math.PI / 2,
     contactAcc: 0,
     contactTimer: 0,
   };
@@ -98,12 +98,14 @@ export function updateBoss(game, dt) {
 
   if (b.entering) {
     b.y += ENTER_SPEED * dt;
-    if (b.y >= BAL.BOSS_STOP_Y) {
-      b.y = BAL.BOSS_STOP_Y;
+    const stopY = game.SQUAD_Y - BAL.BOSS_STOP_DIST;
+    if (b.y >= stopY) {
+      b.y = stopY;
       b.entering = false;
     }
   } else {
     b.y += def.advance * dt;
+    game.bossFight += dt;
 
     const minX = b.w / 2 + 10;
     const maxX = W - b.w / 2 - 10;
@@ -124,7 +126,7 @@ export function updateBoss(game, dt) {
   }
 
   // Geschützrohr zeigt zur Truppe (0 = nach unten).
-  b.turret = Math.atan2(sq.x - b.x, sq.y - b.y);
+  b.turret = Math.atan2(sq.y - b.y, sq.x - b.x);
 
   for (let i = 0; i < b.shells.length; i++) {
     const s = b.shells[i];

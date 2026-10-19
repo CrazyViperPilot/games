@@ -3,6 +3,7 @@
 // Stateless, keine Allokationen pro Tick außer Skalaren; nur Index-Schleifen über Arrays/Pools.
 
 import { BAL, applyAddGate, applyMulGate } from '../data/balance.js';
+import { WEAPONS } from '../data/weapons.js';
 
 const MAX_SPEED = 520;          // Welteinheiten pro Sekunde
 const DEFAULT_W = 360;
@@ -15,31 +16,44 @@ const APC_CONTACT_Y = 80;
 const SNIPER_DODGE = 50;
 const SNIPER_DANGER = 60;
 
+// Modus 'pro' (Standard): plant Tor-Beschuss und weicht aus. Modus 'casual': simuliert einen
+// Gelegenheitsspieler – bewertet Tore nur nach aktuellem Wert, wählt in 35 % der Reihen das
+// schlechtere Tor, weicht nie aus und bewegt sich langsamer.
+let mode = 'pro';
+export function setMode(m) { mode = m === 'casual' ? 'casual' : 'pro'; }
+const CASUAL_MISTAKE = 35;
+
 // Erwartete Truppe nach einem Zahlentor. Weit entfernte negative add-Tore werden
 // mit geschätztem Beschuss verbessert (gedeckelt durch BAL.GATE_MAX_GAIN).
-function scoreNumGate(g, count, dps, squadY, scroll) {
-  if (g.op === 'mul') return applyMulGate(count, g.value);
+// Feuerkraft-Schätzung (wie squad.js): Waffen-DPS × sqrt(Truppe), Truppe gedeckelt.
+function power(n, tier) {
+  const w = WEAPONS[Math.min(WEAPON_MAX_TIER, tier)];
+  return w.damage * w.fireRate * Math.sqrt(Math.min(n, BAL.MAX_SOLDIERS)) * (1 + Math.min(n, 30) / 60);
+}
+
+function scoreNumGate(g, count, dps, squadY, scroll, tier) {
+  if (g.op === 'mul') return power(applyMulGate(count, g.value), tier);
   let v = g.value;
   const dist = squadY - g.y;
-  if (v < 0 && dist > GATE_FAR) {
+  if (mode === 'pro' && v < 0 && dist > GATE_FAR) {
     const t = dist / scroll;
     const pc = g.pointCost > 0 ? g.pointCost : 1;
     const gain = Math.min(BAL.GATE_MAX_GAIN, Math.floor((t * dps) / pc));
     v += gain;
   }
-  return applyAddGate(count, v);
+  return power(applyAddGate(count, v), tier);
 }
 
 // Bewertung eines Waffentors: gesperrt wertlos, freigeschossen (oder bis Ankunft voraussichtlich
 // freischießbar) ein Waffen-Upgrade, solange die Waffe nicht maximal ist.
 function scoreWeaponGate(g, count, tier, dps, squadY, scroll) {
   let unlocked = !g.locked;
-  if (!unlocked) {
+  if (!unlocked && mode === 'pro') {
     const dmgByArrival = dps * ((squadY - g.y) / scroll);
     if (g.unlockHp < dmgByArrival * 0.7) unlocked = true;
   }
-  if (unlocked && tier < WEAPON_MAX_TIER) return count * 1.35 + 5;
-  return count * 1.0 - 1;
+  if (unlocked && tier < WEAPON_MAX_TIER) return power(count, tier + 1);
+  return power(count, tier) * 0.99;
 }
 
 // Wählt die nächstgelegene Tor-Reihe und darin das beste Tor (oder die freie Hälfte).
@@ -59,6 +73,9 @@ function pickGateTarget(game, squad, squadY, W, dps, scroll) {
 
   let bestScore = -Infinity;
   let bestX = NaN;
+  let worstScore = Infinity;
+  let worstX = NaN;
+  let rowId = 0;
   let members = 0;
   let memberX = 0;
   for (let i = 0; i < gates.length; i++) {
@@ -69,15 +86,21 @@ function pickGateTarget(game, squad, squadY, W, dps, scroll) {
     if (g.used) continue;
     const score = g.kind === 'weapon'
       ? scoreWeaponGate(g, count, squad.weaponTier || 0, dps, squadY, scroll)
-      : scoreNumGate(g, count, dps, squadY, scroll);
+      : scoreNumGate(g, count, dps, squadY, scroll, squad.weaponTier || 0);
+    rowId = g.row;
     if (score > bestScore) {
       bestScore = score;
       bestX = g.x + g.w / 2;
     }
+    if (score < worstScore) {
+      worstScore = score;
+      worstX = g.x + g.w / 2;
+    }
   }
+  if (mode === 'casual' && members > 1 && ((rowId * 2654435761) >>> 0) % 100 < CASUAL_MISTAKE) return worstX;
 
   // Nur ein Tor in der Reihe: die freie Hälfte ist neutral (Wert = count).
-  if (members === 1 && count > bestScore) {
+  if (members === 1 && power(count, squad.weaponTier || 0) > bestScore) {
     bestX = memberX < W / 2 ? W * 0.75 : W * 0.25;
   }
   return bestX;
@@ -146,7 +169,9 @@ export function delta(game, dt) {
     }
   }
 
-  // 2) Ausweichen (überschreibt das Ziel)
+  // 2) Ausweichen (überschreibt das Ziel) – nur im Profi-Modus
+  if (mode === 'casual') return move(targetX, squadX, squadR, W, dt, CASUAL_SPEED);
+
   // 2a) Boss-Granaten: aktive Shells mit Ziel nahe am Squad
   const boss = game.boss;
   if (boss && boss.shells) {
@@ -185,6 +210,12 @@ export function delta(game, dt) {
     }
   }
 
+  return move(targetX, squadX, squadR, W, dt, MAX_SPEED);
+}
+
+const CASUAL_SPEED = 260;
+
+function move(targetX, squadX, squadR, W, dt, speed) {
   // Begrenzung auf das Spielfeld
   const lo = squadR;
   const hi = W - squadR;
@@ -194,11 +225,11 @@ export function delta(game, dt) {
   // 3) Bewegung: maximal MAX_SPEED·dt pro Tick, kein Zittern
   let d = targetX - squadX;
   if (Math.abs(d) < 2) return 0;
-  const maxStep = MAX_SPEED * dt;
+  const maxStep = speed * dt;
   if (d > maxStep) d = maxStep;
   else if (d < -maxStep) d = -maxStep;
   return d;
 }
 
-export default { delta };
-export const bot = { delta };
+export default { delta, setMode };
+export const bot = { delta, setMode };

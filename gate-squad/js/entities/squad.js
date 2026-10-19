@@ -11,7 +11,7 @@ import { emit, floatText } from './particles.js';
 const DEG = Math.PI / 180;
 const ORANGE = CFG.COLORS.orange;
 const BANNER_T = 1.6;
-const MAX_SOLDIERS = 999;
+const MAX_SOLDIERS = BAL.MAX_SOLDIERS;
 
 // Radius der Truppe (Kollisionsradius) abhängig von der sichtbaren Anzahl.
 export function squadRadius(count) {
@@ -38,6 +38,11 @@ export function createSquad() {
     radius: squadRadius(0),
     slots,
     fireTimer: 0,
+    shotIdx: 0,
+    hasAim: false,
+    aimX: 0,
+    aimY: 0,
+    soundTimer: 0,
     grenadeTimer: 0,
     muzzle: 0,
     hurt: 0,
@@ -77,15 +82,25 @@ export function updateSquad(game, dt, input) {
   if (sq.count <= 0 || !sq.stats) return;
   const st = sq.stats;
 
-  const interval = 1 / st.fireRate;
-  sq.fireTimer += dt;
-  let guard = 0;
-  while (sq.fireTimer >= interval && guard < 3) {
-    sq.fireTimer -= interval;
-    guard++;
-    fireVolley(game, sq, st);
+  findAimTarget(game, sq, st);
+
+  // Gestaffeltes Feuer: jeder Schütze feuert mit stats.fireRate, aber zeitversetzt (kontinuierlicher Strom).
+  const shooters = Math.min(sq.count, CFG.MAX_SHOOTERS);
+  sq.fireTimer += dt * st.fireRate * shooters;
+  let n = 0;
+  while (sq.fireTimer >= 1 && n < shooters) {
+    sq.fireTimer -= 1;
+    n++;
+    sq.shotIdx = (sq.shotIdx + 1) % shooters;
+    fireBullet(game, sq, st, sq.slots[sq.shotIdx], shooters);
   }
-  if (sq.fireTimer >= interval) sq.fireTimer = 0;
+  if (sq.fireTimer >= 1) sq.fireTimer = 0;
+  sq.soundTimer -= dt;
+  if (n > 0 && sq.soundTimer <= 0) {
+    sq.soundTimer = 1 / st.fireRate;
+    audio.shot(sq.weapon.id);
+    sq.muzzle = 1;
+  }
 
   if (st.grenade) {
     sq.grenadeTimer += dt;
@@ -96,42 +111,64 @@ export function updateSquad(game, dt, input) {
   }
 }
 
-// Eine Salve: jeder Schütze (max. CFG.MAX_SHOOTERS) feuert eine Kugel gerade nach oben mit Streuung.
-function fireVolley(game, sq, st) {
+// Nächster Gegner oberhalb im Zielkegel und in Reichweite (einmal pro Tick). Boss als Fallback.
+function findAimTarget(game, sq, st) {
+  sq.hasAim = false;
+  let best = st.range * 0.95;
+  const items = game.enemies.items;
+  for (let i = 0; i < items.length; i++) {
+    const e = items[i];
+    if (!e.active) continue;
+    const dy = sq.y - e.y;
+    if (dy <= 10) continue;
+    const dx = e.x - sq.x;
+    if (Math.abs(dx) > dy * 0.55 + sq.radius) continue;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (d < best) {
+      best = d;
+      sq.aimX = e.x;
+      sq.aimY = e.y;
+      sq.hasAim = true;
+    }
+  }
+  const boss = game.boss;
+  if (!sq.hasAim && boss && !boss.entering && sq.y - boss.y - boss.h / 2 < st.range) {
+    sq.aimX = Math.max(boss.x - boss.w * 0.35, Math.min(boss.x + boss.w * 0.35, sq.x));
+    sq.aimY = boss.y;
+    sq.hasAim = true;
+  }
+}
+
+// Ein Schuss eines Schützen gerade nach oben mit Streuung. Schaden skaliert mit count/shooters.
+function fireBullet(game, sq, st, slot, shooters) {
   const w = sq.weapon;
-  const shooters = Math.min(sq.count, CFG.MAX_SHOOTERS);
-  const dmg = (st.damage * sq.count) / shooters;
   const spread = st.spread * DEG;
-  const life = st.range / st.bulletSpeed;
-
-  for (let i = 0; i < shooters; i++) {
-    const slot = sq.slots[i];
-    const a = (Math.random() * 2 - 1) * spread;
-    const b = game.bullets.get();
-    b.x = sq.x + slot.ox;
-    b.y = sq.y - 12 + slot.oy * 0.25;
-    b.vx = Math.sin(a) * st.bulletSpeed;
-    b.vy = -Math.cos(a) * st.bulletSpeed;
-    b.dmg = dmg;
-    b.life = life;
-    b.pierce = st.pierce;
-    b.len = w.bulletLen;
-    b.width = w.bulletWidth;
-    b.color = w.color;
-    b.hitId = 0;
+  const b = game.bullets.get();
+  b.x = sq.x + slot.ox;
+  b.y = sq.y - 12 + slot.oy * 0.25;
+  // Automatisches Zielen innerhalb des Kegels BAL.AIM_CONE, sonst gerade nach oben.
+  let a = (Math.random() * 2 - 1) * spread;
+  if (sq.hasAim) {
+    let aim = Math.atan2(sq.aimX - b.x, b.y - sq.aimY);
+    if (aim > BAL.AIM_CONE) aim = BAL.AIM_CONE;
+    else if (aim < -BAL.AIM_CONE) aim = -BAL.AIM_CONE;
+    a += aim;
   }
+  b.vx = Math.sin(a) * st.bulletSpeed;
+  b.vy = -Math.cos(a) * st.bulletSpeed;
+  b.dmg = st.damage * Math.pow(sq.count / shooters, BAL.FIREPOWER_EXP);
+  b.life = st.range / st.bulletSpeed;
+  b.pierce = st.pierce;
+  b.len = w.bulletLen;
+  b.width = w.bulletWidth;
+  b.color = w.color;
+  b.hitId = 0;
+  b.gateRow = -1;
 
-  audio.shot(w.id);
-  sq.muzzle = 1;
-
-  // Mündungsfeuer an zwei Schützen, gelegentlich eine Hülse (Partikel-Budget wird in emit geprüft).
-  for (let k = 0; k < 2; k++) {
-    const slot = sq.slots[Math.floor(Math.random() * shooters)];
-    emit(game, 'flash', sq.x + slot.ox, sq.y - 14 + slot.oy * 0.25);
-  }
-  if (Math.random() < 0.5) {
-    const slot = sq.slots[Math.floor(Math.random() * shooters)];
-    emit(game, 'casing', sq.x + slot.ox, sq.y - 10, {
+  // Mündungsfeuer am Schützen, gelegentlich eine Hülse (Partikel-Budget wird in emit geprüft).
+  if (Math.random() < 0.5) emit(game, 'flash', b.x, b.y - 2);
+  if (Math.random() < 0.2) {
+    emit(game, 'casing', b.x, sq.y - 10, {
       vx: 40 + Math.random() * 40,
       vy: -60 - Math.random() * 40,
       life: 0.5,
@@ -182,7 +219,7 @@ function fireGrenade(game, sq, st) {
   g.ty = ty;
   g.t = 0;
   g.dur = 0.7;
-  g.dmg = BAL.GRENADE_BASE + BAL.GRENADE_DMG_FACTOR * st.damage * Math.max(1, sq.count / 10);
+  g.dmg = BAL.GRENADE_BASE + BAL.GRENADE_DMG_FACTOR * st.damage * Math.max(1, Math.sqrt(sq.count / 4));
   g.radius = BAL.GRENADE_RADIUS;
 }
 

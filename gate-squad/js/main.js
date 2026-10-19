@@ -1,11 +1,11 @@
 // main.js – Bootstrap: Save, Audio, UI, Game, Renderer, Loop, Input, Service Worker, Debug/Autoplay.
-import { CFG } from './config.js';
 import { Loop } from './core/loop.js';
 import { Input } from './core/input.js';
 import { audio } from './core/audio.js';
 import { haptics } from './core/haptics.js';
 import { loadSave, writeSave } from './core/save.js';
-import { BAL } from './data/balance.js';
+import { BAL, upgradeCost } from './data/balance.js';
+import { UPGRADES } from './data/upgrades.js';
 import { Game } from './game/game.js';
 import { Renderer } from './render/renderer.js';
 import { UI } from './ui/ui.js';
@@ -14,6 +14,7 @@ const params = new URLSearchParams(location.search);
 const DEBUG = params.get('debug') === '1';
 const AUTOPLAY = params.get('autoplay') === '1';
 const CHAIN = params.get('chain') === '1';
+const SPEED = DEBUG ? Math.max(1, Math.min(16, parseInt(params.get('speed'), 10) || 1)) : 1;
 
 let save = null;
 let canvas = null;
@@ -102,12 +103,31 @@ function onEnd(result) {
   ui.showResult(result);
 
   if (AUTOPLAY) {
-    window.__results.push({ level, won, survivors, coins, kills, time: game.time });
+    window.__results.push({ level, won, survivors, coins, kills, time: Math.round(game.time), tier: game.squad.weaponTier, att: game.squad.attachments.length, peak: game.peak, bossT: Math.round(game.bossFight || 0), bossHp: game.bossMax });
     if (CHAIN) {
+      // Test-Autopilot kauft wie ein Spieler das günstigste Upgrade, solange Münzen reichen (?shop=1).
+      if (params.get('shop') === '1') autoShop();
       const next = won ? level + 1 : level;
       setTimeout(() => startLevel(next), 1500);
     }
   }
+}
+
+function autoShop() {
+  for (;;) {
+    let best = null;
+    let bestCost = Infinity;
+    for (const u of UPGRADES) {
+      const lvl = save.upgrades[u.id] || 0;
+      if (lvl >= u.max) continue;
+      const c = upgradeCost(u, lvl);
+      if (c < bestCost) { best = u; bestCost = c; }
+    }
+    if (!best || bestCost > save.coins) break;
+    save.coins -= bestCost;
+    save.upgrades[best.id]++;
+  }
+  writeSave(save);
 }
 
 // ---------- Loop ----------
@@ -115,19 +135,14 @@ function onEnd(result) {
 function update(dt) {
   if (!game || game.state !== 'play') return;
   curDt = dt;
-  game.update(dt, AUTOPLAY && bot ? botInput : input);
+  const src = AUTOPLAY && bot ? botInput : input;
+  // Debug-Zeitraffer (?speed=N) für automatisierte Durchläufe.
+  for (let i = 0; i < SPEED && game.state === 'play'; i++) game.update(dt, src);
 }
 
 function render() {
   if (!renderer || !game) return;
-  if (game.state === 'idle') {
-    // Menü: leeres Hintergrundbild statt letztem Spielframe.
-    const ctx = canvas.getContext('2d');
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = CFG.COLORS.bg;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    return;
-  }
+  // Im Menü (state 'idle') zeichnet der Renderer den animierten Hintergrund.
   renderer.render(game, loop.fps, DEBUG);
 }
 
@@ -219,6 +234,7 @@ async function boot() {
     try {
       const mod = await import('./game/bot.js');
       if (mod && typeof mod.delta === 'function') bot = mod;
+      if (bot && bot.setMode) bot.setMode(params.get('bot'));
     } catch (_) {
       bot = null; // Bot fehlt: Pointer-Eingabe bleibt aktiv
     }

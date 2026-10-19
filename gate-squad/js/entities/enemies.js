@@ -32,7 +32,7 @@ export function spawnEnemy(game, def, x, y) {
 export function spawnWave(game, ev) {
   const def = ENEMIES[ev.enemy];
   if (!def) return;
-  const n = ev.count || 1;
+  const n = Math.max(1, Math.round((ev.count || 1) * (ev.enemy === 'apc' || ev.enemy === 'sniper' ? 1 : BAL.WAVE_COUNT_MULT)));
   const W = game.W;
   const r = def.radius;
   const cx = (ev.x !== undefined ? ev.x : randRange(game.rng, 0.25, 0.75)) * W;
@@ -116,8 +116,9 @@ export function updateEnemies(game, dt) {
 
     if (e.state === 'walk') {
       e.y += (game.scroll + def.speed) * dt;
-      if (def.stopY > 0 && e.y >= def.stopY) {
-        e.y = def.stopY;
+      // stopY = Abstand über der Truppenlinie, an dem der Gegner anhält.
+      if (def.stopY > 0 && e.y >= sqY - def.stopY) {
+        e.y = sqY - def.stopY;
         e.state = 'stopped';
         e.timer = 0;
       }

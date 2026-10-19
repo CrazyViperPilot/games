@@ -25,7 +25,7 @@ const END_DELAY_LOST = 1.0;
 
 const bulletFactory = () => ({
   active: false, x: 0, y: 0, vx: 0, vy: 0, dmg: 0, life: 0,
-  pierce: 0, len: 0, width: 0, color: '#ffffff', hitId: 0,
+  pierce: 0, len: 0, width: 0, color: '#ffffff', hitId: 0, gateRow: -1,
 });
 const enemyBulletFactory = () => ({ active: false, x: 0, y: 0, vx: 0, vy: 0 });
 const grenadeFactory = () => ({
@@ -61,6 +61,7 @@ export class Game {
     this.time = 0;
     this.kills = 0;
     this.coinsEarned = 0;
+    this.loot = 0;
     this.shake = 0;
     this.banner = null;
     this.debug = { god: false };
@@ -117,6 +118,10 @@ export class Game {
     this.time = 0;
     this.kills = 0;
     this.coinsEarned = 0;
+    this.loot = 0;
+    this.peak = 0;
+    this.bossTime = 0;
+    this.bossFight = 0;
     this.shake = 0;
     this.phase = 'run';
     this.scroll = this.level.scroll;
@@ -156,6 +161,8 @@ export class Game {
     }
 
     this.time += dt;
+    if (this.squad.count > this.peak) this.peak = this.squad.count;
+    if (this.phase === 'boss') this.bossTime += dt;
     updateSquad(this, dt, input);
 
     if (this.phase === 'run') this.distance += this.scroll * dt;
@@ -189,6 +196,7 @@ export class Game {
       this.scroll = 0;
       this.objSpeed = BOSS_PUSH_SPEED;
       spawnBoss(this);
+      this.bossMax = Math.round(this.boss.maxHp);
       this.banner = { text: 'BOSS: ' + this.boss.def.name, t: 2.5, color: CFG.COLORS.bad };
       audio.explosion(1.5);
       this.shake = 6;
@@ -237,7 +245,7 @@ export class Game {
     this.state = won ? 'won' : 'lost';
     const survivors = Math.max(0, Math.floor(this.squad.count));
     this.coinsEarned = coinsForResult({
-      won, level: this.levelNum, survivors, kills: this.kills,
+      won, level: this.levelNum, survivors, kills: this.kills, loot: this.loot,
     });
     if (won) audio.win();
     else audio.lose();
@@ -265,9 +273,11 @@ export class Game {
   killEnemy(e) {
     if (!e.active) return;
     this.kills++;
+    this.loot += e.def.coins;
+    this.coinsEarned = this.loot;
     burst(this, 'debris', e.x, e.y, 5, { speed: 110 });
     burst(this, 'smoke', e.x, e.y, 3, { speed: 50, life: 0.5 });
-    if (this.rng() < 0.15) floatText(this, e.x, e.y - 12, 'KILL', CFG.COLORS.text);
+    if (this.rng() < 0.2) floatText(this, e.x, e.y - 12, '+' + e.def.coins + ' ◆', CFG.COLORS.orange);
     audio.hit();
     this.enemies.release(e);
   }

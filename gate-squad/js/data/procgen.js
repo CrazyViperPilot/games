@@ -74,7 +74,10 @@ export function generateLevel(n) {
   const finalD = length - 400;
   const events = [];
 
-  let d = 200;
+  // Start-Tor direkt auf dem Bildschirm (wie in den handgebauten Leveln).
+  events.push({ d: 0, yFrac: 0.45, t: 'gates', left: { op: 'add', v: 6 + Math.floor((n - 20) / 4) }, right: { op: 'mul', v: 2 } });
+
+  let d = 330;
   while (d <= length - 250) {
     // Freiraum um das Schluss-Gatepaar lassen.
     if (Math.abs(d - finalD) < 180) {

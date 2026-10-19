@@ -11,7 +11,7 @@ const SPAWN_Y = -40;
 const LEFT_X = 6;
 const GOOD = CFG.COLORS.good;
 const BAD = CFG.COLORS.bad;
-const MUL_LAST = BAL.MUL_STEPS.length - 1;
+const MUL_SHOT_CAP = BAL.MUL_STEPS.indexOf(BAL.MUL_SHOT_MAX);
 const TOP_OFFSET = 30; // Text-Position über der Truppenlinie
 
 function makeNumGate(game, x, w, def, row) {
@@ -100,6 +100,11 @@ export function spawnGateRow(game, ev) {
     game.gates.push(makeWeaponGate(game, sideX, w, row));
     if (ev.other) game.gates.push(makeNumGate(game, otherX, w, ev.other, row));
   }
+  // Optional: ev.yFrac platziert die Reihe direkt auf dem Bildschirm (Start-Tor jedes Levels).
+  if (ev.yFrac !== undefined) {
+    const gates = game.gates;
+    for (let i = 0; i < gates.length; i++) if (gates[i].row === row) gates[i].y = game.SQUAD_Y * ev.yFrac;
+  }
 }
 
 // Schaden auf ein Tor. Zahlentor: Fortschritt zur nächsten Stufe. Waffentor: HP-Balken bis zur Freischaltung.
@@ -123,6 +128,9 @@ export function hitGate(game, gate, dmg) {
 
   if (gate.used) return;
 
+  // Größere Trupps schießen mehr Schaden → Punkte kosten proportional mehr (kein Sofort-Maximum).
+  dmg /= 1 + game.squad.count / BAL.GATE_COST_SQUAD_DIV;
+
   if (gate.op === 'add') {
     const max = gate.base + BAL.GATE_MAX_GAIN;
     if (gate.value >= max) {
@@ -137,17 +145,18 @@ export function hitGate(game, gate, dmg) {
     if (gate.value >= max) gate.progress = 0;
   } else {
     let idx = stepIndex(gate.value);
-    if (idx >= MUL_LAST) {
+    const maxIdx = Math.max(stepIndex(gate.base), Math.min(MUL_SHOT_CAP, stepIndex(gate.base) + BAL.MUL_MAX_SHOT_STEPS));
+    if (idx >= maxIdx) {
       gate.progress = 0;
       return;
     }
     gate.progress += dmg / (gate.pointCost * BAL.MUL_STEP_COST_FACTOR);
-    while (gate.progress >= 1 && idx < MUL_LAST) {
+    while (gate.progress >= 1 && idx < maxIdx) {
       idx++;
       gate.progress -= 1;
     }
     gate.value = BAL.MUL_STEPS[idx];
-    if (idx >= MUL_LAST) gate.progress = 0;
+    if (idx >= maxIdx) gate.progress = 0;
   }
 }
 
@@ -178,7 +187,7 @@ function passGate(game, g) {
 
   const before = sq.count;
   const after = g.op === 'mul' ? applyMulGate(before, g.value) : applyAddGate(before, g.value);
-  sq.count = Math.min(999, after);
+  sq.count = Math.min(BAL.MAX_SOLDIERS, after);
   const good = sq.count >= before;
 
   audio.gate(good);

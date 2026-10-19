@@ -1,4 +1,5 @@
 // Spieler-Kugeln, Granaten und Gegner-Kugeln (alle gepoolt). Arbeiten auf `game`.
+import { BAL } from '../data/balance.js';
 import { audio } from '../core/audio.js';
 import { burst, emit } from './particles.js';
 import { hitGate } from './gates.js';
@@ -26,23 +27,22 @@ export function updateBullets(game, dt) {
       continue;
     }
 
-    // (1) Tore blockieren immer (pierce egal). Benutzte und freigeschaltete Waffentore lassen durch.
-    let done = false;
-    for (let g = 0; g < gates.length && !done; g++) {
+    // (1) Tore: Kugel lädt das Tor einmal auf (gateRow merkt die Reihe) und fliegt mit
+    //     BAL.GATE_PASS_DMG weiter – Gegner hinter Toren bleiben angreifbar.
+    for (let g = 0; g < gates.length; g++) {
       const gate = gates[g];
-      if (gate.used || (gate.kind === 'weapon' && !gate.locked)) continue;
+      if (gate.used || (gate.kind === 'weapon' && !gate.locked) || b.gateRow === gate.row) continue;
       if (b.x >= gate.x && b.x <= gate.x + gate.w &&
           b.y >= gate.y - gate.h / 2 && b.y <= gate.y + gate.h / 2) {
         hitGate(game, gate, b.dmg);
-        done = true;
+        b.gateRow = gate.row;
+        b.dmg *= BAL.GATE_PASS_DMG;
+        break;
       }
     }
-    if (done) {
-      pool.release(b);
-      continue;
-    }
 
-    // (2) Kisten (Kreis)
+    // (2) Kisten (Kreis) blockieren die Kugel
+    let done = false;
     for (let c = 0; c < crates.length && !done; c++) {
       const cr = crates[c];
       if (cr.opened) continue;
@@ -60,7 +60,7 @@ export function updateBullets(game, dt) {
 
     // (3) Boss (Rechteck; nicht solange er mit y < 0 einfährt)
     const boss = game.boss;
-    if (boss && b.hitId !== BOSS_UID && !(boss.entering && boss.y < 0) &&
+    if (boss && b.hitId !== BOSS_UID && !boss.entering &&
         Math.abs(b.x - boss.x) < boss.w / 2 && Math.abs(b.y - boss.y) < boss.h / 2) {
       boss.hp -= b.dmg;
       boss.flash = 1;
