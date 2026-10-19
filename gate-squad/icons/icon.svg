@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Hintergrund: dunkler Stahl mit abgeschrägten Ecken -->
+  <polygon points="96,0 416,0 512,96 512,416 416,512 96,512 0,416 0,96" fill="#1b1f1a"/>
+  <!-- Boden -->
+  <rect x="96" y="392" width="320" height="8" rx="3" fill="#39402f"/>
+  <!-- Tor: Pfosten + Querbalken -->
+  <rect x="140" y="140" width="26" height="252" rx="3" fill="#ff7a1a"/>
+  <rect x="346" y="140" width="26" height="252" rx="3" fill="#ff7a1a"/>
+  <rect x="128" y="124" width="256" height="32" rx="5" fill="#ff7a1a"/>
+  <!-- Plus -->
+  <rect x="230" y="209" width="52" height="12" rx="3" fill="#f4f1e6"/>
+  <rect x="250" y="189" width="12" height="52" rx="3" fill="#f4f1e6"/>
+  <!-- Drei Soldaten: heller Rand (stroke 6, paint-order stroke), oliv Füllung -->
+  <g fill="#4b5a3a" stroke="#9aa873" stroke-width="6" paint-order="stroke">
+    <circle cx="200" cy="280" r="13"/>
+    <rect x="185" y="297" width="30" height="63" rx="10"/>
+    <circle cx="256" cy="280" r="13"/>
+    <rect x="241" y="297" width="30" height="63" rx="10"/>
+    <circle cx="312" cy="280" r="13"/>
+    <rect x="297" y="297" width="30" height="63" rx="10"/>
+  </g>
+</svg>
