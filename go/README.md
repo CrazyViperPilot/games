@@ -1,5 +1,7 @@
 # Go
 
+Teil der Spielesammlung [games](../README.md) – live unter https://crazyviperpilot.github.io/games/go/
+
 Go gegen den Computer als Web-App. Läuft komplett im Browser, ohne Server und ohne Build-Schritt. Einmal geladen, funktioniert sie offline und lässt sich auf dem Startbildschirm installieren.
 
 ## Funktionen
@@ -13,13 +15,13 @@ Go gegen den Computer als Web-App. Läuft komplett im Browser, ohne Server und o
 ## Lokal ausprobieren
 
 ```sh
-python3 -m http.server 8000
+cd go && python3 -m http.server 8000
 # dann http://localhost:8000 öffnen
 ```
 
 ## Auf dem Handy installieren
 
-Die Seite über HTTPS öffnen (z. B. GitHub Pages) und im Chrome-Menü „Zum Startbildschirm hinzufügen“ bzw. „App installieren“ wählen. Danach läuft sie ohne Netz.
+https://crazyviperpilot.github.io/games/go/ öffnen und im Chrome-Menü „Zum Startbildschirm hinzufügen“ bzw. „App installieren“ wählen. Danach läuft sie ohne Netz.
 
 ## Dateien
 
@@ -36,5 +38,7 @@ Wenn sich eine der Dateien aus `sw.js` ändert, `CACHE_NAME` erhöhen, sonst bek
 ## Tests
 
 ```sh
-npm test
+cd go && npm test
 ```
+
+In CI laufen die Tests über `.github/workflows/test-go.yml`, nur bei Änderungen in `go/`.

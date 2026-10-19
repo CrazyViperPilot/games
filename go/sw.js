@@ -1,5 +1,6 @@
-// Bump CACHE_NAME whenever a file in the list changes, so installed copies update.
-const CACHE_NAME = 'go-game-v1';
+// Bei jeder Änderung an einer Datei aus ASSETS die Version in CACHE_NAME erhöhen, sonst bekommen installierte Kopien sie nicht.
+const CACHE_PREFIX = 'go-game-';
+const CACHE_NAME = CACHE_PREFIX + 'v2';
 const ASSETS = [
   './',
   './index.html',
@@ -25,7 +26,8 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
-      .then(names => Promise.all(names.filter(n => n !== CACHE_NAME).map(n => caches.delete(n))))
+      // Nur eigene alte Caches löschen – die anderen Spiele der Suite liegen auf derselben Domain.
+      .then(names => Promise.all(names.filter(n => n.startsWith(CACHE_PREFIX) && n !== CACHE_NAME).map(n => caches.delete(n))))
       .then(() => self.clients.claim())
   );
 });

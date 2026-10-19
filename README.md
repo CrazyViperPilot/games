@@ -1,16 +1,40 @@
 # Games
 
-Kleine Spielesammlung als statische Web-Apps (GitHub Pages). Die Startseite (`index.html`) führt zu den Spielen:
-
-| Spiel | Ordner | Beschreibung |
-|---|---|---|
-| **Gate Squad** | [`gate-squad/`](gate-squad/) | Offline-Arcade-Shooter (PWA): Truppe durch Tore führen, Horden besiegen, Panzer-Boss. Details: [gate-squad/README.md](gate-squad/README.md) |
-| **Sudoku** | [`sudoku/`](sudoku/) | Sudoku-Spiel, ursprünglich gebaut, um Google Antigravity kennenzulernen |
+Spielesammlung als statische Web-Apps (PWA) auf GitHub Pages. Die Startseite (`index.html`) führt zu den Spielen.
 
 Live: https://crazyviperpilot.github.io/games/
 
+| Spiel | Ordner | Beschreibung | Version / Cache |
+|---|---|---|---|
+| **Gate Squad** | [`gate-squad/`](gate-squad/) | Arcade-Shooter: Truppe durch Tore führen, Horden besiegen, Panzer-Boss. [README](gate-squad/README.md) | `CACHE_VERSION` in `gate-squad/sw.js` |
+| **Go** | [`go/`](go/) | Go gegen den Computer (9×9, 13×13). [README](go/README.md) | `CACHE_NAME` in `go/sw.js`, `go/package.json` |
+| **Sudoku** | [`sudoku/`](sudoku/) | Sudoku, ursprünglich gebaut, um Google Antigravity kennenzulernen | `CACHE_NAME` in `sudoku/sw.js` |
+
+## Aufbau: jedes Spiel ist eigenständig
+
+Die Spiele teilen sich nur das Repo und die Domain – sonst nichts.
+
+- **Code:** Jedes Spiel liegt vollständig in seinem Ordner. Keine gemeinsamen Dateien, keine Imports über Ordnergrenzen
+  (auch nicht aus der Startseite). Ein Spiel lässt sich jederzeit herauslösen, indem man seinen Ordner kopiert.
+- **Offline / Installation:** Jedes Spiel hat ein eigenes `manifest.json` (Scope = sein Ordner) und einen eigenen
+  Service Worker mit eigenem Cache-Präfix (`gatesquad-`, `go-game-`, `sudoku-`). Ein Service Worker löscht beim
+  Aktualisieren **nur Caches mit seinem eigenen Präfix** – sonst würde er die Offline-Daten der anderen Spiele zerstören.
+- **Speicherstände:** Jedes Spiel nutzt eigene `localStorage`-Schlüssel.
+- **Lebenszyklus:** Änderungen an einem Spiel betreffen nur seinen Ordner. Ein Release = Änderung + Cache-Version
+  **dieses** Spiels erhöhen. Tests laufen pro Spiel (z. B. `.github/workflows/test-go.yml` nur bei Änderungen in `go/`).
+- **Startseite:** `index.html` verlinkt nur auf die Ordner. Das Wurzel-`sw.js` existiert nur noch, um eine alte
+  Sudoku-Installation von früher abzumelden.
+
+### Neues Spiel hinzufügen
+
+1. Ordner `<spiel>/` mit `index.html`, `manifest.json` (`start_url`/`scope` relativ, `"./"`), `sw.js` mit eigenem
+   Cache-Präfix, der nur eigene Caches löscht, und Icons.
+2. Karte in `index.html` ergänzen und die Tabelle oben erweitern.
+3. Falls das Spiel Tests hat: eigenen Workflow mit `paths: ["<spiel>/**"]` anlegen.
+
+Go wurde mit seiner Git-Historie aus dem Repo `CrazyViperPilot/go` per `git subtree` übernommen.
+
 ## Deploy
 
-Der Workflow `.github/workflows/pages.yml` veröffentlicht bei jedem Push auf `main` das ganze Repo nach GitHub Pages
-(Settings → Pages → Source: „GitHub Actions“). Jedes Spiel hat einen eigenen Service Worker in seinem Ordner und ist
-einzeln als App installierbar.
+`.github/workflows/pages.yml` veröffentlicht bei jedem Push auf `main` die Startseite und alle Spiele
+(Settings → Pages → Source: „GitHub Actions“). Tests, `package.json` und `node_modules` werden nicht veröffentlicht.
