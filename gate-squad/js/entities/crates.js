@@ -1,7 +1,7 @@
 // Attachment-Kisten: werden beschossen oder von der Truppe berührt und geben ein Attachment.
 import { crateHp } from '../data/balance.js';
 import { burst, emit } from './particles.js';
-import { addAttachment } from './squad.js';
+import { addAttachment, addSpecialist, addRpg } from './squad.js';
 
 const SPAWN_Y = -40;
 const RADIUS = 15;
@@ -16,6 +16,8 @@ export function spawnCrate(game, ev) {
     maxHp: hp,
     opened: false,
     flash: 0,
+    kind: ev.kind || 'att',
+    spec: ev.spec || null,
   });
 }
 
@@ -25,7 +27,9 @@ function openCrate(game, c) {
   burst(game, 'debris', c.x, c.y, 8, { speed: 140 });
   burst(game, 'smoke', c.x, c.y, 4, { speed: 40, life: 0.6, size: 8 });
   emit(game, 'ring', c.x, c.y, { size: 10, life: 0.3 });
-  addAttachment(game);
+  if (c.kind === 'rpg') addRpg(game);
+  else if (c.kind === 'spec') addSpecialist(game, c.spec);
+  else addAttachment(game);
 }
 
 // Schaden durch Kugel; bei hp ≤ 0 wird die Kiste geöffnet (Attachment sofort aktiv).

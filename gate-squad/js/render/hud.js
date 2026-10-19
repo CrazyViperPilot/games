@@ -2,21 +2,32 @@
 // Boss-HP, Banner und FPS. Der DOM-Pause-Button liegt oben rechts; dort bleibt Platz frei.
 
 import { CFG } from '../config.js';
-import { drawAttachmentIcon, drawSoldier } from './sprites.js';
+import { SPECIALISTS, SPECIALIST_IDS } from '../data/specialists.js';
+import { drawAttachmentIcon, drawRocketIcon, drawSoldier } from './sprites.js';
 
 const C = CFG.COLORS;
 const PAUSE_RESERVE = 58; // Einheiten rechts oben für #pauseBtn
 
-const F_COUNT = '800 34px system-ui, sans-serif';
+const F_COUNT = '800 30px system-ui, sans-serif';
+const F_KILLS = '800 16px system-ui, sans-serif';
 const F_WEAPON = '800 16px system-ui, sans-serif';
 const F_COINS = '800 15px system-ui, sans-serif';
 const F_SMALL = '800 10px system-ui, sans-serif';
+const F_CHIP = '800 10px system-ui, sans-serif';
 const F_BOSS = '800 11px system-ui, sans-serif';
 const F_BANNER = '800 36px system-ui, sans-serif';
 
 const ATT_SLOTS = 5;
 const ATT_SIZE = 16;
 const ATT_GAP = 4;
+
+// Spezialisten-Chips: Reihenfolge und Zählung (rpg zusätzlich zu den Spezialisten).
+const CHIP_IDS = SPECIALIST_IDS.concat(['rpg']);
+const CHIP_W = 52;
+const CHIP_H = 16;
+const CHIP_GAP = 4;
+const _chipCount = new Int32Array(CHIP_IDS.length);
+const EMPTY_SPECS = [];
 
 // Banner-Zustand (nur Anzeige): Einblendzeit wird aus der Restzeit abgeleitet.
 let _bannerRef = null;
@@ -44,9 +55,10 @@ export function drawHud(ctx, game, W, H, fps, showFps) {
   ctx.fillRect(0, HH - 2, W, 2);
 
   // Truppenzahl mit Soldaten-Symbol (links)
+  const countY = HH / 2 - 8;
   ctx.save();
-  ctx.translate(15, HH / 2);
-  ctx.scale(1.3, 1.3);
+  ctx.translate(15, countY);
+  ctx.scale(1.2, 1.2);
   drawSoldier(ctx, 0, 0, (game.time || 0) * 9, 0, 0);
   ctx.restore();
 
@@ -54,7 +66,21 @@ export function drawHud(ctx, game, W, H, fps, showFps) {
   ctx.font = F_COUNT;
   ctx.textAlign = 'left';
   ctx.fillStyle = C.text;
-  ctx.fillText(String(Math.round(shown)), 36, HH / 2);
+  ctx.fillText(String(Math.round(shown)), 34, countY);
+
+  // Kill-Zähler (unter der Truppenzahl): Fadenkreuz-Symbol + Zahl
+  const killY = HH - 15;
+  ctx.strokeStyle = '#e04a3a';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(15, killY - 5);
+  ctx.lineTo(25, killY + 5);
+  ctx.moveTo(25, killY - 5);
+  ctx.lineTo(15, killY + 5);
+  ctx.stroke();
+  ctx.font = F_KILLS;
+  ctx.fillStyle = C.text;
+  ctx.fillText(String(game.kills || 0), 32, killY);
 
   // Waffenname (Mitte) + Attachment-Icons darunter
   ctx.font = F_WEAPON;
@@ -112,6 +138,40 @@ export function drawHud(ctx, game, W, H, fps, showFps) {
   ctx.textAlign = 'left';
   ctx.fillStyle = C.muted;
   ctx.fillText('LEVEL ' + (game.levelNum || 1), bx, HH + 18);
+
+  // ---- Spezialisten-Chips (Kurztext + Anzahl je Typ, RPG mit Raketen-Symbol)
+  const specs = sq.specs || EMPTY_SPECS;
+  for (let i = 0; i < CHIP_IDS.length; i++) _chipCount[i] = 0;
+  for (let i = 0; i < specs.length; i++) {
+    const k = CHIP_IDS.indexOf(specs[i]);
+    if (k >= 0) _chipCount[k]++;
+  }
+  const chipY = HH + 46;
+  let chipX = bx;
+  for (let i = 0; i < CHIP_IDS.length; i++) {
+    const n = _chipCount[i];
+    if (n <= 0) continue;
+    const id = CHIP_IDS[i];
+    const sp = SPECIALISTS[id];
+    const col = sp ? sp.color : C.text;
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(chipX, chipY, CHIP_W, CHIP_H);
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(chipX + 0.5, chipY + 0.5, CHIP_W - 1, CHIP_H - 1);
+    ctx.font = F_CHIP;
+    ctx.textAlign = 'left';
+    if (id === 'rpg') {
+      drawRocketIcon(ctx, chipX + 11, chipY + CHIP_H / 2, 9);
+    } else {
+      ctx.fillStyle = col;
+      ctx.fillText(sp ? sp.short : id, chipX + 5, chipY + CHIP_H / 2);
+    }
+    ctx.textAlign = 'right';
+    ctx.fillStyle = C.text;
+    ctx.fillText('x' + n, chipX + CHIP_W - 5, chipY + CHIP_H / 2);
+    chipX += CHIP_W + CHIP_GAP;
+  }
 
   // ---- Boss-HP (nur Boss-Phase)
   const boss = game.boss;

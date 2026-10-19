@@ -8,6 +8,29 @@ import { hitCrate } from './crates.js';
 // hitId-Marker: Kugel hat den Boss bereits getroffen (Gegner-uids sind immer > 0).
 const BOSS_UID = -2;
 
+// Spaltenraster für Kugel-Gegner-Kollision (Hunderte Gegner gleichzeitig): Gegner-Indizes je Spalte.
+const COL_W = 24;
+const COLS = 20;
+const PER_COL = 512;
+const grid = new Int32Array(COLS * PER_COL);
+const gridN = new Int32Array(COLS);
+
+function buildGrid(enemies) {
+  gridN.fill(0);
+  for (let i = 0; i < enemies.length; i++) {
+    const e = enemies[i];
+    if (!e.active) continue;
+    let c = (e.x / COL_W) | 0;
+    if (c < 0) c = 0;
+    else if (c >= COLS) c = COLS - 1;
+    const n = gridN[c];
+    if (n < PER_COL) {
+      grid[c * PER_COL + n] = i;
+      gridN[c] = n + 1;
+    }
+  }
+}
+
 // Kollisionsreihenfolge pro Kugel: Tore → Kisten → Boss → Gegner.
 export function updateBullets(game, dt) {
   const pool = game.bullets;
@@ -15,6 +38,7 @@ export function updateBullets(game, dt) {
   const gates = game.gates;
   const crates = game.crates;
   const enemies = game.enemies.items;
+  buildGrid(enemies);
 
   for (let i = 0; i < items.length; i++) {
     const b = items[i];
@@ -74,50 +98,80 @@ export function updateBullets(game, dt) {
       }
     }
 
-    // (4) Gegner (Kreis). Kugeln fliegen nach oben: Gegner unterhalb der Kugel werden übersprungen.
-    for (let e = 0; e < enemies.length; e++) {
-      const en = enemies[e];
-      if (!en.active || en.uid === b.hitId) continue;
-      if (en.y > b.y + en.r + 6) continue;
-      const dx = b.x - en.x;
-      const dy = b.y - en.y;
-      const rr = en.r + 2;
-      if (dx * dx + dy * dy > rr * rr) continue;
+    // (4) Gegner (Kreis) über das Spaltenraster. Gegner unterhalb der Kugel werden übersprungen.
+    let c0 = ((b.x - 24) / COL_W) | 0;
+    let c1 = ((b.x + 24) / COL_W) | 0;
+    if (c0 < 0) c0 = 0;
+    if (c1 >= COLS) c1 = COLS - 1;
+    for (let c = c0; c <= c1 && !done; c++) {
+      const base = c * PER_COL;
+      const n = gridN[c];
+      for (let k = 0; k < n; k++) {
+        const en = enemies[grid[base + k]];
+        if (!en.active || en.uid === b.hitId) continue;
+        if (en.y > b.y + en.r + 6) continue;
+        const dx = b.x - en.x;
+        const dy = b.y - en.y;
+        const rr = en.r + 2;
+        if (dx * dx + dy * dy > rr * rr) continue;
 
-      en.flash = 1;
-      if (en.shield > 0 && b.vy < 0) {
-        // Schild frontal: schluckt die Kugel, Schaden nur auf den Schild.
-        en.shield = Math.max(0, en.shield - b.dmg);
-        burst(game, 'spark', b.x, b.y, 4, { speed: 140 });
-        audio.hit();
-        done = true;
-      } else {
-        en.hp -= b.dmg;
-        emit(game, 'spark', b.x, b.y);
-        if (en.hp <= 0) game.killEnemy(en);
-        if (b.pierce > 0) {
-          b.pierce--;
-          b.hitId = en.uid;
-        } else {
+        en.flash = 1;
+        if (en.shield > 0 && b.vy < 0) {
+          // Schild frontal: schluckt die Kugel, Schaden nur auf den Schild.
+          en.shield = Math.max(0, en.shield - b.dmg);
+          burst(game, 'spark', b.x, b.y, 2, { speed: 140 });
+          audio.hit();
           done = true;
+        } else {
+          en.hp -= b.dmg;
+          if (game.rng() < 0.3) emit(game, 'spark', b.x, b.y);
+          if (en.hp <= 0) game.killEnemy(en);
+          if (b.pierce > 0) {
+            b.pierce--;
+            b.hitId = en.uid;
+          } else {
+            done = true;
+          }
         }
+        break;
       }
-      break;
     }
     if (done) pool.release(b);
   }
 }
 
-// Granaten fliegen auf ihr Ziel (Bogen wird vom Renderer aus t/dur gezeichnet) und explodieren.
+// Granaten-Arten: 'gl' (Bogen, explodiert am Ziel), 'c4' (Bogen, liegt, Zünder, Explosion),
+// 'rocket' (RPG: fliegt gelenkt auf den Boss, Schaden als Anteil seiner Max-HP).
 export function updateGrenades(game, dt) {
   const pool = game.grenades;
   const items = pool.items;
   for (let i = 0; i < items.length; i++) {
     const g = items[i];
     if (!g.active) continue;
+    if (g.kind === 'rocket') {
+      if (updateRocket(game, g, dt)) pool.release(g);
+      continue;
+    }
+    if (g.landed) {
+      // C4 liegt am Boden und scrollt mit; Zünder läuft.
+      g.y += game.scroll * dt;
+      g.ty = g.y;
+      g.fuse -= dt;
+      if (g.fuse <= 0) {
+        explodeGrenade(game, g);
+        pool.release(g);
+      }
+      continue;
+    }
     g.t += dt;
     const p = g.t / g.dur;
     if (p >= 1) {
+      if (g.kind === 'c4') {
+        g.landed = true;
+        g.x = g.tx;
+        g.y = g.ty;
+        continue;
+      }
       explodeGrenade(game, g);
       pool.release(g);
       continue;
@@ -125,6 +179,40 @@ export function updateGrenades(game, dt) {
     g.x = g.x0 + (g.tx - g.x0) * p;
     g.y = g.y0 + (g.ty - g.y0) * p;
   }
+}
+
+// Rakete: lenkt auf die Boss-Mitte; true = verbraucht.
+function updateRocket(game, g, dt) {
+  const boss = game.boss;
+  g.t += dt;
+  if (!boss || g.t > 4) {
+    burst(game, 'smoke', g.x, g.y, 3, { speed: 30, life: 0.5, size: 6 });
+    return true;
+  }
+  const dx = boss.x - g.x;
+  const dy = boss.y - g.y;
+  const d = Math.sqrt(dx * dx + dy * dy) || 1;
+  const sp = Math.sqrt(g.vx * g.vx + g.vy * g.vy) || BAL.RPG_SPEED;
+  // sanftes Einlenken
+  const k = Math.min(1, dt * 5);
+  g.vx += ((dx / d) * sp - g.vx) * k;
+  g.vy += ((dy / d) * sp - g.vy) * k;
+  g.x += g.vx * dt;
+  g.y += g.vy * dt;
+  if (game.rng() < 0.5) emit(game, 'smoke', g.x - g.vx * 0.02, g.y - g.vy * 0.02, { size: 4, life: 0.4 });
+  if (Math.abs(g.x - boss.x) < boss.w / 2 && Math.abs(g.y - boss.y) < boss.h / 2) {
+    if (!boss.entering) {
+      boss.hp -= boss.maxHp * BAL.RPG_DMG_FRAC;
+      boss.flash = 1;
+    }
+    g.tx = g.x;
+    g.ty = g.y;
+    g.radius = 30;
+    g.dmg = 0;
+    explodeGrenade(game, g);
+    return true;
+  }
+  return false;
 }
 
 // Flächenschaden. Ignoriert Schilde (nur HP), trifft den Boss, wenn sein Rechteck im Radius liegt.

@@ -6,12 +6,15 @@ import { WEAPONS, MAX_TIER, getWeapon } from '../data/weapons.js';
 import { ATTACHMENTS, ATTACHMENT_IDS, computeStats } from '../data/attachments.js';
 import { audio } from '../core/audio.js';
 import { haptics } from '../core/haptics.js';
-import { emit, floatText } from './particles.js';
+import { emit, burst, floatText } from './particles.js';
+import { SPECIALISTS } from '../data/specialists.js';
+import { specMult } from '../data/balance.js';
 
 const DEG = Math.PI / 180;
 const ORANGE = CFG.COLORS.orange;
 const BANNER_T = 1.6;
 const MAX_SOLDIERS = BAL.MAX_SOLDIERS;
+const MAX_SPECS = BAL.MAX_SPECS;
 
 // Radius der Truppe (Kollisionsradius) abhängig von der sichtbaren Anzahl.
 export function squadRadius(count) {
@@ -37,6 +40,9 @@ export function createSquad() {
     stats: null,
     radius: squadRadius(0),
     slots,
+    specs: [],
+    specMuzzle: new Float32Array(MAX_SPECS),
+    specTimer: new Float32Array(MAX_SPECS),
     fireTimer: 0,
     shotIdx: 0,
     hasAim: false,
@@ -83,16 +89,22 @@ export function updateSquad(game, dt, input) {
   const st = sq.stats;
 
   findAimTarget(game, sq, st);
+  updateSpecialists(game, sq, dt);
 
-  // Gestaffeltes Feuer: jeder Schütze feuert mit stats.fireRate, aber zeitversetzt (kontinuierlicher Strom).
-  const shooters = Math.min(sq.count, CFG.MAX_SHOOTERS);
-  sq.fireTimer += dt * st.fireRate * shooters;
+  // Gestaffeltes Feuer der normalen Soldaten (Spezialisten belegen die ersten Slots und feuern separat).
+  const nSpec = sq.specs.length;
+  const regular = sq.count - nSpec;
+  const shooters = Math.min(regular, CFG.MAX_SHOOTERS);
+  const freeSlots = Math.max(1, CFG.MAX_DRAWN_SOLDIERS - nSpec);
   let n = 0;
-  while (sq.fireTimer >= 1 && n < shooters) {
-    sq.fireTimer -= 1;
-    n++;
-    sq.shotIdx = (sq.shotIdx + 1) % shooters;
-    fireBullet(game, sq, st, sq.slots[sq.shotIdx], shooters);
+  if (shooters > 0) {
+    sq.fireTimer += dt * st.fireRate * shooters;
+    while (sq.fireTimer >= 1 && n < shooters) {
+      sq.fireTimer -= 1;
+      n++;
+      sq.shotIdx = (sq.shotIdx + 1) % shooters;
+      fireBullet(game, sq, st, sq.slots[nSpec + (sq.shotIdx % freeSlots)], shooters, regular);
+    }
   }
   if (sq.fireTimer >= 1) sq.fireTimer = 0;
   sq.soundTimer -= dt;
@@ -111,17 +123,44 @@ export function updateSquad(game, dt, input) {
   }
 }
 
-// Nächster Gegner oberhalb im Zielkegel und in Reichweite (einmal pro Tick). Boss als Fallback.
+// Ziele (einmal pro Tick, ein Durchlauf): Trupp = nächster Gegner im Zielkegel (Boss als Fallback);
+// Spezialisten = nächster Gegner überhaupt, zähester Gegner, Anzahl naher Gegner (für C4).
+const T = { near: null, nearD: 0, tough: null, toughHp: 0, closeN: 0, closeX: 0, closeY: 0 };
+
 function findAimTarget(game, sq, st) {
   sq.hasAim = false;
   let best = st.range * 0.95;
+  T.near = null;
+  T.nearD = 1e9;
+  T.tough = null;
+  T.toughHp = 0;
+  T.closeN = 0;
+  T.closeX = 0;
+  T.closeY = 0;
+  const demoR = SPECIALISTS.demo.triggerRange;
+  const toughR = SPECIALISTS.sniper.range;
   const items = game.enemies.items;
   for (let i = 0; i < items.length; i++) {
     const e = items[i];
     if (!e.active) continue;
     const dy = sq.y - e.y;
-    if (dy <= 10) continue;
+    if (dy <= -10 || e.y < 0) continue;
     const dx = e.x - sq.x;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < T.nearD) {
+      T.nearD = d2;
+      T.near = e;
+    }
+    if (e.maxHp > T.toughHp && d2 < toughR * toughR) {
+      T.toughHp = e.maxHp;
+      T.tough = e;
+    }
+    if (d2 < demoR * demoR) {
+      T.closeN++;
+      T.closeX += e.x;
+      T.closeY += e.y;
+    }
+    if (dy <= 10) continue;
     if (Math.abs(dx) > dy * 0.55 + sq.radius) continue;
     const d = Math.sqrt(dx * dx + dy * dy);
     if (d < best) {
@@ -140,7 +179,7 @@ function findAimTarget(game, sq, st) {
 }
 
 // Ein Schuss eines Schützen gerade nach oben mit Streuung. Schaden skaliert mit count/shooters.
-function fireBullet(game, sq, st, slot, shooters) {
+function fireBullet(game, sq, st, slot, shooters, regular) {
   const w = sq.weapon;
   const spread = st.spread * DEG;
   const b = game.bullets.get();
@@ -156,7 +195,7 @@ function fireBullet(game, sq, st, slot, shooters) {
   }
   b.vx = Math.sin(a) * st.bulletSpeed;
   b.vy = -Math.cos(a) * st.bulletSpeed;
-  b.dmg = st.damage * Math.pow(sq.count / shooters, BAL.FIREPOWER_EXP);
+  b.dmg = st.damage * Math.pow(regular / shooters, BAL.FIREPOWER_EXP);
   b.life = st.range / st.bulletSpeed;
   b.pierce = st.pierce;
   b.len = w.bulletLen;
@@ -211,6 +250,9 @@ function fireGrenade(game, sq, st) {
   }
 
   const g = game.grenades.get();
+  g.kind = 'gl';
+  g.landed = false;
+  g.fuse = 0;
   g.x0 = sq.x;
   g.y0 = sq.y - 12;
   g.x = g.x0;
@@ -221,6 +263,176 @@ function fireGrenade(game, sq, st) {
   g.dur = 0.7;
   g.dmg = BAL.GRENADE_BASE + BAL.GRENADE_DMG_FACTOR * st.damage * Math.max(1, Math.sqrt(sq.count / 4));
   g.radius = BAL.GRENADE_RADIUS;
+}
+
+// ---------- Spezialisten ----------
+
+function specDamage(game, def) {
+  const up = game.save && game.save.upgrades ? game.save.upgrades.damage || 0 : 0;
+  return def.damage * specMult(game.levelNum) * (1 + 0.08 * up);
+}
+
+function updateSpecialists(game, sq, dt) {
+  const specs = sq.specs;
+  const boss = game.boss;
+  const bossReady = boss && !boss.entering;
+  T.nearD = Math.sqrt(T.nearD);
+  for (let i = 0; i < specs.length; i++) {
+    sq.specMuzzle[i] *= Math.max(0, 1 - dt * 12);
+    const def = SPECIALISTS[specs[i]];
+    if (!def) continue;
+    const slot = sq.slots[i];
+    const x = sq.x + slot.ox;
+    const y = sq.y - 12 + slot.oy * 0.25;
+    sq.specTimer[i] += dt;
+
+    if (def.id === 'rpg') {
+      if (bossReady && sq.specTimer[i] >= def.cooldown) {
+        sq.specTimer[i] = (game.rng() * 0.4);
+        fireRocket(game, x, y, boss);
+        sq.specMuzzle[i] = 1;
+      }
+      continue;
+    }
+
+    if (def.id === 'demo') {
+      if (sq.specTimer[i] >= def.cooldown && T.near &&
+          (T.closeN >= def.triggerCount || T.nearD < def.closeRange)) {
+        sq.specTimer[i] = 0;
+        const tx = T.closeN >= def.triggerCount ? T.closeX / T.closeN : T.near.x;
+        const ty = T.closeN >= def.triggerCount ? T.closeY / T.closeN : T.near.y;
+        throwC4(game, x, y, tx, ty, specDamage(game, def), def);
+        sq.specMuzzle[i] = 1;
+      }
+      continue;
+    }
+
+    // Schützen: Ziel nach Typ wählen, Feuerrate über Timer.
+    let tx = 0;
+    let ty = 0;
+    let has = false;
+    if (def.aim === 'tough' && T.tough) {
+      tx = T.tough.x;
+      ty = T.tough.y;
+      has = true;
+    } else if (T.near && T.nearD < def.range) {
+      tx = T.near.x;
+      ty = T.near.y;
+      has = true;
+    }
+    if (!has && bossReady && sq.y - boss.y - boss.h / 2 < def.range) {
+      tx = boss.x;
+      ty = boss.y;
+      has = true;
+    }
+    const interval = 1 / def.fireRate;
+    if (!has) {
+      if (sq.specTimer[i] > interval) sq.specTimer[i] = interval;
+      continue;
+    }
+    let shots = 0;
+    while (sq.specTimer[i] >= interval && shots < 3) {
+      sq.specTimer[i] -= interval;
+      shots++;
+      fireSpecBullet(game, def, x, y, tx, ty, specDamage(game, def));
+    }
+    if (shots) sq.specMuzzle[i] = 1;
+  }
+}
+
+function fireSpecBullet(game, def, x, y, tx, ty, dmg) {
+  const a = Math.atan2(tx - x, y - ty) + (Math.random() * 2 - 1) * def.spread * DEG;
+  const b = game.bullets.get();
+  b.x = x;
+  b.y = y;
+  b.vx = Math.sin(a) * def.bulletSpeed;
+  b.vy = -Math.cos(a) * def.bulletSpeed;
+  b.dmg = dmg;
+  b.life = def.range / def.bulletSpeed;
+  b.pierce = def.pierce;
+  b.len = def.bulletLen;
+  b.width = def.bulletWidth;
+  b.color = def.bulletColor;
+  b.hitId = 0;
+  b.gateRow = -1;
+  if (def.id === 'sniper') audio.shot('m82');
+}
+
+function throwC4(game, x, y, tx, ty, dmg, def) {
+  const g = game.grenades.get();
+  g.kind = 'c4';
+  g.x0 = x;
+  g.y0 = y;
+  g.x = x;
+  g.y = y;
+  g.tx = tx;
+  g.ty = ty;
+  g.t = 0;
+  g.dur = def.flight;
+  g.dmg = dmg;
+  g.radius = def.radius;
+  g.landed = false;
+  g.fuse = def.fuse;
+  g.vx = 0;
+  g.vy = 0;
+}
+
+function fireRocket(game, x, y, boss) {
+  const g = game.grenades.get();
+  const dx = boss.x - x;
+  const dy = boss.y - y;
+  const d = Math.sqrt(dx * dx + dy * dy) || 1;
+  const sp = SPECIALISTS.rpg.rocketSpeed;
+  g.kind = 'rocket';
+  g.x0 = x;
+  g.y0 = y;
+  g.x = x;
+  g.y = y;
+  g.tx = boss.x;
+  g.ty = boss.y;
+  g.t = 0;
+  g.dur = 4;
+  g.dmg = 0;
+  g.radius = 30;
+  g.landed = false;
+  g.fuse = 0;
+  // leicht seitlich gestreuter Start, damit die Raketen fächern
+  g.vx = (dx / d) * sp + (game.rng() * 2 - 1) * 120;
+  g.vy = (dy / d) * sp;
+  burst(game, 'smoke', x, y + 6, 3, { speed: 40, life: 0.5, size: 6 });
+  audio.explosion(0.5);
+}
+
+// Spezialist-Kiste: neuer Soldat mit Spezialisierung (+1).
+export function addSpecialist(game, id) {
+  const sq = game.squad;
+  const def = SPECIALISTS[id];
+  if (!def) return;
+  if (sq.specs.length < MAX_SPECS) sq.specs.push(id);
+  addSoldiers(game, 1);
+  game.banner = { text: def.name, t: BANNER_T, color: def.color };
+  floatText(game, sq.x, sq.y - 40, '+' + def.short, def.color);
+  audio.upgrade();
+  haptics.tap();
+}
+
+// RPG-Kiste: immer +1 – ein normaler Soldat wird zum reinen RPG-Schützen (fehlt einer, kommt einer dazu).
+export function addRpg(game) {
+  const sq = game.squad;
+  if (sq.specs.length >= MAX_SPECS) return;
+  if (sq.count - sq.specs.length <= 0) addSoldiers(game, 1);
+  sq.specs.push('rpg');
+  const n = countSpec(sq, 'rpg');
+  game.banner = { text: 'RPG ' + n, t: BANNER_T, color: SPECIALISTS.rpg.color };
+  floatText(game, sq.x, sq.y - 40, 'RPG +1', SPECIALISTS.rpg.color);
+  audio.crate();
+  haptics.tap();
+}
+
+export function countSpec(sq, id) {
+  let n = 0;
+  for (let i = 0; i < sq.specs.length; i++) if (sq.specs[i] === id) n++;
+  return n;
 }
 
 function addSoldiers(game, n) {

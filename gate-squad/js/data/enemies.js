@@ -18,10 +18,10 @@ export const ENEMIES = {
 };
 
 export const BOSSES = {
-  boss_apc: { id: 'boss_apc', name: 'Panzerwagen', w: 90, h: 70, speed: 40, advance: 7,
+  boss_apc: { id: 'boss_apc', name: 'Kampfpanzer T-90', w: 78, h: 108, speed: 40, advance: 7,
     shellInterval: 3.2, shellsPerVolley: 1, color: '#7a7f4a' },
-  boss_tank: { id: 'boss_tank', name: 'Kampfpanzer', w: 110, h: 90, speed: 35, advance: 8,
+  boss_tank: { id: 'boss_tank', name: 'Kampfpanzer T-90M', w: 90, h: 122, speed: 35, advance: 8,
     shellInterval: 2.8, shellsPerVolley: 2, color: '#5d6b4e' },
-  boss_fortress: { id: 'boss_fortress', name: 'Bunkerfahrzeug', w: 150, h: 100, speed: 25, advance: 9,
+  boss_fortress: { id: 'boss_fortress', name: 'Schwerer Kampfpanzer', w: 108, h: 140, speed: 25, advance: 9,
     shellInterval: 2.4, shellsPerVolley: 3, color: '#4a4d44' },
 };

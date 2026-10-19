@@ -29,7 +29,8 @@ const bulletFactory = () => ({
 });
 const enemyBulletFactory = () => ({ active: false, x: 0, y: 0, vx: 0, vy: 0 });
 const grenadeFactory = () => ({
-  active: false, x0: 0, y0: 0, x: 0, y: 0, tx: 0, ty: 0, t: 0, dur: 0.7, dmg: 0, radius: 0,
+  active: false, kind: 'gl', x0: 0, y0: 0, x: 0, y: 0, tx: 0, ty: 0, t: 0, dur: 0.7, dmg: 0, radius: 0,
+  landed: false, fuse: 0, vx: 0, vy: 0,
 });
 const enemyFactory = () => ({
   active: false, def: null, x: 0, y: 0, hp: 0, maxHp: 0, shield: 0, maxShield: 0, r: 0,
@@ -83,7 +84,7 @@ export class Game {
     this.boss = null;
     this.levelRunner = new LevelRunner();
 
-    this._hud = { count: -1, tier: -1, att: -1 };
+    this._hud = { count: -1, tier: -1, att: -1, specs: -1 };
   }
 
   resize(W, H) {
@@ -136,6 +137,9 @@ export class Game {
     sq.shownCount = sq.count;
     sq.weaponTier = Math.min(MAX_TIER, up.weapon || 0);
     sq.attachments = [];
+    sq.specs.length = 0;
+    sq.specMuzzle.fill(0);
+    sq.specTimer.fill(0);
     sq.x = this.W / 2;
     sq.y = this.SQUAD_Y;
     sq.radius = squadRadius(sq.count);
@@ -263,6 +267,8 @@ export class Game {
     const lost = before - after;
     if (lost <= 0) return;
     sq.count = after;
+    // Verluste treffen zuerst normale Soldaten; danach fallen Spezialisten (zuletzt erhaltene zuerst).
+    if (sq.specs.length > after) sq.specs.length = after;
     sq.hurt = 1;
     burst(this, 'spark', x, y, 6, { speed: 140, color: CFG.COLORS.bad });
     floatText(this, x, y - 14, '-' + lost, CFG.COLORS.bad);
@@ -273,11 +279,11 @@ export class Game {
   killEnemy(e) {
     if (!e.active) return;
     this.kills++;
-    this.loot += e.def.coins;
-    this.coinsEarned = this.loot;
-    burst(this, 'debris', e.x, e.y, 5, { speed: 110 });
-    burst(this, 'smoke', e.x, e.y, 3, { speed: 50, life: 0.5 });
-    if (this.rng() < 0.2) floatText(this, e.x, e.y - 12, '+' + e.def.coins + ' ◆', CFG.COLORS.orange);
+    this.loot += e.def.coins * BAL.LOOT_PER_COIN;
+    this.coinsEarned = Math.floor(this.loot);
+    burst(this, 'debris', e.x, e.y, 3, { speed: 110 });
+    if (this.rng() < 0.4) emit(this, 'smoke', e.x, e.y, { life: 0.5 });
+    if (this.rng() < 0.03) floatText(this, e.x, e.y - 12, '+◆', CFG.COLORS.orange);
     audio.hit();
     this.enemies.release(e);
   }
@@ -287,7 +293,8 @@ export class Game {
     const sq = this.squad;
     const h = this._hud;
     const att = sq.attachments.length;
-    if (h.count !== sq.count || h.tier !== sq.weaponTier || h.att !== att) {
+    if (h.count !== sq.count || h.tier !== sq.weaponTier || h.att !== att || h.specs !== sq.specs.length) {
+      h.specs = sq.specs.length;
       h.count = sq.count;
       h.tier = sq.weaponTier;
       h.att = att;

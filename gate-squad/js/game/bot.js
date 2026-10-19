@@ -100,8 +100,11 @@ function pickGateTarget(game, squad, squadY, W, dps, scroll) {
   if (mode === 'casual' && members > 1 && ((rowId * 2654435761) >>> 0) % 100 < CASUAL_MISTAKE) return worstX;
 
   // Nur ein Tor in der Reihe: die freie Hälfte ist neutral (Wert = count).
-  if (members === 1 && power(count, squad.weaponTier || 0) > bestScore) {
-    bestX = memberX < W / 2 ? W * 0.75 : W * 0.25;
+  if (members === 1) {
+    let avoid = power(count, squad.weaponTier || 0) > bestScore;
+    // Gelegenheitsspieler: bei 35 % der Einzeltore falsche Entscheidung (nimmt schlechte / verpasst gute).
+    if (mode === 'casual' && ((rowId * 2654435761) >>> 0) % 100 < CASUAL_MISTAKE) avoid = !avoid;
+    if (avoid) bestX = memberX < W / 2 ? W * 0.75 : W * 0.25;
   }
   return bestX;
 }

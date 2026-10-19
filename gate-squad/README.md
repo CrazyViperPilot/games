@@ -13,7 +13,13 @@ Die Soldaten schießen automatisch.
 
 ## Features
 
-- 20 handgebaute Level, danach endlos generierte Level (seeded)
+- 20 handgebaute Level (je ~1,5–2,5 Minuten), danach endlos generierte Level (seeded)
+- Horden: 700–4000 Gegner pro Runde
+- Zwei unabhängige Lanes: linke und rechte Tore kommen zeitversetzt – mit gutem Timing nimmt man beide
+- Spezialisten per Kiste: Sturmgewehr, MP, MG, Scharfschütze (zielt auf die zähesten Gegner),
+  Sprengmeister (wirft C4 auf nahe Gegnergruppen)
+- RPG-Kisten (immer +1): ein Soldat wird zum reinen RPG-Schützen und feuert im Bosskampf Raketen
+- Boss: Kampfpanzer (T-90-Stil) mit schwenkendem Turm, Ziel-Laser und sichtbaren Granaten
 - 7 Waffen mit Tier-Aufstieg über Waffentore, 5 Attachments
 - Zahlentore (addieren, subtrahieren, multiplizieren, dividieren) mit Abwägung
 - Attachment-Kisten, Gegnertypen (Infanterie, Läufer, Schildträger, Scharfschütze, Mini-Fahrzeug) und Bosse

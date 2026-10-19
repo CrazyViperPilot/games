@@ -55,6 +55,11 @@ export function spawnWave(game, ev) {
     } else if (pattern === 'random') {
       x = randRange(game.rng, r, W - r);
       y = SPAWN_Y - randRange(game.rng, 0, 160);
+    } else if (pattern === 'horde') {
+      // dichter, länglicher Pulk um cx (Horden): Breite wächst mit der Anzahl
+      const spread = Math.min(W * 0.42, 40 + n * 4);
+      x = cx + (game.rng() * 2 - 1) * spread;
+      y = SPAWN_Y - game.rng() * (60 + n * 7);
     } else if (pattern === 'wall') {
       const perRow = Math.ceil(n / 2);
       const row = i % 2;
@@ -64,7 +69,12 @@ export function spawnWave(game, ev) {
     }
     if (x < r) x = r;
     else if (x > W - r) x = W - r;
-    spawnEnemy(game, def, x, y);
+    const e = spawnEnemy(game, def, x, y);
+    if (pattern === 'horde') {
+      // Horden sind Kanonenfutter: weniger HP
+      e.hp *= BAL.HORDE_HP;
+      e.maxHp = e.hp;
+    }
   }
 }
 

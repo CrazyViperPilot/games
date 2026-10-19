@@ -345,3 +345,27 @@ d. h. ab Level 8 muss man Tore bewusst wählen/anschießen bzw. Upgrades kaufen.
 
 Die Level-Daten in `levels.js` wurden aus den handgebauten Vorlagen mit diesen Regeln
 (Start-Tor, Waffentor-Anzahl, x2 erst ab L6, x3 erst ab L8, Mindestabstand 150) überarbeitet.
+
+## 12. Erweiterung v2: Horden, unabhängige Lanes, RPG, Spezialisten, T-90-Boss
+
+Arbeitspakete: **WP11** Rendering (Implementer), **WP12** Kernlogik + Level-Expander + Balancing (Opus).
+
+* Level: `data/levelRules.js` `expandLevel(level, L)` wird zur Laufzeit auf jedes Level (handgebaut + Endlos)
+  angewandt: Länge ×3, Tor-Paare → zwei unabhängige Lane-Tore (zeitversetzt, eigene `row`),
+  Horden-Wellen in allen Lücken, Spezialisten- und RPG-Kisten.
+* Spezialisten (`data/specialists.js`): belegen die ersten Formations-Slots. Verluste treffen zuerst
+  normale Soldaten. RPG-Kiste: +1 RPG-Schütze (ein normaler Soldat wird umgerüstet), feuert nur auf den Boss.
+* Boss: alle Bosse als T-90-artiger Kampfpanzer, Turm dreht mit begrenzter Geschwindigkeit,
+  Ziel-Laser vor dem Schuss, sichtbare Granate vom Rohr zum Einschlagpunkt.
+
+### Feld-Vertrag (Ergänzung zu §10)
+```js
+squad.specs: string[]            // Spezialisten-IDs, Index i ↔ Formations-Slot i
+squad.specMuzzle: Float32Array   // pro Spezialist 0..1 Mündungsfeuer
+grenade = { active, kind:'gl'|'c4'|'rocket', x0,y0,x,y,tx,ty,t,dur,dmg,radius,
+            landed /*c4 liegt*/, fuse /*Restzeit c4*/, vx,vy /*rocket*/ }
+crate   = { x,y,r,hp,maxHp,opened,flash, kind:'att'|'rpg'|'spec', spec /*id|null*/ }
+boss    = { ..., turret /*Canvas-Winkel*/, recoil /*0..1*/, aiming /*0..1*/, aimX, aimY, track /*Ketten-Phase*/ }
+boss.shells[i] = { active, sx, sy /*Start am Rohr*/, x, y /*Ziel*/, t, dur }
+game.kills                       // groß im HUD
+```

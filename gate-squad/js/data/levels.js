@@ -5,6 +5,7 @@
 // Letztes Gate-Paar (~length-400) ist jeweils stark positiv (Vorbereitung auf Boss).
 
 import { generateLevel } from './procgen.js';
+import { expandLevel } from './levelRules.js';
 
 export const HANDMADE_COUNT = 20;
 
@@ -418,7 +419,8 @@ export const LEVELS = [
 ];
 
 // Level 1..20 aus LEVELS (JSON-Klon), darüber prozedural (procgen.js).
+// Level-Entwurf → spielbares Level über expandLevel (levelRules.js).
 export function getLevel(n) {
-  if (n <= HANDMADE_COUNT) return JSON.parse(JSON.stringify(LEVELS[n - 1]));
-  return generateLevel(n);
+  const base = n <= HANDMADE_COUNT ? LEVELS[n - 1] : generateLevel(n);
+  return expandLevel(base, n);
 }

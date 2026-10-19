@@ -22,8 +22,20 @@ export const BAL = {
   GATE_PASS_DMG: 0.6, // Kugeln fliegen nach einem Tor-Treffer mit 60 % Schaden weiter
   GATE_COST_SQUAD_DIV: 12, // Tor-Punktkosten ×(1 + Truppe/12) // Multiplikator-Tore lassen sich höchstens 2 Stufen hochschießen
   MAX_SOLDIERS: 300,
-  BOSS_HP_SCALE: 7,
-  BOSS_FIRST_SHOT: 1.0, // s nach Ankunft bis zur ersten Salve
+  MAX_SPECS: 30, // Spezialisten inkl. RPG-Schützen
+  RPG_DMG_FRAC: 0.012, // Schaden je Rakete = Anteil der Boss-Max-HP
+  RPG_SPEED: 520,
+  HORDE_HP: 0.6, // HP-Faktor für Horden-Gegner
+  LOOT_PER_COIN: 0.12, // Münzen je Gegner-Münzwert (Horden: tausende Kills)
+  BOSS_HP_SCALE: 16,
+  BOSS_FIRST_SHOT: 1.0,
+  BOSS_AIM_TIME: 1.1, // s Ziel-Laser vor dem Schuss
+  BOSS_AIM_LOCK: 0.45, // s vor dem Schuss wird das Ziel eingefroren
+  BOSS_SHELL_SPEED: 650, // Granaten-Fluggeschwindigkeit (E/s)
+  BOSS_TURRET_SPEED: 1.6, // rad/s
+  BOSS_BARREL: 0.75, // Rohrlänge relativ zur Boss-Höhe
+  BOSS_VOLLEY_GAP: 0.3, // s zwischen Schüssen einer Salve
+  BOSS_VOLLEY_SPREAD: 45, // seitlicher Versatz weiterer Schüsse // s nach Ankunft bis zur ersten Salve
   WAVE_COUNT_MULT: 1.4, // Wellengröße × (nicht für Scharfschützen/Fahrzeuge)
   FIREPOWER_EXP: 0.5, // Feuerkraft über MAX_SHOOTERS hinaus: Schaden/Kugel ∝ (Truppe/Schützen)^0.5 // globaler Boss-HP-Faktor (kalibriert per Bot-Durchlauf)
   AIM_CONE: 0.45, // rad: Soldaten zielen automatisch auf Gegner in diesem Kegel
@@ -65,7 +77,7 @@ export function crateHp(L) {
 // Münzen für Sieg bzw. Niederlage (Niederlage = LOSS_ON_DEFEAT_COINS davon).
 // loot = während des Laufs gesammelte Münzen (ENEMIES[*].coins); ohne loot zählt kills/2.
 export function coinsForResult({ won, level, survivors, kills, loot }) {
-  const drops = loot !== undefined ? loot : kills / 2;
+  const drops = loot !== undefined ? Math.floor(loot) : kills / 2;
   let coins = 20 + 6 * level + 2 * Math.min(survivors, 60) + drops;
   if (!won) coins *= BAL.LOSS_ON_DEFEAT_COINS;
   return Math.round(coins);
@@ -94,4 +106,9 @@ export function bossBase(L) {
 }
 export function endlessBossBase(L) {
   return bossBase(L);
+}
+
+// Spezialisten-Schaden wächst mit dem Level (sie haben keine Waffenstufen).
+export function specMult(L) {
+  return 1 + 0.25 * (L - 1);
 }

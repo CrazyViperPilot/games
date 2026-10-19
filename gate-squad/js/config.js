@@ -8,11 +8,11 @@ export const CFG = {
   MAX_SHOOTERS: 24,
   MAX_DRAWN_SOLDIERS: 40,
   POOL: {
-    bullets: 800,
+    bullets: 1400,
     enemyBullets: 64,
-    grenades: 32,
-    enemies: 160,
-    particles: 600,
+    grenades: 96,
+    enemies: 700,
+    particles: 900,
   },
   COLORS: {
     bg: '#1b1f1a',
