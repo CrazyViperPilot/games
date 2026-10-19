@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go</title>
+    <meta name="description" content="Go gegen den Computer – offline spielbar">
+    <meta name="theme-color" content="#e5b233">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="fonts/fonts.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="glitter-bg"></div>
+    <div class="app-container">
+        <header>
+            <h1 class="gold-text glow">Go</h1>
+            <span id="captures" class="captures"></span>
+        </header>
+
+        <main>
+            <div class="board-container">
+                <canvas id="board" aria-label="Go-Brett"></canvas>
+            </div>
+
+            <p id="status" class="status" role="status" aria-live="polite"></p>
+
+            <div class="controls-row">
+                <button id="btnPass" class="gold-btn">Passen</button>
+                <button id="btnScoreDone" class="gold-btn" hidden>Fertig</button>
+                <button id="btnUndo" class="gold-btn">Zug zurück</button>
+                <button id="btnResign" class="gold-btn">Aufgeben</button>
+            </div>
+
+            <div class="secondary-controls">
+                <button id="btnNewGame" class="gold-btn">Neues Spiel</button>
+            </div>
+
+            <div class="settings">
+                <div class="setting">
+                    <span class="setting-label">Gegner</span>
+                    <div class="segmented">
+                        <button class="diff-btn active" data-level="easy">Leicht</button>
+                        <button class="diff-btn" data-level="medium">Mittel</button>
+                    </div>
+                </div>
+                <div class="setting">
+                    <span class="setting-label">Brett</span>
+                    <div class="segmented">
+                        <button class="diff-btn active" data-size="9">9 × 9</button>
+                        <button class="diff-btn" data-size="13">13 × 13</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmModal" class="confirm-modal hidden">
+        <div class="confirm-overlay"></div>
+        <div class="confirm-content">
+            <p id="confirmText"></p>
+            <div class="confirm-buttons">
+                <button id="confirmYes" class="gold-btn">Ja</button>
+                <button id="confirmNo" class="gold-btn">Nein</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="go.js"></script>
+    <script src="ai.js"></script>
+    <script src="app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js');
+            });
+        }
+    </script>
+</body>
+</html>

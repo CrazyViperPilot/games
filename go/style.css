@@ -1,0 +1,272 @@
+:root {
+    --gold-light: #f9d976;
+    --gold-main: #e5b233;
+    --gold-dark: #b3821a;
+    --bg-dark: #0f1610; /* Dark emerald/forest green tint */
+    --text-main: #fff;
+    --text-gold: #f9d976;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+body {
+    background-color: var(--bg-dark);
+    color: var(--text-main);
+    font-family: 'Outfit', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow-y: auto;
+    position: relative;
+}
+
+.glitter-bg {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background:
+        radial-gradient(ellipse at 20% 10%, rgba(229, 178, 51, 0.18), transparent 55%),
+        radial-gradient(ellipse at 90% 90%, rgba(229, 178, 51, 0.12), transparent 60%),
+        var(--bg-dark);
+}
+
+/* Subtle sparkle animation overlay */
+.glitter-bg::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(white, rgba(255,255,255,.2) 2px, transparent 4px),
+                      radial-gradient(white, rgba(255,255,255,.15) 1px, transparent 3px),
+                      radial-gradient(white, rgba(255,255,255,.1) 2px, transparent 4px);
+    background-size: 550px 550px, 350px 350px, 250px 250px;
+    background-position: 0 0, 40px 60px, 130px 270px;
+    animation: sparkle 15s linear infinite;
+    opacity: 0.35;
+}
+
+@keyframes sparkle {
+    0% { background-position: 0 0, 40px 60px, 130px 270px; }
+    100% { background-position: 550px 550px, 390px 410px, 380px 520px; }
+}
+
+.app-container {
+    width: 100%;
+    max-width: 500px;
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    padding: 20px 16px;
+    background: linear-gradient(135deg, rgba(15, 22, 16, 0.9) 0%, rgba(5, 8, 5, 0.95) 100%);
+    box-shadow: 0 0 50px rgba(229, 178, 51, 0.1);
+    backdrop-filter: blur(10px);
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+h1 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 0;
+    background: linear-gradient(to right, var(--gold-light), var(--gold-main), var(--gold-dark));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0px 2px 10px rgba(229, 178, 51, 0.4));
+}
+
+.captures {
+    font-size: 0.95rem;
+    color: var(--text-gold);
+    letter-spacing: 1px;
+    opacity: 0.85;
+}
+
+.gold-btn {
+    background: linear-gradient(135deg, var(--gold-main), var(--gold-dark));
+    border: 1px solid var(--gold-light);
+    color: #111;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(229, 178, 51, 0.3);
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 1px;
+}
+
+.gold-btn:hover, .gold-btn:active {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(229, 178, 51, 0.5);
+    background: linear-gradient(135deg, var(--gold-light), var(--gold-main));
+}
+
+.gold-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+    transform: none;
+    box-shadow: none;
+}
+
+.board-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+#board {
+    display: block;
+    max-width: 100%;
+    touch-action: manipulation;
+    cursor: pointer;
+    filter: drop-shadow(0 10px 25px rgba(0, 0, 0, 0.5));
+}
+
+.status {
+    min-height: 3.2em;
+    text-align: center;
+    font-size: 0.95rem;
+    line-height: 1.4;
+    color: rgba(255, 255, 255, 0.85);
+    margin-bottom: 14px;
+}
+
+.controls-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    gap: 8px;
+}
+
+.controls-row .gold-btn {
+    flex: 1;
+    padding: 12px 0;
+    font-size: 0.8rem;
+}
+
+.secondary-controls {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.secondary-controls .gold-btn {
+    padding: 10px 20px;
+    font-size: 0.85rem;
+}
+
+.settings {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+}
+
+.setting {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.setting-label {
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.45);
+    width: 4.5em;
+    text-align: right;
+}
+
+.segmented {
+    display: flex;
+    gap: 18px;
+}
+
+.diff-btn {
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.5);
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.95rem;
+    cursor: pointer;
+    padding-bottom: 5px;
+    transition: color 0.3s;
+}
+
+.diff-btn.active {
+    color: var(--gold-light);
+    border-bottom: 2px solid var(--gold-main);
+}
+
+/* Confirmation modal */
+.confirm-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.confirm-modal.hidden {
+    display: none;
+}
+
+.confirm-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+}
+
+.confirm-content {
+    position: relative;
+    background: linear-gradient(135deg, #1a261b, #0a100b);
+    border: 1px solid var(--gold-main);
+    border-radius: 16px;
+    padding: 24px;
+    width: min(320px, 85vw);
+    text-align: center;
+    box-shadow: 0 0 40px rgba(229, 178, 51, 0.25);
+}
+
+.confirm-content p {
+    font-size: 1rem;
+    margin-bottom: 20px;
+    color: var(--text-gold);
+}
+
+.confirm-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+}
+
+.confirm-buttons .gold-btn {
+    min-width: 90px;
+}
+
+@media (max-width: 360px) {
+    h1 { font-size: 2rem; }
+    .controls-row .gold-btn { font-size: 0.7rem; letter-spacing: 0.5px; }
+}
