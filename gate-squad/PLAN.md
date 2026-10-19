@@ -369,3 +369,14 @@ boss    = { ..., turret /*Canvas-Winkel*/, recoil /*0..1*/, aiming /*0..1*/, aim
 boss.shells[i] = { active, sx, sy /*Start am Rohr*/, x, y /*Ziel*/, t, dur }
 game.kills                       // groß im HUD
 ```
+
+### Ergebnisse v2 (Browser-Kette L1–10 mit Shop + Node-Simulation L8–25)
+
+* Level-Dauer 100–180 s, Kills pro Runde: L1 ≈ 690, L5 ≈ 1070, L10 ≈ 1750, L15 ≈ 2500, L20 ≈ 3400, L25 ≈ 4300;
+  max. ~130 Gegner gleichzeitig. JS-Zeit pro Frame: Render ≈ 0,8 ms, Update ≈ 0,1 ms.
+* Horden-Gegner: 60 % HP, nur Infanterie/Läufer (Schildträger-Horden waren undurchdringlich),
+  Hordengröße steigt im Level von 30 % auf 100 % (bis 40 % der Strecke).
+* Boss: `BOSS_HP_SCALE 16`, ab L6 +18 %/Level; RPG-Rakete = 1,2 % Boss-Max-HP; Bosskampf 10–18 s.
+* Münzen: 0,12 je Gegner-Münzwert (sonst Inflation durch tausende Kills).
+* Beide Bots gewinnen L1–10 mit Shop-Käufen im ersten Versuch; der Gelegenheitsspieler
+  hat deutlich kleinere Trupps (44–106 statt 91–280 Überlebende bis L8) und längere Bosskämpfe.

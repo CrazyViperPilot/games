@@ -28,6 +28,7 @@ export const BAL = {
   HORDE_HP: 0.6, // HP-Faktor für Horden-Gegner
   LOOT_PER_COIN: 0.12, // Münzen je Gegner-Münzwert (Horden: tausende Kills)
   BOSS_HP_SCALE: 16,
+  BOSS_LATE_RAMP: 0.18,
   BOSS_FIRST_SHOT: 1.0,
   BOSS_AIM_TIME: 1.1, // s Ziel-Laser vor dem Schuss
   BOSS_AIM_LOCK: 0.45, // s vor dem Schuss wird das Ziel eingefroren
@@ -59,7 +60,8 @@ export function hpMult(L) {
 
 // Boss-HP. Für Endlos-Level ist baseHp = endlessBossBase(L).
 export function bossHp(baseHp, L) {
-  return baseHp * hpMult(L) * BAL.BOSS_HP_SCALE;
+  // ab Level 6 zusätzlich +12 %/Level: ab L8 braucht der Bosskampf eine gut gewählte Truppe
+  return baseHp * hpMult(L) * BAL.BOSS_HP_SCALE * (1 + BAL.BOSS_LATE_RAMP * Math.max(0, L - 5));
 }
 
 // Schaden pro +1 am Zahlentor.
