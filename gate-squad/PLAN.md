@@ -304,3 +304,31 @@ particle     = { active, kind:'spark'|'smoke'|'flash'|'debris'|'text'|'ring'|'ca
 Tor-Anzeige-Text: op add → `+5` / `-5`; mul → `x2`, `x3`, `x1`, `÷2` (0.5), `÷3` (0.33).
 Gute Tore (Ergebnis > aktuell) grün/blau getönt, schlechte rot getönt; Waffentor orange mit Waffenname
 der nächsten Stufe, gesperrt mit HP-Balken.
+
+## 11. Review-Ergebnisse & Balancing-Entscheidungen (Opus, nach Bot-Durchläufen)
+
+Gemessen mit `?debug=1&autoplay=1&chain=1&shop=1&speed=8` (Profi-Bot) und zusätzlich `&bot=casual`
+(Gelegenheitsspieler: bewertet Tore nur nach aktuellem Wert, wählt in 35 % der Reihen das
+schlechtere Tor, weicht nie aus). Beide kaufen zwischen Leveln das günstigste Upgrade.
+
+Gefundene Probleme und Korrekturen gegenüber §4/§5:
+
+| Problem (gemessen) | Korrektur |
+|---|---|
+| Boss & Scharfschützen hielten bei y=150, Trupp bei ~650 → außerhalb MP5-Reichweite (Boss-Kampf 32 s, Sniper unbesiegbar) | Halte-Abstand relativ zur Truppe: `BOSS_STOP_DIST 300`, `SNIPER_STOP_DIST 290` |
+| L2 mit 3 Startsoldaten unschaffbar: Kugeln nur senkrecht, breite Reihen laufen in den Kontakt | Auto-Zielkegel ±0,45 rad (`AIM_CONE`), Feuer zeitversetzt statt Salven |
+| Gegner hinter Toren unverwundbar (Tore schluckten alle Kugeln, Gegner laufen schneller als das Scrollen) | Kugeln laden das Tor auf und fliegen mit 60 % Schaden weiter (`GATE_PASS_DMG`) |
+| Erste Welle überholt das Start-Tor → Tod nach 10 s | Jedes Level beginnt mit einem Tor-Paar direkt auf dem Bildschirm (`yFrac 0.45`), erste Welle ab d=330 |
+| Exponentielles Wachstum (213 Soldaten in L1) | x2-Tore erst ab L6; Beschuss: add max +6, mul max bis x2; Punktkosten × (1 + Truppe/12); Cap 300 |
+| Linear skalierende Feuerkraft machte Bosse trivial | Ab 24 Schützen Schaden/Kugel ∝ (Truppe/24)^0.5 (`FIREPOWER_EXP`) |
+| Boss starb in der Einfahrt, bevor er schoss | Einfahrt 140 E/s und unverwundbar, erste Salve 1 s nach Ankunft, Vorrücken 7–9 E/s (Zeitdruck ≈ 25–40 s) |
+| Waffenkette endete bei UMP-45 (1 Waffentor/Level) | Waffentore: L1–3: 1, L4–6: 2, L7–10: 3, L11–15: 4, L16–20: 5 |
+| Boss-HP-Sprung L20 → L21 (2,7 M → 0,9 M) | Einheitlich `4000·1.11^(L−1) · hpMult(L) · BOSS_HP_SCALE(7)` |
+
+Finale Kurven: `hpMult(L) = 1 + 0.3·(L−1)` (ab 21: ×1.07/Level), Wellen ×1.4, Niederlage gibt 40 % Münzen.
+
+**Attachments bei Waffenwechsel:** die 2 zuletzt erhaltenen bleiben (unverändert, siehe §4).
+
+Ergebnis (Level 1–10): Profi-Bot gewinnt alle im ersten Versuch (Bosskampf 9–17 s);
+Gelegenheits-Bot gewinnt L1–7 sicher, L8 knapp, L9/L10 erst nach Fehlversuchen + Shop-Upgrades –
+d. h. ab Level 8 muss man Tore bewusst wählen/anschießen bzw. Upgrades kaufen.

@@ -32,7 +32,7 @@ npx http-server gate-squad
 cd gate-squad && python3 -m http.server
 ```
 
-Danach im Browser `http://localhost:8080` (bzw. die von `http-server` angezeigte Adresse) öffnen.
+Danach im Browser `http://localhost:8080` (http-server) bzw. `http://localhost:8000` (Python) öffnen.
 
 ## Deploy auf GitHub Pages
 
@@ -41,7 +41,7 @@ Sudoku liegt unter `/`, Gate Squad unter `/gate-squad/`.
 
 1. Im Repo unter **Settings → Pages** als **Source** „GitHub Actions“ wählen.
 2. Nach dem ersten erfolgreichen Workflow-Lauf ist das Spiel erreichbar unter:
-   `https://<user>.github.io/<repo>/gate-squad/`
+   `https://<user>.github.io/<repo>/gate-squad/` – für dieses Repo: `https://crazyviperpilot.github.io/sudoku/gate-squad/`
 
 ## Installation auf dem Pixel
 
@@ -52,7 +52,12 @@ Sudoku liegt unter `/`, Gate Squad unter `/gate-squad/`.
 ## Debug-Modus
 
 - `?debug=1` – FPS-Anzeige, alle Level freigeschaltet, Unverwundbarkeit im HUD umschaltbar
-- `?debug=1&autoplay=1&level=1&chain=1` – Bot spielt automatisch (für Tests)
+- `?debug=1&autoplay=1&level=1&chain=1` – Bot spielt automatisch und hängt Level aneinander (für Tests)
+  - `&speed=8` – Zeitraffer (1–16 Spielschritte pro Tick)
+  - `&bot=casual` – Bot simuliert einen Gelegenheitsspieler (Standard: Profi)
+  - `&shop=1` – Bot kauft zwischen Leveln Upgrades
+  - Ergebnisse stehen in `window.__results` (Konsole)
+- Taste `g` oder Button „GOD“ – Unverwundbarkeit an/aus
 
 ## Projektstruktur
 
