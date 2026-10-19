@@ -1,0 +1,32 @@
+export const CFG = {
+  WORLD_W: 360,
+  STEP: 1 / 60,
+  MAX_STEPS: 5,
+  DPR_MAX: 2,
+  HUD_H: 64,
+  SQUAD_OFFSET: 150, // SQUAD_Y = WORLD_H - SQUAD_OFFSET
+  MAX_SHOOTERS: 24,
+  MAX_DRAWN_SOLDIERS: 40,
+  POOL: {
+    bullets: 800,
+    enemyBullets: 64,
+    grenades: 32,
+    enemies: 160,
+    particles: 600,
+  },
+  COLORS: {
+    bg: '#1b1f1a',
+    ground: '#2b2f26',
+    ground2: '#33392c',
+    line: '#5a5f4c',
+    orange: '#ff7a1a',
+    text: '#e8e6dc',
+    muted: '#9aa08e',
+    good: '#6fd06a',
+    bad: '#e04a3a',
+    steel: '#2a2f2b',
+    steel2: '#3a4038',
+    olive: '#4b5a3a',
+    enemy: '#8a5a3c',
+  },
+};
