@@ -1,63 +1,13 @@
-const CACHE_NAME = 'sudoku-glamour-v3';
-const urlsToCache = [
-  '/',
-  '/index.html',
-  '/style.css',
-  '/app.js',
-  '/sudoku.js',
-  '/lang.js',
-  '/manifest.json',
-  '/background.png',
-  '/icon-192.png',
-  '/icon-512.png'
-];
-
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        return cache.addAll(urlsToCache);
-      })
-  );
-});
-
-self.addEventListener('fetch', event => {
-  // Network-first for navigation requests so HTML updates are picked up
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request)
-        .then(response => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-          return response;
-        })
-        .catch(() => caches.match(event.request))
-    );
-    return;
-  }
-  // Cache-first for other assets
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        if (response) {
-          return response;
-        }
-        return fetch(event.request);
-      })
-  );
-});
-
-self.addEventListener('activate', event => {
-  const cacheWhitelist = [CACHE_NAME];
-  event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheWhitelist.indexOf(cacheName) === -1) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
-  );
+// Ersatz für den früheren Sudoku-Service-Worker an der Wurzel (Sudoku liegt jetzt in ./sudoku/).
+// Bestehende Installationen laden diese Datei beim nächsten Update, räumen ihren alten Cache auf
+// und melden sich ab. Die Spiele haben eigene Service Worker in ihren Ordnern.
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (event) => {
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter((k) => k === 'sudoku-glamour-v3' || k === 'sudoku-glamour-v2' || k === 'sudoku-glamour-v1').map((k) => caches.delete(k)));
+    await self.registration.unregister();
+    const clients = await self.clients.matchAll({ type: 'window' });
+    clients.forEach((c) => c.navigate(c.url));
+  })());
 });

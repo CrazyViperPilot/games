@@ -1,6 +1,6 @@
-# Deployt Sudoku und Gate Squad gemeinsam nach GitHub Pages.
-# Sudoku liegt unter /, Gate Squad unter /gate-squad/.
-name: Deploy to GitHub Pages (Sudoku + Gate Squad)
+# Deployt die Spielesammlung nach GitHub Pages:
+# Startseite unter /, Sudoku unter /sudoku/, Gate Squad unter /gate-squad/.
+name: Deploy games to GitHub Pages
 
 on:
   # Runs on pushes targeting the default branch

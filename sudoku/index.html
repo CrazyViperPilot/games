@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sudoku Glamour</title>
+    <meta name="description" content="Glamour Sudoku Game">
+    <meta name="theme-color" content="#1a1a1a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="glitter-bg"></div>
+    <div class="app-container">
+        <header>
+            <h1 id="title" class="gold-text glow">Sudoku</h1>
+            <div class="header-controls">
+                <span id="timer" class="timer">00:00</span>
+                <button id="langToggle" class="gold-btn">PL / DE</button>
+            </div>
+        </header>
+
+        <main>
+            <div class="board-container">
+                <div id="board" class="sudoku-board"></div>
+            </div>
+
+            <div class="controls-row">
+                <button id="btnNewGame" class="gold-btn">Nowa gra</button>
+                <button id="btnHint" class="gold-btn">Podpowiedź</button>
+                <button id="btnErase" class="gold-btn">Usuń</button>
+            </div>
+
+            <div class="secondary-controls">
+                <button id="btnUndo" class="gold-btn">Cofnij</button>
+            </div>
+
+            <div class="numpad-container">
+                <div id="numpad" class="numpad">
+                    <!-- Numpad buttons 1-9 generated via JS -->
+                </div>
+            </div>
+            
+            <div class="difficulty-selector">
+                <button class="diff-btn active" data-level="easy" id="btnEasy">Łatwy</button>
+                <button class="diff-btn" data-level="medium" id="btnMedium">Średni</button>
+                <button class="diff-btn" data-level="hard" id="btnHard">Trudny</button>
+            </div>
+        </main>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmModal" class="confirm-modal hidden">
+        <div class="confirm-overlay"></div>
+        <div class="confirm-content">
+            <p id="confirmText">Stracisz postęp. Kontynuować?</p>
+            <div class="confirm-buttons">
+                <button id="confirmYes" class="gold-btn">Tak</button>
+                <button id="confirmNo" class="gold-btn">Nie</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="lang.js"></script>
+    <script src="sudoku.js"></script>
+    <script src="app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js');
+            });
+        }
+    </script>
+</body>
+</html>

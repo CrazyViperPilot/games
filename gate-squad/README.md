@@ -42,12 +42,12 @@ Danach im Browser `http://localhost:8080` (http-server) bzw. `http://localhost:8
 
 ## Deploy auf GitHub Pages
 
-Der Workflow `.github/workflows/gate-squad-pages.yml` deployt bei jedem Push auf `main` das Repo nach GitHub Pages:
-Sudoku liegt unter `/`, Gate Squad unter `/gate-squad/`.
+Der Workflow `.github/workflows/pages.yml` deployt bei jedem Push auf `main` das Repo nach GitHub Pages:
+Startseite unter `/`, Sudoku unter `/sudoku/`, Gate Squad unter `/gate-squad/`.
 
 1. Im Repo unter **Settings → Pages** als **Source** „GitHub Actions“ wählen.
 2. Nach dem ersten erfolgreichen Workflow-Lauf ist das Spiel erreichbar unter:
-   `https://<user>.github.io/<repo>/gate-squad/` – für dieses Repo: `https://crazyviperpilot.github.io/sudoku/gate-squad/`
+   `https://<user>.github.io/<repo>/gate-squad/` – für dieses Repo: `https://crazyviperpilot.github.io/games/gate-squad/`
 
 ## Installation auf dem Pixel
 

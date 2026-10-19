@@ -1,80 +1,127 @@
-<!DOCTYPE html>
-<html lang="pl">
+<!doctype html>
+<html lang="de">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sudoku Glamour</title>
-    <meta name="description" content="Glamour Sudoku Game">
-    <meta name="theme-color" content="#1a1a1a">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="icon-192.png">
-    <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#121512">
+  <title>Games</title>
+  <meta name="description" content="Spielesammlung: Gate Squad und Sudoku">
+  <link rel="icon" href="gate-squad/icons/icon.svg" type="image/svg+xml">
+  <style>
+    :root {
+      --bg: #121512;
+      --card: #1c211c;
+      --card-hover: #242b24;
+      --text: #ecebe3;
+      --muted: #9aa08e;
+      --line: #ffffff14;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      background:
+        radial-gradient(1200px 600px at 50% -10%, #2a3326 0%, transparent 60%),
+        var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: calc(env(safe-area-inset-top) + 40px) 16px calc(env(safe-area-inset-bottom) + 32px);
+      -webkit-tap-highlight-color: transparent;
+    }
+    h1 {
+      margin: 0 0 6px;
+      font-size: 2.4rem;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .sub { margin: 0 0 32px; color: var(--muted); }
+    .games {
+      display: grid;
+      gap: 16px;
+      width: min(100%, 440px);
+    }
+    .game {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px;
+      border-radius: 18px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      color: inherit;
+      text-decoration: none;
+      transition: background .15s, transform .1s;
+      position: relative;
+      overflow: hidden;
+    }
+    .game::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 4px;
+      background: var(--accent);
+    }
+    .game:hover { background: var(--card-hover); }
+    .game:active { transform: scale(.98); }
+    .game img {
+      width: 72px;
+      height: 72px;
+      border-radius: 16px;
+      flex: none;
+      background: #0006;
+    }
+    .game h2 {
+      margin: 0 0 4px;
+      font-size: 1.25rem;
+      color: var(--accent);
+    }
+    .game p { margin: 0; color: var(--muted); font-size: .92rem; line-height: 1.35; }
+    .arrow { margin-left: auto; color: var(--muted); font-size: 1.4rem; }
+    .gate { --accent: #ff7a1a; }
+    .gate h2 { text-transform: uppercase; letter-spacing: .05em; font-weight: 800; }
+    .sudoku { --accent: #e5b233; }
+    .sudoku h2 { font-family: Georgia, "Times New Roman", serif; font-weight: 700; }
+    footer { margin-top: auto; padding-top: 40px; color: var(--muted); font-size: .8rem; text-align: center; }
+  </style>
 </head>
 <body>
-    <div class="glitter-bg"></div>
-    <div class="app-container">
-        <header>
-            <h1 id="title" class="gold-text glow">Sudoku</h1>
-            <div class="header-controls">
-                <span id="timer" class="timer">00:00</span>
-                <button id="langToggle" class="gold-btn">PL / DE</button>
-            </div>
-        </header>
+  <h1>Games</h1>
+  <p class="sub">Wähle ein Spiel</p>
 
-        <main>
-            <div class="board-container">
-                <div id="board" class="sudoku-board"></div>
-            </div>
+  <main class="games">
+    <a class="game gate" href="gate-squad/">
+      <img src="gate-squad/icons/icon-192.png" alt="" width="72" height="72">
+      <div>
+        <h2>Gate Squad</h2>
+        <p>Taktischer Tor-Shooter: Truppe durch Tore führen, Horden besiegen, Panzer knacken.</p>
+      </div>
+      <span class="arrow" aria-hidden="true">›</span>
+    </a>
 
-            <div class="controls-row">
-                <button id="btnNewGame" class="gold-btn">Nowa gra</button>
-                <button id="btnHint" class="gold-btn">Podpowiedź</button>
-                <button id="btnErase" class="gold-btn">Usuń</button>
-            </div>
+    <a class="game sudoku" href="sudoku/">
+      <img src="sudoku/icon-192.png" alt="" width="72" height="72">
+      <div>
+        <h2>Sudoku</h2>
+        <p>Klassisches Sudoku in edlem Look – entspannt knobeln.</p>
+      </div>
+      <span class="arrow" aria-hidden="true">›</span>
+    </a>
+  </main>
 
-            <div class="secondary-controls">
-                <button id="btnUndo" class="gold-btn">Cofnij</button>
-            </div>
+  <footer>Beide Spiele lassen sich einzeln als App installieren und offline spielen.</footer>
 
-            <div class="numpad-container">
-                <div id="numpad" class="numpad">
-                    <!-- Numpad buttons 1-9 generated via JS -->
-                </div>
-            </div>
-            
-            <div class="difficulty-selector">
-                <button class="diff-btn active" data-level="easy" id="btnEasy">Łatwy</button>
-                <button class="diff-btn" data-level="medium" id="btnMedium">Średni</button>
-                <button class="diff-btn" data-level="hard" id="btnHard">Trudny</button>
-            </div>
-        </main>
-    </div>
-
-    <!-- Confirmation Modal -->
-    <div id="confirmModal" class="confirm-modal hidden">
-        <div class="confirm-overlay"></div>
-        <div class="confirm-content">
-            <p id="confirmText">Stracisz postęp. Kontynuować?</p>
-            <div class="confirm-buttons">
-                <button id="confirmYes" class="gold-btn">Tak</button>
-                <button id="confirmNo" class="gold-btn">Nie</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Scripts -->
-    <script src="lang.js"></script>
-    <script src="sudoku.js"></script>
-    <script src="app.js"></script>
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js');
-            });
-        }
-    </script>
+  <script>
+    // Früher lag Sudoku direkt hier und registrierte ./sw.js für den ganzen Ordner.
+    // Diese alte Registrierung entfernen, damit sie die Startseite nicht mehr bedient.
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then((regs) => {
+        const root = new URL('./', location.href).href;
+        regs.forEach((r) => { if (r.scope === root) r.unregister(); });
+      }).catch(() => {});
+    }
+  </script>
 </body>
 </html>
