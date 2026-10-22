@@ -1,0 +1,294 @@
+// DOM-HUD (PLAN §5 ui/hud.js): Ressourcen, Punkte, Zone, Zeit, Auswahl, Befehlskarte und Meldungen.
+// Schreibt das DOM höchstens 5× pro Sekunde und nur, wenn sich der HTML-Text geändert hat.
+import { BALANCE } from '../data/balance.js';
+import { UNITS } from '../data/units.js';
+
+const RES_KEYS = ['money', 'bm', 'mun', 'fuel'];
+const MSG_LIFE = 6000; // ms
+const MSG_MAX = 5;
+const DOM_EVERY = 200; // ms
+const ORDER_LABEL = {
+  idle: 'Bereit',
+  move: 'Bewegung',
+  attackMove: 'Angriffsbewegung',
+  attack: 'Angriff',
+  buildFob: 'Fährt zur FOB-Baustelle',
+};
+const NODE_NAME = { bm: 'Baumaterial', mun: 'Munition', fuel: 'Treibstoff' };
+
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const pct = (f) => `${Math.max(0, Math.min(1, f)) * 100}%`;
+const hpColor = (f) => (f > 0.5 ? '#7dd38b' : f > 0.25 ? '#e0b44a' : '#e5484d');
+const bar = (f, cls = '', color = '') => `<div class="bar ${cls}"><i style="width:${pct(f)}${color ? `;background:${color}` : ''}"></i></div>`;
+
+function fmtRate(v) {
+  if (Math.abs(v) < 0.05) return '0';
+  return v >= 10 ? String(Math.round(v)) : v.toFixed(1);
+}
+
+function fmtTime(s) {
+  const t = Math.max(0, Math.floor(s));
+  const m = Math.floor(t / 60);
+  const sec = t % 60;
+  return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+}
+
+export class Hud {
+  /**
+   * @param {HTMLElement} root  leerer Container; die HUD-Struktur wird hier erzeugt
+   * @param {object} app       optional: { status(), changeSpeed(dir), cycleSpeed(), togglePause(), toggleHelp(), debug }
+   */
+  constructor(root, game, team, controller, app = {}) {
+    this.root = root;
+    this.game = game;
+    this.team = team;
+    this.controller = controller;
+    this.app = app;
+    this.lastDom = -1e9;
+    this.selHtml = '';
+    this.cmdHtml = '';
+    this.entries = [];
+    this.msgs = [];
+
+    root.innerHTML = this.template();
+    root.hidden = false;
+    const q = (s) => root.querySelector(s);
+    this.minimapCanvas = q('.mm canvas');
+    this.msgEl = q('[data-msgs]');
+    this.selEl = q('[data-sel]');
+    this.cmdEl = q('[data-cmd]');
+    this.timeEl = q('[data-time]');
+    this.zoneEl = q('[data-zone]');
+    this.speedBtn = q('[data-act=speed]');
+    this.pauseBtn = q('[data-act=pause]');
+    this.res = {};
+    for (const k of RES_KEYS) this.res[k] = { val: q(`[data-res=${k}] .val`), rate: q(`[data-res=${k}] .rate`) };
+    this.pts = [0, 1].map((t) => ({
+      fill: q(`[data-pf="${t}"]`),
+      prog: q(`[data-pp="${t}"]`),
+      num: q(`[data-pn="${t}"]`),
+    }));
+
+    this.onClick = (e) => this.click(e);
+    root.addEventListener('click', this.onClick);
+  }
+
+  template() {
+    const g = this.game;
+    const res = RES_KEYS.map(
+      (k) =>
+        `<div class="res res-${k}" data-res="${k}"><i class="dot"></i><span class="lbl">${BALANCE.resNames[k]}</span>` +
+        `<b class="val">0</b><small class="rate">+0/s</small></div>`,
+    ).join('');
+    const pts = [0, 1]
+      .map(
+        (t) =>
+          `<div class="pt" style="--c:${BALANCE.teamColors[t]}"><span class="pt-name">${BALANCE.teamNames[t]}</span>` +
+          `<div class="pt-track"><i class="pt-fill" data-pf="${t}"></i><i class="pt-prog" data-pp="${t}"></i></div>` +
+          `<b class="pt-num" data-pn="${t}">0 / ${g.winPoints}</b></div>`,
+      )
+      .join('');
+    return `
+      <header class="top">
+        <div class="res-row">${res}</div>
+        <div class="pts">${pts}</div>
+        <div class="zone" data-zone>neutral</div>
+        <div class="clock">
+          ${this.app.debug ? '<span class="dbg">DEBUG</span>' : ''}
+          <span class="time" data-time>00:00</span>
+          <button type="button" class="btn-sm" data-act="speed" title="Spielgeschwindigkeit (+ / -)">1×</button>
+          <button type="button" class="btn-sm" data-act="pause" title="Pause (P)">Pause</button>
+          <button type="button" class="btn-sm" data-act="help" title="Hilfe (F1)">Hilfe</button>
+        </div>
+      </header>
+      <div class="msgs" data-msgs></div>
+      <div class="bottom">
+        <div class="panel mm"><canvas aria-label="Übersicht"></canvas></div>
+        <div class="panel sel" data-sel></div>
+        <div class="panel cmd" data-cmd></div>
+      </div>`;
+  }
+
+  click(e) {
+    const act = e.target.closest('[data-act]');
+    if (act) {
+      if (act.dataset.act === 'speed') this.app.cycleSpeed?.();
+      else if (act.dataset.act === 'pause') this.app.togglePause?.();
+      else if (act.dataset.act === 'help') this.app.toggleHelp?.();
+      return;
+    }
+    const cb = e.target.closest('.cbtn');
+    if (cb) {
+      const en = this.entries[Number(cb.dataset.i)];
+      if (en) {
+        if (en.enabled) en.action();
+        else this.controller.message(en.reason || en.tip);
+      }
+      this.refresh();
+      return;
+    }
+    const msg = e.target.closest('.msg.go');
+    if (msg) {
+      const m = this.msgs[Number(msg.dataset.m)];
+      if (m && m.pos) this.controller.camera.centerOn(m.pos.x, m.pos.y);
+    }
+  }
+
+  /** Aktualisiert alle Teile, höchstens alle 200 ms (außer force). */
+  update(force = false) {
+    const now = performance.now();
+    if (!force && now - this.lastDom < DOM_EVERY) return;
+    this.lastDom = now;
+    this.updateTop();
+    this.updateSelection();
+    this.updateCommands();
+    this.expire(now);
+  }
+
+  refresh() {
+    this.update(true);
+  }
+
+  updateTop() {
+    const g = this.game;
+    const t = g.teams[this.team];
+    for (const k of RES_KEYS) {
+      const el = this.res[k];
+      el.val.textContent = String(Math.floor(t.res[k]));
+      el.rate.textContent = `+${fmtRate(t.income[k])}/s`;
+    }
+    for (let i = 0; i < 2; i++) {
+      const tm = g.teams[i];
+      const p = this.pts[i];
+      p.fill.style.width = pct(tm.points / g.winPoints);
+      p.prog.style.width = pct(tm.pointProgress / BALANCE.pointInterval);
+      p.num.textContent = `${tm.points} / ${g.winPoints}`;
+    }
+    const z = g.zone;
+    let label;
+    let col;
+    if (z.contested) {
+      label = 'umkämpft';
+      col = '#e8ece4';
+    } else if (z.owner >= 0) {
+      label = `Zone: ${BALANCE.teamNames[z.owner]}`;
+      col = BALANCE.teamColors[z.owner];
+    } else {
+      label = 'neutral';
+      col = '#9aa596';
+    }
+    this.zoneEl.innerHTML = `<span style="color:${col}">${label}</span><small>${BALANCE.teamNames[0]} ${z.counts[0]} · ${BALANCE.teamNames[1]} ${z.counts[1]}</small>`;
+    this.timeEl.textContent = fmtTime(g.time);
+    const st = this.app.status ? this.app.status() : { paused: false, speed: 1 };
+    this.speedBtn.textContent = `${st.speed}×`;
+    this.pauseBtn.textContent = st.paused ? 'Weiter' : 'Pause';
+  }
+
+  updateSelection() {
+    const c = this.controller;
+    const sel = c.selected();
+    const hint = c.hint();
+    let html = hint ? `<div class="hint">${esc(hint)}</div>` : '';
+    if (!sel.length) {
+      html +=
+        '<div class="empty">Nichts ausgewählt</div>' +
+        '<div class="muted small">Klick wählt, Rahmen für mehrere, Rechtsklick befiehlt. F1 zeigt alle Tasten.</div>';
+    } else if (sel.length === 1) {
+      html += sel[0].kind === 'unit' ? this.unitInfo(sel[0]) : this.buildingInfo(sel[0]);
+    } else {
+      html += this.multiInfo(sel);
+    }
+    if (html !== this.selHtml) {
+      this.selHtml = html;
+      this.selEl.innerHTML = html;
+    }
+  }
+
+  unitInfo(u) {
+    const f = u.hp / u.maxHp;
+    const st = ORDER_LABEL[u.order.type] || 'Bereit';
+    return (
+      `<div class="title">${esc(u.def.name)}</div>${bar(f, 'hp', hpColor(f))}` +
+      `<div class="muted small">${Math.ceil(u.hp)} / ${u.maxHp} HP · ${st}</div>`
+    );
+  }
+
+  buildingInfo(b) {
+    const f = b.hp / b.maxHp;
+    let h = `<div class="title">${esc(b.def.name)}</div>${bar(f, 'hp', hpColor(f))}`;
+    if (!b.built) {
+      h += `<div class="muted small">Im Bau · ${Math.floor(b.progress * 100)} %</div>${bar(b.progress, 'prog')}`;
+    } else {
+      h += '<div class="muted small">Einsatzbereit</div>';
+    }
+    if (b.type === 'extractor' && b.nodeId) {
+      const n = this.game.nodeById.get(b.nodeId);
+      if (n) h += `<div class="muted small">Fördert ${NODE_NAME[n.type]} · ${b.def.yields[n.type]}/s</div>`;
+    }
+    if (b.queue.length) {
+      const ut = UNITS[b.queue[0]];
+      const shown = Math.min(ut.buildTime, b.queueTime).toFixed(0);
+      h +=
+        `<div class="queue"><div class="small">${esc(ut.name)}: ${shown} / ${ut.buildTime} s</div>` +
+        `${bar(b.queueTime / ut.buildTime, 'prog')}` +
+        `<div class="muted small">Warteschlange: ${b.queue.map((t) => esc(UNITS[t].name)).join(', ')}</div></div>`;
+    }
+    return h;
+  }
+
+  multiInfo(sel) {
+    const units = sel.filter((e) => e.kind === 'unit').length;
+    const blds = sel.length - units;
+    const counts = new Map();
+    for (const e of sel) counts.set(e.def.name, (counts.get(e.def.name) || 0) + 1);
+    const title = [units ? `${units} Einheiten` : '', blds ? `${blds} Gebäude` : ''].filter(Boolean).join(' · ');
+    const chips = [...counts].map(([n, c]) => `<span>${c}× ${esc(n)}</span>`).join('');
+    return `<div class="title">${title}</div><div class="chips">${chips}</div>`;
+  }
+
+  updateCommands() {
+    const entries = this.controller.commandCard();
+    this.entries = entries;
+    const html = entries
+      .map(
+        (e, i) =>
+          `<button type="button" class="cbtn${e.enabled ? '' : ' off'}" data-i="${i}" ` +
+          `data-tip="${esc(e.enabled ? e.tip : e.reason || e.tip)}">` +
+          `<span class="cl">${esc(e.label)}</span>` +
+          `${e.cost ? `<span class="cc">${esc(e.cost)}</span>` : ''}` +
+          `${e.hotkey ? `<span class="ck">${esc(e.hotkey)}</span>` : ''}</button>`,
+      )
+      .join('');
+    if (html !== this.cmdHtml) {
+      this.cmdHtml = html;
+      this.cmdEl.innerHTML = html;
+    }
+  }
+
+  /** Meldung anzeigen (höchstens 5, je 6 s). pos = {x, y} in Welt: Klick springt dorthin. */
+  pushMessage(text, pos = null) {
+    const now = performance.now();
+    if (this.msgs.some((m) => m.text === text && now - m.t < 1500)) return;
+    this.msgs.push({ text, pos, t: now });
+    if (this.msgs.length > MSG_MAX) this.msgs.splice(0, this.msgs.length - MSG_MAX);
+    this.renderMsgs();
+  }
+
+  renderMsgs() {
+    this.msgEl.innerHTML = this.msgs
+      .map((m, i) => `<div class="msg${m.pos ? ' go' : ''}" data-m="${i}">${esc(m.text)}</div>`)
+      .join('');
+  }
+
+  expire(now) {
+    const n = this.msgs.length;
+    this.msgs = this.msgs.filter((m) => now - m.t < MSG_LIFE);
+    if (this.msgs.length !== n) this.renderMsgs();
+  }
+
+  destroy() {
+    this.root.removeEventListener('click', this.onClick);
+    this.root.innerHTML = '';
+    this.root.hidden = true;
+  }
+}
