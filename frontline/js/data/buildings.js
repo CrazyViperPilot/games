@@ -1,5 +1,5 @@
 // Gebäudewerte (PLAN.md §3.3). w, h in Zellen. Alle Gebäude haben Rüstung 'struct'.
-// Optional: weapon {range, minRange, cooldown, damage, splash, shell}, aa {range, cooldown, chance},
+// Optional: weapon {range, minRange, cooldown, damage, splash, shell, ammoPerShot}, aa {range, cooldown, chance, ammoPerShot},
 // yields (nur Förderanlage), buildable (false = nur per LKW), blocksAll (Mauer), gate (Tor).
 // hotkey: Taste im Baumenü, null = keine.
 export const BUILDINGS = {
@@ -21,6 +21,7 @@ export const BUILDINGS = {
       damage: { inf: 12, light: 4, heavy: 1, struct: 4 },
       splash: 0,
       shell: false,
+      ammoPerShot: 0, // Basis wehrt sich immer
     },
     buildable: false,
   },
@@ -47,7 +48,7 @@ export const BUILDINGS = {
     buildTime: 15,
     hotkey: 'W',
     produces: [],
-    yields: { bm: 3, mun: 2, fuel: 2 }, // Rate je Sekunde je Sorte des Vorkommens
+    yields: { bm: 4, mun: 4, fuel: 3 }, // Rate je Sekunde je Sorte des Vorkommens
   },
   wall: {
     name: 'Mauer',
@@ -93,6 +94,7 @@ export const BUILDINGS = {
       damage: { inf: 60, light: 50, heavy: 25, struct: 80 },
       splash: 60,
       shell: true, // indirektes Feuer: Flugzeit = Distanz / 300
+      ammoPerShot: 4, // je Granate
     },
   },
   aa: {
@@ -106,7 +108,7 @@ export const BUILDINGS = {
     buildTime: 18,
     hotkey: 'Z',
     produces: [],
-    aa: { range: 350, cooldown: 0.6, chance: 0.7 },
+    aa: { range: 350, cooldown: 0.6, chance: 0.7, ammoPerShot: 0.25 }, // je Abfangversuch
     weapon: {
       range: 260,
       minRange: 0,
@@ -114,6 +116,7 @@ export const BUILDINGS = {
       damage: { inf: 10, light: 12, heavy: 2, struct: 4 },
       splash: 0,
       shell: false,
+      ammoPerShot: 0.25,
     },
   },
 };

@@ -30,8 +30,8 @@ Nicht im Umfang: Netzwerk-Multiplayer, Kampagne, Speichern laufender Partien, Lu
 |---|---|---|
 | **Geld** | Konfliktzone (Kontrolle + je Einheit darin), kleines Grundeinkommen je FOB | Einheiten |
 | **Baumaterial** | Förderanlage auf Baumaterial-Vorkommen | Gebäude, FOBs, Mauern, Tore |
-| **Munition** | Förderanlage auf Munitions-Vorkommen | Infanterie, Fahrzeuge, Mörser, Flugabwehr |
-| **Treibstoff** | Förderanlage auf Treibstoff-Vorkommen | LKW, Fahrzeuge |
+| **Munition** | Förderanlage auf Munitions-Vorkommen | Einheiten, Mörser, Flugabwehr – **Verbrauch je Schuss**; ohne Vorrat wird nicht geschossen (FOB-MG kostet nichts) |
+| **Treibstoff** | Förderanlage auf Treibstoff-Vorkommen | LKW, Fahrzeuge – **Verbrauch beim Fahren**; ohne Vorrat nur 25 % Tempo |
 
 - Vorkommen sind unerschöpflich. Pro Vorkommen genau eine Förderanlage.
 - Jede Startposition hat je ein Vorkommen jeder Sorte im Bauradius ihrer Start-FOB; weitere liegen verteilt auf der Karte,

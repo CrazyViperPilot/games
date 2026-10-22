@@ -1,6 +1,6 @@
 // Frontline Service Worker: cache-first mit Hintergrund-Update (stale-while-revalidate).
 // Bei Änderungen an Dateien CACHE_VERSION erhöhen, damit Clients die neue Version laden.
-const CACHE_VERSION = 'frontline-v2';
+const CACHE_VERSION = 'frontline-v3';
 const CACHE_PREFIX = 'frontline-';
 const CACHE_NAME = CACHE_VERSION;
 

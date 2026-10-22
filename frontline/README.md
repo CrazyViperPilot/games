@@ -9,7 +9,7 @@ Spezifikation: [PRD.md](PRD.md) · Architektur: [PLAN.md](PLAN.md)
 
 - Jede Partei startet mit einer FOB, einem LKW, vier Schützen und Startressourcen.
 - **Ressourcen:** Geld (Konfliktzone, Grundeinkommen der FOB), Baumaterial, Munition und Treibstoff
-  (Förderanlagen auf den Vorkommen).
+  (Förderanlagen auf den Vorkommen). Munition und Treibstoff werden verbraucht: je Schuss bzw. beim Fahren.
 - Gebäude nur im Bauradius (450 px) einer fertigen eigenen FOB. Weitere FOBs baut ein LKW (max. 6).
 - **Konfliktzone:** Wer dort Einheiten hat (und der Gegner keine), kontrolliert sie: Geld und alle 30 s ein Punkt.
   Sind beide drin, ist sie umkämpft.

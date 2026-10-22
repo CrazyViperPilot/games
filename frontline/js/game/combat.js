@@ -11,12 +11,31 @@ const BASE_WARN_INTERVAL = 20; // s zwischen zwei Meldungen „Basis wird angegr
 export function weaponOf(e) {
   if (e.kind === 'unit') {
     if (!e.def.range || !e.def.damage) return null;
-    return { range: e.def.range, minRange: 0, cooldown: e.def.cooldown, damage: e.def.damage, splash: 0, shell: false };
+    return {
+      range: e.def.range,
+      minRange: 0,
+      cooldown: e.def.cooldown,
+      damage: e.def.damage,
+      splash: 0,
+      shell: false,
+      ammoPerShot: e.def.ammoPerShot || 0,
+    };
   }
   return e.def.weapon ?? null;
 }
 
 const dmgKey = (e) => (e.kind === 'building' ? 'struct' : e.def.armor);
+
+/** Zieht Munition für einen Schuss ab. false (Mangelmeldung) wenn der Teamvorrat nicht reicht; ohne Verbrauch immer true. */
+function takeAmmo(game, s, need, dt) {
+  if (!(need > 0)) return true;
+  if (game.teams[s.team].res.mun < need) {
+    game.shortage(s.team, 'mun');
+    return false;
+  }
+  game.useRes(s.team, 'mun', need, dt);
+  return true;
+}
 
 function warnBase(game, target) {
   const team = game.teams[target.team];
@@ -87,22 +106,27 @@ function fireShell(game, s, tx, ty, w) {
   s.cooldown = w.cooldown;
 }
 
-/** Schießt auf t, wenn Abklingzeit abgelaufen und t in Reichweite (Mörser: Mindestreichweite und Sicht). */
-function tryFire(game, s, t, w) {
+/**
+ * Schießt auf t, wenn Abklingzeit abgelaufen und t in Reichweite (Mörser: Mindestreichweite und Sicht).
+ * Ohne Munition wird nicht geschossen; die Abklingzeit läuft dann nicht an.
+ */
+function tryFire(game, s, t, w, dt) {
   if (s.cooldown > 0) return;
   if (w.shell) {
     const d = Math.hypot(t.x - s.x, t.y - s.y);
     if (d < w.minRange || !inRange(s, t, w.range)) return;
     if (!game.isVisible(s.team, t.x, t.y)) return;
+    if (!takeAmmo(game, s, w.ammoPerShot, dt)) return;
     fireShell(game, s, t.x, t.y, w);
     return;
   }
   if (!inRange(s, t, w.range)) return;
+  if (!takeAmmo(game, s, w.ammoPerShot, dt)) return;
   fireDirect(game, s, t, w);
 }
 
 /** Flugabwehr: jede bereite Flugabwehr fängt die nächste gegnerische Granate in Reichweite mit `chance` ab. */
-function interceptShells(game) {
+function interceptShells(game, dt) {
   for (const b of game.buildings) {
     if (!b.alive || !b.built || !b.def.aa || b.aaCooldown > 0) continue;
     let best = null;
@@ -116,6 +140,7 @@ function interceptShells(game) {
       }
     }
     if (!best) continue;
+    if (!takeAmmo(game, b, b.def.aa.ammoPerShot, dt)) continue;
     b.aaCooldown = b.def.aa.cooldown;
     if (game.rng.next() < b.def.aa.chance) {
       best.alive = false;
@@ -149,7 +174,7 @@ function updateProjectiles(game, dt) {
     p.x = p.sx + (p.tx - p.sx) * f;
     p.y = p.sy + (p.ty - p.sy) * f;
   }
-  interceptShells(game);
+  interceptShells(game, dt);
   for (const p of game.projectiles) {
     if (p.alive && p.t >= p.duration) impact(game, p);
   }
@@ -181,7 +206,7 @@ export function updateCombat(game, dt) {
     if (o === 'move' || o === 'buildFob') continue; // Marschierende Einheiten feuern nicht automatisch
     if (o === 'attack') {
       const t = game.getEntity(u.order.targetId);
-      if (t && t.team !== u.team) tryFire(game, u, t, w);
+      if (t && t.team !== u.team) tryFire(game, u, t, w, dt);
       continue;
     }
     // idle / attackMove: automatische Zielsuche
@@ -192,7 +217,7 @@ export function updateCombat(game, dt) {
     }
     if (u.targetId !== null) {
       const t = game.getEntity(u.targetId);
-      if (t) tryFire(game, u, t, w);
+      if (t) tryFire(game, u, t, w, dt);
     }
   }
 
@@ -207,7 +232,7 @@ export function updateCombat(game, dt) {
     }
     if (b.targetId !== null) {
       const t = game.getEntity(b.targetId);
-      if (t) tryFire(game, b, t, w);
+      if (t) tryFire(game, b, t, w, dt);
     }
   }
 

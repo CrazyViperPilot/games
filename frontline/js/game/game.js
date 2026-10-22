@@ -17,6 +17,10 @@ const W = BALANCE.map.width;
 const H = BALANCE.map.height;
 const RES_KEYS = ['money', 'bm', 'mun', 'fuel'];
 const EFFECT_LIFE = { tracer: 0.12, shell: 0.3, explosion: 0.5, intercept: 0.4, muzzle: 0.1 };
+const SHORTAGE_TEXT = {
+  mun: 'Keine Munition – Einheiten feuern nicht',
+  fuel: 'Kein Treibstoff – Fahrzeuge langsam',
+};
 
 const zeroRes = () => ({ money: 0, bm: 0, mun: 0, fuel: 0 });
 const fail = (reason) => ({ ok: false, reason });
@@ -78,6 +82,8 @@ export class Game {
       rate: zeroRes(),
       points: 0,
       pointProgress: 0,
+      used: { mun: 0, fuel: 0 }, // Summe des Verbrauchs (Statistik)
+      warnAt: { mun: -1e9, fuel: -1e9 }, // Zeitpunkt der letzten Mangelmeldung je Sorte
       incomeMult: 1,
       isAI: false,
       lastWarn: -1e9,
@@ -116,6 +122,29 @@ export class Game {
   /** Ereignis: team = Empfänger (-1 = alle). */
   message(team, text, x = null, y = null) {
     this.events.push({ type: 'message', team, text, x, y });
+  }
+
+  /**
+   * Verbraucht `amount` aus dem Teamvorrat (nie unter 0). Die Rate wird netto negativ gebucht:
+   * dt = Tickdauer, so dass ein einmaliger Schuss als Anteil dieses Ticks in team.rate landet.
+   * Liefert die tatsächlich verbrauchte Menge.
+   */
+  useRes(team, key, amount, dt) {
+    const t = this.teams[team];
+    const take = Math.min(t.res[key], amount);
+    if (!(take > 0)) return 0;
+    t.res[key] -= take;
+    t.used[key] += take;
+    if (dt > 0) t.rate[key] -= take / dt;
+    return take;
+  }
+
+  /** Mangelmeldung für Munition oder Treibstoff, höchstens alle `shortageWarn` s je Sorte. */
+  shortage(team, key) {
+    const t = this.teams[team];
+    if (this.time - t.warnAt[key] < BALANCE.shortageWarn) return;
+    t.warnAt[key] = this.time;
+    this.message(team, SHORTAGE_TEXT[key]);
   }
 
   drainEvents() {
@@ -582,6 +611,7 @@ export class Game {
       return;
     }
     this.time += dt;
+    // Reihenfolge: economy setzt team.rate zurück; movement/combat buchen Verbrauch (negativ) hinein; smoothIncome zuletzt
     updateEconomy(this, dt);
     updateMovement(this, dt);
     updateCombat(this, dt);

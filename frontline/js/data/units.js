@@ -15,6 +15,8 @@ export const UNITS = {
     cost: { money: 60, mun: 15 },
     buildTime: 8,
     producedAt: 'fob',
+    ammoPerShot: 0.25,
+    fuelPerSec: 0,
     hotkey: 'Q',
   },
   at: {
@@ -30,6 +32,8 @@ export const UNITS = {
     cost: { money: 120, mun: 40 },
     buildTime: 12,
     producedAt: 'fob',
+    ammoPerShot: 2,
+    fuelPerSec: 0,
     hotkey: 'W',
   },
   truck: {
@@ -45,6 +49,8 @@ export const UNITS = {
     cost: { money: 80, fuel: 40 },
     buildTime: 10,
     producedAt: 'fob',
+    ammoPerShot: 0,
+    fuelPerSec: 0.2,
     hotkey: 'E',
   },
   ifv: {
@@ -60,6 +66,8 @@ export const UNITS = {
     cost: { money: 250, mun: 50, fuel: 80 },
     buildTime: 20,
     producedAt: 'depot',
+    ammoPerShot: 0.4,
+    fuelPerSec: 0.4,
     hotkey: 'Q',
   },
   tank: {
@@ -75,6 +83,8 @@ export const UNITS = {
     cost: { money: 500, mun: 100, fuel: 150 },
     buildTime: 35,
     producedAt: 'depot',
+    ammoPerShot: 4,
+    fuelPerSec: 0.6,
     hotkey: 'W',
   },
 };

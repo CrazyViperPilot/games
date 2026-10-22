@@ -31,6 +31,7 @@ export function createUnit(id, type, team, x, y) {
     goalY: y,
     repathTimer: 0,
     needPath: false,
+    speedMul: 1, // 0.25 bei Fahrzeugen ohne Treibstoff (movement.js)
   };
 }
 

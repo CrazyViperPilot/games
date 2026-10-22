@@ -4,11 +4,13 @@ export const BALANCE = {
   tickRate: 20, // Simulationsschritte/s
   winPoints: 100,
   pointInterval: 30,
-  startRes: { money: 400, bm: 500, mun: 150, fuel: 150 },
+  startRes: { money: 400, bm: 600, mun: 150, fuel: 150 },
   startUnits: ['truck', 'rifleman', 'rifleman', 'rifleman', 'rifleman'],
   zone: { r: 1100, controlIncome: 6, unitIncome: 0.25, unitIncomeCap: 30 },
   fob: { buildRadius: 450, minDistOwn: 500, minDistEnemy: 700, max: 6, income: 5 },
   queueMax: 5,
+  shortageWarn: 20,                   // s zwischen zwei Meldungen je Sorte bei Munitions-/Treibstoffmangel
+  fuelSlowMul: 0.25,                  // Tempo von Fahrzeugen ohne Treibstoff
   unitCap: 120,                       // lebende + in Ausbildung befindliche Einheiten je Team
   demolishRefund: 0.25,
   scanInterval: 0.25, // Zielsuche

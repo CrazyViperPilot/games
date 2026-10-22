@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
 import { BALANCE } from '../js/data/balance.js';
+import { UNITS } from '../js/data/units.js';
 
 const DT = 0.05;
 const TILE = BALANCE.map.tile;
@@ -290,4 +291,98 @@ test('Flugabwehr fängt Mörsergranaten ab', () => {
   }
   assert.equal(sawShell, true, 'Granate entsteht');
   assert.equal(sawIntercept, true, 'Abfang');
+});
+
+test('Verbrauch: ein Schuss zieht Munition ab', () => {
+  const g = new Game({ seed: 7 });
+  const sp = g.map.spawns[0];
+  const rifle = g.spawnUnit('rifleman', 0, sp.x + 300, sp.y - 300);
+  const enemy = g.spawnUnit('rifleman', 1, rifle.x + 120, rifle.y);
+  const mun0 = g.teams[0].res.mun;
+  assert.equal(g.issue(0, { type: 'attack', ids: [rifle.id], targetId: enemy.id }).ok, true);
+  run(g, DT);
+  assert.equal(g.teams[0].res.mun, mun0 - UNITS.rifleman.ammoPerShot);
+  assert.equal(g.teams[0].used.mun, UNITS.rifleman.ammoPerShot);
+  assert.ok(rifle.cooldown > 0, 'Abklingzeit läuft nach dem Schuss');
+  assert.ok(g.teams[0].rate.mun < 0, 'Verbrauch fließt negativ in die Rate');
+});
+
+test('Verbrauch: ohne Munition wird nicht geschossen und die Abklingzeit läuft nicht an', () => {
+  const g = new Game({ seed: 7 });
+  const sp = g.map.spawns[0];
+  const rifle = g.spawnUnit('rifleman', 0, sp.x + 300, sp.y - 300);
+  const enemy = g.spawnUnit('rifleman', 1, rifle.x + 120, rifle.y);
+  g.teams[0].res.mun = 0;
+  assert.equal(g.issue(0, { type: 'attack', ids: [rifle.id], targetId: enemy.id }).ok, true);
+  run(g, 3);
+  assert.equal(enemy.hp, enemy.maxHp, 'kein Schaden ohne Munition');
+  assert.equal(rifle.cooldown, 0);
+  assert.equal(g.teams[0].res.mun, 0);
+  assert.equal(g.teams[0].used.mun, 0);
+  assert.ok(g.drainEvents().some((e) => e.text.startsWith('Keine Munition')), 'Mangelmeldung');
+});
+
+test('Verbrauch: fahrender Panzer verbraucht Treibstoff, stehender nicht', () => {
+  const still = new Game({ seed: 7 });
+  const c = still.zone;
+  still.spawnUnit('tank', 0, c.x, c.y);
+  const f0 = still.teams[0].res.fuel;
+  run(still, 3);
+  assert.equal(still.teams[0].res.fuel, f0, 'stehend kein Verbrauch');
+
+  const g = new Game({ seed: 7 });
+  const tank = g.spawnUnit('tank', 0, c.x, c.y);
+  const fuel0 = g.teams[0].res.fuel;
+  assert.equal(g.issue(0, { type: 'move', ids: [tank.id], x: c.x + 600, y: c.y }).ok, true);
+  let moved = 0;
+  for (let i = 0; i < 40; i++) {
+    const x0 = tank.x;
+    const y0 = tank.y;
+    g.update(DT);
+    const mv = tank.x !== x0 || tank.y !== y0;
+    if (mv) moved++;
+    // Rate je Tick: -fuelPerSec, wenn gefahren wurde, sonst 0
+    assert.ok(Math.abs(g.teams[0].rate.fuel + (mv ? UNITS.tank.fuelPerSec : 0)) < 1e-9, `Rate im Tick ${i}`);
+  }
+  assert.ok(moved > 0, 'Panzer ist gefahren');
+  const used = fuel0 - g.teams[0].res.fuel;
+  assert.ok(Math.abs(used - UNITS.tank.fuelPerSec * DT * moved) < 1e-9, `Verbrauch ${used}`);
+  assert.ok(Math.abs(g.teams[0].used.fuel - used) < 1e-9);
+});
+
+test('Verbrauch: ohne Treibstoff fährt ein Panzer mit 25 % Tempo, Vorrat wird nie negativ', () => {
+  const travel = (fuel) => {
+    const g = new Game({ seed: 7 });
+    const c = g.zone;
+    const tank = g.spawnUnit('tank', 0, c.x, c.y);
+    g.teams[0].res.fuel = fuel;
+    assert.equal(g.issue(0, { type: 'move', ids: [tank.id], x: c.x + 800, y: c.y }).ok, true);
+    let d = 0;
+    for (let i = 0; i < 40; i++) {
+      const x0 = tank.x;
+      const y0 = tank.y;
+      g.update(DT);
+      d += dist(x0, y0, tank.x, tank.y);
+    }
+    return { d, fuel: g.teams[0].res.fuel };
+  };
+  const full = travel(150);
+  const empty = travel(0);
+  assert.ok(full.d > 60, 'Referenzstrecke');
+  assert.ok(Math.abs(empty.d / full.d - BALANCE.fuelSlowMul) < 0.02, `Tempoverhältnis ${empty.d / full.d}`);
+  assert.equal(empty.fuel, 0);
+  // Vorrat reicht nur für einen Teil: der Rest wird nicht negativ
+  const short = travel(0.01);
+  assert.equal(short.fuel, 0);
+});
+
+test('Verbrauch: FOB-MG feuert ohne Munition', () => {
+  const g = new Game({ seed: 7 });
+  const f = fobOf(g, 0);
+  g.teams[0].res.mun = 0;
+  const enemy = g.spawnUnit('rifleman', 1, f.x + 150, f.y);
+  run(g, 3);
+  assert.ok(enemy.hp < enemy.maxHp, 'FOB-MG trifft ohne Munition');
+  assert.equal(g.teams[0].res.mun, 0);
+  assert.equal(g.teams[0].used.mun, 0);
 });

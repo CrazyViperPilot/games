@@ -15,6 +15,7 @@ const ORDER_LABEL = {
   buildFob: 'Fährt zur FOB-Baustelle',
 };
 const NODE_NAME = { bm: 'Baumaterial', mun: 'Munition', fuel: 'Treibstoff' };
+const NEG_COLOR = '#e5484d'; // Verbrauch (negative Netto-Rate)
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const pct = (f) => `${Math.max(0, Math.min(1, f)) * 100}%`;
@@ -62,7 +63,9 @@ export class Hud {
     this.speedBtn = q('[data-act=speed]');
     this.pauseBtn = q('[data-act=pause]');
     this.res = {};
-    for (const k of RES_KEYS) this.res[k] = { val: q(`[data-res=${k}] .val`), rate: q(`[data-res=${k}] .rate`) };
+    for (const k of RES_KEYS) {
+      this.res[k] = { box: q(`[data-res=${k}]`), val: q(`[data-res=${k}] .val`), rate: q(`[data-res=${k}] .rate`) };
+    }
     this.pts = [0, 1].map((t) => ({
       fill: q(`[data-pf="${t}"]`),
       prog: q(`[data-pp="${t}"]`),
@@ -154,8 +157,15 @@ export class Hud {
     const t = g.teams[this.team];
     for (const k of RES_KEYS) {
       const el = this.res[k];
+      const v = t.income[k];
+      const neg = v <= -0.05; // Netto-Verbrauch (Munition/Treibstoff)
       el.val.textContent = String(Math.floor(t.res[k]));
-      el.rate.textContent = `+${fmtRate(t.income[k])}/s`;
+      el.rate.textContent = `${neg ? '−' : '+'}${fmtRate(Math.abs(v))}/s`;
+      el.rate.style.color = neg ? NEG_COLOR : '';
+      if (t.used[k] !== undefined) {
+        const tip = `${BALANCE.resNames[k]}: verbraucht ${Math.floor(t.used[k])}`;
+        if (el.box.title !== tip) el.box.title = tip;
+      }
     }
     for (let i = 0; i < 2; i++) {
       const tm = g.teams[i];

@@ -18,6 +18,8 @@ const KEYS = [
   ['Q / W / E', 'Ausbildung im gewählten Gebäude (FOB: Schütze, PAK, LKW · Halle: SPz, KPz)'],
   ['F', 'LKW gewählt: FOB errichten, dann Zielpunkt anklicken'],
   ['Entf', 'Gebäude abreißen (25 % des Baumaterials zurück)'],
+  ['Munition', 'Jeder Schuss verbraucht Munition · ohne Vorrat feuern Einheiten nicht (FOB-MG kostet nichts)'],
+  ['Treibstoff', 'Fahrzeuge verbrauchen Treibstoff nur beim Fahren · ohne Vorrat nur 25 % Tempo'],
   ['Esc', 'Abbrechen · Auswahl aufheben'],
   ['Strg + 0–9', 'Gruppe speichern · 0–9 wählt · zweimal drücken = Kamera hin'],
   ['Pfeile / Rand', 'Kamera bewegen · Mausrad = Zoom · mittlere Taste ziehen'],

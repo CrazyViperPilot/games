@@ -110,7 +110,7 @@ function stepToward(grid, u, tx, ty, step) {
 /** Folgt dem Weg mit Tempo `speed * dt`. false, wenn ein Wegpunkt blockiert ist (neu planen). */
 function followPath(game, u, dt) {
   const grid = game.grid;
-  let budget = u.def.speed * dt;
+  let budget = u.def.speed * u.speedMul * dt;
   while (budget > 1e-9 && u.pathIndex < u.path.length) {
     const wp = u.path[u.pathIndex];
     if (!grid.passable(grid.toCell(wp.x), grid.toCell(wp.y), u.team)) return false;
@@ -247,12 +247,23 @@ function separate(game) {
   }
 }
 
-/** Bewegt alle Einheiten um dt und trennt sie danach. */
+/**
+ * Bewegt alle Einheiten um dt und trennt sie danach.
+ * Fahrzeuge verbrauchen Treibstoff nur, wenn sie sich tatsächlich bewegen; ohne Vorrat fahren sie langsamer.
+ */
 export function updateMovement(game, dt) {
   for (const u of game.units) {
     if (!u.alive) continue;
     u.repathTimer = Math.max(0, u.repathTimer - dt);
+    const fuelPerSec = u.def.fuelPerSec || 0;
+    u.speedMul = fuelPerSec > 0 && game.teams[u.team].res.fuel <= 0 ? BALANCE.fuelSlowMul : 1;
+    const x0 = u.x;
+    const y0 = u.y;
     stepUnit(game, u, dt);
+    if (fuelPerSec > 0 && (u.x !== x0 || u.y !== y0)) {
+      game.useRes(u.team, 'fuel', fuelPerSec * dt, dt);
+      if (game.teams[u.team].res.fuel <= 0) game.shortage(u.team, 'fuel');
+    }
   }
   separate(game);
 }
