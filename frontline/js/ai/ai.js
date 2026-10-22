@@ -1,26 +1,47 @@
-// KI-Gegner (PLAN.md §5, ai/ai.js). Steuert nur über game.issue und liest den Zustand. Kein DOM.
+// KI-Gegner (PLAN.md §5, §10.2). Steuert nur über game.issue und liest den Zustand. Kein DOM.
+// Reihenfolge je Denkschritt: Verteidigung, Expansion (LKW), Förderanlagen, Halle, Produktion,
+// Verteidigungsgebäude und Mauer (erst mit Wirtschaftsbasis), Sammelpunkte, Armee.
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { makeRng } from '../core/rng.js';
 
-const MAX_PLACE = 60; // canPlace-Aufrufe je Denkschritt (Budget für die Platzsuche)
-const DEF_RANGE = BALANCE.fob.buildRadius; // Verteidigungsradius und Bauradius einer FOB
+const MAX_PLACE = 100; // canPlace-Aufrufe je Denkschritt (Budget für die Platzsuche)
+const DEF_RANGE = BALANCE.fob.buildRadius; // Bauradius = Verteidigungsradius einer FOB
+const FOB_MIN = BALANCE.fob.minDistOwn; // Mindestabstand eigener FOBs (auch zwischen Zielen)
+const FOB_COST = BUILDINGS.fob.cost.bm;
+const ZONE_FOB_R = BALANCE.zone.r * 0.6; // Zonen-FOB: Mittelpunkt höchstens so weit von der Zonenmitte
 const THREAT_RANGE = 900; // Kampfeinheiten in dieser Nähe zur Bedrohung reagieren
+const THREAT_DANGER = 600; // Gegner in dieser Nähe machen ein FOB-Ziel unattraktiver
 const GATHER_DIST = 300; // Sammelpunkt Richtung Zone, vom Zentrum der Haupt-FOB
-const FRONT_DIST = BALANCE.zone.r + 150; // FOB-Ziel knapp außerhalb des Zonenrandes (Richtung eigener Basis)
+const ZONE_GATHER_DIST = 150; // Sammelpunkt an der Zonen-FOB, Richtung eigener Basis
+const RALLY_MOVE = 150; // Sammelpunkt-Befehl nur neu setzen, wenn sich der Punkt so weit verschiebt
 const MAX_FOB_NODE_DIST = 2600; // FOB-Ziele an Vorkommen höchstens so weit von der Haupt-FOB
+const JOB_TIMEOUT = 240; // s, danach gilt ein FOB-Auftrag als gescheitert
+const BAD_TIME = 240; // s, Sperre eines fehlgeschlagenen FOB-Ziels
+const ALARM_TIME = 30; // s, Treffer an der Basis gelten als Angriff auf die Basis
+const AMMO_ATTACK = 30; // keine Angriffe bei weniger Munition
+const AMMO_PER_COMBAT = 3; // Munitionsreserve je Kampfeinheit (max. AMMO_RESERVE_MAX)
+const AMMO_RESERVE_MAX = 150;
+const RICH = 1500; // Geld, ab dem zusätzliche Hallen gebaut werden
 const WALL_OFFSET = 4; // Mauer im Abstand (Zellen) vom Zentrum der Haupt-FOB
 const WALL_HALF = 3; // Mauerlinie: 2 × WALL_HALF + 1 Zellen, Tor in der Mitte
 const MIX = { rifleman: 0.5, at: 0.2, ifv: 0.2, tank: 0.1 }; // Zielanteile der Kampfeinheiten
 const THREAT_PER_UNIT = 150; // mittlerer Geldwert einer Kampfeinheit (Mix) für die Schätzung einer Besatzung
-const FOB_CAP = { easy: 2, normal: 4, hard: 4 };
-const NODE_ORDER = { bm: 0, mun: 1, fuel: 2 };
+const FOB_CAP = { easy: 3, normal: 6, hard: 6 }; // FOB-Grenze je Schwierigkeit (Spielmaximum 6)
+const DEPOT_CAP = { easy: 1, normal: 2, hard: 3 }; // Fahrzeughallen je Schwierigkeit
+const NODE_W = { bm: 1, mun: 1.5, fuel: 1.5 }; // Gewicht eines freien Vorkommens für den FOB-Wert
+const NEED = { bm: 1000, mun: 300, fuel: 250 }; // Bedarf je Sorte: kleinster Vorrat/Bedarf zuerst
 const DEG = Math.PI / 180;
 const SITE_ANGLES = [0, 30, -30, 60, -60, 90, -90, 120, -120, 150, -150, 180].map((d) => d * DEG);
 const TWO_PI = Math.PI * 2;
+const RES_KEYS = ['money', 'bm', 'mun', 'fuel'];
 
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
+const TILE = BALANCE.map.tile;
+
+/** Mittelpunkt einer Förderanlage am Vorkommen (wie canPlace: 2×2 Zellen, Mitte auf Zellgrenze). */
+const extractorCenter = (n) => ({ x: Math.floor(n.x / TILE) * TILE, y: Math.floor(n.y / TILE) * TILE });
 
 function unitVec(dx, dy) {
   const len = Math.hypot(dx, dy);
@@ -38,9 +59,10 @@ export class AI {
     this.timer = this.cfg.think; // erster Denkschritt sofort
     this.budget = 0;
     this.corridor = null; // Gasse vor der Haupt-FOB, in der nichts gebaut wird (Ausgang bleibt frei)
-    this.rallied = new Set(); // Gebäude-IDs, deren Sammelpunkt bereits gesetzt ist
-    this.fobJob = null; // { x, y } laufender FOB-Auftrag
+    this.jobs = []; // { truckId, x, y, zone, t0 } laufende FOB-Aufträge (je LKW einer)
     this.badSites = []; // { x, y, until } fehlgeschlagene FOB-Ziele
+    this.rallyAt = new Map(); // Gebäude-ID -> zuletzt gesetzter Sammelpunkt
+    this.bmMines = 0; // Baumaterial-Förderanlagen (alive), aus snapshot
 
     const t = game.teams[team];
     t.isAI = true;
@@ -58,11 +80,12 @@ export class AI {
   think() {
     const s = this.snapshot();
     this.budget = MAX_PLACE;
+    this.updateJobs(s);
     this.defend(s);
+    this.expand(s); // Start-LKW fährt sofort los; FOB-Geld wird vorgemerkt
     this.buildExtractors(s);
     this.buildDepot(s);
     this.produce(s);
-    this.expand(s);
     this.buildDefense(s);
     this.buildWall(s);
     this.rally(s);
@@ -86,6 +109,20 @@ export class AI {
     // Gegner nur, soweit das eigene Team sie sieht (Nebel)
     const enemies = g.units.filter((u) => u.alive && u.team !== t && g.isVisible(t, u.x, u.y));
     this.corridor = home ? { x: home.x, y: home.y, dx: dir.x, dy: dir.y } : null;
+
+    const combat = units.filter((u) => u.def.range > 0);
+    const queuedCombat = own.reduce(
+      (n, b) => n + b.queue.filter((u) => UNITS[u].range > 0).length,
+      0,
+    );
+    const extractors = own.filter((b) => b.type === 'extractor');
+    this.bmMines = extractors.filter((b) => b.nodeId !== null && g.nodeById.get(b.nodeId)?.type === 'bm').length;
+    const zoneFob = fobs.find((f) => dist(f.x, f.y, zone.x, zone.y) <= ZONE_FOB_R + 16) ?? null;
+    const alarm =
+      !!home &&
+      (own.some((b) => dist(b.x, b.y, ax, ay) <= DEF_RANGE && b.lastHitTime > g.time - ALARM_TIME) ||
+        enemies.some((e) => dist(e.x, e.y, ax, ay) <= DEF_RANGE));
+
     return {
       own,
       fobs,
@@ -95,14 +132,21 @@ export class AI {
       ay,
       dir,
       zone,
+      zoneFob,
       enemies,
       units,
-      combat: units.filter((u) => u.def.range > 0),
+      combat,
+      combatN: combat.length + queuedCombat,
       trucks: units.filter((u) => u.type === 'truck'),
+      extractors,
+      extBuilt: extractors.filter((b) => b.built).length,
+      depotBuilt: own.some((b) => b.type === 'depot' && b.built),
+      freeNodes: g.map.nodes.filter((n) => !g.extractorOn(n.id)),
+      alarm,
     };
   }
 
-  /** Eingereihte Einheiten bzw. Gebäude eines Typs in den Warteschlangen. */
+  /** Eingereihte Einheiten eines Typs in den Warteschlangen. */
   queued(s, unitType) {
     let n = 0;
     for (const b of s.own) for (const u of b.queue) if (u === unitType) n++;
@@ -113,7 +157,39 @@ export class AI {
     return FOB_CAP[this.difficulty];
   }
 
-  // ---- Platzsuche (begrenzt durch das Budget) ------------------------------------
+  // ---- Geld und Platzsuche ----------------------------------------------------------
+
+  /** Baumaterial, das laufende FOB-Aufträge beim Errichten noch brauchen (wird erst bei Ankunft abgebucht). */
+  reserveBm() {
+    return this.jobs.length * FOB_COST;
+  }
+
+  /** Kosten bezahlbar, ohne das Baumaterial für laufende FOB-Aufträge anzutasten. */
+  affordable(cost, econFirst = false) {
+    const res = this.game.teams[this.team].res;
+    // Verteidigung und zweite Halle (econFirst = false) lassen die nächste FOB nicht verhungern
+    const next = econFirst || this.fobCount() >= this.fobCap() ? 0 : FOB_COST;
+    for (const k of RES_KEYS) {
+      // Reserve nur, wenn der Auftrag selbst Baumaterial kostet (Einheiten nicht blockieren)
+      const need = (cost[k] || 0) + (k === 'bm' && cost.bm ? this.reserveBm() + next : 0);
+      if (res[k] < need) return false;
+    }
+    return true;
+  }
+
+  /** Eigene FOBs (auch Baustellen) plus laufende Aufträge. */
+  fobCount() {
+    return this.game.buildings.filter((b) => b.alive && b.team === this.team && b.type === 'fob').length + this.jobs.length;
+  }
+
+  /** Kampfeinheit ausbilden: bezahlbar und nach Abzug der Kosten noch Munitionsreserve übrig. */
+  canTrain(type, combatN) {
+    const cost = UNITS[type].cost;
+    if (!this.affordable(cost)) return false;
+    if (!cost.mun) return true;
+    const reserve = Math.min(AMMO_RESERVE_MAX, AMMO_PER_COMBAT * combatN);
+    return this.game.teams[this.team].res.mun - cost.mun >= reserve;
+  }
 
   /** canPlace mit Budget; liefert das Ergebnis, wenn zulässig, sonst null. */
   place(type, x, y) {
@@ -136,6 +212,11 @@ export class AI {
   isBad(x, y) {
     const now = this.game.time;
     return this.badSites.some((b) => b.until > now && dist(b.x, b.y, x, y) < 120);
+  }
+
+  /** Ziel liegt zu nah an einem laufenden FOB-Auftrag (eigene FOBs prüft canPlace selbst). */
+  nearJob(x, y) {
+    return this.jobs.some((j) => dist(j.x, j.y, x, y) < FOB_MIN);
   }
 
   /**
@@ -174,8 +255,37 @@ export class AI {
     return { x, y };
   }
 
+  /** Sammelpunkt: an der Zonen-FOB (Richtung Basis), sonst Richtung Zone vor der Haupt-FOB. */
   gatherPoint(s) {
+    if (s.zoneFob && s.zoneFob.built) {
+      const v = unitVec(s.ax - s.zoneFob.x, s.ay - s.zoneFob.y);
+      return this.freeNear(s.zoneFob.x + v.x * ZONE_GATHER_DIST, s.zoneFob.y + v.y * ZONE_GATHER_DIST);
+    }
     return this.freeNear(s.ax + s.dir.x * GATHER_DIST, s.ay + s.dir.y * GATHER_DIST);
+  }
+
+  /** Förderanlage an Vorkommen n wäre im Bauradius einer dieser FOBs (gleiche Geometrie wie canPlace). */
+  inBuildReach(fobs, n) {
+    const c = extractorCenter(n);
+    return fobs.some((f) => dist(f.x, f.y, c.x, c.y) <= DEF_RANGE);
+  }
+
+  /** Summe der Gewichte freier Vorkommen im Bauradius des Punktes (Liste `nodes`). */
+  nodeValue(x, y, nodes) {
+    let v = 0;
+    for (const n of nodes) if (dist(n.x, n.y, x, y) <= DEF_RANGE) v += this.nodeWeight(n.type);
+    return v;
+  }
+
+  /** Gewicht eines Vorkommens: Baumaterial ist Engpass (FOBs, Förderanlagen), solange weniger als 3 stehen. */
+  nodeWeight(type) {
+    if (type === 'bm' && this.bmMines < 3) return 2.5;
+    return NODE_W[type];
+  }
+
+  /** Gegner (sichtbar) in der Nähe eines Punktes: Malus für FOB-Ziele. */
+  danger(s, x, y) {
+    return s.enemies.some((e) => dist(e.x, e.y, x, y) <= THREAT_DANGER) ? 2 : 0;
   }
 
   // ---- Verteidigung ----------------------------------------------------------------
@@ -197,38 +307,155 @@ export class AI {
     }
   }
 
+  // ---- FOB-Aufträge ----------------------------------------------------------------
+
+  /** Laufende Aufträge prüfen: gebaut, gescheitert (LKW weg oder idle) oder zu lange unterwegs. */
+  updateJobs(s) {
+    const g = this.game;
+    const t = this.team;
+    this.badSites = this.badSites.filter((b) => b.until > g.time);
+    const bad = (j) => this.badSites.push({ x: j.x, y: j.y, until: g.time + BAD_TIME });
+    this.jobs = this.jobs.filter((j) => {
+      if (s.fobs.some((f) => dist(f.x, f.y, j.x, j.y) < 8)) return false; // Baustelle angelegt
+      const truck = g.getEntity(j.truckId);
+      if (!truck || truck.order.type !== 'buildFob') {
+        bad(j);
+        return false;
+      }
+      if (g.time - j.t0 > JOB_TIMEOUT) {
+        g.issue(t, { type: 'stop', ids: [truck.id] });
+        bad(j);
+        return false;
+      }
+      return true;
+    });
+  }
+
+  /** LKW-Aufträge: Zonen-FOB zuerst (solange keine da ist oder unterwegs), dann Vorkommen-FOBs. */
+  expand(s) {
+    const g = this.game;
+    const t = this.team;
+    for (let k = 0; k < 2; k++) {
+      const idle = s.trucks.filter((u) => u.order.type === 'idle');
+      if (!idle.length) return;
+      if (s.fobs.length + this.jobs.length >= this.fobCap()) return;
+      if (!this.affordable(BUILDINGS.fob.cost, true)) return;
+
+      const zoneWanted = !s.zoneFob && !this.jobs.some((j) => j.zone);
+      let site = zoneWanted ? this.zoneSite(s) : null;
+      if (!site) site = this.nodeSite(s);
+      if (!site) return;
+
+      let truck = idle[0];
+      for (const u of idle) if (dist(u.x, u.y, site.x, site.y) < dist(truck.x, truck.y, site.x, site.y)) truck = u;
+      const r = g.issue(t, { type: 'buildFob', truckId: truck.id, x: site.x, y: site.y });
+      if (!r.ok) {
+        this.badSites.push({ x: site.x, y: site.y, until: g.time + BAD_TIME });
+        return;
+      }
+      this.jobs.push({ truckId: truck.id, x: site.x, y: site.y, zone: site.zone, t0: g.time });
+    }
+  }
+
+  /**
+   * Zonen-FOB: Mittelpunkt innerhalb 0,6 · r der Zonenmitte, möglichst viele freie Vorkommen im Bauradius,
+   * bei Gleichstand näher an der eigenen Basis.
+   */
+  zoneSite(s) {
+    const z = s.zone;
+    const cands = [];
+    for (let r = 0; r <= ZONE_FOB_R - 20; r += 110) {
+      const n = r === 0 ? 1 : 12;
+      const a0 = Math.atan2(s.ay - z.y, s.ax - z.x);
+      for (let k = 0; k < n; k++) {
+        const a = a0 + (k * TWO_PI) / n;
+        const x = z.x + Math.cos(a) * r;
+        const y = z.y + Math.sin(a) * r;
+        cands.push({ x, y, v: this.nodeValue(x, y, s.freeNodes), d: dist(x, y, s.ax, s.ay) });
+      }
+    }
+    cands.sort((a, b) => b.v - a.v || a.d - b.d);
+    for (const c of cands) {
+      if (this.budget <= 0) break;
+      if (this.isBad(c.x, c.y) || this.nearJob(c.x, c.y)) continue;
+      const p = this.place('fob', c.x, c.y);
+      if (p && dist(p.x, p.y, z.x, z.y) <= ZONE_FOB_R) return { x: p.x, y: p.y, zone: true };
+    }
+    return null;
+  }
+
+  /**
+   * Vorkommen-FOB: Vorkommen, die noch keine FOB im Bauradius haben, nah an der Basis und ohne Gegner.
+   * Standort 150–220 px vom Vorkommen, Richtung eigener Basis zuerst.
+   */
+  nodeSite(s) {
+    const covered = [...s.fobs, ...this.jobs].map((f) => ({ x: f.x, y: f.y }));
+    const uncovered = s.freeNodes.filter((n) => !this.inBuildReach(covered, n));
+    if (!uncovered.length) return null;
+    const top = uncovered
+      .filter((n) => dist(n.x, n.y, s.ax, s.ay) <= MAX_FOB_NODE_DIST)
+      .map((n) => ({ n, v: this.nodeValue(n.x, n.y, uncovered) - dist(n.x, n.y, s.ax, s.ay) / 2000 }))
+      .sort((a, b) => b.v - a.v)
+      .slice(0, 3);
+
+    const cands = [];
+    for (const { n } of top) {
+      const a0 = Math.atan2(s.ay - n.y, s.ax - n.x);
+      for (const r of [150, 220]) {
+        for (const o of [0, 45, -45, 90, -90, 135, -135, 180]) {
+          const a = a0 + o * DEG;
+          const x = n.x + Math.cos(a) * r;
+          const y = n.y + Math.sin(a) * r;
+          const v = this.nodeValue(x, y, uncovered) - dist(x, y, s.ax, s.ay) / 2000 - this.danger(s, x, y);
+          cands.push({ x, y, v });
+        }
+      }
+    }
+    cands.sort((a, b) => b.v - a.v);
+    for (const c of cands) {
+      if (this.budget <= 0) break;
+      if (this.isBad(c.x, c.y) || this.nearJob(c.x, c.y)) continue;
+      const p = this.place('fob', c.x, c.y);
+      if (p) return { x: p.x, y: p.y, zone: false };
+    }
+    return null;
+  }
+
   // ---- Wirtschaft ------------------------------------------------------------------
 
-  /** Förderanlagen auf allen freien Vorkommen im Bauradius; Baumaterial zuerst. */
+  /**
+   * Förderanlagen auf allen freien Vorkommen im Bauradius einer fertigen eigenen FOB.
+   * Reihenfolge: Baumaterial, bis zwei Anlagen stehen; danach nach Knappheit (kleinster Vorrat/Bedarf zuerst).
+   */
   buildExtractors(s) {
     const g = this.game;
     const t = this.team;
-    if (!s.home) return;
-    const cost = BUILDINGS.extractor.cost;
-    const nodes = [...g.map.nodes].sort(
-      (a, b) =>
-        NODE_ORDER[a.type] - NODE_ORDER[b.type] ||
-        dist(a.x, a.y, s.ax, s.ay) - dist(b.x, b.y, s.ax, s.ay),
+    if (!s.builtFobs.length) return;
+    const res = g.teams[t].res;
+    const cands = s.freeNodes.filter((n) => this.inBuildReach(s.builtFobs, n));
+    const key = (n) => (n.type === 'bm' && this.bmMines < 2 ? -1 : res[n.type] / NEED[n.type]);
+    cands.sort(
+      (a, b) => key(a) - key(b) || dist(a.x, a.y, s.ax, s.ay) - dist(b.x, b.y, s.ax, s.ay),
     );
-    for (const n of nodes) {
-      if (!g.canAfford(t, cost)) break;
-      if (g.extractorOn(n.id)) continue;
-      if (this.budget <= 0) break;
-      this.budget--;
+    for (const n of cands) {
+      if (!this.affordable(BUILDINGS.extractor.cost, true)) break;
       g.issue(t, { type: 'build', building: 'extractor', x: n.x, y: n.y });
     }
   }
 
-  /** Fahrzeughalle, sobald 2 Förderanlagen stehen; zweite ab 3 FOBs (schwer). */
+  /**
+   * Fahrzeughalle: die erste ab 2 Förderanlagen. Weitere nur bei Geldüberschuss (> 1500) und genug
+   * Munition/Treibstoff, bis zur Grenze je Schwierigkeit (normal 2, schwer 3).
+   */
   buildDepot(s) {
     const g = this.game;
     const t = this.team;
-    if (!s.home) return;
-    const built = s.own.filter((b) => b.type === 'extractor' && b.built).length;
-    if (built < 2) return;
-    const want = 1 + (this.difficulty === 'hard' && s.fobs.length >= 3 ? 1 : 0);
+    const res = g.teams[t].res;
+    if (!s.home || s.extBuilt < 2) return;
     const have = s.own.filter((b) => b.type === 'depot').length;
-    if (have >= want || !g.canAfford(t, BUILDINGS.depot.cost)) return;
+    const rich = res.money > RICH && res.mun >= 200 && res.fuel >= 200 && s.extBuilt >= 4;
+    const want = Math.min(DEPOT_CAP[this.difficulty], have < 1 ? 1 : rich ? have + 1 : have);
+    if (have >= want || !this.affordable(BUILDINGS.depot.cost, have < 1)) return;
     const p = this.findSite('depot', s.home.x, s.home.y, 130, 330, {
       angle: Math.atan2(-s.dir.y, -s.dir.x), // hinter der Haupt-FOB
       corridor: true,
@@ -238,7 +465,7 @@ export class AI {
 
   // ---- Produktion ------------------------------------------------------------------
 
-  /** Lkw (1, bei freien FOB-Plätzen 2) und Kampfeinheiten nach Zielmischung (Defizit-Auswahl). */
+  /** Lkw (2, solange die FOB-Grenze nicht erreicht ist, sonst 1) und Kampfeinheiten nach Zielmischung. */
   produce(s) {
     const g = this.game;
     const t = this.team;
@@ -247,9 +474,9 @@ export class AI {
       s.own.filter((b) => b.built && b.def.produces.length && b.queue.length < 2).sort((a, b) => a.id - b.id);
 
     // Lkw
-    const truckWant = s.fobs.length < this.fobCap() ? 2 : 1;
+    const truckWant = s.fobs.length + this.jobs.length < this.fobCap() ? 2 : 1;
     const trucks = s.trucks.length + this.queued(s, 'truck');
-    if (trucks < truckWant && g.canAfford(t, UNITS.truck.cost)) {
+    if (trucks < truckWant && this.affordable(UNITS.truck.cost, true)) {
       const fob = producers().find((b) => b.def.produces.includes('truck'));
       if (fob) g.issue(t, { type: 'train', buildingId: fob.id, unit: 'truck' });
     }
@@ -261,11 +488,10 @@ export class AI {
     let sumW = 0;
     for (const u of avail) sumW += MIX[u];
     const counts = {};
-    for (const u of avail) {
-      counts[u] = s.units.filter((x) => x.type === u).length + this.queued(s, u);
-    }
+    for (const u of avail) counts[u] = s.units.filter((x) => x.type === u).length + this.queued(s, u);
     let total = 0;
     for (const u of avail) total += counts[u];
+    let combatN = s.combatN;
 
     // Global nach Defizit: der wichtigste Typ bekommt die knappe Munition. Fehlt er nur an Mitteln,
     // wird gespart (kein billigerer Typ davor), sonst läuft Schützen-Munition die Panzer leer.
@@ -280,7 +506,7 @@ export class AI {
       entries.sort((a, c) => c.deficit - a.deficit);
       let pick = null;
       for (const e of entries) {
-        if (g.canAfford(t, UNITS[e.u].cost)) {
+        if (this.canTrain(e.u, combatN)) {
           pick = e;
           break;
         }
@@ -290,82 +516,38 @@ export class AI {
       g.issue(t, { type: 'train', buildingId: pick.b.id, unit: pick.u });
       counts[pick.u]++;
       total++;
+      combatN++;
     }
-  }
-
-  // ---- Expansion -------------------------------------------------------------------
-
-  /** Ein FOB-Auftrag gleichzeitig: Lkw fährt los, sobald FOB-Ziel und Geld passen. */
-  expand(s) {
-    const g = this.game;
-    const t = this.team;
-
-    if (s.trucks.some((u) => u.order.type === 'buildFob')) return;
-    if (this.fobJob) {
-      const job = this.fobJob;
-      this.fobJob = null;
-      if (!s.fobs.some((f) => dist(f.x, f.y, job.x, job.y) < 60)) {
-        this.badSites.push({ x: job.x, y: job.y, until: g.time + 240 });
-      }
-    }
-    this.badSites = this.badSites.filter((b) => b.until > g.time);
-
-    if (s.fobs.length >= this.fobCap()) return;
-    if (s.fobs.some((f) => !f.built)) return;
-    if (!g.canAfford(t, BUILDINGS.fob.cost)) return;
-    const idle = s.trucks.filter((u) => u.order.type === 'idle');
-    if (!idle.length) return;
-
-    const site = this.pickFobSite(s);
-    if (!site) return;
-    let truck = idle[0];
-    for (const u of idle) if (dist(u.x, u.y, site.x, site.y) < dist(truck.x, truck.y, site.x, site.y)) truck = u;
-    const r = g.issue(t, { type: 'buildFob', truckId: truck.id, x: site.x, y: site.y });
-    if (r.ok) this.fobJob = { x: site.x, y: site.y };
-  }
-
-  /** FOB-Ziel: zuerst am Zonenrand Richtung eigener Basis, dann an freien Vorkommen. */
-  pickFobSite(s) {
-    const g = this.game;
-    const z = s.zone;
-    const toHome = unitVec(s.ax - z.x, s.ay - z.y);
-    const fx = z.x + toHome.x * FRONT_DIST;
-    const fy = z.y + toHome.y * FRONT_DIST;
-    if (!s.fobs.some((f) => dist(f.x, f.y, fx, fy) < 600)) {
-      const p = this.findSite('fob', fx, fy, 0, 128, { angle: Math.atan2(toHome.y, toHome.x) });
-      if (p) return p;
-    }
-
-    // Knappe Sorten zuerst (Munition, Treibstoff); Baumaterial gibt es im Überfluss
-    const nodes = [...g.map.nodes].sort(
-      (a, b) =>
-        NODE_ORDER[b.type] - NODE_ORDER[a.type] ||
-        dist(a.x, a.y, s.ax, s.ay) - dist(b.x, b.y, s.ax, s.ay),
-    );
-    for (const n of nodes) {
-      if (dist(n.x, n.y, s.ax, s.ay) > MAX_FOB_NODE_DIST) continue;
-      if (s.fobs.some((f) => dist(f.x, f.y, n.x, n.y) < DEF_RANGE)) continue;
-      const p = this.findSite('fob', n.x, n.y, 150, 250);
-      if (p) return p;
-    }
-    return null;
   }
 
   // ---- Verteidigungsgebäude und Mauer ---------------------------------------------
+
+  /**
+   * Verteidigung erst mit Wirtschaftsbasis (≥ 4 fertige Förderanlagen und fertige Halle).
+   * Ausnahme: Angriff auf die Basis – dann genau eine Flugabwehr oder ein Mörser.
+   */
+  defenseMode(s) {
+    if (s.extBuilt >= 4 && s.depotBuilt) return 'full';
+    if (s.alarm) return 'alarm';
+    return null;
+  }
 
   /** Je FOB (nahe der Zone zuerst) ein Mörser und eine Flugabwehr, normal und schwer. */
   buildDefense(s) {
     const g = this.game;
     const t = this.team;
     if (this.difficulty === 'easy' || !s.builtFobs.length) return;
+    const mode = this.defenseMode(s);
+    if (!mode) return;
+    if (mode === 'alarm' && s.own.some((b) => b.type === 'mortar' || b.type === 'aa')) return;
     const z = s.zone;
     const fobs = [...s.builtFobs].sort((a, b) => dist(a.x, a.y, z.x, z.y) - dist(b.x, b.y, z.x, z.y));
     const toZone = Math.atan2(s.dir.y, s.dir.x);
 
     for (const f of fobs) {
-      for (const type of ['mortar', 'aa']) {
+      for (const type of ['aa', 'mortar']) {
         const have = s.own.some((b) => b.type === type && dist(b.x, b.y, f.x, f.y) < DEF_RANGE);
-        if (have || !g.canAfford(t, BUILDINGS[type].cost)) continue;
+        if (have || !this.affordable(BUILDINGS[type].cost)) continue;
         const p = this.findSite(type, f.x, f.y, 130, 330, {
           angle: toZone,
           corridor: f === s.home,
@@ -383,8 +565,8 @@ export class AI {
     const g = this.game;
     const t = this.team;
     const h = s.home;
-    if (this.difficulty === 'easy' || !h) return;
-    if (g.teams[t].res.bm < 150) return; // Mauern nur mit Reserve
+    if (this.difficulty === 'easy' || !h || this.defenseMode(s) !== 'full') return;
+    if (!this.affordable(BUILDINGS.wall.cost)) return; // Mauern nur mit Reserve
 
     const grid = g.grid;
     const mc = h.cx + Math.floor(h.w / 2);
@@ -418,13 +600,15 @@ export class AI {
 
   // ---- Armee -----------------------------------------------------------------------
 
-  /** Sammelpunkte setzen: alle Produktionsgebäude sammeln Richtung Zone (je Gebäude einmal). */
+  /** Sammelpunkte setzen (Produktionsgebäude), neu nur wenn sich der Sammelpunkt deutlich verschoben hat. */
   rally(s) {
     if (!s.home) return;
     const gp = this.gatherPoint(s);
     for (const b of s.own) {
-      if (!b.built || !b.def.produces.length || this.rallied.has(b.id)) continue;
-      this.rallied.add(b.id);
+      if (!b.built || !b.def.produces.length) continue;
+      const prev = this.rallyAt.get(b.id);
+      if (prev && dist(prev.x, prev.y, gp.x, gp.y) < RALLY_MOVE) continue;
+      this.rallyAt.set(b.id, gp);
       this.game.issue(this.team, { type: 'rally', buildingId: b.id, x: gp.x, y: gp.y });
     }
   }
@@ -432,7 +616,8 @@ export class AI {
   /**
    * Angriff, sobald die Summe der idle Kampfeinheiten (Geldwert) die Schwelle erreicht
    * (bei unbesetzter Zone schon ab 60 %). Nicht zu Hause stehende Einheiten folgen dem Befehl.
-   * In der Zone stehende Einheiten verteilen sich auf einem Kreis (r 400) statt im Zentrum zu klumpen.
+   * Keine Angriffe bei Munition unter AMMO_ATTACK. In der Zone stehende Einheiten verteilen sich auf
+   * einem Kreis (r 400) statt im Zentrum zu klumpen.
    */
   army(s) {
     const g = this.game;
@@ -441,6 +626,7 @@ export class AI {
     const idle = s.combat.filter((u) => u.order.type === 'idle');
     if (!idle.length) return;
     const inZone = (u) => dist(u.x, u.y, z.x, z.y) <= z.r;
+    const ammoOk = g.teams[t].res.mun >= AMMO_ATTACK;
 
     // Gegner in der Zone (sichtbar): deren Schwerpunkt ist das Ziel, sonst das Zonenzentrum
     const inside = s.enemies.filter((e) => dist(e.x, e.y, z.x, z.y) <= z.r);
@@ -451,21 +637,24 @@ export class AI {
       ty = inside.reduce((a, e) => a + e.y, 0) / inside.length;
     }
 
-    const strength = idle.reduce((sum, u) => sum + (UNITS[u.type].cost.money || 0), 0);
-    let need = this.cfg.attackStrength;
-    if (z.owner >= 0 && z.owner !== t && z.counts[z.owner] > 0) {
-      // Gegner hält die Zone: Gegenangriff schon ab 1,2× seiner Besatzung (Zonengeld ist sein Vorteil).
-      // Besitz und Anzahl in der Zone sind öffentlich; die Stärke wird mit dem mittleren Einheitenwert geschätzt.
-      const threat = z.counts[z.owner] * THREAT_PER_UNIT;
-      need = Math.min(need, Math.max(300, 1.2 * threat));
-    }
-    const ready = strength >= need || (z.owner === -1 && strength >= 0.6 * need);
-    if (ready) {
-      const go = idle.filter((u) => !inZone(u)).map((u) => u.id);
-      if (go.length) g.issue(t, { type: 'attackMove', ids: go, x: tx, y: ty });
+    if (ammoOk) {
+      const strength = idle.reduce((sum, u) => sum + (UNITS[u.type].cost.money || 0), 0);
+      let need = this.cfg.attackStrength;
+      if (z.owner >= 0 && z.owner !== t && z.counts[z.owner] > 0) {
+        // Gegner hält die Zone: Gegenangriff schon ab 1,2× seiner Besatzung (Zonengeld ist sein Vorteil).
+        // Besitz und Anzahl in der Zone sind öffentlich; die Stärke wird mit dem mittleren Einheitenwert geschätzt.
+        const threat = z.counts[z.owner] * THREAT_PER_UNIT;
+        need = Math.min(need, Math.max(300, 1.2 * threat));
+      }
+      const ready = strength >= need || (z.owner === -1 && strength >= 0.6 * need);
+      if (ready) {
+        const go = idle.filter((u) => !inZone(u)).map((u) => u.id);
+        if (go.length) g.issue(t, { type: 'attackMove', ids: go, x: tx, y: ty });
+      }
     }
 
     if (inside.length) {
+      if (!ammoOk) return;
       // Gegner in der Zone, eigene Einheit ohne Feindkontakt: auf die Gegner zu, sonst stehen beide Seiten
       // außer Sichtweite und das Gefecht kommt nie zustande.
       const lone = idle

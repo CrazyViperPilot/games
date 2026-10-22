@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
 import { AI } from '../js/ai/ai.js';
+import { BALANCE } from '../js/data/balance.js';
 
 const DT = 0.05;
 const MINUTES = 20;
@@ -42,6 +43,33 @@ function playAiVsAi(seed) {
     points: game.teams.map((t) => t.points),
   };
 }
+
+/** KI allein (Team 1, normal), andere Seite passiv. Liefert Anzahl Förderanlagen, FOB-Abstände zur Zonenmitte. */
+function playAiAlone(seed, minutes) {
+  const game = new Game({ seed });
+  const ai = new AI(game, 1, 'normal');
+  const steps = Math.round((minutes * 60) / DT);
+  for (let i = 0; i < steps; i++) {
+    ai.update(DT);
+    game.update(DT);
+  }
+  const own = game.buildings.filter((b) => b.alive && b.team === 1);
+  const z = game.zone;
+  return {
+    extractors: own.filter((b) => b.type === 'extractor' && b.built).length,
+    fobDistances: own
+      .filter((b) => b.type === 'fob')
+      .map((b) => Math.hypot(b.x - z.x, b.y - z.y)),
+  };
+}
+
+test('KI allein (Seed 7): nach 10 min ≥ 5 Förderanlagen, ≥ 3 FOBs, eine FOB in der Zone', () => {
+  const r = playAiAlone(7, 10);
+  assert.ok(r.extractors >= 5, `nur ${r.extractors} Förderanlagen`);
+  assert.ok(r.fobDistances.length >= 3, `nur ${r.fobDistances.length} FOBs`);
+  const inZone = r.fobDistances.some((d) => d <= BALANCE.zone.r);
+  assert.ok(inZone, `keine FOB in der Zone (Abstände ${r.fobDistances.map(Math.round)})`);
+});
 
 for (const seed of [1, 2]) {
   test(`KI gegen KI (Seed ${seed}): 20 min ohne Fehler, beide Teams bauen und kämpfen`, () => {

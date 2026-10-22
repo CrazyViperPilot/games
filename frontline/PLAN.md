@@ -359,3 +359,8 @@ WP 3 und 4 laufen parallel. Danach Review durch Opus (Browser-Test mit Playwrigh
 - **Produktion:** Munitionsreserve halten: Kampfeinheiten nur ausbilden, wenn nach Abzug der Kosten noch
   `min(150, 3 × Anzahl Kampfeinheiten)` Munition übrig bleibt (Schüsse brauchen Vorrat).
 - Ziel (KI gegen KI, normal, Seed 7, ohne Gegnerdruck): nach 10 min ≥ 6 Förderanlagen, ≥ 3 FOBs, davon eine in der Zone.
+
+### 10.3 Review v2 (Opus)
+- KI-Fehler behoben: die Baumaterial-Reserve für FOBs blockierte auch die Ausbildung von Einheiten (kosten kein Baumaterial)
+  → KI hatte nach 5 min nur 6 Einheiten; jetzt ~50, Expansion unverändert schnell (5 FOBs, 8 Förderanlagen nach 6 min, Zonen-FOB nach ~1 min).
+- KI gegen KI (normal): Partien 55–58 min, eine 90-min-Dauerschlacht um die Zone (Stand 45:0, > 1600 gefallene Einheiten).
