@@ -318,3 +318,15 @@ mit 1 px `#ffffff1a`, Akzent `#c9a227`), `system-ui`. Minimap 180 × 180. Button
 | 5 | UI, Bootstrap, PWA, Einbindung | `js/ui/*`, `js/main.js`, `index.html`, `css/style.css`, `manifest.json`, `sw.js` (Präfix `frontline-`), `icons/icon.svg`, `README.md`, Karte in `/index.html` + Tabelle in `/README.md`, `.github/workflows/test-frontline.yml` | 3, 4 |
 
 WP 3 und 4 laufen parallel. Danach Review durch Opus (Browser-Test mit Playwright, Balancing, Code-Review).
+
+## 9. Review (Opus) – Ergebnisse & Entscheidungen
+
+- **Balancing:** KI-gegen-KI zeigte starken Schneeball – der Zonenhalter hortete ~50 000 Geld, der Gegner verdiente nur 2 Geld/s je FOB.
+  Geändert: `fob.income` 2 → 5, `zone.controlIncome` 12 → 6, `zone.unitIncome` 0,5 → 0,25. Danach Partien mit Hin und Her
+  (z. B. 100:22, 100:42), Dauer 57–79 min bei 100 Punkten.
+- **Einheitenlimit** `unitCap: 120` je Team (lebend + in Ausbildung), damit Endspiele nicht auf 175+ Einheiten wachsen.
+- KI-Paket fixte zwei Engine-Fehler: Ankunft am Ziel (Einheiten blieben ewig im `move`) und Spawn-Seite (Blau spawnte zum Kartenrand).
+- `?debug=1` legt den Spielzustand als `window.frontline` ab (für Konsole/Browser-Tests).
+- PNG-Icons aus `icons/icon.svg` erzeugt.
+- Browser-Prüfung (Chromium, 1440×900): keine Konsolenfehler; 60 FPS bei 164 Einheiten im Gefecht (schlechtester Frame 23 ms);
+  Siegbildschirm, Debug-Tempo 10×, Steuerung und Bau laut WP5-Durchlauf.

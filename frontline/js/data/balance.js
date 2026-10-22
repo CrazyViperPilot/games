@@ -6,9 +6,10 @@ export const BALANCE = {
   pointInterval: 30,
   startRes: { money: 400, bm: 500, mun: 150, fuel: 150 },
   startUnits: ['truck', 'rifleman', 'rifleman', 'rifleman', 'rifleman'],
-  zone: { r: 1100, controlIncome: 12, unitIncome: 0.5, unitIncomeCap: 30 },
-  fob: { buildRadius: 450, minDistOwn: 500, minDistEnemy: 700, max: 6, income: 2 },
+  zone: { r: 1100, controlIncome: 6, unitIncome: 0.25, unitIncomeCap: 30 },
+  fob: { buildRadius: 450, minDistOwn: 500, minDistEnemy: 700, max: 6, income: 5 },
   queueMax: 5,
+  unitCap: 120,                       // lebende + in Ausbildung befindliche Einheiten je Team
   demolishRefund: 0.25,
   scanInterval: 0.25, // Zielsuche
   fogInterval: 0.25,

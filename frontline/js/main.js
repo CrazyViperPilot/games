@@ -195,6 +195,7 @@ function startGame(opts) {
   });
   s.loop.speed = startSpeed();
   session = s;
+  if (DEBUG) window.frontline = s; // Konsole/Tests: Zugriff auf Spielzustand
   s.loop.start();
 }
 

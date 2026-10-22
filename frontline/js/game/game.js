@@ -474,12 +474,21 @@ export class Game {
     if (!b.built) return fail('Gebäude ist noch im Bau');
     if (!UNITS[cmd.unit] || !b.def.produces.includes(cmd.unit)) return fail('Dieses Gebäude bildet diese Einheit nicht aus');
     if (b.queue.length >= BALANCE.queueMax) return fail('Warteschlange ist voll');
+    if (this.unitCount(team) >= BALANCE.unitCap) return fail(`Einheitenlimit erreicht (${BALANCE.unitCap})`);
     const cost = UNITS[cmd.unit].cost;
     if (!this.canAfford(team, cost)) return fail(this.missingRes(team, cost));
     this.pay(team, cost);
     if (b.queue.length === 0) b.queueTime = 0;
     b.queue.push(cmd.unit);
     return { ok: true };
+  }
+
+  /** Lebende plus in Ausbildung befindliche Einheiten eines Teams. */
+  unitCount(team) {
+    let n = 0;
+    for (const u of this.units) if (u.alive && u.team === team) n++;
+    for (const b of this.buildings) if (b.alive && b.team === team) n += b.queue.length;
+    return n;
   }
 
   cmdCancelTrain(team, cmd) {
