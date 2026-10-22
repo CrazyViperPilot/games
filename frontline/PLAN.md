@@ -330,3 +330,32 @@ WP 3 und 4 laufen parallel. Danach Review durch Opus (Browser-Test mit Playwrigh
 - PNG-Icons aus `icons/icon.svg` erzeugt.
 - Browser-Prüfung (Chromium, 1440×900): keine Konsolenfehler; 60 FPS bei 164 Einheiten im Gefecht (schlechtester Frame 23 ms);
   Siegbildschirm, Debug-Tempo 10×, Steuerung und Bau laut WP5-Durchlauf.
+
+## 10. Erweiterung v2: Versorgung & stärkere KI
+
+### 10.1 Verbrauch (Team-Vorrat, kein Einzel-Vorrat je Einheit)
+- **Munition pro Schuss** aus `team.res.mun`. Neues Feld `ammoPerShot` in `UNITS` und in `BUILDINGS.*.weapon` / `.aa`:
+  Schütze 0.25, PAK 2, SPz 0.4, KPz 4, Mörser 4 (je Granate), Flugabwehr 0.25 (je Schuss/Abfangversuch), FOB-MG 0 (Basis nie wehrlos).
+  Reicht der Vorrat nicht (`res.mun < ammoPerShot`), wird **nicht** gefeuert (Abklingzeit läuft nicht an).
+- **Treibstoff** für Fahrzeuge: neues Feld `fuelPerSec` in `UNITS` (LKW 0.2, SPz 0.4, KPz 0.6), nur solange sich die Einheit
+  tatsächlich bewegt. Ist `res.fuel <= 0`, fahren Fahrzeuge mit 25 % Geschwindigkeit (nie ganz stehen bleiben).
+- Verbrauch fließt negativ in `team.rate` (→ HUD zeigt Netto-Rate, rot wenn negativ).
+- Meldungen (je Sorte höchstens alle 20 s): „Keine Munition – Einheiten feuern nicht“, „Kein Treibstoff – Fahrzeuge langsam“.
+- Statistik `team.used = { mun, fuel }` (Summe des Verbrauchs).
+- Ertrag angepasst: Förderanlage `yields: { bm: 4, mun: 4, fuel: 3 }`, Start `bm: 600`.
+
+### 10.2 KI
+- **Wirtschaft zuerst:** Förderanlagen vor allem anderen; Mörser/Flugabwehr/Mauern erst ab ≥ 4 fertigen Förderanlagen
+  **und** fertiger Halle (oder wenn die Basis angegriffen wird: dann 1 Flugabwehr/Mörser erlaubt).
+  Förderanlagen-Reihenfolge nach Knappheit: Sorte mit dem kleinsten Vorrat relativ zum Bedarf zuerst.
+- **Expansion früh und oft:** Start-LKW fährt sofort los. Ziel: 2 LKW, solange FOB-Grenze nicht erreicht. FOB-Grenze
+  leicht 3, normal 6, schwer 6 (= Spielmaximum). Mehrere FOB-Aufträge gleichzeitig erlaubt (je LKW einer).
+- **FOB-Ziele (bewertet, bestes zuerst):**
+  1. **Zonen-FOB innerhalb der Konfliktzone** (Abstand zur Mitte ≤ 0,6 · r), bevorzugt so, dass Vorkommen in der Zone im
+     Bauradius liegen; sonst auf der Linie Zonenmitte → eigene Basis bei ~0,45 · r. Hat sie eine, und geht sie verloren: neu bauen.
+  2. **Vorkommen-FOBs:** Kandidat = Position nahe freier Vorkommen; Wert = Σ Gewicht der freien Vorkommen im Bauradius
+     (Munition/Treibstoff 1,5, Baumaterial 1) − Entfernung zur Haupt-FOB / 2000 − 2 bei sichtbaren Gegnern in 600 px.
+- **Armee:** Sammelpunkt bei der Zonen-FOB (falls vorhanden), sonst wie bisher. Bei Munition < 30 keine Angriffe starten.
+- **Produktion:** Munitionsreserve halten: Kampfeinheiten nur ausbilden, wenn nach Abzug der Kosten noch
+  `min(150, 3 × Anzahl Kampfeinheiten)` Munition übrig bleibt (Schüsse brauchen Vorrat).
+- Ziel (KI gegen KI, normal, Seed 7, ohne Gegnerdruck): nach 10 min ≥ 6 Förderanlagen, ≥ 3 FOBs, davon eine in der Zone.
