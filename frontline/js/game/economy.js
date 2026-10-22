@@ -9,15 +9,30 @@ const INCOME_TAU = 2; // Glättungszeitkonstante des angezeigten Einkommens (s)
 
 const zeroRes = () => ({ money: 0, bm: 0, mun: 0, fuel: 0 });
 
-/** Freie Stelle unterhalb des Gebäudes (1–2 Zellen Abstand, zuerst die Zeile direkt darunter). */
+/**
+ * Freie Stelle am Rand des Gebäudes (1–3 Zellen Abstand), die dem Sammelpunkt am nächsten liegt.
+ * (Früher fest „unterhalb“: Das ist bei punktsymmetrischen Startlagen unfair – Team 0 spawnte zum Kartenrand hin.)
+ */
 function spawnSpot(game, b) {
   const g = game.grid;
-  for (let r = b.cy + b.h; r <= b.cy + b.h + 2; r++) {
-    for (let c = b.cx - 1; c <= b.cx + b.w; c++) {
-      if (g.passable(c, r, b.team)) return { x: g.center(c), y: g.center(r) };
+  let best = null;
+  let bestD = Infinity;
+  for (let ring = 1; ring <= 3 && !best; ring++) {
+    for (let r = b.cy - ring; r < b.cy + b.h + ring; r++) {
+      for (let c = b.cx - ring; c < b.cx + b.w + ring; c++) {
+        const inside = c >= b.cx && c < b.cx + b.w && r >= b.cy && r < b.cy + b.h;
+        if (inside || !g.passable(c, r, b.team)) continue;
+        const x = g.center(c);
+        const y = g.center(r);
+        const d = Math.hypot(x - b.rallyX, y - b.rallyY);
+        if (d < bestD) {
+          bestD = d;
+          best = { x, y };
+        }
+      }
     }
   }
-  return null;
+  return best;
 }
 
 /**

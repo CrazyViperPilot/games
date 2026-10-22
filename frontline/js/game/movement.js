@@ -7,6 +7,7 @@ const REPATH = 1.0; // Neuplanung bei Verfolgung (s)
 const BLOCK_REPATH = 0.5; // Neuplanung nach blockiertem Wegpunkt (s)
 const FOB_REACH = 48; // LKW gilt als am Ziel
 const ARRIVE = 0.5; // Wegpunkt erreicht (px)
+const FINAL_ARRIVE = 32; // Endziel erreicht (px): Einheiten am selben Sammelpunkt drängeln sich sonst ewig in 'move'
 export const HASH_CELL = 128; // räumliches Hash-Gitter
 
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
@@ -113,15 +114,16 @@ function followPath(game, u, dt) {
   while (budget > 1e-9 && u.pathIndex < u.path.length) {
     const wp = u.path[u.pathIndex];
     if (!grid.passable(grid.toCell(wp.x), grid.toCell(wp.y), u.team)) return false;
+    const arrive = u.pathIndex === u.path.length - 1 ? FINAL_ARRIVE : ARRIVE;
     const d = dist(wp.x, wp.y, u.x, u.y);
-    if (d < ARRIVE) {
+    if (d < arrive) {
       u.pathIndex++;
       continue;
     }
     const step = Math.min(d, budget);
     if (!stepToward(grid, u, wp.x, wp.y, step)) return false;
     budget -= step;
-    if (dist(wp.x, wp.y, u.x, u.y) < ARRIVE) u.pathIndex++;
+    if (dist(wp.x, wp.y, u.x, u.y) < arrive) u.pathIndex++;
   }
   return true;
 }
