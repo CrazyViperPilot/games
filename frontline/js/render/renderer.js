@@ -122,6 +122,7 @@ export class Renderer {
     }
 
     if (v.placement) this.drawRadii(ctx, z);
+    this.drawSelectedRadii(ctx, z, v);
 
     for (const b of g.buildings) {
       if (!b.alive || (b.team !== team && !known(b.x, b.y))) continue;
@@ -240,6 +241,32 @@ export class Renderer {
       if (!b.alive || !b.built || b.team !== this.team || b.type !== 'fob') continue;
       ctx.beginPath();
       ctx.arc(b.x, b.y, BALANCE.fob.buildRadius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /** Bauradius gewählter oder überfahrener FOBs (eigene und gegnerische) in Teamfarbe, leicht gefüllt. */
+  drawSelectedRadii(ctx, z, v) {
+    const g = this.game;
+    const ids = v.selection ? [...v.selection] : [];
+    if (v.hoverId) ids.push(v.hoverId);
+    const seen = new Set();
+    ctx.save();
+    ctx.lineWidth = 2 / z;
+    ctx.setLineDash([10 / z, 8 / z]);
+    for (const id of ids) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const b = g.getEntity(id);
+      if (!b || b.kind !== 'building' || b.type !== 'fob') continue;
+      const color = g.teams[b.team].color;
+      ctx.globalAlpha = b.built ? 1 : 0.5;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, BALANCE.fob.buildRadius, 0, Math.PI * 2);
+      ctx.fillStyle = hexA(color, 0.07);
+      ctx.fill();
+      ctx.strokeStyle = hexA(color, 0.8);
       ctx.stroke();
     }
     ctx.restore();
