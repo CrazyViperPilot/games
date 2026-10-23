@@ -14,6 +14,7 @@ import * as Explode from './explode.js';
 import * as Projectiles from './projectiles.js';
 import * as Items from './items.js';
 import * as Mobs from './mobs.js';
+import { createBoss } from './bosses.js';
 
 const T = PHYS.tile;
 const E = 1e-6;
@@ -92,12 +93,13 @@ export class Game {
     const power = POWERS.includes(s.power) ? s.power : 'plain';
     this.player = createPlayer(map.start.x, map.start.y, power);
 
-    // Gegner aus den Spawns; der Boss kommt mit A11–A13 (bis dahin null).
+    // Gegner aus den Spawns; Spawn '@' (type 'boss') erzeugt den Boss des Levels (map.boss, z. B. 'slimeking').
     this.mobs = [];
     this.boss = null;
     for (let i = 0; i < map.spawns.length; i++) {
       const sp = map.spawns[i];
-      if (sp.type !== 'boss') this.mobs.push(Mobs.createMob(sp.type, sp.x, sp.y));
+      if (sp.type === 'boss') this.boss = createBoss(map.boss, sp.x, sp.y);
+      else this.mobs.push(Mobs.createMob(sp.type, sp.x, sp.y));
     }
 
     this.crystals = map.crystals.map((cr) => ({
