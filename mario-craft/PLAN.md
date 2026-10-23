@@ -312,3 +312,9 @@ Meilenstein 2 = A12–A13, D3–D4 → alle 12 Level, Review, Push nach main.
 - Game muss Forwarder bereitstellen: `openChest(c,r)`, `startFalling(c,r)`, `spawnDebris(c,r,id)`, `spawnSmoke(x,y)`, `spawnMob(type, footX, footY)`, `igniteTnt(c,r,fuse)`, `givePower(name)`, `givePick(n)`, `addEmeralds(n)`, `gainLife()` (emittiert `oneup`), `hitMob`, `killMob`, `damageBoss`.
 - Pools am game (`pickups`, `particles`, `falling`, `tnt`, `projectiles`) werden lazy von den Modulen angelegt; Game legt sie im Konstruktor an (gleiche Größen), damit Renderer sie lesen kann.
 - Mobs: Stern vor Schaden (Mob stirbt, Spieler unverletzt); nicht stampfbare Mobs (Glutgeist) verletzen beim Stampfen; Zombie nutzt `m.timer` als Wende-Cooldown → andere Typen nutzen eigene Felder (`fuse`, `shootT`, `timer2`).
+
+**A7a (Review)**
+- Boss-Schnittstelle: `game.boss` hat Methoden `update(game, dt, prevFeet)` und `damage(game, how)`; Game ruft `boss?.update?.()` / `boss?.damage?.()`.
+  `createBoss(kind, x, y)` (A11) liefert ein Objekt mit diesen Methoden plus den Lesefeldern aus §6. Diamanten: `map.gems[i].slot` (0..2).
+- `emeralds` = Rest unter 100 (je 100 → Leben). Event `diamond` nur aus `Game.collectDiamond`. Kristalle: linke obere Ecke, 12×18.
+- Alte Level, `enemies.js`, `combat.js` gelöscht; `LEVELS = []` bis D2. `main.js`, `renderer.js`, `hud.js`, `menu.js` sind bis B7/C2 kaputt.

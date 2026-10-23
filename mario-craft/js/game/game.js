@@ -1,162 +1,141 @@
-// Ablauf eines Levels (PLAN §5, PRD §2–§7). Kein DOM. update(dt, input) = ein fester Schritt.
-// Lesbar für Renderer/HUD: map, player, enemies[], items[], fireballs[], shots[], particles[], platforms[],
-// boss, bumps[], camX, viewW, time, coins, lives, starCoins[3], score, state, collectedCoins.
-// Renderer: map.coins[i].taken, map.hidden entfällt (versteckte Blöcke sind Kachel 0 bis zum Treffer).
+// Ablauf eines Levels (PLAN §2, §6, §13; PRD §2–§7). Kein DOM. update(dt, input) = ein fester Schritt.
+// Lesbar für Renderer/HUD: map, light, player, mobs[], boss, projectiles[], pickups[], falling[], particles[], tnt[],
+// dig, crystals[], camX, camY, shake, time, emeralds, lives, diamonds[3], pick, score, state: 'play'|'dying'|'won'|'over'.
 // Geänderte Kacheln: game.dirty[0..dirtyCount) enthält r*cols+c; nach dem Zeichnen clearDirty() aufrufen.
-// Plattform: { x, y, w, h, dx, dy, path, active, ... } – x/y oben links, y = Oberkante. Inaktive nicht zeichnen.
+// game.light wird nach einem Schritt mit lightDirty neu berechnet (danach lightDirty = false); der Renderer liest game.light je Bild.
+// Kristalle: { x, y, w, h, alive } mit linker oberer Ecke in px (wie alle anderen Rechtecke).
 import { PHYS } from '../data/physics.js';
-import { TILES, TILE_BY_ID, BARRIER_TILE } from '../data/tiles.js';
-import { TUNE } from '../data/combat.js';
+import { TILE_BY_ID, TILE_IDS } from '../data/tiles.js';
 import { parseLevel } from './level.js';
 import { createPlayer, setPower, updatePlayer } from './player.js';
-import { createEnemy, createBoss, updateEnemies, updateBoss, updateShots, killEnemiesOn, rectHit } from './enemies.js';
-import { hitBlock, spawnFireball, updateFireballs, updateItems, updateEffects } from './items.js';
+import { updateDig, headBreak } from './dig.js';
+import { computeLight } from './light.js';
+import * as Explode from './explode.js';
+import * as Projectiles from './projectiles.js';
+import * as Items from './items.js';
+import * as Mobs from './mobs.js';
 
 const T = PHYS.tile;
-const R = PHYS.rows;
-const G = PHYS.gravity;
-const INVIS_ID = TILES['!'].id;
-const BARRIER_ID = BARRIER_TILE.id;
-const POOL_ITEMS = 16;
-const POOL_SHOTS = 6;
-const POOL_PARTICLES = 64;
-const POOL_BUMPS = 4;
+const E = 1e-6;
+const AIR_ID = TILE_IDS.air;
+const BARRIER_ID = TILE_IDS.barrier;
+
+const POWERS = ['plain', 'armor', 'bow'];   // aufsteigend
+const DEATH_TIME = 1.5;         // s Sterben vor Neustart bzw. Game Over
+const DEATH_HOP = -200;         // px/s Startsprung beim Tod
+const RESPAWN_INVULN = 1;       // s Unverwundbarkeit nach dem Neustart
+const EMERALDS_PER_LIFE = 100;
+const MAX_MOBS = 48;
+const DIAMOND_COUNT = 3;
+const DIAMOND_REACH = 24;       // px: Erz-Diamant zur Gem-Mitte
+const GEM_REACH = 10;           // px: Spieler zur Gem-Mitte
+const BED_REACH = 20;           // px
+const GEM_HALF = 8;             // px: Mitte eines Gegenstands über seiner Unterkante (Zelle 16)
+const HEAD_Y = 4;               // px unter der Oberkante: Kopfpunkt für Lava
+const FALL_MARGIN = 32;         // px unter rows*T, ab dem der Sturz tödlich ist
+const CRYSTAL_RADIUS = 1.0;     // Kacheln
+const CRYSTAL_W = 12, CRYSTAL_H = 18;
+const GOAL_W = 32, GOAL_H = 48;
+const CAM_X_LO = 0.40, CAM_X_HI = 0.55;   // Totzone horizontal (Anteil der Sichtbreite)
+const CAM_Y_LO = 0.40, CAM_Y_HI = 0.60;   // Totzone vertikal (Anteil der Sichthöhe)
+const PROJECTILE_POOL = 16;
+const PICKUP_POOL = 16;
+const PARTICLE_POOL = 96;
+const FALLING_POOL = 8;
+const TNT_POOL = 8;
+
+// Pools (Größen wie in PLAN §10). Objektformen = die der Module, die sie benutzen.
+function makePool(n, make) {
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(make());
+  return out;
+}
+const newProjectile = () => ({ active: false, type: 'arrow', x: 0, y: 0, w: 0, h: 0, vx: 0, vy: 0, life: 0, stuck: false, owner: null });
+const newPickup = () => ({ active: false, kind: '', x: 0, y: 0, w: 0, h: 0, vx: 0, vy: 0, life: 0, onGround: false });
+const newParticle = () => ({ active: false, kind: '', x: 0, y: 0, vx: 0, vy: 0, life: 0, tile: 0, frame: 0 });
+const newFalling = () => ({ active: false, tile: 0, c: 0, x: 0, y: 0, vy: 0 });
+const newTnt = () => ({ active: false, x: 0, y: 0, timer: 0, fuse: 0 });
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
-function blank() {
-  return {
-    type: '', x: 0, y: 0, w: 0, h: 0, vx: 0, vy: 0, face: 1, anim: '', animTime: 0,
-    active: false, state: '', timer: 0, targetY: 0, life: 0, c: 0, r: 0,
-  };
-}
-
-function makePool(n) {
-  const out = [];
-  for (let i = 0; i < n; i++) out.push(blank());
-  return out;
-}
-
-// Plattform: Kachel-Einheiten → px. 'h'/'v' pendeln über range, 'fall' fällt nach 0,5 s Stehzeit mit speed px/s.
-function makePlatform(pd) {
-  const x = pd.c * T, y = pd.r * T;
-  return {
-    x, y, w: pd.w * T, h: T / 2, dx: 0, dy: 0,
-    path: pd.path, ox: x, oy: y, range: (pd.range || 0) * T, speed: pd.speed || 0,
-    off: 0, dir: 1, state: 'still', timer: 0, active: true,
-  };
+// Quadrat des Abstands von Punkt (x, y) zum Rechteck p (linke obere Ecke, w, h).
+function dist2ToRect(x, y, p) {
+  const dx = x < p.x ? p.x - x : x > p.x + p.w ? x - p.x - p.w : 0;
+  const dy = y < p.y ? p.y - y : y > p.y + p.h ? y - p.y - p.h : 0;
+  return dx * dx + dy * dy;
 }
 
 export class Game {
-  constructor({ level, save, onEvent, viewW = 384 } = {}) {
+  constructor({ level, save, onEvent, viewW = 384, viewH = 240 } = {}) {
     const s = save || {};
     const map = parseLevel(level);
     this.map = map;
     this.onEvent = onEvent || null;
     this.viewW = viewW;
+    this.viewH = viewH;
     this.state = 'play';
     this.time = 0;
     this.score = 0;
     this.lives = s.lives ?? PHYS.lives;
-    this.coins = s.coins ?? 0;
-    this.collectedCoins = 0;
-    this.starCoins = [false, false, false];
-    this.chain = 0;
+    this.emeralds = s.emeralds ?? 0;
+    this.pick = Math.max(s.pick ?? 0, map.pick);
+    this.diamonds = [false, false, false];
     this.jumpHeld = false;
-    this.dyingT = 0;
-    this.bossDefeated = false;
     this.checkpointReached = false;
+    this.bossDefeated = false;
     this.respawnAt = { x: map.start.x, y: map.start.y };
+    this.dyingT = 0;
+    this.shake = 0;
     this.camX = 0;
+    this.camY = 0;
 
-    this.player = createPlayer(map.start.x, map.start.y, s.power || 'small');
-    this.platforms = map.platforms.map(makePlatform);
+    const power = POWERS.includes(s.power) ? s.power : 'plain';
+    this.player = createPlayer(map.start.x, map.start.y, power);
 
-    this.enemies = [];
-    for (const sp of map.spawns) {
-      if (sp.type !== 'boss') this.enemies.push(createEnemy(sp.type, sp.x, sp.y));
-    }
+    // Gegner aus den Spawns; der Boss kommt mit A11–A13 (bis dahin null).
+    this.mobs = [];
     this.boss = null;
-    if (map.boss) {
-      const sp = map.spawns.find((q) => q.type === 'boss');
-      this.boss = sp
-        ? createBoss(map.boss, sp.x, sp.y)
-        : createBoss(map.boss, map.goal.x - 8 * T, (R) * T);
+    for (let i = 0; i < map.spawns.length; i++) {
+      const sp = map.spawns[i];
+      if (sp.type !== 'boss') this.mobs.push(Mobs.createMob(sp.type, sp.x, sp.y));
     }
 
-    this.items = makePool(POOL_ITEMS);
-    this.fireballs = makePool(PHYS.maxFireballs);
-    this.shots = makePool(POOL_SHOTS);
-    this.particles = makePool(POOL_PARTICLES);
-    this.bumps = makePool(POOL_BUMPS);
+    this.crystals = map.crystals.map((cr) => ({
+      x: cr.x - CRYSTAL_W / 2, y: cr.y - CRYSTAL_H, w: CRYSTAL_W, h: CRYSTAL_H, alive: true,
+    }));
 
-    this.dirty = new Int32Array(64);
+    // Diamant-Gems bekommen einen festen Platz (slot 0..2) in diamonds[] in Reihenfolge der Karte.
+    let slot = 0;
+    for (let i = 0; i < map.gems.length; i++) {
+      if (map.gems[i].diamond) map.gems[i].slot = slot++;
+    }
+
+    this.projectiles = makePool(PROJECTILE_POOL, newProjectile);
+    this.pickups = makePool(PICKUP_POOL, newPickup);
+    this.particles = makePool(PARTICLE_POOL, newParticle);
+    this.falling = makePool(FALLING_POOL, newFalling);
+    this.tnt = makePool(TNT_POOL, newTnt);
+    this.dig = { active: false, c: 0, r: 0, progress: 0, stage: 0, failCd: 0, soundCd: 0 };
+
+    this.dirty = new Int32Array(256);
     this.dirtyCount = 0;
     this.dirtyAll = false;
 
-    // Versteckte Blöcke: leer bis zum Kopfstoß von unten.
-    this.hidden = [];
-    const tiles = map.tiles;
-    for (let idx = 0; idx < tiles.length; idx++) {
-      if (tiles[idx] === INVIS_ID) {
-        const c = idx % map.cols;
-        tiles[idx] = 0;
-        this.hidden.push({ c, r: (idx - c) / map.cols });
-      }
-    }
-
-    // Inhalt der Bonusblöcke, Schlüssel = r*cols + c.
-    this.blockContent = new Map();
-    for (const key of Object.keys(map.items)) {
-      const [c, r] = key.split(',').map(Number);
-      this.blockContent.set(r * map.cols + c, { kind: map.items[key], left: 10 });
-    }
-
-    // Münzen: Sternmünzen nach x nummeriert (starIdx 0..2).
-    for (const coin of map.coins) { coin.taken = false; coin.starIdx = -1; }
-    const stars = map.coins.filter((c) => c.star).sort((a, b) => a.x - b.x);
-    stars.forEach((c, i) => { c.starIdx = i; });
-
-    // Unsichtbare Wand 2 Kacheln vor der Zielfahne (nur Boss-Levels, nur auf leeren Zellen).
-    this.barrier = [];
-    if (map.boss) {
-      const bc = Math.floor(map.goal.x / T) - TUNE.barrierDist;
-      for (let r = 0; r < R; r++) {
-        if (map.get(bc, r) === 0) {
-          map.set(bc, r, BARRIER_ID);
-          this.barrier.push({ c: bc, r });
-        }
-      }
-    }
-
-    this._follow();
+    this.light = computeLight(map);
+    this.lightDirty = false;
+    this.snapCamera();
   }
+
+  // ---------- Ereignisse, Kacheln, Anzeige ----------
 
   emit(name, data) {
     if (this.onEvent) this.onEvent(name, data);
   }
 
-  addScore(n) {
-    if (!n) return;
-    this.score += n;
-    this.emit('hudChange');
-  }
-
-  collectCoin() {
-    this.collectedCoins++;
-    this.coins++;
-    this.emit('coin');
-    if (this.coins >= PHYS.coinsPerLife) {
-      this.coins -= PHYS.coinsPerLife;
-      this.gainLife();
-    }
-    this.emit('hudChange');
-  }
-
-  gainLife() {
-    this.lives++;
-    this.emit('oneup');
-    this.emit('hudChange');
+  setView(w, h) {
+    this.viewW = w;
+    this.viewH = h;
+    this.snapCamera();
   }
 
   markDirty(c, r) {
@@ -169,213 +148,94 @@ export class Game {
     this.dirtyAll = false;
   }
 
-  // Treffer durch Gegner, Geschoss oder Lava-Kontakt: stuft die Figur herunter oder kostet ein Leben.
-  hurtPlayer(cause) {
+  // ---------- Kamera (PLAN §2) ----------
+
+  // Sofort auf den Spieler zentrieren (Start, Neustart, Größenänderung).
+  snapCamera() {
     const p = this.player;
-    if (this.state !== 'play' || p.dead) return;
-    if (p.invuln > 0 || p.star > 0) return;
-    if (p.power === 'small') { this.loseLife(cause); return; }
-    setPower(p, p.power === 'fire' ? 'big' : 'small');
-    p.invuln = PHYS.hurtInvuln;
-    this.emit('hurt');
-    this.emit('hudChange');
+    this._setCamera(p.x + p.w / 2 - this.viewW / 2, p.y + p.h / 2 - this.viewH / 2);
   }
 
-  // Leben verloren: 1,5 s Sterben, danach Neustart (siehe _updateDying).
-  loseLife(cause) {
-    if (this.state !== 'play') return;
-    const p = this.player;
-    this.state = 'dying';
-    this.dyingT = TUNE.deathTime;
-    p.dead = true;
-    p.vx = 0;
-    p.vy = cause === 'pit' ? 0 : TUNE.deathHop;
-    this.emit('die', { cause });
-    this.emit('lifeLost', { cause, lives: this.lives });
+  // Ganzzahlig und begrenzt. Ist das Level kleiner als die Sicht: links bzw. unten bündig.
+  _setCamera(x, y) {
+    const maxX = this.map.cols * T - this.viewW;
+    const maxY = this.map.rows * T - this.viewH;
+    this.camX = maxX <= 0 ? 0 : Math.round(clamp(x, 0, maxX));
+    this.camY = maxY <= 0 ? maxY : Math.round(clamp(y, 0, maxY));
   }
 
-  defeatBoss() {
-    this.bossDefeated = true;
-    for (const cell of this.barrier) {
-      this.map.set(cell.c, cell.r, 0);
-      this.markDirty(cell.c, cell.r);
-    }
-    this.addScore(TUNE.bossDefeatPoints);
-    this.emit('stomp');
+  // Totzone: horizontal 40–55 %, vertikal 40–60 % der Sicht. Außerhalb wird die Kamera nachgezogen.
+  _updateCamera() {
+    const p = this.player;
+    const cx = p.x + p.w / 2;
+    const cy = p.y + p.h / 2;
+    const vw = this.viewW, vh = this.viewH;
+    let x = this.camX, y = this.camY;
+    const sx = cx - x;
+    if (sx < CAM_X_LO * vw) x = cx - CAM_X_LO * vw;
+    else if (sx > CAM_X_HI * vw) x = cx - CAM_X_HI * vw;
+    const sy = cy - y;
+    if (sy < CAM_Y_LO * vh) y = cy - CAM_Y_LO * vh;
+    else if (sy > CAM_Y_HI * vh) y = cy - CAM_Y_HI * vh;
+    this._setCamera(x, y);
   }
+
+  // ---------- Schritt ----------
 
   update(dt, input) {
-    this.jumpHeld = input.jump;
-    if (this.state === 'dying') { this._updateDying(dt); return; }
-    if (this.state !== 'play') return;
+    this.jumpHeld = !!input.jump;
+    if (this.state === 'dying') this._updateDying(dt);
+    else if (this.state === 'play') this._stepPlay(dt, input);
+    if (this.shake > 0) this.shake = Math.max(0, this.shake - dt);
+    this._updateCamera();
+    if (this.lightDirty) {
+      this.light = computeLight(this.map, this.light);
+      this.lightDirty = false;
+    }
+  }
+
+  _stepPlay(dt, input) {
     const p = this.player;
     this.time += dt;
 
-    this._movePlatforms(dt);
     const prevFeet = p.y + p.h;
-    const prevTop = p.y;
     const wasGround = p.onGround;
     const res = updatePlayer(this, dt, input);
-    if (p.onGround) this.chain = 0;
+    if (res.hitHead) headBreak(this, res.hitHead.c, res.hitHead.r);
     if (wasGround && !p.onGround && p.vy < 0) this.emit('jump');
-    if (res.hitHead) this._headHit(res.hitHead.c, res.hitHead.r);
-    this._checkHidden(prevTop);
-    this._advancePlatforms();
 
-    if (input.firePressed && p.power === 'fire') spawnFireball(this);
-    updateFireballs(this, dt);
-    updateEnemies(this, dt, prevFeet);
+    updateDig(this, dt, input);
+    if (input.firePressed && p.power === 'bow') Projectiles.spawnPlayerArrow(this);
+
+    Mobs.updateMobs(this, dt, prevFeet);
+    Mobs.updateSpawners(this, dt);
     if (this.state !== 'play') return;
-    updateBoss(this, dt, prevFeet);
+
+    this.boss?.update?.(this, dt, prevFeet);
     if (this.state !== 'play') return;
-    updateShots(this, dt);
+
+    Projectiles.updateProjectiles(this, dt);
+    Explode.updateTnt(this, dt);
+    Items.updatePickups(this, dt);
+    Items.updateFalling(this, dt);
+    Items.updateParticles(this, dt);
     if (this.state !== 'play') return;
-    updateItems(this, dt);
-    updateEffects(this, dt);
-    this._checkCoins();
-    this._checkCheckpoint();
-    this._checkGoal();
-    if (this.state !== 'play') return;
+
+    this._collectGems();
     this._checkHazards();
     if (this.state !== 'play') return;
-    this._follow();
+    this._checkCheckpoint();
+    this._checkGoal();
   }
 
-  _headHit(c, r) {
-    hitBlock(this, c, r);
-    killEnemiesOn(this, c, r);
-  }
-
-  // Unsichtbarer Block: Die Figur steigt von unten durch seine Unterkante → Block wird fest.
-  _checkHidden(prevTop) {
-    const p = this.player;
-    if (!(p.y < prevTop)) return;
-    for (let i = 0; i < this.hidden.length; i++) {
-      const h = this.hidden[i];
-      if (!h) continue;
-      const bottom = (h.r + 1) * T;
-      if (prevTop >= bottom - 0.01 && p.y < bottom && p.x < (h.c + 1) * T && p.x + p.w > h.c * T) {
-        p.y = bottom;
-        p.vy = 0;
-        this.map.set(h.c, h.r, TILES['H'].id);
-        this.markDirty(h.c, h.r);
-        this.hidden[i] = null;
-        bumpBlockAt(this, h.c, h.r);
-        this.emit('appear');
-        return;
-      }
-    }
-  }
-
-  _standingOn(pl) {
-    const p = this.player;
-    return !p.dead && p.onGround && p.x + p.w > pl.x && p.x < pl.x + pl.w
-      && Math.abs(p.y + p.h - pl.y) < 0.5;
-  }
-
-  // Bewegt Plattformen für diesen Schritt (dx/dy); Position wird in _advancePlatforms übernommen.
-  _movePlatforms(dt) {
-    for (let i = 0; i < this.platforms.length; i++) {
-      const pl = this.platforms[i];
-      if (!pl.active) { pl.dx = 0; pl.dy = 0; continue; }
-      if (pl.path === 'fall') {
-        pl.dx = 0;
-        if (pl.state === 'still') {
-          pl.dy = 0;
-          pl.timer = this._standingOn(pl) ? pl.timer + dt : 0;
-          if (pl.timer >= TUNE.fallDelay) pl.state = 'falling';
-        } else {
-          pl.dy = pl.speed * dt;
-        }
-      } else {
-        pl.off += pl.dir * pl.speed * dt;
-        if (pl.off >= pl.range) { pl.off = pl.range; pl.dir = -1; }
-        else if (pl.off <= 0) { pl.off = 0; pl.dir = 1; }
-        const nx = pl.ox + (pl.path === 'h' ? pl.off : 0);
-        const ny = pl.oy + (pl.path === 'v' ? pl.off : 0);
-        pl.dx = nx - pl.x;
-        pl.dy = ny - pl.y;
-      }
-    }
-  }
-
-  _advancePlatforms() {
-    for (let i = 0; i < this.platforms.length; i++) {
-      const pl = this.platforms[i];
-      if (!pl.active) continue;
-      pl.x += pl.dx;
-      pl.y += pl.dy;
-      if (pl.path === 'fall' && pl.state === 'falling' && pl.y > R * T + 16) {
-        pl.active = false;
-        pl.y = 1e6;
-      }
-    }
-  }
-
-  _checkCoins() {
-    const p = this.player;
-    const coins = this.map.coins;
-    for (let i = 0; i < coins.length; i++) {
-      const c = coins[i];
-      if (c.taken) continue;
-      if (!rectHit(p.x, p.y, p.w, p.h, c.x - 6, c.y - 14, 12, 12)) continue;
-      c.taken = true;
-      if (c.star) {
-        if (c.starIdx >= 0 && c.starIdx < this.starCoins.length) this.starCoins[c.starIdx] = true;
-        this.emit('coin');
-        this.emit('hudChange');
-      } else {
-        this.collectCoin();
-      }
-    }
-  }
-
-  _checkCheckpoint() {
-    const cp = this.map.checkpoint;
-    if (!cp || this.checkpointReached) return;
-    const p = this.player;
-    if (p.x + p.w / 2 >= cp.x) {
-      this.checkpointReached = true;
-      this.respawnAt = { x: cp.x, y: cp.y };
-      this.emit('checkpoint');
-    }
-  }
-
-  _checkGoal() {
-    const goal = this.map.goal;
-    const p = this.player;
-    if (p.x + p.w < goal.x - 2) return;
-    if (this.boss && !this.bossDefeated) return;
-    const top = 2 * T, bottom = (R - 1) * T;
-    const frac = clamp((bottom - (p.y + p.h)) / (bottom - top), 0, 1);
-    this.addScore(TUNE.pointsFlagMin + Math.round(frac * (TUNE.pointsFlagMax - TUNE.pointsFlagMin)));
-    this.state = 'won';
-    this.emit('goal');
-    this.emit('levelDone', {
-      time: this.time, coins: this.collectedCoins, starCoins: this.starCoins.slice(), score: this.score,
-    });
-  }
-
-  // Grube (unter dem Level) oder Gefahrenkachel (Lava, Stacheln) kostet ein Leben.
-  _checkHazards() {
-    const p = this.player;
-    const map = this.map;
-    if (p.y > R * T) { this.loseLife('pit'); return; }
-    const c0 = Math.floor(p.x / T), c1 = Math.floor((p.x + p.w - 0.01) / T);
-    const r0 = Math.floor(p.y / T), r1 = Math.floor((p.y + p.h - 0.01) / T);
-    for (let r = r0; r <= r1; r++) {
-      for (let c = c0; c <= c1; c++) {
-        if (TILE_BY_ID[map.get(c, r)].hazard) { this.loseLife('hazard'); return; }
-      }
-    }
-  }
-
+  // Sterben: Fallen ohne Kollision, nach DEATH_TIME Leben abziehen und neu starten oder Game Over.
   _updateDying(dt) {
     const p = this.player;
     this.dyingT -= dt;
-    p.vy = Math.min(p.vy + G * dt, PHYS.maxFall);
+    p.vy = Math.min(p.vy + PHYS.gravity * dt, PHYS.maxFall);
     p.y += p.vy * dt;
     if (this.dyingT > 0) return;
+
     this.lives -= 1;
     if (this.lives <= 0) {
       this.lives = 0;
@@ -385,41 +245,249 @@ export class Game {
       return;
     }
     const at = this.respawnAt;
-    this.player = createPlayer(at.x, at.y, 'small');
-    this.camX = this._clampCam(at.x - 0.4 * this.viewW);
+    this.player = createPlayer(at.x, at.y, 'plain');
+    this.player.invuln = RESPAWN_INVULN;
+    this.dig.active = false;
+    this.dig.progress = 0;
+    this.dig.stage = 0;
+    this.snapCamera();
     this.state = 'play';
     this.emit('hudChange');
   }
 
-  _clampCam(x) {
-    const max = Math.max(0, this.map.cols * T - this.viewW);
-    return Math.round(clamp(x, 0, max));
-  }
-
-  // Kamera: Totzone 35–50 % der Breite; scrollt nur nach rechts. Die Figur kann nicht hinter den Bildrand.
-  _follow() {
+  // Smaragde und Diamanten einsammeln (Gegenstände sind Punkte, Abstand zum Spieler-Rechteck).
+  _collectGems() {
     const p = this.player;
-    const center = p.x + p.w / 2;
-    if (center - this.camX > 0.5 * this.viewW) {
-      this.camX = this._clampCam(center - 0.5 * this.viewW);
-    }
-    if (p.x < this.camX) {
-      p.x = this.camX;
-      if (p.vx < 0) p.vx = 0;
+    const gems = this.map.gems;
+    for (let i = 0; i < gems.length; i++) {
+      const g = gems[i];
+      if (g.taken || dist2ToRect(g.x, g.y - GEM_HALF, p) > GEM_REACH * GEM_REACH) continue;
+      g.taken = true;
+      if (g.diamond) {
+        this.collectDiamond(g.slot);
+      } else {
+        this.addEmeralds(1);
+        this.emit('emerald');
+      }
     }
   }
-}
 
-// Wackeln an einer Zelle (ohne Treffer-Logik).
-function bumpBlockAt(game, c, r) {
-  for (let i = 0; i < game.bumps.length; i++) {
-    const b = game.bumps[i];
-    if (!b.active) {
-      b.active = true;
-      b.c = c;
-      b.r = r;
-      b.timer = TUNE.bumpTime;
-      return;
+  // Lava an Fuß- oder Kopfpunkt und Sturz unter die Karte kosten ein Leben.
+  _checkHazards() {
+    const p = this.player;
+    const map = this.map;
+    if (p.y > map.rows * T + FALL_MARGIN) { this.loseLife('fall'); return; }
+    const c = Math.floor((p.x + p.w / 2) / T);
+    const feet = Math.floor((p.y + p.h - E) / T);
+    const head = Math.floor((p.y + HEAD_Y) / T);
+    if (TILE_BY_ID[map.get(c, feet)].hazard || TILE_BY_ID[map.get(c, head)].hazard) this.loseLife('lava');
+  }
+
+  // Bett: berührt → Checkpoint (einmal).
+  _checkCheckpoint() {
+    const cp = this.map.checkpoint;
+    if (!cp || this.checkpointReached) return;
+    if (dist2ToRect(cp.x, cp.y - GEM_HALF, this.player) >= BED_REACH * BED_REACH) return;
+    this.checkpointReached = true;
+    this.respawnAt = { x: cp.x, y: cp.y };
+    this.emit('checkpoint');
+  }
+
+  // Portal: 32×48 über der Zielzelle. Boss-Level erst nach dem Sieg.
+  _checkGoal() {
+    const map = this.map;
+    if (map.boss && !this.bossDefeated) return;
+    const p = this.player;
+    const gx = map.goal.x - GOAL_W / 2;
+    const gy = map.goal.y - GOAL_H;
+    if (!(p.x < gx + GOAL_W && p.x + p.w > gx && p.y < gy + GOAL_H && p.y + p.h > gy)) return;
+    this.state = 'won';
+    this.emit('levelDone', {
+      time: this.time,
+      emeralds: this.emeralds,
+      diamonds: this.diamonds.filter(Boolean).length,
+      score: this.score,
+      pick: this.pick,
+    });
+    this.emit('portal');
+  }
+
+  // ---------- Leben und Schaden ----------
+
+  // Treffer durch Gegner, Geschoss, Explosion: Bogen → Rüstung → ohne Rüstung → Leben verloren.
+  hurtPlayer(cause) {
+    const p = this.player;
+    if (this.state !== 'play' || p.dead) return;
+    if (p.invuln > 0 || p.star > 0) return;
+    if (p.power === 'bow') setPower(p, 'armor');
+    else if (p.power === 'armor') setPower(p, 'plain');
+    else { this.loseLife(cause); return; }
+    p.invuln = PHYS.hurtInvuln;
+    this.emit('hurt');
+    this.emit('hudChange');
+  }
+
+  // Sterben beginnt. Das Leben wird erst nach DEATH_TIME abgezogen (_updateDying).
+  loseLife(cause) {
+    if (this.state !== 'play') return;
+    const p = this.player;
+    this.state = 'dying';
+    this.dyingT = DEATH_TIME;
+    p.dead = true;
+    p.anim = 'dead';
+    p.animTime = 0;
+    p.vx = 0;
+    p.vy = DEATH_HOP;
+    this.emit('die', { cause });
+    this.emit('lifeLost', { cause, lives: this.lives });
+  }
+
+  gainLife() {
+    this.lives++;
+    this.emit('oneup');
+    this.emit('hudChange');
+  }
+
+  // Je 100 Smaragde ein Leben; der Zähler zeigt den Rest.
+  addEmeralds(n) {
+    if (!n) return;
+    this.emeralds += n;
+    while (this.emeralds >= EMERALDS_PER_LIFE) {
+      this.emeralds -= EMERALDS_PER_LIFE;
+      this.gainLife();
     }
+    this.emit('hudChange');
+  }
+
+  addScore(n) {
+    if (!n) return;
+    this.score += n;
+    this.emit('hudChange');
+  }
+
+  // Nur aufwerten: plain < armor < bow.
+  givePower(name) {
+    const want = POWERS.indexOf(name);
+    if (want < 0) return;
+    const p = this.player;
+    if (want > POWERS.indexOf(p.power)) setPower(p, name);
+  }
+
+  // Spitzhacke bleibt gespeichert: nur aufwerten.
+  givePick(level) {
+    if (level > this.pick) this.pick = level;
+  }
+
+  // ---------- Diamanten ----------
+
+  // Diamant Nummer i (0..2) sammeln. Gibt false zurück, wenn er schon gesammelt ist.
+  collectDiamond(i) {
+    if (!(i >= 0 && i < DIAMOND_COUNT) || this.diamonds[i]) return false;
+    this.diamonds[i] = true;
+    this.emit('diamond', { index: i });
+    this.emit('hudChange');
+    return true;
+  }
+
+  // Erz-Diamant bei (x, y) in px: nächstes offenes Diamant-Gem in Reichweite, sonst der erste freie Platz.
+  collectDiamondAt(x, y) {
+    const gems = this.map.gems;
+    let best = null;
+    let bestD = DIAMOND_REACH * DIAMOND_REACH;
+    for (let i = 0; i < gems.length; i++) {
+      const g = gems[i];
+      if (!g.diamond || g.taken) continue;
+      const dx = g.x - x;
+      const dy = g.y - GEM_HALF - y;
+      const d = dx * dx + dy * dy;
+      if (d < bestD) { bestD = d; best = g; }
+    }
+    if (best) {
+      best.taken = true;
+      return this.collectDiamond(best.slot);
+    }
+    // Erst Plätze ohne offenes Gem, sonst irgendeinen freien.
+    for (let pass = 0; pass < 2; pass++) {
+      for (let i = 0; i < DIAMOND_COUNT; i++) {
+        if (this.diamonds[i]) continue;
+        if (pass === 0 && this._slotPending(i)) continue;
+        return this.collectDiamond(i);
+      }
+    }
+    return false;
+  }
+
+  _slotPending(i) {
+    const gems = this.map.gems;
+    for (let k = 0; k < gems.length; k++) {
+      if (gems[k].diamond && !gems[k].taken && gems[k].slot === i) return true;
+    }
+    return false;
+  }
+
+  // ---------- Boss (Platzhalter bis A11–A13) ----------
+
+  // Sieg: Arena-Barrieren verschwinden, das Portal wird aktiv.
+  defeatBoss() {
+    this.bossDefeated = true;
+    const map = this.map;
+    for (let r = 0; r < map.rows; r++) {
+      for (let c = 0; c < map.cols; c++) {
+        if (map.get(c, r) === BARRIER_ID) {
+          map.set(c, r, AIR_ID);
+          this.markDirty(c, r);
+        }
+      }
+    }
+    this.lightDirty = true;
+  }
+
+  damageBoss(how) {
+    this.boss?.damage?.(this, how);
+  }
+
+  // ---------- Forwarder auf Module (PLAN §13) ----------
+
+  spawnMob(type, footX, footY) {
+    if (this.mobs.length >= MAX_MOBS) return null;
+    const m = Mobs.createMob(type, footX, footY);
+    m.active = true;
+    this.mobs.push(m);
+    return m;
+  }
+
+  killMob(m, how) {
+    Mobs.killMob(this, m, how);
+  }
+
+  hitMob(m, how) {
+    Mobs.hitMob(this, m, how);
+  }
+
+  openChest(c, r) {
+    return Items.openChest(this, c, r);
+  }
+
+  startFalling(c, r) {
+    return Items.startFalling(this, c, r);
+  }
+
+  spawnDebris(c, r, tileId) {
+    Items.spawnDebris(this, c, r, tileId);
+  }
+
+  spawnSmoke(x, y) {
+    Items.spawnSmoke(this, x, y);
+  }
+
+  igniteTnt(c, r, fuse = 2.0) {
+    Explode.igniteTnt(this, c, r, fuse);
+  }
+
+  // Kristall: zerstört, kleine Explosion in seiner Mitte.
+  hitCrystal(cr) {
+    if (cr.alive === false) return;
+    cr.alive = false;
+    Explode.explode(this, cr.x + cr.w / 2, cr.y + cr.h / 2, CRYSTAL_RADIUS);
   }
 }

@@ -1,11 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PHYS } from '../js/data/physics.js';
+import { TILE_IDS } from '../js/data/tiles.js';
 import { parseLevel } from '../js/game/level.js';
 import { createPlayer } from '../js/game/player.js';
+import { breakTile } from '../js/game/dig.js';
 import {
   createMob, updateMobs, hitMob, killMob, rectHit, updateSpawners,
 } from '../js/game/mobs.js';
+
+const DIRT = TILE_IDS.dirt;
+const AIR = TILE_IDS.air;
 
 const T = PHYS.tile;
 const DT = PHYS.step;
@@ -44,9 +49,17 @@ function makeGame(extra = {}, [px, py] = [20, GROUND]) {
     score: 0,
     hurts: 0,
     events: [],
+    lightDirty: false,
+    shake: 0,
+    dirty: [],
+    emeralds: 0,
     emit(name) { this.events.push(name); },
     addScore(n) { this.score += n; },
     hurtPlayer() { this.hurts++; },
+    markDirty(c, r) { this.dirty.push([c, r]); },
+    addEmeralds(n) { this.emeralds += n; },
+    killMob(m, how) { killMob(this, m, how); },
+    spawnMob(type, x, y) { const m = createMob(type, x, y); this.mobs.push(m); return m; },
   };
 }
 
@@ -240,7 +253,171 @@ test('Lava tötet den Zombie', () => {
   assert.ok(!g.events.includes('stomp'));
 });
 
-test('updateSpawners ist vorerst leer (A8)', () => {
-  const g = makeGame();
-  assert.doesNotThrow(() => updateSpawners(g, DT));
+test('Zischer läuft nur in Aggro-Reichweite (8 Kacheln) auf den Spieler zu', () => {
+  const g = makeGame({}, [20, GROUND]);
+  const far = spawn(g, 'zischer', 300); // 280 px > 8 × 16 px
+  step(g, 120);
+  assert.equal(far.x, 300 - 6, 'steht still');
+
+  const near = spawn(g, 'zischer', 100); // 80 px ≤ 128 px
+  step(g);
+  assert.equal(near.face, -1);
+  const x0 = near.x;
+  step(g, 59); // ca. 0,5 s bei 40 px/s
+  assert.ok(Math.abs((x0 - near.x) - 20) < 1, `Strecke ${x0 - near.x}`);
+});
+
+test('Zischer zündet bei 1,5 Kacheln, steht still und explodiert nach 1,5 s', () => {
+  // Zischer-Mitte liegt bei y 162, Explosion bei x ≈ 44: Zelle (2,8) im Radius, (8,8) außerhalb.
+  const g = makeGame({ '2,8': '#', '8,8': '#' }, [20, GROUND]);
+  const m = spawn(g, 'zischer', 100);
+  let guard = 0;
+  while (m.state !== 'fuse' && guard++ < 600) step(g);
+  assert.equal(m.state, 'fuse', 'gezündet');
+  assert.equal(m.anim, 'fuse');
+  assert.equal(m.fuse, 1.5);
+  assert.ok(g.events.includes('fuse'));
+
+  const x = m.x;
+  step(g, 100); // ca. 0,83 s
+  assert.equal(m.x, x, 'steht still');
+  assert.equal(m.dead, false);
+  step(g, 68); // insgesamt ca. 1,4 s
+  assert.equal(m.dead, false, 'Zündschnur läuft noch');
+  assert.equal(g.map.get(2, 8), DIRT);
+
+  step(g, 24); // insgesamt ca. 1,6 s
+  assert.equal(g.map.get(2, 8), AIR, 'Block im Radius gesprengt');
+  assert.equal(g.map.get(8, 8), DIRT, 'Block außerhalb bleibt');
+  assert.ok(g.events.includes('explode'));
+  assert.equal(g.mobs.length, 0, 'Zischer entfernt');
+  assert.equal(g.score, 0, 'kein Punkt für die Explosion');
+  assert.ok(!g.events.includes('stomp'));
+  assert.equal(g.hurts, 1, 'Spieler im Radius wird durch die Explosion verletzt');
+});
+
+test('Stampfen zündet den Zischer: Abprall, Zündschnur 1,0 s, kein Schaden, kein Punkt', () => {
+  const g = makeGame({}, [20, GROUND]);
+  const m = spawn(g, 'zischer', 300);
+  g.player = createPlayer(300, m.y + 4);
+  g.player.vy = 200;
+  step(g, 1, m.y);
+  assert.equal(m.state, 'fuse');
+  assert.equal(m.fuse, 1.0);
+  assert.equal(m.dead, false);
+  assert.equal(g.player.vy, -PHYS.stompBounce);
+  assert.equal(g.hurts, 0);
+  assert.equal(g.score, 0);
+});
+
+test('Seitlicher Kontakt zündet den Zischer statt den Spieler direkt zu verletzen', () => {
+  const g = makeGame({}, [20, GROUND]);
+  const m = spawn(g, 'zischer', 300);
+  g.player = createPlayer(300, GROUND);
+  step(g, 1, GROUND);
+  assert.equal(m.state, 'fuse');
+  assert.equal(m.fuse, 1.0);
+  assert.equal(g.hurts, 0);
+  assert.equal(m.dead, false);
+});
+
+test('Pfeil tötet den Zischer ohne Explosion', () => {
+  const g = makeGame({}, [20, GROUND]);
+  const m = spawn(g, 'zischer', 300);
+  step(g);
+  hitMob(g, m, 'arrow');
+  assert.equal(m.dead, true);
+  assert.equal(g.score, 100);
+  step(g, 200);
+  assert.ok(!g.events.includes('explode'));
+  assert.equal(g.hurts, 0);
+  assert.equal(g.mobs.length, 0);
+});
+
+test('Silberfischchen läuft flink (75 px/s) auf den Spieler zu', () => {
+  const g = makeGame({}, [20, GROUND]);
+  const m = spawn(g, 'silverfish', 100);
+  step(g);
+  assert.equal(m.face, -1);
+  const x0 = m.x;
+  step(g, 59); // ca. 0,5 s
+  assert.ok(Math.abs((x0 - m.x) - 37.5) < 1, `Strecke ${x0 - m.x}`);
+});
+
+test('Silberfischchen verletzt bei seitlichem Kontakt und stirbt beim Stampfen', () => {
+  const g = makeGame({}, [20, GROUND]);
+  const m = spawn(g, 'silverfish', 40);
+  let guard = 0;
+  while (g.hurts === 0 && guard++ < 100) step(g);
+  assert.ok(g.hurts >= 1, 'Spieler verletzt');
+  assert.equal(m.dead, false);
+
+  const g2 = makeGame({}, [20, GROUND]);
+  const s = spawn(g2, 'silverfish', 300);
+  g2.player = createPlayer(300, s.y + 4);
+  g2.player.vy = 200;
+  step(g2, 1, s.y);
+  assert.equal(s.dead, true);
+  assert.equal(g2.hurts, 0);
+  assert.equal(g2.score, 100);
+});
+
+// Spawner bei Spalte 30, Reihe 10; Spieler 5 Kacheln entfernt (in Reichweite).
+function spawners(g, n) {
+  for (let i = 0; i < n; i++) updateSpawners(g, DT);
+}
+
+test('Spawner erzeugt nach 4 s einen Zombie über sich, nicht früher', () => {
+  const g = makeGame({ '30,10': 'M' }, [400, GROUND]);
+  spawners(g, 470); // ca. 3,9 s
+  assert.equal(g.mobs.length, 0);
+  spawners(g, 20); // ca. 4,1 s
+  assert.equal(g.mobs.length, 1);
+  const m = g.mobs[0];
+  assert.equal(m.type, 'zombie');
+  assert.equal(m.x + m.w / 2, 30.5 * T);
+  assert.equal(m.y + m.h, 10 * T, 'steht auf der Zelle über dem Spawner');
+  assert.ok(g.events.includes('spawn'));
+});
+
+test('Spawner hält höchstens 3 lebende Mobs und wechselt die Typen ab', () => {
+  const g = makeGame({ '30,10': 'M' }, [400, GROUND]);
+  spawners(g, 120 * 30); // 30 s
+  assert.equal(g.mobs.length, 3);
+  assert.deepEqual(g.mobs.map((m) => m.type), ['zombie', 'skeleton', 'zombie']);
+});
+
+test('Spawner ersetzt einen getöteten Mob beim nächsten Takt', () => {
+  const g = makeGame({ '30,10': 'M' }, [400, GROUND]);
+  spawners(g, 120 * 13); // Mobs bei 4, 8 und 12 s
+  assert.equal(g.mobs.length, 3);
+  killMob(g, g.mobs[0], 'arrow');
+  spawners(g, 120 * 4); // nächster Takt bei 16 s
+  assert.equal(g.mobs.filter((m) => !m.dead).length, 3);
+  assert.equal(g.mobs.length, 4, 'ein neuer Mob, der tote ist noch nicht entfernt');
+});
+
+test('Spawner erzeugt nichts außerhalb von 10 Kacheln', () => {
+  const g = makeGame({ '30,10': 'M' }, [20, GROUND]); // ca. 29 Kacheln entfernt
+  spawners(g, 120 * 20);
+  assert.equal(g.mobs.length, 0);
+});
+
+test('Spawner weicht seitlich aus, wenn die Zelle darüber fest ist', () => {
+  const g = makeGame({ '30,10': 'M', '30,9': '#' }, [400, GROUND]);
+  spawners(g, 120 * 5);
+  assert.equal(g.mobs.length, 1);
+  const m = g.mobs[0];
+  assert.equal(m.x + m.w / 2, 29.5 * T, 'links vom Spawner');
+  assert.equal(m.y + m.h, 11 * T, 'Fuß auf der Spawner-Reihe');
+});
+
+test('Abgebauter Spawner verschwindet und erzeugt keine Mobs mehr', () => {
+  const g = makeGame({ '30,10': 'M' }, [400, GROUND]);
+  spawners(g, 10);
+  assert.equal(g.spawners.length, 1);
+  breakTile(g, 30, 10, 'dig');
+  spawners(g, 120 * 20);
+  assert.equal(g.spawners.length, 0);
+  assert.equal(g.mobs.length, 0);
 });

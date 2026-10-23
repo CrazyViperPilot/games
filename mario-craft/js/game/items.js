@@ -119,8 +119,7 @@ function collectPickup(game, it) {
       game.emit('emerald');
       break;
     case 'diamond':
-      game.collectDiamondAt?.(it.x, it.y);
-      game.emit('diamond');
+      game.collectDiamondAt?.(it.x, it.y);   // Event 'diamond' kommt von Game.collectDiamond
       break;
     case 'armor':
       game.givePower('armor');
