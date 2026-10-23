@@ -255,3 +255,13 @@ spielneutralen Auftrag: „Lies `<spiel>/PLAN.md`, setze nur das genannte Paket 
 - 12 Level in `js/data/levels/`, Reihenfolge in `LEVELS`. Plattform `fall`: `range = 0`, `speed` = Fallgeschwindigkeit (px/s).
 - `!` nur als versteckte begehbare Blöcke (ohne `items`); Gegenstände liegen nur auf `?`. Kein Stern-Block in v1-Leveln.
 - Boss-Arena: 22 flache Spalten, `b` in Zeile 12, Zielfahne direkt nach der Arena. `l` in Zeile 12 über Lava (Zeilen 13–14).
+
+**WP2**
+- `js/data/combat.js` → `TUNE` (Feinwerte: Boss, Punkte, Zeiten). Neue Kacheln ohne Zeichen: id 13 `USED_TILE` (leerer Bonusblock,
+  wird gezeichnet), id 14 `BARRIER_TILE` (unsichtbare Wand vor der Zielfahne im Boss-Level, **nicht** zeichnen).
+- `new Game({ level, save, onEvent, viewW = 384 })`. Zusätzliche Felder: `shots[]` (Boss-Geschosse, type 'rock'|'flame'),
+  `bumps[]` ({ c, r, timer } – Block wackelt), `dirty[]`/`dirtyCount` (Zellen `r*cols+c`, die der Tile-Cache neu zeichnen muss;
+  danach `game.clearDirty()`), `map.coins[i].taken`.
+- Entitäten: `hidden`/`done` überspringen. Gegner `state`: 'walk'|'shell'|'kicked'|'dead' (dead → `flip` = kopfüber fallen).
+  Boss: `kind`, `state` 'walk'|'jump'|'dizzy'|'defeated', `hp`, `invuln` (blinken).
+- Kamera scrollt nur nach rechts; Figur wird am linken Bildrand gestoppt.

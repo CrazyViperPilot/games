@@ -19,3 +19,10 @@ export const TILES = {
 // Lookup id → Eintrag (Index = id).
 export const TILE_BY_ID = [];
 for (const ch of Object.keys(TILES)) TILE_BY_ID[TILES[ch].id] = TILES[ch];
+
+// Zustände ohne Zeichen: entstehen nur zur Laufzeit (game/items.js, game/game.js), nicht im Level-Text.
+// USED: leerer Bonusblock nach dem Treffer. BARRIER: unsichtbare Wand vor der Zielfahne bei Boss-Levels.
+export const USED_TILE = { id: 13, solid: true, oneWay: false, hazard: false, kind: 'used' };
+export const BARRIER_TILE = { id: 14, solid: true, oneWay: false, hazard: false, kind: 'barrier' };
+TILE_BY_ID[USED_TILE.id] = USED_TILE;
+TILE_BY_ID[BARRIER_TILE.id] = BARRIER_TILE;
