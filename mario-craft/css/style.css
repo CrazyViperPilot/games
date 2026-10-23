@@ -57,6 +57,8 @@ html, body {
   touch-action: manipulation;
 }
 
+.ui > .panel { margin: auto; } /* zentriert, läuft bei Platzmangel oben nicht ab (scrollbar) */
+
 .panel {
   width: min(100%, 560px);
   display: flex;
@@ -92,6 +94,18 @@ html, body {
 .hint {
   margin: 0;
   font-size: 0.85rem;
+  color: var(--muted);
+}
+/* Hilfezeilen auf dem Titelbildschirm: mindestens 14 px. */
+.help {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.lbl {
+  font-size: 0.9rem;
+  font-weight: 800;
   color: var(--muted);
 }
 
@@ -144,6 +158,18 @@ html, body {
   gap: 12px;
   justify-content: center;
   align-items: center;
+}
+/* Kompakte Zeile (Pause-Menü, Einstellungen): kleinere Knöpfe, passt bei 412 px Bildhöhe. */
+.row.tight { gap: 8px; }
+.row.tight .btn { min-height: 44px; min-width: 0; padding: 0 12px; font-size: 0.95rem; }
+.row.tight .seg-b { min-width: 0; min-height: 44px; padding: 0 10px; font-size: 0.9rem; }
+
+/* Niedrige Bildschirme (z. B. Querformat 915×412): Menüs kompakter, damit das Pause-Menü ohne Abschneiden passt. */
+@media (max-height: 480px) {
+  .panel { gap: 8px; padding: 12px 16px; }
+  .panel .col { gap: 8px; }
+  .panel .btn { min-height: 44px; }
+  .big { font-size: 1.5rem; }
 }
 
 .seg { display: flex; }
@@ -288,4 +314,12 @@ html, body {
   justify-content: center;
   padding: 24px;
   text-align: center;
+}
+
+/* Einmaliger Spielhinweis, oben mittig, lässt Berührungen durch. */
+.hint {
+  position: fixed; top: 8px; left: 50%; transform: translateX(-50%);
+  max-width: min(80vw, 560px); padding: 8px 14px; z-index: 5;
+  background: rgba(11, 11, 26, 0.85); color: #fff; border: 2px solid #ffd23f;
+  font-size: 0.95rem; line-height: 1.35; text-align: center; pointer-events: none;
 }

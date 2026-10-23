@@ -1,6 +1,6 @@
 // Vibe Squadron Service Worker: network-first (immer die neueste Version), Cache nur als Offline-Fallback.
 // Bei Änderungen an Dateien CACHE_VERSION erhöhen, damit Clients die neue Version laden.
-const CACHE_VERSION = 'vibesquadron-v1';
+const CACHE_VERSION = 'vibesquadron-v2';
 const CACHE_PREFIX = 'vibesquadron-';
 const CACHE_NAME = CACHE_VERSION;
 

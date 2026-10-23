@@ -10,6 +10,8 @@ const OPEN_WORLDS = 3;
 const WORLDS = [1, 2, 3];
 const LEVELS_PER_WORLD = 4;
 const PICK_KEYS = ['pickWood', 'pickStone', 'pickIron', 'pickDiamond'];
+const BTN_SIZES = ['small', 'normal', 'large'];
+const BTN_SIZE_KEYS = { small: 'btnSmall', normal: 'btnNormal', large: 'btnLarge' };
 
 let root = null;
 let cur = null; // { screen, args, cb }
@@ -77,14 +79,23 @@ function soundBtn() {
   return `<button class="btn" data-act="sound" data-arg="${on ? 0 : 1}">${t('sound')}: ${on ? t('on') : t('off')}</button>`;
 }
 
+// Knopfgröße: drei Auswahlknöpfe (klein / normal / groß), der gewählte ist „on“.
+function sizeSeg(size) {
+  const label = t('btnSize');
+  return `<div class="seg" role="group" aria-label="${esc(label)}">${BTN_SIZES.map((k) => {
+    const on = k === size;
+    return `<button class="seg-b${on ? ' on' : ''}" data-act="btnsize" data-arg="${k}" aria-pressed="${on}">${t(BTN_SIZE_KEYS[k])}</button>`;
+  }).join('')}</div>`;
+}
+
 function viewStart() {
   return `<section class="panel center">
     <h1 class="title">${t('title')}</h1>
     <button class="btn primary" data-act="play">${t('start')}</button>
     <div class="row">${langSeg()}${soundBtn()}</div>
-    <p class="hint">${t('controls')}</p>
-    <p class="hint">${t('dig')}</p>
-    <p class="hint">${t('keys')}</p>
+    <p class="help">${t('controls')}</p>
+    <p class="help">${t('dig')}</p>
+    <p class="help">${t('keys')}</p>
   </section>`;
 }
 
@@ -127,7 +138,7 @@ function viewLevels(save) {
   return html + '</section>';
 }
 
-function viewPause() {
+function viewPause(size) {
   return `<section class="panel center">
     <h2 class="big">${t('pause')}</h2>
     <div class="col">
@@ -135,7 +146,8 @@ function viewPause() {
       <button class="btn" data-act="restart">${t('restart')}</button>
       <button class="btn" data-act="levels">${t('levels')}</button>
     </div>
-    <div class="row">${langSeg()}${soundBtn()}</div>
+    <div class="row tight">${langSeg()}${soundBtn()}</div>
+    <div class="row tight"><span class="lbl">${t('btnSize')}</span>${sizeSeg(size)}</div>
   </section>`;
 }
 
@@ -189,7 +201,10 @@ function onClick(e) {
   if (act === 'level') cb('level', Number(arg));
   else if (act === 'sound') cb('sound', arg === '1');
   else if (act === 'lang') cb('lang', arg);
-  else cb(act);
+  else if (act === 'btnsize') {
+    cur.args = [arg]; // Auswahl sofort markieren, auch bei refresh()
+    cb('btnsize', arg);
+  } else cb(act);
 }
 
 // Titelbildschirm. cb('play') | cb('lang', 'de'|'pl') | cb('sound', bool)
@@ -203,9 +218,9 @@ export function showLevelSelect(save, cb) {
   show('levels', [save], cb);
 }
 
-// Pause. cb('resume' | 'restart' | 'levels' | 'lang', v | 'sound', bool)
-export function showPause(cb) {
-  show('pause', [], cb);
+// Pause. size = 'small' | 'normal' | 'large' (Knopfgröße). cb('resume' | 'restart' | 'levels' | 'lang', v | 'sound', bool | 'btnsize', size)
+export function showPause(cb, size = 'normal') {
+  show('pause', [size], cb);
 }
 
 // Levelende. result = { time, emeralds, diamonds: [b, b, b], hasNext }. cb('next' | 'again' | 'levels')

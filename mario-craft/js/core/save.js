@@ -7,6 +7,9 @@ const POWERS = ['plain', 'armor', 'bow'];
 // lang: null (noch nicht gewählt, dann Gerätesprache) | 'de' | 'pl'
 // power: 'plain' | 'armor' | 'bow'; pick: beste Spitzhacke 0..3
 // levels: { [id]: { done, bestTime, emeralds, diamonds: [b, b, b] } }
+// btnSize (optional, abwesend = 'normal'): Knopfgröße 'small' | 'normal' | 'large'. Ergänzt v2 ohne Versionssprung;
+// ältere Stände ohne das Feld laden unverändert.
+const BTN_SIZES = ['small', 'normal', 'large'];
 export function defaultSave() {
   return {
     v: 2,
@@ -44,6 +47,7 @@ export function loadSave() {
     if (POWERS.includes(d.power)) s.power = d.power;
     if (Number.isInteger(d.pick) && d.pick >= 0 && d.pick <= 3) s.pick = d.pick;
     if (d.levels && typeof d.levels === 'object' && !Array.isArray(d.levels)) s.levels = d.levels;
+    if (BTN_SIZES.includes(d.btnSize)) s.btnSize = d.btnSize;
     return s;
   } catch (_) {
     return base;

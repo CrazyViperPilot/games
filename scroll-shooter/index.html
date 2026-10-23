@@ -52,10 +52,13 @@
             display: flex;
             justify-content: space-between;
         }
+        /* Combo: zentriert unter dem Mutterschiff-Balken (Schild-Balken inklusive), frei von Pause-Button */
         #comboDisplay {
             position: absolute;
-            top: 80px;
-            right: 15px;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
             font-size: 20px;
             font-weight: bold;
             color: #ffcc33;
@@ -232,24 +235,28 @@
         }
 
         /* Scrap currency chip */
+        /* Ressourcen-Zeile: Schrott, Titan, Plasma nebeneinander (spart Höhe in der linken Spalte) */
+        .res-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 6px;
+            white-space: nowrap;
+        }
         #scrapChip {
             color: #ffdd66;
-            font-size: 15px;
-            margin-top: 6px;
+            font-size: 13px;
             text-shadow: 0 0 6px #aa7700;
         }
-        #scrapChip .coin { font-size: 13px; }
+        #scrapChip .coin { font-size: 12px; }
         #titanChip {
             color: #b8c6d0;
-            font-size: 15px;
-            margin-top: 3px;
+            font-size: 13px;
             text-shadow: 0 0 6px #5a7080;
         }
-        #titanChip .coin { font-size: 13px; }
+        #titanChip .coin { font-size: 12px; }
         #plasmaChip {
             color: #66eaff;
-            font-size: 15px;
-            margin-top: 3px;
+            font-size: 13px;
             text-shadow: 0 0 6px #0088aa;
         }
         #plasmaChip .coin { font-size: 13px; }
@@ -334,7 +341,7 @@
         /* --- Pause button + overlay --- */
         #pauseBtn {
             position: absolute;
-            top: 84px;
+            top: 128px; /* unterhalb der rechten HUD-Spalte (inkl. Welle-Zeile) */
             right: 12px;
             width: 44px;
             height: 44px;
@@ -583,6 +590,9 @@
         .shop-item .si-cost.locked { color: #ff6688; }
         #startWaveBtn {
             flex-shrink: 0;
+            position: sticky; /* bleibt unten sichtbar, auch wenn die Karten darüber scrollen */
+            bottom: 0;
+            z-index: 2;
             width: 100%;
             box-sizing: border-box;
             margin: 10px 0 0;
@@ -598,6 +608,12 @@
             box-shadow: 0 0 16px rgba(255, 204, 51, 0.5);
         }
         #startWaveBtn:hover, #startWaveBtn:active { background: #ffcc33; color: #000; }
+        /* Querformat (Handy quer, ca. 412 px hoch): mehr Platz für die Karten, Button bleibt sichtbar */
+        @media (max-height: 500px) {
+            #buildPhase { padding-top: 6px; padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px)); }
+            #buildPhase .bp-sub { margin: 0 0 4px; }
+            #startWaveBtn { margin-top: 6px; padding: 10px 30px; font-size: 17px; }
+        }
 
         #startMenu {
             position: absolute;
@@ -670,9 +686,11 @@
                 <div class="bar-container"><div id="shieldBar"></div></div>
                 <div class="xp-row" style="color: #ffcc33;">Level <span id="levelText">1</span></div>
                 <div class="xp-bar-container"><div id="xpBar"></div></div>
-                <div id="scrapChip"><span class="coin">⚙</span> Schrott: <span id="scrapText">0</span></div>
-                <div id="titanChip"><span class="coin">🛠️</span> Titan: <span id="titanText">0</span></div>
-                <div id="plasmaChip"><span class="coin">⚡</span> Plasma: <span id="plasmaText">0</span></div>
+                <div class="res-row">
+                    <div id="scrapChip"><span class="coin">⚙</span> Schrott: <span id="scrapText">0</span></div>
+                    <div id="titanChip"><span class="coin">🛠️</span> Titan: <span id="titanText">0</span></div>
+                    <div id="plasmaChip"><span class="coin">⚡</span> Plasma: <span id="plasmaText">0</span></div>
+                </div>
             </div>
             <div style="text-align: right;">
                 <div>Score: <span id="scoreText">0</span></div>
@@ -829,31 +847,50 @@
     // --- VERBESSERTE STEUERUNG ---
     let targetX = canvas.width / 2;
 
+    // Schiff-Höhe: Ruheposition liegt eine Schiffshöhe höher als früher (Abstand zur Waffenleiste im Daumenbereich)
+    const PLAYER_HOME_Y = canvas.height - 178;  // unterste Position (vorher canvas.height - 130)
+    const PLAYER_TOP_Y = canvas.height - 420;   // höchste Position beim Ziehen
+    const TOUCH_Y_OFFSET = 60;                  // Schiff schwebt 60 px über dem Finger, der Daumen verdeckt es nicht
+    let targetY = PLAYER_HOME_Y;
+
     function updatePosition(e) {
         if (isGameOver || isBuildPhase) return;
-        
-        if (e.type === 'touchmove' || e.type === 'touchstart') {
-            e.preventDefault(); 
+
+        const isTouch = e.type === 'touchmove' || e.type === 'touchstart';
+        if (isTouch) {
+            e.preventDefault();
         }
 
         const rect = canvas.getBoundingClientRect();
-        const scaleX = canvas.width / rect.width; 
-        
-        let clientX;
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+
         // Prefer touches that actually started on the canvas (ignores button taps)
+        let pt = e;
         if (e.targetTouches && e.targetTouches.length > 0) {
-            clientX = e.targetTouches[0].clientX;
+            pt = e.targetTouches[0];
         } else if (e.touches && e.touches.length > 0) {
-            clientX = e.touches[0].clientX;
-        } else {
-            clientX = e.clientX;
+            pt = e.touches[0];
         }
-        
-        targetX = (clientX - rect.left) * scaleX;
+
+        targetX = (pt.clientX - rect.left) * scaleX;
+
+        // Touch: Ziel-Y = Finger minus Offset, begrenzt auf den Bereich zwischen oberer und unterer Grenze
+        if (isTouch) {
+            const y = (pt.clientY - rect.top - TOUCH_Y_OFFSET) * scaleY;
+            targetY = Math.min(PLAYER_HOME_Y, Math.max(PLAYER_TOP_Y, y));
+        }
+    }
+
+    // Finger weg: Schiff gleitet zurück in die Ruheposition
+    function releaseShipY() {
+        targetY = PLAYER_HOME_Y;
     }
 
     canvas.addEventListener('touchstart', updatePosition, { passive: false });
     canvas.addEventListener('touchmove', updatePosition, { passive: false });
+    canvas.addEventListener('touchend', releaseShipY);
+    canvas.addEventListener('touchcancel', releaseShipY);
     canvas.addEventListener('mousemove', updatePosition);
 
     const keys = { ArrowLeft: false, ArrowRight: false, a: false, d: false, A: false, D: false };
@@ -1337,7 +1374,7 @@
 
     class Player extends Entity {
         constructor() {
-            super(canvas.width / 2, canvas.height - 130);
+            super(canvas.width / 2, PLAYER_HOME_Y);
             this.width = 36;
             this.height = 48;
             this.speed = 8;
@@ -1383,6 +1420,7 @@
         takeDamage(amount) {
             if (this.invuln > 0) return;
             super.takeDamage(amount);
+            hitFeedback();
             // Reset combo on taking damage
             combo = 0;
             comboTimer = 0;
@@ -1515,6 +1553,7 @@
             if (targetX > canvas.width - 20) targetX = canvas.width - 20;
 
             this.x += (targetX - this.x) * 0.3;
+            this.y += (targetY - this.y) * 0.25;
 
             if (this.invuln > 0) this.invuln--;
             if (this.overdrive > 0) this.overdrive--;
@@ -2399,6 +2438,7 @@
                 createParticles(this.x + (Math.random() - 0.5) * this.width * 0.6, this.top, '#ff8800', 10, 1.5);
             }
             addShake(6, 12);
+            hitFeedback();
 
             if (this.hp <= 0) {
                 this.hp = 0;
@@ -3006,6 +3046,24 @@
     function addShake(mag, time) {
         shakeMag = Math.max(shakeMag, mag);
         shakeTime = Math.max(shakeTime, time);
+    }
+
+    // --- TREFFER-FEEDBACK: kurzes Wackeln (max. ±2 px, ca. 0,2 s) + Vibration ---
+    // Bei "Bewegung reduzieren" im System kein Wackeln, die Vibration bleibt.
+    const PREFERS_REDUCED_MOTION = (() => {
+        try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; }
+    })();
+    let hitShakeTime = 0;   // verbleibende Render-Frames des Wackelns
+    let lastVibrateAt = 0;  // Zeitpunkt der letzten Vibration (ms)
+    function hitFeedback() {
+        if (!PREFERS_REDUCED_MOTION) hitShakeTime = 12; // 12 Frames bei 60 Hz = 0,2 s
+        // Vibration höchstens alle 150 ms, sonst bei Dauerbeschuss nur Dauerrattern
+        const now = performance.now();
+        if (now - lastVibrateAt < 150) return;
+        lastVibrateAt = now;
+        try {
+            if (navigator.vibrate) navigator.vibrate(30);
+        } catch (e) { /* Vibration nicht verfügbar oder blockiert */ }
     }
 
     // --- WAVE BANNER ---
@@ -3642,10 +3700,12 @@
             bpSub.innerText = 'Pause – kaufe & rüste auf';
             startWaveBtn.innerText = 'FORTSETZEN';
             pauseBtn.innerText = '▶';
+            pauseBtn.style.display = '';
         } else {
             bpSub.innerText = 'Bereite dich auf Welle ' + (wave + 1) + ' vor';
             startWaveBtn.innerText = 'WELLE STARTEN';
-            pauseBtn.innerText = '⏸';
+            // Zwischen den Wellen gibt es nichts zu pausieren: Button ausblenden, damit er nicht über den Karten liegt
+            pauseBtn.style.display = 'none';
         }
         renderShop();
         buildPhaseScreen.style.display = 'flex';
@@ -3658,6 +3718,7 @@
         isBuildPhase = false;
         isPaused = false;
         pauseBtn.innerText = '⏸';
+        pauseBtn.style.display = '';
         if (pauseShop) {
             // Opened via pause mid-wave -> just resume, no new wave
             pauseShop = false;
@@ -4042,6 +4103,7 @@
         player = new Player();
         mothership = new Mothership();
         targetX = canvas.width / 2;
+        targetY = PLAYER_HOME_Y;
         projectiles = []; enemies = []; enemyProjectiles = []; missiles = []; perks = []; particles = [];
         score = 0; frameCount = 0; isGameOver = false; isPaused = false;
 
@@ -4365,6 +4427,12 @@
             oy = (Math.random() - 0.5) * shakeMag;
             shakeTime--;
             if (shakeTime === 0) shakeMag = 0;
+        }
+        if (hitShakeTime > 0) {
+            // Trefferwackeln: max. ±2 px pro Achse
+            ox += (Math.random() - 0.5) * 4;
+            oy += (Math.random() - 0.5) * 4;
+            hitShakeTime--;
         }
 
         ctx.save();

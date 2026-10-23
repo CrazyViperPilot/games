@@ -1,7 +1,8 @@
 // Gegenstände, Truhen, fallender Sand und Partikel (PLAN §6, PRD §4, §6). Kein DOM, keine Allokation im Update:
 // alle Objekte kommen aus Pools, die beim ersten Zugriff am game-Objekt angelegt werden.
 //   game.pickups   (16)  { active, kind, x, y, w, h, vx, vy, life, onGround }   x,y = Mitte-Unterkante
-//   game.particles (96)  { active, kind, x, y, vx, vy, life, tile, frame }      kind 'debris' | 'smoke'
+//   game.particles (96)  { active, kind, x, y, vx, vy, life, tile, frame }      kind 'debris' | 'smoke' | 'spark' | 'dust'
+//                                                                              spark: frame 0 weiß, 1 grün
 //   game.falling   (8)   { active, tile, c, x, y, vy }                          x,y = Oberkante links (px)
 import { PHYS } from '../data/physics.js';
 import { TILE_BY_ID, TILE_IDS } from '../data/tiles.js';
@@ -38,6 +39,12 @@ const DEBRIS_PATTERN = [
 // Rauch-Muster: [x-Versatz, y-Versatz, vx]; alle steigen mit SMOKE_VY.
 const SMOKE_PATTERN = [[-4, 0, -8], [0, -3, 8], [4, -1, 0]];
 const SMOKE_VY = -20;
+// Funken (Smaragd/Diamant) und Staub (Landung): [x-Versatz, y-Versatz, vx, vy] in px bzw. px/s.
+const SPARK_LIFE = 0.35;
+const SPARK_PATTERN = [[-5, -8, -35, -90], [4, -12, 30, -110], [-1, -4, -20, -60], [6, -2, 45, -50], [0, -14, 0, -130]];
+const DUST_LIFE = 0.3;
+const DUST_PATTERN = [[-4, -1, -28, -26], [0, 0, 6, -34], [4, -1, 26, -22]];
+const FALL_DUST_MIN = 24;        // px: Landung ab 1,5 Kacheln Fallhöhe staubt
 
 // Gemeinsamer Körper für moveAndCollide (wird nicht gespeichert).
 const BODY = { x: 0, y: 0, w: 0, h: 0, vx: 0, vy: 0 };
@@ -321,8 +328,74 @@ export function spawnSmoke(game, x, y) {
   }
 }
 
+// Bis zu n Partikel der Art kind an (x, y) mit den Werten aus pattern.
+function emitBurst(game, kind, pattern, n, x, y, life, frame) {
+  for (let i = 0; i < n; i++) {
+    const q = findFree(game.particles);
+    if (!q) break;
+    const d = pattern[i];
+    q.active = true;
+    q.kind = kind;
+    q.x = x + d[0];
+    q.y = y + d[1];
+    q.vx = d[2];
+    q.vy = d[3];
+    q.life = life;
+    q.tile = 0;
+    q.frame = frame;
+  }
+}
+
+function countDiamonds(game) {
+  let n = 0;
+  const d = game.diamonds;
+  if (d) for (let i = 0; i < d.length; i++) if (d[i]) n++;
+  return n;
+}
+
+// Effekte aus dem Spielerzustand, ohne eigene Ereignisse: Funken bei neuem Smaragd/Diamant (Zählerzuwachs),
+// Staub bei Landung nach freiem Fall ab FALL_DUST_MIN. Zustand liegt am game (_fx), keine Allokation je Schritt.
+function trackEffects(game) {
+  let fx = game._fx;
+  if (!fx) {
+    fx = game._fx = { em: game.emeralds | 0, dia: countDiamonds(game), pl: null, air: false, falling: false, startY: 0 };
+  }
+  const p = game.player;
+  const cx = p ? p.x + p.w / 2 : 0;
+  const head = p ? p.y + 6 : 0;
+
+  const em = game.emeralds | 0;
+  if (em > fx.em && p) emitBurst(game, 'spark', SPARK_PATTERN, 4, cx, head, SPARK_LIFE, 0);
+  fx.em = em;
+  const dia = countDiamonds(game);
+  if (dia > fx.dia && p) emitBurst(game, 'spark', SPARK_PATTERN, 5, cx, head, SPARK_LIFE, 1);
+  fx.dia = dia;
+
+  if (!p || p.dead) { fx.pl = null; return; }
+  if (fx.pl !== p) {                       // neuer Spieler (Start, Neustart): ohne Effekt beginnen
+    fx.pl = p;
+    fx.air = !p.onGround;
+    fx.falling = false;
+    fx.startY = p.y;
+    return;
+  }
+  if (p.onGround) {
+    if (fx.air && fx.falling && p.y - fx.startY >= FALL_DUST_MIN) {
+      emitBurst(game, 'dust', DUST_PATTERN, 3, cx, p.y + p.h, DUST_LIFE, 0);
+    }
+    fx.air = false;
+    fx.falling = false;
+  } else if (!fx.air) {
+    // Abheben: ein Sprung (vy < 0) zählt nicht als Fall, nur Herunterlaufen von einer Kante.
+    fx.air = true;
+    fx.falling = p.vy >= 0;
+    fx.startY = p.y;
+  }
+}
+
 export function updateParticles(game, dt) {
   initPools(game);
+  trackEffects(game);
   const list = game.particles;
   const map = game.map;
   for (let i = 0; i < list.length; i++) {

@@ -110,16 +110,25 @@ export function drawHud(ctx, game, w, h) {
   }
 }
 
-// Bedienknöpfe: input.buttons = [{ id, x, y, down, visible }] (Mittelpunkt x, y). Pause zeichnet drawHud.
+// Bedienknöpfe: input.buttons = [{ id, x, y, r, base, down, visible }] (Mittelpunkt x, y). Pause zeichnet drawHud.
+// Ruhend halbtransparent (0.45), gedrückt 0.9. Größe = Sprite × r / base (Knopfgröße). Alpha wird wiederhergestellt.
 export function drawControls(ctx, input, w, h) {
   if (!S || !input || !input.buttons) return;
   const list = input.buttons;
+  const prevAlpha = ctx.globalAlpha;
+  const prevSmooth = ctx.imageSmoothingEnabled;
+  ctx.imageSmoothingEnabled = false;
   for (let i = 0; i < list.length; i++) {
     const b = list[i];
     if (!b.visible || b.id === 'pause') continue;
     const name = BTN_NAME[b.id];
     if (!name) continue;
     const s = S.get(name, b.down ? 1 : 0, false);
-    ctx.drawImage(S.atlas, s.sx, s.sy, s.w, s.h, Math.round(b.x - s.w / 2), Math.round(b.y - s.h / 2), s.w, s.h);
+    const k = b.base ? b.r / b.base : 1;
+    const dw = Math.round(s.w * k), dh = Math.round(s.h * k);
+    ctx.globalAlpha = b.down ? 0.9 : 0.45;
+    ctx.drawImage(S.atlas, s.sx, s.sy, s.w, s.h, Math.round(b.x - dw / 2), Math.round(b.y - dh / 2), dw, dh);
   }
+  ctx.globalAlpha = prevAlpha;
+  ctx.imageSmoothingEnabled = prevSmooth;
 }

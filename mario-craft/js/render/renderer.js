@@ -12,6 +12,11 @@ const CHUNK = 256;
 const BG_W = 256;                 // Kachelbreite der Parallax-Ebenen
 const PARA_FAR = 0.15, PARA_NEAR = 0.35;
 const SHAKE_PX = 2;
+const HURT_FLASH_T = 0.1;         // s: Held weiß getönt nach Treffer
+const HURT_VIG_T = 0.15;          // s: roter Bildrand nach Treffer
+const FLASH_FILTER = 'brightness(3) saturate(0)';
+const SPARK_COL = ['#ffffff', '#7dff8a'];   // Funken: 0 weiß, 1 grün (Diamant)
+const DUST_COL = '#b8a888';
 const TAU = Math.PI * 2;
 
 // Dunkelheit: Stufe p deckt Licht LO[p]..HI[p] ab (0 = am dunkelsten).
@@ -139,32 +144,43 @@ function embers(g, h, count, seed) {
   }
 }
 
-// Ebenen eines Themes: { far, near } als Funktionen (g, h) -> void. far = 0,15, near = 0,35.
+// Wolkengruppe: [x, Höhe in Anteilen von h, Radius] je Wolke.
+function clouds(g, h, list) {
+  for (let i = 0; i < list.length; i++) cloud(g, list[i][0], Math.round(h * list[i][1]), list[i][2]);
+}
+
+// Dunst: Ebene nur dort färben, wo schon Pixel stehen (source-atop), zum Horizont hin heller.
+function haze(g, h) {
+  g.globalCompositeOperation = 'source-atop';
+  const gr = g.createLinearGradient(0, h * 0.4, 0, h * 0.75);
+  gr.addColorStop(0, 'rgba(230,246,255,0)');
+  gr.addColorStop(1, 'rgba(230,246,255,0.45)');
+  g.fillStyle = gr;
+  g.fillRect(0, 0, BG_W, h);
+  g.globalCompositeOperation = 'source-over';
+}
+
+// Ebenen eines Themes, hinten → vorn: { fn (g, h), f = Parallaxfaktor, wind = Drift in px/s }.
+// Overworld: zwei Wolkenebenen (langsam und etwas schneller), ferne Hügel bläulich mit Dunst, nahe Hügel dunkelgrün.
 const LAYERS = {
-  overworld: {
-    far: (g, h) => {
-      cloud(g, 30, Math.round(h * 0.42), 6);
-      cloud(g, 110, Math.round(h * 0.36), 5);
-      cloud(g, 190, Math.round(h * 0.5), 7);
-      cloud(g, 240, Math.round(h * 0.33), 4);
-    },
-    near: (g, h) => silhouette(g, h, 0.6, h * 0.07, '#6cc06a', 0.0),
-  },
-  depths: {
-    far: (g, h) => silhouette(g, h, 0.45, h * 0.1, '#262d3f', 0.8),
-    near: (g, h) => silhouette(g, h, 0.6, h * 0.12, '#171c29', 2.1),
-  },
-  nether: {
-    far: (g, h) => silhouette(g, h, 0.5, h * 0.12, '#3a0d0a', 0.4),
-    near: (g, h) => {
-      silhouette(g, h, 0.7, h * 0.08, '#250606', 1.7);
-      embers(g, h, 14, 7);
-    },
-  },
-  end: {
-    far: (g, h) => stars(g, h, 40, '#6a5a92', false, 11, 0.8),
-    near: (g, h) => stars(g, h, 14, '#f0e6ff', true, 23, 0.7),
-  },
+  overworld: [
+    { fn: (g, h) => clouds(g, h, [[30, 0.42, 6], [190, 0.5, 7]]), f: 0.12, wind: 2.5 },
+    { fn: (g, h) => clouds(g, h, [[110, 0.36, 5], [240, 0.33, 4]]), f: 0.18, wind: 6 },
+    { fn: (g, h) => { silhouette(g, h, 0.55, h * 0.09, '#9cc9e4', 0.6); haze(g, h); }, f: 0.25 },
+    { fn: (g, h) => silhouette(g, h, 0.6, h * 0.07, '#3f8f4c', 0.0), f: PARA_NEAR },
+  ],
+  depths: [
+    { fn: (g, h) => silhouette(g, h, 0.45, h * 0.1, '#262d3f', 0.8), f: PARA_FAR },
+    { fn: (g, h) => silhouette(g, h, 0.6, h * 0.12, '#171c29', 2.1), f: PARA_NEAR },
+  ],
+  nether: [
+    { fn: (g, h) => silhouette(g, h, 0.5, h * 0.12, '#3a0d0a', 0.4), f: PARA_FAR },
+    { fn: (g, h) => { silhouette(g, h, 0.7, h * 0.08, '#250606', 1.7); embers(g, h, 14, 7); }, f: PARA_NEAR },
+  ],
+  end: [
+    { fn: (g, h) => stars(g, h, 40, '#6a5a92', false, 11, 0.8), f: PARA_FAR },
+    { fn: (g, h) => stars(g, h, 14, '#f0e6ff', true, 23, 0.7), f: PARA_NEAR },
+  ],
 };
 
 function newCanvas(w, h) {
@@ -196,10 +212,11 @@ export class Renderer {
     this.theme = null;
     this.tiles = null;
     this.skyCv = null;
-    this.paraFar = null;
-    this.paraNear = null;
+    this.para = [];         // { cv, f, wind } je Parallax-Ebene, hinten → vorn
     this.darkCv = null;
     this.dctx = null;
+    this.vigCv = null;      // roter Bildrand (Treffer)
+    this._hurt = { pl: null, inv: 0, at: -10 };   // Erkennung Treffer: Spieler, letzte Unverwundbarkeit, Zeitpunkt
     this.offX = 0;          // Verschiebung Welt → Bildschirm (−camX + Wackeln)
     this.offY = 0;
     this.sx = 0;            // Wackel-Versatz (±2 px) dieses Frames
@@ -213,11 +230,25 @@ export class Renderer {
     this._makeDark();
   }
 
-  // Offscreen-Puffer für die Dunkelheit (Größe = Sicht).
+  // Offscreen-Puffer für die Dunkelheit und den Treffer-Rand (Größe = Sicht).
   _makeDark() {
     this.darkCv = newCanvas(this.viewW, this.viewH);
     this.dctx = this.darkCv.getContext('2d');
     this.dctx.imageSmoothingEnabled = false;
+    this._makeVig();
+  }
+
+  // Roter Rand: transparent zur Mitte, am Rand 1 (einmal vorab gezeichnet, nur Alpha wird je Frame gesetzt).
+  _makeVig() {
+    const w = this.viewW, h = this.viewH;
+    this.vigCv = newCanvas(w, h);
+    const g = this.vigCv.getContext('2d');
+    const r = Math.hypot(w, h) / 2;
+    const gr = g.createRadialGradient(w / 2, h / 2, r * 0.55, w / 2, h / 2, r);
+    gr.addColorStop(0, 'rgba(230,20,20,0)');
+    gr.addColorStop(1, 'rgba(230,20,20,1)');
+    g.fillStyle = gr;
+    g.fillRect(0, 0, w, h);
   }
 
   setView(viewW, viewH) {
@@ -248,15 +279,15 @@ export class Renderer {
     g.imageSmoothingEnabled = false;
     paintSky(g, w, h, SKY[this.theme]);
     this.skyCv = sky;
-    const layers = LAYERS[this.theme];
-    this.paraFar = makeLayer(layers.far, h);
-    this.paraNear = makeLayer(layers.near, h);
+    this.para = LAYERS[this.theme].map((L) => ({ cv: makeLayer(L.fn, h), f: L.f, wind: L.wind || 0 }));
   }
 
-  // Kachelbare Ebene: x um camX·f, y um halbes camY verschoben (Bild ist höchstens so hoch wie die Sicht).
-  _drawPara(cv, f, camX, camY) {
+  // Kachelbare Ebene: x um camX·f + wind·t verschoben (Drift), y um halbes camY (Bild ist höchstens so hoch wie die Sicht).
+  _drawPara(cv, f, camX, camY, wind, t) {
     const ctx = this.ctx;
-    let x = -(Math.floor(camX * f) % BG_W) + this.sx;
+    let m = Math.floor(camX * f + wind * t) % BG_W;
+    if (m < 0) m += BG_W;
+    let x = -m + this.sx;
     if (x > 0) x -= BG_W;
     const y = -Math.floor(camY / 2) + this.sy;
     for (; x < this.viewW; x += BG_W) ctx.drawImage(cv, x, y);
@@ -382,8 +413,11 @@ export class Renderer {
 
     // (2) Himmel und Parallax (nur die Ebenen, die Erde deckt darunter ab).
     ctx.drawImage(this.skyCv, this.sx, this.sy);
-    this._drawPara(this.paraFar, PARA_FAR, camX, camY);
-    this._drawPara(this.paraNear, PARA_NEAR, camX, camY);
+    const t = game.time;
+    for (let i = 0; i < this.para.length; i++) {
+      const L = this.para[i];
+      this._drawPara(L.cv, L.f, camX, camY, L.wind, t);
+    }
 
     // (3) Chunks, die das Bild überlappen.
     const chunks = this.tiles.chunks;
@@ -526,16 +560,26 @@ export class Renderer {
     }
 
     // (10) Spieler: 16×28, Hitbox 12×26 (Mitte unten), blinkt bei Verwundbarkeit, Stern = Farbwechsel.
+    // Treffer erkannt an einem Sprung von invuln (nicht bei neuem Spieler nach dem Neustart): 0,1 s weiß, 0,15 s roter Rand.
     const p = game.player;
+    const hx = this._hurt;
+    if (hx.pl !== p) { hx.pl = p; hx.inv = p.invuln; }
+    else if (p.invuln > hx.inv + 0.2) hx.at = game.time;
+    hx.inv = p.invuln;
+    const hurtAge = game.time - hx.at;
+    const flashing = hurtAge >= 0 && hurtAge < HURT_FLASH_T;
     const pBlink = p.invuln > 0 && (((game.time * 12.5) | 0) & 1);
-    if (!pBlink) {
+    if (flashing || !pBlink) {
       const names = HERO_NAME[p.power] || HERO_NAME.plain;
       const name = names[p.anim] || names.stand;
       const frame = (p.animTime * (HERO_RATE[p.anim] || 1)) | 0;
       const starred = p.star > 0;
-      if (starred) ctx.filter = HUE[((game.time * 10) | 0) % HUE.length];
+      let filt = null;
+      if (flashing) filt = FLASH_FILTER;
+      else if (starred) filt = HUE[((game.time * 10) | 0) % HUE.length];
+      if (filt) ctx.filter = filt;
       this._put(name, frame, p.face < 0, p.x + p.w / 2, p.y + p.h);
-      if (starred) ctx.filter = 'none';
+      if (filt) ctx.filter = 'none';
     }
 
     // (11) Geschosse und Partikel.
@@ -555,6 +599,14 @@ export class Renderer {
         this._put('fx_smoke', q.frame, false, q.x, q.y + 8);
         continue;
       }
+      if (q.kind === 'spark' || q.kind === 'dust') {
+        const dx = Math.round(q.x + ox), dy = Math.round(q.y + oy);
+        if (dx < -2 || dx > vw || dy < -2 || dy > vh) continue;
+        ctx.fillStyle = q.kind === 'dust' ? DUST_COL : SPARK_COL[q.frame];
+        const sz = q.kind === 'dust' ? 2 : 1;
+        ctx.fillRect(dx, dy, sz, sz);
+        continue;
+      }
       // Bröckchen: 4×4-Ausschnitt aus der Mitte des Block-Sprites.
       const art = TILE_BY_ID[q.tile].art;
       if (!art) continue;
@@ -565,8 +617,13 @@ export class Renderer {
       ctx.drawImage(this.sprites.atlas, s.sx + 6, s.sy + 6, 4, 4, dx, dy, 4, 4);
     }
 
-    // (12) Dunkelheit.
+    // (12) Dunkelheit, dann roter Rand nach Treffer.
     this._drawDark(game);
+    if (hurtAge >= 0 && hurtAge < HURT_VIG_T) {
+      ctx.globalAlpha = 0.7 * (1 - hurtAge / HURT_VIG_T);
+      ctx.drawImage(this.vigCv, 0, 0);
+      ctx.globalAlpha = 1;
+    }
 
     // (13) HUD und Knöpfe.
     drawHud(ctx, game, vw, vh);

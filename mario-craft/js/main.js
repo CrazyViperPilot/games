@@ -2,7 +2,7 @@
 // Vollbild und Querformat beim ersten Antippen, ?debug=1, Service Worker.
 // Fester Schritt 1/120 s (PHYS.step, im Loop). Ohne Level (LEVELS leer) läuft die Levelauswahl mit „bald“.
 import { createLoop } from './core/loop.js';
-import { Input } from './core/input.js';
+import { Input, BTN_SCALE } from './core/input.js';
 import { audio, playEvent } from './core/audio.js';
 import { loadSave, writeSave } from './core/save.js';
 import { setLang, getLang, defaultLang, t } from './core/i18n.js';
@@ -41,6 +41,8 @@ function computeLayout() {
 const sprites = buildSprites();
 const renderer = new Renderer(canvas, sprites, { debug: DEBUG });
 const input = new Input(canvas, getLayout);
+const btnSize = () => (BTN_SCALE[save.btnSize] ? save.btnSize : 'normal');
+input.setButtonScale(BTN_SCALE[btnSize()]);
 
 let game = null;
 let levelIndex = 0;
@@ -152,9 +154,23 @@ function newGame(index) {
   });
 }
 
+// Einmaliger Hinweis in Level 1-1 (Graben), danach nie wieder.
+function showHint(key) {
+  let seen = false;
+  try { seen = localStorage.getItem('mariocraft-hint-' + key) === '1'; } catch (_) { /* egal */ }
+  if (seen) return;
+  try { localStorage.setItem('mariocraft-hint-' + key, '1'); } catch (_) { /* egal */ }
+  const el = document.createElement('div');
+  el.className = 'hint';
+  el.textContent = t(key);
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 8000);
+}
+
 function startLevel(index) {
   if (!LEVELS[index]) return;
   setGame(newGame(index));
+  if (index === 0) showHint('hint1');
   input.setFireVisible(game.player.power === 'bow');
   mode = 'play';
   menu.hideAll();
@@ -162,7 +178,7 @@ function startLevel(index) {
 
 function openPause() {
   mode = 'paused';
-  menu.showPause(pauseCb);
+  menu.showPause(pauseCb, btnSize());
 }
 
 function resume() {
@@ -195,6 +211,14 @@ function setSound(on) {
   menu.refresh();
 }
 
+function setButtonSize(k) {
+  if (!BTN_SCALE[k]) return;
+  save.btnSize = k;
+  writeSave(save);
+  input.setButtonScale(BTN_SCALE[k]);
+  menu.refresh();
+}
+
 function startCb(act, v) {
   if (act === 'play') showLevels();
   else if (act === 'lang') setLanguage(v);
@@ -220,6 +244,7 @@ function pauseCb(act, v) {
     showLevels();
   } else if (act === 'lang') setLanguage(v);
   else if (act === 'sound') setSound(v);
+  else if (act === 'btnsize') setButtonSize(v);
 }
 
 function doneCb(act) {
@@ -239,6 +264,8 @@ function overCb(act) {
 
 // ---------- Loop ----------
 function update(dt) {
+  // Touch-Knöpfe nur im Spiel; Titel, Levelauswahl und Pause zeigen keine.
+  input.setControlsOn(mode === 'play');
   const st = input.state;
   if (st.pausePressed) {
     if (mode === 'play') openPause();
