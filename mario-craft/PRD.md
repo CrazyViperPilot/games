@@ -1,108 +1,128 @@
-# Mario Craft – Product Requirements
+# Mario Craft – Product Requirements (v2: Blockwelt)
 
-Jump'n Run im Stil klassischer 2D-Plattformer: laufen, springen, Gegner stampfen, Münzen sammeln, Power-ups, Ziel erreichen.
-Eigene Pixel-Art, keine Figuren, Namen oder Grafiken aus Nintendo-Spielen.
+Jump'n Run mit dem Spielgefühl klassischer 2D-Plattformer (laufen, springen, stampfen) in einer Blockwelt im
+Minecraft-Stil. Neu gegenüber v1: **Graben**, hohe Level (runter in Höhlen und Dungeons, wieder hoch ans Licht),
+Monster im Blockstil, explodierende Zischer. Designvorschlag mit Daniel abgestimmt am 2026-10-23.
 
-## 1. Ziel & Rahmen
+**Namen:** eigene Namen bei Blockwelt-Aussehen (Seite ist öffentlich; Namen/Figuren von Mojang/Microsoft werden nicht
+übernommen, kein Nachbau von Steve, Creeper-Gesicht etc. 1:1). Allgemeine Wörter (Zombie, Skelett, Spinne, Schleim) bleiben.
+
+## 1. Ziel & Rahmen (unverändert zu v1)
 
 | | |
 |---|---|
-| Geräte | **Google Pixel 8a** (2400×1080, 20:9) und **Lenovo Tab M11** (1920×1200, 16:10, schwacher Prozessor), jeweils Chrome |
-| Ausrichtung | Querformat. Im Hochformat erscheint „Bitte Gerät drehen“. |
-| Steuerung | Touch: linker Daumen ◀ ▶, rechter Daumen Springen (+ Feuer, sobald verfügbar). Tastatur zum Testen am PC. |
-| Leistung | flüssige 60 fps auf beiden Geräten, scharfe Pixel ohne Unschärfe, gleiches Bild auf beiden Geräten |
-| Technik | Statische Web-App, Vanilla JS (ES-Module), Canvas 2D, kein Build-Schritt, keine externen Dateien/CDNs/Fonts |
-| Auslieferung | Ordner `mario-craft/` im Repo `games`, GitHub Pages, offline spielbar und installierbar (PWA) |
-| Sprache | Deutsch und Polnisch, im Menü umschaltbar, Auswahl wird gespeichert (Standard: Gerätesprache, sonst Deutsch) |
+| Geräte | Google Pixel 8a (2400×1080) und Lenovo Tab M11 (1920×1200, schwach), Chrome, **Querformat** |
+| Leistung | 60 fps auf beiden, scharfe Pixel (interne Auflösung ~15 Kacheln hoch, ganzzahlig skaliert) |
+| Technik | Vanilla JS (ES-Module), Canvas 2D, kein Build, keine externen Dateien |
+| Auslieferung | `mario-craft/` im Repo `games`, GitHub Pages, offline (PWA), Cache-Präfix `mariocraft-` |
+| Sprache | Deutsch und Polnisch, umschaltbar |
 
-Nicht im Umfang (v1): Level-Editor, Musik, Mehrspieler, Online-Bestenliste, Unterwasser-Level, Röhren-Warps.
+Nicht in v2: Blöcke setzen (Bauen), Inventar, Loren, Musik, Mehrspieler.
 
 ## 2. Spielablauf
 
-1. **Startbildschirm:** Titel, „Spielen“, Sprache (DE/PL), Ton an/aus.
-2. **Levelauswahl:** 3 Welten × 4 Level als Kacheln. Gesperrte Level ausgegraut. Je Level: Bestzeit, gesammelte Münzen, ob alle
-   3 Sternmünzen gefunden wurden.
-3. **Level:** von links nach rechts zur **Zielfahne**. In der Mitte ein **Checkpoint**. Level 4 jeder Welt ist eine Burg mit **Boss**.
-4. **Levelende:** Zusammenfassung (Zeit, Münzen, Sternmünzen), „Weiter“ / „Nochmal“ / „Levelauswahl“. Nächstes Level wird freigeschaltet.
-5. **Pause:** Knopf oben rechts → Fortsetzen, Neustart, Levelauswahl, Sprache, Ton.
+Startbildschirm → Levelauswahl (3 Welten × 4 Level) → Level → Levelende. Wie v1 (Pause, Speichern, Game Over setzt die
+Welt auf Level 1 zurück, Leben wieder 3).
 
-## 3. Welten
+Jedes Level folgt grob dem Weg **Oberfläche → Abstieg (graben, Schluchten) → Höhle/Dungeon → (Boss) → Aufstieg →
+Portal**. Level sind 100–250 Blöcke breit und 30–70 Blöcke hoch; die Kamera folgt in beide Richtungen.
 
-| Welt | Thema | Neue Elemente | Boss (Level 4) |
+| Welt | Oben | Unten | Boss (Level 4) |
 |---|---|---|---|
-| 1 Wiese | Himmel, Hügel, Bäume | Grundlagen, Bonusblöcke, Lücken, Läufer, Panzerkäfer | **Wurzelkönig**: läuft hin und her, springt, 3× stampfen |
-| 2 Höhle | dunkel, Kristalle | bewegliche Plattformen, Stachlinge, Hüpfer, enge Gänge | **Felsgolem**: lässt Steine fallen, 3× stampfen, wenn er nach einem Sprung kurz benommen ist |
-| 3 Burg | Stein, Lava | Lava, Feuerbälle aus der Lava, fallende Plattformen | **Glutdrache**: spuckt Feuer, 3× stampfen oder 8 Feuerbälle |
+| 1 Oberwelt | Wiese, Wald | Höhlen, erster Dungeon | **Riesenschleim** – teilt sich bei Stampfern (groß → 2 mittel → je 2 klein) |
+| 2 Tiefen | Berge, Schlucht | großer Dungeon, Lavaseen | **Dreikopf** – schwebt, schießt explodierende Schädel |
+| 3 Nether & Leere | Glutwelt (Nether-artig) | Leere mit schwebenden Inseln | **Leerendrache** – erst 4 Kristalle zerstören, dann stampfen, wenn er landet |
 
-Jedes Level dauert 1–3 Minuten, enthält 3 versteckte oder schwer erreichbare **Sternmünzen** und wird mit jeder Welt schwerer.
-Mehr Level kommen später; das Level-Format muss das ohne Code-Änderung erlauben.
+## 3. Spielfigur
 
-## 4. Spielfigur
+- Bewegung und Sprungwerte wie v1 (variable Sprunghöhe, Renntempo, Coyote Time, Jump Buffer).
+- **Feste Größe** 12×26 px (passt durch 2 Blöcke hohe Gänge). Zustände: **ohne Rüstung → Rüstung → Rüstung + Bogen**.
+  Treffer: Bogen → Rüstung → ohne → Leben verloren. Rüstung ist an der Figur sichtbar.
+- **Leitern/Ranken:** Sprung halten = hochklettern, Graben halten = runterklettern, sonst festhalten.
+- **Wasser:** langsam sinken, Sprung = Schwimmzug nach oben.
+- **Schleimblock:** Landen schleudert hoch (ca. 8 Blöcke).
 
-- **Laufen** mit ◀ ▶. Wer eine Richtung länger als ~0,6 s hält, beschleunigt automatisch auf **Renntempo** (kein eigener Knopf).
-- **Springen:** variable Höhe – kurz tippen = kleiner Sprung (~2 Kacheln), halten = hoher Sprung (~4 Kacheln, im Rennen ~5).
-  Rennsprung überwindet Lücken von bis zu 6 Kacheln.
-- **Spielgefühl-Hilfen:** Springen ist noch kurz nach dem Verlassen einer Kante möglich (Coyote Time), ein Sprungdruck kurz vor
-  der Landung wird gemerkt (Jump Buffer), Kopfstöße an Blockkanten schieben die Figur leicht zur Seite.
-- **Zustände:** klein → groß (Pilz) → Feuer (Feuerblume). Ein Treffer stuft eine Stufe zurück (Feuer → groß → klein → Leben verloren),
-  danach 1,5 s unverwundbar (Blinken).
-- Leben verloren auch durch Fallen in eine Grube und durch Lava.
+## 4. Graben
+
+- Knopf **Graben** (Spitzhacke) rechts. Allein = Block unter den Füßen; mit ◀/▶ = Block daneben (bei 2 hohen
+  Blöcken erst unten, dann oben). Halten: Risse (4 Stufen), dann bricht der Block.
+- **Kopfstoß** bricht weiche Blöcke (Erde, Gras, Sand, Blätter, Bretter) sofort.
+- Abbauzeit = Härte × Faktor der Spitzhacke. Spitzhacken: Holz (Start) 1,0 → Stein 0,7 → Eisen 0,5 → Diamant 0,35.
+  Manche Blöcke brauchen eine Mindest-Spitzhacke (Obsidian: Diamant). Grundgestein nie.
+
+| Block | Härte (s) | Mindest-Hacke | Ergebnis |
+|---|---|---|---|
+| Erde, Gras, Sand, Blätter | 0,3 | – | – (Sand fällt, wenn darunter frei) |
+| Holz, Bretter | 0,4 | – | – |
+| Stein, Bruchstein, Steinziegel, Glutstein | 0,8 | Holz | – |
+| Kohle-/Eisen-/Golderz | 1,0 | Holz/Stein/Eisen | 1/3/5 Smaragde |
+| Diamanterz | 1,2 | Eisen | Diamant (einer der 3 im Level) |
+| Getarnter Stein | 0,8 | Holz | Silberfischchen springt heraus |
+| TNT | 0,2 | – | zündet (2 s) |
+| Monster-Spawner | 1,5 | Holz | Spawner weg, 3 Smaragde |
+| Obsidian | 3,0 | Diamant | – |
+| Grundgestein | – | – | unzerstörbar |
 
 ## 5. Gegner
 
 | Gegner | Verhalten | Besiegen |
 |---|---|---|
-| **Läufer** | läuft geradeaus, dreht an Wänden, fällt von Kanten | stampfen, Feuerball, Panzer, Stern |
-| **Panzerkäfer** | wie Läufer; gestampft wird er zum Panzer | Panzer antippen = kicken, gekickter Panzer räumt Gegner ab und prallt an Wänden zurück (trifft auch den Spieler) |
-| **Hüpfer** | springt in Bögen auf den Spieler zu | stampfen, Feuerball |
-| **Stachling** | langsam, dreht an Kanten | **nicht** stampfbar; nur Feuerball, Panzer, Stern |
-| **Lavaball** (Welt 3) | springt senkrecht aus der Lava | nicht besiegbar, ausweichen |
+| **Zischer** (explodierender Blockgeist, grün) | läuft ab 8 Blöcken Abstand auf dich zu; ab 1,5 Blöcken: steht, blinkt, zischt 1,5 s → Explosion | Stampfen **zündet** ihn (1 s Flucht), Pfeil besiegt ihn ohne Explosion |
+| **Zombie** | langsam auf dich zu, fällt von Kanten | stampfen, Pfeil |
+| **Skelett** | hält 4–6 Blöcke Abstand, schießt alle 2 s einen Pfeil | stampfen, Pfeil |
+| **Spinne** | schnell, klettert Wände hoch, springt dich ab 3 Blöcken an | stampfen, Pfeil |
+| **Schleim** | hüpft auf dich zu; groß → 2 klein | stampfen, Pfeil |
+| **Silberfischchen** | klein, flink, aus getarntem Stein | stampfen, Pfeil |
+| **Glutgeist** (Welt 3) | schwebt, schießt alle 3 s drei Feuerkugeln | nur Pfeil (Stampfen verbrennt) |
+| **Leerenläufer** (Welt 3) | harmlos; berührt man ihn, teleportiert er neben dich und greift an | 2 Stampfer, Pfeil |
 
-Stampfen lässt die Figur abprallen; hält man Springen, prallt sie höher ab. Mehrere Gegner hintereinander ohne Landung ergeben steigende Punkte.
+**Explosion** (Zischer, TNT, Schädel): Radius 2,5 Blöcke (Schädel 1,5), zerstört alle Blöcke außer Obsidian und
+Grundgestein, besiegt Gegner, verletzt die Figur, zündet TNT in Reichweite (0,5 s). Bildschirmwackeln, Vibration.
+**Monster-Spawner** erzeugen alle 4 s einen Zombie oder ein Skelett, solange die Figur ≤ 10 Blöcke entfernt ist
+(max. 3 lebende je Spawner). **Lava** tötet sofort.
 
-## 6. Blöcke & Gegenstände
+## 6. Gegenstände
 
-- **Boden/Stein** (fest), **Ziegel** (klein: wackelt beim Kopfstoß, groß: zerbricht), **Bonusblock** (Münze, Pilz bzw. Feuerblume
-  je nach Zustand, Stern, oder 5–10 Münzen nacheinander), **unsichtbarer Block**, **harter Block**, **Plattformen** (nur von oben begehbar).
-- **Münze:** 100 Münzen = 1 Extraleben. **Sternmünze:** 3 pro Level, für die Levelauswahl.
-- **Pilz:** macht groß. **Feuerblume:** Feuerbälle (max. 2 gleichzeitig), hüpfen über den Boden. **Stern:** 8 s unverwundbar, Gegner
-  werden bei Berührung besiegt. **1-Up-Pilz** (selten, versteckt).
-- **Checkpoint-Fahne:** nach Leben-Verlust startet man dort (klein). **Zielfahne:** je höher berührt, desto mehr Punkte.
+| Gegenstand | Herkunft | Wirkung |
+|---|---|---|
+| **Truhe** | Block, von unten anstoßen oder abbauen | gibt ihren Inhalt (Level-Datei), sonst 3 Smaragde |
+| **Smaragd** | frei, aus Erzen, Truhen | 100 = 1 Leben |
+| **Diamant** | frei oder Diamanterz, genau 3 je Level | Levelauswahl zeigt sie |
+| **Rüstung** | Truhe | ein Treffer mehr |
+| **Bogen** | Truhe | Pfeile (Feuerknopf, max. 2 gleichzeitig) |
+| **Goldener Apfel** | Truhe | 8 s unverwundbar, Gegner fliegen bei Berührung |
+| **Kuchen** | Truhe, versteckt | 1 Leben |
+| **Spitzhacke** (Stein/Eisen/Diamant) | Truhe | bessere Hacke, **bleibt gespeichert** |
+| **Bett** | im Level | Checkpoint |
+| **Portal** | Levelende | Level geschafft (Boss-Level: erscheint nach dem Sieg) |
+| **Fackel** | im Level | Licht |
 
-## 7. Leben & Fortschritt
+## 7. Grafik
 
-- Start mit 3 Leben. Bei 0 Leben: **Game Over** → zurück zu Level 1 der aktuellen Welt, Leben wieder 3. Freigeschaltete Level bleiben frei.
-- Gespeichert (`localStorage`, eigener Schlüssel `mariocraft-save`): freigeschaltete Level, je Level Bestzeit, Münzen, Sternmünzen;
-  Leben, Münzen und Zustand der Figur beim Verlassen; Sprache; Ton an/aus.
+- 16×16-Blocktexturen mit Pixelrauschen im Blockstil (Gras mit Seitengras, Erz-Sprenkel, Bruchstein, Holzmaserung).
+- Unter der Oberfläche liegt hinter Luft eine dunkle **Rückwand**; Höhlen werden mit der Tiefe dunkler, Licht um
+  Fackeln, Lava, Glutstein, Portal und die Figur (Radius 4 Blöcke).
+- Risse beim Abbauen, Block-Bröckchen, Explosionswolke, Bildschirmwackeln.
+- Eigene eckige Heldenfigur (Hemd, Hose, eckiger Kopf), Rüstung sichtbar. Monster und Bosse eckig im Blockstil.
 
-## 8. Bedienung (Touch)
+## 8. Bedienung
 
-- **Links:** zwei große Knöpfe ◀ ▶ nebeneinander. Die Trefferflächen sind größer als die gezeichneten Knöpfe und reichen bis zur
-  Bildschirmmitte, ein Daumen kann zwischen ◀ und ▶ rutschen, ohne loszulassen.
-- **Rechts:** großer Sprungknopf; darüber ein kleinerer **Feuerknopf**, nur sichtbar mit Feuerblume.
-- Echtes Multitouch: Laufen und Springen gleichzeitig. Kein Zoom, kein Scrollen, kein Kontextmenü, keine Textauswahl.
-- Knöpfe halbtransparent, liegen über dem Spielbild; die Kamera lässt unten genug Platz, dass die Figur nicht unter den Daumen verschwindet.
-- Kurze Vibration bei Treffer und Stampfen (abschaltbar mit dem Ton).
-- Tastatur (PC): ←/→ bzw. A/D laufen, Leertaste/↑/W springen, X/J Feuer, Esc Pause.
-- Vollbild beim ersten Antippen; als installierte App im Querformat gesperrt.
+| Seite | Knopf | |
+|---|---|---|
+| links | ◀ ▶ | laufen |
+| rechts | Springen (groß) | auch Klettern hoch / Schwimmen |
+| rechts | **Graben** (Spitzhacke) links neben Springen | auch Klettern runter |
+| rechts | Bogen (klein, über Springen) | nur mit Bogen sichtbar |
+| Tastatur | ←→/AD, Leertaste/W/↑, **↓/S = Graben**, X = Bogen, Esc | |
 
-## 9. Grafik & Ton
+## 9. Speicherstand
 
-- **Pixel-Art im Code:** Sprites als Zeichenraster mit Farbpalette, beim Start einmal in Bilder umgewandelt. Kachelgröße 16 px.
-- **Auflösung:** Das Spiel rendert in eine kleine interne Auflösung von etwa 15 Kacheln Höhe und skaliert sie **ganzzahlig**
-  (Nearest Neighbor) auf den Bildschirm: Tab M11 384×240 ×5, Pixel 8a 480×216 ×5 (breiterer Ausschnitt). Dadurch scharf,
-  gleich aussehend und sehr günstig zu zeichnen.
-- Hintergrund mit 2 Parallax-Ebenen pro Welt.
-- **Ton:** kurze, synthetisch erzeugte Effekte (Web Audio): Sprung, Münze, Stampfen, Block, Power-up, Treffer, Feuerball, Ziel,
-  Game Over. Keine Musik in v1. Ton an/aus im Menü.
+Wie v1 plus `pick` (beste Spitzhacke) und `power` mit Werten `plain|armor|bow`. Alte Spielstände (v1) werden
+zurückgesetzt, außer Sprache und Ton.
 
 ## 10. Akzeptanzkriterien
 
-1. Läuft offline nach dem ersten Besuch und ist als App installierbar; eigener Service Worker mit Präfix `mariocraft-`, der nur eigene Caches löscht.
-2. Stabile 60 fps auf Pixel 8a und Lenovo Tab M11 (Prüfung in Chromium mit 4-facher CPU-Drosselung: kein Frame über 16,7 ms im Schnitt,
-   ruckelfreies Scrollen).
-3. Laufen + Springen gleichzeitig per Multitouch; kein versehentliches Zoomen/Scrollen.
-4. Alle 12 Level sind durchspielbar (Level-Prüfung: jede Lücke und jede Stufe ist mit den Physikwerten schaffbar).
-5. Umschalten DE/PL wirkt sofort auf alle Texte und bleibt nach Neustart erhalten.
-6. Fortschritt bleibt nach Schließen der App erhalten.
-7. Karte auf der Startseite der Spielesammlung, Eintrag in der README-Tabelle, eigener Test-Workflow.
+1. 60 fps auf beiden Geräten (Prüfung: Chromium, CPU ×4, Ø ≤ 16,7 ms, auch beim Graben und bei Explosionen).
+2. Graben, Klettern, Schwimmen, Schleimblock, Zischer-Explosion mit Blockzerstörung funktionieren per Touch.
+3. Alle 12 Level schaffbar (Prüf-Suche durch die Level inkl. Graben; Test-Bot schafft Welt 1 komplett).
+4. DE/PL vollständig, Offline-Modus, Fortschritt bleibt erhalten.
