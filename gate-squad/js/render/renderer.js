@@ -273,8 +273,15 @@ export class Renderer {
 
   // Canvas auf Fenstergröße und DPR setzen. Welt: W = WORLD_W, H aus Seitenverhältnis.
   resize() {
-    const cssW = Math.max(1, window.innerWidth);
+    // Desktop (Maus, Querformat): schmale Hochformat-Spalte in der Fenstermitte
+    const winW = Math.max(1, window.innerWidth);
     const cssH = Math.max(1, window.innerHeight);
+    this.desktop = winW > cssH && !!(window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches);
+    const cssW = this.desktop ? Math.min(winW, Math.round(cssH * 0.6)) : winW;
+    const st = this.canvas.style;
+    st.width = this.desktop ? cssW + 'px' : '';
+    st.left = this.desktop ? Math.round((winW - cssW) / 2) + 'px' : '';
+    st.right = this.desktop ? 'auto' : '';
     const dpr = Math.min(window.devicePixelRatio || 1, CFG.DPR_MAX);
     const pw = Math.round(cssW * dpr);
     const ph = Math.round(cssH * dpr);
@@ -291,7 +298,7 @@ export class Renderer {
 
   // CSS-Pixel pro Welteinheit (für Input).
   get scale() {
-    return window.innerWidth / this.W;
+    return this.canvas.clientWidth / this.W;
   }
 
   // game = null oder state 'idle': nur animierter Hintergrund.

@@ -72,6 +72,7 @@ export function updateSquad(game, dt, input) {
   if (input) {
     const dx = input.consumeDeltaX();
     if (dx) sq.x += dx;
+    if (input.targetX != null) sq.x += (input.targetX - sq.x) * Math.min(1, dt * 20);
   }
   const lo = sq.radius;
   const hi = game.W - sq.radius;

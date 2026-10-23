@@ -149,7 +149,7 @@ function render() {
 function onResize() {
   if (!renderer || !game) return;
   const { W, H } = renderer.resize();
-  game.resize(W, H);
+  game.resize(W, H, renderer.desktop);
 }
 
 // ---------- Globale Ereignisse ----------

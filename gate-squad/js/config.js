@@ -5,6 +5,7 @@ export const CFG = {
   DPR_MAX: 2,
   HUD_H: 64,
   SQUAD_OFFSET: 150, // SQUAD_Y = WORLD_H - SQUAD_OFFSET
+  SQUAD_OFFSET_DESKTOP: 90, // am PC steht die Truppe weiter unten
   MAX_SHOOTERS: 24,
   MAX_DRAWN_SOLDIERS: 40,
   POOL: {

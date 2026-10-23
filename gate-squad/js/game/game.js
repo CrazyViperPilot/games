@@ -87,10 +87,10 @@ export class Game {
     this._hud = { count: -1, tier: -1, att: -1, specs: -1 };
   }
 
-  resize(W, H) {
+  resize(W, H, desktop = false) {
     this.W = W > 0 ? W : CFG.WORLD_W;
     this.H = H > 0 ? H : DEFAULT_H;
-    this.SQUAD_Y = this.H - CFG.SQUAD_OFFSET;
+    this.SQUAD_Y = this.H - (desktop ? CFG.SQUAD_OFFSET_DESKTOP : CFG.SQUAD_OFFSET);
     this.squad.y = this.SQUAD_Y;
   }
 
