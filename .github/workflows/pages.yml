@@ -1,5 +1,5 @@
 # Deployt die Spielesammlung nach GitHub Pages:
-# Startseite unter /, jedes Spiel in seinem Ordner: /gate-squad/, /go/, /sudoku/.
+# Startseite unter /, jedes Spiel in seinem Ordner: /gate-squad/, /scroll-shooter/, /go/, /sudoku/, /frontline/, /mario-craft/.
 # Entwicklungsdateien (Tests, package.json, Pläne) werden nicht veröffentlicht.
 name: Deploy games to GitHub Pages
 
