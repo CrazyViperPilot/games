@@ -318,3 +318,5 @@ Meilenstein 2 = A12–A13, D3–D4 → alle 12 Level, Review, Push nach main.
   `createBoss(kind, x, y)` (A11) liefert ein Objekt mit diesen Methoden plus den Lesefeldern aus §6. Diamanten: `map.gems[i].slot` (0..2).
 - `emeralds` = Rest unter 100 (je 100 → Leben). Event `diamond` nur aus `Game.collectDiamond`. Kristalle: linke obere Ecke, 12×18.
 - Alte Level, `enemies.js`, `combat.js` gelöscht; `LEVELS = []` bis D2. `main.js`, `renderer.js`, `hud.js`, `menu.js` sind bis B7/C2 kaputt.
+
+- **Arena-Tür (Opus, nach D2):** Zeichen `:` im Level = Luft, in `map.doors` gesammelt; `game.lockArena()` (bei `bossStart`) macht sie zu Barrieren, `defeatBoss()` öffnet sie. Türen eine Spalte vor dem Arena-Eingang setzen (Spieler darf beim Auslösen nicht darin stehen). Boss-Levels brauchen sie, sonst ist das Portal vorab erreichbar.

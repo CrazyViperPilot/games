@@ -429,6 +429,15 @@ export class Game {
 
   // ---------- Boss (Platzhalter bis A11–A13) ----------
 
+  // Bosskampf beginnt: Arena-Türen (`:`) werden zu Barrieren.
+  lockArena() {
+    for (const d of this.map.doors) {
+      this.map.set(d.c, d.r, BARRIER_ID);
+      this.markDirty(d.c, d.r);
+    }
+    this.lightDirty = true;
+  }
+
   // Sieg: Arena-Barrieren verschwinden, das Portal wird aktiv.
   defeatBoss() {
     this.bossDefeated = true;

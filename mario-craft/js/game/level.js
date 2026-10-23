@@ -38,6 +38,7 @@ export function parseLevel(def) {
   const tiles = new Uint8Array(cols * R);
   const gems = [];
   const crystals = [];
+  const doors = [];
   const spawns = [];
   let start = null;
   let goal = null;
@@ -67,6 +68,8 @@ export function parseLevel(def) {
         }
       } else if (Object.hasOwn(GEMS, ch)) {
         gems.push({ x: pos.x, y: pos.y, diamond: GEMS[ch], taken: false });
+      } else if (ch === ':') {
+        doors.push({ c, r });
       } else if (ch === 'y') {
         crystals.push({ x: pos.x, y: pos.y });
       } else if (Object.hasOwn(SPAWN_TYPES, ch)) {
@@ -122,6 +125,7 @@ export function parseLevel(def) {
     chests: def.chests || {},
     boss: def.boss,
     crystals,
+    doors,
     pick: def.pick || 0,
   };
   return map;
