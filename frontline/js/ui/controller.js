@@ -369,7 +369,6 @@ export class Controller {
   /**
    * Rechtsklick auf eigenes Gebäude. Liefert die IDs der Einheiten, die damit erledigt sind.
    * LKW: leer → laden, beladen → entladen (FOB); an Baustelle → entladen. Baufahrzeug/Infanterie an Baustelle → hinfahren
-   * (die Engine kennt keinen Befehl „Bauer einer bestehenden Baustelle zuweisen“; idle Bauer nahe der Baustelle helfen).
    * Baufahrzeug an beschädigtem fertigen Gebäude → reparieren.
    */
   orderOnOwnBuilding(b, units) {
@@ -390,7 +389,7 @@ export class Controller {
     const others = units.filter((u) => !done.has(u.id));
     if (!b.built) {
       const builders = others.filter((u) => canBuild(u.def, b.type));
-      if (builders.length && this.issue({ type: 'move', ids: ids(builders), x: b.x, y: b.y }).ok) {
+      if (builders.length && this.issue({ type: 'build', ids: ids(builders), siteId: b.id }).ok) {
         this.moveMarker(b.x, b.y);
       }
       for (const u of builders) done.add(u.id);

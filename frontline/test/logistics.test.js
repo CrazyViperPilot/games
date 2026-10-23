@@ -304,3 +304,18 @@ test('Mauer außerhalb des Radius ohne LKW-Ladung wird abgelehnt', () => {
   assert.equal(r.ok, false);
   assert.equal(r.reason, 'Außerhalb des Bauradius einer eigenen FOB');
 });
+
+test('build mit siteId schickt Bauer an eine bestehende Baustelle; Schütze nicht an eine Halle', () => {
+  const g = new Game({ seed: 7 });
+  const f = fobOf(g, 0);
+  const spot = g.canPlace(0, 'depot', f.x + 160, f.y);
+  assert.equal(spot.ok, true, spot.reason);
+  const site = g.spawnBuilding('depot', 0, spot.cx, spot.cy, { built: false });
+  const eng = g.units.find((u) => u.team === 0 && u.type === 'engineer');
+  const rifle = g.units.find((u) => u.team === 0 && u.type === 'rifleman');
+  assert.equal(g.issue(0, { type: 'build', ids: [rifle.id], siteId: site.id }).ok, false);
+  assert.equal(g.issue(0, { type: 'build', ids: [eng.id], siteId: site.id }).ok, true);
+  assert.equal(eng.order.type, 'build');
+  run(g, 40);
+  assert.equal(site.built, true);
+});

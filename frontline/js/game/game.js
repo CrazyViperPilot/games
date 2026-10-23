@@ -523,6 +523,17 @@ export class Game {
     };
   }
 
+  /** `{ type: 'build', ids, siteId }`: Bauer an eine bestehende eigene Baustelle schicken. */
+  cmdJoinSite(team, cmd) {
+    const site = this.getEntity(cmd.siteId);
+    if (!site || site.kind !== 'building' || site.team !== team || site.built) return fail('Keine eigene Baustelle');
+    const pick = this.pickBuilders(team, cmd.ids, site.type);
+    if (pick.reason) return fail(pick.reason);
+    if (!pick.list.length) return fail('Keine Bauer gewählt');
+    for (const u of pick.list) orderBuild(u, site);
+    return { ok: true, count: pick.list.length };
+  }
+
   /** Freie Formationspunkte im 24-px-Raster um (x, y), nach Entfernung sortiert. */
   formationSpots(team, x, y, n) {
     const step = 24;
@@ -587,6 +598,7 @@ export class Game {
    * ids = Bauer, die sofort hinfahren; ohne ids helfen idle Bauer automatisch.
    */
   cmdBuild(team, cmd) {
+    if (cmd.siteId) return this.cmdJoinSite(team, cmd);
     const def = BUILDINGS[cmd.building];
     if (!def || def.buildable === false) return fail('Dieses Gebäude kann nicht gebaut werden');
     const pick = this.pickBuilders(team, cmd.ids, cmd.building);

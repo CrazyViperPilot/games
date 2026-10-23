@@ -475,3 +475,9 @@ Eliminierung ohne FOB und ohne Baufahrzeug; KI-gegen-KI läuft weiter fehlerfrei
 - UI: Baumenü (B) zeigt bei Baufahrzeug alles inkl. „FOB-Baustelle (F)“; bei Infanterie nur Mauer/Tor; ohne passende Auswahl
   ist B deaktiviert mit Tooltip „Baufahrzeug oder Infanterie wählen“. Rechtsklick Baufahrzeug auf eigene beschädigte Baustelle/
   Gebäude → bauen/reparieren. Baustellen zeigen Fortschrittsbalken und ein Symbol, wenn kein Bauer da ist.
+
+### 11.9 Review v3 (Opus)
+- L1 (Haiku), L2 (Haiku), L3 (Sonnet) umgesetzt; 66 Tests grün, Browser ohne Fehler, Rot steht nach 5 min mit Zonen-FOB und 42 Einheiten.
+- Engine ergänzt: `{ type: 'build', ids, siteId }` schickt Bauer an eine bestehende Baustelle (Rechtsklick Bauer → Baustelle).
+- KI gegen KI (normal): 58–61 min, viel Kampf (je 470–600 gefallene Einheiten), aber Zonenhalter gewinnt 100:0 –
+  Balancing bewusst zurückgestellt, weil das HQ-Konzept (unendlicher Nachschub, begrenzte Ladeleistung) die Wirtschaft ändert.

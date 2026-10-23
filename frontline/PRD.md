@@ -98,7 +98,7 @@ Schadensmodell: Schaden je Schuss nach Panzerklasse des Ziels (Infanterie / leic
 | Eingabe | Aktion |
 |---|---|
 | Linksklick / Ziehen | Auswählen / Rahmenauswahl; Shift = hinzufügen; Doppelklick = alle dieses Typs im Bild |
-| Rechtsklick | Bewegen; auf Gegner = Angreifen; Gebäude gewählt = Sammelpunkt; LKW auf eigene FOB = laden (leer) bzw. entladen; Baufahrzeug/Infanterie auf eigene Baustelle = hinfahren und mithelfen (Abweichung, siehe unten); Baufahrzeug auf beschädigtes eigenes Gebäude = reparieren |
+| Rechtsklick | Bewegen; auf Gegner = Angreifen; Gebäude gewählt = Sammelpunkt; LKW auf eigene FOB = laden (leer) bzw. entladen; Baufahrzeug/Infanterie auf eigene Baustelle = dort bauen; Baufahrzeug auf beschädigtes eigenes Gebäude = reparieren |
 | A + Linksklick | Angriffsbewegung |
 | S | Stopp |
 | B | Baumenü (Baufahrzeug: alles, Infanterie: nur Mauer/Tor); darin Q Halle, W Förderanlage, E Mauer, R Tor, T Mörser, Z/Y Flugabwehr, F FOB-Baustelle |
