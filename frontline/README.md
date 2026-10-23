@@ -7,13 +7,19 @@ Spezifikation: [PRD.md](PRD.md) · Architektur: [PLAN.md](PLAN.md)
 
 ## Spielprinzip
 
-- Jede Partei startet mit einer FOB, einem LKW, vier Schützen und Startressourcen.
-- **Ressourcen:** Geld (Konfliktzone, Grundeinkommen der FOB), Baumaterial, Munition und Treibstoff
-  (Förderanlagen auf den Vorkommen). Munition und Treibstoff werden verbraucht: je Schuss bzw. beim Fahren.
-- Gebäude nur im Bauradius (450 px) einer fertigen eigenen FOB. Weitere FOBs baut ein LKW (max. 6).
+- Jede Partei startet mit einer FOB (gefülltes Lager), einem LKW, einem Baufahrzeug und vier Schützen.
+- **Ressourcen:** Geld (Konfliktzone, Grundeinkommen der FOB) sowie Baumaterial, Munition und Treibstoff.
+  Die drei Sorten kommen von Förderanlagen auf den Vorkommen und liegen in den **Lagern der FOBs** (je Sorte max. 3000).
+  Eine Förderanlage liefert in die FOB, in deren Bauradius sie steht. Gebäude und Ausbildung zahlt die FOB in Reichweite.
+- **LKW** laden Material an einer FOB, bringen es zu einer anderen FOB oder Baustelle, pendeln auf Routen und
+  versorgen Truppen im Feld. Munition und Treibstoff werden verbraucht: je Schuss bzw. beim Fahren.
+- **Bauen:** Gebäude entstehen als Baustelle und wachsen nur, solange ein Bauer daneben steht. Das **Baufahrzeug**
+  baut alles und repariert beschädigte Gebäude; Schützen und PAK bauen Mauern und Tore.
+- Gebäude nur im Bauradius (450 px) einer fertigen eigenen FOB. Eine neue FOB setzt das Baufahrzeug als Baustelle;
+  sie braucht 400 Baumaterial im eigenen Lager (per LKW) und wird dann vom Baufahrzeug gebaut (max. 6 FOBs).
 - **Konfliktzone:** Wer dort Einheiten hat (und der Gegner keine), kontrolliert sie: Geld und alle 30 s ein Punkt.
   Sind beide drin, ist sie umkämpft.
-- **Sieg:** Siegpunkte erreichen (25, 50 oder 100) oder den Gegner ohne FOB und LKW ausschalten.
+- **Sieg:** Siegpunkte erreichen (25, 50 oder 100) oder den Gegner ohne FOB und Baufahrzeug ausschalten.
 
 ## Steuerung
 
@@ -21,11 +27,13 @@ Spezifikation: [PRD.md](PRD.md) · Architektur: [PLAN.md](PLAN.md)
 |---|---|
 | Linksklick / Ziehen | Auswählen / Rahmenauswahl (Shift = hinzufügen, Doppelklick = alle dieses Typs im Bild) |
 | Rechtsklick | Bewegen, auf Gegner angreifen, Gebäude gewählt = Sammelpunkt |
+| Rechtsklick auf eigene FOB | LKW: leer laden, beladen entladen · Baufahrzeug: an Baustelle helfen, beschädigtes Gebäude reparieren |
 | A, dann Klick | Angriffsbewegung |
 | S | Stopp |
-| B | Baumenü (Q Fahrzeughalle, W Förderanlage, E Mauer, R Tor, T Mörser, Z Flugabwehr) |
-| Q / W / E | Ausbildung im gewählten Gebäude |
-| F | LKW gewählt: FOB errichten |
+| B | Baumenü: Baufahrzeug alles (Q Fahrzeughalle, W Förderanlage, E Mauer, R Tor, T Mörser, Z Flugabwehr, F FOB-Baustelle); Infanterie nur E Mauer, R Tor |
+| Q / W / E / R | Ausbildung im gewählten Gebäude (FOB: Schütze, PAK, LKW, Baufahrzeug) |
+| L / U / T | LKW gewählt: Laden (dann FOB anklicken) · Entladen (FOB oder FOB-Baustelle) · Pendeln (Start-FOB, dann Ziel) |
+| Q / W / E / R | LKW gewählt: Ladungsart Gemischt · Baumaterial · Munition · Treibstoff |
 | Entf | Gebäude abreißen |
 | Esc | Abbrechen / Auswahl aufheben |
 | Strg + 0–9, dann 0–9 | Gruppe speichern / wählen (zweimal = Kamera hin) |

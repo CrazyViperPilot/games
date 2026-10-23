@@ -10,15 +10,22 @@ import {
   drawShell,
   drawEffect,
   drawBar,
+  fitText,
   hpColor,
   hexA,
 } from './sprites.js';
+import { builderState } from '../ui/status.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
 const H = BALANCE.map.height;
 const BG = '#0d110d';
 const ACCENT = '#c9a227';
+const SITE_BM = BALANCE.construction.fobMaterial; // Material, das eine FOB-Baustelle braucht
+const CARGO_COLOR = { bm: '#a0703f', mun: '#d9b600', fuel: '#9b7bc4' }; // LKW-Ladung je Sorte
+const AMMO_COLOR = '#7f93ad'; // Munitionsbalken (grau-blau)
+const FUEL_COLOR = '#9b7bc4'; // Treibstoffbalken (violett)
+const BAR_W = 24; // Balkenbreite über Einheiten (Welt-px)
 const FOG_EXPLORED_ALPHA = 150; // erkundet: abgedunkelt, nicht schwarz
 const MARKER_LIFE = 0.8; // s, Lebensdauer des Wegziel-Markers
 
@@ -123,11 +130,13 @@ export class Renderer {
 
     if (v.placement) this.drawRadii(ctx, z);
     this.drawSelectedRadii(ctx, z, v);
+    this.drawRoutes(ctx, sel, z);
 
     for (const b of g.buildings) {
       if (!b.alive || (b.team !== team && !known(b.x, b.y))) continue;
       if (!inRect(b.x, b.y, (Math.max(b.w, b.h) * TILE) / 2)) continue;
       drawBuilding(ctx, b, g.teams[b.team].color, z);
+      if (!b.built && b.team === team) this.drawSiteMarks(ctx, b, z);
     }
 
     // Auswahl und Hover (unter den Einheiten)
@@ -184,6 +193,12 @@ export class Renderer {
       if (!(sel.has(b.id) || hover === b || b.hp < b.maxHp)) continue;
       const bw = b.w * TILE * 0.8;
       this.drawHp(ctx, b.x - bw / 2, b.cy * TILE - 8 / z, bw, b.hp / b.maxHp, z);
+    }
+
+    // Vorrat und Warnzeichen (nur eigene Einheiten: Vorrat des Gegners ist unbekannt)
+    for (const u of g.units) {
+      if (!u.alive || u.team !== team || !inRect(u.x, u.y, 30)) continue;
+      this.drawSupply(ctx, u, sel.has(u.id) || hover === u, z);
     }
 
     if (v.placement) this.drawPlacement(ctx, v.placement, z);
@@ -286,6 +301,108 @@ export class Renderer {
       ctx.strokeRect(e.x - half, e.y - half, half * 2, half * 2);
     }
     ctx.restore();
+  }
+
+  /** Gestrichelte Routenlinie gewählter LKW von Start-FOB nach Ziel-FOB, mit Pfeilspitze am Ziel. */
+  drawRoutes(ctx, sel, z) {
+    const g = this.game;
+    const seen = new Set();
+    ctx.save();
+    ctx.strokeStyle = 'rgba(201,162,39,0.85)';
+    ctx.fillStyle = 'rgba(201,162,39,0.85)';
+    ctx.lineWidth = 2 / z;
+    ctx.setLineDash([10 / z, 7 / z]);
+    for (const id of sel) {
+      const u = g.getEntity(id);
+      if (!u || u.kind !== 'unit' || u.type !== 'truck' || u.order.type !== 'route') continue;
+      const a = g.getEntity(u.order.fromId);
+      const b = g.getEntity(u.order.toId);
+      if (!a || !b) continue;
+      const key = `${a.id}>${b.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      const ang = Math.atan2(b.y - a.y, b.x - a.x);
+      const hx = b.x - Math.cos(ang) * 30;
+      const hy = b.y - Math.sin(ang) * 30;
+      const s = 9 / z;
+      ctx.beginPath();
+      ctx.moveTo(hx + Math.cos(ang) * s, hy + Math.sin(ang) * s);
+      ctx.lineTo(hx + Math.cos(ang + 2.5) * s, hy + Math.sin(ang + 2.5) * s);
+      ctx.lineTo(hx + Math.cos(ang - 2.5) * s, hy + Math.sin(ang - 2.5) * s);
+      ctx.fill();
+      ctx.setLineDash([10 / z, 7 / z]);
+    }
+    ctx.restore();
+  }
+
+  /**
+   * Eigene Baustelle: FOB-Baustelle mit Materialbalken x/400 über dem Gebäude; ohne Bauer ein graues „!“ an der Ecke.
+   */
+  drawSiteMarks(ctx, b, z) {
+    const x0 = b.cx * TILE;
+    const y0 = b.cy * TILE;
+    const w = b.w * TILE;
+    if (b.type === 'fob' && !b.supplied) {
+      const yb = y0 - 7 / z;
+      const have = Math.min(SITE_BM, Math.floor(b.store.bm));
+      drawBar(ctx, x0, yb, w, 4 / z, b.store.bm / SITE_BM, CARGO_COLOR.bm);
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      fitText(ctx, `${have}/${SITE_BM}`, x0 + w / 2, yb - 7 / z, 10, z, w * 1.2);
+    }
+    if (builderState(this.game, b) === 'none') {
+      ctx.save();
+      ctx.fillStyle = '#8c8f89';
+      ctx.strokeStyle = 'rgba(0,0,0,0.65)';
+      ctx.lineWidth = 1 / z;
+      ctx.beginPath();
+      ctx.arc(x0 + w, y0, 7 / z, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#161916';
+      fitText(ctx, '!', x0 + w, y0, 12, z);
+      ctx.restore();
+    }
+  }
+
+  /**
+   * Eigene Einheit: LKW-Ladung (immer), Munitions- und Treibstoffbalken (gewählt/gehovert), rotes „!“ bei leerer
+   * Munition (bewaffnete Einheiten, immer).
+   */
+  drawSupply(ctx, u, picked, z) {
+    const r = u.def.radius;
+    const x = u.x - BAR_W / 2;
+    if (u.type === 'truck' && u.cargo) {
+      const cap = BALANCE.logistics.truckCapacity;
+      const y = u.y + r + 4 / z;
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillRect(x, y, BAR_W, 3 / z);
+      let x0 = x;
+      for (const k of ['bm', 'mun', 'fuel']) {
+        const w = (BAR_W * u.cargo[k]) / cap;
+        if (w <= 0) continue;
+        ctx.fillStyle = CARGO_COLOR[k];
+        ctx.fillRect(x0, y, w, 3 / z);
+        x0 += w;
+      }
+    }
+    if (picked) {
+      const y = u.y - r - 9 / z;
+      if (u.def.ammoMax) drawBar(ctx, x, y + 5.5 / z, BAR_W, 3 / z, u.ammo / u.def.ammoMax, AMMO_COLOR);
+      if (u.def.fuelMax) drawBar(ctx, x, y + 9.5 / z, BAR_W, 3 / z, u.fuel / u.def.fuelMax, FUEL_COLOR);
+    }
+    if (u.def.range > 0 && u.def.ammoMax && u.ammo < u.def.ammoPerShot) {
+      ctx.save();
+      ctx.fillStyle = '#ff4d4d';
+      ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+      ctx.lineWidth = 2 / z;
+      fitText(ctx, '!', u.x + r + 5 / z, u.y - r - 3 / z, 14, z);
+      ctx.restore();
+    }
   }
 
   /** Sammelpunkt-Linie mit kleiner Flagge. */

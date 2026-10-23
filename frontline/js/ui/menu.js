@@ -12,12 +12,16 @@ const KEYS = [
   ['Linksklick', 'Auswählen · Shift = hinzufügen · Doppelklick = alle dieses Typs im Bild'],
   ['Ziehen', 'Rahmenauswahl (nur Einheiten)'],
   ['Rechtsklick', 'Bewegen · auf Gegner = angreifen · Gebäude gewählt = Sammelpunkt'],
+  ['Rechtsklick auf FOB', 'LKW: leer laden, beladen entladen · Baufahrzeug: an Baustelle helfen, beschädigtes Gebäude reparieren'],
   ['A + Klick', 'Angriffsbewegung'],
   ['S', 'Stopp'],
-  ['B', 'Baumenü: Q Fahrzeughalle, W Förderanlage, E Mauer, R Tor, T Mörser, Z Flugabwehr'],
-  ['Q / W / E', 'Ausbildung im gewählten Gebäude (FOB: Schütze, PAK, LKW · Halle: SPz, KPz)'],
-  ['F', 'LKW gewählt: FOB errichten, dann Zielpunkt anklicken'],
+  ['B', 'Baumenü: Baufahrzeug alles (Q Halle, W Förderanlage, E Mauer, R Tor, T Mörser, Z Flak, F FOB-Baustelle) · Infanterie nur E Mauer, R Tor'],
+  ['Bauen', 'Gebäude brauchen einen Bauer daneben: Baufahrzeug oder Infanterie (nur Mauer/Tor)'],
+  ['Q / W / E / R', 'Ausbildung im gewählten Gebäude (FOB: Schütze, PAK, LKW, Baufahrzeug · Halle: SPz, KPz)'],
+  ['L / U / T', 'LKW gewählt: Laden (dann FOB anklicken) · Entladen (FOB oder FOB-Baustelle) · Pendeln (Start-FOB, dann Ziel)'],
+  ['Q / W / E / R', 'LKW gewählt: Ladungsart Gemischt · Baumaterial · Munition · Treibstoff'],
   ['Entf', 'Gebäude abreißen (25 % des Baumaterials zurück)'],
+  ['Lager', 'Jede FOB hat ein eigenes Lager. Förderanlagen liefern in die FOB in deren Radius · Gebäude bezahlt die FOB in Reichweite'],
   ['Munition', 'Jeder Schuss verbraucht Munition · ohne Vorrat feuern Einheiten nicht (FOB-MG kostet nichts)'],
   ['Treibstoff', 'Fahrzeuge verbrauchen Treibstoff nur beim Fahren · ohne Vorrat nur 25 % Tempo'],
   ['Esc', 'Abbrechen · Auswahl aufheben'],
@@ -68,9 +72,10 @@ export function showStartMenu(root, onStart) {
         <div class="seg">${POINTS.map((p) => `<button type="button" data-pts="${p}">${p}</button>`).join('')}</div>
       </div>
       <ol class="howto">
-        <li>Förderanlagen auf Vorkommen im Bauradius deiner FOB setzen.</li>
+        <li>Baufahrzeug (R): Förderanlagen auf die Vorkommen im Bauradius deiner FOB setzen, daneben stehen lassen.</li>
+        <li>LKW (E): Baumaterial, Munition und Treibstoff aus dem FOB-Lager zu Baustellen und Truppen bringen.</li>
         <li>Die Konfliktzone in der Mitte halten: Geld, und alle 30 s ein Punkt.</li>
-        <li>Gewinnen: Siegpunkte erreichen oder den Gegner ohne FOB und LKW ausschalten.</li>
+        <li>Gewinnen: Siegpunkte erreichen oder den Gegner ohne FOB und Baufahrzeug ausschalten.</li>
       </ol>
       <button type="button" class="primary" data-act="start">Start</button>
       <p class="muted small center">Alle Tasten zeigt F1 im Spiel.</p>
@@ -141,8 +146,8 @@ export function showEnd(root, { winner, team, reason, stats }, onRestart) {
   const who = BALANCE.teamNames[winner];
   let why;
   if (reason === 'points') why = `${who} hat ${stats.winPoints} Siegpunkte erreicht.`;
-  else if (won) why = 'Der Gegner hat keine FOB und keinen LKW mehr.';
-  else why = 'Du hast keine FOB und keinen LKW mehr.';
+  else if (won) why = 'Der Gegner hat keine FOB und kein Baufahrzeug mehr.';
+  else why = 'Du hast keine FOB und kein Baufahrzeug mehr.';
   show(
     root,
     'end',

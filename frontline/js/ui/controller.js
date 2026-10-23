@@ -1,21 +1,32 @@
-// Spieler-Steuerung (PLAN §5 ui/controller.js): Auswahl, Modi, Befehle und Befehlskarte. Kein DOM.
+// Spieler-Steuerung (PLAN §5 ui/controller.js, §11.3–11.8): Auswahl, Modi, Befehle und Befehlskarte. Kein DOM.
 // Hält den Ansichtszustand `view`, den renderer.render(view) liest. Befehle laufen nur über game.issue.
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
+import { canBuild } from '../game/construction.js';
+import { cargoSum } from '../game/logistics.js';
 
 const WALL_MAX = 40; // max. Zellen je Mauerzug (Vorschau und Befehl)
 const DOUBLE_MS = 350; // Doppelklick auf einen Typ = alle dieses Typs im Bild
 const GROUP_DOUBLE_MS = 500; // Gruppentaste zweimal = Kamera hin
 const PICK_PX = 16; // Trefferradius in Bildschirm-Pixeln
-const TARGET_MODES = ['place', 'wall', 'attackMove', 'fobTarget'];
+const TARGET_MODES = ['place', 'wall', 'attackMove', 'fobTarget', 'loadFob', 'unloadFob', 'routeFrom', 'routeTo'];
 const BUILD_MENU = Object.keys(BUILDINGS).filter((k) => BUILDINGS[k].hotkey && BUILDINGS[k].buildable !== false);
 const RES_KEYS = ['money', 'bm', 'mun', 'fuel'];
+const CARGO_KEYS = ['bm', 'mun', 'fuel']; // Lagersorten (FOB-Lager, LKW-Ladung)
 const SHORT = { money: 'G', bm: 'BM', mun: 'MUN', fuel: 'TS' };
 const HOTKEY_ALIAS = { Y: 'Z' }; // Flugabwehr auch mit Y
 // Kurznamen für die Befehlskarte (der volle Name steht im Tooltip)
 const SHORT_BLD = { depot: 'Halle', extractor: 'Förder­anlage', wall: 'Mauer', gate: 'Tor', mortar: 'Mörser', aa: 'Flak' };
-const SHORT_UNIT = { rifleman: 'Schütze', at: 'PAK', truck: 'LKW', ifv: 'SPz', tank: 'KPz' };
+const SHORT_UNIT = { rifleman: 'Schütze', at: 'PAK', truck: 'LKW', engineer: 'Baufz.', ifv: 'SPz', tank: 'KPz' };
+// Ladungsart: Taste, Kurzname, Bezeichnung
+const PRESET_BTN = [
+  ['mix', 'Q', 'Gemischt', 'Gemischt'],
+  ['bm', 'W', 'Baumat.', 'Baumaterial'],
+  ['mun', 'E', 'Munition', 'Munition'],
+  ['fuel', 'R', 'Treibstoff', 'Treibstoff'],
+];
+const LOADED = 0.5; // ab dieser Ladung gilt ein LKW als beladen
 
 /** Zellen einer Geraden zwischen zwei Zellen (Bresenham, inklusive Endpunkte). */
 function lineCells(c0, r0, c1, r1) {
@@ -48,6 +59,9 @@ function wallLine(a, b) {
   return lineCells(a.c, a.r, b.c, b.r).slice(0, WALL_MAX);
 }
 
+/** Lager (FOB oder LKW) deckt die Kosten (nur Sorten bm/mun/fuel). */
+const covers = (st, cost) => CARGO_KEYS.every((k) => (st[k] || 0) >= (cost[k] || 0));
+
 /** Kosten kurz für Schaltflächen: "400 BM". */
 export function costText(cost) {
   return RES_KEYS.filter((k) => cost[k]).map((k) => `${cost[k]} ${SHORT[k]}`).join(' · ');
@@ -55,15 +69,6 @@ export function costText(cost) {
 
 function longCost(cost) {
   return RES_KEYS.filter((k) => cost[k]).map((k) => `${cost[k]} ${BALANCE.resNames[k]}`).join(', ');
-}
-
-/** "Fehlt: 120 Munition" oder "" wenn das Team alles bezahlen kann. */
-export function shortage(game, team, cost) {
-  const res = game.teams[team].res;
-  const miss = RES_KEYS.filter((k) => (cost[k] || 0) > (res[k] || 0)).map(
-    (k) => `${Math.ceil(cost[k] - res[k])} ${BALANCE.resNames[k]}`,
-  );
-  return miss.length ? `Fehlt: ${miss.join(', ')}` : '';
 }
 
 /** Eintrag der Befehlskarte. */
@@ -75,6 +80,7 @@ function entry(label, hotkey, o = {}) {
     tip: o.tip || label,
     enabled: o.enabled !== false,
     reason: o.reason || '',
+    active: !!o.active,
     action: o.action,
   };
 }
@@ -95,6 +101,7 @@ export class Controller {
     };
     this.placeType = null; // Gebäudetyp im Modus place
     this.wall = null; // Startzelle {c, r} eines Mauerzugs (während der Maus gedrückt ist)
+    this.routeFromId = null; // Start-FOB beim Pendeln (Modus routeTo)
     this.pointer = null; // letzte Weltposition des Mauszeigers
     this.lastClick = null;
     this.lastGroup = null;
@@ -118,6 +125,7 @@ export class Controller {
     this.placeType = null;
     this.wall = null;
     this.view.placement = null;
+    if (mode !== 'routeTo') this.routeFromId = null;
   }
 
   setDragBox(rect) {
@@ -174,8 +182,18 @@ export class Controller {
       }
     }
     if (best) return best;
+    return this.pickB(wx, wy, pred);
+  }
+
+  /** Gebäude unter dem Weltpunkt (Fußabdruck) oder null. */
+  pickB(wx, wy, pred = () => true) {
     for (const e of this.game.query(wx, wy, 0, (e) => e.kind === 'building' && pred(e))) return e;
     return null;
+  }
+
+  /** Gewählte eigene Einheiten (ohne Gebäude). */
+  selectedUnits() {
+    return this.selected().filter((e) => e.kind === 'unit');
   }
 
   // ---- Auswahl ------------------------------------------------------------------
@@ -280,6 +298,18 @@ export class Controller {
       case 'fobTarget':
         this.confirmFob(wx, wy, shift);
         return;
+      case 'loadFob':
+        this.confirmTruckFob('load', wx, wy);
+        return;
+      case 'unloadFob':
+        this.confirmTruckFob('unload', wx, wy);
+        return;
+      case 'routeFrom':
+        this.confirmRouteFrom(wx, wy);
+        return;
+      case 'routeTo':
+        this.confirmRouteTo(wx, wy);
+        return;
       case 'wall':
         return; // Mauerzug läuft über beginWall/endWall
       case 'build':
@@ -306,41 +336,92 @@ export class Controller {
     this.selectAt(wx, wy, shift);
   }
 
-  /** Rechtsklick: Bewegen, Angriff (auf Gegner) oder Sammelpunkt (nur Gebäude gewählt). */
+  /**
+   * Rechtsklick: Bewegen, Angriff (auf Gegner), Sammelpunkt (nur Gebäude gewählt) – und auf eigene Gebäude:
+   * LKW laden/entladen (FOB), Baufahrzeug hinfahren (Baustelle) bzw. reparieren (beschädigtes Gebäude).
+   */
   rightClick(wx, wy) {
     const sel = this.selected();
     if (!sel.length) return;
     const units = sel.filter((e) => e.kind === 'unit');
-    if (units.length) {
-      const target = this.pick(wx, wy, (e) => e.team !== this.team && this.game.isVisible(this.team, e.x, e.y));
-      const ids = units.map((u) => u.id);
-      if (target) {
-        this.issue({ type: 'attack', ids, targetId: target.id });
-        return;
-      }
-      if (this.issue({ type: 'move', ids, x: wx, y: wy }).ok) this.moveMarker(wx, wy);
+    if (!units.length) {
+      const producers = sel.filter((e) => e.def.produces.length > 0);
+      for (const b of producers) this.issue({ type: 'rally', buildingId: b.id, x: wx, y: wy });
+      if (producers.length) this.moveMarker(wx, wy);
       return;
     }
-    const producers = sel.filter((e) => e.def.produces.length > 0);
-    for (const b of producers) this.issue({ type: 'rally', buildingId: b.id, x: wx, y: wy });
-    if (producers.length) this.moveMarker(wx, wy);
+    let rest = units;
+    const own = this.pickB(wx, wy, (e) => e.team === this.team);
+    if (own) {
+      const done = this.orderOnOwnBuilding(own, units);
+      rest = units.filter((u) => !done.has(u.id));
+      if (!rest.length) return;
+    }
+    const ids = rest.map((u) => u.id);
+    const target = this.pick(wx, wy, (e) => e.team !== this.team && this.game.isVisible(this.team, e.x, e.y));
+    if (target) {
+      this.issue({ type: 'attack', ids, targetId: target.id });
+      return;
+    }
+    if (this.issue({ type: 'move', ids, x: wx, y: wy }).ok) this.moveMarker(wx, wy);
+  }
+
+  /**
+   * Rechtsklick auf eigenes Gebäude. Liefert die IDs der Einheiten, die damit erledigt sind.
+   * LKW: leer → laden, beladen → entladen (FOB); an Baustelle → entladen. Baufahrzeug/Infanterie an Baustelle → hinfahren
+   * (die Engine kennt keinen Befehl „Bauer einer bestehenden Baustelle zuweisen“; idle Bauer nahe der Baustelle helfen).
+   * Baufahrzeug an beschädigtem fertigen Gebäude → reparieren.
+   */
+  orderOnOwnBuilding(b, units) {
+    const done = new Set();
+    const ids = (list) => list.map((u) => u.id);
+    const trucks = units.filter((u) => u.type === 'truck');
+    if (b.type === 'fob' && trucks.length) {
+      if (!b.built) {
+        this.issue({ type: 'unload', ids: ids(trucks), fobId: b.id });
+      } else {
+        const empty = trucks.filter((u) => cargoSum(u.cargo) < LOADED);
+        const loaded = trucks.filter((u) => cargoSum(u.cargo) >= LOADED);
+        if (empty.length) this.issue({ type: 'load', ids: ids(empty), fobId: b.id });
+        if (loaded.length) this.issue({ type: 'unload', ids: ids(loaded), fobId: b.id });
+      }
+      for (const u of trucks) done.add(u.id);
+    }
+    const others = units.filter((u) => !done.has(u.id));
+    if (!b.built) {
+      const builders = others.filter((u) => canBuild(u.def, b.type));
+      if (builders.length && this.issue({ type: 'move', ids: ids(builders), x: b.x, y: b.y }).ok) {
+        this.moveMarker(b.x, b.y);
+      }
+      for (const u of builders) done.add(u.id);
+    } else if (b.hp < b.maxHp) {
+      const eng = others.filter((u) => u.def.builder === 'all');
+      if (eng.length && this.issue({ type: 'repair', ids: ids(eng), targetId: b.id }).ok) this.moveMarker(b.x, b.y);
+      for (const u of eng) done.add(u.id);
+    }
+    return done;
   }
 
   moveMarker(x, y) {
     this.view.moveMarker = { x, y, t: performance.now() };
   }
 
+  /** IDs der gewählten Bauer, die `type` bauen dürfen (Baufahrzeug: alles, Infanterie: Mauer/Tor). */
+  builderIds(type) {
+    return this.selectedUnits().filter((u) => canBuild(u.def, type)).map((u) => u.id);
+  }
+
   confirmPlace(wx, wy, shift) {
     const type = this.placeType;
     if (!type) return;
-    const r = this.issue({ type: 'build', building: type, x: wx, y: wy });
+    const r = this.issue({ type: 'build', ids: this.builderIds(type), building: type, x: wx, y: wy });
     if (!r.ok) return;
     if (shift) this.updatePointer(wx, wy);
     else this.setMode('normal');
   }
 
   confirmAttackMove(wx, wy, shift) {
-    const ids = this.selected().filter((e) => e.kind === 'unit').map((e) => e.id);
+    const ids = this.selectedUnits().map((e) => e.id);
     if (!ids.length) {
       this.message('Keine Einheit gewählt');
       this.setMode('normal');
@@ -352,18 +433,67 @@ export class Controller {
     if (!shift) this.setMode('normal');
   }
 
+  /** Baufahrzeuge setzen eine FOB-Baustelle (keine Kosten; 400 Baumaterial kommen per LKW). */
   confirmFob(wx, wy, shift) {
-    const truck = this.selected().find((e) => e.kind === 'unit' && e.type === 'engineer');
-    if (!truck) {
+    const ids = this.selectedUnits().filter((e) => e.type === 'engineer').map((e) => e.id);
+    if (!ids.length) {
       this.message('Kein Baufahrzeug gewählt');
       this.setMode('normal');
       return;
     }
-    const r = this.issue({ type: 'buildFob', ids: [truck.id], x: wx, y: wy });
+    const r = this.issue({ type: 'buildFob', ids, x: wx, y: wy });
     if (!r.ok) return;
     this.moveMarker(wx, wy);
     if (shift) this.updatePointer(wx, wy);
     else this.setMode('normal');
+  }
+
+  /** Laden oder Entladen: Klick auf eigene FOB (Entladen auch auf FOB-Baustelle). */
+  confirmTruckFob(kind, wx, wy) {
+    const ids = this.selectedUnits().filter((e) => e.type === 'truck').map((e) => e.id);
+    if (!ids.length) {
+      this.message('Kein LKW gewählt');
+      this.setMode('normal');
+      return;
+    }
+    const fob = this.pickB(wx, wy, (e) => e.team === this.team && e.type === 'fob');
+    if (!fob) {
+      this.message(kind === 'load' ? 'Eigene fertige FOB anklicken' : 'Eigene FOB oder FOB-Baustelle anklicken');
+      return;
+    }
+    if (this.issue({ type: kind, ids, fobId: fob.id }).ok) this.setMode('normal');
+  }
+
+  /** Pendeln, Schritt 1: Start-FOB (fertig). */
+  confirmRouteFrom(wx, wy) {
+    const ids = this.selectedUnits().filter((e) => e.type === 'truck');
+    if (!ids.length) {
+      this.message('Kein LKW gewählt');
+      this.setMode('normal');
+      return;
+    }
+    const fob = this.pickB(wx, wy, (e) => e.team === this.team && e.type === 'fob' && e.built);
+    if (!fob) {
+      this.message('Start: eigene fertige FOB anklicken');
+      return;
+    }
+    this.routeFromId = fob.id; // setMode('routeTo') behält die Start-FOB
+    this.setMode('routeTo');
+  }
+
+  /** Pendeln, Schritt 2: Ziel-FOB (oder Baustelle). */
+  confirmRouteTo(wx, wy) {
+    const ids = this.selectedUnits().filter((e) => e.type === 'truck').map((e) => e.id);
+    const fob = this.pickB(wx, wy, (e) => e.team === this.team && e.type === 'fob');
+    if (!fob) {
+      this.message('Ziel: eigene FOB oder FOB-Baustelle anklicken');
+      return;
+    }
+    if (fob.id === this.routeFromId) {
+      this.message('Start und Ziel sind gleich');
+      return;
+    }
+    if (this.issue({ type: 'route', ids, fromId: this.routeFromId, toId: fob.id }).ok) this.setMode('normal');
   }
 
   // ---- Platzierung und Mauerzug -------------------------------------------------
@@ -383,7 +513,7 @@ export class Controller {
     this.updatePointer(wx, wy);
   }
 
-  /** Maus losgelassen im Modus wall: Mauerzug bauen. */
+  /** Maus losgelassen im Modus wall: Mauerzug bauen (die gewählten Bauer gehen mit). */
   endWall(wx, wy, shift) {
     if (this.view.mode !== 'wall') return;
     const g = this.game.grid;
@@ -394,6 +524,7 @@ export class Controller {
     const r = this.issue({
       type: 'buildWall',
       building: 'wall',
+      ids: this.builderIds('wall'),
       x1: g.center(start.c),
       y1: g.center(start.r),
       x2: g.center(end.c),
@@ -411,6 +542,7 @@ export class Controller {
       y: Number.isFinite(p.y) ? p.y : wy,
       ok: p.ok,
       reason: p.ok ? null : p.reason,
+      payer: p.payer || null, // { kind: 'fob'|'truck', id } – wer bezahlt (Vorschau)
     };
   }
 
@@ -420,10 +552,10 @@ export class Controller {
     const cells = this.wall ? wallLine(this.wall, cur) : [cur];
     const cost = BUILDINGS.wall.cost;
     const affordable = this.game.canAfford(this.team, cost);
-    const short = shortage(this.game, this.team, cost);
+    const short = this.moneyReason(cost);
     const list = cells.map(({ c, r }) => {
       const p = this.game.canPlace(this.team, 'wall', g.center(c), g.center(r));
-      return { cx: c, cy: r, ok: p.ok && affordable, reason: p.ok ? null : p.reason };
+      return { cx: c, cy: r, ok: p.ok && affordable, reason: p.ok ? null : p.reason, payer: p.payer || null };
     });
     const ok = list.some((x) => x.ok);
     const firstReason = list.find((x) => x.reason)?.reason || null;
@@ -453,29 +585,52 @@ export class Controller {
 
   // ---- Modi ---------------------------------------------------------------------
 
+  /** Wer darf bauen: 'all' (Baufahrzeug), 'fort' (nur Infanterie: Mauer/Tor) oder null (mit Grund). */
+  buildPermission() {
+    const units = this.selectedUnits();
+    if (units.some((u) => u.def.builder === 'all')) return { level: 'all', reason: '' };
+    if (units.some((u) => u.def.builder === 'fort')) return { level: 'fort', reason: '' };
+    return { level: null, reason: 'Baufahrzeug oder Infanterie wählen' };
+  }
+
   startBuildMenu() {
+    const perm = this.buildPermission();
+    if (!perm.level) {
+      this.message(perm.reason);
+      return;
+    }
     this.setMode('build');
   }
 
   startAttackMove() {
-    if (!this.selected().some((e) => e.kind === 'unit')) {
+    if (!this.selectedUnits().length) {
       this.message('Keine Einheit gewählt');
       return;
     }
     this.setMode('attackMove');
   }
 
+  /** Baumenü-Eintrag F: FOB-Baustelle setzen (Baufahrzeug gewählt). */
   startFobTarget() {
-    if (!this.selected().some((e) => e.kind === 'unit' && e.type === 'truck')) {
-      this.message('Kein LKW gewählt');
+    if (!this.selectedUnits().some((e) => e.type === 'engineer')) {
+      this.message('Kein Baufahrzeug gewählt');
       return;
     }
     this.setMode('fobTarget');
     if (this.pointer) this.updatePointer(this.pointer.x, this.pointer.y);
   }
 
+  /** LKW-Modi: 'loadFob' (L), 'unloadFob' (U), 'routeFrom' (T, Start-FOB). */
+  startTruckMode(mode) {
+    if (!this.selectedUnits().some((e) => e.type === 'truck')) {
+      this.message('Kein LKW gewählt');
+      return;
+    }
+    this.setMode(mode);
+  }
+
   stop() {
-    const ids = this.selected().filter((e) => e.kind === 'unit').map((e) => e.id);
+    const ids = this.selectedUnits().map((e) => e.id);
     if (ids.length) this.issue({ type: 'stop', ids });
     this.setMode('normal');
   }
@@ -502,13 +657,58 @@ export class Controller {
     for (const b of bs) this.issue({ type: 'demolish', buildingId: b.id });
   }
 
+  // ---- Gründe für gesperrte Schaltflächen ----------------------------------------
+
+  /** Fehlt Geld für die Kosten? Text „Fehlt: n Geld“ oder "". */
+  moneyReason(cost) {
+    const have = this.game.teams[this.team].res.money;
+    const need = cost.money || 0;
+    return have >= need ? '' : `Fehlt: ${Math.ceil(need - have)} ${BALANCE.resNames.money}`;
+  }
+
+  /** Hat eine fertige eigene FOB ein Lager, das alle Sorten der Kosten deckt? */
+  anyFobCovers(cost) {
+    return this.game.buildings.some((b) => b.alive && b.built && b.team === this.team && b.type === 'fob' && covers(b.store, cost));
+  }
+
+  /** Grund, wenn kein FOB-Lager die Sorten der Kosten deckt (ohne Ort: für Befehlskarte). */
+  lagerReason(cost) {
+    const fobs = this.game.buildings.filter((b) => b.alive && b.built && b.team === this.team && b.type === 'fob');
+    if (!fobs.length) return 'Keine fertige FOB';
+    const miss = CARGO_KEYS.filter((k) => (cost[k] || 0) > 0 && !fobs.some((f) => f.store[k] >= cost[k])).map(
+      (k) => BALANCE.resNames[k],
+    );
+    if (miss.length) return `FOB-Lager: zu wenig ${miss.join(', ')}`;
+    return 'FOB-Lager: keine einzelne FOB deckt alle Kosten';
+  }
+
+  /** Grund für ein Gebäude im Baumenü: Geld, dann Lager (Mauer/Tor prüft die Platzierung selbst). */
+  buildReason(key) {
+    const cost = BUILDINGS[key].cost;
+    const money = this.moneyReason(cost);
+    if (money) return money;
+    if (key === 'wall' || key === 'gate') return '';
+    return this.anyFobCovers(cost) ? '' : this.lagerReason(cost);
+  }
+
+  /** Grund für Ausbildung in einem Gebäude: Geld, Lager (FOB selbst bzw. Zahler in Reichweite) oder Limit. */
+  trainReason(b, cost) {
+    const money = this.moneyReason(cost);
+    if (money) return money;
+    if (this.game.unitCount(this.team) >= BALANCE.unitCap) return `Einheitenlimit erreicht (${BALANCE.unitCap})`;
+    const ok = b.type === 'fob' ? covers(b.store, cost) : !!this.game.payerFor(this.team, b.x, b.y, cost);
+    return ok ? '' : this.game.stockReason(this.team, b.x, b.y, cost);
+  }
+
   // ---- Befehlskarte und Tasten --------------------------------------------------
 
   /** Kurzer Hinweistext für den aktuellen Modus (leer im Normalbetrieb). */
   hint() {
     switch (this.view.mode) {
       case 'build':
-        return 'Gebäude wählen';
+        return this.buildPermission().level === 'fort'
+          ? 'Baumenü Infanterie: nur Mauer und Tor'
+          : 'Baumenü: Gebäude wählen (Baufahrzeug)';
       case 'place':
         return `${BUILDINGS[this.placeType]?.name || 'Gebäude'}: Klick baut · Rechtsklick oder Esc bricht ab · Shift = mehrfach`;
       case 'wall':
@@ -516,13 +716,21 @@ export class Controller {
       case 'attackMove':
         return 'Angriffsbewegung: Ziel anklicken · Esc bricht ab';
       case 'fobTarget':
-        return 'FOB-Standort anklicken, der LKW fährt hin · Esc bricht ab';
+        return 'FOB-Baustelle: Standort anklicken · Esc bricht ab';
+      case 'loadFob':
+        return 'LKW laden: eigene fertige FOB anklicken · Esc bricht ab';
+      case 'unloadFob':
+        return 'LKW entladen: eigene FOB oder FOB-Baustelle anklicken · Esc bricht ab';
+      case 'routeFrom':
+        return 'Pendeln: Start-FOB (fertig) anklicken · Esc bricht ab';
+      case 'routeTo':
+        return 'Pendeln: Ziel-FOB oder FOB-Baustelle anklicken · Esc bricht ab';
       default:
         return '';
     }
   }
 
-  /** Befehlskarte für Auswahl bzw. Modus. Einträge: { label, hotkey, cost, tip, enabled, reason, action }. */
+  /** Befehlskarte für Auswahl bzw. Modus. Einträge: { label, hotkey, cost, tip, enabled, reason, active, action }. */
   commandCard() {
     const m = this.view.mode;
     if (TARGET_MODES.includes(m)) {
@@ -532,18 +740,35 @@ export class Controller {
     return this.selectionCard();
   }
 
+  /** Baumenü: Baufahrzeug alles (plus F FOB-Baustelle), Infanterie nur Mauer/Tor. */
   buildCard() {
-    const card = BUILD_MENU.map((key) => {
-      const def = BUILDINGS[key];
-      const short = shortage(this.game, this.team, def.cost);
-      return entry(SHORT_BLD[key] || def.name, def.hotkey, {
-        cost: costText(def.cost),
-        tip: `${def.name}: ${longCost(def.cost)}`,
-        enabled: !short,
-        reason: short,
-        action: () => this.beginPlacement(key),
-      });
-    });
+    const perm = this.buildPermission();
+    const card = [];
+    if (perm.level) {
+      for (const key of BUILD_MENU) {
+        if (perm.level === 'fort' && !canBuild({ builder: 'fort' }, key)) continue;
+        const def = BUILDINGS[key];
+        const reason = this.buildReason(key);
+        card.push(
+          entry(SHORT_BLD[key] || def.name, def.hotkey, {
+            cost: costText(def.cost),
+            tip: `${def.name}: ${longCost(def.cost)}`,
+            enabled: !reason,
+            reason,
+            action: () => this.beginPlacement(key),
+          }),
+        );
+      }
+      if (perm.level === 'all') {
+        card.push(
+          entry('FOB-Baustelle', 'F', {
+            cost: '400 BM',
+            tip: 'FOB-Baustelle: Standort anklicken. Danach 400 Baumaterial per LKW ins Lager der Baustelle, dann baut das Baufahrzeug (30 s).',
+            action: () => this.startFobTarget(),
+          }),
+        );
+      }
+    }
     card.push(entry('Zurück', 'Esc', { tip: 'Zurück zu den Befehlen (Esc)', action: () => this.cancel() }));
     return card;
   }
@@ -554,8 +779,14 @@ export class Controller {
     const blds = sel.filter((e) => e.kind === 'building');
     if (!units.length && blds.length) return this.buildingCard(blds);
 
+    const perm = this.buildPermission();
     const card = [
-      entry('Bauen', 'B', { tip: 'Baumenü öffnen (B)', action: () => this.startBuildMenu() }),
+      entry('Bauen', 'B', {
+        tip: perm.level ? 'Baumenü öffnen (B)' : perm.reason,
+        enabled: !!perm.level,
+        reason: perm.reason,
+        action: () => this.startBuildMenu(),
+      }),
       entry('Angriff', 'A', {
         tip: 'Angriffsbewegung (A, dann Ziel anklicken)',
         enabled: units.length > 0,
@@ -571,17 +802,29 @@ export class Controller {
     ];
     const trucks = units.filter((u) => u.type === 'truck');
     if (trucks.length) {
-      const cost = BUILDINGS.fob.cost;
-      const short = shortage(this.game, this.team, cost);
       card.push(
-        entry('FOB errichten', 'F', {
-          cost: costText(cost),
-          tip: `FOB errichten (F): ${longCost(cost)}`,
-          enabled: !short,
-          reason: short,
-          action: () => this.startFobTarget(),
+        entry('Laden', 'L', {
+          tip: 'Laden (L): LKW fährt zur eigenen FOB und lädt; FOB anklicken',
+          action: () => this.startTruckMode('loadFob'),
+        }),
+        entry('Entladen', 'U', {
+          tip: 'Entladen (U): eigene FOB oder FOB-Baustelle anklicken',
+          action: () => this.startTruckMode('unloadFob'),
+        }),
+        entry('Pendeln', 'T', {
+          tip: 'Pendeln (T): Start-FOB, dann Ziel-FOB anklicken',
+          action: () => this.startTruckMode('routeFrom'),
         }),
       );
+      for (const [preset, key, label, long] of PRESET_BTN) {
+        card.push(
+          entry(label, key, {
+            tip: `Ladungsart ${long} (${key})`,
+            active: trucks.every((t) => t.preset === preset),
+            action: () => this.issue({ type: 'setPreset', ids: trucks.map((t) => t.id), preset }),
+          }),
+        );
+      }
     }
     return card;
   }
@@ -595,10 +838,11 @@ export class Controller {
     for (const u of types) {
       const def = UNITS[u];
       const producers = blds.filter((b) => b.def.produces.includes(u));
+      const ready = producers.find((b) => b.built && b.queue.length < BALANCE.queueMax);
       let reason = '';
       if (!producers.some((b) => b.built)) reason = 'Gebäude ist noch im Bau';
-      else if (!producers.some((b) => b.built && b.queue.length < BALANCE.queueMax)) reason = 'Warteschlange ist voll';
-      else reason = shortage(this.game, this.team, def.cost);
+      else if (!ready) reason = 'Warteschlange ist voll';
+      else reason = this.trainReason(ready, def.cost);
       card.push(
         entry(SHORT_UNIT[u] || def.name, def.hotkey, {
           cost: costText(def.cost),

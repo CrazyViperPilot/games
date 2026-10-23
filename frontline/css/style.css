@@ -214,7 +214,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .cmd {
   flex: none;
   display: grid;
-  grid-template-columns: repeat(4, 56px);
+  grid-template-columns: repeat(5, 56px); /* LKW-Karte hat 10 Befehle: 5 × 2 statt 4 × 3 (passt in 190 px Höhe) */
   grid-auto-rows: 56px;
   gap: 6px;
   align-content: start;
@@ -370,3 +370,20 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .end-title.win { color: #7dd38b; }
 .end-title.lose { color: var(--bad); }
 .end p { color: var(--muted); }
+
+/* ---- Logistik und Bau (L2) ------------------------------------------------------ */
+.cbtn.on { border-color: var(--accent); background: #3a3520; color: #f5e6b0; }
+.cbtn.on .cl { color: #f5e6b0; }
+.sel .warn { color: var(--bad); margin-top: 4px; font-weight: 600; }
+.sel .gauge { margin-top: 4px; }
+.sel .gauge .gl,
+.sel .srow { display: flex; align-items: center; gap: 6px; font-size: 11.5px; }
+.sel .gauge .gl { justify-content: space-between; color: var(--muted); }
+.sel .gauge .gl b,
+.sel .srow b { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--text); }
+.sel .srow { margin-top: 3px; }
+.sel .srow > span { width: 34px; color: var(--muted); }
+.sel .srow > b { min-width: 78px; text-align: right; }
+.sel .srow .bar { flex: 1; margin: 0; }
+.sel .lagerhead { margin-top: 6px; }
+.bar.store { height: 7px; margin: 0; }

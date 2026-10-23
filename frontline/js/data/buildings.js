@@ -13,7 +13,7 @@ export const BUILDINGS = {
     cost: { bm: 400 },
     buildTime: 30,
     hotkey: null,
-    produces: ['rifleman', 'at', 'truck'],
+    produces: ['rifleman', 'at', 'truck', 'engineer'],
     weapon: {
       range: 220,
       minRange: 0,

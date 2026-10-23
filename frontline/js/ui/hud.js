@@ -1,21 +1,20 @@
-// DOM-HUD (PLAN §5 ui/hud.js): Ressourcen, Punkte, Zone, Zeit, Auswahl, Befehlskarte und Meldungen.
+// DOM-HUD (PLAN §5 ui/hud.js, §11.4): Ressourcen, Punkte, Zone, Zeit, Auswahl, Befehlskarte und Meldungen.
 // Schreibt das DOM höchstens 5× pro Sekunde und nur, wenn sich der HTML-Text geändert hat.
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
+import { builderState, fobLabel, orderText } from './status.js';
 
 const RES_KEYS = ['money', 'bm', 'mun', 'fuel'];
 const MSG_LIFE = 6000; // ms
 const MSG_MAX = 5;
 const DOM_EVERY = 200; // ms
-const ORDER_LABEL = {
-  idle: 'Bereit',
-  move: 'Bewegung',
-  attackMove: 'Angriffsbewegung',
-  attack: 'Angriff',
-  buildFob: 'Fährt zur FOB-Baustelle',
-};
 const NODE_NAME = { bm: 'Baumaterial', mun: 'Munition', fuel: 'Treibstoff' };
 const NEG_COLOR = '#e5484d'; // Verbrauch (negative Netto-Rate)
+const COLOR = { bm: '#a0703f', mun: '#7f93ad', fuel: '#9b7bc4', cargo: '#c9a227' };
+const PRESET_NAME = { mix: 'Gemischt', bm: 'Baumaterial', mun: 'Munition', fuel: 'Treibstoff' };
+const STORE_CAP = BALANCE.logistics.storeCap;
+const TRUCK_CAP = BALANCE.logistics.truckCapacity;
+const SITE_BM = BALANCE.construction.fobMaterial;
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const pct = (f) => `${Math.max(0, Math.min(1, f)) * 100}%`;
@@ -32,6 +31,17 @@ function fmtTime(s) {
   const m = Math.floor(t / 60);
   const sec = t % 60;
   return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+}
+
+/** Zeile „Name · Balken · Zahl / Obergrenze“ (Einheiten: Munition, Treibstoff, Ladung). */
+function gauge(label, val, max, color) {
+  const v = Math.max(0, Math.floor(val));
+  return `<div class="gauge"><div class="gl"><span>${label}</span><b>${v} / ${max}</b></div>${bar(val / max, '', color)}</div>`;
+}
+
+/** Lagerzeile einer FOB: Sorte, Balken, Zahl / Obergrenze. */
+function storeRow(label, val, cap, color) {
+  return `<div class="srow"><span>${label}</span>${bar(val / cap, 'store', color)}<b>${Math.floor(val)} / ${cap}</b></div>`;
 }
 
 export class Hud {
@@ -162,10 +172,11 @@ export class Hud {
       el.val.textContent = String(Math.floor(t.res[k]));
       el.rate.textContent = `${neg ? '−' : '+'}${fmtRate(Math.abs(v))}/s`;
       el.rate.style.color = neg ? NEG_COLOR : '';
-      if (t.used[k] !== undefined) {
-        const tip = `${BALANCE.resNames[k]}: verbraucht ${Math.floor(t.used[k])}`;
-        if (el.box.title !== tip) el.box.title = tip;
-      }
+      // Lagersorten: Summe aller fertigen FOB-Lager; Geld ist global
+      const lines = [k === 'money' ? 'Geld (global, nicht pro FOB)' : 'Summe aller FOB-Lager'];
+      if (t.used[k] !== undefined) lines.push(`verbraucht: ${Math.floor(t.used[k])}`);
+      const tip = lines.join('\n');
+      if (el.box.title !== tip) el.box.title = tip;
     }
     for (let i = 0; i < 2; i++) {
       const tm = g.teams[i];
@@ -214,26 +225,58 @@ export class Hud {
     }
   }
 
+  /** Einzelne Einheit: HP, Vorrat (Munition/Treibstoff), LKW-Ladung, Auftrag. */
   unitInfo(u) {
     const f = u.hp / u.maxHp;
-    const st = ORDER_LABEL[u.order.type] || 'Bereit';
-    return (
+    let h =
       `<div class="title">${esc(u.def.name)}</div>${bar(f, 'hp', hpColor(f))}` +
-      `<div class="muted small">${Math.ceil(u.hp)} / ${u.maxHp} HP · ${st}</div>`
-    );
+      `<div class="muted small">${Math.ceil(u.hp)} / ${u.maxHp} HP · ${esc(orderText(this.game, u))}</div>`;
+    if (u.def.ammoMax) {
+      h += gauge('Munition', u.ammo, u.def.ammoMax, COLOR.mun);
+      if (u.def.range > 0 && u.ammo < u.def.ammoPerShot) h += `<div class="warn small">Keine Munition – feuert nicht</div>`;
+    }
+    if (u.def.fuelMax) {
+      h += gauge('Treibstoff', u.fuel, u.def.fuelMax, COLOR.fuel);
+      if (u.fuel <= 0) h += `<div class="warn small">Kein Treibstoff – nur 25 % Tempo</div>`;
+    }
+    if (u.type === 'truck') {
+      const c = u.cargo;
+      const sum = c.bm + c.mun + c.fuel;
+      h += gauge('Ladung', sum, TRUCK_CAP, COLOR.cargo);
+      h +=
+        `<div class="muted small">${Math.floor(c.bm)} BM · ${Math.floor(c.mun)} MUN · ${Math.floor(c.fuel)} TS` +
+        ` · Ladungsart: ${PRESET_NAME[u.preset] || u.preset}</div>`;
+    }
+    return h;
   }
 
+  /** Gebäude: FOB (Lager, Baustelle), Baustelle (Fortschritt, Status), Förderanlage, Ausbildung. */
   buildingInfo(b) {
+    const g = this.game;
     const f = b.hp / b.maxHp;
-    let h = `<div class="title">${esc(b.def.name)}</div>${bar(f, 'hp', hpColor(f))}`;
+    const name = b.type === 'fob' ? fobLabel(g, b) : b.def.name;
+    let h = `<div class="title">${esc(name)}</div>${bar(f, 'hp', hpColor(f))}`;
     if (!b.built) {
-      h += `<div class="muted small">Im Bau · ${Math.floor(b.progress * 100)} %</div>${bar(b.progress, 'prog')}`;
+      h += `<div class="muted small">${esc(this.siteStatus(b))}</div>${bar(b.progress, 'prog')}`;
     } else {
       h += '<div class="muted small">Einsatzbereit</div>';
     }
+    if (b.type === 'fob') {
+      h +=
+        '<div class="muted small lagerhead">Lager dieser FOB</div>' +
+        storeRow('BM', b.store.bm, STORE_CAP, COLOR.bm) +
+        storeRow('MUN', b.store.mun, STORE_CAP, COLOR.mun) +
+        storeRow('TS', b.store.fuel, STORE_CAP, COLOR.fuel);
+    }
     if (b.type === 'extractor' && b.nodeId) {
-      const n = this.game.nodeById.get(b.nodeId);
+      const n = g.nodeById.get(b.nodeId);
       if (n) h += `<div class="muted small">Fördert ${NODE_NAME[n.type]} · ${b.def.yields[n.type]}/s</div>`;
+      if (b.built) {
+        const sup = g.supplierOf(b);
+        h += sup
+          ? `<div class="muted small">Liefert an ${esc(fobLabel(g, sup))}</div>`
+          : `<div class="warn small">Keine FOB in Reichweite – ruht</div>`;
+      }
     }
     if (b.queue.length) {
       const ut = UNITS[b.queue[0].unit ?? b.queue[0]];
@@ -246,14 +289,32 @@ export class Hud {
     return h;
   }
 
+  /** Status einer Baustelle: Material (FOB-Baustelle), dann Baufahrzeug/Bauer, sonst Fortschritt. */
+  siteStatus(b) {
+    if (b.type === 'fob' && !b.supplied && b.store.bm < SITE_BM) {
+      return `Wartet auf Material (${Math.min(Math.floor(b.store.bm), SITE_BM)}/${SITE_BM})`;
+    }
+    const st = builderState(this.game, b);
+    if (st === 'near') return `Im Bau · ${Math.floor(b.progress * 100)} %`;
+    if (st === 'assigned') return 'Baufahrzeug unterwegs';
+    return b.type === 'wall' || b.type === 'gate' ? 'Wartet auf Infanterie oder Baufahrzeug' : 'Wartet auf Baufahrzeug';
+  }
+
+  /** Mehrfachauswahl: Anzahl je Typ, Einheiten ohne Munition/Treibstoff. */
   multiInfo(sel) {
-    const units = sel.filter((e) => e.kind === 'unit').length;
-    const blds = sel.length - units;
+    const units = sel.filter((e) => e.kind === 'unit');
+    const blds = sel.length - units.length;
     const counts = new Map();
     for (const e of sel) counts.set(e.def.name, (counts.get(e.def.name) || 0) + 1);
-    const title = [units ? `${units} Einheiten` : '', blds ? `${blds} Gebäude` : ''].filter(Boolean).join(' · ');
+    const title = [units.length ? `${units.length} Einheiten` : '', blds ? `${blds} Gebäude` : ''].filter(Boolean).join(' · ');
     const chips = [...counts].map(([n, c]) => `<span>${c}× ${esc(n)}</span>`).join('');
-    return `<div class="title">${title}</div><div class="chips">${chips}</div>`;
+    const noAmmo = units.filter((u) => u.def.range > 0 && u.def.ammoMax && u.ammo < u.def.ammoPerShot).length;
+    const noFuel = units.filter((u) => u.def.fuelMax && u.fuel <= 0).length;
+    const warn = [noAmmo ? `${noAmmo} ohne Munition` : '', noFuel ? `${noFuel} ohne Treibstoff` : ''].filter(Boolean);
+    return (
+      `<div class="title">${title}</div><div class="chips">${chips}</div>` +
+      (warn.length ? `<div class="warn small">${esc(warn.join(' · '))}</div>` : '')
+    );
   }
 
   updateCommands() {
@@ -262,7 +323,7 @@ export class Hud {
     const html = entries
       .map(
         (e, i) =>
-          `<button type="button" class="cbtn${e.enabled ? '' : ' off'}" data-i="${i}" ` +
+          `<button type="button" class="cbtn${e.enabled ? '' : ' off'}${e.active ? ' on' : ''}" data-i="${i}" ` +
           `data-tip="${esc(e.enabled ? e.tip : e.reason || e.tip)}">` +
           `<span class="cl">${esc(e.label)}</span>` +
           `${e.cost ? `<span class="cc">${esc(e.cost)}</span>` : ''}` +

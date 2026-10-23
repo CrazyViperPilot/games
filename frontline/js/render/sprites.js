@@ -105,6 +105,23 @@ export function drawUnit(ctx, u, color, zoom = 1, aim = null) {
     ctx.fillStyle = light;
     ctx.fillRect(4, -5, 5, 10);
     ctx.strokeRect(4, -5, 5, 10);
+  } else if (u.type === 'engineer') {
+    // Baufahrzeug: Wanne mit Ketten, Kabine und Kran-Arm mit Schaufel nach vorn
+    ctx.rotate(hull);
+    ctx.fillStyle = '#23272a';
+    ctx.fillRect(-9, -8, 17, 2.5);
+    ctx.fillRect(-9, 5.5, 17, 2.5);
+    ctx.fillStyle = dark;
+    ctx.fillRect(-9, -6, 17, 12);
+    ctx.strokeRect(-9, -6, 17, 12);
+    ctx.fillStyle = light;
+    ctx.fillRect(-4, -4, 6, 8);
+    ctx.strokeRect(-4, -4, 6, 8);
+    ctx.fillStyle = '#c9a227'; // Kran-Arm und Schaufel in Akzentgelb
+    ctx.fillRect(2, -1, 11, 2);
+    ctx.strokeRect(2, -1, 11, 2);
+    ctx.fillRect(11, -4.5, 2.5, 9);
+    ctx.strokeRect(11, -4.5, 2.5, 9);
   } else if (u.type === 'ifv' || u.type === 'tank') {
     const big = u.type === 'tank';
     const hl = big ? 14 : 12;
