@@ -26,6 +26,7 @@ const CARGO_COLOR = { bm: '#a0703f', mun: '#d9b600', fuel: '#9b7bc4' }; // LKW-L
 const AMMO_COLOR = '#7f93ad'; // Munitionsbalken (grau-blau)
 const FUEL_COLOR = '#9b7bc4'; // Treibstoffbalken (violett)
 const BAR_W = 24; // Balkenbreite über Einheiten (Welt-px)
+const HP_OFFSET = 14; // Abstand Lebensbalken-Oberkante zum Einheitenrand (Bildschirm-px); darunter Vorrat
 const FOG_EXPLORED_ALPHA = 150; // erkundet: abgedunkelt, nicht schwarz
 const MARKER_LIFE = 0.8; // s, Lebensdauer des Wegziel-Markers
 
@@ -186,7 +187,7 @@ export class Renderer {
       if (!u.alive || !shown(u) || !inRect(u.x, u.y, 30)) continue;
       if (!(sel.has(u.id) || hover === u || u.hp < u.maxHp)) continue;
       const bw = 24;
-      this.drawHp(ctx, u.x - bw / 2, u.y - u.def.radius - 9 / z, bw, u.hp / u.maxHp, z);
+      this.drawHp(ctx, u.x - bw / 2, u.y - u.def.radius - HP_OFFSET / z, bw, u.hp / u.maxHp, z);
     }
     for (const b of g.buildings) {
       if (!b.alive || b.team !== team || !inRect(b.x, b.y, 40)) continue;
@@ -391,9 +392,10 @@ export class Renderer {
       }
     }
     if (picked) {
-      const y = u.y - r - 9 / z;
-      if (u.def.ammoMax) drawBar(ctx, x, y + 5.5 / z, BAR_W, 3 / z, u.ammo / u.def.ammoMax, AMMO_COLOR);
-      if (u.def.fuelMax) drawBar(ctx, x, y + 9.5 / z, BAR_W, 3 / z, u.fuel / u.def.fuelMax, FUEL_COLOR);
+      // unter dem Lebensbalken: Munition, dann Treibstoff (beide oberhalb des Sprites)
+      const y = u.y - r - HP_OFFSET / z;
+      if (u.def.ammoMax) drawBar(ctx, x, y + 5 / z, BAR_W, 3 / z, u.ammo / u.def.ammoMax, AMMO_COLOR);
+      if (u.def.fuelMax) drawBar(ctx, x, y + 9 / z, BAR_W, 3 / z, u.fuel / u.def.fuelMax, FUEL_COLOR);
     }
     if (u.def.range > 0 && u.def.ammoMax && u.ammo < u.def.ammoPerShot) {
       ctx.save();
