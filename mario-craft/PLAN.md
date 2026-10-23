@@ -265,3 +265,10 @@ spielneutralen Auftrag: „Lies `<spiel>/PLAN.md`, setze nur das genannte Paket 
 - Entitäten: `hidden`/`done` überspringen. Gegner `state`: 'walk'|'shell'|'kicked'|'dead' (dead → `flip` = kopfüber fallen).
   Boss: `kind`, `state` 'walk'|'jump'|'dizzy'|'defeated', `hp`, `invuln` (blinken).
 - Kamera scrollt nur nach rechts; Figur wird am linken Bildrand gestoppt.
+
+**WP4**
+- `buildSprites()` → `{ atlas, get(name, frame, flip), size }`; `buildChunks(map, sprites, theme)` → `{ chunks, redrawCell, redrawAll }`.
+- `new Renderer(canvas, sprites, { debug })`; `hud.js` exportiert zusätzlich `drawText` und `bindHud(sprites)` (Renderer ruft es).
+- Pause-Knopf zeichnet `drawHud` fest bei `(w-28, 4)`, 24×24 → Input-Trefferfläche dort. `drawControls` überspringt 'pause',
+  zeichnet ◀ ▶ Sprung Feuer an den Positionen aus `input.buttons` (x, y, down, visible); Radien fest (24/24/30/20).
+- Großer Held: Sprite 16×32 auf Hitbox 12×28.
