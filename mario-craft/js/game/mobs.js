@@ -1,4 +1,4 @@
-// Mobs (PLAN §6, PRD §5). Kein DOM. Zombie, Zischer, Silberfischchen; Monster-Spawner (Kachel M).
+// Mobs (PLAN §6, PRD §5). Kein DOM. Zombie, Zischer, Silberfischchen, Skelett, Spinne, Schleim; Monster-Spawner (Kachel M).
 // createMob erwartet die Fußmitte (wie parseLevel-Spawns); gespeichert wird die linke obere Ecke.
 // Lebende Zombies und Zischer nutzen m.timer als Wende-Cooldown nach einem Wandtreffer.
 // Zischer: state 'walk' | 'fuse' (m.fuse = Zündschnur in s). Explodiert er, ist state 'gone' (ohne Punkt, ohne Flip).
@@ -8,6 +8,7 @@ import { MOBS, SPAWNER } from '../data/mobs.js';
 import { TILE_BY_ID, TILE_IDS } from '../data/tiles.js';
 import { moveAndCollide } from './collide.js';
 import { explode } from './explode.js';
+import { spawnProjectile } from './projectiles.js';
 
 const T = PHYS.tile;
 const E = 1e-6;
@@ -21,6 +22,23 @@ const AGGRO_RANGE = 10 * T;   // px: ab hier dreht der Zombie nicht mehr zum Spi
 const TURN_COOLDOWN = 0.5;    // s nach Wandtreffer, in denen der Zombie nicht zum Spieler dreht
 const ZISCHER_Y_RANGE = 4 * T; // px: vertikaler Aggro-Bereich des Zischers
 const SPAWNER_ID = TILE_IDS.spawner;
+const SIGHT_X = 10 * T;          // Skelett sieht den Spieler bis 10 Kacheln (x) ...
+const SIGHT_Y = 3 * T;           // ... und bis 3 Kacheln (y)
+const SKEL_APPROACH = 12 * T;    // darüber steht das Skelett still
+const SKEL_AIM_TIME = 0.4;       // s Anim 'shoot' vor dem Pfeil
+const SKEL_ARROW_VX = 150;
+const SKEL_ARROW_VY = -40;
+const SPIDER_CLIMB_VY = -60;     // px/s Kletteraufstieg an einer Wand (ohne Schwerkraft)
+const SPIDER_JUMP_VY = -260;
+const SPIDER_JUMP_VX = 110;
+const SPIDER_COOLDOWN = 1.5;     // s zwischen zwei Sprüngen
+const SLIME_WAIT = 0.8;          // s am Boden vor dem nächsten Hüpfer
+const SLIME_SQUASH = 0.2;        // letzte s des Wartens: Anim 'squash'
+const SLIME_JUMP_VY = -240;
+const SLIME_SMALL_JUMP_VY = -200;
+const SPLIT_VX = 60;             // Startgeschwindigkeit der beiden kleinen Schleime
+const SPLIT_VY = -150;
+const SPLIT_DX = 6;              // px links/rechts vom großen Schleim
 
 // Mob an der Fußmitte (x, y) erzeugen.
 export function createMob(type, x, y) {
@@ -31,6 +49,7 @@ export function createMob(type, x, y) {
     vx: 0, vy: 0, face: -1, anim: 'walk', animTime: 0,
     active: false, dead: false, state: 'walk', timer: 0,
     hp: d.hp, onGround: false, flip: false, fuse: 0, shootT: 0, spawned: false,
+    timer2: 0, climb: false,   // timer2: Zweitzeit je Typ (Skelett-Schussanim, Spinnen-Sprungcooldown, Schleim-Warten)
   };
 }
 
@@ -142,11 +161,173 @@ function moveZischer(game, m, dt) {
   if (dx * dx + dy * dy <= R * R) igniteZischer(game, m, d.fuse);
 }
 
+function applyGravity(m, dt) {
+  m.vy = Math.min(m.vy + PHYS.gravity * dt, PHYS.maxFall);
+}
+
+// Richtung zum Spieler (±1) von der Mitte des Mobs aus.
+function faceTo(p, m) {
+  return (p.x + p.w / 2) - (m.x + m.w / 2) < 0 ? -1 : 1;
+}
+
+// Feste oder Plattform-Kachel 1 px vor der Fußkante? Sonst ist es eine Kante.
+function groundAhead(map, m, dir) {
+  const fx = dir > 0 ? m.x + m.w + 1 : m.x - 1;
+  const t = TILE_BY_ID[map.get(Math.floor(fx / T), Math.floor((m.y + m.h + 1) / T))];
+  return t.solid || t.oneWay;
+}
+
+// Feste Kachel in Blickrichtung neben dem Körper (über die ganze Körperhöhe)?
+function wallAhead(map, m, dir) {
+  const c = Math.floor((dir > 0 ? m.x + m.w + 1 : m.x - 1) / T);
+  const r0 = Math.floor(m.y / T), r1 = Math.floor((m.y + m.h - E) / T);
+  for (let r = r0; r <= r1; r++) {
+    if (map.isSolid(c, r)) return true;
+  }
+  return false;
+}
+
+// Skelett: hält 4–6 Kacheln Abstand. Schuss: m.shootT = Zeit seit dem letzten Schuss, m.state 'aim' = Anim 'shoot'
+// für SKEL_AIM_TIME (m.timer2 = Restzeit), danach Pfeil. Dreht an Wänden, bleibt an Kanten stehen.
+function moveSkeleton(game, m, dt) {
+  const d = MOBS.skeleton;
+  const p = game.player;
+  const dxp = (p.x + p.w / 2) - (m.x + m.w / 2);
+  const dyp = (p.y + p.h / 2) - (m.y + m.h / 2);
+  const ax = Math.abs(dxp);
+  const toward = dxp < 0 ? -1 : 1;
+  const cooling = m.timer > 0;
+  let dir = 0;
+  m.shootT += dt;
+
+  if (m.state === 'aim') {
+    m.timer2 -= dt;
+    if (m.timer2 <= 0) {
+      m.state = 'walk';
+      m.face = toward;
+      spawnProjectile(game, 'enemyArrow', m.x + m.w / 2 + toward * 8, m.y + 10, toward * SKEL_ARROW_VX, SKEL_ARROW_VY);
+    }
+  } else if (m.shootT >= d.shootEvery && ax < SIGHT_X && Math.abs(dyp) < SIGHT_Y) {
+    m.shootT = 0;
+    m.state = 'aim';
+    m.timer2 = SKEL_AIM_TIME;
+    m.face = toward;
+  } else {
+    if (cooling) {
+      m.timer = Math.max(0, m.timer - dt);
+      dir = m.face;
+    } else if (ax < d.keep[0] * T) {
+      dir = -toward;
+    } else if (ax > d.keep[1] * T && ax < SKEL_APPROACH) {
+      dir = toward;
+    }
+    if (!cooling) m.face = dir !== 0 ? dir : toward;
+    if (dir !== 0 && m.onGround && !groundAhead(game.map, m, dir)) dir = 0;
+  }
+
+  m.vx = dir * d.speed;
+  m.anim = m.state === 'aim' ? 'shoot' : 'walk';
+  applyGravity(m, dt);
+  const res = moveAndCollide(m, game.map, dt);
+  m.onGround = res.onGround;
+  m.animTime += dt;
+  // Wand in Gehrichtung: beim Anlaufen zum Spieler (oder im Cooldown) umdrehen; auf der Flucht steht es still.
+  if (res.hitWall !== 0 && res.hitWall === dir && (cooling || dir === toward)) {
+    m.face = -res.hitWall;
+    m.timer = TURN_COOLDOWN;
+  }
+}
+
+// Spinne: schnell auf den Spieler zu. Stößt sie seitlich an eine feste Kachel, klettert sie (m.climb,
+// vy = SPIDER_CLIMB_VY, ohne Schwerkraft) solange die Wand in Blickrichtung fest ist. Sprung (m.state 'jump')
+// ab jumpRange Kacheln, dann SPIDER_COOLDOWN Sperre (m.timer2).
+function moveSpider(game, m, dt) {
+  const d = MOBS.spider;
+  const p = game.player;
+  const dxp = (p.x + p.w / 2) - (m.x + m.w / 2);
+  const toward = dxp < 0 ? -1 : 1;
+  m.timer2 = Math.max(0, m.timer2 - dt);
+  if (m.climb && !wallAhead(game.map, m, m.face)) m.climb = false;
+  if (!m.climb) m.face = toward;
+
+  if (m.climb) {
+    m.vx = m.face * d.speed;
+    m.vy = SPIDER_CLIMB_VY;
+    m.anim = 'walk';
+  } else {
+    applyGravity(m, dt);
+    if (m.state === 'jump') {
+      m.vx = m.face * SPIDER_JUMP_VX;
+      m.anim = 'jump';
+    } else {
+      m.vx = m.face * d.speed;
+      m.anim = 'walk';
+      if (m.onGround && m.timer2 <= 0 && Math.abs(dxp) < d.jumpRange * T) {
+        m.state = 'jump';
+        m.timer2 = SPIDER_COOLDOWN;
+        m.vx = m.face * SPIDER_JUMP_VX;
+        m.vy = SPIDER_JUMP_VY;
+        m.anim = 'jump';
+      }
+    }
+  }
+
+  const res = moveAndCollide(m, game.map, dt);
+  m.onGround = res.onGround;
+  m.animTime += dt;
+  if (res.hitWall !== 0) m.climb = true;
+  if (m.state === 'jump' && res.onGround) m.state = 'walk';
+}
+
+// Schleim und kleiner Schleim: wartet am Boden (SLIME_WAIT, letzte SLIME_SQUASH s Anim 'squash'), dann Sprung
+// zum Spieler mit vx = face × speed × 2. m.state 'wait' | 'air'. Die Teilung steckt in killMob (splitSlime).
+function moveSlime(game, m, dt) {
+  const d = MOBS[m.type];
+  if (m.state !== 'wait' && m.state !== 'air') {
+    m.state = 'wait';
+    m.timer2 = SLIME_WAIT;
+  }
+  applyGravity(m, dt);
+  if (m.state === 'wait') {
+    m.vx = 0;
+    if (!m.onGround) m.timer2 = SLIME_WAIT;
+    else m.timer2 -= dt;
+    m.anim = m.timer2 <= SLIME_SQUASH ? 'squash' : 'stand';
+    if (m.timer2 <= 0 && m.onGround) {
+      m.face = faceTo(game.player, m);
+      m.vx = m.face * d.speed * 2;
+      m.vy = m.type === 'slime' ? SLIME_JUMP_VY : SLIME_SMALL_JUMP_VY;
+      m.state = 'air';
+      m.anim = 'jump';
+    }
+  } else {
+    m.anim = 'jump';
+  }
+  const res = moveAndCollide(m, game.map, dt);
+  m.onGround = res.onGround;
+  m.animTime += dt;
+  if (m.state === 'air' && res.onGround) {
+    m.state = 'wait';
+    m.timer2 = SLIME_WAIT;
+    m.vx = 0;
+  }
+}
+
 // Bewegung je Typ. Neue Typen als eigener case; default läuft wie zombie.
 function moveMobType(game, m, dt) {
   switch (m.type) {
     case 'zischer':
       moveZischer(game, m, dt);
+      break;
+    case 'skeleton':
+      moveSkeleton(game, m, dt);
+      break;
+    case 'spider':
+      moveSpider(game, m, dt);
+      break;
+    case 'slime':
+    case 'slimeSmall':
+      moveSlime(game, m, dt);
       break;
     case 'zombie':
     case 'silverfish':
@@ -237,9 +418,37 @@ export function hitMob(game, m, how) {
   if (m.hp <= 0) killMob(game, m, how);
 }
 
+// Schleim-Teilung (Stampfen/Pfeil): großer Schleim verschwindet, zwei kleine springen links und rechts ab.
+// Wie der Zischer ist der Mob vorher als tot markiert, damit updateDead ihn im nächsten Schritt entfernt.
+function splitSlime(game, m, how) {
+  m.dead = true;
+  m.state = 'gone';
+  m.hp = 0;
+  m.vx = 0;
+  m.vy = 0;
+  m.timer = 0;
+  game.addScore(KILL_SCORE);
+  if (how === 'stomp') game.emit('stomp');
+  const fx = m.x + m.w / 2;
+  const fy = m.y + m.h;
+  for (const sgn of [-1, 1]) {
+    const c = game.spawnMob('slimeSmall', fx + sgn * SPLIT_DX, fy);
+    if (!c) continue;
+    c.state = 'air';   // fliegt mit dem Abprall, bis er landet
+    c.anim = 'jump';
+    c.vx = sgn * SPLIT_VX;
+    c.vy = SPLIT_VY;
+  }
+}
+
 // Tod: kopfüber fallen, nach DEAD_TIME entfernen, Punkte, Stampf-Ton.
+// Schleim teilt sich bei Stampfen und Pfeil; Explosion, Lava und Stern töten ihn ohne Teilung.
 export function killMob(game, m, how) {
   if (m.dead) return;
+  if (m.type === 'slime' && (how === 'stomp' || how === 'arrow')) {
+    splitSlime(game, m, how);
+    return;
+  }
   m.dead = true;
   m.state = 'dead';
   m.flip = true;
