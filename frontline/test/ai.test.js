@@ -2,25 +2,42 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
 import { AI } from '../js/ai/ai.js';
+import { BALANCE } from '../js/data/balance.js';
 
-// Vorübergehend gelockert (Logistik-Umbau, L1): die KI-Strategie wird in L3 neu geprüft.
-// Geprüft wird nur, dass die KI ohne Exception und ohne Endlosschleife weiterläuft.
 const DT = 0.05;
+const START_UNITS = BALANCE.startUnits.length;
+const mine = (game, team, type, built = true) =>
+  game.buildings.filter((b) => b.alive && b.team === team && b.type === type && (!built || b.built));
 
-/** KI gegen KI über `minutes` Spielminuten; liefert Spielzeit und Kennzahlen. */
+/** KI gegen KI über `minutes` Spielminuten; liefert Kennzahlen je Team (Ausbildung, Zonenbesitz, Gebäude). */
 function playAiVsAi(seed, minutes) {
   const game = new Game({ seed });
   const ais = [new AI(game, 0, 'normal'), new AI(game, 1, 'normal')];
+  const seen = [new Set(), new Set()]; // alle je gesehenen Einheiten-IDs je Team
+  let zoneHeld = false;
+  let maxExt = [0, 0];
   const steps = Math.round((minutes * 60) / DT);
   for (let i = 0; i < steps && game.winner === null; i++) {
     ais[0].update(DT);
     ais[1].update(DT);
     game.update(DT);
+    if (i % 20 === 0) {
+      for (const u of game.units) seen[u.team].add(u.id);
+      if (game.zone.owner >= 0) zoneHeld = true;
+      for (let t = 0; t < 2; t++) maxExt[t] = Math.max(maxExt[t], mine(game, t, 'extractor').length);
+    }
   }
-  return { time: game.time, winner: game.winner, units: game.units.filter((u) => u.alive).length };
+  return {
+    game,
+    time: game.time,
+    winner: game.winner,
+    produced: seen.map((s) => s.size - START_UNITS),
+    zoneHeld,
+    maxExt,
+  };
 }
 
-test('KI allein (Seed 7): 10 min ohne Exception', () => {
+test('KI allein (Seed 7): nach 10 min ≥ 5 Förderanlagen, ≥ 3 FOBs, eine FOB in der Zone', () => {
   const game = new Game({ seed: 7 });
   const ai = new AI(game, 1, 'normal');
   const steps = Math.round((10 * 60) / DT);
@@ -29,11 +46,50 @@ test('KI allein (Seed 7): 10 min ohne Exception', () => {
     game.update(DT);
   }
   assert.ok(game.time >= 10 * 60 - 1, `Spielzeit ${game.time.toFixed(1)} s`);
+  const ext = mine(game, 1, 'extractor').length;
+  const fobs = mine(game, 1, 'fob');
+  const z = game.zone;
+  const nearest = Math.min(...fobs.map((f) => Math.hypot(f.x - z.x, f.y - z.y)));
+  assert.ok(ext >= 5, `fertige Förderanlagen: ${ext}`);
+  assert.ok(fobs.length >= 3, `fertige FOBs: ${fobs.length}`);
+  assert.ok(nearest <= z.r, `nächste FOB ${nearest.toFixed(0)} px von der Zonenmitte`);
+  assert.ok(game.units.some((u) => u.alive && u.team === 1 && u.type === 'engineer'), 'Baufahrzeug lebt');
 });
 
 for (const seed of [1, 2]) {
-  test(`KI gegen KI (Seed ${seed}): 20 min ohne Exception`, () => {
+  test(`KI gegen KI (Seed ${seed}): 20 min ohne Exception, beide bauen aus und bilden aus, Zone wird gehalten`, () => {
     const r = playAiVsAi(seed, 20);
     assert.ok(r.time >= 20 * 60 - 1 || r.winner !== null, `Spielzeit ${r.time.toFixed(1)} s`);
+    for (let t = 0; t < 2; t++) {
+      assert.ok(r.maxExt[t] >= 3, `Team ${t}: höchstens ${r.maxExt[t]} fertige Förderanlagen`);
+      assert.ok(r.produced[t] >= 15, `Team ${t}: ${r.produced[t]} Einheiten ausgebildet`);
+    }
+    assert.ok(r.zoneHeld, 'niemand hat die Zone gehalten');
   });
 }
+
+test('KI: leicht und schwer laufen ohne Exception (gegeneinander)', () => {
+  const game = new Game({ seed: 3 });
+  const ais = [new AI(game, 0, 'easy'), new AI(game, 1, 'hard')];
+  for (let i = 0; i < Math.round((6 * 60) / DT); i++) {
+    for (const ai of ais) ai.update(DT);
+    game.update(DT);
+  }
+  assert.ok(game.time >= 6 * 60 - 1 || game.winner !== null);
+});
+
+test('KI ersetzt ein verlorenes Baufahrzeug', () => {
+  const game = new Game({ seed: 7 });
+  const ai = new AI(game, 1, 'normal');
+  const run = (sec) => {
+    for (let i = 0; i < Math.round(sec / DT); i++) {
+      ai.update(DT);
+      game.update(DT);
+    }
+  };
+  run(120);
+  const eng = () => game.units.filter((u) => u.alive && u.team === 1 && u.type === 'engineer');
+  for (const u of eng()) u.hp = 0; // alle Baufahrzeuge fallen
+  run(90);
+  assert.ok(eng().length >= 1, 'kein Ersatz-Baufahrzeug ausgebildet');
+});
