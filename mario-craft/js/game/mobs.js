@@ -1,4 +1,6 @@
-// Mobs (PLAN §6, PRD §5). Kein DOM. Zombie, Zischer, Silberfischchen, Skelett, Spinne, Schleim; Monster-Spawner (Kachel M).
+// Mobs (PLAN §6, PRD §5). Kein DOM. Zombie, Zischer, Silberfischchen, Skelett, Spinne, Schleim, Glutgeist,
+// Leerenläufer; Monster-Spawner (Kachel M).
+// Leerenläufer: m.state 'calm' | 'angry'. m.invuln = Schonzeit nach einem Stampfer (Renderer blinkt damit).
 // createMob erwartet die Fußmitte (wie parseLevel-Spawns); gespeichert wird die linke obere Ecke.
 // Lebende Zombies und Zischer nutzen m.timer als Wende-Cooldown nach einem Wandtreffer.
 // Zischer: state 'walk' | 'fuse' (m.fuse = Zündschnur in s). Explodiert er, ist state 'gone' (ohne Punkt, ohne Flip).
@@ -50,6 +52,8 @@ export function createMob(type, x, y) {
     active: false, dead: false, state: 'walk', timer: 0,
     hp: d.hp, onGround: false, flip: false, fuse: 0, shootT: 0, spawned: false,
     timer2: 0, climb: false,   // timer2: Zweitzeit je Typ (Skelett-Schussanim, Spinnen-Sprungcooldown, Schleim-Warten)
+    invuln: 0,                 // s Schonzeit nach einem Stampfer (nur Leerenläufer)
+    y0: y - d.h,               // Schwebehöhe (Glutgeist wippt um sie)
   };
 }
 
@@ -313,9 +317,141 @@ function moveSlime(game, m, dt) {
   }
 }
 
+// Freie Fläche für eine Box (px): keine feste Kachel in den überlappten Zellen.
+function boxFree(map, x, y, w, h) {
+  const c0 = Math.floor(x / T), c1 = Math.floor((x + w - E) / T);
+  const r0 = Math.floor(y / T), r1 = Math.floor((y + h - E) / T);
+  for (let r = r0; r <= r1; r++) {
+    for (let c = c0; c <= c1; c++) {
+      if (map.isSolid(c, r)) return false;
+    }
+  }
+  return true;
+}
+
+// Glutgeist: schwebt ohne Schwerkraft, wippt um y0. Innerhalb range Kacheln driftet er zum Spieler, sonst steht er.
+// Feste Kacheln blockieren nur die Bewegung (keine Kollisionsauflösung). Salve alle shootEvery s, solange der
+// Spieler in Reichweite ist (Timer läuft immer, die Salve kommt beim Eintritt in Reichweite).
+function moveGlutgeist(game, m, dt) {
+  const d = MOBS.glutgeist;
+  const p = game.player;
+  const pcx = p.x + p.w / 2;
+  const pcy = p.y + p.h / 2;
+  const mcx = m.x + m.w / 2;
+  const mcy = m.y + m.h / 2;
+  const dxp = pcx - mcx;
+  const dyp = pcy - mcy;
+  const R = d.range * T;
+  const inRange = dxp * dxp + dyp * dyp < R * R;
+  m.face = dxp < 0 ? -1 : 1;
+  m.onGround = false;
+  m.anim = 'walk';
+  m.animTime += dt;
+
+  m.vx = inRange ? m.face * d.speed : 0;
+  const nx = m.x + m.vx * dt;
+  if (boxFree(game.map, nx, m.y, m.w, m.h)) m.x = nx;
+  else m.vx = 0;
+  const ny = m.y0 + Math.sin(m.animTime * (2 * Math.PI / d.bobPeriod)) * d.bobAmp;
+  m.vy = 0;
+  if (boxFree(game.map, m.x, ny, m.w, m.h)) m.y = ny;
+
+  m.shootT += dt;
+  if (inRange && m.shootT >= d.shootEvery) {
+    m.shootT = 0;
+    glutSalvo(game, m, mcx, mcy, pcx, pcy);
+  }
+}
+
+// Salve: `shots` Feuerkugeln von (sx, sy) Richtung (tx, ty), fächerförmig um `fan` rad auseinander.
+function glutSalvo(game, m, sx, sy, tx, ty) {
+  const d = MOBS.glutgeist;
+  const base = Math.atan2(ty - sy, tx - sx);
+  const half = (d.shots - 1) / 2;
+  for (let k = 0; k < d.shots; k++) {
+    const a = base + (k - half) * d.fan;
+    spawnProjectile(game, 'fire', sx, sy, Math.cos(a) * d.shotSpeed, Math.sin(a) * d.shotSpeed);
+  }
+}
+
+// Leerenläufer calm: läuft hin und her, dreht an Wänden und Kanten. Angry: läuft auf den Spieler zu.
+function moveLaeufer(game, m, dt) {
+  const d = MOBS.leerenlaeufer;
+  if (m.state !== 'angry') m.state = 'calm';
+  if (m.state === 'angry') {
+    m.face = faceTo(game.player, m);
+    m.vx = m.face * d.angrySpeed;
+  } else {
+    if (m.timer > 0) m.timer = Math.max(0, m.timer - dt);
+    else if (m.onGround && !groundAhead(game.map, m, m.face)) {
+      m.face = -m.face;
+      m.timer = TURN_COOLDOWN;
+    }
+    m.vx = m.face * d.speed;
+  }
+  applyGravity(m, dt);
+  const res = moveAndCollide(m, game.map, dt);
+  m.onGround = res.onGround;
+  m.animTime += dt;
+  if (m.state !== 'angry' && res.hitWall !== 0) {
+    m.face = -res.hitWall;
+    m.timer = TURN_COOLDOWN;
+  }
+}
+
+// Teleport neben den Spieler: teleportDist px vor ihm in Blickrichtung, Füße auf Spielerfüßen. Nur auf freie
+// Fläche; sonst bleibt der Läufer, wo er ist.
+function teleportLaeufer(game, m) {
+  const p = game.player;
+  const side = p.face < 0 ? -1 : 1;
+  const nx = p.x + p.w / 2 + side * MOBS.leerenlaeufer.teleportDist - m.w / 2;
+  const ny = p.y + p.h - m.h;
+  if (!boxFree(game.map, nx, ny, m.w, m.h)) return;
+  m.x = nx;
+  m.y = ny;
+  m.vx = 0;
+  m.vy = 0;
+  m.face = -side;
+  game.emit('teleport');
+}
+
+// Spieler prallt von einem Stampfer ab (Sprung gehalten = höher).
+function bouncePlayer(game) {
+  game.player.vy = -(game.jumpHeld ? PHYS.stompBounceHold : PHYS.stompBounce);
+}
+
+// Leerenläufer-Kontakt: Stern tötet. Calm: Berührung macht ihn angry und teleportiert ihn. Angry: Stampfen nimmt
+// 1 hp (Schonzeit), Seitenkontakt verletzt. Während der Schonzeit prallt der Spieler nur ab.
+function touchLaeufer(game, m, prevFeet) {
+  const p = game.player;
+  const stomp = p.vy > 0 && prevFeet <= m.y + m.h * 0.5;
+  if (p.star > 0) {
+    killMob(game, m, 'star');
+    return;
+  }
+  if (m.state !== 'angry') {
+    m.state = 'angry';
+    teleportLaeufer(game, m);
+    if (stomp) bouncePlayer(game);
+    return;
+  }
+  if (stomp) {
+    if (m.invuln <= 0) hitMob(game, m, 'stomp');
+    bouncePlayer(game);
+    return;
+  }
+  if (p.invuln <= 0) game.hurtPlayer('mob');
+}
+
 // Bewegung je Typ. Neue Typen als eigener case; default läuft wie zombie.
 function moveMobType(game, m, dt) {
   switch (m.type) {
+    case 'glutgeist':
+      moveGlutgeist(game, m, dt);
+      break;
+    case 'leerenlaeufer':
+      moveLaeufer(game, m, dt);
+      break;
     case 'zischer':
       moveZischer(game, m, dt);
       break;
@@ -360,6 +496,10 @@ function hazardAtFeet(map, m) {
 function touchPlayer(game, m, prevFeet) {
   const p = game.player;
   if (!rectHit(m.x, m.y, m.w, m.h, p.x, p.y, p.w, p.h)) return;
+  if (m.type === 'leerenlaeufer') {
+    touchLaeufer(game, m, prevFeet);
+    return;
+  }
   const stompable = MOBS[m.type].stompable !== false;
   if (stompable && p.vy > 0 && prevFeet <= m.y + m.h * 0.5) {
     if (m.type === 'zischer') {
@@ -368,7 +508,7 @@ function touchPlayer(game, m, prevFeet) {
     } else {
       hitMob(game, m, 'stomp');
     }
-    p.vy = -(game.jumpHeld ? PHYS.stompBounceHold : PHYS.stompBounce);
+    bouncePlayer(game);
     return;
   }
   if (p.star > 0) {
@@ -396,13 +536,14 @@ export function updateMobs(game, dt, prevFeet) {
     updateActivity(game, m);
     if (!m.active) continue;
 
+    if (m.invuln > 0) m.invuln = Math.max(0, m.invuln - dt);
     moveMobType(game, m, dt);
     if (m.dead) continue;   // Zischer ist in diesem Schritt explodiert
     if (m.y > fallLimit) {
       removeAt(mobs, i);
       continue;
     }
-    if (hazardAtFeet(game.map, m)) {
+    if (!MOBS[m.type].flies && hazardAtFeet(game.map, m)) {
       killMob(game, m, 'lava');
       continue;
     }
@@ -410,12 +551,21 @@ export function updateMobs(game, dt, prevFeet) {
   }
 }
 
-// Treffer: explosion/lava/star töten sofort, sonst −1 HP.
+// Treffer: explosion/lava/star töten sofort, sonst −1 HP. Ein Stampfer während der Schonzeit (m.invuln) zählt nicht.
+// Überlebt der Mob einen Stampfer, gibt es die Schonzeit aus MOBS (invulnTime) und den Stampf-Ton.
 export function hitMob(game, m, how) {
   if (m.dead) return;
+  if (how === 'stomp' && m.invuln > 0) return;
   if (how === 'explosion' || how === 'lava' || how === 'star') m.hp = 0;
   else m.hp -= 1;
-  if (m.hp <= 0) killMob(game, m, how);
+  if (m.hp <= 0) {
+    killMob(game, m, how);
+    return;
+  }
+  if (how === 'stomp') {
+    m.invuln = MOBS[m.type].invulnTime ?? 0;
+    game.emit('stomp');
+  }
 }
 
 // Schleim-Teilung (Stampfen/Pfeil): großer Schleim verschwindet, zwei kleine springen links und rechts ab.

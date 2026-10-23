@@ -626,3 +626,164 @@ test('Explosion und Lava teilen den großen Schleim nicht', () => {
   assert.equal(l.dead, true);
   assert.equal(g2.mobs.filter((k) => k.type === 'slimeSmall').length, 0);
 });
+
+// Glutgeist und Leerenläufer (A10). spawnAt: Fußmitte (x, y) wie spawn, aber frei wählbare Höhe.
+function spawnAt(g, type, x, y) {
+  const m = createMob(type, x, y);
+  g.mobs.push(m);
+  return m;
+}
+
+function fires(g) {
+  return (g.projectiles || []).filter((o) => o.active && o.type === 'fire');
+}
+
+test('Glutgeist feuert alle 3 s drei Feuerkugeln fächerförmig auf den Spieler', () => {
+  const g = makeGame({}, [20, GROUND]);
+  spawnAt(g, 'glutgeist', 150, GROUND - 60);
+  step(g, 355); // ca. 2,96 s
+  assert.equal(fires(g).length, 0);
+  step(g, 11); // ca. 3,05 s
+  const f = fires(g);
+  assert.equal(f.length, 3);
+  assert.ok(f.every((o) => o.vx < 0), 'fliegen zum Spieler (links)');
+  assert.ok(Math.abs(Math.hypot(f[1].vx, f[1].vy) - 90) < 1e-6, 'Tempo 90 px/s');
+  const angles = f.map((o) => Math.atan2(o.vy, o.vx)).sort((a, b) => a - b);
+  assert.ok(Math.abs((angles[2] - angles[0]) - 0.5) < 1e-6, 'Fächer ±0,25 rad');
+  const aim = Math.atan2(g.player.y + g.player.h / 2 - f[1].y, g.player.x + g.player.w / 2 - f[1].x);
+  assert.ok(Math.abs(Math.atan2(f[1].vy, f[1].vx) - aim) < 1e-6, 'mittlere Kugel zielt auf den Spieler');
+
+  step(g, 366); // ca. 6,1 s: zweite Salve
+  assert.equal(fires(g).length, 6);
+});
+
+test('Glutgeist feuert nicht, wenn der Spieler mehr als 12 Kacheln entfernt ist', () => {
+  const g = makeGame({}, [20, GROUND]);
+  spawnAt(g, 'glutgeist', 400, GROUND - 60); // 380 px > 192 px
+  step(g, 400);
+  assert.equal(fires(g).length, 0);
+});
+
+test('Glutgeist: Stampfen verletzt den Spieler, ohne Abprall und ohne Schaden am Mob', () => {
+  const g = makeGame({}, [20, GROUND]);
+  const m = spawnAt(g, 'glutgeist', 300, GROUND - 60);
+  g.player = createPlayer(300, m.y + 4);
+  g.player.vy = 200;
+  step(g, 1, m.y);
+  assert.equal(g.hurts, 1);
+  assert.equal(m.dead, false);
+  assert.equal(g.player.vy, 200, 'kein Abprall');
+  assert.equal(g.score, 0);
+});
+
+test('Glutgeist stirbt durch einen Pfeil (100 Punkte) und schwebt über Lava weiter', () => {
+  const g = makeGame({ '10,10': 'L' }, [20, GROUND]);
+  const over = spawnAt(g, 'glutgeist', 168, GROUND - 16); // Füße in der Lava-Zelle (10,10)
+  step(g);
+  assert.equal(over.dead, false, 'fliegt über Lava');
+
+  hitMob(g, over, 'arrow');
+  assert.equal(over.dead, true);
+  assert.equal(g.score, 100);
+});
+
+test('Leerenläufer calm: harmlos, läuft hin und her und dreht an der Wand', () => {
+  const g = makeGame({ '8,10': 'S', '8,9': 'S' }, [20, GROUND]);
+  const m = spawnAt(g, 'leerenlaeufer', 200, GROUND);
+  let guard = 0;
+  while (m.face !== 1 && guard++ < 600) step(g);
+  assert.equal(m.face, 1, 'hat an der Wand gedreht');
+  assert.ok(m.x >= 144 - 1e-6, 'steht vor der Wand');
+  assert.equal(m.state, 'calm');
+  assert.equal(g.hurts, 0);
+  assert.ok(!g.events.includes('teleport'));
+});
+
+test('Leerenläufer: Berührung macht ihn angry und teleportiert ihn vor den Spieler', () => {
+  const g = makeGame({}, [20, GROUND]);
+  const m = spawnAt(g, 'leerenlaeufer', 200, GROUND);
+  g.player = createPlayer(200, GROUND);
+  step(g, 1, GROUND);
+  assert.equal(m.state, 'angry');
+  assert.ok(g.events.includes('teleport'));
+  assert.equal(g.hurts, 0, 'die Berührung selbst verletzt nicht');
+  assert.equal(m.x + m.w / 2, g.player.x + g.player.w / 2 + 20, '20 px vor dem Spieler (Blickrichtung)');
+  assert.equal(rectHit(m.x, m.y, m.w, m.h, g.player.x, g.player.y, g.player.w, g.player.h), false);
+});
+
+test('Leerenläufer angry: läuft auf den Spieler zu und verletzt bei Kontakt', () => {
+  const g = makeGame({}, [20, GROUND]);
+  const m = spawnAt(g, 'leerenlaeufer', 200, GROUND);
+  g.player = createPlayer(200, GROUND);
+  step(g, 1, GROUND);
+  const x0 = m.x;
+  step(g, 60); // 0,5 s bei 70 px/s: nach ca. 0,15 s erreicht er die Spielermitte
+  assert.ok(m.x < x0 - 15, 'läuft schnell heran');
+  assert.ok(Math.abs(m.x + m.w / 2 - (g.player.x + g.player.w / 2)) < 2, 'steht am Spieler');
+  assert.ok(g.hurts >= 1, 'verletzt bei Kontakt');
+});
+
+test('Leerenläufer angry: Teleport nur auf freie Fläche, sonst bleibt er stehen', () => {
+  const g = makeGame({ '2,10': 'S', '2,9': 'S' }, [20, GROUND]);
+  const m = spawnAt(g, 'leerenlaeufer', 20, GROUND);
+  g.player = createPlayer(20, GROUND);
+  const x0 = m.x;
+  step(g, 1, GROUND);
+  assert.equal(m.state, 'angry');
+  assert.ok(Math.abs(m.x - x0) < 1, 'kein Teleport in die Wand (nur der Schritt des Laufens)');
+  assert.ok(!g.events.includes('teleport'));
+});
+
+test('Leerenläufer: Stern tötet ihn bei Kontakt, ohne Teleport', () => {
+  const g = makeGame({}, [20, GROUND]);
+  const m = spawnAt(g, 'leerenlaeufer', 200, GROUND);
+  g.player = createPlayer(200, GROUND);
+  g.player.star = 5;
+  step(g, 1, GROUND);
+  assert.equal(m.dead, true);
+  assert.equal(g.hurts, 0);
+  assert.ok(!g.events.includes('teleport'));
+});
+
+test('Leerenläufer stirbt erst beim zweiten Stampfer; Schonzeit lässt den ersten nicht zählen', () => {
+  const g = makeGame({}, [20, GROUND]);
+  const m = spawnAt(g, 'leerenlaeufer', 300, GROUND);
+  m.state = 'angry';
+  g.player = createPlayer(300, m.y + 4);
+  g.player.vy = 200;
+  step(g, 1, m.y);
+  assert.equal(m.dead, false);
+  assert.equal(m.hp, 1);
+  assert.ok(m.invuln > 0.5, 'Schonzeit läuft');
+  assert.equal(g.player.vy, -PHYS.stompBounce, 'Spieler prallt ab');
+  assert.equal(g.hurts, 0);
+
+  // Zweiter Stampfer innerhalb der Schonzeit: Spieler prallt ab, Mob bleibt bei 1 hp.
+  g.player.vy = 200;
+  step(g, 1, m.y);
+  assert.equal(m.hp, 1);
+  assert.equal(m.dead, false);
+
+  // Schonzeit vorbei (Spieler weit weg, Läufer läuft ihm nach).
+  g.player = createPlayer(20, GROUND);
+  step(g, 90); // ca. 0,75 s
+  assert.equal(m.invuln, 0);
+  g.player = createPlayer(m.x + m.w / 2, m.y + 4);
+  g.player.vy = 200;
+  step(g, 1, m.y);
+  assert.equal(m.dead, true);
+  assert.equal(g.score, 100);
+  assert.equal(g.hurts, 0);
+});
+
+test('Leerenläufer: Pfeil nimmt je 1 hp, zwei Pfeile töten', () => {
+  const g = makeGame({}, [20, GROUND]);
+  const m = spawnAt(g, 'leerenlaeufer', 300, GROUND);
+  step(g);
+  hitMob(g, m, 'arrow');
+  assert.equal(m.hp, 1);
+  assert.equal(m.dead, false);
+  hitMob(g, m, 'arrow');
+  assert.equal(m.dead, true);
+  assert.equal(g.score, 100);
+});

@@ -10,8 +10,18 @@ export const MOBS = {
   slime: { w: 16, h: 16, speed: 45, hp: 1, stompable: true, split: 2, splitInto: 'slimeSmall' },
   slimeSmall: { w: 8, h: 8, speed: 60, hp: 1, stompable: true },
   silverfish: { w: 10, h: 6, speed: 75, hp: 1, stompable: true },
-  glutgeist: { w: 14, h: 20, speed: 25, hp: 3, stompable: false, shootEvery: 3, shots: 3 },
-  leerenlaeufer: { w: 10, h: 30, speed: 50, hp: 2, stompable: true },
+  // Glutgeist: schwebt (flies), driftet mit speed (px/s) zum Spieler innerhalb range Kacheln, wippt bobAmp px um y0.
+  // Salve alle shootEvery s: shots Feuerkugeln (shotSpeed px/s), Fächerabstand fan rad. Stampfen verletzt.
+  glutgeist: {
+    w: 14, h: 20, speed: 20, hp: 1, stompable: false, flies: true,
+    shootEvery: 3, shots: 3, shotSpeed: 90, fan: 0.25, range: 12, bobAmp: 4, bobPeriod: 2,
+  },
+  // Leerenläufer: calm läuft mit speed hin und her. Berührung → angry: teleportiert vor den Spieler (teleportDist px
+  // nach Blickrichtung) und läuft mit angrySpeed auf ihn zu. hp 2: Stampfer nimmt 1 hp und gibt invulnTime s Schonzeit.
+  leerenlaeufer: {
+    w: 10, h: 30, speed: 30, angrySpeed: 70, hp: 2, stompable: true,
+    teleportDist: 20, invulnTime: 0.6,
+  },
 };
 
 export const BOSSES = {
@@ -21,12 +31,15 @@ export const BOSSES = {
     hopEvery: 1.6, hopVy: -380,
     split: { w: 32, h: 32, count: 2, into: 'slime' },
   },
-  // Arena 30×14. Schwebt 4–6 Kacheln hoch, 60 px/s. Schädel alle 2 s (1 s ab halber Energie),
-  // Schädel-Explosion Radius 1,5. Stampfer 4 Schaden (3 Stampfer), Pfeil 1 (10 Pfeile).
+  // Arena 30×14. Schwebt 4–6 Kacheln über dem Boden (Mitte 5), pendelt ±6 Kacheln (Spitze speed px/s).
+  // Salve alle 3 s, ab halber Energie alle 2 s: 3 Schädel (5), Fächer ±0,3 rad, 80 px/s, Explosion Radius 1,5.
+  // Nach jeder Salve 1,5 s Sturzflug auf Spielerhöhe, wenn der Spieler nahe ist (diveRange Kacheln).
+  // Stampfer 1 Schaden, Pfeil 1 (10 Treffer). Explosionen wirken nicht (keine Eigenverletzung durch Schädel).
   dreikopf: {
-    w: 48, h: 40, arena: { w: 30, h: 14 }, hp: 10, stompDmg: 4, arrowDmg: 1,
-    hover: { minH: 4, maxH: 6 }, speed: 60,
-    shootEvery: 2, shootEveryEnraged: 1.4, enrageAt: 0.5, skullRadius: 1.5,
+    w: 48, h: 40, arena: { w: 30, h: 14 }, hp: 10, stompDmg: 1, arrowDmg: 1, invulnTime: 1.2,
+    hover: { minH: 4, maxH: 6 }, speed: 60, sway: 6, bobSpeed: 1,
+    shootEvery: 3, shootEveryEnraged: 2, enrageAt: 0.5, skulls: 3, skullsEnraged: 5, skullSpeed: 80, fan: 0.3,
+    skullRadius: 1.5, diveTime: 1.5, diveRange: 4, diveFeet: 28, diveSpeed: 150, defeatRadius: 2,
   },
   // Arena 40×18. 4 Kristalle auf Säulen; solange einer steht, unverwundbar. Kristall: Stampfer oder Pfeil,
   // Explosion 1,0. Alle 6 s Landung auf dem Sockel für 2,5 s (perch). Stampfer 3 (4 Stampfer), Pfeil 1 (12 Pfeile).
