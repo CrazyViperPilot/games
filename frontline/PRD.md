@@ -19,38 +19,46 @@ Nicht im Umfang: Netzwerk-Multiplayer, Kampagne, Speichern laufender Partien, Lu
 ## 2. Spielablauf
 
 1. Startmenü: Schwierigkeit (Leicht/Normal/Schwer), Siegpunkte (100 Standard; 25/50 für Schnellpartie), Start.
-2. Jede Partei startet in einer Ecke der großen Karte mit **1 FOB** (mit gefülltem Lager), 1 Baufahrzeug, 1 LKW (leer) und 4 Schützen.
-3. Man baut Förderanlagen auf Ressourcenvorkommen, Fahrzeughalle, Verteidigung, weitere FOBs und eine Armee und hält
-   sie mit LKW-Nachschub am Laufen.
+2. Jede Partei startet in einer Ecke der großen Karte mit ihrem **HQ** (unbegrenzter Nachschub), 1 Baufahrzeug, 1 LKW (leer)
+   und 4 Schützen.
+3. Man baut vorgeschobene **FOBs** Richtung Front, bringt per LKW Nachschub vom HQ dorthin, baut Förderanlagen an der Front
+   als Nahquellen, Fahrzeughalle, Verteidigung und eine Armee. **Zeit und Transport sind die eigentliche Ressource.**
 4. In der Mitte liegt die sehr große **Konfliktzone**. Wer sie beherrscht, bekommt Geld und alle 30 s einen Punkt.
-5. **Sieg:** zuerst die Siegpunktzahl (Standard 100) erreichen – oder der Gegner hat keine FOB und kein Baufahrzeug mehr.
+5. **Sieg:** zuerst die Siegpunktzahl (Standard 100) erreichen – oder das **HQ** des Gegners ist zerstört.
 
 ## 3. Ressourcen & Logistik
 
 | Ressource | Quelle | Lagerort | Verwendung |
 |---|---|---|---|
-| **Geld** | Konfliktzone, Grundeinkommen 5/s je FOB | global | Einheiten |
-| **Baumaterial** | Förderanlage auf Baumaterial-Vorkommen | FOB-Lager, LKW | Gebäude, Mauern, Tore, Reparatur; 400 per LKW für eine neue FOB-Baustelle |
-| **Munition** | Förderanlage auf Munitions-Vorkommen | FOB-Lager, Einheiten, LKW | Einheiten-Kosten; **Verbrauch je Schuss** |
-| **Treibstoff** | Förderanlage auf Treibstoff-Vorkommen | FOB-Lager, Fahrzeuge, LKW | Fahrzeug-Kosten; **Verbrauch beim Fahren** |
+| **Geld** | Konfliktzone, Grundeinkommen HQ 6/s und 2/s je FOB | global | Einheiten |
+| **Baumaterial** | HQ (unbegrenzt), Förderanlage | HQ, FOB-Lager, LKW | Gebäude, Mauern, Tore, Reparatur; 400 per LKW für eine neue FOB-Baustelle |
+| **Munition** | HQ (unbegrenzt), Förderanlage | HQ, FOB-Lager, Einheiten, LKW | Einheiten-Kosten; **Verbrauch je Schuss** |
+| **Treibstoff** | HQ (unbegrenzt), Förderanlage | HQ, FOB-Lager, Fahrzeuge, LKW | Fahrzeug-Kosten; **Verbrauch beim Fahren** |
 
+- **Alles kommt aus der Runde:** Es gibt keine Vorab-Käufe. Das **HQ** ist eine unbegrenzte Quelle für Baumaterial, Munition
+  und Treibstoff – aber es steht weit hinten, und es können nur **2 LKW gleichzeitig** dort laden (100/s). Was nicht
+  an die Front gefahren wird, nützt nichts.
 - **FOB-Lager:** Jede FOB hat ein eigenes Lager (max. 3000 je Sorte). Eine Förderanlage liefert (4 Baumaterial, 4 Munition bzw.
-  3 Treibstoff pro s) in die FOB, in deren Bauradius sie steht. Ressourcen sind **nicht** automatisch überall verfügbar.
+  3 Treibstoff pro s) in die FOB, in deren Bauradius sie steht – sie sind **Nahquellen an der Front**, die Transportwege sparen. Ressourcen sind
+  **nicht** automatisch überall verfügbar.
 - **Bezahlen:** Gebäude zahlen aus einer FOB, deren Bauradius den Bauort enthält; Ausbildung aus dem Lager der ausbildenden FOB
   (Fahrzeughalle: aus der FOB in Reichweite). Geld kommt immer aus dem globalen Vorrat. Abbruch erstattet voll an dieses Lager.
 - **Vorrat der Einheiten:** Jede Einheit trägt Munition, Fahrzeuge zusätzlich Treibstoff. Ohne Munition wird nicht geschossen,
   ohne Treibstoff fahren Fahrzeuge mit 25 % Tempo. Mörser und Flugabwehr verbrauchen Munition aus dem Lager ihrer FOB;
   das MG der FOB schießt kostenlos.
-- **Nachfüllen:** automatisch im Bauradius einer eigenen FOB (aus deren Lager) oder in der Nähe (180 px) eines eigenen LKW mit Ladung.
-- Vorkommen sind unerschöpflich. Pro Vorkommen genau eine Förderanlage. Jede Startposition hat je ein Vorkommen jeder Sorte
-  im Bauradius ihrer Start-FOB; weitere liegen verteilt, einige in der Konfliktzone.
+- **Nachfüllen:** automatisch im Radius des HQ (unbegrenzt), einer eigenen FOB (aus deren Lager) oder in der Nähe (180 px) eines eigenen LKW mit Ladung.
+- Vorkommen sind unerschöpflich. Pro Vorkommen genau eine Förderanlage. Vorkommen liegen zwischen den HQs und
+  der Zone und in der Zone (keine beim HQ – dort ist Nachschub ohnehin unbegrenzt).
 
-## 4. FOB & Bauradius
+## 4. HQ, FOB & Bauradius
 
-- Die FOB ist das Hauptgebäude: Lager, Bauradius (450 px), bildet Infanterie und LKW aus, leichtes MG, Grundeinkommen.
-- Gebäude dürfen nur im Bauradius einer eigenen **fertigen** FOB platziert werden. Ein Klick auf eine FOB zeigt ihren Radius
-  (gestrichelter Kreis) und ihr Lager.
-- **Weitere FOBs:** Ein **Baufahrzeug** setzt eine FOB-Baustelle (Mindestabstand 500 px zu eigenen FOBs, 700 px zu gegnerischen
+- Das **HQ** ist das Hauptquartier: unbegrenzter Nachschub, Bauradius 550 px, starkes MG, bildet Infanterie, LKW und
+  Baufahrzeuge aus, Grundeinkommen. Es gibt genau eins; es kann nicht neu gebaut werden. **HQ zerstört = verloren.**
+- Die **FOB** (Forward Operating Base) ist ein vorgeschobener Stützpunkt: begrenztes Lager, Bauradius 450 px, bildet
+  Infanterie und LKW aus, leichtes MG, kleines Grundeinkommen.
+- Gebäude dürfen nur im Bauradius des HQ oder einer eigenen **fertigen** FOB platziert werden. Ein Klick auf HQ/FOB zeigt
+  den Radius (gestrichelter Kreis) und das Lager.
+- **Weitere FOBs:** Ein **Baufahrzeug** setzt eine FOB-Baustelle (Mindestabstand 500 px zu eigenem HQ/FOBs, 700 px zu gegnerischen
   Gebäuden, max. 6 FOBs). Ein **LKW** liefert 400 Baumaterial dorthin, dann baut das Baufahrzeug die FOB (30 s).
 - **Bauen braucht Bauer:** Gebäude werden als Baustelle platziert (bezahlt aus einem FOB-Lager in Reichweite) und wachsen nur,
   solange ein Bauer daneben steht – **Baufahrzeug** für alle Gebäude, **Fußsoldaten** (Schütze, Panzerabwehrsoldat) für Mauern
@@ -62,9 +70,10 @@ Nicht im Umfang: Netzwerk-Multiplayer, Kampagne, Speichern laufender Partien, Lu
 
 | Gebäude | Zweck |
 |---|---|
-| FOB | Hauptquartier, Lager, Bauradius, bildet Schützen / Panzerabwehrsoldaten / LKW aus, leichtes MG |
+| HQ | Hauptquartier (Start, einmalig): unbegrenzter Nachschub, 2 Ladeplätze, Bauradius, starkes MG, bildet Schützen / Panzerabwehrsoldaten / LKW / Baufahrzeuge aus |
+| FOB | Vorgeschobener Stützpunkt: Lager, Bauradius, bildet Schützen / Panzerabwehrsoldaten / LKW / Baufahrzeuge aus, leichtes MG |
 | Fahrzeughalle | Baut Schützenpanzer und Kampfpanzer |
-| Förderanlage | Nur auf freiem Vorkommen; liefert in die FOB, in deren Radius sie steht |
+| Förderanlage | Nur auf freiem Vorkommen; liefert in die FOB, in deren Radius sie steht (Nahquelle an der Front) |
 | Mauer | Blockiert alle Einheiten. Wird per Ziehen als Linie gebaut. |
 | Tor | Wie Mauer, aber eigene Einheiten fahren hindurch |
 | Mörser | Indirektes Feuer, große Reichweite (Mindestreichweite), Flächenschaden; braucht Sicht auf das Ziel |
@@ -76,10 +85,10 @@ Gebäude können abgerissen werden (Erstattung 25 % Baumaterial). Max. 120 Einhe
 
 | Einheit | Gebaut in | Rolle |
 |---|---|---|
-| Schütze | FOB | Billige Infanterie, stark gegen Infanterie; baut Mauern und Tore |
-| Panzerabwehrsoldat | FOB | Langsam feuernd, stark gegen Fahrzeuge und Gebäude; baut Mauern und Tore |
-| LKW | FOB | Unbewaffnet, schnell. **Logistik:** lädt Ressourcen an einer FOB (400), bringt sie zu einer anderen FOB oder FOB-Baustelle, pendelt auf Routen, versorgt Truppen im Feld |
-| Baufahrzeug | FOB | Unbewaffnet. Setzt FOB-Baustellen, baut alle Gebäude, repariert |
+| Schütze | HQ, FOB | Billige Infanterie, stark gegen Infanterie; baut Mauern und Tore |
+| Panzerabwehrsoldat | HQ, FOB | Langsam feuernd, stark gegen Fahrzeuge und Gebäude; baut Mauern und Tore |
+| LKW | HQ, FOB | Unbewaffnet, schnell. **Logistik:** lädt Ressourcen am HQ oder an einer FOB (400), bringt sie zu einer anderen FOB oder FOB-Baustelle, pendelt auf Routen, versorgt Truppen im Feld |
+| Baufahrzeug | HQ, FOB | Unbewaffnet. Setzt FOB-Baustellen, baut alle Gebäude, repariert |
 | Schützenpanzer | Fahrzeughalle | Schnell, gut gegen Infanterie und leichte Fahrzeuge |
 | Kampfpanzer | Fahrzeughalle | Teuer, schwer gepanzert, stark gegen alles |
 
@@ -130,7 +139,7 @@ Schadensmodell: Schaden je Schuss nach Panzerklasse des Ziels (Infanterie / leic
 
 Gleiche Regeln und Befehls-Schnittstelle wie der Spieler (Sonderrecht nur: Einkommensfaktor je Schwierigkeit; die KI
 ignoriert den Nebel bei der Zielwahl, Mörser brauchen aber Sicht).
-Verhalten: Baufahrzeug setzt Baustellen und baut, Schützen bauen Mauern; Wirtschaft zuerst (Förderanlagen) → früh expandieren, **zuerst eine FOB in der Konfliktzone** (wird neu gebaut,
+Verhalten: Pendler-LKW bringen Nachschub vom HQ an die Front (Hauptaufgabe); Baufahrzeug setzt Baustellen und baut, Schützen bauen Mauern; Wirtschaft zuerst (Förderanlagen) → früh expandieren, **zuerst eine FOB in der Konfliktzone** (wird neu gebaut,
 wenn verloren), dann FOBs an freien Vorkommen → Fahrzeughalle und gemischte Armee mit Munitionsreserve → Zone halten →
 Verteidigung (Mörser/Flugabwehr/Mauern) erst mit stehender Wirtschaft. **Logistik:** Lieferant bringt Baumaterial zu FOB-Baustellen, Pendler-LKW
 zwischen Überschuss- und Bedarfs-FOBs (v. a. Zonen-FOB), Versorger-LKW folgt der Armee; Einheiten ohne Munition ziehen sich zurück.
@@ -156,3 +165,5 @@ zwischen Überschuss- und Bedarfs-FOBs (v. a. Zonen-FOB), Versorger-LKW folgt de
 - v2: Munitions-/Treibstoffverbrauch; stärkere KI (Wirtschaft zuerst, Zonen-FOB).
 - v3: Logistik – FOB-Lager, Vorrat je Einheit, LKW als Transporter/Versorger/Pendler; Baufahrzeug baut und repariert,
   Infanterie baut Mauern/Tore; Service Worker network-first.
+- v4: HQ mit unbegrenztem Nachschub (2 Ladeplätze), FOBs als vorgeschobene Lager, Förderanlagen als Nahquellen an der Front,
+  Niederlage bei HQ-Verlust.

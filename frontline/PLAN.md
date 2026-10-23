@@ -481,3 +481,62 @@ Eliminierung ohne FOB und ohne Baufahrzeug; KI-gegen-KI läuft weiter fehlerfrei
 - Engine ergänzt: `{ type: 'build', ids, siteId }` schickt Bauer an eine bestehende Baustelle (Rechtsklick Bauer → Baustelle).
 - KI gegen KI (normal): 58–61 min, viel Kampf (je 470–600 gefallene Einheiten), aber Zonenhalter gewinnt 100:0 –
   Balancing bewusst zurückgestellt, weil das HQ-Konzept (unendlicher Nachschub, begrenzte Ladeleistung) die Wirtschaft ändert.
+
+## 12. Erweiterung v4: HQ mit unbegrenztem Nachschub
+
+Leitidee: Alles kommt aus der Runde; Zeit und Transport sind die Ressource. Das HQ liefert unbegrenzt, aber langsam (Ladeplätze)
+und weit hinten; Förderanlagen sind Nahquellen an der Front.
+
+### 12.1 Daten
+- `BUILDINGS.hq`: name 'HQ', armor 'struct', 4×4, hp 6000, sight 500, `buildable: false`, `unique: true`, `infinite: true`,
+  produces `['rifleman', 'at', 'truck', 'engineer']`, weapon range 260, cooldown 0.4, dmg 14/6/2/6, ammoPerShot 0.
+- `BALANCE.hq = { buildRadius: 550, income: 6, docks: 2 }`; `BALANCE.fob.income` 5 → 2.
+- Start: HQ (statt Start-FOB) zentriert auf dem Spawn, fertig. `startUnits` unverändert (truck, engineer, 4× rifleman).
+  `startRes` bm/mun/fuel entfällt (HQ ist unbegrenzt); `startRes.money` 400 bleibt.
+
+### 12.2 Engine
+- **Lager-Abstraktion:** Funktionen, die heute „fertige eigene FOB“ meinen (Bauradius, payerFor, supplierOf, Nachfüllen, load,
+  route, Abstandsregeln, Förderanlagen-Zuordnung), behandeln das HQ wie eine FOB mit eigenem Radius `hq.buildRadius`.
+  Helfer `isDepot(b)` = fertige FOB oder HQ; `radiusOf(b)` je Typ. Das HQ zählt nicht zur FOB-Grenze (`fob.max`).
+- **Unbegrenzt:** Hat ein Lager `def.infinite`, deckt es jede bm/mun/fuel-Forderung, Abzüge/Gutschriften ändern nichts.
+  `team.res.bm/mun/fuel` summieren nur endliche Lager (HQ nicht mitzählen; HUD zeigt HQ separat als „∞“).
+  Förderanlagen im HQ-Radius sind erlaubt, liefern aber ins HQ = wirkungslos → `canPlace` verbietet Förderanlagen,
+  deren nächster Versorger das HQ ist („Am HQ unnötig – Nachschub ist unbegrenzt“).
+- **Ladeplätze:** Am HQ laden höchstens `hq.docks` LKW gleichzeitig (`transferRate` je LKW). Weitere LKW warten in der Nähe
+  (`u.waitingDock = true`, Reihenfolge nach Ankunft) und laden, sobald ein Platz frei ist. Entladen am HQ ist sinnlos → `unload`
+  am HQ `fail('HQ braucht keinen Nachschub')`. FOBs haben keine Ladeplatzbegrenzung.
+- **Nachfüllen** im HQ-Radius aus dem unbegrenzten Lager (wie FOB, aber ohne Verbrauch).
+- **Niederlage:** Team verliert, wenn sein HQ zerstört ist (`winReason = 'hq'`). Die bisherige Eliminierungsregel
+  (keine FOB und kein Baufahrzeug) entfällt. HQ kann nicht abgerissen werden.
+- **Karte:** Keine Vorkommen mehr im Umkreis von 700 px um die Spawns. Stattdessen 9 Paare verteilt (davon 2–3 in der Zone),
+  bevorzugt im Band zwischen Spawn und Zone (Abstand zum Spawn 900–2200), weiterhin punktsymmetrisch und ≥ 250 px auseinander.
+- Ereignisse: „HQ wird angegriffen“ (statt „Basis…“ wenn das HQ getroffen wird), „LKW wartet auf Ladeplatz“ (gedrosselt).
+
+### 12.3 UI / Render
+- HQ-Sprite: größer, Flagge/Antenne, Kürzel „HQ“, Teamfarbe kräftiger. Auswahl: Bauradius-Kreis, Lager „∞ unbegrenzt“,
+  Ladeplätze „1/2 belegt, 3 wartend“, Ausbildung Q/W/E/R wie FOB.
+- HUD oben: weiter Summe der FOB-Lager (Tooltip: „ohne HQ – das HQ ist unbegrenzt“).
+- LKW-Auftragstext: „Wartet auf Ladeplatz am HQ“. Rechtsklick LKW auf HQ = laden.
+- Endbildschirm: „HQ zerstört“ als Grund. Hilfe/Startmenü-Kurzanleitung/README anpassen. Taste H = Kamera auf HQ.
+- Minimap: HQ größer markieren.
+
+### 12.4 KI
+- Haupt-„home“ ist das HQ. Pendler: Route **HQ → Front-FOB** (Zonen-FOB zuerst, dann FOBs mit Bedarf/Produktion);
+  Anzahl Pendler nach Entfernung und Bedarf (z. B. 1 je 1500 px Strecke zur Zonen-FOB, max. 5), Preset nach Engpass der Ziel-FOB.
+  Lieferant lädt Baumaterial am HQ für FOB-Baustellen. Versorger lädt am HQ oder an der nächsten FOB.
+- Förderanlagen nur an Vorkommen nahe Front-FOBs (sind jetzt Nahquellen), bevorzugt Munition/Treibstoff an der Zonen-FOB.
+- HQ-Verteidigung: Bedrohung am HQ hat höchste Priorität (alle Kampfeinheiten ≤ 1500 px).
+
+### 12.5 Tests
+HQ unbegrenzt (Bau/Ausbildung im HQ-Radius ohne Lager); `res`-Summe ohne HQ; nur 2 LKW laden gleichzeitig, der dritte wartet
+und lädt danach; `unload` am HQ scheitert; Förderanlage am HQ verboten; HQ zerstört → Niederlage; ohne FOB, aber mit HQ → kein
+Ende; Karte: keine Vorkommen ≤ 700 px vom Spawn, Symmetrie bleibt; KI-Tests (angepasst): KI allein 10 min → Zonen-FOB, ≥ 2 Pendler,
+Lager der Zonen-FOB nicht dauerhaft leer; KI gegen KI 20 min ohne Exception.
+
+### 12.6 Arbeitspakete
+| Paket | Modell | Inhalt |
+|---|---|---|
+| H1 | Haiku 5.5 | Daten, Engine, Karte §12.1–12.2, Tests §12.5 (ohne KI) |
+| H2 | Haiku 5.5 | UI/Render §12.3 |
+| H3 | Sonnet 5.5 | KI §12.4 |
+| Review | Opus 5.5 | Balancing (Schneeball prüfen), KI-gegen-KI, Browser, PRD-Abgleich |
