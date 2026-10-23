@@ -293,3 +293,8 @@ Meilenstein 2 = A12–A13, D3–D4 → alle 12 Level, Review, Push nach main.
 ## 13. Notizen aus den Aufgaben
 
 (Opus ergänzt hier nach jedem Review, was spätere Aufgaben wissen müssen.)
+
+**A1**
+- `TILE_BY_ID` hat 64 Einträge (Lücken = air). air/barrier `art: null`. `MOBS.slime.splitInto = 'slimeSmall'`, `MOBS.glutgeist.shots`.
+- `BOSSES`: slimeking `split: { w, h, count, into }`; dreikopf `hp 10, stompDmg 4, arrowDmg 1, shootEveryEnraged`;
+  drache `hp 12, stompDmg 3, arrowDmg 1, perchEvery, perchTime`. Spawns: `@` → `{ type: 'boss' }`, Reihenfolge zeilenweise.

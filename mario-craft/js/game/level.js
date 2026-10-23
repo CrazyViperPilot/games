@@ -1,16 +1,19 @@
-// Level-Parser (PLAN §4.2, §5): Level-Definition → LevelMap.
+// Level-Parser v2 (PLAN §3, §4, §6): Level-Definition → LevelMap.
 import { PHYS } from '../data/physics.js';
 import { TILES, TILE_BY_ID } from '../data/tiles.js';
 
 const T = PHYS.tile;
-const GROUND_ID = TILES['#'].id;
+const BEDROCK_ID = TILES.Z.id;
+const AIR_ID = TILES['.'].id;
+const MIN_ROWS = 8;
 
-// Entitäts-Zeichen, die keine Kachel sind.
-const ENTITY_KINDS = {
-  P: 'start', F: 'goal', K: 'checkpoint', o: 'coin', '*': 'starCoin',
-  g: 'walker', k: 'beetle', h: 'hopper', s: 'spiky', l: 'lavaball', b: 'boss',
+// Entitäts-Zeichen (keine Kacheln).
+const SINGLE = { P: 'start', F: 'goal', K: 'checkpoint' };
+const GEMS = { o: false, '*': true };
+const SPAWN_TYPES = {
+  '@': 'boss', c: 'zischer', z: 'zombie', s: 'skeleton', r: 'spider',
+  m: 'slime', f: 'silverfish', g: 'glutgeist', e: 'leerenlaeufer',
 };
-const SPAWN_TYPES = { g: 'walker', k: 'beetle', h: 'hopper', s: 'spiky', l: 'lavaball', b: 'boss' };
 
 // Position in Weltpixeln: x = Mitte der Zelle, y = Unterkante der Zelle.
 function cellPos(c, r) {
@@ -21,8 +24,8 @@ export function parseLevel(def) {
   const id = def && def.id;
   if (!def || !Array.isArray(def.rows)) throw new Error(`Level ${id}: rows fehlt`);
   const rowsDef = def.rows;
-  const R = PHYS.rows;
-  if (rowsDef.length !== R) throw new Error(`Level ${id}: ${rowsDef.length} Zeilen statt ${R}`);
+  const R = rowsDef.length;
+  if (R < MIN_ROWS) throw new Error(`Level ${id}: ${R} Zeilen, mindestens ${MIN_ROWS} nötig`);
   const cols = typeof rowsDef[0] === 'string' ? rowsDef[0].length : 0;
   if (cols === 0) throw new Error(`Level ${id}: leere Zeilen`);
   for (let r = 0; r < R; r++) {
@@ -33,11 +36,13 @@ export function parseLevel(def) {
   }
 
   const tiles = new Uint8Array(cols * R);
-  const coins = [];
+  const gems = [];
+  const crystals = [];
   const spawns = [];
   let start = null;
   let goal = null;
   let checkpoint = null;
+  let bossSeen = false;
 
   for (let r = 0; r < R; r++) {
     const row = rowsDef[r];
@@ -47,23 +52,31 @@ export function parseLevel(def) {
         tiles[r * cols + c] = TILES[ch].id;
         continue;
       }
-      if (!Object.hasOwn(ENTITY_KINDS, ch)) {
-        throw new Error(`Level ${id}: unbekanntes Zeichen "${ch}" bei Spalte ${c}, Zeile ${r}`);
-      }
       const pos = cellPos(c, r);
-      switch (ENTITY_KINDS[ch]) {
-        case 'start':
+      if (Object.hasOwn(SINGLE, ch)) {
+        const kind = SINGLE[ch];
+        if (kind === 'start') {
           if (start) throw new Error(`Level ${id}: mehr als ein P`);
-          start = pos; break;
-        case 'goal':
+          start = pos;
+        } else if (kind === 'goal') {
           if (goal) throw new Error(`Level ${id}: mehr als ein F`);
-          goal = pos; break;
-        case 'checkpoint':
+          goal = pos;
+        } else {
           if (checkpoint) throw new Error(`Level ${id}: mehr als ein K`);
-          checkpoint = pos; break;
-        case 'coin': coins.push({ x: pos.x, y: pos.y, star: false }); break;
-        case 'starCoin': coins.push({ x: pos.x, y: pos.y, star: true }); break;
-        default: spawns.push({ type: SPAWN_TYPES[ch], x: pos.x, y: pos.y }); break;
+          checkpoint = pos;
+        }
+      } else if (Object.hasOwn(GEMS, ch)) {
+        gems.push({ x: pos.x, y: pos.y, diamond: GEMS[ch], taken: false });
+      } else if (ch === 'y') {
+        crystals.push({ x: pos.x, y: pos.y });
+      } else if (Object.hasOwn(SPAWN_TYPES, ch)) {
+        if (ch === '@') {
+          if (bossSeen) throw new Error(`Level ${id}: mehr als ein @`);
+          bossSeen = true;
+        }
+        spawns.push({ type: SPAWN_TYPES[ch], x: pos.x, y: pos.y });
+      } else {
+        throw new Error(`Level ${id}: unbekanntes Zeichen "${ch}" bei Spalte ${c}, Zeile ${r}`);
       }
     }
   }
@@ -71,16 +84,27 @@ export function parseLevel(def) {
   if (!start) throw new Error(`Level ${id}: kein P (Spielerstart)`);
   if (!goal) throw new Error(`Level ${id}: kein F (Zielfahne)`);
 
+  // Erste feste Zeile von oben je Spalte (sonst R).
+  const surface = new Int16Array(cols);
+  for (let c = 0; c < cols; c++) {
+    let s = R;
+    for (let r = 0; r < R; r++) {
+      if (TILE_BY_ID[tiles[r * cols + c]].solid) { s = r; break; }
+    }
+    surface[c] = s;
+  }
+
   const map = {
     id,
     theme: def.theme,
     cols,
     rows: R,
     tiles,
-    // Außerhalb links/rechts: fest. Oben: leer. Unten: leer (Grube).
+    surface,
+    // Außerhalb links/rechts/oben: Grundgestein. Unten: leer (Grube).
     get(c, r) {
-      if (r < 0 || r >= R) return 0;
-      if (c < 0 || c >= cols) return GROUND_ID;
+      if (r >= R) return AIR_ID;
+      if (r < 0 || c < 0 || c >= cols) return BEDROCK_ID;
       return tiles[r * cols + c];
     },
     set(c, r, v) {
@@ -94,10 +118,11 @@ export function parseLevel(def) {
     checkpoint,
     goal,
     spawns,
-    coins,
-    items: def.items || {},
-    platforms: def.platforms || [],
+    gems,
+    chests: def.chests || {},
     boss: def.boss,
+    crystals,
+    pick: def.pick || 0,
   };
   return map;
 }
