@@ -1,19 +1,25 @@
-// HUD und Bedienknöpfe (PLAN §7, PRD §8). Alles aus dem Atlas: Ziffern und Zeichen sind Pixel-Glyphen
+// HUD und Bedienknöpfe (PLAN §6, §7, PRD §4, §8). Alles aus dem Atlas: Ziffern und Zeichen sind Pixel-Glyphen
 // (Sprite font_*), kein fillText. Die Sprites werden über bindHud() einmal gesetzt (Renderer ruft es auf).
+import { BOSSES } from '../data/mobs.js';
+
 let S = null;
 
 const DIGITS = ['font_0', 'font_1', 'font_2', 'font_3', 'font_4', 'font_5', 'font_6', 'font_7', 'font_8', 'font_9'];
-const ADV = 4; // Glyphenbreite 4 px inkl. Schatten
-const PAUSE_X_OFF = 28; // Abstand rechts
+const ADV = 4;                  // Glyphenbreite 4 px inkl. Schatten
+const PAUSE_X_OFF = 28;         // Pause-Knopf rechts (24 px + Rand)
 const PAUSE_Y = 4;
+const PICK_NAMES = ['it_pick_stone', 'it_pick_stone', 'it_pick_iron', 'it_pick_diamond'];
+const BOSS_BAR_W = 80, BOSS_BAR_H = 4;
+const BOSS_PARTS_FULL = 4;      // Slimeking: ab 4 Teilen volle Anzeige
+const BTN_NAME = { left: 'btn_left', right: 'btn_right', jump: 'btn_jump', fire: 'btn_fire', dig: 'btn_dig' };
 
 export function bindHud(sprites) {
   S = sprites;
 }
 
 // Zeichnet eine Sprite-Region an Pixelposition (ganzzahlig).
-function blit(ctx, name, frame, x, y, flip = false) {
-  const s = S.get(name, frame, flip);
+function blit(ctx, name, frame, x, y) {
+  const s = S.get(name, frame, false);
   ctx.drawImage(S.atlas, s.sx, s.sy, s.w, s.h, x | 0, y | 0, s.w, s.h);
 }
 
@@ -39,36 +45,72 @@ export function drawText(ctx, text, x, y) {
   return cx - x;
 }
 
-// Oben: Münzen, Leben, Sternmünzen, Zeit; oben rechts der Pause-Knopf (24×24).
+// Anteil der Boss-Energie 0..1 (Slimeking: Teile, sonst HP).
+function bossRatio(b) {
+  if (b.kind === 'slimeking') {
+    const n = b.parts ? b.parts.length : 0;
+    return Math.min(n, BOSS_PARTS_FULL) / BOSS_PARTS_FULL;
+  }
+  const def = BOSSES[b.kind];
+  if (!def || !def.hp) return 1;
+  const r = b.hp / def.hp;
+  return r < 0 ? 0 : r > 1 ? 1 : r;
+}
+
+// Oben links: Smaragde, Leben, Diamant-Slots, Zeit, Spitzhacke mit Stufe; oben rechts der Pause-Knopf.
+// Unten Mitte: Energieleiste des aktiven Bosses.
 export function drawHud(ctx, game, w, h) {
   if (!S) return;
   const y = 4;
-  // Münzen
-  blit(ctx, 'coin', 0, 4, y);
-  blit(ctx, 'font_x', 0, 18, y + 3);
-  drawNum(ctx, game.coins, 2, 24, y + 3);
-  // Leben: kleines Männchen mit Zahl
-  blit(ctx, 'pl_s_n', 0, 46, y - 2);
-  blit(ctx, 'font_x', 0, 60, y + 3);
-  drawNum(ctx, game.lives, 1, 64, y + 3);
-  // Sternmünzen (3 Slots, gefüllt wenn gesammelt)
+  let x = 4;
+  // Smaragde (2-stellig, Rest unter 100)
+  blit(ctx, 'hud_emerald', 0, x, y);
+  x += 10;
+  blit(ctx, 'font_x', 0, x, y + 2);
+  x += 5;
+  x += drawNum(ctx, game.emeralds, 2, x, y + 2) + 3;
+  // Leben: Kopf mit Zahl
+  blit(ctx, 'hud_head', 0, x, y);
+  x += 11;
+  blit(ctx, 'font_x', 0, x, y + 2);
+  x += 5;
+  x += drawNum(ctx, game.lives, game.lives >= 10 ? 2 : 1, x, y + 2) + 3;
+  // Diamant-Slots (gefüllt, wenn gesammelt)
   for (let i = 0; i < 3; i++) {
-    const got = game.starCoins && game.starCoins[i];
-    blit(ctx, got ? 'coinstar' : 'starslot', 0, 80 + i * 14, y);
+    blit(ctx, game.diamonds[i] ? 'hud_diamond' : 'hud_slot', 0, x, y);
+    x += 11;
   }
+  x += 4;
   // Zeit mm:ss
   const t = game.time | 0;
-  const mm = (t / 60) | 0, ss = t % 60;
-  const tx = 128;
-  drawNum(ctx, mm, 2, tx, y + 3);
-  blit(ctx, 'font_colon', 0, tx + 8, y + 3);
-  drawNum(ctx, ss, 2, tx + 12, y + 3);
+  x += drawNum(ctx, (t / 60) | 0, 2, x, y + 2);
+  blit(ctx, 'font_colon', 0, x, y + 2);
+  x += 4;
+  x += drawNum(ctx, t % 60, 2, x, y + 2) + 6;
+  // Spitzhacke (bei 0 Holz-Platzhalter, halb transparent) mit Stufe
+  const pick = game.pick | 0;
+  const pname = PICK_NAMES[pick] || PICK_NAMES[0];
+  if (pick === 0) ctx.globalAlpha = 0.5;
+  blit(ctx, pname, 0, x, y);
+  ctx.globalAlpha = 1;
+  drawNum(ctx, pick, 1, x + 13, y + 2);
   // Pause
   blit(ctx, 'pause', 0, w - PAUSE_X_OFF, PAUSE_Y);
+  // Boss-Energie
+  const b = game.boss;
+  if (b && b.active) {
+    const bx = ((w - BOSS_BAR_W) / 2) | 0;
+    const by = h - BOSS_BAR_H - 6;
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(bx - 1, by - 1, BOSS_BAR_W + 2, BOSS_BAR_H + 2);
+    ctx.fillStyle = '#4a0f14';
+    ctx.fillRect(bx, by, BOSS_BAR_W, BOSS_BAR_H);
+    ctx.fillStyle = '#e0383f';
+    ctx.fillRect(bx, by, Math.round(BOSS_BAR_W * bossRatio(b)), BOSS_BAR_H);
+  }
 }
 
-// Bedienknöpfe: input.buttons = [{ id, x, y, r, down, visible }]. Pause wird von drawHud gezeichnet.
-const BTN_NAME = { left: 'btn_left', right: 'btn_right', jump: 'btn_jump', fire: 'btn_fire' };
+// Bedienknöpfe: input.buttons = [{ id, x, y, down, visible }] (Mittelpunkt x, y). Pause zeichnet drawHud.
 export function drawControls(ctx, input, w, h) {
   if (!S || !input || !input.buttons) return;
   const list = input.buttons;
