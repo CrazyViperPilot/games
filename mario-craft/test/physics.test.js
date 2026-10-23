@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { PHYS } from '../js/data/physics.js';
 import { TILES, TILE_BY_ID, TILE_IDS, PICKS } from '../js/data/tiles.js';
 import { parseLevel } from '../js/game/level.js';
+import { moveAndCollide } from '../js/game/collide.js';
+import { createPlayer, setPower, updatePlayer } from '../js/game/player.js';
 
 const T = PHYS.tile;
 
@@ -155,4 +157,239 @@ test('Fehlerfälle werfen', () => {
   assert.throws(() => parseLevel({ id: 'e', rows: ok.slice(0, 7) }), /Zeilen/);
   assert.throws(() => parseLevel({ id: 'e', rows: [...ok.slice(0, 7), ok[7] + '.'] }), /Zeile 7/);
   assert.throws(() => parseLevel({ id: 'e' }), /rows fehlt/);
+});
+
+// ---------- Bewegung (A2) ----------
+
+const NONE = { left: false, right: false, jump: false, dig: false, fire: false, jumpPressed: false, digPressed: false, firePressed: false };
+const inp = (o = {}) => ({ ...NONE, ...o });
+
+// Spielwelt: P und F gesetzt, Boden = unterste Zeile (Z) bei Zeile rows-1 → Fußlinie floor = (rows-1)*T.
+function world(cells = {}, { cols = 40, rows = 12, px = 2, py = 10 } = {}) {
+  const all = { [`${px},${py}`]: 'P', [`${cols - 2},${py}`]: 'F', ...cells };
+  const map = parseLevel({ id: 'm', theme: 'overworld', rows: level(all, { cols, rows }) });
+  const events = [];
+  const game = { map, events, emit: (name) => events.push(name) };
+  game.player = createPlayer(map.start.x, map.start.y, 'plain');
+  return game;
+}
+const FLOOR = (12 - 1) * T;                       // Oberkante Boden in world()
+function fill(g, c0, c1, r0, r1, id) {
+  for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) g.map.set(c, r, id);
+}
+function step(g, input = inp()) {
+  return updatePlayer(g, PHYS.step, input);
+}
+function runFor(g, seconds, input = inp()) {
+  const n = Math.round(seconds / PHYS.step);
+  for (let i = 0; i < n; i++) step(g, typeof input === 'function' ? input(i) : input);
+}
+const feet = (p) => p.y + p.h;
+
+test('Kollision: Körper fällt auf festen Boden, groundId = Bedrock', () => {
+  const g = world({}, {});
+  const body = { x: 20 * T, y: 0, w: 12, h: 26, vx: 0, vy: 0 };
+  let res = null;
+  for (let i = 0; i < 600 && !(res && res.onGround); i++) {
+    body.vy = Math.min(body.vy + PHYS.gravity * (1 / 60), PHYS.maxFall);
+    res = moveAndCollide(body, g.map, 1 / 60);
+  }
+  assert.equal(res.onGround, true);
+  assert.equal(res.groundId, TILE_IDS.bedrock);
+  assert.equal(body.y + body.h, FLOOR);
+});
+
+test('groundId: Kachel unter den Füßen, sonst 0', () => {
+  const g = world({ '5,8': 'J' });
+  // Körper steht auf Bedrock-Boden.
+  const b1 = { x: 20 * T, y: FLOOR - 26, w: 12, h: 26, vx: 0, vy: 0 };
+  assert.equal(moveAndCollide(b1, g.map, PHYS.step).groundId, TILE_IDS.bedrock);
+  // Körper in der Luft.
+  const b2 = { x: 20 * T, y: 2 * T, w: 12, h: 26, vx: 0, vy: 0 };
+  assert.equal(moveAndCollide(b2, g.map, PHYS.step).groundId, 0);
+  // Auf Schleimblock.
+  const b3 = { x: 5 * T, y: 8 * T - 26, w: 12, h: 26, vx: 0, vy: 0 };
+  assert.equal(moveAndCollide(b3, g.map, PHYS.step).groundId, TILE_IDS.slime);
+});
+
+test('Sprunghöhe stehend ≥ 4 Kacheln, gerannt ≥ 5', () => {
+  const g = world();
+  runFor(g, 0.3);
+  assert.equal(g.player.onGround, true);
+  let top = Infinity;
+  step(g, inp({ jump: true, jumpPressed: true }));
+  for (let i = 0; i < 120; i++) { step(g, inp({ jump: true })); top = Math.min(top, feet(g.player)); }
+  const stand = (FLOOR - top) / T;
+  assert.ok(stand >= 4, `Sprunghöhe stehend ${stand.toFixed(2)} Kacheln`);
+
+  const g2 = world();
+  runFor(g2, 0.3);
+  runFor(g2, 1.0, inp({ right: true }));
+  assert.ok(g2.player.runTimer >= PHYS.runDelay, 'Renntempo erreicht');
+  let top2 = Infinity;
+  step(g2, inp({ right: true, jump: true, jumpPressed: true }));
+  for (let i = 0; i < 120; i++) { step(g2, inp({ right: true, jump: true })); top2 = Math.min(top2, feet(g2.player)); }
+  const run = (FLOOR - top2) / T;
+  assert.ok(run >= 5, `Sprunghöhe gerannt ${run.toFixed(2)} Kacheln`);
+});
+
+test('Rennsprung über 5er-Lücke landet auf der anderen Seite', () => {
+  const cells = {};
+  for (let c = 12; c <= 16; c++) cells[`${c},11`] = '.';    // Grube 5 Kacheln breit
+  const g = world(cells);
+  runFor(g, 0.3);
+  // Anlauf nach rechts bis Kachel 10, dann springen.
+  let guard = 0;
+  while (g.player.x + g.player.w / 2 < 10 * T && guard++ < 600) step(g, inp({ right: true }));
+  step(g, inp({ right: true, jump: true, jumpPressed: true }));
+  let landedCenter = null;
+  for (let i = 0; i < 400 && landedCenter === null; i++) {
+    step(g, inp({ right: true, jump: true }));
+    if (g.player.onGround && i > 5) landedCenter = g.player.x + g.player.w / 2;
+  }
+  assert.notEqual(landedCenter, null, 'Landung');
+  assert.ok(landedCenter >= 17 * T, `Landung bei ${(landedCenter / T).toFixed(2)} Kacheln`);
+  assert.equal(feet(g.player), FLOOR);
+});
+
+test('Coyote Time: Sprung kurz nach Kantenverlassen', () => {
+  const cells = {};
+  for (let c = 10; c < 40; c++) cells[`${c},11`] = '.';     // Boden endet bei Kachel 9
+  const g = world(cells, { px: 8, py: 10 });
+  runFor(g, 0.3);
+  let guard = 0;
+  while (g.player.onGround && guard++ < 300) step(g, inp({ right: true }));
+  assert.equal(g.player.onGround, false);
+  step(g, inp({ jump: true, jumpPressed: true }));
+  assert.ok(g.player.vy < -200, `Coyote-Sprung vy=${g.player.vy}`);
+});
+
+test('Coyote Time: nach 0,15 s in der Luft kein Sprung', () => {
+  const cells = {};
+  for (let c = 10; c < 40; c++) cells[`${c},11`] = '.';
+  const g = world(cells, { px: 8, py: 10 });
+  runFor(g, 0.3);
+  let guard = 0;
+  while (g.player.onGround && guard++ < 300) step(g, inp({ right: true }));
+  runFor(g, 0.15);
+  step(g, inp({ jump: true, jumpPressed: true }));
+  assert.ok(g.player.vy > 0, `kein Sprung erwartet, vy=${g.player.vy}`);
+});
+
+test('Jump Buffer: Druck kurz vor Landung springt nach der Landung', () => {
+  const g = world({}, { px: 2, py: 6 });
+  let guard = 0;
+  while (feet(g.player) < FLOOR - 6 && guard++ < 300) step(g);
+  step(g, inp({ jumpPressed: true, jump: true }));
+  let minFeet = feet(g.player);
+  for (let i = 0; i < 120; i++) { step(g, inp({ jump: true })); minFeet = Math.min(minFeet, feet(g.player)); }
+  assert.ok((FLOOR - minFeet) / T >= 3, 'Sprung nach Landung ausgelöst');
+});
+
+test('Jump Buffer: Druck 0,3 s vor Landung springt nicht', () => {
+  const g = world({}, { px: 2, py: 2 });
+  let guard = 0;
+  while (feet(g.player) < 4 * T && guard++ < 300) step(g);       // Höhe ~ 2 Kacheln über dem Ziel
+  const f0 = feet(g.player);
+  step(g, inp({ jumpPressed: true }));
+  let minFeet = feet(g.player);
+  for (let i = 0; i < 120; i++) { step(g); minFeet = Math.min(minFeet, feet(g.player)); }
+  assert.equal(feet(g.player), FLOOR);
+  assert.ok(minFeet >= f0 - 1e-6, `kein Sprung erwartet, minFeet=${minFeet}, Start=${f0}`);
+});
+
+test('Plattform "=" nur von oben: durchspringbar, von oben begehbar', () => {
+  const g = world({ '5,8': '=' }, { px: 5, py: 10 });
+  runFor(g, 0.3);
+  let top = Infinity;
+  step(g, inp({ jump: true, jumpPressed: true }));
+  for (let i = 0; i < 120; i++) { step(g, inp({ jump: true })); top = Math.min(top, feet(g.player)); }
+  assert.ok(top <= 8 * T - 4, `Sprung durch Plattform, Fuß bei ${top}`);
+
+  const g2 = world({ '5,8': '=' }, { px: 5, py: 6 });
+  runFor(g2, 0.5);
+  assert.equal(g2.player.onGround, true);
+  assert.equal(feet(g2.player), 8 * T, 'Landung auf Plattform');
+});
+
+test('Leiter: hoch mit Sprung, runter mit Graben, Klettern ohne Schwerkraft', () => {
+  const g = world({}, { px: 6, py: 10 });
+  fill(g, 6, 6, 2, 10, TILE_IDS.ladder);
+  runFor(g, 0.3);
+  const y0 = g.player.y;
+  runFor(g, 0.8, inp({ jump: true }));
+  assert.equal(g.player.climbing, true);
+  assert.equal(g.player.anim, 'climb');
+  assert.ok(y0 - g.player.y >= 40, `hoch geklettert ${y0 - g.player.y}px`);
+
+  // Runter: oben in der Leiter starten, Graben halten.
+  const g2 = world({}, { px: 6, py: 10 });
+  fill(g2, 6, 6, 2, 10, TILE_IDS.ladder);
+  g2.player.y = 2 * T;
+  runFor(g2, 2.0, inp({ dig: true }));
+  assert.equal(g2.player.onGround, true, 'unten angekommen');
+  assert.equal(feet(g2.player), FLOOR);
+});
+
+test('Leiter: Festhalten beim Fallen (vy > 0 in der Leiter stoppt den Fall)', () => {
+  const g = world({}, { px: 6, py: 10 });
+  fill(g, 6, 6, 2, 10, TILE_IDS.ladder);
+  g.player.y = 3 * T;
+  runFor(g, 0.5);
+  assert.equal(g.player.climbing, true);
+  assert.equal(g.player.vy, 0);
+  assert.ok(Math.abs(g.player.y - 3 * T) < 0.5, `Festhalten, y=${g.player.y}`);
+});
+
+test('Wasser: sinkt langsamer als maxFall, Schwimmzug hebt an, Splash', () => {
+  const g = world({}, { px: 2, py: 4 });
+  fill(g, 1, 38, 2, 10, TILE_IDS.water);
+  step(g);
+  assert.equal(g.player.inWater, true);
+  assert.ok(g.events.includes('splash'), 'splash-Ereignis');
+  const y0 = g.player.y;
+  runFor(g, 1.0);
+  assert.ok(g.player.vy <= PHYS.water.maxFall + 1e-6, `vy=${g.player.vy} über maxFall`);
+  assert.ok(g.player.vy > 0);
+  assert.ok(g.player.y - y0 < 120, `Fall im Wasser ${g.player.y - y0}px`);
+  step(g, inp({ jumpPressed: true }));
+  assert.ok(g.player.vy < 0, 'Schwimmzug');
+  const y1 = g.player.y;
+  runFor(g, 0.3);
+  assert.ok(g.player.y < y1 - 10, 'steigt nach Schwimmzug');
+  assert.equal(g.events.filter((e) => e === 'splash').length, 1, 'splash nur beim Eintauchen');
+});
+
+test('Schleimblock: Fall aus 4 Kacheln schleudert ≥ 7 Kacheln hoch', () => {
+  const g = world({}, { px: 6, py: 6 });
+  g.map.set(6, 11, TILE_IDS.slime);
+  let guard = 0;
+  while (g.player.vy < 200 || guard === 0) { step(g); if (++guard > 300) break; }
+  let prev = 0;
+  for (let i = 0; i < 400 && g.player.vy >= -200; i++) { step(g); prev++; }
+  // Nach der Landung: Aufstieg messen.
+  step(g);
+  assert.ok(g.player.vy < -200, `Schleim-Sprung vy=${g.player.vy}`);
+  let minFeet = feet(g.player);
+  for (let i = 0; i < 200; i++) { step(g); minFeet = Math.min(minFeet, feet(g.player)); }
+  const h = (FLOOR - minFeet) / T;
+  assert.ok(h >= 7, `Schleim-Höhe ${h.toFixed(2)} Kacheln`);
+});
+
+test('Animation: dig am Boden, Klettern, Wasser; Power ändert nur power', () => {
+  const g = world();
+  runFor(g, 0.3);
+  g.player.digging = true;
+  step(g);
+  assert.equal(g.player.anim, 'dig');
+  g.player.digging = false;
+  step(g);
+  assert.equal(g.player.anim, 'stand');
+
+  const p = createPlayer(10, 50, 'plain');
+  const w0 = p.w, h0 = p.h, x0 = p.x, y0 = p.y;
+  setPower(p, 'bow');
+  assert.equal(p.power, 'bow');
+  assert.deepEqual([p.w, p.h, p.x, p.y], [w0, h0, x0, y0]);
+  assert.deepEqual([w0, h0], [PHYS.player.w, PHYS.player.h]);
 });

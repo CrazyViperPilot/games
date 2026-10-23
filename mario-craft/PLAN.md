@@ -298,3 +298,11 @@ Meilenstein 2 = A12–A13, D3–D4 → alle 12 Level, Review, Push nach main.
 - `TILE_BY_ID` hat 64 Einträge (Lücken = air). air/barrier `art: null`. `MOBS.slime.splitInto = 'slimeSmall'`, `MOBS.glutgeist.shots`.
 - `BOSSES`: slimeking `split: { w, h, count, into }`; dreikopf `hp 10, stompDmg 4, arrowDmg 1, shootEveryEnraged`;
   drache `hp 12, stompDmg 3, arrowDmg 1, perchEvery, perchTime`. Spawns: `@` → `{ type: 'boss' }`, Reihenfolge zeilenweise.
+
+**A2–A4 (Review)**
+- `player.js` emittiert nur `splash`. **`jump`-Event und `dig`-Anim-Logik macht `Game`:** `jump`, wenn `vy` im Schritt von ≥ 0 auf < 0 springt und vorher `onGround`.
+- `moveAndCollide` liefert `groundId`. Klettern: gehalten solange Hitbox die Leiter überlappt (kein Abrutschen); seitlich 75 px/s.
+- Gemessen: Sprung stehend 5,15, gerannt 6,14 Kacheln; Schleimblock aus 4 Kacheln → 7,4 Kacheln; Wasser Fallgrenze 70 px/s.
+- `dig.js`: `game.dig = { active, c, r, progress, stage, failCd, soundCd }`; Pflicht-Methoden am Game: `openChest, collectDiamondAt(x?, y?), spawnMob, addEmeralds, markDirty, emit`;
+  optional: `spawnDebris, igniteTnt, startFalling`. `break`-Event mit `{ c, r, id, cause }`. Seitliches Ziel: Fuß-Zeile zuerst, dann Kopf-Zeile.
+- `light.js`: `computeLight(map, out)`, `lightAt(light, map, c, r)`; Wasser dunkelt Himmelslicht um 1/Zelle ab.

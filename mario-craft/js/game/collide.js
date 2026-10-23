@@ -1,4 +1,4 @@
-// AABB-Kollision gegen Kacheln (PLAN §5).
+// AABB-Kollision gegen Kacheln (PLAN §5, §6).
 // Achtung: Das Ergebnisobjekt und hitHead werden wiederverwendet; sie gelten nur bis zum nächsten Aufruf.
 import { PHYS } from '../data/physics.js';
 import { TILE_BY_ID } from '../data/tiles.js';
@@ -6,7 +6,7 @@ import { TILE_BY_ID } from '../data/tiles.js';
 const T = PHYS.tile;
 const E = 1e-6;
 
-const RESULT = { hitHead: null, onGround: false, hitWall: 0 };
+const RESULT = { hitHead: null, onGround: false, hitWall: 0, groundId: 0 };
 const HEAD = { c: 0, r: 0 };
 
 // Ist der Körper an dieser Position in einer festen Kachel?
@@ -32,26 +32,28 @@ function nudgeDelta(body, c) {
   return 0;
 }
 
-// Steht der Körper auf einer festen Kachel oder einer Plattform ('=' von oben)?
-function standing(body, map, c0, c1) {
+// Id der Kachel, auf der der Körper steht (feste Kachel oder Plattform '=' von oben), sonst 0.
+function standingId(body, map, c0, c1) {
   const bottom = body.y + body.h;
   const r = Math.floor((bottom + 1) / T);
   for (let c = c0; c <= c1; c++) {
     const info = TILE_BY_ID[map.get(c, r)];
-    if (info.solid) return true;
-    if (info.oneWay && bottom <= r * T + 0.01) return true;
+    if (info.solid) return info.id;
+    if (info.oneWay && bottom <= r * T + 0.01) return info.id;
   }
-  return false;
+  return 0;
 }
 
 // body = { x, y, w, h, vx, vy } (x, y = linke obere Ecke). Verändert x, y, vx, vy des Körpers.
-// Ergebnis: { hitHead: {c,r}|null, onGround, hitWall: -1|0|1 }. hitWall: 1 = Wand rechts, -1 = Wand links.
+// Ergebnis: { hitHead: {c,r}|null, onGround, hitWall: -1|0|1, groundId }.
+// hitWall: 1 = Wand rechts, -1 = Wand links. groundId = Kachel unter den Füßen (0 = keine).
 // Blockierte Achsen setzen die Geschwindigkeit auf 0.
 export function moveAndCollide(body, map, dt) {
   const w = body.w, h = body.h;
   RESULT.hitHead = null;
   RESULT.hitWall = 0;
   RESULT.onGround = false;
+  RESULT.groundId = 0;
 
   // ---- X ----
   const dx = body.vx * dt;
@@ -91,6 +93,7 @@ export function moveAndCollide(body, map, dt) {
   const c0 = Math.floor(body.x / T), c1 = Math.floor((body.x + w - E) / T);
   const dy = body.vy * dt;
   let landed = false;
+  let landedId = 0;
   if (dy > 0) {
     const ob = body.y + h, nb = ob + dy;
     const kLo = Math.ceil(ob / T - E), kHi = Math.floor(nb / T + E);
@@ -102,6 +105,7 @@ export function moveAndCollide(body, map, dt) {
           body.y = k * T - h;
           body.vy = 0;
           landed = true;
+          landedId = info.id;
           break outerD;
         }
       }
@@ -134,8 +138,11 @@ export function moveAndCollide(body, map, dt) {
 
   if (landed) {
     RESULT.onGround = true;
+    RESULT.groundId = landedId;
   } else if (body.vy >= 0) {
-    RESULT.onGround = standing(body, map, c0, c1);
+    const id = standingId(body, map, c0, c1);
+    RESULT.groundId = id;
+    RESULT.onGround = id !== 0;
   }
   return RESULT;
 }
