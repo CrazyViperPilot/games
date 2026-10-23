@@ -20,6 +20,12 @@ const PATH_CAP = 400000;                 // maximale Knotenentnahmen je Suche
 const JUMP_VARIANTS = [
   { delay: 0, hold: 1 }, { delay: 0.2, hold: 1 }, { delay: 0.35, hold: 1 },
   { delay: 0, hold: 0.22 }, { delay: 0.1, hold: 0.3 }, { delay: 0, hold: 0.4 },
+  // Schleimblock: erst Sprung, Landung auf dem Block schleudert hoch; erst danach seitlich zum Ziel
+  { delay: 0.9, hold: 1, slime: true }, { delay: 1.1, hold: 1, slime: true }, { delay: 0.9, hold: 1.4, slime: true },
+  { delay: 1.2, hold: 1.4, slime: true }, { delay: 1.5, hold: 1.7, slime: true }, { delay: 1.8, hold: 2, slime: true },
+  // mit Anlauf (k Kacheln zurück, dann Richtung Ziel, Absprung an der Kante): lange Sprünge unter niedrigen Decken
+  { delay: 0, hold: 1, run: 3 }, { delay: 0, hold: 0.5, run: 3 }, { delay: 0, hold: 0.4, run: 3 },
+  { delay: 0, hold: 1, run: 6 }, { delay: 0, hold: 0.5, run: 6 }, { delay: 0, hold: 0.4, run: 6 },
 ];
 const EXIT_OFFSETS = [0.7, 2.5];
 
@@ -65,20 +71,37 @@ function drive(m, s, p, inp) {
   resetInput(inp);
 
   if (m.kind === 'move') {
+    if (m.run && !s.jumped) {
+      // Anlauf: erst k Kacheln gegen die Sprungrichtung, dann zur Kante, dort abspringen.
+      if (!s.go) {
+        if (m.dir > 0 ? cx > m.preTx : cx < m.preTx) setDir(inp, -m.dir); else s.go = true;
+      }
+      if (s.go) {
+        setDir(inp, m.dir);
+        if ((cx - m.jx) * m.dir >= 0) { s.jumped = true; s.tj = s.n; }
+      }
+      if (!s.jumped) {
+        if (s.n * DT > 4) return -1;
+        s.n++;
+        return 0;
+      }
+    }
     if (s.n > 0) {
       if (!rest) s.air = true;
       if (rest && Math.abs(p.vx) < 6 && Math.abs(cx - m.tx) < (m.tol || SETTLE_X) && (!m.needAir || s.air)) return 1;
-      if (t > m.timeout) return -1;
+      if (t > m.timeout + (m.run ? 4 : 0)) return -1;
     }
+    const tj = s.tj || 0;
+    const tt = (s.n - tj) * DT;
     if (m.jump) {
-      inp.jumpPressed = s.n === 0;
-      inp.jump = t < m.hold;
+      inp.jumpPressed = s.n === tj;
+      inp.jump = tt < m.hold;
     }
     if (p.inWater && m.swim && !p.onGround && p.vy >= 0 && s.n % 24 === 3) {
       inp.jumpPressed = true;
       inp.jump = true;
     }
-    if (t >= m.delay) setDir(inp, steer(p, m.tx));
+    if (tt >= m.delay) setDir(inp, steer(p, m.tx));
     s.n++;
     return 0;
   }
@@ -265,6 +288,15 @@ class Bot {
     };
     const move = (tx, extra = {}) => ({ kind: 'move', tx, jump: false, hold: 0, delay: 0, needAir: false, timeout: 4, ...extra });
 
+    if (onLadder && !grounded) {
+      // Leiterende ohne Boden darunter: seitlich abspringen und fallen (Leiter loslassen).
+      for (const d of [-1, 1]) {
+        const mv = move(this.center(c + d), { needAir: true });
+        const r = this.sim(c, f, mv);
+        if (r) add({ id: `l${d}`, type: 'walk', dir: d, to: this.key(r.c, r.f), cost: r.t + 0.1, macro: mv, align: true, digs: null });
+      }
+    }
+
     if (grounded) {
       for (const d of [-1, 1]) {
         const nc = c + d;
@@ -339,8 +371,14 @@ class Bot {
       for (let n = 0; n <= 5; n++) {
         if (n === 0 && s < 0) continue;
         const nc = c + s * n;
-        for (let ft = f - 4; ft <= f + 2; ft++) {
-          if (!this.valid(nc, ft) || !this.groundAt(nc, ft + 1)) continue;
+        // Schleimblock zwischen Start und Ziel (Boden unter Fuß): Sprung kann bis ~11 Kacheln hoch tragen.
+        let slime = false;
+        for (let i = 0; i <= n && !slime; i++) {
+          const cc = c + s * i;
+          if (cc >= 0 && cc < this.cols && f + 1 < this.rows && this.info(cc, f + 1).bounce) slime = true;
+        }
+        for (let ft = f - (slime ? 11 : 4); ft <= f + 12; ft++) {
+          if (!this.valid(nc, ft)) continue;
           const bounce = this.info(nc, ft + 1).bounce;
           if (n === 0 && !(bounce && ft === f)) continue;
           // gehbar? (ebene, lückenlos); Schleimblöcke schleudern nur nach Sprung/Fall
@@ -350,7 +388,10 @@ class Bot {
             if (walkable) continue;
           }
           for (const v of JUMP_VARIANTS) {
-            const mv = move(this.center(nc), { jump: true, hold: v.hold, delay: v.delay, needAir: true, timeout: 3, swim: true });
+            if ((v.run && n === 0) || (v.slime && !slime)) continue;
+            const extra = { jump: true, hold: v.hold, delay: v.delay, needAir: true, timeout: 3, swim: true };
+            if (v.run) Object.assign(extra, { run: v.run, dir: s, preTx: this.center(c) - s * v.run * T, jx: s > 0 ? (c + 1) * T - 1 : c * T + 1 });
+            const mv = move(this.center(nc), extra);
             const r = this.sim(c, f, mv);
             if (!r) continue;
             add({ id: `j${s}_${n}_${ft}_${v.delay}_${v.hold}`, type: 'jump', dir: s, to: this.key(r.c, r.f), cost: r.t + 0.15, macro: mv, align: true, digs: null });

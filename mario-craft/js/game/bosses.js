@@ -120,6 +120,14 @@ function stepBoss(game, b, dt, prevFeet) {
   if (b.state === 'idle') {
     const flyer = b.kind === 'dreikopf' || b.kind === 'drache';
     if (flyer ? !nearFlyer(game, b) : game.player.x < b.x - ARENA_LEAD) return;
+    if (b.kind === 'drache') {
+      // Landeplatz: erster fester Boden unterhalb des Spawns (der Spawn darf in der Luft liegen).
+      const map = game.map;
+      const c = Math.floor(b.ai.homeX / 16);
+      let r = Math.floor((b.ai.groundY - 1) / 16);
+      while (r < map.rows && !map.isSolid(c, r)) r++;
+      b.ai.groundY = r * 16;
+    }
     b.state = b.kind === 'drache' ? 'fly' : 'fight';
     b.active = true;
     game.lockArena?.();
