@@ -211,7 +211,7 @@ Jedes `*_ART` ist `{ name: { pal: {char:'#rrggbb[aa]'}, frames: [grid,...], flip
 - **Bosse:** `boss_slime_l`(2) 48×48, `boss_slime_m`(2) 32×32; `boss_dreikopf`(2) 48×40; `boss_drache`(2) 64×32 +
   `boss_drache_perch`(1) 48×40; `crystal`(2) 12×18.
 - **Gegenstände/Effekte:** `it_emerald`(2) 10×12, `it_diamond`(2) 12×12, `it_armor` 12×12, `it_bow` 12×12, `it_apple` 10×12,
-  `it_cake` 14×10, `it_pick`(3 Frames: stone, iron, diamond) 12×12, `portal`(4) 32×48, `bed` 32×12, `pr_arrow` 10×3,
+  `it_cake` 14×10, `it_pick_stone`, `it_pick_iron`, `it_pick_diamond` (je 1 Frame) 12×12, `portal`(4) 32×48, `bed` 32×12, `pr_arrow` 10×3,
   `pr_skull` 8×8, `pr_fire` 8×8, `fx_smoke`(4) 16×16, `fx_spark`(2) 4×4.
 - **HUD:** `hud_emerald` 8×9, `hud_diamond` 9×9, `hud_slot` 9×9, `hud_head` 9×9, `btn_dig`(2: normal, gedrückt) Kreis Ø 48
   mit Spitzhacke (wie `btn_jump`).
