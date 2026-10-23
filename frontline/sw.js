@@ -1,6 +1,6 @@
-// Frontline Service Worker: cache-first mit Hintergrund-Update (stale-while-revalidate).
+// Frontline Service Worker: network-first (immer die neueste Version), Cache nur als Offline-Fallback.
 // Bei Änderungen an Dateien CACHE_VERSION erhöhen, damit Clients die neue Version laden.
-const CACHE_VERSION = 'frontline-v3';
+const CACHE_VERSION = 'frontline-v4';
 const CACHE_PREFIX = 'frontline-';
 const CACHE_NAME = CACHE_VERSION;
 
@@ -44,7 +44,8 @@ self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
     // Einzelne Fehler (z. B. fehlende Datei) brechen die Installation nicht ab.
-    await Promise.allSettled(ASSETS.map((url) => cache.add(url)));
+    // cache: 'reload' umgeht den HTTP-Cache des Browsers, sonst landen veraltete Dateien im neuen Cache.
+    await Promise.allSettled(ASSETS.map((url) => cache.add(new Request(url, { cache: 'reload' }))));
     await self.skipWaiting();
   })());
 });
@@ -70,34 +71,24 @@ self.addEventListener('fetch', (event) => {
 
   event.respondWith((async () => {
     const cache = await caches.open(CACHE_NAME);
-    const cached = await cache.match(req, { ignoreSearch: true });
-
-    // Netzwerk im Hintergrund holen und Cache aktualisieren.
-    const network = fetch(req)
-      .then((res) => {
-        if (res && res.ok && res.type === 'basic') {
-          // Ohne Query-String ablegen, damit ?debug=1 keine eigenen Cache-Einträge erzeugt.
-          const key = new URL(req.url);
-          key.search = '';
-          cache.put(key.href, res.clone()).catch(() => {});
-        }
-        return res;
-      })
-      .catch(() => null);
-
-    if (cached) {
-      event.waitUntil(network);
-      return cached;
+    try {
+      const res = await fetch(req, { cache: 'no-cache' });
+      if (res && res.ok && res.type === 'basic') {
+        // Ohne Query-String ablegen, damit ?debug=1 keine eigenen Cache-Einträge erzeugt.
+        const key = new URL(req.url);
+        key.search = '';
+        cache.put(key.href, res.clone()).catch(() => {});
+      }
+      return res;
+    } catch {
+      // Offline: aus dem Cache, Navigation fällt auf die Spiel-Shell zurück.
+      const cached = await cache.match(req, { ignoreSearch: true });
+      if (cached) return cached;
+      if (req.mode === 'navigate') {
+        const shell = await cache.match('./index.html', { ignoreSearch: true });
+        if (shell) return shell;
+      }
+      return Response.error();
     }
-
-    const fresh = await network;
-    if (fresh) return fresh;
-
-    // Offline ohne Cache-Treffer: Navigation → Spiel-Shell.
-    if (req.mode === 'navigate') {
-      const shell = await cache.match('./index.html', { ignoreSearch: true });
-      if (shell) return shell;
-    }
-    return Response.error();
   })());
 });

@@ -364,3 +364,114 @@ WP 3 und 4 laufen parallel. Danach Review durch Opus (Browser-Test mit Playwrigh
 - KI-Fehler behoben: die Baumaterial-Reserve für FOBs blockierte auch die Ausbildung von Einheiten (kosten kein Baumaterial)
   → KI hatte nach 5 min nur 6 Einheiten; jetzt ~50, Expansion unverändert schnell (5 FOBs, 8 Förderanlagen nach 6 min, Zonen-FOB nach ~1 min).
 - KI gegen KI (normal): Partien 55–58 min, eine 90-min-Dauerschlacht um die Zone (Stand 45:0, > 1600 gefallene Einheiten).
+
+## 11. Erweiterung v3: Logistik (FOB-Lager, Einheiten-Vorrat, LKW als Transporter)
+
+Ersetzt den Team-Vorrat aus §10.1 für Baumaterial, Munition und Treibstoff. **Geld bleibt global** (`team.res.money`).
+
+### 11.1 Lager
+- Jede FOB hat `store: { bm, mun, fuel }`, Obergrenze `BALANCE.logistics.storeCap = 3000` je Sorte. Start-FOB startet mit
+  `startRes.bm/mun/fuel`. Baustellen haben ein Lager, nutzen es aber erst, wenn fertig. Zerstörte FOB → Lager verloren.
+- `team.res.bm/mun/fuel` sind **nur noch lesbare Summen** über alle fertigen eigenen FOB-Lager (Getter via `Object.defineProperty`
+  im Konstruktor; nie direkt schreiben). Testhilfe: `game.setStock(team, { bm, mun, fuel })` setzt das Lager der Haupt-FOB
+  (älteste fertige) und leert die übrigen.
+- **Förderanlage** liefert in die **nächste fertige eigene FOB, in deren Bauradius sie steht** (`game.supplierOf(b)`).
+  Gibt es keine (FOB zerstört), ruht die Förderung; Ereignis „Förderanlage ohne FOB“ (gedrosselt 30 s je Team).
+  Volles Lager → Überschuss verfällt.
+- **Bezahlen:** `game.payerFor(team, x, y, cost)` = nächste fertige eigene FOB, deren Bauradius `(x, y)` enthält und deren Lager
+  die Kosten (bm/mun/fuel) deckt; sonst `null`. Geld immer aus `team.res.money`.
+  - `build`/`buildWall`: Zahler am Bauort (Mauer: je Zelle). Gebäude merkt `payerId` (für Abbruch/Abriss-Erstattung).
+  - `train`: FOB zahlt aus eigenem Lager; Halle aus `payerFor(team, halle.x, halle.y, cost)`. Queue-Eintrag merkt Zahler:
+    `queue: [{ unit, payerId }]` (Renderer/HUD lesen `entry.unit`).
+  - Erstattung an `payerId`, falls tot an die nächste eigene FOB, sonst verfällt sie.
+  - `missingRes` nennt den Engpass: „FOB-Lager: zu wenig Munition“ bzw. „Kein FOB-Lager in Reichweite“.
+- `canAfford(team, cost)` bleibt für Geld-only-Prüfungen; alle bm/mun/fuel-Prüfungen laufen über `payerFor`.
+
+### 11.2 Vorrat der Einheiten
+- Neue Felder in `UNITS`: `ammoMax` (Munitionseinheiten), `fuelMax` (nur Fahrzeuge):
+  Schütze ammoMax 10 · PAK 12 · SPz 16, fuelMax 40 · KPz 40, fuelMax 60 · LKW fuelMax 30.
+- Einheiten spawnen voll (`u.ammo`, `u.fuel`). Schuss kostet `ammoPerShot` aus `u.ammo`; reicht es nicht → kein Schuss.
+  Fahren kostet `fuelPerSec · dt` aus `u.fuel`; bei 0 → `fuelSlowMul` (25 %).
+- **Gebäude-Waffen** (Mörser, Flugabwehr) zahlen aus dem Lager ihres Versorgers (`supplierOf`); FOB-MG kostenlos.
+- **Nachfüllen** (`logistics.js`, alle 0,5 s): Einheit im Bauradius einer eigenen fertigen FOB → aus deren Lager,
+  sonst im Umkreis `truckSupplyRange = 180` eines eigenen LKW mit Ladung → aus der Ladung. Rate `resupplyRate = 4`/s
+  je Sorte und Einheit, begrenzt durch Vorrat und Bedarf.
+- Meldungen (gedrosselt 20 s je Sorte und Team): „Einheiten ohne Munition“, „Fahrzeuge ohne Treibstoff“, wenn eine
+  eigene Einheit beim Schießen/Fahren leer ist.
+- Rate/HUD: Verbrauch der Einheiten zählt **nicht** gegen die Lagerrate; Nachfüllen aus Lagern zählt negativ in `team.rate`.
+
+### 11.3 LKW
+- Feld `cargo: { bm, mun, fuel }`, Kapazität `truckCapacity = 400` (Summe), `preset: 'mix'|'bm'|'mun'|'fuel'` (Standard `'mix'`).
+  Laden/Entladen mit `transferRate = 100`/s, wenn der LKW ≤ 140 px von der FOB-Mitte steht. LKW zerstört → Ladung weg.
+- Befehle (`game.issue`):
+  - `{ type: 'load', ids, fobId, preset? }` – hinfahren, laden bis voll oder Lager leer. `mix` = je ein Drittel, Rest auffüllen.
+  - `{ type: 'unload', ids, fobId }` – hinfahren, alles abladen (bis `storeCap`).
+  - `{ type: 'route', ids, fromId, toId, preset? }` – Pendeln: laden an `from`, abladen an `to`, wiederholen, bis neuer Befehl.
+    Ist eine FOB tot → idle + Meldung „Route unterbrochen“.
+  - `{ type: 'setPreset', ids, preset }`.
+  - Der LKW baut **keine** FOBs mehr (siehe §11.8). `unload` geht auch an eine eigene **FOB-Baustelle** (liefert deren Material).
+- Rechtsklick mit gewählten LKW auf eigene FOB: fertige FOB leer → `load`, mit Ladung → `unload`; Baustelle → `unload`.
+- Order-Typen in `u.order.type`: zusätzlich `'load'|'unload'|'route'` (marschieren wie `move`, feuern nie).
+- Start: Haupt-FOB-Lager = `startRes` (bm 600, mun 150, fuel 150), LKW leer, dazu 1 Baufahrzeug (`startUnits`).
+
+### 11.4 UI & Darstellung
+- HUD oben: Summen aller Lager + Netto-Rate wie bisher; Tooltip: „Summe aller FOB-Lager“.
+- Auswahl FOB: Lagerbestand (3 Balken mit Zahlen / Obergrenze). Auswahl LKW: Ladung + Preset. Einheiten: Munitions-/Treibstoffbalken.
+- Befehlskarte LKW: `L` Laden (dann FOB anklicken), `U` Entladen (dann FOB anklicken), `T` Pendeln (Start-FOB,
+  dann Ziel-FOB anklicken), Preset-Buttons `1`–`4` sind **nicht** erlaubt (Kontrollgruppen) → `Q` Gemischt, `W` Baumaterial,
+  `E` Munition, `R` Treibstoff (aktives Preset hervorgehoben).
+- Renderer: kleiner Munitionsbalken (blau-grau) unter dem HP-Balken bei gewählten/gehoverten Einheiten, Treibstoff (violett)
+  für Fahrzeuge; LKW mit Ladung zeigt Ladungsbalken; gewählter LKW mit Route zeigt gestrichelte Linie von→nach;
+  Einheiten mit leerer Munition bekommen ein kleines rotes „!“.
+- Hilfe/README/PRD aktualisieren.
+
+### 11.5 KI
+- LKW-Rollen: **Lieferant** (bringt 400 bm von der FOB mit dem meisten Baumaterial zu einer eigenen FOB-Baustelle), **Pendler** (Route von der FOB
+  mit dem größten Überschuss zur FOB mit dem größten Bedarf, v. a. Zonen-FOB; Preset nach Engpass), **Versorger**
+  (folgt dem Schwerpunkt der Armee in ~150 px Abstand dahinter, lädt Munition/Treibstoff nach, wenn Ladung < 25 %).
+- Baufahrzeuge: 1 (normal), 2 ab 3 FOBs; setzen FOB-Baustellen und bauen alle Gebäude; idle → reparieren.
+  Schützen bauen die KI-Mauern.
+- Ziel-LKW-Zahl: 1 Lieferant (solange FOB-Grenze nicht erreicht) + 1 Pendler je 2 Außen-FOBs (max. 3) + 1 Versorger ab 15 Kampfeinheiten.
+- Bezahlen läuft über die Engine (`payerFor`); die KI wählt Bauorte, die ein Lager in Reichweite haben.
+- Einheiten mit `ammo` < 20 % ziehen sich zur nächsten FOB oder zum Versorger zurück (nur außerhalb von Abwehrlagen).
+
+### 11.6 Tests (Pflicht)
+Förderanlage füllt Lager ihrer FOB; Bau zahlt aus Lager in Reichweite, nicht aus fernem Lager; Ausbildung zahlt aus FOB-Lager;
+Erstattung an Zahler; Schuss leert `u.ammo`, nicht das Lager; Nachfüllen im FOB-Radius und am LKW; leerer Schütze feuert nicht;
+LKW lädt/entlädt (Mengen, Kapazität, Preset), Route pendelt mindestens 2 Runden; FOB-Baustelle wartet ohne Material und ohne
+Baufahrzeug, wird mit beidem fertig; Gebäude-Baustelle ohne Bauer kommt nicht voran, 2 Bauer doppelt so schnell; Reparatur
+kostet Baumaterial und heilt; Schütze baut Mauer, Schütze kann keine Halle bauen; Mauer per LKW-Ladung außerhalb des FOB-Radius;
+Eliminierung ohne FOB und ohne Baufahrzeug; KI-gegen-KI läuft weiter fehlerfrei (bestehende Tests anpassen).
+
+### 11.7 Arbeitspakete
+| Paket | Modell | Inhalt |
+|---|---|---|
+| L1 | Haiku 5.5 | Engine §11.1–11.3 + §11.8 (+ `js/game/logistics.js`, `js/game/construction.js`), Tests §11.6 (ohne KI) |
+| L2 | Haiku 5.5 | UI/Render §11.4 |
+| L3 | Sonnet 5.5 | KI §11.5 (strategisch anspruchsvoll, Haikus KI-Fehler aus v2 zeigt den Bedarf) |
+| Review | Opus 5.5 | Code-Review, KI-gegen-KI-Messungen, Browser-Test, PRD-Abgleich |
+
+### 11.8 Bauen mit Baufahrzeug und Infanterie
+- Neue Einheit `engineer` „Baufahrzeug“: FOB, Hotkey R, armor light, hp 400, speed 70, radius 12, sight 260, unbewaffnet,
+  cost money 150 + fuel 60, buildTime 15, fuelPerSec 0.3, fuelMax 40. `builder: 'all'`.
+  Infanterie (`rifleman`, `at`): `builder: 'fort'` (nur Mauer und Tor). `startUnits` = truck, engineer, 4× rifleman.
+- **Keine automatische Bauzeit mehr.** Eine Baustelle macht nur Fortschritt, solange ein passender eigener Bauer ≤ 90 px vom
+  Gebäuderand steht (`order.type === 'build'` oder idle in der Nähe): `progress += dt / buildTime` je Bauer, max. 3 Bauer.
+  Infanterie hilft nur bei Mauer/Tor, Baufahrzeug bei allem.
+- **Befehle:** `{ type: 'build', ids?, building, x, y }` und `buildWall` nehmen optional `ids` der Bauer; diese bekommen
+  `order = { type: 'build', targetId }` (Baustellen einer Mauerlinie der Reihe nach). Ohne `ids` (KI/Tests) arbeiten idle Bauer
+  im Umkreis 400 px automatisch (alle 1 s prüfen). `{ type: 'repair', ids, targetId }` (nur Baufahrzeug).
+  Ein Bauer ohne Baustelle wird idle; idle Baufahrzeuge reparieren automatisch beschädigte eigene Gebäude ≤ 300 px.
+  Prüfung `build`: Gebäude ohne Bauer-Typ-Recht (z. B. Halle mit Schützen gewählt) → `fail('Nur Baufahrzeuge bauen das')`.
+- **FOB:** `{ type: 'buildFob', ids /*Baufahrzeuge*/, x, y }` (bisheriges `truckId` entfällt) legt sofort eine **FOB-Baustelle**
+  an (Regeln aus `canPlace`, kein Bauradius nötig, nichts wird bezahlt). Die Baustelle hat `store` und braucht
+  **400 Baumaterial im eigenen Lager** (per LKW `unload`), bevor Fortschritt möglich ist (dann werden die 400 verbraucht);
+  Bauzeit 30 s mit einem Baufahrzeug. HUD zeigt „Wartet auf Material (x/400)“ bzw. „Wartet auf Baufahrzeug“.
+- **Reparatur:** 2 % maxHp/s je Baufahrzeug, Kosten `cost.bm × geheilt/maxHp × 0.5` aus dem Lager des Versorgers (`payerFor` am
+  Gebäude); ohne Lager in Reichweite keine Reparatur. Baustellen werden nicht „repariert“, sondern gebaut.
+- **Mauer/Tor außerhalb des FOB-Radius:** zulässig, wenn ein eigener LKW mit genug Baumaterial-Ladung ≤ 180 px vom Bauort steht;
+  dann zahlt die Ladung. `canPlace` liefert dafür `payer: { kind: 'fob'|'truck', id }`.
+- Eliminierung: Team ohne FOB (auch Baustellen) **und** ohne Baufahrzeug verliert.
+- UI: Baumenü (B) zeigt bei Baufahrzeug alles inkl. „FOB-Baustelle (F)“; bei Infanterie nur Mauer/Tor; ohne passende Auswahl
+  ist B deaktiviert mit Tooltip „Baufahrzeug oder Infanterie wählen“. Rechtsklick Baufahrzeug auf eigene beschädigte Baustelle/
+  Gebäude → bauen/reparieren. Baustellen zeigen Fortschrittsbalken und ein Symbol, wenn kein Bauer da ist.
