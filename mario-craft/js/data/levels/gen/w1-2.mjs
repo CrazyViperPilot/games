@@ -105,7 +105,7 @@ export default {
   rows: [
 ${rows.map((r) => `    '${r}',`).join('\n')}
   ],
-  chests: ${JSON.stringify(chests).replace(/"/g, "'").replace(/,/g, ', ').replace(/:/g, ': ')},
+  chests: { ${Object.entries(chests).map(([k, v]) => `'${k}': '${v}'`).join(', ')} },
   pick: 0,
 };
 `;
