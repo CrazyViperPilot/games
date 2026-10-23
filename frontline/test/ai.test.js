@@ -37,25 +37,97 @@ function playAiVsAi(seed, minutes) {
   };
 }
 
-// Vorläufig (HQ-Umbau, H1): nur Lauf ohne Exception. Die KI-Ziele mit HQ folgen in H3 (PLAN §12.4, §12.5).
-test('KI allein (Seed 7): 10 min ohne Exception', () => {
+/** Summe des Lagers einer FOB (Baumaterial + Munition + Treibstoff). */
+const stockSum = (f) => f.store.bm + f.store.mun + f.store.fuel;
+
+// §12.5: KI allein (ohne Angriff aufs gegnerische HQ, sonst endet die Partie gegen den passiven Gegner früh)
+test('KI allein (Seed 7): nach 10 min Zonen-FOB, Pendler, Förderanlagen, Lager gefüllt', () => {
   const game = new Game({ seed: 7 });
-  const ai = new AI(game, 1, 'normal');
+  const ai = new AI(game, 1, 'normal', { assault: false });
+  const hq = game.buildings.find((b) => b.team === 1 && b.type === 'hq');
+  const z = game.zone;
+  const commuters = new Set(); // LKW, die je eine Route ab HQ oder FOB gefahren sind
+  const samples = []; // Lager der Zonen-FOB (Summe) alle 10 s
+  let zoneFobAt = null;
   const steps = Math.round((10 * 60) / DT);
   for (let i = 0; i < steps; i++) {
     ai.update(DT);
     game.update(DT);
+    if (i % 20 !== 0) continue;
+    for (const u of game.units) if (u.alive && u.team === 1 && u.type === 'truck' && u.order.type === 'route') commuters.add(u.id);
+    const zf = mine(game, 1, 'fob').find((f) => Math.hypot(f.x - z.x, f.y - z.y) <= z.r);
+    if (zf && zoneFobAt === null) zoneFobAt = game.time;
+    if (zf && i % 200 === 0) samples.push(stockSum(zf));
   }
-  assert.ok(game.time >= 10 * 60 - 1, `Spielzeit ${game.time.toFixed(1)} s`);
+  const zf = mine(game, 1, 'fob').find((f) => Math.hypot(f.x - z.x, f.y - z.y) <= z.r);
+  assert.ok(zf, 'keine fertige FOB in der Konfliktzone');
+  assert.ok(zoneFobAt < 5 * 60, `Zonen-FOB erst nach ${zoneFobAt?.toFixed(0)} s fertig`);
+  assert.ok(commuters.size >= 2, `nur ${commuters.size} Pendler (LKW mit Route)`);
+  assert.ok(commuters.size <= 6, `zu viele Pendler: ${commuters.size}`);
+  const ext = mine(game, 1, 'extractor');
+  assert.ok(ext.length >= 3, `nur ${ext.length} fertige Förderanlagen`);
+  assert.ok(ext.every((e) => game.supplierOf(e).type !== 'hq'), 'Förderanlage am HQ gebaut');
+  assert.ok(mine(game, 1, 'fob').length >= 3, 'weniger als 3 fertige FOBs');
+  assert.ok(samples.length >= 3 && samples.some((v) => v >= 400) && samples[samples.length - 1] > 0, `Lager der Zonen-FOB leer: ${samples.join(',')}`);
+  const live = game.units.filter((u) => u.alive && u.team === 1).length;
+  assert.ok(live >= 30, `nur ${live} Einheiten nach 10 min`);
+  assert.ok(game.buildings.some((b) => b.alive && b.id === hq.id), 'HQ verloren');
 });
 
-// Vorläufig (HQ-Umbau, H1): nur Lauf ohne Exception; Ausbau- und Zonenziele folgen mit der KI in H3.
 for (const seed of [1, 2]) {
-  test(`KI gegen KI (Seed ${seed}): 20 min ohne Exception`, () => {
+  test(`KI gegen KI (Seed ${seed}): 20 min ohne Exception, beide produzieren, Zone wird gehalten`, () => {
     const r = playAiVsAi(seed, 20);
     assert.ok(r.time >= 20 * 60 - 1 || r.winner !== null, `Spielzeit ${r.time.toFixed(1)} s`);
+    assert.ok(r.produced[0] >= 15 && r.produced[1] >= 15, `produziert: ${r.produced}`);
+    assert.ok(r.zoneHeld, 'niemand hat die Zone gehalten');
+    assert.ok(r.maxExt[0] >= 3 && r.maxExt[1] >= 3, `Förderanlagen: ${r.maxExt}`);
   });
 }
+
+test('KI verteidigt das HQ: Kampfeinheiten kehren zurück, Angreifer fallen', () => {
+  const game = new Game({ seed: 7 });
+  const ai = new AI(game, 1, 'normal', { assault: false });
+  const run = (sec) => {
+    for (let i = 0; i < Math.round(sec / DT); i++) {
+      ai.update(DT);
+      game.update(DT);
+    }
+  };
+  run(240);
+  const hq = game.buildings.find((b) => b.team === 1 && b.type === 'hq');
+  const combat = () => game.units.filter((u) => u.alive && u.team === 1 && u.def.range > 0);
+  assert.ok(combat().length >= 10, 'zu wenige Kampfeinheiten für den Test');
+  const invaders = [];
+  for (let i = 0; i < 4; i++) invaders.push(game.spawnUnit('tank', 0, hq.x - 700 + i * 20, hq.y + 400));
+  game.issue(0, { type: 'attackMove', ids: invaders.map((u) => u.id), x: hq.x, y: hq.y });
+  run(12);
+  const home = combat().filter((u) => u.order.type !== 'idle' && Math.hypot(u.order.x - hq.x, u.order.y - hq.y) <= 1500);
+  assert.ok(home.length >= 8, `nur ${home.length} Kampfeinheiten verteidigen das HQ`);
+  run(60);
+  assert.ok(invaders.every((u) => !u.alive), 'Angreifer leben noch');
+  assert.ok(hq.alive && hq.hp > hq.maxHp * 0.8, `HQ beschädigt: ${hq.hp}`);
+});
+
+test('KI greift das gegnerische HQ nur bei klarer Überlegenheit an', () => {
+  const game = new Game({ seed: 7 });
+  const ai = new AI(game, 1, 'normal');
+  const run = (sec) => {
+    for (let i = 0; i < Math.round(sec / DT); i++) {
+      ai.update(DT);
+      game.update(DT);
+    }
+  };
+  run(30);
+  assert.equal(ai.assault, false, 'Angriff ohne Überlegenheit');
+  const z = game.zone;
+  for (let i = 0; i < 24; i++) game.spawnUnit('tank', 1, z.x + (i % 6) * 40 - 100, z.y + Math.floor(i / 6) * 40 - 60);
+  run(10);
+  assert.equal(game.zone.owner, 1, 'Zone nicht gehalten');
+  assert.equal(ai.assault, true, 'kein Angriff trotz 24 Panzern gegen 4 Schützen');
+  const enemyHq = game.buildings.find((b) => b.team === 0 && b.type === 'hq');
+  const heading = game.units.filter((u) => u.alive && u.team === 1 && u.type === 'tank' && Math.hypot(u.order.x - enemyHq.x, u.order.y - enemyHq.y) < 400);
+  assert.ok(heading.length >= 15, `nur ${heading.length} Panzer marschieren zum gegnerischen HQ`);
+});
 
 test('KI: leicht und schwer laufen ohne Exception (gegeneinander)', () => {
   const game = new Game({ seed: 3 });

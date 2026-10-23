@@ -10,6 +10,7 @@ import { makeRng } from '../core/rng.js';
 const MAX_PLACE = 100; // canPlace-Aufrufe je Denkschritt (Budget für die Platzsuche)
 const DEF_RANGE = BALANCE.fob.buildRadius; // Bauradius = Verteidigungsradius einer FOB
 const FOB_COST = BALANCE.construction.fobMaterial; // Baumaterial, das eine FOB-Baustelle braucht
+const ZONE_FOB_MIN_R = 360; // Zonen-FOB mindestens so weit von der Zonenmitte (eigene Hälfte)
 const ZONE_FOB_R = BALANCE.zone.r * 0.6; // Zonen-FOB: Mittelpunkt höchstens so weit von der Zonenmitte
 const HQ_R = BALANCE.hq.buildRadius; // Bauradius des HQ
 const HQ_THREAT = 800; // Gegner so nah am HQ lösen die HQ-Verteidigung aus
@@ -23,15 +24,16 @@ const MAX_FOB_NODE_DIST = 2600; // FOB-Ziele an Vorkommen höchstens so weit von
 const SITE_TIMEOUT = 200; // s, eine FOB-Baustelle ohne Material wird danach abgerissen
 const BAD_TIME = 240; // s, Sperre eines fehlgeschlagenen FOB-Ziels
 const ALARM_TIME = 30; // s, Treffer an der Basis gelten als Angriff auf die Basis
-const AMMO_ATTACK = 30; // keine Angriffe bei weniger Munition (Summe der Lager)
-const AMMO_PER_COMBAT = 3; // Munitionsreserve je Kampfeinheit (max. AMMO_RESERVE_MAX)
-const AMMO_RESERVE_MAX = 150;
+const AMMO_ATTACK = 30; // kein Vorstoß, wenn die Zonen-FOB weniger Munition hat
+const PUSH_NEAR = 450; // Einheiten näher am Zonenziel gelten als angekommen
+const WAVE = 600; // Geldwert einer Welle, die vom HQ zur Zonen-FOB marschiert
+const ASSAULT_RATIO = 2; // Angriff aufs gegnerische HQ ab dieser Überlegenheit (Geldwert der Kampfeinheiten)
+const ASSAULT_MIN = 20; // und mindestens so vielen eigenen Kampfeinheiten
 const DRY = 0.2; // Einheiten mit weniger Munition/Treibstoff (Anteil) ziehen sich zurück
 const RICH = 1500; // Geld, ab dem zusätzliche Hallen gebaut werden
 const WALL_OFFSET = 4; // Mauer im Abstand (Zellen) vom Zentrum der Haupt-FOB
 const WALL_HALF = 3; // Mauerlinie: 2 × WALL_HALF + 1 Zellen, Tor in der Mitte
 const MIX = { rifleman: 0.5, at: 0.2, ifv: 0.2, tank: 0.1 }; // Zielanteile der Kampfeinheiten
-const THREAT_PER_UNIT = 150; // mittlerer Geldwert einer Kampfeinheit (Mix) für die Schätzung einer Besatzung
 const FOB_CAP = { easy: 3, normal: 6, hard: 6 }; // FOB-Grenze je Schwierigkeit (Spielmaximum 6)
 const DEPOT_CAP = { easy: 1, normal: 2, hard: 3 }; // Fahrzeughallen je Schwierigkeit
 const NODE_W = { bm: 1, mun: 1.5, fuel: 1.5 }; // Gewicht eines freien Vorkommens für den FOB-Wert
@@ -46,7 +48,7 @@ const MAX_PEND = 5; // Pendler insgesamt
 const PEND_STEP = 1500; // 1 Pendler je so viele px Strecke HQ → Zonen-FOB
 const SURPLUS_MIN = 120; // Pendler fährt nur, wenn die Quelle so viel Überschuss hat
 const ROUTE_HOLD = 20; // s, früheste Neuplanung einer Pendler-Route
-const DEFAULT_OPTS = { hall: 'hq', train: 'hq' };
+const DEFAULT_OPTS = { hall: 'hq', train: 'hq', assault: true };
 const DEG = Math.PI / 180;
 const SITE_ANGLES = [0, 30, -30, 60, -60, 90, -90, 120, -120, 150, -150, 180].map((d) => d * DEG);
 const TWO_PI = Math.PI * 2;
@@ -73,7 +75,7 @@ const cargoTotal = (u) => u.cargo.bm + u.cargo.mun + u.cargo.fuel;
 export class AI {
   /**
    * opts (nur für Messungen): hall 'hq' | 'front' (Fahrzeughalle nahe HQ oder an der Front-FOB),
-   * train 'hq' | 'front' (Infanterie am HQ oder an der vordersten FOB mit Vorrat).
+   * train 'hq' | 'front' (Infanterie am HQ oder an der vordersten FOB mit Vorrat), assault false = nie das gegnerische HQ angreifen.
    */
   constructor(game, team, difficulty = 'normal', opts = {}) {
     this.game = game;
@@ -129,6 +131,7 @@ export class AI {
     this.buildWall(s);
     this.manageEngineers(s);
     this.manageTrucks(s);
+    this.park(s);
     this.rally(s);
     this.army(s);
   }
@@ -153,7 +156,6 @@ export class AI {
     this.corridor = home ? { x: home.x, y: home.y, dx: dir.x, dy: dir.y } : null;
 
     const combat = units.filter((u) => u.def.range > 0);
-    const queuedCombat = own.reduce((n, b) => n + b.queue.filter((e) => UNITS[e.unit ?? e].range > 0).length, 0);
     const extractors = own.filter((b) => b.type === 'extractor');
     this.bmMines = extractors.filter((b) => b.nodeId !== null && g.nodeById.get(b.nodeId)?.type === 'bm').length;
     const zoneFob = fobs.find((f) => dist(f.x, f.y, zone.x, zone.y) <= ZONE_FOB_R + 16) ?? null;
@@ -184,9 +186,10 @@ export class AI {
       zone,
       zoneFob,
       enemies,
+      // Gegner in der Zone: Zielwahl ohne Nebel (PRD §10), sonst blockiert ein einzelner versprengter Gegner die Zone ewig
+      zoneEnemies: g.units.filter((u) => u.alive && u.team !== t && dist(u.x, u.y, zone.x, zone.y) <= zone.r),
       units,
       combat,
-      combatN: combat.length + queuedCombat,
       trucks: units.filter((u) => u.type === 'truck').sort((a, b) => a.id - b.id),
       engineers: units.filter((u) => u.type === 'engineer').sort((a, b) => a.id - b.id),
       extractors,
@@ -269,8 +272,8 @@ export class AI {
         const y = cy + Math.sin(a) * r;
         if (corridor && this.inCorridor(x, y)) continue;
         if (this.isBad(x, y)) continue;
-        const p = this.place(type, x, y);
-        if (p) return { x: p.x, y: p.y };
+        // die abgefragte Position zurückgeben (nicht die Fußabdruck-Mitte): der Bau-Befehl prüft dieselbe Stelle noch einmal
+        if (this.place(type, x, y)) return { x, y };
       }
     }
     return null;
@@ -490,11 +493,14 @@ export class AI {
   zoneSite(s) {
     const z = s.zone;
     const cands = [];
-    for (let r = 0; r <= ZONE_FOB_R - 20; r += 110) {
-      const n = r === 0 ? 1 : 12;
+    // Nur auf der eigenen Hälfte der Zone und mindestens 350 px von der Mitte: das Spiegelbild beim Gegner liegt dann
+    // ≥ 700 px entfernt (Mindestabstand zu gegnerischen Gebäuden), keiner blockiert dem anderen den besten Platz.
+    for (let r = ZONE_FOB_MIN_R; r <= ZONE_FOB_R - 20; r += 110) {
+      const n = 16;
       const a0 = Math.atan2(s.ay - z.y, s.ax - z.x);
       for (let k = 0; k < n; k++) {
         const a = a0 + (k * TWO_PI) / n;
+        if (Math.cos(k * TWO_PI / n) < -1e-6) continue;
         const x = z.x + Math.cos(a) * r;
         const y = z.y + Math.sin(a) * r;
         const d = dist(x, y, s.ax, s.ay);
@@ -506,7 +512,7 @@ export class AI {
       if (this.budget <= 0) break;
       if (this.isBad(c.x, c.y) || this.danger(s, c.x, c.y)) continue;
       const p = this.place('fob', c.x, c.y);
-      if (p && dist(p.x, p.y, z.x, z.y) <= ZONE_FOB_R) return { x: p.x, y: p.y, zone: true };
+      if (p && dist(p.x, p.y, z.x, z.y) <= ZONE_FOB_R) return { x: c.x, y: c.y, zone: true };
     }
     return null;
   }
@@ -544,8 +550,7 @@ export class AI {
     for (const c of cands) {
       if (this.budget <= 0) break;
       if (this.isBad(c.x, c.y)) continue;
-      const p = this.place('fob', c.x, c.y);
-      if (p) return { x: p.x, y: p.y, zone: false };
+      if (this.place('fob', c.x, c.y)) return { x: c.x, y: c.y, zone: false };
     }
     return null;
   }
@@ -565,7 +570,7 @@ export class AI {
     if (room <= 0) return;
     const res = g.teams[t].res;
     const zf = s.zoneFob && s.zoneFob.built ? s.zoneFob : null;
-    const cands = s.freeNodes.filter((n) => this.inBuildReach(s.builtFobs, n) && !this.danger(s, n.x, n.y));
+    const cands = s.freeNodes.filter((n) => this.inBuildReach(s.builtFobs, n) && !this.danger(s, n.x, n.y) && !this.isBad(n.x, n.y));
     const key = (n) => {
       let k = res[n.type] / NEED[n.type];
       if (n.type === 'bm' && this.bmMines < 1) k -= 1;
@@ -579,6 +584,7 @@ export class AI {
       if (!g.payerFor(t, c.x, c.y, BUILDINGS.extractor.cost)) continue; // kein Lager mit Baumaterial in Reichweite
       const r = g.issue(t, { type: 'build', building: 'extractor', x: n.x, y: n.y });
       if (r.ok) room--;
+      else this.badSites.push({ x: n.x, y: n.y, until: g.time + BAD_TIME }); // z. B. am Kartenrand: nicht jeden Schritt neu versuchen
     }
   }
 
@@ -610,7 +616,7 @@ export class AI {
         corridor: true,
       });
     }
-    if (p) g.issue(t, { type: 'build', building: 'depot', x: p.x, y: p.y });
+    if (p && !g.issue(t, { type: 'build', building: 'depot', x: p.x, y: p.y }).ok) this.badSites.push({ x: p.x, y: p.y, until: g.time + BAD_TIME });
   }
 
   // ---- Produktion ------------------------------------------------------------------
@@ -744,7 +750,7 @@ export class AI {
           corridor: f === s.home,
         });
         if (p) {
-          g.issue(t, { type: 'build', building: type, x: p.x, y: p.y });
+          if (!g.issue(t, { type: 'build', building: type, x: p.x, y: p.y }).ok) this.badSites.push({ x: p.x, y: p.y, until: g.time + BAD_TIME });
           return; // höchstens ein Verteidigungsgebäude je Denkschritt
         }
       }
@@ -1086,14 +1092,52 @@ export class AI {
     g.issue(this.team, { type: 'move', ids: [tr.id], x: p.x, y: p.y });
   }
 
+  /**
+   * Untätige LKW und Baufahrzeuge verlassen die Konfliktzone und warten außerhalb (am nächsten Lager): Sonst halten sie die
+   * Zone dauernd „umkämpft“ (Einheiten zählen für die Kontrolle) und sterben dort ohne Nutzen.
+   */
+  park(s) {
+    const z = s.zone;
+    const idleWorkers = [...s.trucks.filter((u) => this.roles.get(u.id) !== 'vers'), ...s.engineers].filter(
+      (u) => u.order.type === 'idle' && dist(u.x, u.y, z.x, z.y) <= z.r,
+    );
+    if (!idleWorkers.length) return;
+    const sites = s.own.some((b) => !b.built);
+    const outside = s.depots.filter((f) => dist(f.x, f.y, z.x, z.y) > z.r + 100);
+    for (const u of idleWorkers) {
+      if (u.type === 'engineer' && (sites || s.own.some((b) => b.built && b.hp < b.maxHp && dist(b.x, b.y, u.x, u.y) < 400))) continue;
+      if (!this.once(`park${u.id}`, 20)) continue;
+      let f = null;
+      let bd = Infinity;
+      for (const d of outside) {
+        const dd = dist(d.x, d.y, u.x, u.y);
+        if (dd < bd) {
+          bd = dd;
+          f = d;
+        }
+      }
+      f = f ?? s.hq;
+      if (!f) continue;
+      const p = this.freeNear(f.x + (this.rng.next() - 0.5) * 200, f.y + (f.type === 'hq' ? 170 : 120));
+      this.game.issue(this.team, { type: 'move', ids: [u.id], x: p.x, y: p.y });
+    }
+  }
+
   // ---- Armee -----------------------------------------------------------------------
 
-  /** Sammelpunkte setzen (Produktionsgebäude), neu nur wenn sich der Sammelpunkt deutlich verschoben hat. */
+  /**
+   * Sammelpunkte setzen (Produktionsgebäude), neu nur wenn sich der Sammelpunkt deutlich verschoben hat.
+   * Am HQ ausgebildete Einheiten sammeln sich vor dem HQ (Heimwache, dann Wellen an die Front – kein Tröpfeln einzelner
+   * Einheiten über 2500 px); FOB-Produktion sammelt direkt am Frontpunkt.
+   */
   rally(s) {
-    if (!s.home) return;
-    const gp = this.gatherPoint(s);
+    if (!s.hq) return;
+    const front = this.gatherPoint(s);
+    const home = this.guardPoint(s);
     for (const b of s.own) {
       if (!b.built || !b.def.produces.length) continue;
+      const nearHq = b.type === 'hq' || dist(b.x, b.y, s.ax, s.ay) <= HQ_R;
+      const gp = nearHq ? home : front;
       const prev = this.rallyAt.get(b.id);
       if (prev && dist(prev.x, prev.y, gp.x, gp.y) < RALLY_MOVE) continue;
       this.rallyAt.set(b.id, gp);
@@ -1101,23 +1145,60 @@ export class AI {
     }
   }
 
+  /** Geldwert einer Einheitenliste. */
+  value(list) {
+    return list.reduce((a, u) => a + (UNITS[u.type].cost.money || 0), 0);
+  }
+
   /**
-   * Angriff, sobald die Summe der idle Kampfeinheiten (Geldwert) die Schwelle erreicht
-   * (bei unbesetzter Zone schon ab 60 %). Nicht zu Hause stehende Einheiten folgen dem Befehl.
-   * Keine Angriffe bei Munition unter AMMO_ATTACK; Einheiten mit fast leerem Vorrat bleiben zum Nachfüllen zurück.
+   * Angriff auf das gegnerische HQ (Niederlage des Gegners): nur bei klarer Überlegenheit – die eigene Kampfstärke
+   * (Geldwert) mindestens doppelt so hoch wie die des Gegners (Zielwahl ohne Nebel), Zone gehalten, genug Einheiten.
+   * Fällt das Verhältnis unter 1,3 oder wird das eigene HQ bedroht, endet der Angriff.
+   */
+  updateAssault(s) {
+    if (!this.opts.assault || !s.enemyHq || !s.hq) {
+      this.assault = false;
+      return;
+    }
+    const g = this.game;
+    const mine = this.value(s.combat);
+    const foe = this.value(g.units.filter((u) => u.alive && u.team !== this.team && u.def.range > 0));
+    if (this.assault) {
+      if (s.alarm || mine < 1.3 * foe || s.combat.length < 10) this.assault = false;
+    } else if (!s.alarm && s.zone.owner === this.team && s.combat.length >= ASSAULT_MIN && mine >= ASSAULT_RATIO * foe) {
+      this.assault = true;
+    }
+  }
+
+  /**
+   * Zone: Sammeln und Angriff. Untätige Einheiten (ohne Heimwache) gehen zur Zonen-FOB, sobald diese steht; in die Zonenmitte
+   * bzw. zu den Gegnern in der Zone geht es, sobald die Summe der idle Kampfeinheiten (Geldwert) die Schwelle erreicht
+   * (bei unbesetzter Zone schon ab 60 %). Einheiten mit fast leerem Vorrat bleiben zum Nachfüllen zurück.
    * In der Zone stehende Einheiten verteilen sich auf einem Kreis (r 400) statt im Zentrum zu klumpen.
    */
   army(s) {
     const g = this.game;
     const t = this.team;
     const z = s.zone;
-    const idle = s.combat.filter((u) => u.order.type === 'idle' && !this.dryKind(u));
+    this.updateAssault(s);
+    if (s.alarm) return; // defend() führt die Verteidigung
+    const guard = new Set(this.guardUnits(s).map((u) => u.id));
+    const idle = s.combat.filter((u) => u.order.type === 'idle' && !this.dryKind(u) && !guard.has(u.id));
     if (!idle.length) return;
-    const inZone = (u) => dist(u.x, u.y, z.x, z.y) <= z.r;
-    const ammoOk = g.teams[t].res.mun >= AMMO_ATTACK;
 
-    // Gegner in der Zone (sichtbar): deren Schwerpunkt ist das Ziel, sonst das Zonenzentrum
-    const inside = s.enemies.filter((e) => dist(e.x, e.y, z.x, z.y) <= z.r);
+    if (this.assault && s.enemyHq) {
+      const go = idle.filter((u) => dist(u.x, u.y, s.enemyHq.x, s.enemyHq.y) > 350).map((u) => u.id);
+      if (go.length) g.issue(t, { type: 'attackMove', ids: go, x: s.enemyHq.x, y: s.enemyHq.y });
+      return;
+    }
+
+    const inZone = (u) => dist(u.x, u.y, z.x, z.y) <= z.r;
+    const zf = s.zoneFob && s.zoneFob.built ? s.zoneFob : null;
+    // Ohne Vorrat an der Front lohnt kein Vorstoß (die Einheiten würden trocken laufen)
+    const ammoOk = !zf || zf.store.mun >= AMMO_ATTACK || s.trucks.some((tr) => tr.cargo.mun >= 100 && dist(tr.x, tr.y, zf.x, zf.y) < 600);
+
+    // Gegner in der Zone: deren Schwerpunkt ist das Ziel, sonst das Zonenzentrum
+    const inside = s.zoneEnemies;
     let tx = z.x;
     let ty = z.y;
     if (inside.length) {
@@ -1125,18 +1206,27 @@ export class AI {
       ty = inside.reduce((a, e) => a + e.y, 0) / inside.length;
     }
 
+    const enemyZone = z.owner >= 0 && z.owner !== t && z.counts[z.owner] > 0;
+    // Kampfwert der Gegner in der Zone (Zielwahl ohne Nebel)
+    const threat = this.value(inside.filter((e) => e.def.range > 0));
+    if (zf && !enemyZone && threat < WAVE) {
+      // Zonen-FOB steht und die Zone gehört dem Gegner nicht: eine Welle (am HQ gesammelt) marschiert zur FOB
+      const gp = this.gatherPoint(s);
+      const far = idle.filter((u) => !inZone(u) && dist(u.x, u.y, gp.x, gp.y) > 400);
+      if (this.value(far) >= WAVE) g.issue(t, { type: 'attackMove', ids: far.map((u) => u.id), x: gp.x, y: gp.y });
+    }
+
     if (ammoOk) {
-      const strength = idle.reduce((sum, u) => sum + (UNITS[u.type].cost.money || 0), 0);
+      const strength = this.value(idle);
       let need = this.cfg.attackStrength;
-      if (z.owner >= 0 && z.owner !== t && z.counts[z.owner] > 0) {
-        // Gegner hält die Zone: Gegenangriff schon ab 1,2× seiner Besatzung (Zonengeld ist sein Vorteil).
-        // Besitz und Anzahl in der Zone sind öffentlich; die Stärke wird mit dem mittleren Einheitenwert geschätzt.
-        const threat = z.counts[z.owner] * THREAT_PER_UNIT;
-        need = Math.min(need, Math.max(300, 1.2 * threat));
+      if (inside.length) {
+        // Gegner in der Zone: Vorstoß ab 1,3× ihrer Kampfstärke, aber nie über 1,5× der Grundschwelle
+        need = Math.min(need * 1.5, Math.max(300, 1.3 * threat));
       }
-      const ready = strength >= need || (z.owner === -1 && strength >= 0.6 * need);
+      const ready = strength >= need || (z.owner === -1 && !inside.length && strength >= 0.6 * need);
       if (ready) {
-        const go = idle.filter((u) => !inZone(u)).map((u) => u.id);
+        // alle untätigen Einheiten, die nicht schon im Zielgebiet stehen (auch die an der Zonen-FOB am Rand der Zone)
+        const go = idle.filter((u) => dist(u.x, u.y, tx, ty) > PUSH_NEAR).map((u) => u.id);
         if (go.length) g.issue(t, { type: 'attackMove', ids: go, x: tx, y: ty });
       }
     }
