@@ -9,6 +9,6 @@ export const ENEMIES = {
 
 export const BOSSES = {
   rootking: { w: 32, h: 32, hp: 3, speed: 50, jumpEvery: 2.5 },
-  golem:    { w: 32, h: 40, hp: 3, speed: 35, rockEvery: 1.8, dizzy: 1.5 },
+  golem:    { w: 32, h: 40, hp: 3, speed: 35, rockEvery: 2.8, dizzy: 2.0 },
   dragon:   { w: 40, h: 32, hp: 3, fireHp: 8, speed: 40, fireEvery: 2.0 },
 };

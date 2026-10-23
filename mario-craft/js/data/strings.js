@@ -62,8 +62,8 @@ export const STRINGS = {
     w3: 'Zamek',
     rootking: 'Król korzeni',
     golem: 'Skalny golem',
-    dragon: 'Żarowy smok',
-    controls: 'Lewo: ◀ ▶ · Prawo: skok',
-    keys: 'Klawiatura: ←→ biegaj, spacja skok, X ogień, Esc pauza',
+    dragon: 'Ognisty smok',
+    controls: 'Lewa strona: ◀ ▶ · Prawa strona: skok',
+    keys: 'Klawiatura: ←→ ruch, spacja skok, X ogień, Esc pauza',
   },
 };

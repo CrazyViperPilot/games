@@ -272,3 +272,14 @@ spielneutralen Auftrag: „Lies `<spiel>/PLAN.md`, setze nur das genannte Paket 
 - Pause-Knopf zeichnet `drawHud` fest bei `(w-28, 4)`, 24×24 → Input-Trefferfläche dort. `drawControls` überspringt 'pause',
   zeichnet ◀ ▶ Sprung Feuer an den Positionen aus `input.buttons` (x, y, down, visible); Radien fest (24/24/30/20).
 - Großer Held: Sprite 16×32 auf Hitbox 12×28.
+
+## 11. Review (Opus) – Ergebnisse & Entscheidungen
+
+- **Durchspielbarkeit:** Node-Bot (immer rechts, springt vor Wänden, Lücken, Stacheln, Gegnern) schafft 11 von 12 Leveln ohne
+  Hilfe; die Boss-Level zusätzlich mit einem Boss-Bot (Abstand halten, bei Verwundbarkeit stampfen): alle drei Bosse besiegt.
+  Bot-Laufzeit 16–45 s je Level bei Vollgas, also für Menschen ca. 1–3 min.
+- **w2-1:** zwei Stacheln direkt hinter der ersten Lücke lagen genau im Landepunkt eines Rennsprungs → entfernt.
+- **Felsgolem** zu hart (Bot starb > 50×): `rockEvery` 1,8 → 2,8 s, `dizzy` 1,5 → 2,0 s. Danach mit 1 Leben-Verlust besiegt.
+- **Leistung:** Chromium mit CPU-Drosselung ×4, 600 Frames im Level: 1920×1200 (384×240 ×5) Ø 16,7 ms, p95 16,7 ms;
+  915×412 @ 2,625 (480×216) Ø 16,7 ms, p95 16,8 ms. Keine Konsolenfehler.
+- Polnische Texte gegengelesen („Ognisty smok“, Steuerungshinweise). PNG-Icons aus `icons/icon.svg` erzeugt.
