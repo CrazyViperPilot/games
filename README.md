@@ -10,6 +10,7 @@ Live: https://crazyviperpilot.github.io/games/
 | **Go** | [`go/`](go/) | Go gegen den Computer (9×9, 13×13). [README](go/README.md) | `CACHE_NAME` in `go/sw.js`, `go/package.json` |
 | **Sudoku** | [`sudoku/`](sudoku/) | Sudoku, ursprünglich gebaut, um Google Antigravity kennenzulernen | `CACHE_NAME` in `sudoku/sw.js` |
 | **Frontline** | [`frontline/`](frontline/) | Echtzeit-Strategie: FOB bauen, Ressourcen fördern, Konfliktzone halten, gegen den Computer. [README](frontline/README.md) | `CACHE_VERSION` in `frontline/sw.js` |
+| **Mario Craft** | [`mario-craft/`](mario-craft/) | Jump'n Run im Pixel-Stil: 3 Welten mit Bossen, Deutsch und Polnisch. [README](mario-craft/README.md) | `CACHE_VERSION` in `mario-craft/sw.js` |
 
 ## Aufbau: jedes Spiel ist eigenständig
 

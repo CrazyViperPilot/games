@@ -1,0 +1,26 @@
+# Tests für Mario Craft – läuft nur, wenn sich etwas in mario-craft/ ändert (eigener Lebenszyklus je Spiel).
+name: Test Mario Craft
+
+on:
+  push:
+    branches: ["main"]
+    paths: ["mario-craft/**", ".github/workflows/test-mario-craft.yml"]
+  pull_request:
+    paths: ["mario-craft/**", ".github/workflows/test-mario-craft.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mario-craft
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test

@@ -1,0 +1,198 @@
+// Menüs als DOM-Overlays über dem Canvas (PLAN §5, PRD §2). Texte über t(), damit ein Sprachwechsel
+// sofort wirkt: refresh() zeichnet den aktuellen Bildschirm neu. Sprache und Ton melden die Menüs per
+// Callback an main.js, dort wird gespeichert.
+import { LEVELS } from '../data/levels/index.js';
+import { LANGS, getLang, t } from '../core/i18n.js';
+import { audio } from '../core/audio.js';
+
+let root = null;
+let cur = null; // { screen, args, cb }
+let bound = false;
+
+function el() {
+  if (!root) root = document.getElementById('ui');
+  if (!bound && root) {
+    root.addEventListener('click', onClick);
+    bound = true;
+  }
+  return root;
+}
+
+const pad = (n) => String(n).padStart(2, '0');
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function fmtTime(sec) {
+  const s = Math.max(0, sec || 0);
+  return `${pad(Math.floor(s / 60))}:${pad(Math.floor(s % 60))}`;
+}
+
+function fmtTenths(sec) {
+  const s = Math.max(0, sec || 0);
+  return `${fmtTime(s)}.${Math.floor((s * 10) % 10)}`;
+}
+
+function stars(arr) {
+  let out = '';
+  for (let i = 0; i < 3; i++) out += arr && arr[i] ? '★' : '☆';
+  return out;
+}
+
+function unlockedIndex(save) {
+  const i = LEVELS.findIndex((d) => d.id === save.unlocked);
+  return i < 0 ? 0 : i;
+}
+
+function langSeg() {
+  const cur = getLang();
+  const label = t('lang');
+  return `<div class="seg" role="group" aria-label="${esc(label)}">${LANGS.map((l) => {
+    const on = l === cur;
+    return `<button class="seg-b${on ? ' on' : ''}" data-act="lang" data-arg="${l}" aria-pressed="${on}">${l.toUpperCase()}</button>`;
+  }).join('')}</div>`;
+}
+
+function soundBtn() {
+  const on = audio.enabled;
+  return `<button class="btn" data-act="sound" data-arg="${on ? 0 : 1}">${t('sound')}: ${on ? t('on') : t('off')}</button>`;
+}
+
+function viewStart() {
+  return `<section class="panel center">
+    <h1 class="title">${t('title')}</h1>
+    <button class="btn primary" data-act="play">${t('start')}</button>
+    <div class="row">${langSeg()}${soundBtn()}</div>
+    <p class="hint">${t('controls')}</p>
+    <p class="hint">${t('keys')}</p>
+  </section>`;
+}
+
+function viewLevels(save) {
+  const unl = unlockedIndex(save);
+  let html = `<section class="panel wide">
+    <header class="head"><button class="btn small" data-act="back">← ${t('back')}</button><h2>${t('levels')}</h2></header>`;
+  for (let w = 1; w <= 3; w++) {
+    html += `<div class="world"><div class="wname">${w} · ${t('w' + w)}</div><div class="tiles">`;
+    for (let l = 1; l <= 4; l++) {
+      const idx = LEVELS.findIndex((d) => d.id === `w${w}-${l}`);
+      const def = LEVELS[idx];
+      const rec = (save.levels && save.levels[def.id]) || null;
+      const label = `${w}-${l}`;
+      if (idx > unl) {
+        html += `<button class="tile" disabled aria-label="${label} ${t('locked')}"><span class="tn">${label}</span><span class="tsub">${t('locked')}</span></button>`;
+        continue;
+      }
+      let sub;
+      if (def.boss) sub = `<span class="tsub">${t(def.boss)}</span>`;
+      else if (rec && rec.done) sub = `<span class="tbest">${fmtTime(rec.bestTime)}</span>`;
+      else sub = `<span class="tsub">–</span>`;
+      const extra = rec && rec.done
+        ? `<span class="tstars">${stars(rec.stars)}</span><span class="tsub">● ${rec.coins | 0}</span>`
+        : '';
+      html += `<button class="tile${def.boss ? ' boss' : ''}" data-act="level" data-arg="${idx}"><span class="tn">${label}</span>${sub}${extra}</button>`;
+    }
+    html += '</div></div>';
+  }
+  return html + '</section>';
+}
+
+function viewPause() {
+  return `<section class="panel center">
+    <h2 class="big">${t('pause')}</h2>
+    <div class="col">
+      <button class="btn primary" data-act="resume">${t('resume')}</button>
+      <button class="btn" data-act="restart">${t('restart')}</button>
+      <button class="btn" data-act="levels">${t('levels')}</button>
+    </div>
+    <div class="row">${langSeg()}${soundBtn()}</div>
+  </section>`;
+}
+
+function viewDone(r) {
+  const n = r.starCoins.filter(Boolean).length;
+  return `<section class="panel center">
+    <h2 class="big">${t('levelDone')}</h2>
+    <dl class="stats">
+      <div><dt>${t('time')}</dt><dd>${fmtTenths(r.time)}</dd></div>
+      <div><dt>${t('coins')}</dt><dd>${r.coins}</dd></div>
+      <div><dt>${t('stars')}</dt><dd><span class="stars-big">${stars(r.starCoins)}</span> <small>${t('starsOf', { n })}</small></dd></div>
+    </dl>
+    <div class="col">
+      ${r.hasNext ? `<button class="btn primary" data-act="next">${t('next')}</button>` : ''}
+      <button class="btn${r.hasNext ? '' : ' primary'}" data-act="again">${t('again')}</button>
+      <button class="btn" data-act="levels">${t('levels')}</button>
+    </div>
+  </section>`;
+}
+
+function viewOver(world) {
+  return `<section class="panel center">
+    <h2 class="big">${t('gameOver')}</h2>
+    <p>${t('gameOverText', { world: t('w' + world) })}</p>
+    <button class="btn primary" data-act="retry">${t('again')}</button>
+  </section>`;
+}
+
+const VIEWS = { start: viewStart, levels: viewLevels, pause: viewPause, done: viewDone, over: viewOver };
+
+function draw() {
+  if (!cur) return;
+  const root = el();
+  root.innerHTML = VIEWS[cur.screen](...cur.args);
+  root.dataset.screen = cur.screen;
+}
+
+function show(screen, args, cb) {
+  cur = { screen, args, cb };
+  draw();
+  el().hidden = false;
+}
+
+function onClick(e) {
+  const b = e.target.closest ? e.target.closest('[data-act]') : null;
+  if (!b || b.disabled || !cur) return;
+  audio.click();
+  const cb = cur.cb;
+  const act = b.dataset.act;
+  const arg = b.dataset.arg;
+  if (act === 'level') cb('level', Number(arg));
+  else if (act === 'sound') cb('sound', arg === '1');
+  else if (act === 'lang') cb('lang', arg);
+  else cb(act);
+}
+
+// Titelbildschirm. cb('play') | cb('lang', 'de'|'pl') | cb('sound', bool)
+export function showStart(cb) {
+  show('start', [], cb);
+}
+
+// Levelauswahl. cb('level', index) | cb('back')
+export function showLevelSelect(save, cb) {
+  show('levels', [save], cb);
+}
+
+// Pause. cb('resume' | 'restart' | 'levels' | 'lang', v | 'sound', bool)
+export function showPause(cb) {
+  show('pause', [], cb);
+}
+
+// Levelende. result = { time, coins, starCoins, hasNext }. cb('next' | 'again' | 'levels')
+export function showLevelDone(result, cb) {
+  show('done', [result], cb);
+}
+
+// Game Over. world = 1..3. cb('retry')
+export function showGameOver(cb, world) {
+  show('over', [world], cb);
+}
+
+// Zeichnet den offenen Bildschirm mit der aktuellen Sprache neu.
+export function refresh() {
+  draw();
+}
+
+export function hideAll() {
+  cur = null;
+  const r = el();
+  r.hidden = true;
+  r.innerHTML = '';
+}

@@ -1,0 +1,291 @@
+/* Mario Craft: schwarzer Rahmen, Spielfeld zentriert, Menüs im Pixel-Look (harte Kanten, Schatten ohne Weichzeichnung). */
+:root {
+  --bg: #000000;
+  --panel: #1d3163;
+  --panel-line: #0b0b1a;
+  --btn: #ffcf40;
+  --btn-text: #2a1a00;
+  --btn-blue: #3a5a9e;
+  --tile: #2a4a85;
+  --tile-off: #2a2f4a;
+  --text: #ffffff;
+  --muted: #b9c7ea;
+  --locked: #6b7196;
+  --star: #ffd23f;
+  color-scheme: dark;
+}
+
+[hidden] { display: none !important; }
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#view {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  touch-action: none;
+  background: var(--bg);
+}
+
+.ui {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(env(safe-area-inset-top) + 12px) 16px calc(env(safe-area-inset-bottom) + 12px);
+  background: rgba(5, 6, 18, 0.72);
+  overflow-y: auto;
+  touch-action: manipulation;
+}
+
+.panel {
+  width: min(100%, 560px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 20px;
+  background: var(--panel);
+  border: 4px solid var(--panel-line);
+  box-shadow: inset 0 0 0 3px #ffffff1f, 8px 8px 0 var(--panel-line);
+}
+.panel.wide { width: min(100%, 680px); }
+.center { align-items: center; text-align: center; }
+
+.title {
+  margin: 0;
+  font-size: clamp(2.2rem, 9vw, 3.4rem);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--btn);
+  text-shadow: 4px 4px 0 var(--panel-line);
+}
+
+.big {
+  margin: 0;
+  font-size: clamp(1.6rem, 6vw, 2.3rem);
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-shadow: 3px 3px 0 var(--panel-line);
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.btn {
+  appearance: none;
+  min-height: 56px;
+  min-width: 160px;
+  padding: 0 18px;
+  font: 800 1.1rem/1 system-ui, -apple-system, sans-serif;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text);
+  background: var(--btn-blue);
+  border: 4px solid var(--panel-line);
+  border-radius: 0;
+  box-shadow: 0 6px 0 var(--panel-line);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.btn.primary {
+  background: var(--btn);
+  color: var(--btn-text);
+}
+.btn.small {
+  min-height: 44px;
+  min-width: 0;
+  padding: 0 12px;
+  font-size: 0.95rem;
+}
+.btn:active:not(:disabled) {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 var(--panel-line);
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:focus-visible,
+.seg-b:focus-visible,
+.tile:focus-visible {
+  outline: 3px solid #ffffff;
+  outline-offset: 3px;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  align-items: center;
+}
+
+.seg { display: flex; }
+.seg-b {
+  appearance: none;
+  min-width: 64px;
+  min-height: 52px;
+  padding: 0 12px;
+  font: 800 1rem/1 system-ui, -apple-system, sans-serif;
+  color: var(--text);
+  background: var(--btn-blue);
+  border: 4px solid var(--panel-line);
+  border-radius: 0;
+  margin-left: -4px;
+  box-shadow: 0 6px 0 var(--panel-line);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.seg-b:first-child { margin-left: 0; }
+.seg-b.on {
+  background: var(--btn);
+  color: var(--btn-text);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.head h2 {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  text-shadow: 2px 2px 0 var(--panel-line);
+}
+
+.world {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.wname {
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.tile {
+  appearance: none;
+  min-height: 74px;
+  padding: 4px 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font: inherit;
+  color: var(--text);
+  background: var(--tile);
+  border: 4px solid var(--panel-line);
+  border-radius: 0;
+  box-shadow: 0 5px 0 var(--panel-line);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.tile.boss { background: #6a2a3a; }
+.tile:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 2px 0 var(--panel-line);
+}
+.tile:disabled {
+  background: var(--tile-off);
+  color: var(--locked);
+  cursor: not-allowed;
+  box-shadow: 0 5px 0 var(--panel-line);
+}
+.tn {
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+.tbest,
+.tsub,
+.tstars {
+  font-size: 0.75rem;
+  line-height: 1.2;
+}
+.tstars { color: var(--star); letter-spacing: 0.08em; }
+
+.stats {
+  width: 100%;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.stats div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 6px;
+  border-bottom: 2px dashed #ffffff33;
+  font-size: 1.1rem;
+}
+.stats dt { color: var(--muted); }
+.stats dd { margin: 0; font-weight: 800; }
+.stats small { font-size: 0.8rem; color: var(--muted); }
+.stars-big {
+  color: var(--star);
+  font-size: 1.3rem;
+  letter-spacing: 0.12em;
+}
+
+.rotate {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #0b0b1af2;
+  font-size: 1.3rem;
+  font-weight: 800;
+  text-align: center;
+}
+.rotate p { margin: 0; }
+
+.noscript {
+  position: fixed;
+  inset: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+}
