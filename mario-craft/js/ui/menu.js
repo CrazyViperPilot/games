@@ -6,7 +6,7 @@ import { LANGS, getLang, t } from '../core/i18n.js';
 import { audio } from '../core/audio.js';
 
 // Welten, deren Level spielbar sind. Welt 2 und 3 zeigen bis Meilenstein 2 „bald verfügbar“.
-const OPEN_WORLDS = 1;
+const OPEN_WORLDS = 3;
 const WORLDS = [1, 2, 3];
 const LEVELS_PER_WORLD = 4;
 const PICK_KEYS = ['pickWood', 'pickStone', 'pickIron', 'pickDiamond'];

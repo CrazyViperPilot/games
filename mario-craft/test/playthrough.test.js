@@ -11,7 +11,7 @@ import { playLevel } from './helpers/bot.js';
 const TIME_LIMIT = 300;   // s Simulationszeit je Level
 const TODO = {};
 
-for (const id of ['w1-1', 'w1-2', 'w1-3', 'w2-1', 'w2-2', 'w3-1', 'w3-2', 'w3-3']) {
+for (const id of ['w1-1', 'w1-2', 'w1-3', 'w2-1', 'w2-2', 'w2-3', 'w3-1', 'w3-2', 'w3-3']) {
   const opts = TODO[id] ? { todo: TODO[id] } : {};
   test(`Bot spielt ${id} bis zum Portal`, opts, () => {
     const def = LEVELS.find((l) => l.id === id);

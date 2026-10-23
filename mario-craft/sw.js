@@ -1,6 +1,6 @@
 // Mario Craft Service Worker: network-first (immer die neueste Version), Cache nur als Offline-Fallback.
 // Bei Änderungen an Dateien CACHE_VERSION erhöhen, damit Clients die neue Version laden.
-const CACHE_VERSION = 'mariocraft-v2';
+const CACHE_VERSION = 'mariocraft-v3';
 const CACHE_PREFIX = 'mariocraft-';
 const CACHE_NAME = CACHE_VERSION;
 
@@ -23,6 +23,14 @@ const ASSETS = [
   './js/data/levels/w1-2.js',
   './js/data/levels/w1-3.js',
   './js/data/levels/w1-4.js',
+  './js/data/levels/w2-1.js',
+  './js/data/levels/w2-2.js',
+  './js/data/levels/w2-3.js',
+  './js/data/levels/w2-4.js',
+  './js/data/levels/w3-1.js',
+  './js/data/levels/w3-2.js',
+  './js/data/levels/w3-3.js',
+  './js/data/levels/w3-4.js',
   './js/data/mobs.js',
   './js/data/physics.js',
   './js/data/strings.js',
