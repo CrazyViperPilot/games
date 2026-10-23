@@ -2,6 +2,7 @@
 import { BALANCE } from '../data/balance.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { driveTo, footDist, setIdle } from './movement.js';
+import { isInfinite } from './entities.js';
 
 const C = BALANCE.construction;
 const BUILD_HP_SHARE = 0.9; // Baustellen-HP wächst um 90 % über die Bauzeit (Start 10 %)
@@ -105,14 +106,14 @@ function stepRepairer(game, u, dt) {
   }
   if (st !== 'arrived') return;
   const heal = Math.min(b.maxHp - b.hp, b.maxHp * C.repairRate * dt);
-  const costBm = b.def.cost.bm * (heal / b.maxHp) * C.repairCostShare;
+  const costBm = (b.def.cost.bm || 0) * (heal / b.maxHp) * C.repairCostShare; // HQ ohne Baukosten: Reparatur kostet nichts
   const payer = game.payerFor(u.team, b.x, b.y, { bm: costBm });
   if (!payer) {
     game.notify(u.team, 'rep', 'Reparatur: kein FOB-Lager in Reichweite', WARN, b.x, b.y);
     setIdle(u);
     return;
   }
-  payer.store.bm -= costBm;
+  if (!isInfinite(payer)) payer.store.bm -= costBm;
   b.hp += heal;
 }
 

@@ -39,6 +39,8 @@ export function createUnit(id, type, team, x, y) {
     fuel: def.fuelMax ?? 0,
     cargo: { bm: 0, mun: 0, fuel: 0 },
     preset: 'mix', // LKW-Ladungsart: 'mix' | 'bm' | 'mun' | 'fuel'
+    waitingDock: false, // LKW wartet am HQ auf einen Ladeplatz (logistics.js)
+    dockHeld: false, // LKW belegt einen Ladeplatz am HQ
   };
 }
 
@@ -82,7 +84,8 @@ export function createBuilding(id, type, team, cx, cy, tile) {
     nodeId: null,
     lastHitTime: -1e9,
     demolished: false,
-    store: { bm: 0, mun: 0, fuel: 0 },
+    // Lager: HQ unbegrenzt (Infinity, Schreibzugriffe werden über isInfinite übersprungen)
+    store: def.infinite ? { bm: Infinity, mun: Infinity, fuel: Infinity } : { bm: 0, mun: 0, fuel: 0 },
     payerId: null,
     supplied: type !== 'fob', // FOB-Baustelle: erst nach 400 Baumaterial im eigenen Lager
     warnTime: -1e9,
@@ -110,6 +113,24 @@ export function createShell(id, team, sx, sy, tx, ty, def) {
     splash: def.splash,
     alive: true,
   };
+}
+
+/**
+ * Lager-Gebäude: fertige eigene FOB oder HQ (Bauradius, Bezahlen, Nachschub, Ausbildung, Laden).
+ * Prüft nur Typ, Zustand und Lebensstatus, nicht den Besitzer.
+ */
+export function isDepot(b) {
+  return b.kind === 'building' && b.alive && b.built && (b.type === 'fob' || b.type === 'hq');
+}
+
+/** Bauradius eines Lager-Gebäudes (HQ 550 px, FOB 450 px). */
+export function depotRadius(b) {
+  return b.type === 'hq' ? BALANCE.hq.buildRadius : BALANCE.fob.buildRadius;
+}
+
+/** Unbegrenztes Lager (HQ): deckt jede Forderung, Abzüge und Gutschriften ändern nichts. */
+export function isInfinite(e) {
+  return e.kind === 'building' && !!e.def.infinite;
 }
 
 /** Radius einer Entity für Reichweiten- und Trennungsprüfungen. */

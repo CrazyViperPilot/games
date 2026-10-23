@@ -4,10 +4,12 @@ export const BALANCE = {
   tickRate: 20, // Simulationsschritte/s
   winPoints: 100,
   pointInterval: 30,
-  startRes: { money: 400, bm: 600, mun: 150, fuel: 150 }, // bm/mun/fuel = Lager der Start-FOB
+  startRes: { money: 400 }, // Start: nur Geld; Nachschub kommt aus dem HQ (unbegrenzt)
   startUnits: ['truck', 'engineer', 'rifleman', 'rifleman', 'rifleman', 'rifleman'],
   zone: { r: 1100, controlIncome: 6, unitIncome: 0.25, unitIncomeCap: 30 },
-  fob: { buildRadius: 450, minDistOwn: 500, minDistEnemy: 700, max: 6, income: 5 },
+  fob: { buildRadius: 450, minDistOwn: 500, minDistEnemy: 700, max: 6, income: 2 },
+  // HQ (§12.1): unbegrenzter Nachschub, 2 Ladeplätze, Grundeinkommen
+  hq: { buildRadius: 550, income: 6, docks: 2 },
   queueMax: 5,
   shortageWarn: 20, // s zwischen zwei Meldungen je Sorte und Team
   fuelSlowMul: 0.25, // Tempo von Fahrzeugen ohne Treibstoff

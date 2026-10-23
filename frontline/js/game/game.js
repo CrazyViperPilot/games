@@ -5,7 +5,7 @@ import { BUILDINGS } from '../data/buildings.js';
 import { makeRng } from '../core/rng.js';
 import { generateMap } from './map.js';
 import { Grid } from './grid.js';
-import { createUnit, createBuilding } from './entities.js';
+import { createUnit, createBuilding, isDepot, depotRadius, isInfinite } from './entities.js';
 import { Fog } from './fog.js';
 import { updateEconomy, smoothIncome } from './economy.js';
 import { updateMovement, nearestPassable, planPath, setIdle, separate } from './movement.js';
@@ -31,8 +31,12 @@ const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 /** Hat das Lager (Gebäude-store oder LKW-cargo) die Kosten (Sorten bm/mun/fuel) ganz? */
 const covers = (stock, cost) => STOCK_KEYS.every((k) => stock[k] >= (cost[k] || 0));
 
-/** Bezahlt die Sorten aus dem Lager (Gebäude → store, LKW → cargo). Geld zahlt das Team separat. */
+/** Deckt Gebäude- oder LKW-Lager die Kosten? Unbegrenzte Lager (HQ) decken alles. */
+const payCovers = (e, cost) => isInfinite(e) || covers(e.kind === 'building' ? e.store : e.cargo, cost);
+
+/** Bezahlt die Sorten aus dem Lager (Gebäude → store, LKW → cargo). Geld zahlt das Team separat. Unbegrenzt: ohne Wirkung. */
 function takeStock(e, cost) {
+  if (isInfinite(e)) return;
   const stock = e.kind === 'building' ? e.store : e.cargo;
   for (const k of STOCK_KEYS) stock[k] -= cost[k] || 0;
 }
@@ -98,6 +102,7 @@ export class Game {
         points: 0,
         pointProgress: 0,
         used: { mun: 0, fuel: 0 }, // Summe des Verbrauchs (Statistik)
+        dockQueue: [], // LKW-IDs, die am HQ auf einen Ladeplatz warten (FIFO, logistics.js)
         warnAt: {}, // Zeitpunkt der letzten Meldung je Schlüssel (notify)
         incomeMult: 1,
         isAI: false,
@@ -112,11 +117,10 @@ export class Game {
     this.zone = { ...this.map.zone, owner: -1, contested: false, counts: [0, 0] };
     this.fog = [new Fog(W, H), new Fog(W, H)];
 
-    // Startzustand: je Team eine fertige FOB auf dem Spawn (Lager = startRes), Startunits im Halbkreis davor
+    // Startzustand: je Team ein fertiges HQ (unbegrenzter Nachschub) zentriert auf dem Spawn, Startunits im Halbkreis davor
     for (let t = 0; t < 2; t++) {
       const sp = this.map.spawns[t];
-      const fob = this.spawnBuilding('fob', t, this.grid.toCell(sp.x) - 1, this.grid.toCell(sp.y) - 1, { built: true });
-      fob.store = { bm: BALANCE.startRes.bm, mun: BALANCE.startRes.mun, fuel: BALANCE.startRes.fuel };
+      this.spawnBuilding('hq', t, this.grid.toCell(sp.x) - 2, this.grid.toCell(sp.y) - 2, { built: true });
       const ang0 = Math.atan2(H / 2 - sp.y, W / 2 - sp.x);
       const n = BALANCE.startUnits.length;
       BALANCE.startUnits.forEach((type, i) => {
@@ -219,7 +223,7 @@ export class Game {
 
   // ---- Lager, Zahlung, Versorgung ----------------------------------------------------
 
-  /** Summe einer Sorte über alle fertigen eigenen FOB-Lager (Getter von team.res). */
+  /** Summe einer Sorte über alle fertigen eigenen FOB-Lager (Getter von team.res). HQ zählt nicht (unbegrenzt). */
   stockOf(team, k) {
     let sum = 0;
     for (const b of this.buildings) {
@@ -229,8 +233,8 @@ export class Game {
   }
 
   /**
-   * Testhilfe: setzt das Lager der Haupt-FOB (älteste fertige) auf {bm, mun, fuel} (fehlende Sorten = 0)
-   * und leert die übrigen fertigen FOB-Lager.
+   * Testhilfe: setzt das Lager der ältesten fertigen eigenen FOB auf {bm, mun, fuel} (fehlende Sorten = 0)
+   * und leert die übrigen fertigen FOB-Lager. Ohne FOB keine Wirkung (das HQ ist unbegrenzt).
    */
   setStock(team, vals) {
     const fobs = this.buildings.filter((b) => b.alive && b.built && b.team === team && b.type === 'fob');
@@ -239,26 +243,22 @@ export class Game {
     });
   }
 
-  /** Eigene fertige FOBs, deren Bauradius (x, y) enthält. */
-  fobsInRadius(team, x, y) {
-    const R = BALANCE.fob.buildRadius;
-    return this.buildings.filter(
-      (b) => b.alive && b.built && b.team === team && b.type === 'fob' && dist(b.x, b.y, x, y) <= R,
-    );
+  /** Eigene fertige Lager-Gebäude (FOB oder HQ), deren Bauradius (x, y) enthält. */
+  depotsInRadius(team, x, y) {
+    return this.buildings.filter((b) => isDepot(b) && b.team === team && dist(b.x, b.y, x, y) <= depotRadius(b));
   }
 
   /**
-   * Zahler für Kosten an (x, y): nächste fertige eigene FOB, deren Bauradius (x, y) enthält und deren Lager
-   * die Kosten (bm/mun/fuel) deckt. null, wenn keine.
+   * Zahler für Kosten an (x, y): nächstes fertiges eigenes Lager-Gebäude, dessen Bauradius (x, y) enthält und das
+   * die Kosten (bm/mun/fuel) deckt. Das HQ deckt immer. null, wenn keines.
    */
   payerFor(team, x, y, cost) {
-    const R = BALANCE.fob.buildRadius;
     let best = null;
     let bestD = Infinity;
     for (const b of this.buildings) {
-      if (!(b.alive && b.built && b.team === team && b.type === 'fob')) continue;
+      if (!isDepot(b) || b.team !== team) continue;
       const d = dist(b.x, b.y, x, y);
-      if (d > R || d >= bestD || !covers(b.store, cost)) continue;
+      if (d > depotRadius(b) || d >= bestD || !payCovers(b, cost)) continue;
       best = b;
       bestD = d;
     }
@@ -280,7 +280,7 @@ export class Game {
     return best;
   }
 
-  /** Erste fertige eigene FOB nahe (x, y) (Erstattung, falls der Zahler tot ist). */
+  /** Erste fertige eigene FOB nahe (x, y) mit endlichem Lager (Erstattung, falls der Zahler tot ist). */
   nearestFob(team, x, y) {
     let best = null;
     let bestD = Infinity;
@@ -295,17 +295,33 @@ export class Game {
     return best;
   }
 
-  /** Versorger eines Gebäudes (Förderanlage, Mörser, Flugabwehr): nächste fertige eigene FOB, wenn ihr Bauradius es enthält. */
+  /**
+   * Versorger an (x, y): nächstes fertiges eigenes Lager-Gebäude (FOB oder HQ), dessen Bauradius den Punkt enthält.
+   * null, wenn keines.
+   */
+  supplierAt(team, x, y) {
+    let best = null;
+    let bestD = Infinity;
+    for (const b of this.buildings) {
+      if (!isDepot(b) || b.team !== team) continue;
+      const d = dist(b.x, b.y, x, y);
+      if (d > depotRadius(b) || d >= bestD) continue;
+      best = b;
+      bestD = d;
+    }
+    return best;
+  }
+
+  /** Versorger eines Gebäudes (Förderanlage, Mörser, Flugabwehr); siehe supplierAt. */
   supplierOf(b) {
-    const f = this.nearestFob(b.team, b.x, b.y);
-    return f && dist(f.x, f.y, b.x, b.y) <= BALANCE.fob.buildRadius ? f : null;
+    return this.supplierAt(b.team, b.x, b.y);
   }
 
   /** Begründung, warum die Sorten für (x, y) nicht bezahlt werden können. */
   stockReason(team, x, y, cost) {
-    const fobs = this.fobsInRadius(team, x, y);
-    if (!fobs.length) return 'Kein FOB-Lager in Reichweite';
-    const miss = STOCK_KEYS.filter((k) => (cost[k] || 0) > 0 && !fobs.some((f) => f.store[k] >= cost[k])).map(
+    const ds = this.depotsInRadius(team, x, y);
+    if (!ds.length) return 'Kein FOB-Lager in Reichweite';
+    const miss = STOCK_KEYS.filter((k) => (cost[k] || 0) > 0 && !ds.some((f) => isInfinite(f) || f.store[k] >= cost[k])).map(
       (k) => BALANCE.resNames[k],
     );
     if (miss.length) return `FOB-Lager: zu wenig ${miss.join(', ')}`;
@@ -333,12 +349,13 @@ export class Game {
   /**
    * Erstattet Sorten an den Zahler `payerId` (eigene Entity mit Lager). Ist er tot oder fremd,
    * geht es an die nächste eigene FOB bei (x, y); ohne FOB verfällt es. Lager-Obergrenze wird beachtet.
+   * Unbegrenzte Lager (HQ) nehmen nichts an: die Gutschrift wirkt dort nicht.
    */
   refundStock(team, payerId, cost, factor, x, y) {
     let target = payerId !== null && payerId !== undefined ? this.getEntity(payerId) : null;
     if (target && target.team !== team) target = null;
     if (!target) target = this.nearestFob(team, x, y);
-    if (!target) return;
+    if (!target || isInfinite(target)) return;
     const stock = target.kind === 'building' ? target.store : target.cargo;
     for (const k of STOCK_KEYS) {
       const amt = (cost[k] || 0) * factor;
@@ -380,8 +397,9 @@ export class Game {
   /**
    * Prüft, ob Gebäude `type` mit Mitte (x, y) gebaut werden darf.
    * Liefert { ok, reason, cx, cy, x, y, nodeId, payer } (x, y = Mitte des Fußabdrucks).
-   * payer = { kind: 'fob'|'truck', id } – wer die Sorten zahlt (null bei FOB-Baustellen).
-   * Mauer/Tor außerhalb eines FOB-Radius: eigener LKW mit Ladung ≤ truckSupplyRange.
+   * payer = { kind: 'fob'|'hq'|'truck', id } – wer die Sorten zahlt (null bei FOB-Baustellen).
+   * Mauer/Tor außerhalb eines Lager-Radius: eigener LKW mit Ladung ≤ truckSupplyRange.
+   * Förderanlage, deren Versorger das HQ wäre: verboten (Nachschub ist dort unbegrenzt).
    */
   canPlace(team, type, x, y) {
     const def = BUILDINGS[type];
@@ -398,6 +416,8 @@ export class Game {
       px = node.x;
       py = node.y;
       nodeId = node.id;
+      const sup = this.supplierAt(team, px, py);
+      if (sup && isInfinite(sup)) return { ok: false, reason: 'Am HQ unnötig – Nachschub ist unbegrenzt' };
     } else if (this.nodeAt(x, y, 48)) {
       return { ok: false, reason: 'Auf einem Ressourcenvorkommen nur eine Förderanlage' };
     }
@@ -431,9 +451,12 @@ export class Game {
     if (type === 'fob') {
       let count = 0;
       for (const b of this.buildings) {
-        if (!b.alive || b.team !== team || b.type !== 'fob') continue;
-        count++;
-        if (dist(b.x, b.y, mx, my) < BALANCE.fob.minDistOwn) return bad('Zu nah an einer eigenen FOB');
+        if (!b.alive || b.team !== team) continue;
+        if (b.type === 'fob') count++;
+        if (b.type !== 'fob' && b.type !== 'hq') continue;
+        if (dist(b.x, b.y, mx, my) < BALANCE.fob.minDistOwn) {
+          return bad(b.type === 'hq' ? 'Zu nah am eigenen HQ' : 'Zu nah an einer eigenen FOB');
+        }
       }
       if (count >= BALANCE.fob.max) return bad(`Höchstens ${BALANCE.fob.max} FOBs möglich`);
       for (const b of this.buildings) {
@@ -441,16 +464,16 @@ export class Game {
           return bad('Zu nah an einem gegnerischen Gebäude');
         }
       }
-    } else if (this.fobsInRadius(team, mx, my).length) {
+    } else if (this.depotsInRadius(team, mx, my).length) {
       const f = this.payerFor(team, mx, my, def.cost);
       if (!f) return bad(this.stockReason(team, mx, my, def.cost));
-      payer = { kind: 'fob', id: f.id };
+      payer = { kind: f.type === 'hq' ? 'hq' : 'fob', id: f.id };
     } else if (WALL_TYPES.has(type)) {
       const tr = this.truckPayer(team, mx, my, def.cost);
-      if (!tr) return bad('Außerhalb des Bauradius einer eigenen FOB');
+      if (!tr) return bad('Außerhalb des Bauradius einer eigenen FOB oder des HQ');
       payer = { kind: 'truck', id: tr.id };
     } else {
-      return bad('Außerhalb des Bauradius einer eigenen FOB');
+      return bad('Außerhalb des Bauradius einer eigenen FOB oder des HQ');
     }
 
     return { ok: true, reason: null, cx, cy, x: mx, y: my, nodeId, payer };
@@ -672,7 +695,7 @@ export class Game {
     if (this.unitCount(team) >= BALANCE.unitCap) return fail(`Einheitenlimit erreicht (${BALANCE.unitCap})`);
     const cost = UNITS[cmd.unit].cost;
     if (!this.canAfford(team, cost)) return fail(this.missingMoney());
-    const payer = b.type === 'fob' ? (covers(b.store, cost) ? b : null) : this.payerFor(team, b.x, b.y, cost);
+    const payer = isDepot(b) ? (payCovers(b, cost) ? b : null) : this.payerFor(team, b.x, b.y, cost);
     if (!payer) return fail(this.stockReason(team, b.x, b.y, cost));
     this.pay(team, cost);
     takeStock(payer, cost);
@@ -716,6 +739,7 @@ export class Game {
   cmdDemolish(team, cmd) {
     const b = this.getEntity(cmd.buildingId);
     if (!b || b.kind !== 'building' || b.team !== team) return fail('Kein eigenes Gebäude gewählt');
+    if (b.type === 'hq') return fail('Das HQ kann nicht abgerissen werden');
     const factor = b.built ? BALANCE.demolishRefund : 1;
     const stock = { bm: b.store.bm, mun: b.store.mun, fuel: b.store.fuel };
     b.demolished = true;
@@ -737,21 +761,20 @@ export class Game {
   endGame(winner, reason) {
     this.winner = winner;
     this.winReason = reason;
-    const how = reason === 'points' ? 'nach Punkten' : 'durch Eliminierung';
+    const how = reason === 'points' ? 'nach Punkten' : 'durch Zerstörung des HQ';
     this.message(-1, `${BALANCE.teamNames[winner]} gewinnt ${how}`);
   }
 
-  /** Team ohne FOB (auch Baustellen zählen) und ohne Baufahrzeug verliert. */
-  checkElimination() {
+  /** Team verliert, sobald sein HQ zerstört ist. Beide zugleich: mehr Punkte gewinnt. */
+  checkHq() {
     const lost = [];
     for (let t = 0; t < 2; t++) {
-      const hasFob = this.buildings.some((b) => b.alive && b.team === t && b.type === 'fob');
-      const hasEngineer = this.units.some((u) => u.alive && u.team === t && u.type === 'engineer');
-      if (!hasFob && !hasEngineer) lost.push(t);
+      const hasHq = this.buildings.some((b) => b.alive && b.team === t && b.type === 'hq');
+      if (!hasHq) lost.push(t);
     }
     if (lost.length === 0) return;
     const winner = lost.length === 1 ? 1 - lost[0] : this.teams[0].points >= this.teams[1].points ? 0 : 1;
-    this.endGame(winner, 'eliminated');
+    this.endGame(winner, 'hq');
   }
 
   ageEffects(dt) {
@@ -813,6 +836,6 @@ export class Game {
 
     this.ageEffects(dt);
     this.cleanup();
-    if (this.winner === null) this.checkElimination();
+    if (this.winner === null) this.checkHq();
   }
 }

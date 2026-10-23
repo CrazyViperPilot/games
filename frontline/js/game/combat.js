@@ -1,11 +1,11 @@
 // Kampf: Zielsuche, Direktfeuer, Mörser und Granaten, Flugabwehr, Schaden (PLAN.md §5, §11.2). Kein DOM.
 import { BALANCE } from '../data/balance.js';
-import { createShell, inRange, radiusOf } from './entities.js';
+import { createShell, inRange, radiusOf, isDepot, depotRadius, isInfinite } from './entities.js';
 import { buildHash, nearby } from './movement.js';
 
 const SCAN = BALANCE.scanInterval;
 const MAX_UNIT_RADIUS = 16; // größter Einheitenradius (Trefferkreis-Suche)
-const BASE_WARN_INTERVAL = 20; // s zwischen zwei Meldungen „Basis wird angegriffen“
+const BASE_WARN_INTERVAL = 20; // s zwischen zwei Meldungen „Basis wird angegriffen“ bzw. „HQ wird angegriffen“
 // Aufträge, bei denen nicht automatisch geschossen wird (Marsch, Bau, Reparatur, Logistik)
 const NO_FIRE = new Set(['move', 'build', 'repair', 'load', 'unload', 'route']);
 
@@ -49,21 +49,24 @@ function takeAmmo(game, s, need) {
     game.shortage(s.team, 'mun');
     return false;
   }
-  sup.store.mun -= need;
+  if (!isInfinite(sup)) sup.store.mun -= need;
   stats.mun += need;
   return true;
 }
 
+/** Warnung „HQ wird angegriffen“ (HQ getroffen) bzw. „Basis wird angegriffen“ (im Bauradius eines eigenen Lagers). */
 function warnBase(game, target) {
   const team = game.teams[target.team];
   if (game.time - team.lastWarn <= BASE_WARN_INTERVAL) return;
-  const r = BALANCE.fob.buildRadius;
-  const inBase = game.buildings.some(
-    (b) => b.alive && b.built && b.team === target.team && b.type === 'fob' && Math.hypot(b.x - target.x, b.y - target.y) <= r,
-  );
-  if (!inBase) return;
+  let text = null;
+  if (target.type === 'hq') {
+    text = 'HQ wird angegriffen';
+  } else if (game.buildings.some((b) => isDepot(b) && b.team === target.team && Math.hypot(b.x - target.x, b.y - target.y) <= depotRadius(b))) {
+    text = 'Basis wird angegriffen';
+  }
+  if (!text) return;
   team.lastWarn = game.time;
-  game.message(target.team, 'Basis wird angegriffen', target.x, target.y);
+  game.message(target.team, text, target.x, target.y);
 }
 
 /** Fügt Schaden zu, setzt lastHitTime und markiert Tote. */

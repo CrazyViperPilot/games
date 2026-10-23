@@ -164,9 +164,9 @@ export class Controller {
     return { x: x / s.length, y: y / s.length };
   }
 
-  /** Erste fertige eigene FOB (Haupt-FOB) oder null. */
+  /** Eigenes HQ (Ausgangspunkt für die Kamera-Taste H) oder null. */
   homeBase() {
-    return this.game.buildings.find((b) => b.alive && b.built && b.team === this.team && b.type === 'fob') || null;
+    return this.game.buildings.find((b) => b.alive && b.built && b.team === this.team && b.type === 'hq') || null;
   }
 
   /** Nächste passende Entity an Weltpunkt: zuerst Einheiten, dann Gebäude (Fußabdruck). */
@@ -375,7 +375,7 @@ export class Controller {
     const done = new Set();
     const ids = (list) => list.map((u) => u.id);
     const trucks = units.filter((u) => u.type === 'truck');
-    if (b.type === 'fob' && trucks.length) {
+    if ((b.type === 'fob' || b.type === 'hq') && trucks.length) {
       if (!b.built) {
         this.issue({ type: 'unload', ids: ids(trucks), fobId: b.id });
       } else {
@@ -455,9 +455,9 @@ export class Controller {
       this.setMode('normal');
       return;
     }
-    const fob = this.pickB(wx, wy, (e) => e.team === this.team && e.type === 'fob');
+    const fob = this.pickB(wx, wy, (e) => e.team === this.team && (e.type === 'fob' || e.type === 'hq'));
     if (!fob) {
-      this.message(kind === 'load' ? 'Eigene fertige FOB anklicken' : 'Eigene FOB oder FOB-Baustelle anklicken');
+      this.message(kind === 'load' ? 'Eigene fertige FOB oder HQ anklicken' : 'Eigene FOB oder FOB-Baustelle anklicken');
       return;
     }
     if (this.issue({ type: kind, ids, fobId: fob.id }).ok) this.setMode('normal');
@@ -471,7 +471,7 @@ export class Controller {
       this.setMode('normal');
       return;
     }
-    const fob = this.pickB(wx, wy, (e) => e.team === this.team && e.type === 'fob' && e.built);
+    const fob = this.pickB(wx, wy, (e) => e.team === this.team && (e.type === 'fob' || e.type === 'hq') && e.built);
     if (!fob) {
       this.message('Start: eigene fertige FOB anklicken');
       return;
@@ -667,7 +667,9 @@ export class Controller {
 
   /** Hat eine fertige eigene FOB ein Lager, das alle Sorten der Kosten deckt? */
   anyFobCovers(cost) {
-    return this.game.buildings.some((b) => b.alive && b.built && b.team === this.team && b.type === 'fob' && covers(b.store, cost));
+    return this.game.buildings.some(
+      (b) => b.alive && b.built && b.team === this.team && (b.type === 'fob' || b.type === 'hq') && covers(b.store, cost),
+    );
   }
 
   /** Grund, wenn kein FOB-Lager die Sorten der Kosten deckt (ohne Ort: für Befehlskarte). */

@@ -1,8 +1,32 @@
 // Gebäudewerte (PLAN.md §3.3). w, h in Zellen. Alle Gebäude haben Rüstung 'struct'.
 // Optional: weapon {range, minRange, cooldown, damage, splash, shell, ammoPerShot}, aa {range, cooldown, chance, ammoPerShot},
 // yields (nur Förderanlage), buildable (false = nur per LKW), blocksAll (Mauer), gate (Tor).
-// hotkey: Taste im Baumenü, null = keine.
+// hotkey: Taste im Baumenü, null = keine. infinite: Lager ist unbegrenzt (HQ, §12.1), unique: nur einmal je Team.
 export const BUILDINGS = {
+  hq: {
+    name: 'HQ',
+    armor: 'struct',
+    w: 4,
+    h: 4,
+    hp: 6000,
+    sight: 500,
+    cost: {},
+    buildTime: 0, // wird nur fertig gestartet, nie gebaut
+    hotkey: null,
+    produces: ['rifleman', 'at', 'truck', 'engineer'],
+    weapon: {
+      range: 260,
+      minRange: 0,
+      cooldown: 0.4,
+      damage: { inf: 14, light: 6, heavy: 2, struct: 6 },
+      splash: 0,
+      shell: false,
+      ammoPerShot: 0,
+    },
+    buildable: false,
+    unique: true,
+    infinite: true,
+  },
   fob: {
     name: 'FOB',
     armor: 'struct',

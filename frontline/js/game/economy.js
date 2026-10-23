@@ -3,6 +3,7 @@
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { planPath, setIdle } from './movement.js';
+import { isInfinite } from './entities.js';
 
 const STOCK_KEYS = ['bm', 'mun', 'fuel'];
 const INCOME_TAU = 2; // Glättungszeitkonstante des angezeigten Einkommens (s)
@@ -65,13 +66,17 @@ export function updateEconomy(game, dt) {
     game.message(b.team, `${ut.name} bereit`, spot.x, spot.y);
   }
 
-  // Einkommen: FOBs (Geld) und Förderanlagen (Sorte des Vorkommens, in die FOB ihres Bauradius)
+  // Einkommen: FOBs und HQ (Geld) und Förderanlagen (Sorte des Vorkommens, in das Lager ihres Versorgers)
   for (const b of game.buildings) {
     if (!b.alive || !b.built) continue;
     const team = game.teams[b.team];
     const mult = team.incomeMult;
     if (b.type === 'fob') {
       team.rate.money += BALANCE.fob.income * mult;
+      continue;
+    }
+    if (b.type === 'hq') {
+      team.rate.money += BALANCE.hq.income * mult;
       continue;
     }
     if (b.nodeId === null) continue;
@@ -82,6 +87,7 @@ export function updateEconomy(game, dt) {
       game.notify(b.team, 'noFob', 'Förderanlage ohne FOB', BALANCE.logistics.noFobWarn);
       continue;
     }
+    if (isInfinite(sup)) continue; // Versorger ist das HQ: die Förderung wäre wirkungslos
     const amount = (b.def.yields[node.type] || 0) * mult;
     team.rate[node.type] += amount;
     const cap = BALANCE.logistics.storeCap;

@@ -49,21 +49,38 @@ test('Spawns liegen auf der Karte und sind punktsymmetrisch', () => {
   assert.deepStrictEqual(map.zone, { x: W / 2, y: H / 2, r: BALANCE.zone.r });
 });
 
-test('jeder Spawn hat je 3 Sorten im FOB-Radius', () => {
-  const map = generateMap(5);
-  for (const s of map.spawns) {
-    const types = new Set(
-      map.nodes
-        .filter((n) => Math.hypot(n.x - s.x, n.y - s.y) <= BALANCE.fob.buildRadius)
-        .map((n) => n.type),
-    );
-    assert.deepStrictEqual([...types].sort(), ['bm', 'fuel', 'mun']);
+test('kein Vorkommen im 700-px-Umkreis eines Spawns (§12.2)', () => {
+  for (const seed of [1, 2, 3, 5, 6, 7, 8, 13]) {
+    const map = generateMap(seed);
+    for (const s of map.spawns) {
+      for (const n of map.nodes) {
+        assert.ok(Math.hypot(n.x - s.x, n.y - s.y) > 700, `Seed ${seed}: Vorkommen ${n.id} bei Spawn`);
+      }
+    }
+  }
+});
+
+test('je 3 Vorkommen-Paare pro Sorte, 2 Paare in der Zone, übrige im Band 900–2200 px um einen Spawn', () => {
+  for (const seed of [1, 2, 3, 5, 6, 7, 8, 13]) {
+    const map = generateMap(seed);
+    const ids = new Set(map.nodes.map((n) => n.type));
+    assert.deepStrictEqual([...ids].sort(), ['bm', 'fuel', 'mun']);
+    for (const t of ['bm', 'mun', 'fuel']) {
+      assert.equal(map.nodes.filter((n) => n.type === t).length, 6, `Seed ${seed}: Sorte ${t}`);
+    }
+    const inZone = map.nodes.filter((n) => Math.hypot(n.x - map.zone.x, n.y - map.zone.y) <= map.zone.r);
+    assert.equal(inZone.length, 4, `Seed ${seed}: 2 Paare in der Zone`);
+    for (const n of map.nodes) {
+      if (inZone.includes(n)) continue;
+      const d = Math.min(...map.spawns.map((s) => Math.hypot(n.x - s.x, n.y - s.y)));
+      assert.ok(d >= 900 && d <= 2200, `Seed ${seed}: Vorkommen ${n.id} im Abstand ${d.toFixed(0)} zum Spawn`);
+    }
   }
 });
 
 test('Vorkommen-IDs sind 1..n und haben Mindestabstand', () => {
   const map = generateMap(6);
-  assert.equal(map.nodes.length, 18);
+  assert.equal(map.nodes.length, 18, '9 Paare');
   map.nodes.forEach((n, i) => assert.equal(n.id, i + 1));
   for (let i = 0; i < map.nodes.length; i++) {
     for (let j = i + 1; j < map.nodes.length; j++) {

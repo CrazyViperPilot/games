@@ -17,33 +17,57 @@ function run(game, seconds) {
 const cellOf = (v) => Math.floor(v / TILE);
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 
-function fobOf(game, t) {
-  return game.buildings.find((b) => b.alive && b.team === t && b.type === 'fob' && b.built);
+function hqOf(game, t) {
+  return game.buildings.find((b) => b.alive && b.team === t && b.type === 'hq');
 }
 
 function unitsOf(game, t, type = null) {
   return game.units.filter((u) => u.alive && u.team === t && (!type || u.type === type));
 }
 
-/** Erste zulässige Mitte für `type` auf Ringen um (x0, y0) zwischen rMin und rMax. */
-function findSpot(game, team, type, x0, y0, rMin = 0, rMax = 400) {
+/** Erste zulässige Mitte für `type` auf Ringen um (x0, y0) zwischen rMin und rMax (optional mit Prädikat). */
+function findSpot(game, team, type, x0, y0, rMin = 0, rMax = 400, pred = () => true) {
   for (let r = rMin; r <= rMax; r += 32) {
     for (let a = 0; a < 16; a++) {
       const x = x0 + Math.cos((a * Math.PI) / 8) * r;
       const y = y0 + Math.sin((a * Math.PI) / 8) * r;
       const p = game.canPlace(team, type, x, y);
-      if (p.ok) return { x: p.x, y: p.y };
+      if (p.ok && pred(p)) return { x: p.x, y: p.y };
     }
   }
   return null;
 }
 
-/** Baut sofort (ohne Kosten) eine fertige FOB an eine zulässige Stelle im Ring um (x0, y0). */
-function fobAt(game, team, x0, y0, rMin = 600, rMax = 800) {
-  const s = findSpot(game, team, 'fob', x0, y0, rMin, rMax);
+/**
+ * Haupt-FOB des Teams: die älteste fertige eigene FOB; sonst legt der Test eine an, 700–900 px vom HQ
+ * (außerhalb des HQ-Radius, damit HQ-Nachschub nicht stört). Lager leer.
+ */
+function fobOf(game, t) {
+  const f = game.buildings.find((b) => b.alive && b.team === t && b.type === 'fob' && b.built);
+  if (f) return f;
+  const hq = hqOf(game, t);
+  const s = findSpot(game, t, 'fob', hq.x, hq.y, 700, 900);
   assert.ok(s, 'freie FOB-Stelle');
-  const p = game.canPlace(team, 'fob', s.x, s.y);
-  return game.spawnBuilding('fob', team, p.cx, p.cy, { built: true });
+  const p = game.canPlace(t, 'fob', s.x, s.y);
+  return game.spawnBuilding('fob', t, p.cx, p.cy, { built: true });
+}
+
+/**
+ * Baubare Stelle für `type` um (x0, y0), deren Bauradius genau das Lager `only` enthält (Zahler = only).
+ * Ein Lager mit genug Vorrat vorausgesetzt.
+ */
+function onlyIn(game, team, only, x0, y0, type = 'depot') {
+  for (let r = 0; r <= 350; r += 25) {
+    for (let a = 0; a < 16; a++) {
+      const x = x0 + Math.cos((a * Math.PI) / 8) * r;
+      const y = y0 + Math.sin((a * Math.PI) / 8) * r;
+      const ds = game.depotsInRadius(team, x, y);
+      if (ds.length !== 1 || ds[0] !== only) continue;
+      const p = game.canPlace(team, type, x, y);
+      if (p.ok && p.payer && p.payer.id === only.id) return { x: p.x, y: p.y };
+    }
+  }
+  assert.fail('baubare Stelle nur im Radius dieses Lagers');
 }
 
 /** Ein Baufahrzeug direkt am Gebäuderand, damit es ohne Anfahrt mitbaut. */
@@ -61,20 +85,23 @@ function silence(game, team) {
   }
 }
 
-test('Startzustand: fertige Haupt-FOB mit Lager, Startunits, Geld', () => {
+test('Startzustand: fertiges HQ, keine FOB, Startunits, nur Geld', () => {
   const g = new Game({ seed: 7 });
   for (let t = 0; t < 2; t++) {
-    const f = fobOf(g, t);
-    assert.ok(f, `FOB für Team ${t}`);
-    assert.equal(f.built, true);
-    assert.equal(f.hp, f.maxHp);
+    const hq = hqOf(g, t);
+    assert.ok(hq, `HQ für Team ${t}`);
+    assert.equal(hq.built, true);
+    assert.equal(hq.hp, hq.maxHp);
+    assert.equal(hq.def.infinite, true);
+    assert.equal(g.buildings.filter((b) => b.team === t && b.type === 'fob').length, 0, 'keine Start-FOB');
     assert.equal(unitsOf(g, t).length, BALANCE.startUnits.length);
     assert.equal(unitsOf(g, t, 'truck').length, 1);
     assert.equal(unitsOf(g, t, 'engineer').length, 1);
     assert.equal(unitsOf(g, t, 'rifleman').length, 4);
-    assert.deepEqual(f.store, { bm: BALANCE.startRes.bm, mun: BALANCE.startRes.mun, fuel: BALANCE.startRes.fuel });
     assert.equal(g.teams[t].res.money, BALANCE.startRes.money);
-    assert.equal(g.teams[t].res.bm, BALANCE.startRes.bm, 'Summe aller FOB-Lager');
+    assert.equal(g.teams[t].res.bm, 0, 'HQ zählt nicht zu den Lagersummen');
+    assert.equal(g.teams[t].res.mun, 0);
+    assert.equal(g.teams[t].res.fuel, 0);
   }
   assert.equal(g.winner, null);
   assert.equal(g.zone.owner, -1);
@@ -86,19 +113,22 @@ test('Team-Ressourcen sind Lesegetter: direktes Schreiben ist nicht möglich', (
     'use strict';
     g.teams[0].res.bm = 5;
   }, TypeError);
+  fobOf(g, 0);
   g.setStock(0, { bm: 123, mun: 45, fuel: 6 });
   assert.equal(g.teams[0].res.bm, 123);
   assert.equal(g.teams[0].res.mun, 45);
   assert.equal(g.teams[0].res.fuel, 6);
-  assert.equal(g.teams[1].res.bm, BALANCE.startRes.bm, 'Team 1 unberührt');
+  assert.equal(g.teams[1].res.bm, 0, 'Team 1 ohne FOB unberührt');
 });
 
 test('Platzierung: Bauradius, Hindernisse, Förderanlage nur auf Vorkommen', () => {
   const g = new Game({ seed: 7 });
-  const f = fobOf(g, 0);
+  const hq = hqOf(g, 0);
 
-  // außerhalb des Bauradius (450 px)
-  assert.equal(g.canPlace(0, 'depot', f.x + 1500, f.y).ok, false);
+  // außerhalb aller Bauradien (keine FOB, HQ-Radius 550 px)
+  const far = g.canPlace(0, 'depot', hq.x + 1500, hq.y);
+  assert.equal(far.ok, false);
+  assert.match(far.reason, /Außerhalb/);
 
   // auf einem Hindernis (eigene FOB direkt auf den Felsen setzen, damit der Radius erfüllt ist)
   const ob = g.map.obstacles[0];
@@ -107,12 +137,15 @@ test('Platzierung: Bauradius, Hindernisse, Förderanlage nur auf Vorkommen', () 
   assert.equal(onRock.ok, false);
   assert.match(onRock.reason, /Gelände/);
 
-  // Förderanlage nur auf einem Vorkommen
-  assert.equal(g.canPlace(0, 'extractor', f.x, f.y).ok, false);
-  const node = g.map.nodes.find((n) => dist(n.x, n.y, f.x, f.y) < 380);
-  assert.ok(node, 'Vorkommen im Bauradius');
+  // Förderanlage nur auf einem Vorkommen; FOB nahe am Vorkommen (Versorger, nicht das HQ)
+  const node = g.map.nodes.find((n) => n.type === 'bm');
+  const fp = findSpot(g, 0, 'fob', node.x, node.y, 150, 350);
+  assert.ok(fp, 'FOB-Stelle nahe Vorkommen');
+  const f = g.spawnBuilding('fob', 0, g.canPlace(0, 'fob', fp.x, fp.y).cx, g.canPlace(0, 'fob', fp.x, fp.y).cy, { built: true });
+  f.store.bm = 400;
+  assert.equal(g.canPlace(0, 'extractor', f.x, f.y).ok, false, 'am FOB-Mittelpunkt kein Vorkommen');
   const ex = g.canPlace(0, 'extractor', node.x, node.y);
-  assert.equal(ex.ok, true);
+  assert.equal(ex.ok, true, ex.reason);
   assert.equal(ex.nodeId, node.id);
   assert.equal(ex.payer.kind, 'fob', 'Zahler ist die FOB im Radius');
   // auf dem Vorkommen keine andere Stelle als Förderanlage
@@ -122,16 +155,17 @@ test('Platzierung: Bauradius, Hindernisse, Förderanlage nur auf Vorkommen', () 
   assert.ok(findSpot(g, 0, 'depot', f.x, f.y, 0, 400));
 });
 
-test('Bau: Gebäude-Baustelle kostet Geld und Lager sofort; Fortschritt nur mit Bauer', () => {
+test('Bau: Gebäude-Baustelle kostet Lager sofort; Fortschritt nur mit Bauer', () => {
   const g = new Game({ seed: 7 });
   const f = fobOf(g, 0);
-  const spot = findSpot(g, 0, 'depot', f.x, f.y);
+  f.store.bm = 400;
+  const spot = onlyIn(g, 0, f, f.x, f.y);
   const eng = unitsOf(g, 0, 'engineer')[0];
   const r = g.issue(0, { type: 'build', ids: [eng.id], building: 'depot', x: spot.x, y: spot.y });
   assert.equal(r.ok, true, r.reason);
   const b = g.getEntity(r.id);
   assert.equal(b.built, false);
-  assert.equal(g.teams[0].res.bm, BALANCE.startRes.bm - 300);
+  assert.equal(f.store.bm, 100, 'Halle kostet 300 aus dem Lager der FOB');
   assert.equal(b.payerId, f.id);
 
   run(g, 40);
@@ -143,9 +177,10 @@ test('Bau: Gebäude-Baustelle kostet Geld und Lager sofort; Fortschritt nur mit 
 test('Bau: Gebäude-Baustelle ohne Bauer kommt nicht voran; 2 Bauer doppelt so schnell', () => {
   const g = new Game({ seed: 7 });
   const f = fobOf(g, 0);
-  const spot = findSpot(g, 0, 'depot', f.x, f.y);
+  f.store.bm = 400;
+  const spot = onlyIn(g, 0, f, f.x, f.y);
   const r = g.issue(0, { type: 'build', building: 'depot', x: spot.x, y: spot.y });
-  assert.equal(r.ok, true);
+  assert.equal(r.ok, true, r.reason);
   const b = g.getEntity(r.id);
   // ohne Bauer (Start-Baufahrzeug ausgeschaltet) kein Fortschritt
   silence(g, 0);
@@ -155,18 +190,17 @@ test('Bau: Gebäude-Baustelle ohne Bauer kommt nicht voran; 2 Bauer doppelt so s
   // zwei Bauer direkt am Gebäude: 25 s Bauzeit / 2 = 12,5 s
   const g2 = new Game({ seed: 7 });
   silence(g2, 0);
-  const f2 = fobOf(g2, 0);
-  const spot2 = findSpot(g2, 0, 'depot', f2.x, f2.y);
-  const site = g2.spawnBuilding('depot', 0, cellOf(spot2.x) - 1, cellOf(spot2.y) - 1, { built: false });
-  engineerBeside(g2, site);
-  engineerBeside(g2, site);
+  const hq2 = hqOf(g2, 0);
+  const site2 = g2.spawnBuilding('depot', 0, cellOf(hq2.x) - 10, cellOf(hq2.y) - 10, { built: false });
+  engineerBeside(g2, site2);
+  engineerBeside(g2, site2);
   run(g2, 13);
-  assert.equal(site.built, true, 'mit 2 Bauern nach ~12,5 s fertig');
+  assert.equal(site2.built, true, 'mit 2 Bauern nach ~12,5 s fertig');
+
   const g1 = new Game({ seed: 7 });
   silence(g1, 0);
-  const f1 = fobOf(g1, 0);
-  const spot1 = findSpot(g1, 0, 'depot', f1.x, f1.y);
-  const one = g1.spawnBuilding('depot', 0, cellOf(spot1.x) - 1, cellOf(spot1.y) - 1, { built: false });
+  const hq1 = hqOf(g1, 0);
+  const one = g1.spawnBuilding('depot', 0, cellOf(hq1.x) - 10, cellOf(hq1.y) - 10, { built: false });
   engineerBeside(g1, one);
   run(g1, 13);
   assert.equal(one.built, false, 'mit einem Bauer noch nicht fertig');
@@ -176,8 +210,16 @@ test('Bau: Gebäude-Baustelle ohne Bauer kommt nicht voran; 2 Bauer doppelt so s
 
 test('Bauer hilft automatisch: idle Baufahrzeug in 400 px baut Baustelle ohne ids', () => {
   const g = new Game({ seed: 7 });
-  const f = fobOf(g, 0);
-  const node = g.map.nodes.find((n) => dist(n.x, n.y, f.x, f.y) < 380);
+  const node = g.map.nodes.find((n) => n.type === 'mun');
+  const fp = findSpot(g, 0, 'fob', node.x, node.y, 150, 350);
+  const p = g.canPlace(0, 'fob', fp.x, fp.y);
+  const f = g.spawnBuilding('fob', 0, p.cx, p.cy, { built: true });
+  f.store.bm = 400;
+  // Baufahrzeug am Vorkommen (das Start-Baufahrzeug steht am HQ, zu weit weg)
+  const eng = unitsOf(g, 0, 'engineer')[0];
+  const q = nearestPassable(g.grid, node.x + 120, node.y, 0) || { x: node.x, y: node.y };
+  eng.x = q.x;
+  eng.y = q.y;
   const r = g.issue(0, { type: 'build', building: 'extractor', x: node.x, y: node.y });
   assert.equal(r.ok, true, r.reason);
   const b = g.getEntity(r.id);
@@ -185,15 +227,16 @@ test('Bauer hilft automatisch: idle Baufahrzeug in 400 px baut Baustelle ohne id
   assert.equal(b.built, true, 'Förderanlage (15 s) mit automatischem Bauer fertig');
 });
 
-test('Training: Kosten werden aus dem FOB-Lager und Geld abgezogen, Einheit spawnt', () => {
+test('Training: Kosten aus dem FOB-Lager und Geld, Einheit spawnt', () => {
   const g = new Game({ seed: 7 });
   const f = fobOf(g, 0);
+  g.setStock(0, { bm: 400, mun: 150, fuel: 150 });
   const before = unitsOf(g, 0, 'rifleman').length;
   const { money } = g.teams[0].res;
   const r = g.issue(0, { type: 'train', buildingId: f.id, unit: 'rifleman' });
-  assert.equal(r.ok, true);
+  assert.equal(r.ok, true, r.reason);
   assert.equal(g.teams[0].res.money, money - 60);
-  assert.equal(f.store.mun, BALANCE.startRes.mun - 15);
+  assert.equal(f.store.mun, 150 - 15);
   assert.equal(f.queue.length, 1);
   assert.equal(f.queue[0].unit, 'rifleman');
   assert.equal(f.queue[0].payerId, f.id);
@@ -262,35 +305,10 @@ test('Sieg: Partie endet, sobald winPoints erreicht sind', () => {
   assert.equal(g.issue(0, { type: 'stop', ids: [] }).ok, false);
 });
 
-test('Eliminierung: Team ohne FOB und ohne Baufahrzeug verliert (LKW zählt nicht)', () => {
-  const g = new Game({ seed: 7 });
-  for (const e of [...g.buildings, ...g.units]) {
-    if (e.team === 1 && (e.type === 'fob' || e.type === 'engineer')) e.hp = 0;
-  }
-  g.update(DT);
-  assert.equal(g.winner, 0);
-  assert.equal(g.winReason, 'eliminated');
-});
-
-test('Eliminierung: ohne FOB, aber mit Baufahrzeug bleibt man im Spiel; FOB-Baustelle zählt als FOB', () => {
-  const g = new Game({ seed: 7 });
-  for (const e of [...g.buildings]) if (e.team === 1 && e.type === 'fob') e.hp = 0;
-  g.update(DT);
-  assert.equal(g.winner, null, 'Baufahrzeug hält das Team am Leben');
-
-  const g2 = new Game({ seed: 7 });
-  for (const e of [...g2.units]) if (e.team === 1 && e.type === 'engineer') e.hp = 0;
-  g2.update(DT);
-  assert.equal(g2.winner, null, 'FOB hält das Team am Leben');
-  const site = g2.buildings.find((b) => b.team === 1 && b.type === 'fob');
-  site.hp = 0; // nur Baustelle, sonst keine FOB
-  g2.update(DT);
-  assert.equal(g2.winner, 0);
-});
-
 test('Mauer blockiert Bewegung', () => {
   const g = new Game({ seed: 7 });
   const f = fobOf(g, 0);
+  f.store.bm = 400;
   // Mauerring 5×5 (Rand) um (c0, r0): ohne Vorkommen im Umkreis, alle Zellen frei, im Bauradius
   const ring = (c0, r0) => {
     const out = [];
@@ -350,13 +368,17 @@ test('Mauer blockiert Bewegung', () => {
 test('Schütze baut Mauer, Schütze kann keine Halle bauen', () => {
   const g = new Game({ seed: 7 });
   const f = fobOf(g, 0);
+  f.store.bm = 400;
   const rifle = unitsOf(g, 0, 'rifleman')[0];
-  const spot = findSpot(g, 0, 'depot', f.x, f.y);
+  const q = nearestPassable(g.grid, f.x + 80, f.y, 0) || { x: f.x, y: f.y };
+  rifle.x = q.x;
+  rifle.y = q.y;
+  const spot = onlyIn(g, 0, f, f.x, f.y);
   const bad = g.issue(0, { type: 'build', ids: [rifle.id], building: 'depot', x: spot.x, y: spot.y });
   assert.equal(bad.ok, false);
   assert.equal(bad.reason, 'Nur Baufahrzeuge bauen das');
 
-  const w = findSpot(g, 0, 'wall', f.x, f.y);
+  const w = onlyIn(g, 0, f, f.x, f.y, 'wall');
   const ok = g.issue(0, { type: 'build', ids: [rifle.id], building: 'wall', x: w.x, y: w.y });
   assert.equal(ok.ok, true, ok.reason);
   const wall = g.getEntity(ok.id);
@@ -400,7 +422,8 @@ test('buildFob: ohne Baufahrzeug in Reichweite wartet die Baustelle, auch mit Ma
   const g = new Game({ seed: 7 });
   const f = fobOf(g, 0);
   const spot = findSpot(g, 0, 'fob', f.x, f.y, 600, 800);
-  const site = g.spawnBuilding('fob', 0, g.canPlace(0, 'fob', spot.x, spot.y).cx, g.canPlace(0, 'fob', spot.x, spot.y).cy, { built: false });
+  const p = g.canPlace(0, 'fob', spot.x, spot.y);
+  const site = g.spawnBuilding('fob', 0, p.cx, p.cy, { built: false });
   site.store.bm = 400;
   // das Start-Baufahrzeug ist weit weg und hat keinen Auftrag
   const eng = unitsOf(g, 0, 'engineer')[0];
@@ -415,8 +438,12 @@ test('buildFob: ohne Baufahrzeug in Reichweite wartet die Baustelle, auch mit Ma
 test('Reparatur: Baufahrzeug heilt, kostet Baumaterial aus dem Lager des Zahlers', () => {
   const g = new Game({ seed: 7 });
   const f = fobOf(g, 0);
+  f.store.bm = 400;
   f.hp = f.maxHp - 500;
   const eng = unitsOf(g, 0, 'engineer')[0];
+  const q = nearestPassable(g.grid, f.x + 80, f.y, 0) || { x: f.x, y: f.y };
+  eng.x = q.x;
+  eng.y = q.y;
   const bm0 = f.store.bm;
   const r = g.issue(0, { type: 'repair', ids: [eng.id], targetId: f.id });
   assert.equal(r.ok, true, r.reason);
@@ -431,12 +458,14 @@ test('Reparatur: Baufahrzeug heilt, kostet Baumaterial aus dem Lager des Zahlers
   assert.equal(eng.order.type, 'idle', 'Baufahrzeug wird danach idle');
 });
 
-test('Reparatur ohne FOB-Lager in Reichweite findet nicht statt', () => {
+test('Reparatur ohne Lager in Reichweite findet nicht statt', () => {
   const g = new Game({ seed: 7 });
-  const f = fobOf(g, 0);
-  const wall = g.spawnBuilding('wall', 0, cellOf(f.x) + 20, cellOf(f.y), { built: true });
+  const z = g.zone;
+  const wall = g.spawnBuilding('wall', 0, cellOf(z.x), cellOf(z.y), { built: true });
   wall.hp = 100;
   const eng = unitsOf(g, 0, 'engineer')[0];
+  eng.x = wall.x + 80;
+  eng.y = wall.y;
   assert.equal(g.issue(0, { type: 'repair', ids: [eng.id], targetId: wall.id }).ok, true);
   run(g, 10);
   assert.equal(wall.hp, 100);
@@ -446,46 +475,52 @@ test('Reparatur ohne FOB-Lager in Reichweite findet nicht statt', () => {
 test('Erstattung an den Zahler: Ausbildung abbrechen erstattet an die FOB, die bezahlt hat', () => {
   const g = new Game({ seed: 7 });
   const f = fobOf(g, 0);
-  const far = fobAt(g, 0, f.x, f.y, 600, 800);
-  far.store.mun = 0;
+  g.setStock(0, { bm: 400, mun: 150, fuel: 0 });
+  const far = findSpot(g, 0, 'fob', f.x, f.y, 600, 800);
+  const pf = g.canPlace(0, 'fob', far.x, far.y);
+  const other = g.spawnBuilding('fob', 0, pf.cx, pf.cy, { built: true });
+  other.store.mun = 0;
   const money0 = g.teams[0].res.money;
   const r = g.issue(0, { type: 'train', buildingId: f.id, unit: 'rifleman' });
   assert.equal(r.ok, true);
-  assert.equal(f.store.mun, BALANCE.startRes.mun - 15);
+  assert.equal(f.store.mun, 150 - 15);
   assert.equal(g.issue(0, { type: 'cancelTrain', buildingId: f.id }).ok, true);
-  assert.equal(f.store.mun, BALANCE.startRes.mun, 'Munition an den Zahler zurück');
-  assert.equal(far.store.mun, 0, 'andere FOB unberührt');
+  assert.equal(f.store.mun, 150, 'Munition an den Zahler zurück');
+  assert.equal(other.store.mun, 0, 'andere FOB unberührt');
   assert.equal(g.teams[0].res.money, money0, 'Geld zurück');
 });
 
 test('Abriss einer FOB: Lager geht an die nächste andere FOB, kein Material wird erstattet', () => {
   const g = new Game({ seed: 7 });
   const f = fobOf(g, 0);
-  const far = fobAt(g, 0, f.x, f.y, 600, 800);
-  far.store.bm = 100;
+  const far = findSpot(g, 0, 'fob', f.x, f.y, 600, 800);
+  const pf = g.canPlace(0, 'fob', far.x, far.y);
+  const other = g.spawnBuilding('fob', 0, pf.cx, pf.cy, { built: true });
+  other.store.bm = 100;
   f.store.bm = 250;
   const eng = unitsOf(g, 0, 'engineer')[0];
-  // Baustelle einer FOB abreißen: nichts bezahlt, nichts erstattet
+  // Baustelle einer FOB abreißen: nichts bezahlt, nichts erstattet, Lager geht an die nächste FOB
   const site = g.spawnBuilding('fob', 0, cellOf(f.x) - 8, cellOf(f.y), { built: false });
   site.store.bm = 40;
   assert.equal(g.issue(0, { type: 'demolish', buildingId: site.id }).ok, true);
-  assert.equal(f.store.bm, 250 + 40, 'nächste FOB (die Haupt-FOB) nimmt das Baustellenlager');
-  assert.equal(far.store.bm, 100, 'fernere FOB unberührt');
+  assert.equal(f.store.bm, 250 + 40, 'nächste FOB (f) nimmt das Baustellenlager');
+  assert.equal(other.store.bm, 100, 'fernere FOB unberührt');
   assert.equal(g.issue(0, { type: 'demolish', buildingId: f.id }).ok, true);
-  assert.equal(far.store.bm, 100 + 290, 'Lager der abgerissenen FOB geht an die andere; kein Materialgeschenk');
+  assert.equal(other.store.bm, 100 + 290, 'Lager der abgerissenen FOB geht an die andere; kein Materialgeschenk');
   assert.equal(eng.alive, true);
 });
 
 test('Erstattung: Abriss fertiger Gebäude 25 % Baumaterial, Baustelle voll, an den Zahler', () => {
   const g = new Game({ seed: 7 });
   const f = fobOf(g, 0);
-  const spot = findSpot(g, 0, 'depot', f.x, f.y);
+  f.store.bm = 400;
+  const spot = onlyIn(g, 0, f, f.x, f.y);
   const eng = unitsOf(g, 0, 'engineer')[0];
   const r = g.issue(0, { type: 'build', ids: [eng.id], building: 'depot', x: spot.x, y: spot.y });
   const b = g.getEntity(r.id);
-  const bm0 = f.store.bm;
+  assert.equal(f.store.bm, 100);
   assert.equal(g.issue(0, { type: 'demolish', buildingId: b.id }).ok, true);
-  assert.equal(f.store.bm, bm0 + 300, 'Baustelle: volle Erstattung');
+  assert.equal(f.store.bm, 400, 'Baustelle: volle Erstattung');
 
   const r2 = g.issue(0, { type: 'build', ids: [eng.id], building: 'depot', x: spot.x, y: spot.y });
   assert.equal(r2.ok, true, r2.reason);
@@ -497,16 +532,22 @@ test('Erstattung: Abriss fertiger Gebäude 25 % Baumaterial, Baustelle voll, an 
   assert.equal(f.store.bm, bm1 + 300 * BALANCE.demolishRefund);
 });
 
-/** Mörser (Team 0) bei (600, 3800), Feind-Schütze bei (1000, 3800), eigene Sicht durch Fahrzeughalle. */
+/**
+ * Mörser (Team 0) bei (600, 2800), versorgt von einer eigenen FOB bei (600, 3050) (HQ liegt außerhalb des Radius).
+ * Feind-Schütze bei (1000, 2800), eigene Sicht durch Fahrzeughalle bei (1000, 2950).
+ * Mit Flugabwehr: Team 1 hat sie bei (800, 2850), versorgt von einer FOB bei (800, 2500).
+ */
 function mortarScene(withAA) {
   const g = new Game({ seed: 7 });
-  g.spawnBuilding('mortar', 0, cellOf(600) - 1, cellOf(3800) - 1);
-  g.spawnBuilding('depot', 0, cellOf(1000) - 1, cellOf(3950) - 1);
-  const enemy = g.spawnUnit('rifleman', 1, 1000, 3800);
+  const f0 = g.spawnBuilding('fob', 0, cellOf(600) - 1, cellOf(3050) - 1);
+  f0.store.mun = 200;
+  g.spawnBuilding('mortar', 0, cellOf(600) - 1, cellOf(2800) - 1);
+  g.spawnBuilding('depot', 0, cellOf(1000) - 1, cellOf(2950) - 1);
+  const enemy = g.spawnUnit('rifleman', 1, 1000, 2800);
   if (withAA) {
-    g.spawnBuilding('aa', 1, cellOf(800) - 1, cellOf(3950) - 1);
+    g.spawnBuilding('aa', 1, cellOf(800) - 1, cellOf(2850) - 1);
     // Versorger der Flugabwehr: eigene FOB in Reichweite mit Munition
-    const f1 = g.spawnBuilding('fob', 1, cellOf(800) - 5, cellOf(3950) - 1);
+    const f1 = g.spawnBuilding('fob', 1, cellOf(800) - 1, cellOf(2500) - 1);
     f1.store.mun = 200;
   }
   return { g, enemy };
@@ -550,8 +591,8 @@ test('Flugabwehr fängt Mörsergranaten ab', () => {
 
 test('Verbrauch: ein Schuss zieht Munition aus dem Einheitenvorrat, nicht aus dem Lager', () => {
   const g = new Game({ seed: 7 });
-  const sp = g.map.spawns[0];
-  const rifle = g.spawnUnit('rifleman', 0, sp.x + 300, sp.y - 300);
+  const z = g.zone;
+  const rifle = g.spawnUnit('rifleman', 0, z.x, z.y);
   const enemy = g.spawnUnit('rifleman', 1, rifle.x + 120, rifle.y);
   const stock0 = g.teams[0].res.mun;
   const ammo0 = rifle.ammo;
@@ -565,11 +606,10 @@ test('Verbrauch: ein Schuss zieht Munition aus dem Einheitenvorrat, nicht aus de
 
 test('Verbrauch: leerer Schütze feuert nicht, Abklingzeit läuft nicht an, Mangelmeldung', () => {
   const g = new Game({ seed: 7 });
-  const sp = g.map.spawns[0];
-  const rifle = g.spawnUnit('rifleman', 0, sp.x + 300, sp.y - 300);
-  const enemy = g.spawnUnit('rifleman', 1, rifle.x + 120, rifle.y);
   silence(g, 0);
-  g.setStock(0, { bm: BALANCE.startRes.bm, mun: 0, fuel: BALANCE.startRes.fuel }); // kein Nachfüllen aus der FOB
+  const z = g.zone; // außerhalb jedes Lager-Radius: kein Nachschub
+  const rifle = g.spawnUnit('rifleman', 0, z.x, z.y);
+  const enemy = g.spawnUnit('rifleman', 1, rifle.x + 120, rifle.y);
   rifle.ammo = 0;
   assert.equal(g.issue(0, { type: 'attack', ids: [rifle.id], targetId: enemy.id }).ok, true);
   run(g, 3);
@@ -643,6 +683,7 @@ test('Determinismus: gleicher Seed, gleiche Partie', () => {
   const play = () => {
     const g = new Game({ seed: 11 });
     const f = fobOf(g, 0);
+    g.setStock(0, { bm: 800, mun: 150, fuel: 150 });
     const sp = findSpot(g, 0, 'depot', f.x, f.y);
     g.issue(0, { type: 'build', building: 'depot', x: sp.x, y: sp.y });
     g.issue(0, { type: 'train', buildingId: f.id, unit: 'rifleman' });

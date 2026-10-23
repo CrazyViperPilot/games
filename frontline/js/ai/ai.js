@@ -125,7 +125,7 @@ export class AI {
     const fobs = own.filter((b) => b.type === 'fob');
     const builtFobs = fobs.filter((b) => b.built).sort((a, b) => a.id - b.id);
     const units = g.units.filter((u) => u.alive && u.team === t);
-    const home = builtFobs[0] ?? null;
+    const home = own.find((b) => b.type === 'hq' && b.built) ?? null; // Ausgangspunkt der KI ist das HQ (§12.4)
     const ax = home ? home.x : fobs[0] ? fobs[0].x : g.map.spawns[t].x;
     const ay = home ? home.y : fobs[0] ? fobs[0].y : g.map.spawns[t].y;
     const zone = g.zone;
@@ -655,7 +655,7 @@ export class AI {
       for (const type of ['aa', 'mortar']) {
         const have = s.own.some((b) => b.type === type && dist(b.x, b.y, f.x, f.y) < DEF_RANGE);
         if (have || !this.canPay(BUILDINGS[type].cost, this.fobReserve(s) + 300)) continue;
-        if (g.fobsInRadius(t, f.x, f.y).every((o) => o.store.bm < BUILDINGS[type].cost.bm || o.store.mun < BUILDINGS[type].cost.mun)) continue;
+        if (g.depotsInRadius(t, f.x, f.y).every((o) => o.store.bm < BUILDINGS[type].cost.bm || o.store.mun < BUILDINGS[type].cost.mun)) continue;
         const p = this.findSite(type, f.x, f.y, 130, 330, {
           angle: toZone,
           corridor: f === s.home,
