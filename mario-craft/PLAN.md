@@ -250,3 +250,8 @@ spielneutralen Auftrag: „Lies `<spiel>/PLAN.md`, setze nur das genannte Paket 
 - `moveAndCollide`/`updatePlayer` liefern wiederverwendete Ergebnisobjekte; `hitHead` sofort auswerten.
 - `player.invuln`/`player.star` sind Restzeiten (s), `updatePlayer` zählt sie herunter; setzen tut `Game`.
 - Gemessen: gehaltener Sprung stehend ≈ 5,2 Kacheln, gerannt ≈ 6,2; Rennsprung landet ≈ 8,7 Kacheln weit; kurzer Tipp ≈ 2,1.
+
+**WP3**
+- 12 Level in `js/data/levels/`, Reihenfolge in `LEVELS`. Plattform `fall`: `range = 0`, `speed` = Fallgeschwindigkeit (px/s).
+- `!` nur als versteckte begehbare Blöcke (ohne `items`); Gegenstände liegen nur auf `?`. Kein Stern-Block in v1-Leveln.
+- Boss-Arena: 22 flache Spalten, `b` in Zeile 12, Zielfahne direkt nach der Arena. `l` in Zeile 12 über Lava (Zeilen 13–14).
