@@ -1,5 +1,6 @@
-// KI-Gegner (PLAN.md §5, §10.2, §11.5). Steuert nur über game.issue und liest den Zustand. Kein DOM.
-// Reihenfolge je Denkschritt: Baustellen pflegen, Verteidigung, Rückzug, Förderanlagen, Expansion (FOB-Baustellen),
+// KI-Gegner (PLAN.md §5, §10.2, §11.5, §12.4). Steuert nur über game.issue und liest den Zustand. Kein DOM.
+// Das HQ ist Ausgangspunkt (unbegrenzter Nachschub, 2 Ladeplätze); FOBs sind vorgeschobene Lager an der Front.
+// Reihenfolge je Denkschritt: Baustellen pflegen, Verteidigung (HQ zuerst), Rückzug, Förderanlagen, Expansion (FOB-Baustellen),
 // Halle, Produktion, Verteidigungsgebäude und Mauer, Baufahrzeuge, LKW (Lieferant/Pendler/Versorger), Sammelpunkte, Armee.
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
@@ -10,6 +11,9 @@ const MAX_PLACE = 100; // canPlace-Aufrufe je Denkschritt (Budget für die Platz
 const DEF_RANGE = BALANCE.fob.buildRadius; // Bauradius = Verteidigungsradius einer FOB
 const FOB_COST = BALANCE.construction.fobMaterial; // Baumaterial, das eine FOB-Baustelle braucht
 const ZONE_FOB_R = BALANCE.zone.r * 0.6; // Zonen-FOB: Mittelpunkt höchstens so weit von der Zonenmitte
+const HQ_R = BALANCE.hq.buildRadius; // Bauradius des HQ
+const HQ_THREAT = 800; // Gegner so nah am HQ lösen die HQ-Verteidigung aus
+const HQ_DEFEND = 1500; // alle Kampfeinheiten bis hierher zum HQ rufen
 const THREAT_RANGE = 900; // Kampfeinheiten in dieser Nähe zur Bedrohung reagieren
 const THREAT_DANGER = 600; // Gegner in dieser Nähe machen ein FOB-Ziel unattraktiver
 const GATHER_DIST = 300; // Sammelpunkt Richtung Zone, vom Zentrum der Haupt-FOB
@@ -33,18 +37,24 @@ const DEPOT_CAP = { easy: 1, normal: 2, hard: 3 }; // Fahrzeughallen je Schwieri
 const NODE_W = { bm: 1, mun: 1.5, fuel: 1.5 }; // Gewicht eines freien Vorkommens für den FOB-Wert
 const NEED = { bm: 1000, mun: 300, fuel: 250 }; // Bedarf je Sorte: kleinster Vorrat/Bedarf zuerst
 const KEYS = ['bm', 'mun', 'fuel'];
+const FOB_MUN_RESERVE = 40; // Munition, die ein FOB-Lager bei der Ausbildung für das Nachfüllen behält
 const CAP = BALANCE.logistics.truckCapacity;
 const ENG_NEAR = 250; // Baufahrzeug näher an einer Baustelle: die automatische Zuweisung übernimmt
 const SUPPLY_BEHIND = 150; // Versorger steht so weit hinter dem Schwerpunkt der Armee
 const SUPPLY_MIN = 0.25; // Versorger lädt nach, wenn die Ladung unter diesem Anteil liegt
+const MAX_PEND = 5; // Pendler insgesamt
+const PEND_STEP = 1500; // 1 Pendler je so viele px Strecke HQ → Zonen-FOB
 const SURPLUS_MIN = 120; // Pendler fährt nur, wenn die Quelle so viel Überschuss hat
 const ROUTE_HOLD = 20; // s, früheste Neuplanung einer Pendler-Route
+const DEFAULT_OPTS = { hall: 'hq', train: 'hq' };
 const DEG = Math.PI / 180;
 const SITE_ANGLES = [0, 30, -30, 60, -60, 90, -90, 120, -120, 150, -150, 180].map((d) => d * DEG);
 const TWO_PI = Math.PI * 2;
 const RES_KEYS = ['money', 'bm', 'mun', 'fuel'];
 
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
+/** Bauradius eines Lager-Gebäudes (HQ oder FOB). */
+const depotR = (b) => (b.type === 'hq' ? HQ_R : DEF_RANGE);
 const TILE = BALANCE.map.tile;
 
 /** Mittelpunkt einer Förderanlage am Vorkommen (wie canPlace: 2×2 Zellen, Mitte auf Zellgrenze). */
@@ -61,8 +71,13 @@ function unitVec(dx, dy) {
 const cargoTotal = (u) => u.cargo.bm + u.cargo.mun + u.cargo.fuel;
 
 export class AI {
-  constructor(game, team, difficulty = 'normal') {
+  /**
+   * opts (nur für Messungen): hall 'hq' | 'front' (Fahrzeughalle nahe HQ oder an der Front-FOB),
+   * train 'hq' | 'front' (Infanterie am HQ oder an der vordersten FOB mit Vorrat).
+   */
+  constructor(game, team, difficulty = 'normal', opts = {}) {
     this.game = game;
+    this.opts = { ...DEFAULT_OPTS, ...opts };
     this.team = team;
     this.difficulty = BALANCE.difficulty[difficulty] ? difficulty : 'normal';
     this.cfg = BALANCE.difficulty[this.difficulty];
@@ -82,6 +97,8 @@ export class AI {
     this.hadZoneFob = false; // eine Zonen-FOB (auch Baustelle) existierte im letzten Denkschritt
     this.avoidZone = false; // Vorkommen-FOBs außerhalb der (feindlich gehaltenen) Zone suchen
     this.zoneBan = 0; // bis dahin keine neue Zonen-FOB (nach Verlust, gegen Nachschub in den Tod)
+    this.assault = false; // Angriff auf das gegnerische HQ läuft
+    this.defMemo = null; // letztes Ziel der HQ-Verteidigung { x, y, t }
 
     const t = game.teams[team];
     t.isAI = true;
@@ -124,8 +141,9 @@ export class AI {
     const own = g.buildings.filter((b) => b.alive && b.team === t);
     const fobs = own.filter((b) => b.type === 'fob');
     const builtFobs = fobs.filter((b) => b.built).sort((a, b) => a.id - b.id);
+    const hq = own.find((b) => b.type === 'hq' && b.built) ?? null;
     const units = g.units.filter((u) => u.alive && u.team === t);
-    const home = own.find((b) => b.type === 'hq' && b.built) ?? null; // Ausgangspunkt der KI ist das HQ (§12.4)
+    const home = hq; // Ausgangspunkt der KI ist das HQ (§12.4)
     const ax = home ? home.x : fobs[0] ? fobs[0].x : g.map.spawns[t].x;
     const ay = home ? home.y : fobs[0] ? fobs[0].y : g.map.spawns[t].y;
     const zone = g.zone;
@@ -139,10 +157,13 @@ export class AI {
     const extractors = own.filter((b) => b.type === 'extractor');
     this.bmMines = extractors.filter((b) => b.nodeId !== null && g.nodeById.get(b.nodeId)?.type === 'bm').length;
     const zoneFob = fobs.find((f) => dist(f.x, f.y, zone.x, zone.y) <= ZONE_FOB_R + 16) ?? null;
+    // Bedrohung des HQ: sichtbare Gegner in der Nähe oder Treffer am HQ bzw. an Gebäuden in seinem Umkreis
+    const hqEnemies = home ? enemies.filter((e) => dist(e.x, e.y, ax, ay) <= HQ_THREAT) : [];
     const alarm =
       !!home &&
-      (own.some((b) => dist(b.x, b.y, ax, ay) <= DEF_RANGE && b.lastHitTime > g.time - ALARM_TIME) ||
-        enemies.some((e) => dist(e.x, e.y, ax, ay) <= DEF_RANGE));
+      (hqEnemies.length > 0 ||
+        own.some((b) => dist(b.x, b.y, ax, ay) <= DEF_RANGE + 100 && b.lastHitTime > g.time - ALARM_TIME));
+    const enemyHq = g.buildings.find((b) => b.alive && b.team !== t && b.type === 'hq') ?? null;
     // FOB-Baustellen, die noch auf ihr Baumaterial warten (Zonen-FOB zuerst)
     const needMat = fobs
       .filter((f) => !f.built && !f.supplied && f.store.bm < FOB_COST)
@@ -152,6 +173,10 @@ export class AI {
       own,
       fobs,
       builtFobs,
+      depots: home ? [home, ...builtFobs] : builtFobs, // Lager-Gebäude: HQ (unbegrenzt) und fertige FOBs
+      hq,
+      hqEnemies,
+      enemyHq,
       home,
       ax,
       ay,
@@ -206,16 +231,6 @@ export class AI {
   /** Baumaterial, das für die nächste FOB zurückgehalten wird (Verteidigung und zweite Halle). */
   fobReserve(s) {
     return s.fobs.length < this.fobCap() ? FOB_COST : 0;
-  }
-
-  /** Kampfeinheit ausbilden: Geld da und nach Abzug der Kosten noch Munitionsreserve übrig. */
-  canTrain(type, combatN) {
-    const cost = UNITS[type].cost;
-    const res = this.game.teams[this.team].res;
-    if (res.money < (cost.money || 0)) return false;
-    if (!cost.mun) return true;
-    const reserve = Math.min(AMMO_RESERVE_MAX, AMMO_PER_COMBAT * combatN);
-    return res.mun - cost.mun >= reserve;
   }
 
   /** canPlace mit Budget; liefert das Ergebnis, wenn zulässig, sonst null. */
@@ -277,13 +292,34 @@ export class AI {
     return { x, y };
   }
 
-  /** Sammelpunkt: an der Zonen-FOB (Richtung Basis), sonst Richtung Zone vor der Haupt-FOB. */
+  /** Sammelpunkt: an der Zonen-FOB (Richtung Basis), sonst Richtung Zone vor dem HQ; bei Angriff aufs HQ am HQ. */
   gatherPoint(s) {
+    if (s.alarm && s.hq) return this.guardPoint(s);
     if (s.zoneFob && s.zoneFob.built) {
       const v = unitVec(s.ax - s.zoneFob.x, s.ay - s.zoneFob.y);
       return this.freeNear(s.zoneFob.x + v.x * ZONE_GATHER_DIST, s.zoneFob.y + v.y * ZONE_GATHER_DIST);
     }
+    return this.guardPoint(s);
+  }
+
+  /** Wachposten am HQ: Richtung Zone vor dem HQ. */
+  guardPoint(s) {
     return this.freeNear(s.ax + s.dir.x * GATHER_DIST, s.ay + s.dir.y * GATHER_DIST);
+  }
+
+  /** Sollstärke der Heimwache (Kampfeinheiten nahe dem HQ): ab 8 Kampfeinheiten ein Viertel, höchstens 10. */
+  guardWanted(s) {
+    return s.combat.length < 8 ? 0 : Math.min(10, Math.floor(s.combat.length / 4));
+  }
+
+  /** Untätige Kampfeinheiten der Heimwache (die HQ-nächsten bis zur Sollstärke). */
+  guardUnits(s) {
+    if (!s.hq) return [];
+    const want = this.guardWanted(s);
+    return s.combat
+      .filter((u) => dist(u.x, u.y, s.ax, s.ay) <= 700 && !(u.order.type === 'move' && dist(u.order.x, u.order.y, s.ax, s.ay) > 700))
+      .sort((a, b) => dist(a.x, a.y, s.ax, s.ay) - dist(b.x, b.y, s.ax, s.ay) || a.id - b.id)
+      .slice(0, want);
   }
 
   /** Förderanlage an Vorkommen n wäre im Bauradius einer dieser FOBs (gleiche Geometrie wie canPlace). */
@@ -312,8 +348,32 @@ export class AI {
 
   // ---- Verteidigung und Rückzug ---------------------------------------------------
 
-  /** Gegner im Bauradius einer eigenen FOB: Kampfeinheiten in der Nähe greifen dort an. */
+  /**
+   * HQ-Verteidigung (höchste Priorität, das HQ-Verlust ist die Niederlage): sichtbare Gegner am HQ oder Treffer →
+   * alle Kampfeinheiten bis HQ_DEFEND px greifen an; ist die Bedrohung stark, kommt die ganze Armee.
+   * Danach Verteidigung der FOBs: Gegner im Bauradius → Kampfeinheiten in der Nähe greifen dort an.
+   */
   defend(s) {
+    const g = this.game;
+    if (s.hq && s.alarm) {
+      const near = s.hqEnemies.length ? s.hqEnemies : s.enemies.filter((e) => dist(e.x, e.y, s.ax, s.ay) <= HQ_DEFEND);
+      let cx = s.ax + s.dir.x * 120;
+      let cy = s.ay + s.dir.y * 120;
+      if (near.length) {
+        cx = near.reduce((a, e) => a + e.x, 0) / near.length;
+        cy = near.reduce((a, e) => a + e.y, 0) / near.length;
+      }
+      const value = (list) => list.reduce((a, u) => a + (UNITS[u.type].cost.money || 0), 0);
+      const close = s.combat.filter((u) => dist(u.x, u.y, s.ax, s.ay) <= HQ_DEFEND);
+      // starke Bedrohung: die ganze Armee kommt (Niederlage bei HQ-Verlust)
+      const all = near.length && value(near) > 0.7 * value(close) ? s.combat : close;
+      const ids = all
+        .filter((u) => !(u.order.type === 'attackMove' && dist(u.order.x, u.order.y, cx, cy) < 250))
+        .filter((u) => u.order.type !== 'attack')
+        .map((u) => u.id);
+      if (ids.length) g.issue(this.team, { type: 'attackMove', ids, x: cx, y: cy });
+      this.assault = false;
+    }
     if (!s.enemies.length) return;
     for (const f of s.builtFobs) {
       const near = s.enemies.filter((e) => dist(e.x, e.y, f.x, f.y) <= DEF_RANGE);
@@ -325,7 +385,7 @@ export class AI {
         .filter((u) => !(u.order.type === 'attackMove' && dist(u.order.x, u.order.y, cx, cy) < 120))
         .filter((u) => u.order.type !== 'attack')
         .map((u) => u.id);
-      if (ids.length) this.game.issue(this.team, { type: 'attackMove', ids, x: cx, y: cy });
+      if (ids.length) g.issue(this.team, { type: 'attackMove', ids, x: cx, y: cy });
     }
   }
 
@@ -337,24 +397,24 @@ export class AI {
   }
 
   /**
-   * Einheiten mit fast leerem Vorrat ziehen sich zur nächsten FOB (mit Vorrat) oder zum Versorger zurück,
-   * sofern sie nicht schon dort nachgefüllt werden. Nicht bei Angriff auf die Basis.
+   * Einheiten mit fast leerem Vorrat ziehen sich zum nächsten Lager (FOB mit Vorrat, sonst HQ) oder zum Versorger
+   * zurück, sofern sie nicht schon dort nachgefüllt werden. Nicht bei Angriff auf die Basis.
    */
   retreat(s) {
-    if (s.alarm || !s.builtFobs.length) return;
+    if (s.alarm || !s.depots.length) return;
     const groups = new Map(); // Zielschlüssel -> { x, y, ids }
     const supplyTrucks = s.trucks.filter((t) => this.roles.get(t.id) === 'vers');
     for (const u of s.combat) {
       const k = this.dryKind(u);
       if (!k || u.order.type === 'move' || u.order.type === 'attack') continue;
       // wird dort, wo die Einheit steht, bereits nachgefüllt?
-      if (s.builtFobs.some((f) => f.store[k] > 2 && dist(f.x, f.y, u.x, u.y) <= DEF_RANGE)) continue;
+      if (s.depots.some((f) => f.store[k] > 2 && dist(f.x, f.y, u.x, u.y) <= depotR(f))) continue;
       const lorry = s.trucks.find((t) => t.cargo[k] > 2 && dist(t.x, t.y, u.x, u.y) <= BALANCE.logistics.truckSupplyRange);
       if (lorry) continue;
       let best = null;
       let bd = Infinity;
-      for (const f of s.builtFobs) {
-        const d = dist(f.x, f.y, u.x, u.y) + (f.store[k] >= 20 ? 0 : 1500);
+      for (const f of s.depots) {
+        const d = dist(f.x, f.y, u.x, u.y) + (f.store[k] >= 20 ? 0 : 3000);
         if (d < bd) {
           bd = d;
           best = { key: `f${f.id}`, x: f.x, y: f.y, fob: f };
@@ -373,7 +433,7 @@ export class AI {
       groups.get(best.key).ids.push(u.id);
     }
     for (const gr of groups.values()) {
-      const p = gr.fob ? this.freeNear(gr.x + (this.rng.next() - 0.5) * 200, gr.y + 120) : { x: gr.x, y: gr.y };
+      const p = gr.fob ? this.freeNear(gr.x + (this.rng.next() - 0.5) * 200, gr.y + (gr.fob.type === 'hq' ? 170 : 120)) : { x: gr.x, y: gr.y };
       this.game.issue(this.team, { type: 'move', ids: gr.ids, x: p.x, y: p.y });
     }
   }
@@ -398,14 +458,15 @@ export class AI {
     }
   }
 
-  /** FOB-Baustellen setzen: Zonen-FOB zuerst, dann Vorkommen-FOBs; nur wenn Material bereitsteht. */
+  /**
+   * FOB-Baustellen setzen: Zonen-FOB zuerst, dann Vorkommen-FOBs. Das Baufahrzeug fährt sofort los; das Material
+   * (400 Baumaterial) lädt der Lieferant am HQ (unbegrenzt) und bringt es zur Baustelle.
+   */
   expand(s) {
     const g = this.game;
-    if (!s.engineers.length || !s.builtFobs.length) return;
+    if (!s.engineers.length || !s.hq) return;
     if (s.fobs.length >= this.fobCap()) return;
     if (s.needMat.length >= 1 || s.fobs.filter((f) => !f.built).length >= 2) return;
-    // 400 Baumaterial müssen in einer FOB bereitliegen (der Lieferant lädt sie dort)
-    if (!s.builtFobs.some((f) => f.store.bm >= FOB_COST)) return;
 
     // Zonen-FOB zuerst – nicht kurz nach einem Verlust und nicht mitten in einer gegnerischen Übermacht
     const zoneHeld = s.zone.counts[1 - this.team] >= 4; // Besatzung der Zone ist öffentlich (wie bei der Zonenwertung)
@@ -414,7 +475,11 @@ export class AI {
     let site = zoneWanted ? this.zoneSite(s) : null;
     if (!site) site = this.nodeSite(s);
     if (!site) return;
-    const r = g.issue(this.team, { type: 'buildFob', x: site.x, y: site.y });
+    // nächstes untätiges Baufahrzeug fährt sofort hin
+    const idle = s.engineers.filter((u) => u.order.type === 'idle').sort((a, b) => dist(a.x, a.y, site.x, site.y) - dist(b.x, b.y, site.x, site.y));
+    const cmd = { type: 'buildFob', x: site.x, y: site.y };
+    if (idle.length) cmd.ids = [idle[0].id];
+    const r = g.issue(this.team, cmd);
     if (!r.ok) this.badSites.push({ x: site.x, y: site.y, until: g.time + BAD_TIME });
   }
 
@@ -432,7 +497,8 @@ export class AI {
         const a = a0 + (k * TWO_PI) / n;
         const x = z.x + Math.cos(a) * r;
         const y = z.y + Math.sin(a) * r;
-        cands.push({ x, y, v: this.nodeValue(x, y, s.freeNodes), d: dist(x, y, s.ax, s.ay) });
+        const d = dist(x, y, s.ax, s.ay);
+        cands.push({ x, y, v: this.nodeValue(x, y, s.freeNodes) - d / 1500, d }); // Vorkommen zählen, die eigene Seite ist sicherer
       }
     }
     cands.sort((a, b) => b.v - a.v || a.d - b.d);
@@ -487,9 +553,9 @@ export class AI {
   // ---- Wirtschaft ------------------------------------------------------------------
 
   /**
-   * Förderanlagen auf allen freien Vorkommen im Bauradius einer fertigen eigenen FOB, deren Lager das Baumaterial hat.
-   * Reihenfolge: Baumaterial, bis zwei Anlagen stehen; danach nach Knappheit (kleinster Vorrat/Bedarf zuerst).
-   * Höchstens 3 (mit 2 Baufahrzeugen 4) unfertige Förderanlagen gleichzeitig.
+   * Förderanlagen (Nahquellen) auf freien Vorkommen im Bauradius einer fertigen Front-FOB, deren Lager das Baumaterial hat
+   * (am HQ unnötig). Munition und Treibstoff an der Zonen-FOB zuerst; sonst nach Knappheit (kleinster Vorrat/Bedarf).
+   * Höchstens 3 (mit 2 Baufahrzeugen 4) unfertige Förderanlagen gleichzeitig; keine Vorkommen mit Gegnern in der Nähe.
    */
   buildExtractors(s) {
     const g = this.game;
@@ -498,8 +564,14 @@ export class AI {
     let room = (s.engineers.length >= 2 ? 4 : 3) - s.extractors.filter((b) => !b.built).length;
     if (room <= 0) return;
     const res = g.teams[t].res;
-    const cands = s.freeNodes.filter((n) => this.inBuildReach(s.builtFobs, n));
-    const key = (n) => (n.type === 'bm' && this.bmMines < 2 ? -1 : res[n.type] / NEED[n.type]);
+    const zf = s.zoneFob && s.zoneFob.built ? s.zoneFob : null;
+    const cands = s.freeNodes.filter((n) => this.inBuildReach(s.builtFobs, n) && !this.danger(s, n.x, n.y));
+    const key = (n) => {
+      let k = res[n.type] / NEED[n.type];
+      if (n.type === 'bm' && this.bmMines < 1) k -= 1;
+      if (zf && n.type !== 'bm' && dist(n.x, n.y, zf.x, zf.y) <= DEF_RANGE) k -= 0.8; // Munition/Treibstoff an der Zonen-FOB
+      return k;
+    };
     cands.sort((a, b) => key(a) - key(b) || dist(a.x, a.y, s.ax, s.ay) - dist(b.x, b.y, s.ax, s.ay));
     for (const n of cands) {
       if (room <= 0) break;
@@ -511,42 +583,55 @@ export class AI {
   }
 
   /**
-   * Fahrzeughalle: die erste ab 2 Förderanlagen. Weitere nur bei Geldüberschuss (> 1500) und genug
-   * Munition/Treibstoff, bis zur Grenze je Schwierigkeit (normal 2, schwer 3).
+   * Fahrzeughalle: die erste früh (nach der ersten FOB-Baustelle), nur Baumaterial. Weitere nur bei Geldüberschuss
+   * (> 1500) und genug Munition/Treibstoff, bis zur Grenze je Schwierigkeit (normal 2, schwer 3).
+   * opts.hall 'hq': hinter dem HQ (bezahlt aus dem unbegrenzten HQ-Lager); 'front': an der Zonen-FOB (Lager nötig).
    */
   buildDepot(s) {
     const g = this.game;
     const t = this.team;
     const res = g.teams[t].res;
-    if (!s.home || s.extBuilt < 2) return;
+    if (!s.hq) return;
     const have = s.own.filter((b) => b.type === 'depot').length;
-    // Erst expandieren (Baumaterial für Zonen-FOB), dann die Halle – außer die Expansion ist am Ende
-    const expanded = s.builtFobs.length >= 2 || s.fobs.length >= this.fobCap() || this.game.time > 360;
-    if (have < 1 && !expanded) return;
-    const rich = res.money > RICH && res.mun >= 200 && res.fuel >= 200 && s.extBuilt >= 4;
+    if (have < 1 && (g.time < 45 || !s.fobs.length)) return;
+    const rich = res.money > RICH && s.extBuilt >= 4;
     const want = Math.min(DEPOT_CAP[this.difficulty], have < 1 ? 1 : rich ? have + 1 : have);
-    if (have >= want || !this.canPay(BUILDINGS.depot.cost, have < 1 ? 0 : this.fobReserve(s))) return;
-    if (!s.home.store || s.home.store.bm < BUILDINGS.depot.cost.bm) return;
-    const p = this.findSite('depot', s.home.x, s.home.y, 130, 330, {
-      angle: Math.atan2(-s.dir.y, -s.dir.x), // hinter der Haupt-FOB
-      corridor: true,
-    });
+    if (have >= want) return;
+    if (s.own.some((b) => b.type === 'depot' && !b.built)) return;
+    let p = null;
+    if (this.opts.hall === 'front') {
+      const anchors = [...s.builtFobs].sort((a, b) => dist(a.x, a.y, s.zone.x, s.zone.y) - dist(b.x, b.y, s.zone.x, s.zone.y));
+      const f = anchors[0];
+      if (!f || f.store.bm < BUILDINGS.depot.cost.bm) return;
+      p = this.findSite('depot', f.x, f.y, 130, 330, { angle: Math.atan2(s.ay - f.y, s.ax - f.x) });
+    } else {
+      p = this.findSite('depot', s.hq.x, s.hq.y, 130, 330, {
+        angle: Math.atan2(-s.dir.y, -s.dir.x), // hinter dem HQ
+        corridor: true,
+      });
+    }
     if (p) g.issue(t, { type: 'build', building: 'depot', x: p.x, y: p.y });
   }
 
   // ---- Produktion ------------------------------------------------------------------
 
-  /** Beste ausbildende Einrichtung für `type`: Lager deckt die Kosten, kürzeste Warteschlange, dann Zonennähe/ID. */
-  pickProducer(s, type, qmax, towardZone) {
+  /**
+   * Beste ausbildende Einrichtung für `type`: Lager deckt die Kosten (HQ immer), kürzeste Warteschlange, dann nach
+   * `pref`: 'hq' = HQ zuerst, 'front' = nächste zur Zone. FOB-Lager behalten eine Munitionsreserve für das Nachfüllen.
+   */
+  pickProducer(s, type, qmax, pref) {
     const g = this.game;
     const cost = UNITS[type].cost;
     let best = null;
     let bestKey = Infinity;
     for (const b of s.own) {
       if (!b.built || !b.def.produces.includes(type) || b.queue.length >= qmax) continue;
-      const ok = b.type === 'fob' ? KEYS.every((k) => b.store[k] >= (cost[k] || 0)) : !!g.payerFor(this.team, b.x, b.y, cost);
-      if (!ok) continue;
-      const key = b.queue.length * 100000 + (towardZone ? dist(b.x, b.y, s.zone.x, s.zone.y) : b.id);
+      let payer = b;
+      if (b.type !== 'hq' && b.type !== 'fob') payer = g.payerFor(this.team, b.x, b.y, cost); // Halle: Zahler in Reichweite
+      if (!payer || !KEYS.every((k) => payer.store[k] >= (cost[k] || 0))) continue;
+      if (payer.type === 'fob' && cost.mun && payer.store.mun - cost.mun < FOB_MUN_RESERVE) continue;
+      const order = pref === 'front' ? dist(b.x, b.y, s.zone.x, s.zone.y) : b.type === 'hq' ? 0 : b.id + 1;
+      const key = b.queue.length * 100000 + order;
       if (key < bestKey) {
         bestKey = key;
         best = b;
@@ -565,12 +650,12 @@ export class AI {
     const res = g.teams[t].res;
     const qmax = res.money > 900 ? 4 : 2;
 
-    // Baufahrzeuge: 1 (2 ab 3 FOBs)
-    const engWant = s.fobs.length >= 3 ? 2 : 1;
+    // Baufahrzeuge: 2 (3 ab 3 FOBs); Ausbildung nur am HQ (unbegrenzt)
+    const engWant = s.fobs.length >= 3 ? 3 : 2;
     const engHave = s.engineers.length + this.queued(s, 'engineer');
     if (engHave < engWant) {
       if (res.money >= UNITS.engineer.cost.money) {
-        const b = this.pickProducer(s, 'engineer', BALANCE.queueMax - 1, false);
+        const b = this.pickProducer(s, 'engineer', BALANCE.queueMax - 1, 'hq');
         if (b) g.issue(t, { type: 'train', buildingId: b.id, unit: 'engineer' });
       } else if (!s.engineers.length) {
         return; // ohne Baufahrzeug droht die Eliminierung: Geld dafür sparen
@@ -581,7 +666,7 @@ export class AI {
     const quota = this.truckQuota(s);
     const truckHave = s.trucks.length + this.queued(s, 'truck');
     if (truckHave < quota.total && res.money >= UNITS.truck.cost.money) {
-      const b = this.pickProducer(s, 'truck', 2, false);
+      const b = this.pickProducer(s, 'truck', 2, 'hq');
       if (b) g.issue(t, { type: 'train', buildingId: b.id, unit: 'truck' });
     }
 
@@ -600,7 +685,6 @@ export class AI {
     for (const u of avail) counts[u] = s.units.filter((x) => x.type === u).length + this.queued(s, u);
     let total = 0;
     for (const u of avail) total += counts[u];
-    let combatN = s.combatN;
 
     // Global nach Defizit: der wichtigste Typ bekommt die knappen Mittel. Fehlt er nur an Geld, wird gespart;
     // fehlt es nur im Lager der Produktionsstätten, kommt der nächste Typ dran (Pendler füllen auf).
@@ -610,8 +694,8 @@ export class AI {
       entries.sort((a, c) => c.deficit - a.deficit);
       let pick = null;
       for (const e of entries) {
-        const b = this.pickProducer(s, e.u, qmax, true);
-        if (b && this.canTrain(e.u, combatN)) {
+        const b = this.pickProducer(s, e.u, qmax, UNITS[e.u].producedAt === 'depot' || this.opts.train === 'front' ? 'front' : 'hq');
+        if (b && res.money >= (UNITS[e.u].cost.money || 0)) {
           pick = { b, u: e.u };
           break;
         }
@@ -622,7 +706,6 @@ export class AI {
       if (!r.ok) break;
       counts[pick.u]++;
       total++;
-      combatN++;
     }
   }
 
@@ -747,7 +830,7 @@ export class AI {
         const taken = s.engineers.some(
           (e) => e !== u && ((e.order.type === 'build' && e.order.targetId === b.id) || (e.order.type === 'move' && this.engTarget.get(e.id) === b.id)),
         );
-        const key = prio(b) * 1500 + dist(u.x, u.y, b.x, b.y) + (taken ? 1000 : 0);
+        const key = prio(b) * 1500 + dist(u.x, u.y, b.x, b.y) + (taken ? 6000 : 0); // unbesetzte Baustellen zuerst
         if (key < bestKey) {
           bestKey = key;
           best = b;
@@ -765,10 +848,21 @@ export class AI {
 
   // ---- LKW ---------------------------------------------------------------------------
 
-  /** Soll-Zahl der LKW je Rolle: 1 Lieferant (solange FOB-Baustellen möglich), Pendler je 2 Außen-FOBs (max. 3), Versorger. */
+  /**
+   * Soll-Zahl der LKW je Rolle: 1 Lieferant (solange FOB-Baustellen möglich; ohne Auftrag pendelt er), Pendler nach
+   * Strecke HQ → Zonen-FOB (1 je 1500 px) plus 1 je 2 weitere Front-FOBs (max. 5; vor der ersten fertigen FOB nur 1),
+   * Versorger ab 15 Kampfeinheiten. Das HQ lädt höchstens 2 LKW zugleich – mehr als 5 Pendler wären nur Warteschlange.
+   */
   truckQuota(s) {
     const lief = s.fobs.length < this.fobCap() || s.needMat.length > 0 ? 1 : 0;
-    const pend = Math.min(3, Math.ceil(Math.max(0, s.fobs.length - 1) / 2));
+    let pend = 0;
+    if (s.hq && s.fobs.length) {
+      const zf = s.zoneFob;
+      const d = zf ? dist(s.ax, s.ay, zf.x, zf.y) : Math.max(0, dist(s.ax, s.ay, s.zone.x, s.zone.y) - 500);
+      const others = s.builtFobs.filter((f) => f !== zf).length;
+      pend = Math.min(MAX_PEND, Math.ceil(d / PEND_STEP) + Math.ceil(others / 2));
+      if (!s.builtFobs.length) pend = Math.min(pend, 1);
+    }
     const vers = s.combat.length >= 15 ? 1 : 0;
     return { lief, pend, vers, total: lief + pend + vers };
   }
@@ -793,59 +887,86 @@ export class AI {
     }
   }
 
-  /** Soll-Lagerstand einer FOB je Sorte: Zonen-FOB und Haupt-FOB (Ausbildung, Halle) brauchen am meisten. */
+  /** Soll-Lagerstand einer FOB je Sorte: die Zonen-FOB (Ausbildung, Nachfüllen der Armee) braucht am meisten. */
   wantOf(s, f) {
     const nodesFree = s.freeNodes.some((n) => dist(n.x, n.y, f.x, f.y) <= DEF_RANGE);
-    if (f === s.zoneFob) return { bm: nodesFree ? 250 : 150, mun: 250, fuel: 150 };
-    if (f === s.home) return { bm: 300, mun: 200, fuel: 200 };
-    return { bm: nodesFree ? 200 : 80, mun: 80, fuel: 60 };
+    if (f === s.zoneFob) return { bm: nodesFree ? 400 : 200, mun: 500, fuel: 300 };
+    return { bm: nodesFree ? 200 : 80, mun: 100, fuel: 80 };
   }
 
   manageTrucks(s) {
     this.assignRoles(s);
-    const fobsLoaded = s.builtFobs.length > 0;
-    if (!fobsLoaded) return;
-    // FOB, aus der der Lieferant sein Baumaterial lädt (die mit dem meisten): hier exportieren Pendler kein Baumaterial
-    const reserveFob = s.needMat.length ? this.richest(s, 'bm') : null;
+    if (!s.hq) return;
     const taken = new Set();
     for (const tr of s.trucks) {
       const role = this.roles.get(tr.id);
-      if (role === 'lief') this.manageLieferant(s, tr);
-      else if (role === 'vers') this.manageVersorger(s, tr);
+      if (role === 'lief') {
+        if (!this.manageLieferant(s, tr)) this.managePendler(s, tr, taken); // ohne Baustelle pendelt der Lieferant
+      } else if (role === 'vers') this.manageVersorger(s, tr);
     }
     for (const tr of s.trucks) {
-      if (this.roles.get(tr.id) === 'pend') this.managePendler(s, tr, taken, reserveFob);
+      if (this.roles.get(tr.id) === 'pend') this.managePendler(s, tr, taken);
     }
   }
 
-  /** Fertige FOB mit dem größten Vorrat einer Sorte. */
+  /** Lager (HQ oder fertige FOB) mit dem größten Vorrat einer Sorte (das HQ ist unbegrenzt, also immer vorn). */
   richest(s, k) {
     let best = null;
-    for (const f of s.builtFobs) if (!best || f.store[k] > best.store[k]) best = f;
+    for (const f of s.depots) if (!best || f.store[k] > best.store[k]) best = f;
     return best;
   }
 
-  /** Lieferant: lädt 400 Baumaterial an der reichsten FOB und entlädt es an der eigenen FOB-Baustelle. */
+  /**
+   * Lieferant: lädt 400 Baumaterial am HQ (oder an einer näheren FOB mit reichlich Vorrat) und entlädt es an der eigenen
+   * FOB-Baustelle. Liefert false, wenn keine Baustelle auf Material wartet (dann pendelt er).
+   */
   manageLieferant(s, tr) {
     const g = this.game;
     const site = s.needMat[0];
-    if (!site) return;
+    if (!site) return false;
     const o = tr.order.type;
-    if (o === 'load' || o === 'unload') return; // arbeitet noch
+    if (o === 'load' || o === 'unload') return true; // arbeitet noch
+    // Pendler mit voller Fracht fährt erst zu Ende
+    if (o === 'route' && tr.order.phase === 'unload' && cargoTotal(tr) > 100) return false;
     const sum = cargoTotal(tr);
     if (tr.cargo.bm >= CAP - 20) {
       if (this.once(`unl${tr.id}:${site.id}`, 6)) g.issue(this.team, { type: 'unload', ids: [tr.id], fobId: site.id });
-      return;
+      return true;
     }
     if (sum - tr.cargo.bm > 40) {
       // fremde Ladung zuerst an der nächsten FOB abladen
       const f = this.nearestBuilt(s, tr.x, tr.y);
       if (f && this.once(`dmp${tr.id}`, 6)) g.issue(this.team, { type: 'unload', ids: [tr.id], fobId: f.id });
-      return;
+      return true;
     }
-    const src = this.richest(s, 'bm');
-    if (!src || src.store.bm < CAP - tr.cargo.bm - 5) return; // erst laden, wenn eine volle Ladung da ist
-    if (this.once(`lod${tr.id}`, 4)) g.issue(this.team, { type: 'load', ids: [tr.id], fobId: src.id, preset: 'bm' });
+    // Quelle: näheste Lager mit genug Baumaterial (FOBs behalten 100 zurück), sonst das HQ
+    let src = s.hq;
+    let sd = dist(s.hq.x, s.hq.y, site.x, site.y);
+    for (const f of s.builtFobs) {
+      const d = dist(f.x, f.y, site.x, site.y);
+      if (d < sd && f.store.bm >= CAP - tr.cargo.bm + 100) {
+        src = f;
+        sd = d;
+      }
+    }
+    if (this.once(`lod${tr.id}`, 4)) {
+      g.issue(this.team, { type: 'load', ids: [tr.id], fobId: src.id, preset: 'bm' });
+      this.routes.delete(tr.id);
+    }
+    return true;
+  }
+
+  nearestDepot(s, x, y) {
+    let best = null;
+    let bd = Infinity;
+    for (const f of s.depots) {
+      const d = dist(f.x, f.y, x, y);
+      if (d < bd) {
+        bd = d;
+        best = f;
+      }
+    }
+    return best;
   }
 
   nearestBuilt(s, x, y) {
@@ -862,10 +983,10 @@ export class AI {
   }
 
   /**
-   * Bester Transport: Ziel-FOB und Sorte mit dem größten Bedarf (Zonen-FOB bevorzugt), Quelle = FOB mit dem
-   * größten Überschuss dieser Sorte (mindestens SURPLUS_MIN).
+   * Bester Transport: Ziel-FOB und Sorte mit dem größten Bedarf (Zonen-FOB bevorzugt). Quelle ist das HQ (unbegrenzt),
+   * außer eine deutlich nähere FOB hat Überschuss dieser Sorte (mindestens SURPLUS_MIN).
    */
-  pendlerPlan(s, taken, reserveFob) {
+  pendlerPlan(s, taken) {
     let best = null;
     for (const to of s.builtFobs) {
       const wTo = this.wantOf(s, to);
@@ -873,26 +994,28 @@ export class AI {
         if (taken.has(to.id + k)) continue;
         const need = (wTo[k] - to.store[k]) / wTo[k];
         if (need < 0.3) continue;
-        const score = need * (to === s.zoneFob ? 1.5 : to === s.home ? 1.2 : 1);
+        const score = need * (to === s.zoneFob ? 1.5 : 1);
         if (best && score <= best.score) continue;
-        let src = null;
-        let sv = SURPLUS_MIN - 1;
+        let src = s.hq;
+        let sv = 400 - dist(s.hq.x, s.hq.y, to.x, to.y) / 10;
         for (const f of s.builtFobs) {
           if (f === to) continue;
-          const sur = f.store[k] - 0.5 * this.wantOf(s, f)[k] - (k === 'bm' && f === reserveFob ? FOB_COST : 0);
-          if (sur > sv) {
-            sv = sur;
+          const sur = f.store[k] - 0.5 * this.wantOf(s, f)[k];
+          if (sur < SURPLUS_MIN) continue;
+          const sc = Math.min(sur, 400) - dist(f.x, f.y, to.x, to.y) / 10;
+          if (sc > sv) {
+            sv = sc;
             src = f;
           }
         }
-        if (src) best = { from: src, to, k, score };
+        best = { from: src, to, k, score };
       }
     }
     return best;
   }
 
-  /** Pendler: Route von der Überschuss-FOB zur Bedarfs-FOB, Ladungsart nach Engpass. */
-  managePendler(s, tr, taken, reserveFob) {
+  /** Pendler: Route vom HQ (oder einer Überschuss-FOB) zur Front-FOB mit Bedarf, Ladungsart nach Engpass. */
+  managePendler(s, tr, taken) {
     const g = this.game;
     const cur = this.routes.get(tr.id);
     const o = tr.order;
@@ -909,7 +1032,7 @@ export class AI {
         }
       }
     }
-    const plan = this.pendlerPlan(s, taken, reserveFob);
+    const plan = this.pendlerPlan(s, taken);
     if (!plan) {
       if (o.type === 'route' && cur) {
         // nichts mehr zu tun: Ladung (falls vorhanden) abliefern, sonst anhalten
@@ -945,13 +1068,14 @@ export class AI {
         dFuel += (u.def.fuelMax || 0) - u.fuel;
       }
       const k = dMun >= dFuel ? 'mun' : 'fuel';
-      const src = this.richest(s, k);
-      if (src && src.store[k] >= 100) {
+      // Quelle: das Lager (HQ oder FOB) mit Vorrat, das dem Heer am nächsten liegt
+      const src = s.depots.filter((f) => f.store[k] >= 150).sort((a, b) => dist(a.x, a.y, cx, cy) - dist(b.x, b.y, cx, cy))[0];
+      if (src) {
         if (this.once(`vld${tr.id}`, 6)) g.issue(this.team, { type: 'load', ids: [tr.id], fobId: src.id, preset: k });
         return;
       }
     }
-    const f = this.nearestBuilt(s, cx, cy);
+    const f = this.nearestDepot(s, cx, cy);
     const v = f ? unitVec(f.x - cx, f.y - cy) : { x: 0, y: 0 };
     const p = this.freeNear(cx + v.x * SUPPLY_BEHIND, cy + v.y * SUPPLY_BEHIND);
     const last = this.supplyAt.get(tr.id);
