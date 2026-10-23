@@ -95,6 +95,9 @@ put(21, 12, '*');   // frei über dem Teich, auf dem Weg
 put(105, 31, '*');  // auf der Schlucht-Plattform B
 put(88, 28, '*');   // Umweg über den Schleimblock (Schleimnische, Kammer)
 
+// Grundgesteinswand von oben bis in den Fels: die Oberfläche ist gesperrt, der Weg führt durch die Tiefe.
+for (let r = 0; r <= 36; r++) put(76, r, 'Z');
+
 // ---- Ausgabe.
 const rows = g.map((row) => row.join(''));
 const out = `// Level w1-2 „Wald und Höhlen“ – erzeugt von js/data/levels/gen/w1-2.mjs (nicht von Hand ändern).

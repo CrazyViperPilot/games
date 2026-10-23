@@ -112,6 +112,9 @@ dots([[118, 47], [119, 47]], 'o');
 dots([[125, 13], [126, 13]], 'o');
 dots([[137, 13], [138, 13], [139, 13], [142, 13], [143, 13], [144, 13]], 'o');
 
+// Grundgesteinswand von oben bis in den Fels: die Oberfläche ist gesperrt, der Weg führt durch die Tiefe.
+for (let r = 0; r <= 37; r++) put(80, r, 'Z');
+
 // Ausgabe
 const rows = g.map((r) => r.join(''));
 const out = `// Generiert von js/data/levels/gen/w1-3.mjs. Nicht von Hand ändern, sondern den Generator anpassen.

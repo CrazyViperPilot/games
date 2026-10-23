@@ -1,6 +1,6 @@
 // Level-Parser v2 (PLAN §3, §4, §6): Level-Definition → LevelMap.
 import { PHYS } from '../data/physics.js';
-import { TILES, TILE_BY_ID } from '../data/tiles.js';
+import { TILES, TILE_BY_ID, TILE_IDS } from '../data/tiles.js';
 
 const T = PHYS.tile;
 const BEDROCK_ID = TILES.Z.id;
@@ -92,7 +92,8 @@ export function parseLevel(def) {
   for (let c = 0; c < cols; c++) {
     let s = R;
     for (let r = 0; r < R; r++) {
-      if (TILE_BY_ID[tiles[r * cols + c]].solid) { s = r; break; }
+      const t = tiles[r * cols + c];
+      if (t !== TILE_IDS.leaves && TILE_BY_ID[t].solid) { s = r; break; }
     }
     surface[c] = s;
   }
