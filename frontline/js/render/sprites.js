@@ -156,6 +156,56 @@ export function drawUnit(ctx, u, color, zoom = 1, aim = null) {
 }
 
 /**
+ * HQ (4 × 4) fertig: Sockel in dunkler Teamfarbe, Gebäudekörper in voller Teamfarbe, helles Dach mit Kante,
+ * zwei Antennen (eine mit gelber Flagge) und großes Kürzel „HQ“.
+ */
+function drawHqBody(ctx, b, color, z) {
+  const x0 = b.cx * TILE;
+  const y0 = b.cy * TILE;
+  const w = b.w * TILE;
+  const h = b.h * TILE;
+  ctx.fillStyle = shade(color, 0.55);
+  ctx.fillRect(x0, y0, w, h);
+  ctx.fillStyle = color;
+  ctx.fillRect(x0 + 5, y0 + 5, w - 10, h - 10);
+  ctx.fillStyle = tint(color, 0.18);
+  ctx.fillRect(x0 + 14, y0 + 14, w - 28, h - 28);
+  ctx.strokeStyle = OUTLINE;
+  ctx.lineWidth = 2 / z;
+  ctx.strokeRect(x0 + 1, y0 + 1, w - 2, h - 2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+  ctx.lineWidth = 1.5 / z;
+  ctx.strokeRect(x0 + 5.5, y0 + 5.5, w - 11, h - 11);
+
+  // Antenne links oben (dunkle Schüssel), Flagge rechts oben in Akzentgelb
+  ctx.strokeStyle = OUTLINE;
+  ctx.lineWidth = 1.5 / z;
+  ctx.fillStyle = '#23272a';
+  ctx.beginPath();
+  ctx.arc(x0 + w * 0.22, y0 + h * 0.2, 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  const px = x0 + w * 0.78;
+  const py = y0 + h * 0.2;
+  ctx.fillStyle = '#23272a';
+  ctx.beginPath();
+  ctx.arc(px, py, 4.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#c9a227';
+  ctx.beginPath();
+  ctx.moveTo(px, py - 2);
+  ctx.lineTo(px + 17, py - 7);
+  ctx.lineTo(px + 17, py + 3);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = '#ffffff';
+  fitText(ctx, 'HQ', x0 + w / 2, y0 + h / 2 + 4, 30, z, w * 0.62);
+}
+
+/**
  * Gebäude: fertig (Team-Plate mit Kürzel), im Bau (gestrichelt, Gerüst, Fortschrittsbalken),
  * Mauer (grauer Block), Tor (grauer Block mit Teamstreifen). Dunkelt sich mit Schaden ab,
  * Fertigungsbalken unter dem Gebäude.
@@ -217,15 +267,19 @@ export function drawBuilding(ctx, b, color, zoom = 1) {
     ctx.fillRect(x0 + w - 5, y0 + 2, 3, h - 4);
     ctx.strokeRect(x0 + 1, y0 + 1, w - 2, h - 2);
   } else {
-    ctx.fillStyle = shade(color, 0.5);
-    ctx.fillRect(x0 + 1, y0 + 1, w - 2, h - 2);
-    ctx.fillStyle = shade(color, 0.3);
-    ctx.fillRect(x0 + 4, y0 + 4, w - 8, h - 8);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2 / z;
-    ctx.strokeRect(x0 + 1, y0 + 1, w - 2, h - 2);
-    ctx.fillStyle = 'rgba(255,255,255,0.92)';
-    fitText(ctx, BUILD_ABBR[b.type] || b.def.name, x0 + w / 2, y0 + h / 2, 11, z, w * 0.88);
+    if (b.type === 'hq') {
+      drawHqBody(ctx, b, color, z);
+    } else {
+      ctx.fillStyle = shade(color, 0.5);
+      ctx.fillRect(x0 + 1, y0 + 1, w - 2, h - 2);
+      ctx.fillStyle = shade(color, 0.3);
+      ctx.fillRect(x0 + 4, y0 + 4, w - 8, h - 8);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2 / z;
+      ctx.strokeRect(x0 + 1, y0 + 1, w - 2, h - 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      fitText(ctx, BUILD_ABBR[b.type] || b.def.name, x0 + w / 2, y0 + h / 2, 11, z, w * 0.88);
+    }
     if (b.hp < b.maxHp) {
       ctx.fillStyle = `rgba(0,0,0,${(1 - b.hp / b.maxHp) * 0.45})`;
       ctx.fillRect(x0 + 1, y0 + 1, w - 2, h - 2);

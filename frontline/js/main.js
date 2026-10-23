@@ -108,13 +108,17 @@ const app = {
     s.loop.speed = SPEEDS[(nearestSpeedIndex(s.loop.speed) + 1) % SPEEDS.length];
     s.hud.pushMessage(`Tempo ${s.loop.speed}×`);
   },
+  /** Debug (M): +1000 Geld und +1000 in jedem endlichen FOB-Lager (Obergrenze storeCap); das HQ ist ohnehin unbegrenzt. */
   debugMoney() {
     const s = session;
     if (!DEBUG || !s) return;
-    const team = s.game.teams[HUMAN];
-    team.res.money += 1000;
-    s.game.setStock(HUMAN, { bm: team.res.bm + 1000, mun: team.res.mun + 1000, fuel: team.res.fuel + 1000 });
-    s.hud.pushMessage('Debug: +1000 aller Ressourcen');
+    const g = s.game;
+    g.teams[HUMAN].res.money += 1000;
+    for (const b of g.buildings) {
+      if (!b.alive || !b.built || b.team !== HUMAN || b.type !== 'fob') continue;
+      for (const k of ['bm', 'mun', 'fuel']) b.store[k] = Math.min(BALANCE.logistics.storeCap, b.store[k] + 1000);
+    }
+    s.hud.pushMessage('Debug: +1000 Geld und +1000 je FOB-Lager (HQ ist unbegrenzt)');
   },
 };
 

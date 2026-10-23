@@ -173,7 +173,7 @@ export class Hud {
       el.rate.textContent = `${neg ? '−' : '+'}${fmtRate(Math.abs(v))}/s`;
       el.rate.style.color = neg ? NEG_COLOR : '';
       // Lagersorten: Summe aller fertigen FOB-Lager; Geld ist global
-      const lines = [k === 'money' ? 'Geld (global, nicht pro FOB)' : 'Summe aller FOB-Lager'];
+      const lines = [k === 'money' ? 'Geld (global, nicht pro FOB)' : 'Summe aller FOB-Lager – ohne HQ, das ist unbegrenzt'];
       if (t.used[k] !== undefined) lines.push(`verbraucht: ${Math.floor(t.used[k])}`);
       const tip = lines.join('\n');
       if (el.box.title !== tip) el.box.title = tip;
@@ -261,6 +261,7 @@ export class Hud {
     } else {
       h += '<div class="muted small">Einsatzbereit</div>';
     }
+    if (b.type === 'hq') h += this.hqInfo(b);
     if (b.type === 'fob') {
       h +=
         '<div class="muted small lagerhead">Lager dieser FOB</div>' +
@@ -287,6 +288,22 @@ export class Hud {
         `<div class="muted small">Warteschlange: ${b.queue.map((e) => esc(UNITS[e.unit ?? e].name)).join(', ')}</div></div>`;
     }
     return h;
+  }
+
+  /**
+   * HQ: unbegrenzter Nachschub (nie der Lagerwert, der ist Infinity), Ladeplätze mit Belegung und Warteschlange.
+   * Belegt = eigene LKW mit dockHeld, wartend = eigene LKW mit waitingDock (logistics.js).
+   */
+  hqInfo(b) {
+    const units = this.game.units;
+    const held = units.filter((u) => u.alive && u.team === b.team && u.dockHeld).length;
+    const wait = units.filter((u) => u.alive && u.team === b.team && u.waitingDock).length;
+    return (
+      '<div class="muted small lagerhead">Nachschub</div>' +
+      '<div class="small">∞ unbegrenzt · Baumaterial, Munition, Treibstoff</div>' +
+      `<div class="small">Ladeplätze: ${held}/${BALANCE.hq.docks} belegt, ${wait} wartend</div>` +
+      `<div class="muted small">Bauradius ${BALANCE.hq.buildRadius} px</div>`
+    );
   }
 
   /** Status einer Baustelle: Material (FOB-Baustelle), dann Baufahrzeug/Bauer, sonst Fortschritt. */

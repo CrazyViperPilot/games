@@ -107,7 +107,7 @@ Schadensmodell: Schaden je Schuss nach Panzerklasse des Ziels (Infanterie / leic
 | Eingabe | Aktion |
 |---|---|
 | Linksklick / Ziehen | Auswählen / Rahmenauswahl; Shift = hinzufügen; Doppelklick = alle dieses Typs im Bild |
-| Rechtsklick | Bewegen; auf Gegner = Angreifen; Gebäude gewählt = Sammelpunkt; LKW auf eigene FOB = laden (leer) bzw. entladen; Baufahrzeug/Infanterie auf eigene Baustelle = dort bauen; Baufahrzeug auf beschädigtes eigenes Gebäude = reparieren |
+| Rechtsklick | Bewegen; auf Gegner = Angreifen; Gebäude gewählt = Sammelpunkt; LKW auf eigene FOB = laden (leer) bzw. entladen, auf das HQ = laden (2 Ladeplätze); Baufahrzeug/Infanterie auf eigene Baustelle = dort bauen; Baufahrzeug auf beschädigtes eigenes Gebäude = reparieren |
 | A + Linksklick | Angriffsbewegung |
 | S | Stopp |
 | B | Baumenü (Baufahrzeug: alles, Infanterie: nur Mauer/Tor); darin Q Halle, W Förderanlage, E Mauer, R Tor, T Mörser, Z/Y Flugabwehr, F FOB-Baustelle |
@@ -118,7 +118,7 @@ Schadensmodell: Schaden je Schuss nach Panzerklasse des Ziels (Infanterie / leic
 | Strg+0–9 / 0–9 | Gruppe speichern / wählen (2× = Kamera hin) |
 | Pfeiltasten, Bildschirmrand, mittlere Maustaste ziehen | Kamera bewegen |
 | Mausrad | Zoom |
-| Leertaste / H | Kamera auf Auswahl / Haupt-FOB |
+| Leertaste / H | Kamera auf Auswahl / H = Kamera auf das HQ |
 | P | Pause; `+` / `-` Spielgeschwindigkeit 1×–3× |
 | F1 / ? | Hilfe |
 | Minimap | Linksklick = Kamera, Rechtsklick = Bewegen |
@@ -130,10 +130,10 @@ Schadensmodell: Schaden je Schuss nach Panzerklasse des Ziels (Infanterie / leic
 - Unten links Minimap, Mitte Auswahlinfo (FOB: Lager; LKW: Ladung und Ladungsart; Einheiten: Munition/Treibstoff),
   rechts Befehlskarte mit Kosten und Tastenkürzeln (nicht bezahlbare Buttons ausgegraut mit Grund).
 - Auf der Karte: Munitions-/Treibstoffbalken bei gewählten Einheiten, Warnzeichen bei Einheiten ohne Munition,
-  Route gewählter LKW als gestrichelte Linie, Bauradius gewählter FOBs als gestrichelter Kreis.
+  Route gewählter LKW als gestrichelte Linie, Bauradius gewählter FOBs und des HQ als gestrichelter Kreis.
 - Meldungen (z. B. „Einheit bereit“, „Basis wird angegriffen“, „Einheiten ohne Munition“, „Route unterbrochen“).
 - Nebel des Krieges: Unerkundet schwarz, erkundet abgedunkelt, gegnerische Einheiten nur in Sicht.
-- Platzierungsvorschau grün/rot mit Bauradien aller eigenen FOBs.
+- Platzierungsvorschau grün/rot mit Bauradien aller eigenen FOBs und des HQ.
 
 ## 10. KI-Gegner
 

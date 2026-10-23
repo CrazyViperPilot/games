@@ -21,9 +21,10 @@ export function builderState(game, b) {
   return state;
 }
 
-/** Name einer eigenen FOB nach Reihenfolge der Gründung: „FOB 2“ bzw. „FOB 2 (Baustelle)“. */
+/** Name eines Lager-Gebäudes: „HQ“, sonst eigene FOB nach Reihenfolge der Gründung: „FOB 2“ bzw. „FOB 2 (Baustelle)“. */
 export function fobLabel(game, b) {
   if (!b) return 'FOB';
+  if (b.type === 'hq') return 'HQ';
   const own = game.buildings.filter((x) => x.alive && x.team === b.team && x.type === 'fob');
   const i = own.indexOf(b);
   const n = i >= 0 ? i + 1 : '';
@@ -33,6 +34,7 @@ export function fobLabel(game, b) {
 /** Kurztext des Auftrags einer eigenen Einheit (Auftragstyp aus Engine). */
 export function orderText(game, u) {
   const o = u.order;
+  if (u.waitingDock) return 'Wartet auf Ladeplatz am HQ'; // LKW am HQ: beide Ladeplätze belegt (logistics.js)
   switch (o.type) {
     case 'idle':
       return u.def.builder ? 'Bereit (hilft bei Baustellen)' : 'Bereit';

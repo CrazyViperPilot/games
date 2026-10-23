@@ -15,6 +15,7 @@ import {
   hexA,
 } from './sprites.js';
 import { builderState } from '../ui/status.js';
+import { isDepot, depotRadius } from '../game/entities.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
@@ -246,7 +247,7 @@ export class Renderer {
     ctx.restore();
   }
 
-  /** Bauradius der eigenen fertigen FOBs (nur bei Platzierung). */
+  /** Bauradius der eigenen fertigen Lager-Gebäude (HQ 550 px, FOB 450 px) – nur bei Platzierung. */
   drawRadii(ctx, z) {
     const g = this.game;
     ctx.save();
@@ -254,15 +255,15 @@ export class Renderer {
     ctx.strokeStyle = 'rgba(120,190,255,0.4)';
     ctx.lineWidth = 2 / z;
     for (const b of g.buildings) {
-      if (!b.alive || !b.built || b.team !== this.team || b.type !== 'fob') continue;
+      if (!isDepot(b) || b.team !== this.team) continue;
       ctx.beginPath();
-      ctx.arc(b.x, b.y, BALANCE.fob.buildRadius, 0, Math.PI * 2);
+      ctx.arc(b.x, b.y, depotRadius(b), 0, Math.PI * 2);
       ctx.stroke();
     }
     ctx.restore();
   }
 
-  /** Bauradius gewählter oder überfahrener FOBs (eigene und gegnerische) in Teamfarbe, leicht gefüllt. */
+  /** Bauradius gewählter oder überfahrener Lager-Gebäude (HQ und FOB, eigene und gegnerische) in Teamfarbe, leicht gefüllt. */
   drawSelectedRadii(ctx, z, v) {
     const g = this.game;
     const ids = v.selection ? [...v.selection] : [];
@@ -275,11 +276,11 @@ export class Renderer {
       if (seen.has(id)) continue;
       seen.add(id);
       const b = g.getEntity(id);
-      if (!b || b.kind !== 'building' || b.type !== 'fob') continue;
+      if (!b || b.kind !== 'building' || (b.type !== 'fob' && b.type !== 'hq')) continue;
       const color = g.teams[b.team].color;
       ctx.globalAlpha = b.built ? 1 : 0.5;
       ctx.beginPath();
-      ctx.arc(b.x, b.y, BALANCE.fob.buildRadius, 0, Math.PI * 2);
+      ctx.arc(b.x, b.y, depotRadius(b), 0, Math.PI * 2);
       ctx.fillStyle = hexA(color, 0.07);
       ctx.fill();
       ctx.strokeStyle = hexA(color, 0.8);

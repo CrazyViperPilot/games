@@ -12,22 +12,23 @@ const KEYS = [
   ['Linksklick', 'Auswählen · Shift = hinzufügen · Doppelklick = alle dieses Typs im Bild'],
   ['Ziehen', 'Rahmenauswahl (nur Einheiten)'],
   ['Rechtsklick', 'Bewegen · auf Gegner = angreifen · Gebäude gewählt = Sammelpunkt'],
-  ['Rechtsklick auf FOB', 'LKW: leer laden, beladen entladen · Baufahrzeug: an Baustelle helfen, beschädigtes Gebäude reparieren'],
+  ['Rechtsklick auf FOB/HQ', 'LKW: leer laden, beladen entladen (am HQ nur laden) · Baufahrzeug: an Baustelle helfen, beschädigtes Gebäude reparieren'],
   ['A + Klick', 'Angriffsbewegung'],
   ['S', 'Stopp'],
   ['B', 'Baumenü: Baufahrzeug alles (Q Halle, W Förderanlage, E Mauer, R Tor, T Mörser, Z Flak, F FOB-Baustelle) · Infanterie nur E Mauer, R Tor'],
   ['Bauen', 'Gebäude brauchen einen Bauer daneben: Baufahrzeug oder Infanterie (nur Mauer/Tor)'],
   ['Q / W / E / R', 'Ausbildung im gewählten Gebäude (FOB: Schütze, PAK, LKW, Baufahrzeug · Halle: SPz, KPz)'],
-  ['L / U / T', 'LKW gewählt: Laden (dann FOB anklicken) · Entladen (FOB oder FOB-Baustelle) · Pendeln (Start-FOB, dann Ziel)'],
+  ['L / U / T', 'LKW gewählt: Laden (dann FOB oder HQ anklicken) · Entladen (FOB oder FOB-Baustelle) · Pendeln (Start-FOB oder HQ, dann Ziel-FOB)'],
   ['Q / W / E / R', 'LKW gewählt: Ladungsart Gemischt · Baumaterial · Munition · Treibstoff'],
   ['Entf', 'Gebäude abreißen (25 % des Baumaterials zurück)'],
-  ['Lager', 'Jede FOB hat ein eigenes Lager. Förderanlagen liefern in die FOB in deren Radius · Gebäude bezahlt die FOB in Reichweite'],
+  ['HQ', 'Unbegrenzter Nachschub, 2 Ladeplätze für LKW (weitere warten) · Bauradius 550 px · zerstört = Niederlage'],
+  ['Lager', 'Jede FOB hat ein eigenes Lager (max. 3000 je Sorte). Förderanlagen liefern in die FOB, in deren Radius sie stehen · Gebäude bezahlt die FOB oder das HQ in Reichweite'],
   ['Munition', 'Jeder Schuss verbraucht Munition · ohne Vorrat feuern Einheiten nicht (FOB-MG kostet nichts)'],
   ['Treibstoff', 'Fahrzeuge verbrauchen Treibstoff nur beim Fahren · ohne Vorrat nur 25 % Tempo'],
   ['Esc', 'Abbrechen · Auswahl aufheben'],
   ['Strg + 0–9', 'Gruppe speichern · 0–9 wählt · zweimal drücken = Kamera hin'],
   ['Pfeile / Rand', 'Kamera bewegen · Mausrad = Zoom · mittlere Taste ziehen'],
-  ['Leertaste', 'Kamera auf Auswahl oder letzte Meldung · H = Haupt-FOB'],
+  ['Leertaste', 'Kamera auf Auswahl oder letzte Meldung · H = Kamera auf das HQ'],
   ['+ / −', 'Spielgeschwindigkeit'],
   ['P', 'Pause'],
   ['Minimap', 'Linksklick = Kamera, Rechtsklick = Bewegen'],
@@ -62,7 +63,7 @@ export function showStartMenu(root, onStart) {
     'start',
     `<section class="menu start">
       <h1 class="logo">FRONTLINE</h1>
-      <p class="tag">Echtzeit-Strategie · FOB bauen, Ressourcen fördern, Konfliktzone halten</p>
+      <p class="tag">Echtzeit-Strategie · Nachschub vom HQ an die Front fahren, Konfliktzone halten</p>
       <div class="field">
         <span class="flabel">Schwierigkeit</span>
         <div class="seg">${DIFFS.map(([k, l]) => `<button type="button" data-diff="${k}">${l}</button>`).join('')}</div>
@@ -72,10 +73,10 @@ export function showStartMenu(root, onStart) {
         <div class="seg">${POINTS.map((p) => `<button type="button" data-pts="${p}">${p}</button>`).join('')}</div>
       </div>
       <ol class="howto">
-        <li>Baufahrzeug (R): Förderanlagen auf die Vorkommen im Bauradius deiner FOB setzen, daneben stehen lassen.</li>
-        <li>LKW (E): Baumaterial, Munition und Treibstoff aus dem FOB-Lager zu Baustellen und Truppen bringen.</li>
-        <li>Die Konfliktzone in der Mitte halten: Geld, und alle 30 s ein Punkt.</li>
-        <li>Gewinnen: Siegpunkte erreichen oder den Gegner ohne FOB und Baufahrzeug ausschalten.</li>
+        <li>Das HQ liefert unbegrenzt Nachschub, aber nur 2 LKW laden gleichzeitig. Vorgeschobene FOBs bauen (Baufahrzeug, B F).</li>
+        <li>LKW (E): Baumaterial, Munition und Treibstoff vom HQ oder aus FOB-Lagern an Baustellen und Truppen bringen.</li>
+        <li>Förderanlagen (Baufahrzeug, B W) auf Vorkommen an der Front liefern als Nahquelle in die FOB in deren Radius.</li>
+        <li>Die Konfliktzone in der Mitte halten: Geld, und alle 30 s ein Punkt. Gewinnen: Siegpunkte erreichen oder das gegnerische HQ zerstören. Verlierst du dein HQ, ist die Partie verloren.</li>
       </ol>
       <button type="button" class="primary" data-act="start">Start</button>
       <p class="muted small center">Alle Tasten zeigt F1 im Spiel.</p>
@@ -139,15 +140,20 @@ export function showHelp(root) {
 }
 
 /**
- * Endbildschirm. info = { winner, team (eigenes Team), reason ('points' | 'eliminated'), stats: { time, points: [a, b], winPoints } }.
+ * Endbildschirm. info = { winner, team (eigenes Team), reason ('points' | 'hq'), stats: { time, points: [a, b], winPoints } }.
  */
 export function showEnd(root, { winner, team, reason, stats }, onRestart) {
   const won = winner === team;
   const who = BALANCE.teamNames[winner];
   let why;
-  if (reason === 'points') why = `${who} hat ${stats.winPoints} Siegpunkte erreicht.`;
-  else if (won) why = 'Der Gegner hat keine FOB und kein Baufahrzeug mehr.';
-  else why = 'Du hast keine FOB und kein Baufahrzeug mehr.';
+  let cause;
+  if (reason === 'hq') {
+    cause = 'HQ zerstört';
+    why = won ? 'Das gegnerische HQ ist zerstört.' : 'Dein HQ wurde zerstört.';
+  } else {
+    cause = 'Siegpunkte';
+    why = `${who} hat ${stats.winPoints} Siegpunkte erreicht.`;
+  }
   show(
     root,
     'end',
@@ -155,6 +161,7 @@ export function showEnd(root, { winner, team, reason, stats }, onRestart) {
       <h2 class="end-title ${won ? 'win' : 'lose'}">${won ? 'Sieg' : 'Niederlage'}</h2>
       <p class="center">${esc(why)}</p>
       <table class="keys">
+        <tr><th>Grund</th><td>${esc(cause)}</td></tr>
         <tr><th>Spielzeit</th><td>${fmtTime(stats.time)}</td></tr>
         <tr><th>Siegpunkte</th><td>${BALANCE.teamNames[0]} ${stats.points[0]} : ${stats.points[1]} ${BALANCE.teamNames[1]}</td></tr>
       </table>

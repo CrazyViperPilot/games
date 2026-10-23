@@ -719,7 +719,7 @@ export class Controller {
       case 'fobTarget':
         return 'FOB-Baustelle: Standort anklicken · Esc bricht ab';
       case 'loadFob':
-        return 'LKW laden: eigene fertige FOB anklicken · Esc bricht ab';
+        return 'LKW laden: eigene fertige FOB oder das HQ anklicken · Esc bricht ab';
       case 'unloadFob':
         return 'LKW entladen: eigene FOB oder FOB-Baustelle anklicken · Esc bricht ab';
       case 'routeFrom':
@@ -805,7 +805,7 @@ export class Controller {
     if (trucks.length) {
       card.push(
         entry('Laden', 'L', {
-          tip: 'Laden (L): LKW fährt zur eigenen FOB und lädt; FOB anklicken',
+          tip: 'Laden (L): LKW fährt zur eigenen FOB oder zum HQ und lädt; anklicken',
           action: () => this.startTruckMode('loadFob'),
         }),
         entry('Entladen', 'U', {
@@ -862,9 +862,12 @@ export class Controller {
         action: () => this.cancelTrain(),
       }),
     );
+    const demolishable = blds.some((b) => b.type !== 'hq');
     card.push(
       entry('Abreißen', 'Entf', {
         tip: 'Gebäude abreißen (25 % des Baumaterials zurück)',
+        enabled: demolishable,
+        reason: 'Das HQ kann nicht abgerissen werden',
         action: () => this.demolish(),
       }),
     );

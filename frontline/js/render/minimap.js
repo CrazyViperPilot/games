@@ -87,6 +87,16 @@ export class Minimap {
     // Gebäude (eigene immer, fremde wenn erkundet); mindestens ca. 2,5 CSS-Pixel groß
     for (const b of g.buildings) {
       if (!b.alive || (b.team !== team && !known(b.x, b.y))) continue;
+      if (b.type === 'hq') {
+        // HQ: größer als alle anderen Gebäude (ca. 9 CSS-Pixel), heller Rand
+        const s = 9 * px;
+        ctx.fillStyle = g.teams[b.team].color;
+        ctx.fillRect(b.x - s / 2, b.y - s / 2, s, s);
+        ctx.strokeStyle = '#f2f5f2';
+        ctx.lineWidth = 1.2 * px;
+        ctx.strokeRect(b.x - s / 2, b.y - s / 2, s, s);
+        continue;
+      }
       const w = Math.max(b.w * TILE, 2.5 * px);
       const h = Math.max(b.h * TILE, 2.5 * px);
       ctx.fillStyle = g.teams[b.team].color;

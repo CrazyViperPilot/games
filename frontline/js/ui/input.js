@@ -206,7 +206,7 @@ export class Input {
     }
   }
 
-  /** Leertaste: Auswahl, sonst letzte Meldung, sonst Haupt-FOB. */
+  /** Leertaste: Auswahl, sonst letzte Meldung, sonst HQ. */
   jump() {
     const c = this.controller;
     const center = c.selectionCenter() || c.lastEvent;
@@ -214,6 +214,7 @@ export class Input {
     else this.goHome();
   }
 
+  /** H: Kamera auf das eigene HQ. */
   goHome() {
     const h = this.controller.homeBase();
     if (h) this.camera.centerOn(h.x, h.y);
