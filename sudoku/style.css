@@ -324,7 +324,7 @@ h1 {
     100% { background: var(--cell-bg); }
 }
 
-/* Glassmorphism Toast Overlay for Love Messages */
+/* Glassmorphism Toast Overlay */
 .love-toast {
     position: fixed;
     bottom: 30px;

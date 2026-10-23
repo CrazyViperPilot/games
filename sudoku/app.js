@@ -74,7 +74,7 @@ function updateTimerDisplay() {
 }
 
 // =============================================================
-// Toast / Love-Messages
+// Toast
 // =============================================================
 
 /**
@@ -404,15 +404,7 @@ function fillNumber(num) {
     updateNumpadIndicators();
     saveGameState();
 
-    // Check milestones before win (win overrides these toasts)
-    if (!checkWin()) {
-        const rowDone = checkRowComplete(r);
-        const colDone = checkColComplete(c);
-        const boxDone = checkBoxComplete(r, c);
-        if (rowDone || colDone || boxDone) {
-            showToast(getRandomLoveMessage(window.currentLang));
-        }
-    }
+    checkWin();
 }
 
 /**

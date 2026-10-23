@@ -1,5 +1,5 @@
 // Relative Pfade: funktioniert in jedem Unterordner (GitHub Pages: /<repo>/sudoku/).
-const CACHE_NAME = 'sudoku-glamour-v4';
+const CACHE_NAME = 'sudoku-glamour-v5';
 const urlsToCache = [
   './',
   './index.html',
