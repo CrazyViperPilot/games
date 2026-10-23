@@ -674,3 +674,349 @@ test('Dreikopf: Bot besiegt den Boss in unter 90 s Simulationszeit', () => {
   assert.ok(steps * STEP < 90, `Zeit ${secs} s`);
   assert.ok(count('bossHit') >= DRE.hp / DRE.arrowDmg / 2, 'Treffer');
 });
+
+// ---------- Leerendrache ----------
+
+const DRA = BOSSES.drache;
+const CRYSTAL_ROW = 10;     // Kristalle schweben über Luft: Pfeile vom Boden treffen sie (Zeile 11 ist frei)
+const DRAKE_SAFE_X = 430;       // px: Bot wartet in Flugphasen links davon (Körper reicht bis ca. 480)
+const CRYSTAL_COLS = [23, 25, 27, 29];   // rechts der Aktivierungslinie, eng beieinander vermeiden; Bot steht links davon
+
+// Testarena für den Drachen: P links, F rechts, '@' in der Mitte, 4 Kristalle. Treffer werden nur gezählt.
+function drake(save = { lives: 99, power: 'bow' }, cols = CRYSTAL_COLS) {
+  const events = [];
+  const cells = { '2,11': 'P', '58,11': 'F', [`${BOSS_C},11`]: '@' };
+  for (const c of cols) cells[`${c},${CRYSTAL_ROW}`] = 'y';
+  const rows = makeRows(cells, 'S');
+  const game = new Game({
+    level: { id: 'drache-test', theme: 'end', rows, boss: 'drache' },
+    save,
+    onEvent: (name, data) => events.push({ name, data }),
+  });
+  game.locks = 0;
+  game.lockArena = () => { game.locks++; };
+  game.hurts = [];
+  game.hurtPlayer = (cause) => { game.hurts.push(cause); };
+  const count = (name) => events.filter((e) => e.name === name).length;
+  return { game, events, count };
+}
+
+// Spieler steht am Boden auf x (Fuß-Links), Arena-Grenze knapp innen → Boss wird aktiv.
+function activateDrake(game) {
+  const b = game.boss;
+  const p = game.player;
+  p.x = b.ai.homeX - 20 * T + 1 - p.w / 2;   // Mitte 1 px innerhalb der Arena
+  p.y = GROUND_Y - p.h;
+  p.vy = 0;
+  p.onGround = true;
+  game.update(DT, input());
+  assert.equal(b.state, 'fly');
+  return b;
+}
+
+// Spieler stellt sich weit links auf den Boden (außerhalb der Arena).
+function parkLeft(game) {
+  const p = game.player;
+  p.x = 2 * T;
+  p.y = GROUND_Y - p.h;
+  p.vy = 0;
+  p.onGround = true;
+}
+
+// Spieler fällt von oben auf ein Ziel-Rechteck (Kristall oder Boss) und landet im nächsten Schritt darauf.
+function stompRect(game, r) {
+  const p = game.player;
+  p.x = r.x + r.w / 2 - p.w / 2;
+  p.y = r.y - p.h - 1;
+  p.vy = 300;
+  p.onGround = false;
+  game.update(DT, input());
+}
+
+// Warten, bis state erreicht ist (max. maxSec); gibt die Zeit zurück.
+function untilState(game, b, state, maxSec = 20) {
+  return runUntil(game, () => b.state === state, maxSec);
+}
+
+test('Leerendrache: createBoss liefert die Felder für den Renderer', () => {
+  const b = createBoss('drache', 100, 200);
+  assert.equal(b.kind, 'drache');
+  assert.equal(b.state, 'idle');
+  assert.equal(b.active, false);
+  assert.equal(b.w, 64);
+  assert.equal(b.h, 32);
+  assert.equal(b.anim, 'boss_drache');
+  assert.equal(b.hp, DRA.hp);
+  assert.equal(b.maxHp, DRA.hp);
+  assert.equal(b.parts.length, 0);
+  assert.equal(b.y + b.h / 2, 200 - (DRA.hover + DRA.flyRange.h) * T, 'Start oben auf der Ellipse');
+  assert.equal(typeof b.update, 'function');
+  assert.equal(typeof b.damage, 'function');
+});
+
+test('Leerendrache: Parser-Spawn @ und Kristalle aus dem Level', () => {
+  const { game } = drake();
+  assert.equal(game.boss.kind, 'drache');
+  assert.equal(game.crystals.length, 4);
+  assert.ok(game.crystals.every((c) => c.alive === true && c.w === 12 && c.h === 18));
+});
+
+test('Leerendrache: wird erst aktiv, wenn der Spieler in der Arena steht', () => {
+  const { game, count } = drake();
+  const b = game.boss;
+  parkLeft(game);
+  run(game, 240);
+  assert.equal(b.state, 'idle');
+  assert.equal(count('bossStart'), 0);
+  activateDrake(game);
+  assert.equal(count('bossStart'), 1);
+  assert.equal(game.locks, 1);
+});
+
+test('Leerendrache: Phase 1 unverwundbar (Pfeil, Explosion), kreist in der Luft', () => {
+  const { game } = drake();
+  const b = activateDrake(game);
+  const ys = [];
+  for (let i = 0; i < 6 * 60; i++) {
+    damageBoss(game, 'arrow');
+    if (i === 100) damageBoss(game, 'explosion');
+    game.update(DT, input());
+    ys.push(b.y + b.h);
+    assert.equal(b.state, 'fly');
+  }
+  assert.equal(b.hp, DRA.hp);
+  const floor = GROUND_Y;
+  assert.ok(Math.min(...ys) < floor - 4 * T && Math.max(...ys) < floor, 'in der Luft');
+  assert.ok(Math.max(...ys) - Math.min(...ys) > 20, 'kreist (vertikal)');
+});
+
+test('Leerendrache: spuckt alle 3 s einen Feuerball auf den Spieler', () => {
+  const { game } = drake();
+  const b = activateDrake(game);
+  parkLeft(game);
+  run(game, 186);                     // 3,1 s
+  assert.equal(b.shots, 1);
+  assert.ok(game.projectiles.some((o) => o.active && o.type === 'fire'), 'Feuerball aktiv');
+  run(game, 180);
+  assert.equal(b.shots, 2);
+  run(game, 180);
+  assert.equal(b.shots, 3);
+});
+
+test('Leerendrache: Kristall per Pfeil zerstört, Punkte und Ereignis', () => {
+  const { game, count } = drake();
+  const b = activateDrake(game);
+  const score0 = game.score;
+  game.hitCrystal(game.crystals[0]);
+  assert.equal(game.crystals[0].alive, false);
+  run(game, 1);
+  assert.equal(game.score - score0, 200);
+  assert.equal(count('crystal'), 1);
+  assert.ok(count('bossHit') >= 1);
+  assert.equal(b.state, 'fly', 'noch Kristalle da');
+});
+
+test('Leerendrache: Kristall per Stampfen zerstört, Abprall', () => {
+  const { game } = drake();
+  const b = activateDrake(game);
+  parkLeft(game);
+  const cr = game.crystals[1];
+  stompRect(game, cr);
+  assert.equal(cr.alive, false);
+  assert.equal(game.player.vy, -PHYS.stompBounce);
+  assert.equal(game.hurts.length, 0);
+  run(game, 1);
+  assert.equal(b.state, 'fly');
+});
+
+test('Leerendrache: alle Kristalle zerstört → Landung → Sitzen mit Sockelgröße', () => {
+  const { game, count } = drake();
+  const b = activateDrake(game);
+  parkLeft(game);
+  game.hitCrystal(game.crystals[0]);
+  game.hitCrystal(game.crystals[1]);
+  stompRect(game, game.crystals[2]);
+  game.hitCrystal(game.crystals[3]);
+  run(game, 1);
+  assert.equal(game.crystals.filter((c) => c.alive).length, 0);
+  assert.equal(count('crystal'), 4);
+  assert.equal(b.phase, 2);
+  assert.equal(b.state, 'land');
+  untilState(game, b, 'perch', 3);
+  assert.equal(b.anim, 'boss_drache_perch');
+  assert.equal(b.w, DRA.perchW);
+  assert.equal(b.h, DRA.perchH);
+  assert.equal(b.y + b.h, GROUND_Y, 'Unterkante auf dem Boden');
+  assert.equal(b.onGround, true);
+});
+
+test('Leerendrache: Sitzen: Stampfer 3 Schaden, Abprall, 1,2 s Unverwundbarkeit', () => {
+  const { game } = drake();
+  const b = activateDrake(game);
+  parkLeft(game);
+  for (const c of game.crystals) game.hitCrystal(c);
+  run(game, 1);
+  untilState(game, b, 'perch', 3);
+  parkLeft(game);
+  const score0 = game.score;
+  stompRect(game, b);
+  assert.equal(b.hp, DRA.hp - DRA.stompDmg);
+  assert.equal(game.player.vy, -PHYS.stompBounce);
+  assert.equal(game.score - score0, 500);
+  assert.ok(b.invuln > DRA.invulnTime - 0.1 && b.invuln <= DRA.invulnTime);
+
+  stompRect(game, b);                    // unverwundbar: kein Schaden, Abprall trotzdem
+  assert.equal(b.hp, DRA.hp - DRA.stompDmg);
+  assert.equal(game.player.vy, -PHYS.stompBounce);
+
+  run(game, Math.ceil((DRA.invulnTime + 0.1) / DT));
+  parkLeft(game);
+  stompRect(game, b);
+  assert.equal(b.hp, DRA.hp - 2 * DRA.stompDmg);
+});
+
+test('Leerendrache: Sitzen: Pfeil 1 Schaden; seitlicher Kontakt verletzt den Spieler', () => {
+  const { game } = drake();
+  const b = activateDrake(game);
+  parkLeft(game);
+  for (const c of game.crystals) game.hitCrystal(c);
+  run(game, 1);
+  untilState(game, b, 'perch', 3);
+  damageBoss(game, 'explosion');
+  assert.equal(b.hp, DRA.hp, 'Explosion wirkt nicht');
+  damageBoss(game, 'arrow');
+  assert.equal(b.hp, DRA.hp - DRA.arrowDmg);
+  game.damageBoss('arrow');
+  assert.equal(b.hp, DRA.hp - DRA.arrowDmg, 'Schutzzeit');
+  run(game, Math.ceil((DRA.invulnTime + 0.1) / DT));
+  game.damageBoss('arrow');
+  assert.equal(b.hp, DRA.hp - 2 * DRA.arrowDmg);
+
+  const p = game.player;
+  p.x = b.x - p.w + 2;
+  p.y = b.y + 10;
+  p.vy = 0;
+  game.hurts.length = 0;
+  game.update(DT, input());
+  assert.deepEqual(game.hurts, ['boss']);
+  assert.equal(b.hp, DRA.hp - 2 * DRA.arrowDmg);
+});
+
+test('Leerendrache: Zyklus Sitzen 6 s → Fliegen 4 s → Landen → Sitzen', () => {
+  const { game } = drake();
+  const b = activateDrake(game);
+  parkLeft(game);
+  for (const c of game.crystals) game.hitCrystal(c);
+  run(game, 1);
+  untilState(game, b, 'perch', 3);
+  const tPerch = runUntil(game, () => b.state === 'fly', 10);
+  assert.ok(Math.abs(tPerch - DRA.perchTime) < 0.05, `sitzt ${tPerch} s`);
+  const shots0 = b.shots;
+  run(game, Math.round(2.1 * 60));
+  assert.equal(b.shots - shots0, 1, 'in Phase 2 alle 2 s ein Feuerball');
+  assert.equal(b.phase, 2);
+  const tFly = runUntil(game, () => b.state === 'land', 10);
+  assert.ok(Math.abs(tFly - (DRA.flyTime - 2.1)) < 0.05, `fliegt ${tFly} s weiter`);
+  untilState(game, b, 'perch', 3);
+  assert.equal(b.anim, 'boss_drache_perch');
+});
+
+test('Leerendrache: Sieg bei 0 Energie: Explosion mit Schütteln, defeatBoss, danach inaktiv', () => {
+  const { game, count } = drake();
+  const b = activateDrake(game);
+  parkLeft(game);
+  for (const c of game.crystals) game.hitCrystal(c);
+  run(game, 1);
+  untilState(game, b, 'perch', 3);
+  let defeats = 0;
+  const orig = game.defeatBoss.bind(game);
+  game.defeatBoss = () => { defeats++; orig(); };
+  b.hp = DRA.arrowDmg;
+  const score0 = game.score;
+  damageBoss(game, 'arrow');
+  assert.equal(b.hp, 0);
+  assert.equal(b.state, 'defeated');
+  assert.equal(b.active, false);
+  assert.equal(defeats, 1);
+  assert.equal(game.bossDefeated, true);
+  assert.equal(game.score - score0, 500 + 5000);
+  assert.ok(game.shake > 0, 'Schüttelbewegung');
+  assert.ok(count('bossHit') >= 1);
+
+  const score = game.score;
+  run(game, 60);
+  assert.equal(b.state, 'defeated');
+  assert.equal(defeats, 1);
+  assert.equal(game.score, score);
+});
+
+// Bot für den Drachen: springt Feuerbällen aus dem Weg; in Phase 1 schießt er Kristalle vom Boden ab (Abstand 65–120 px,
+// von links); in Phase 2 steht er außerhalb der Flugbahn (rechts davon, Körper des Drachen ab ca. 488 px) und schießt
+// auf den Sockel, sobald der Drache verwundbar ist (Pfeil-Reichweite reicht bis zum Körper).
+const DRAKE_STAND_X = 455;     // px: Schussposition der Phase 2 (Mitte des Bots)
+function drakeBotInput(game) {
+  const p = game.player;
+  const b = game.boss;
+  const inp = input();
+  if (b.state === 'idle') { inp.right = true; return inp; }
+  if (b.state === 'defeated') return inp;
+  const pcx = p.x + p.w / 2, pcy = p.y + p.h / 2;
+  const bcx = b.x + b.w / 2;
+  const arrowFlying = (game.projectiles || []).some((o) => o.active && o.type === 'arrow');
+
+  // Feuerball nähert sich: auf dem Boden springen, in der Luft die Sprunghöhe halten.
+  for (const o of game.projectiles || []) {
+    if (!o.active || o.type !== 'fire') continue;
+    const toward = (pcx - o.x) * o.vx > 0;
+    if (toward && Math.abs(o.x - pcx) < 100 && Math.abs(o.y - pcy) < 60) {
+      if (p.onGround) { inp.jump = true; inp.jumpPressed = true; } else inp.jump = p.vy < 0;
+      return inp;
+    }
+  }
+
+  if (b.phase === 2) {
+    if (b.state !== 'perch') {
+      // Flugphasen: außerhalb der Flugbahn bleiben.
+      if (pcx > DRAKE_STAND_X + 15) inp.left = true;
+      else if (pcx < DRAKE_STAND_X - 15) inp.right = true;
+      return inp;
+    }
+    // Sitzen: aus der Schussposition auf den Körper (Blickrichtung zum Boss), wenn verwundbar.
+    if (pcx > DRAKE_STAND_X + 15) { inp.left = true; return inp; }
+    if (pcx < DRAKE_STAND_X - 15) { inp.right = true; return inp; }
+    if (p.face !== 1) inp.right = true;   // Drehen und Schießen im selben Schritt
+    if (b.invuln <= 0 && !arrowFlying) inp.firePressed = true;
+    return inp;
+  }
+
+  // Phase 1: erster lebender Kristall in Listenreihenfolge (kein Wechsel zwischen gleich nahen Zielen).
+  const target = game.crystals.find((cr) => cr.alive !== false) || null;
+  if (target) {
+    // Seite und Abstand halten; Drehen und Schießen im selben Schritt (Blickrichtung wird vor dem Schuss gesetzt).
+    const dx = target.x + target.w / 2 - pcx;
+    const adx = Math.abs(dx);
+    const side = dx >= 0 ? 1 : -1;
+    if (adx > 120) { inp.right = side > 0; inp.left = side < 0; return inp; }
+    if (adx < 65) { inp.right = side < 0; inp.left = side > 0; return inp; }
+    inp.right = side > 0;
+    inp.left = side < 0;
+    if (!arrowFlying) inp.firePressed = true;
+  }
+  return inp;
+}
+
+test('Leerendrache: Bot besiegt die Arena in unter 120 s Simulationszeit', () => {
+  const { game, count } = drake({ lives: 99, power: 'bow' });
+  delete game.hurtPlayer;              // echte Schadenslogik: Bogen, Rüstung, Leben
+  const b = game.boss;
+  const maxSteps = 120 / STEP;
+  let steps = 0;
+  while (b.state !== 'defeated' && steps < maxSteps) {
+    game.update(STEP, drakeBotInput(game));
+    steps++;
+  }
+  const secs = (steps * STEP).toFixed(1);
+  assert.equal(b.state, 'defeated', `nicht besiegt nach ${secs} s (hp ${b.hp}, phase ${b.phase}, Zustand ${b.state}, Leben ${game.lives}, Spieler ${game.state})`);
+  assert.ok(steps * STEP < 120, `Zeit ${secs} s`);
+  assert.equal(count('crystal'), 4);
+});

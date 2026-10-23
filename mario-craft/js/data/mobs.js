@@ -41,11 +41,17 @@ export const BOSSES = {
     shootEvery: 3, shootEveryEnraged: 2, enrageAt: 0.5, skulls: 2, skullsEnraged: 3, skullSpeed: 70, fan: 0.3,
     skullRadius: 1.5, diveTime: 1.5, diveRange: 4, diveFeet: 28, diveSpeed: 150, defeatRadius: 2,
   },
-  // Arena 40×18. 4 Kristalle auf Säulen; solange einer steht, unverwundbar. Kristall: Stampfer oder Pfeil,
-  // Explosion 1,0. Alle 6 s Landung auf dem Sockel für 2,5 s (perch). Stampfer 3 (4 Stampfer), Pfeil 1 (12 Pfeile).
+  // Arena 40×18. Phase 1: kreist in der Luft (Ellipse ±flyRange Kacheln um den Spawn, Mittelpunkt hover Kacheln
+  // über dem Boden, unverwundbar), spuckt alle fireEvery s einen Feuerball (fireSpeed px/s). Kristalle (Level `y`)
+  // zerstören: Stampfen, Pfeil oder Explosion; Kristall = 200 Punkte. Sind alle weg: Phase 2.
+  // Phase 2: landet (transitTime s) und sitzt perchTime s (perch, verwundbar: Stampfer stompDmg, Pfeil arrowDmg,
+  // invulnTime nach jedem Treffer), fliegt flyTime s (fly, unverwundbar, Feuerball alle fireEveryEnraged s), landet usw.
+  // Explosionen wirken nicht. Berührung im Flug und seitlich am Boden verletzt; Stampfen im Sitzen prallt ab.
   drache: {
-    w: 64, h: 32, perchW: 48, perchH: 40, arena: { w: 40, h: 18 }, hp: 12, stompDmg: 3, arrowDmg: 1,
-    crystals: 4, crystalExplode: 1.0, perchEvery: 6, perchTime: 2.5,
+    w: 64, h: 32, perchW: 48, perchH: 40, arena: { w: 40, h: 18 }, hp: 12, stompDmg: 3, arrowDmg: 1, invulnTime: 1.2,
+    hover: 4, flyRange: { w: 8, h: 2 }, lapTime: 6, transitTime: 1.2,
+    fireEvery: 3, fireEveryEnraged: 2, fireSpeed: 100,
+    perchTime: 6, flyTime: 4, defeatRadius: 2,
   },
 };
 

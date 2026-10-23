@@ -10,6 +10,10 @@
 // Dreikopf (dreikopf): schwebt, parts = []. state 'fight' | 'dive' (Sturzflug nach einer Salve, active = true).
 //   hp = Energie (BOSSES.dreikopf.hp), maxHp, phase (1, ab hp ≤ 50 % → 2), invuln (s, Blinken), salvos/shots (Zähler).
 //   Stampfer und Pfeil treffen; Explosionen nicht. Sieg: explode-Radius 2 am Körpermittelpunkt, dann defeatBoss().
+// Leerendrache (drache): state 'fly' (Phase 1 mit Kristallen, Phase 2 nach 4 s Flug) | 'land' | 'perch'. Körper flying
+//   64×32, perch 48×40 mit Unterkante auf dem Spawn-y. ai = { homeX, groundY, angle, shootT, timer, transit, fromX, fromY }.
+//   game.crystals: { x, y, w, h, alive }; zerstört durch Stampfer (hier), Pfeil (game.hitCrystal) oder Explosion.
+//   Kristall zerstört: 200 Punkte, Event 'crystal' und 'bossHit'. Feuerbälle ('fire') zielen auf den Spieler.
 import { PHYS } from '../data/physics.js';
 import { BOSSES } from '../data/mobs.js';
 import { moveAndCollide } from './collide.js';
@@ -41,7 +45,7 @@ export function createBoss(kind, x, y) {
   return KINDS[kind](x, y);
 }
 
-const KINDS = { slimeking: makeSlimeKing, dreikopf: makeDreikopf };
+const KINDS = { slimeking: makeSlimeKing, dreikopf: makeDreikopf, drache: makeDrache };
 
 function newBoss(kind, x, y, w, h) {
   const b = {
@@ -114,8 +118,9 @@ export function damageBoss(game, how) {
 function stepBoss(game, b, dt, prevFeet) {
   if (b.state === 'defeated') return;
   if (b.state === 'idle') {
-    if (b.kind === 'dreikopf' ? !nearDreikopf(game, b) : game.player.x < b.x - ARENA_LEAD) return;
-    b.state = 'fight';
+    const flyer = b.kind === 'dreikopf' || b.kind === 'drache';
+    if (flyer ? !nearFlyer(game, b) : game.player.x < b.x - ARENA_LEAD) return;
+    b.state = b.kind === 'drache' ? 'fly' : 'fight';
     b.active = true;
     game.lockArena?.();
     game.emit('bossStart');
@@ -123,6 +128,10 @@ function stepBoss(game, b, dt, prevFeet) {
 
   if (b.kind === 'dreikopf') {
     stepDreikopf(game, b, dt, prevFeet);
+    return;
+  }
+  if (b.kind === 'drache') {
+    stepDrache(game, b, dt, prevFeet);
     return;
   }
 
@@ -137,6 +146,10 @@ function stepBoss(game, b, dt, prevFeet) {
 function hitBoss(game, b, how) {
   if (b.kind === 'dreikopf') {
     if (how === 'arrow') hitFlyer(game, b, DRE.arrowDmg);
+    return;
+  }
+  if (b.kind === 'drache') {
+    if (how === 'arrow') hitDrache(game, b, DRA.arrowDmg);   // Explosionen wirken nicht
     return;
   }
   if (b.state !== 'fight') return;
@@ -272,10 +285,11 @@ function checkDefeat(game, b) {
 
 // ---------- Dreikopf ----------
 
-// Aktiv, sobald der Spieler in der Arena (halbe Breite um den Spawn) steht.
-function nearDreikopf(game, b) {
+// Aktiv, sobald der Spieler in der Arena (halbe Breite um den Spawn) steht. Dreikopf und Drache.
+function nearFlyer(game, b) {
   const p = game.player;
-  return Math.abs(p.x + p.w / 2 - b.ai.homeX) <= (DRE.arena.w / 2) * T;
+  const arena = b.kind === 'drache' ? DRA.arena : DRE.arena;
+  return Math.abs(p.x + p.w / 2 - b.ai.homeX) <= (arena.w / 2) * T;
 }
 
 // Ein Schritt: Salvenzähler, Sturzflug, Schweben (Sinus), Kontakt mit dem Spieler.
@@ -360,13 +374,228 @@ function hitFlyer(game, b, dmg) {
 }
 
 // Sieg: Zustand zuerst setzen (Explosion trifft den Boss dann nicht mehr), Explosion, Punkte, defeatBoss.
-function defeatFlyer(game, b) {
+function defeatFlyer(game, b, radius = DRE.defeatRadius) {
   b.state = 'defeated';
   b.active = false;
   b.invuln = 0;
   b.hp = 0;
-  explode(game, b.x + b.w / 2, b.y + b.h / 2, DRE.defeatRadius);
+  explode(game, b.x + b.w / 2, b.y + b.h / 2, radius);
   game.addScore(DEFEAT_SCORE);
   game.emit('bossHit', { defeated: true });
   game.defeatBoss();
+}
+
+// ---------- Leerendrache ----------
+
+const DRA = BOSSES.drache;
+const DRA_RX = DRA.flyRange.w * T;            // px: Ellipse horizontal um den Spawn
+const DRA_RY = DRA.flyRange.h * T;            // px: Ellipse vertikal
+const DRA_HOVER = DRA.hover * T;              // px: Mittelpunkt der Ellipse über dem Boden
+const DRA_OMEGA = 2 * Math.PI / DRA.lapTime;  // rad/s
+const CRYSTAL_SCORE = 200;
+const PT = { x: 0, y: 0 };                    // Rückgabepuffer (kein Neuanlegen im Schritt)
+const BL = { x: 0, y: 0 };
+
+function makeDrache(x, y) {
+  const b = newBoss('drache', 0, 0, DRA.w, DRA.h);
+  b.anim = 'boss_drache';
+  b.hp = DRA.hp;
+  b.maxHp = DRA.hp;
+  b.phase = 1;
+  b.shots = 0;    // Zähler: erzeugte Feuerbälle
+  // Start oben auf der Ellipse; ai.angle läuft die Ellipse ab.
+  b.ai = { homeX: x, groundY: y, angle: -Math.PI / 2, shootT: DRA.fireEvery, timer: 0, transit: 0, fromX: x, fromY: y - DRA_HOVER };
+  const fp = flyPoint(b.ai);
+  placeCenter(b, fp.x, fp.y);
+  return b;
+}
+
+// Ellipsenpunkt der Flugbahn (Mittelpunkt).
+function flyPoint(ai) {
+  PT.x = ai.homeX + DRA_RX * Math.cos(ai.angle);
+  PT.y = ai.groundY - DRA_HOVER + DRA_RY * Math.sin(ai.angle);
+  return PT;
+}
+
+// Sitzposition: Mitte auf dem Sockel, Unterkante auf dem Boden.
+function perchPoint(ai) {
+  PT.x = ai.homeX;
+  PT.y = ai.groundY - DRA.perchH / 2;
+  return PT;
+}
+
+// Mittelpunkt setzen (Körper = Rechteck um die Mitte).
+function placeCenter(b, cx, cy) {
+  b.x = cx - b.w / 2;
+  b.y = cy - b.h / 2;
+}
+
+// Größe ändern, Mittelpunkt bleibt.
+function setSize(b, w, h) {
+  const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+  b.w = w;
+  b.h = h;
+  placeCenter(b, cx, cy);
+}
+
+// Übergang (Start- bis Zielpunkt) über ai.transit Sekunden, weich (Smoothstep). Ohne Übergang das Ziel.
+function blendToward(ai, tx, ty) {
+  if (ai.transit <= 0) {
+    BL.x = tx;
+    BL.y = ty;
+    return BL;
+  }
+  const p = 1 - ai.transit / DRA.transitTime;
+  const s = p * p * (3 - 2 * p);
+  BL.x = ai.fromX + (tx - ai.fromX) * s;
+  BL.y = ai.fromY + (ty - ai.fromY) * s;
+  return BL;
+}
+
+function aliveCrystals(game) {
+  const list = game.crystals || [];
+  let n = 0;
+  for (let i = 0; i < list.length; i++) if (list[i].alive !== false) n++;
+  return n;
+}
+
+function centerX(b) { return b.x + b.w / 2; }
+function centerY(b) { return b.y + b.h / 2; }
+
+// Start der Landung: aus der Luft zum Sockel.
+function beginLand(b) {
+  const ai = b.ai;
+  b.state = 'land';
+  b.phase = 2;
+  ai.fromX = centerX(b);
+  ai.fromY = centerY(b);
+  ai.transit = DRA.transitTime;
+}
+
+// Sitzen: verwundbar, Körper auf dem Boden (perch-Größe).
+function beginPerch(b) {
+  const ai = b.ai;
+  b.state = 'perch';
+  setSize(b, DRA.perchW, DRA.perchH);
+  const pp = perchPoint(ai);
+  placeCenter(b, pp.x, pp.y);
+  ai.timer = DRA.perchTime;
+  ai.transit = 0;
+}
+
+// Wieder aufsteigen (Phase 2): aus dem Sitz zur Ellipse, dann flyTime s Flug.
+function beginFly(b) {
+  const ai = b.ai;
+  b.state = 'fly';
+  setSize(b, DRA.w, DRA.h);
+  ai.fromX = centerX(b);
+  ai.fromY = centerY(b);
+  ai.transit = DRA.transitTime;
+  ai.timer = DRA.flyTime;
+  ai.shootT = DRA.fireEveryEnraged;
+}
+
+// Ein Schritt des Drachen.
+function stepDrache(game, b, dt, prevFeet) {
+  const ai = b.ai;
+  const p = game.player;
+  const oldCx = centerX(b), oldCy = centerY(b);
+  b.animTime += dt;
+  b.invuln = Math.max(0, b.invuln - dt);
+  ai.transit = Math.max(0, ai.transit - dt);
+
+  crystalPass(game, b, prevFeet);
+  if (b.phase === 1 && aliveCrystals(game) === 0) beginLand(b);
+
+  if (b.state === 'fly') {
+    ai.angle += DRA_OMEGA * dt;
+    const fp = flyPoint(ai);
+    const q = blendToward(ai, fp.x, fp.y);
+    placeCenter(b, q.x, q.y);
+    ai.shootT -= dt;
+    if (ai.shootT <= 0) {
+      fireFireball(game, b);
+      ai.shootT = b.phase === 2 ? DRA.fireEveryEnraged : DRA.fireEvery;
+    }
+    if (b.phase === 2) {
+      ai.timer -= dt;
+      if (ai.timer <= 0) beginLand(b);
+    }
+  } else if (b.state === 'land') {
+    const pp = perchPoint(ai);
+    const q = blendToward(ai, pp.x, pp.y);
+    placeCenter(b, q.x, q.y);
+    if (ai.transit <= 0) beginPerch(b);
+  } else if (b.state === 'perch') {
+    ai.timer -= dt;
+    if (ai.timer <= 0) beginFly(b);
+  }
+
+  const cx = centerX(b);
+  const cy = centerY(b);
+  b.vx = (cx - oldCx) / dt;
+  b.vy = (cy - oldCy) / dt;
+  b.face = p.x + p.w / 2 >= cx ? 1 : -1;
+  b.onGround = b.state === 'perch';
+  b.anim = b.state === 'perch' ? 'boss_drache_perch' : 'boss_drache';
+
+  touchDrache(game, b, prevFeet);
+}
+
+// Kristalle: Stampfen zerstört einen (Abprall). Jeder zerstörte Kristall zählt einmal: 200 Punkte, Events.
+function crystalPass(game, b, prevFeet) {
+  const p = game.player;
+  const list = game.crystals || [];
+  for (let i = 0; i < list.length; i++) {
+    const cr = list[i];
+    if (cr.alive !== false && overlapsPlayer(cr, p) && p.vy > 0 && prevFeet <= cr.y + cr.h * 0.5) {
+      cr.alive = false;
+      p.vy = -(game.jumpHeld ? PHYS.stompBounceHold : PHYS.stompBounce);
+    }
+    if (cr.alive === false && !cr.counted) {
+      cr.counted = true;
+      game.addScore(CRYSTAL_SCORE);
+      game.emit('crystal', { index: i });
+      game.emit('bossHit', { crystals: aliveCrystals(game) });
+    }
+  }
+}
+
+// Feuerball von der Körpermitte auf den Spieler (Tempo fireSpeed).
+function fireFireball(game, b) {
+  const p = game.player;
+  const sx = centerX(b), sy = centerY(b);
+  const dx = p.x + p.w / 2 - sx, dy = p.y + p.h / 2 - sy;
+  const d = Math.hypot(dx, dy) || 1;
+  if (spawnProjectile(game, 'fire', sx, sy, dx / d * DRA.fireSpeed, dy / d * DRA.fireSpeed)) b.shots++;
+}
+
+// Kontakt: im Sitzen Stampfen von oben (Schaden, Abprall) und Stern (Schaden); sonst Schaden für den Spieler.
+// Im Flug und bei der Landung verletzt jede Berührung (Stern ausgenommen).
+function touchDrache(game, b, prevFeet) {
+  const p = game.player;
+  if (!overlapsPlayer(b, p)) return;
+  if (b.state === 'perch') {
+    if (p.vy > 0 && prevFeet <= b.y + b.h * 0.5) {
+      hitDrache(game, b, DRA.stompDmg);
+      p.vy = -(game.jumpHeld ? PHYS.stompBounceHold : PHYS.stompBounce);
+      return;
+    }
+    if (p.star > 0) {
+      hitDrache(game, b, DRA.stompDmg);
+      return;
+    }
+  }
+  if (p.star > 0) return;
+  if (p.invuln <= 0) game.hurtPlayer('boss');
+}
+
+// Schaden nur im Sitzen, 1,2 s Unverwundbarkeit danach; bei 0 Sieg.
+function hitDrache(game, b, dmg) {
+  if (b.state !== 'perch' || b.invuln > 0) return;
+  b.hp = Math.max(0, b.hp - dmg);
+  b.invuln = DRA.invulnTime;
+  game.addScore(HIT_SCORE);
+  game.emit('bossHit', { hp: b.hp });
+  if (b.hp <= 0) defeatFlyer(game, b, DRA.defeatRadius);
 }
