@@ -1,9 +1,15 @@
 // Menüs als DOM-Overlays über dem Canvas (PLAN §5, PRD §2). Texte über t(), damit ein Sprachwechsel
 // sofort wirkt: refresh() zeichnet den aktuellen Bildschirm neu. Sprache und Ton melden die Menüs per
-// Callback an main.js, dort wird gespeichert.
+// Callback an main.js, dort wird gespeichert. Bedienung nur per Tippen/Klicken auf Rechtecke.
 import { LEVELS } from '../data/levels/index.js';
 import { LANGS, getLang, t } from '../core/i18n.js';
 import { audio } from '../core/audio.js';
+
+// Welten, deren Level spielbar sind. Welt 2 und 3 zeigen bis Meilenstein 2 „bald verfügbar“.
+const OPEN_WORLDS = 1;
+const WORLDS = [1, 2, 3];
+const LEVELS_PER_WORLD = 4;
+const PICK_KEYS = ['pickWood', 'pickStone', 'pickIron', 'pickDiamond'];
 
 let root = null;
 let cur = null; // { screen, args, cb }
@@ -21,6 +27,14 @@ function el() {
 const pad = (n) => String(n).padStart(2, '0');
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+// Level-Namensschlüssel: def.name, sonst lv_w<welt>_<nr> aus der id.
+const levelKey = (id) => 'lv_' + id.replace('-', '_');
+
+// Spielbar = in LEVELS eingetragen und Welt offen.
+export function isPlayable(def) {
+  return !!def && def.world <= OPEN_WORLDS;
+}
+
 function fmtTime(sec) {
   const s = Math.max(0, sec || 0);
   return `${pad(Math.floor(s / 60))}:${pad(Math.floor(s % 60))}`;
@@ -31,15 +45,22 @@ function fmtTenths(sec) {
   return `${fmtTime(s)}.${Math.floor((s * 10) % 10)}`;
 }
 
-function stars(arr) {
+// Diamant-Symbole für drei Plätze (gesammelt ◆, offen ◇).
+function diamondRow(arr) {
   let out = '';
-  for (let i = 0; i < 3; i++) out += arr && arr[i] ? '★' : '☆';
+  for (let i = 0; i < 3; i++) out += arr && arr[i] ? '◆' : '◇';
   return out;
 }
 
 function unlockedIndex(save) {
   const i = LEVELS.findIndex((d) => d.id === save.unlocked);
   return i < 0 ? 0 : i;
+}
+
+function gearText(power) {
+  if (power === 'bow') return `${t('armor')} + ${t('bow')}`;
+  if (power === 'armor') return t('armor');
+  return t('plain');
 }
 
 function langSeg() {
@@ -62,33 +83,44 @@ function viewStart() {
     <button class="btn primary" data-act="play">${t('start')}</button>
     <div class="row">${langSeg()}${soundBtn()}</div>
     <p class="hint">${t('controls')}</p>
+    <p class="hint">${t('dig')}</p>
     <p class="hint">${t('keys')}</p>
   </section>`;
 }
 
+// Eine Kachel der Levelauswahl. Gesperrt/bald: disabled, sonst data-act="level".
+function levelTile(label, name, state, def, rec, idx) {
+  const boss = def && def.boss;
+  if (state === 'open') {
+    const info = rec && rec.done ? fmtTime(rec.bestTime) : (boss ? t(boss) : '–');
+    return `<button class="tile${boss ? ' boss' : ''}" data-act="level" data-arg="${idx}" aria-label="${label} ${esc(name)}">`
+      + `<span class="tn">${label}</span><span class="tsub">${esc(name)}</span>`
+      + `<span class="tbest">${esc(info)}</span><span class="tstars">${diamondRow(rec && rec.diamonds)}</span></button>`;
+  }
+  const text = state === 'locked' ? t('locked') : t('soon');
+  return `<button class="tile" disabled aria-label="${label} ${esc(name)} ${esc(text)}">`
+    + `<span class="tn">${label}</span><span class="tsub">${esc(name)}</span><span class="tbest">${esc(text)}</span></button>`;
+}
+
 function viewLevels(save) {
   const unl = unlockedIndex(save);
+  const pick = Math.min(PICK_KEYS.length - 1, Math.max(0, save.pick | 0));
   let html = `<section class="panel wide">
-    <header class="head"><button class="btn small" data-act="back">← ${t('back')}</button><h2>${t('levels')}</h2></header>`;
-  for (let w = 1; w <= 3; w++) {
+    <header class="head"><button class="btn small" data-act="back">← ${t('back')}</button><h2>${t('levels')}</h2></header>
+    <p class="hint">${t('pickLabel')}: ${t(PICK_KEYS[pick])} · ${gearText(save.power)}</p>`;
+  for (const w of WORLDS) {
     html += `<div class="world"><div class="wname">${w} · ${t('w' + w)}</div><div class="tiles">`;
-    for (let l = 1; l <= 4; l++) {
-      const idx = LEVELS.findIndex((d) => d.id === `w${w}-${l}`);
-      const def = LEVELS[idx];
-      const rec = (save.levels && save.levels[def.id]) || null;
+    for (let l = 1; l <= LEVELS_PER_WORLD; l++) {
+      const id = `w${w}-${l}`;
       const label = `${w}-${l}`;
-      if (idx > unl) {
-        html += `<button class="tile" disabled aria-label="${label} ${t('locked')}"><span class="tn">${label}</span><span class="tsub">${t('locked')}</span></button>`;
-        continue;
-      }
-      let sub;
-      if (def.boss) sub = `<span class="tsub">${t(def.boss)}</span>`;
-      else if (rec && rec.done) sub = `<span class="tbest">${fmtTime(rec.bestTime)}</span>`;
-      else sub = `<span class="tsub">–</span>`;
-      const extra = rec && rec.done
-        ? `<span class="tstars">${stars(rec.stars)}</span><span class="tsub">● ${rec.coins | 0}</span>`
-        : '';
-      html += `<button class="tile${def.boss ? ' boss' : ''}" data-act="level" data-arg="${idx}"><span class="tn">${label}</span>${sub}${extra}</button>`;
+      const idx = LEVELS.findIndex((d) => d.id === id);
+      const def = idx >= 0 ? LEVELS[idx] : null;
+      const name = t(def && def.name ? def.name : levelKey(id));
+      const rec = (save.levels && save.levels[id]) || null;
+      let state = 'open';
+      if (!isPlayable(def)) state = 'soon';
+      else if (idx > unl) state = 'locked';
+      html += levelTile(label, name, state, def, rec, idx);
     }
     html += '</div></div>';
   }
@@ -108,13 +140,13 @@ function viewPause() {
 }
 
 function viewDone(r) {
-  const n = r.starCoins.filter(Boolean).length;
+  const n = r.diamonds.filter(Boolean).length;
   return `<section class="panel center">
     <h2 class="big">${t('levelDone')}</h2>
     <dl class="stats">
       <div><dt>${t('time')}</dt><dd>${fmtTenths(r.time)}</dd></div>
-      <div><dt>${t('coins')}</dt><dd>${r.coins}</dd></div>
-      <div><dt>${t('stars')}</dt><dd><span class="stars-big">${stars(r.starCoins)}</span> <small>${t('starsOf', { n })}</small></dd></div>
+      <div><dt>${t('emeralds')}</dt><dd>${r.emeralds}</dd></div>
+      <div><dt>${t('diamonds')}</dt><dd><span class="stars-big">${diamondRow(r.diamonds)}</span> <small>${t('diamondsOf', { n })}</small></dd></div>
     </dl>
     <div class="col">
       ${r.hasNext ? `<button class="btn primary" data-act="next">${t('next')}</button>` : ''}
@@ -165,7 +197,8 @@ export function showStart(cb) {
   show('start', [], cb);
 }
 
-// Levelauswahl. cb('level', index) | cb('back')
+// Levelauswahl. save.levels[id] = { done, bestTime, emeralds, diamonds: [b, b, b] }.
+// cb('level', index) | cb('back')
 export function showLevelSelect(save, cb) {
   show('levels', [save], cb);
 }
@@ -175,7 +208,7 @@ export function showPause(cb) {
   show('pause', [], cb);
 }
 
-// Levelende. result = { time, coins, starCoins, hasNext }. cb('next' | 'again' | 'levels')
+// Levelende. result = { time, emeralds, diamonds: [b, b, b], hasNext }. cb('next' | 'again' | 'levels')
 export function showLevelDone(result, cb) {
   show('done', [result], cb);
 }

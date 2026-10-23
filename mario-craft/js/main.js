@@ -1,8 +1,9 @@
-// Bootstrap (PLAN §2, §3, §5, §7): Skalierung, Menüfluss, Ton und Vibration, Fortschritt speichern,
+// Bootstrap (PLAN §2, §3, §5, §6, §7): Skalierung, Menüfluss, Ton und Vibration, Fortschritt speichern,
 // Vollbild und Querformat beim ersten Antippen, ?debug=1, Service Worker.
+// Fester Schritt 1/120 s (PHYS.step, im Loop). Ohne Level (LEVELS leer) läuft die Levelauswahl mit „bald“.
 import { createLoop } from './core/loop.js';
 import { Input } from './core/input.js';
-import { audio } from './core/audio.js';
+import { audio, playEvent } from './core/audio.js';
 import { loadSave, writeSave } from './core/save.js';
 import { setLang, getLang, defaultLang, t } from './core/i18n.js';
 import { LEVELS } from './data/levels/index.js';
@@ -51,13 +52,19 @@ function applyLayout() {
   renderer.setView(layout.viewW, layout.viewH);
   canvas.style.width = `${(layout.viewW * layout.scale) / layout.dpr}px`;
   canvas.style.height = `${(layout.viewH * layout.scale) / layout.dpr}px`;
-  if (game) game.viewW = layout.viewW;
+  if (game) game.setView(layout.viewW, layout.viewH);
   rotateEl.hidden = !isPortrait();
 }
 
 function applyStatic() {
   document.documentElement.lang = getLang();
   for (const el of document.querySelectorAll('[data-t]')) el.textContent = t(el.dataset.t);
+}
+
+// Spiel setzen und Renderer auf dessen Level umstellen (game = null: nichts zu zeichnen).
+function setGame(g) {
+  game = g;
+  if (g) renderer.setLevel(g.map, g.map.theme);
 }
 
 // ---------- Spielstand ----------
@@ -68,45 +75,50 @@ function unlockedIndex() {
 
 // Debug: alle Level frei.
 function viewSave() {
-  return DEBUG ? { ...save, unlocked: LEVELS[LEVELS.length - 1].id } : save;
+  return DEBUG && LEVELS.length ? { ...save, unlocked: LEVELS[LEVELS.length - 1].id } : save;
 }
 
-// Leben, Münzen und Figurzustand in den Spielstand übernehmen und schreiben.
+// Leben, Smaragde, Figur und beste Spitzhacke aus dem Spiel in den Spielstand übernehmen (ohne Schreiben).
+function syncSave() {
+  if (!game) return;
+  save.lives = Math.max(1, game.lives);
+  save.emeralds = game.emeralds;
+  save.power = game.player.power;
+  save.pick = Math.max(save.pick, game.pick);
+}
+
+// Zwischenstand schreiben (Pause, Menü, Tab verlassen).
 function persistProgress() {
   if (!game || (mode !== 'play' && mode !== 'paused')) return;
-  save.lives = Math.max(1, game.lives);
-  save.coins = game.coins;
-  save.power = game.player.power;
+  syncSave();
   writeSave(save);
 }
 
+// Levelende: Bestwerte, Diamanten (je Platz einmal gesammelt), Freischalten des nächsten Levels, Speichern.
 function finishLevel(res) {
   const def = LEVELS[levelIndex];
   const old = save.levels[def.id] || {};
-  const rec = {
+  const diamonds = [0, 1, 2].map((i) => !!(old.diamonds && old.diamonds[i]) || !!game.diamonds[i]);
+  save.levels[def.id] = {
     done: true,
     bestTime: old.bestTime == null ? res.time : Math.min(old.bestTime, res.time),
-    coins: Math.max(old.coins || 0, res.coins),
-    stars: [0, 1, 2].map((i) => !!(old.stars && old.stars[i]) || !!res.starCoins[i]),
+    emeralds: Math.max(old.emeralds || 0, game.emeralds),
+    diamonds,
   };
-  save.levels[def.id] = rec;
   const next = levelIndex + 1;
-  if (next < LEVELS.length && unlockedIndex() < next) save.unlocked = LEVELS[next].id;
-  save.lives = Math.max(1, game.lives);
-  save.coins = game.coins;
-  save.power = game.player.power;
+  const hasNext = next < LEVELS.length && menu.isPlayable(LEVELS[next]);
+  if (hasNext && unlockedIndex() < next) save.unlocked = LEVELS[next].id;
+  syncSave();
   writeSave(save);
   mode = 'done';
-  menu.showLevelDone({
-    time: res.time, coins: res.coins, starCoins: res.starCoins, hasNext: next < LEVELS.length,
-  }, doneCb);
+  menu.showLevelDone({ time: res.time, emeralds: game.emeralds, diamonds, hasNext }, doneCb);
 }
 
 function gameOver() {
-  // Game Over: zurück zu Level 1 der Welt, Leben wieder 3, Figur klein.
+  // Game Over: zurück zu Level 1 der Welt, Leben wieder 3, Figur klein. Smaragde und Spitzhacke bleiben.
+  syncSave();
   save.lives = 3;
-  save.power = 'small';
-  save.coins = game ? game.coins : save.coins;
+  save.power = 'plain';
   writeSave(save);
   mode = 'over';
   menu.showGameOver(overCb, LEVELS[levelIndex].world);
@@ -118,12 +130,12 @@ function buzz(ms) {
   try { navigator.vibrate(ms); } catch (_) { /* nicht unterstützt */ }
 }
 
-// Game ruft onEvent(name, data). Töne heißen wie die audio-Funktionen (PLAN §5).
+// Game ruft onEvent(name, data) (PLAN §6). Töne laufen über playEvent; unbekannte Namen tun dort nichts.
 function onEvent(name, data) {
-  const sfx = audio[name];
-  if (typeof sfx === 'function') sfx.call(audio);
+  playEvent(name);
   if (name === 'hurt') buzz(40);
   else if (name === 'stomp') buzz(15);
+  else if (name === 'explode') buzz(60);
   else if (name === 'levelDone') finishLevel(data);
   else if (name === 'gameOver') gameOver();
 }
@@ -133,16 +145,17 @@ function newGame(index) {
   levelIndex = index;
   return new Game({
     level: LEVELS[index],
-    save: { lives: save.lives, coins: save.coins, power: save.power },
+    save: { lives: save.lives, emeralds: save.emeralds, pick: save.pick, power: save.power },
     onEvent,
     viewW: layout.viewW,
+    viewH: layout.viewH,
   });
 }
 
 function startLevel(index) {
-  game = newGame(index);
-  renderer.setLevel(game.map, game.map.theme);
-  input.setFireVisible(game.player.power === 'fire');
+  if (!LEVELS[index]) return;
+  setGame(newGame(index));
+  input.setFireVisible(game.player.power === 'bow');
   mode = 'play';
   menu.hideAll();
 }
@@ -191,8 +204,9 @@ function startCb(act, v) {
 function levelsCb(act, v) {
   if (act === 'back') showStart();
   else if (act === 'level') {
-    const max = DEBUG ? LEVELS.length - 1 : unlockedIndex();
-    if (v >= 0 && v <= max) startLevel(v);
+    const def = LEVELS[v];
+    if (!menu.isPlayable(def)) return;
+    if (DEBUG || v <= unlockedIndex()) startLevel(v);
   }
 }
 
@@ -217,7 +231,9 @@ function doneCb(act) {
 function overCb(act) {
   if (act === 'retry') {
     const world = LEVELS[levelIndex].world;
-    startLevel(LEVELS.findIndex((d) => d.world === world));
+    const first = LEVELS.findIndex((d) => d.id === `w${world}-1`);
+    if (first >= 0) startLevel(first);
+    else showLevels();
   }
 }
 
@@ -230,7 +246,7 @@ function update(dt) {
   }
   // Hochformat: Spiel steht still, der Hinweis „Bitte Gerät drehen“ liegt darüber.
   if (mode === 'play' && game && !isPortrait()) {
-    input.setFireVisible(game.player.power === 'fire');
+    input.setFireVisible(game.player.power === 'bow');
     game.update(dt, st);
   }
   input.endStep();
@@ -270,9 +286,8 @@ document.addEventListener('visibilitychange', () => {
 });
 window.addEventListener('pagehide', persistProgress);
 
-// Hintergrund des Startbildschirms: Level 1, steht still.
-game = newGame(0);
-renderer.setLevel(game.map, game.map.theme);
+// Hintergrund des Startbildschirms: Level 1, steht still. Ohne Level kein Hintergrund.
+setGame(LEVELS.length ? newGame(0) : null);
 showStart();
 
 loop = createLoop(update, render);
