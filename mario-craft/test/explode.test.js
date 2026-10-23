@@ -209,8 +209,8 @@ test('Boss im Radius bekommt Explosionsschaden', () => {
 });
 
 test('Pfeil fliegt, fällt, bleibt in der Wand stecken und verschwindet danach', () => {
-  // Wand in Spalte 12 (Zeilen 0–10), Boden ab Zeile 7.
-  const map = makeMap(24, 12, (c, r) => (c === 12 && r <= 10 ? '#' : dirtFill(c, r)));
+  // Wand in Spalte 12 (Zeilen 0–10), Boden ab Zeile 7 (Luft darüber, Pfeil in Zeile 2).
+  const map = makeMap(24, 12, (c, r) => (c === 12 && r <= 10) || r >= 7 ? '#' : null);
   const game = makeGame(map);
   const a = spawnProjectile(game, 'arrow', 88, 40, 200, 0);
   assert.ok(a);
@@ -284,8 +284,9 @@ test('Pfeil nach links: Blickrichtung spiegelt Start und Geschwindigkeit', () =>
 
 test('Feuer trifft Spieler → hurtPlayer(fire), Feuer verschwindet', () => {
   const map = makeMap(24, 12, dirtFill);
-  const game = makeGame(map, { player: { x: 100, y: 100, w: 12, h: 26, face: 1, invuln: 0, star: 0, dead: false } });
-  const f = spawnProjectile(game, 'fire', 106, 110, 0, 0);
+  // Spieler: x 100–112, y 30–56 (Luft in Zeile 1–2); Feuer in der Mitte.
+  const game = makeGame(map, { player: { x: 100, y: 30, w: 12, h: 26, face: 1, invuln: 0, star: 0, dead: false } });
+  const f = spawnProjectile(game, 'fire', 106, 40, 0, 0);
   updateProjectiles(game, DT);
   assert.deepEqual(game.hurts, ['fire']);
   assert.equal(f.active, false);

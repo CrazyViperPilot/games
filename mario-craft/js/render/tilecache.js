@@ -1,10 +1,21 @@
-// Vorgerenderte Level-Abschnitte (PLAN §6). Je 16 Zellen Breite (256 px) × 15 Zeilen (240 px).
-// Animierte Teile (Bonusblock, Lava-Oberfläche, Münzen, Bewegungen) zeichnet der Renderer als Overlay.
-// Kachel-Zeichen laut data/tiles.js; Kachel 14 (Barriere) und 4 (verstecktes Feld) werden nicht gezeichnet.
-const CELLS_X = 16;
-const T = 16;
-const CH_W = CELLS_X * T;   // 256
-const CH_H = 15 * T;        // 240
+// Tile-Cache (PLAN §6, §8): Level in 256×256-Quadrate (16×16 Zellen) vorrendern.
+// Je Zelle: (1) Rückwand, wenn die Zelle nicht fest und nicht barrier ist und r > surface[c];
+// (2) die Kachel selbst (TILE_BY_ID[id].art, null = nichts).
+// Animierte Kacheln (lava, water, torch) stehen im Cache mit Frame 0; der Renderer überzeichnet sie.
+// Rückgabe.animated = Int32Array aus Tripeln [c, r, artIndex] (0 lava, 1 water, 2 torch).
+import { TILE_BY_ID, TILE_IDS } from '../data/tiles.js';
+
+const CHUNK_CELLS = 16;          // Zellen je Chunk-Kante
+const CELL = 16;                 // Pixel je Zelle
+const CHUNK_PX = CHUNK_CELLS * CELL;  // 256
+const AIR_ID = TILE_IDS.air;
+const BARRIER_ID = TILE_IDS.barrier;
+
+// Kachel-Id -> Index in animated (-1 = nicht animiert).
+const ANIM_OF = new Int8Array(64).fill(-1);
+ANIM_OF[TILE_IDS.lava] = 0;
+ANIM_OF[TILE_IDS.water] = 1;
+ANIM_OF[TILE_IDS.torch] = 2;
 
 function makeCanvas(w, h) {
   if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(w, h);
@@ -14,74 +25,91 @@ function makeCanvas(w, h) {
   return c;
 }
 
-// Kachel-Id -> Sprite-Name (ohne Welt-Präfix) für Zellen ohne Sonderlogik.
-const SIMPLE = { 2: 'brick', 3: 'bonus', 5: 'hard', 13: 'used', 8: 'spikes', 7: 'lava' };
+// Rückwand-Sprite für Zelle (r) einer Spalte mit Oberfläche surf.
+function wallName(theme, r, surf) {
+  if (theme === 'nether') return 'wall_nether';
+  if (theme === 'end') return 'wall_end';
+  return r <= surf + 4 ? 'wall_dirt' : 'wall_stone';
+}
 
-export function buildChunks(map, sprites, theme) {
+export function buildChunks(map, sprites, theme = map.theme) {
   const cols = map.cols;
   const rows = map.rows;
-  const nChunks = Math.ceil(cols / CELLS_X);
+  const ncx = Math.ceil(cols / CHUNK_CELLS);
+  const ncy = Math.ceil(rows / CHUNK_CELLS);
   const atlas = sprites.atlas;
-  const get = sprites.get;
+
   const chunks = [];
-  for (let i = 0; i < nChunks; i++) {
-    const cv = makeCanvas(CH_W, CH_H);
-    const cx = cv.getContext('2d');
-    cx.imageSmoothingEnabled = false;
-    chunks.push(cv);
-  }
-  const N = {};
-  for (const k of ['ground_top', 'ground', 'brick', 'hard', 'bonus', 'used', 'plat_l', 'plat_m', 'plat_r', 'plat_s',
-    'pipe_cl', 'pipe_cr', 'pipe_bl', 'pipe_br', 'lava', 'spikes', 'deco']) N[k] = `${theme}/${k}`;
-
-  // Zeichnet eine Sprite-Region in den Abschnitt der Zelle (c, r).
-  function blit(ctx, name, frame, lx, ly) {
-    const s = get(name, frame, false);
-    ctx.drawImage(atlas, s.sx, s.sy, s.w, s.h, lx, ly, s.w, s.h);
+  for (let cy = 0; cy < ncy; cy++) {
+    const line = [];
+    for (let cx = 0; cx < ncx; cx++) {
+      const cv = makeCanvas(CHUNK_PX, CHUNK_PX);
+      cv.getContext('2d').imageSmoothingEnabled = false;
+      line.push(cv);
+    }
+    chunks.push(line);
   }
 
+  // Flache Liste [c, r, a, c, r, a, ...] der animierten Zellen.
+  const animFlat = [];
+  const out = { chunks, cols: ncx, rows: ncy, redrawCell, redrawAll, animated: new Int32Array(0) };
+
+  function blit(ctx, name, lx, ly) {
+    const s = sprites.get(name, 0, false);
+    if (s.w > 0 && s.h > 0) ctx.drawImage(atlas, s.sx, s.sy, s.w, s.h, lx, ly, s.w, s.h);
+  }
+
+  // Zeichnet Rückwand + Kachel der Zelle (c, r). Liefert den Animationsindex oder -1.
   function drawCell(c, r) {
-    if (c < 0 || c >= cols || r < 0 || r >= rows) return;
-    const ci = (c / CELLS_X) | 0;
-    const ctx = chunks[ci].getContext('2d');
-    const lx = (c - ci * CELLS_X) * T, ly = r * T;
-    ctx.clearRect(lx, ly, T, T);
+    const ctx = chunks[r >> 4][c >> 4].getContext('2d');
+    const lx = (c & (CHUNK_CELLS - 1)) * CELL;
+    const ly = (r & (CHUNK_CELLS - 1)) * CELL;
+    ctx.clearRect(lx, ly, CELL, CELL);
+
     const id = map.get(c, r);
-    if (id === 0 || id === 4 || id === 14) return;
-    if (id === 1) {
-      // Grasoberkante, wenn darüber nichts Festes liegt.
-      blit(ctx, map.isSolid(c, r - 1) ? N.ground : N.ground_top, 0, lx, ly);
-      return;
+    const t = TILE_BY_ID[id];
+    const surf = map.surface[c];
+    if (!t.solid && id !== BARRIER_ID && r > surf) {
+      blit(ctx, wallName(theme, r, surf), lx, ly);
     }
-    if (id === 6) {
-      // Einseitige Plattform: obere Hälfte der Zelle, Ende wo der Nachbar keine Plattform ist.
-      const l = map.get(c - 1, r) !== 6, rt = map.get(c + 1, r) !== 6;
-      const name = l && rt ? N.plat_s : l ? N.plat_l : rt ? N.plat_r : N.plat_m;
-      blit(ctx, name, 0, lx, ly);
-      return;
+    if (id === AIR_ID || !t.art) return -1;
+    blit(ctx, t.art, lx, ly);
+    return ANIM_OF[id];
+  }
+
+  // Aktualisiert den Eintrag einer Zelle in der animierten Liste.
+  function setAnimated(c, r, a) {
+    for (let i = 0; i < animFlat.length; i += 3) {
+      if (animFlat[i] === c && animFlat[i + 1] === r) {
+        animFlat.splice(i, 3);
+        break;
+      }
     }
-    if (id === 9) {
-      // Röhrenkörper: linke Hälfte, wenn links keine Röhre ist, sonst rechte.
-      blit(ctx, map.get(c - 1, r) === 9 ? N.pipe_br : N.pipe_bl, 0, lx, ly);
-      return;
-    }
-    if (id === 10) { blit(ctx, N.pipe_cl, 0, lx, ly); return; }
-    if (id === 11) { blit(ctx, N.pipe_cr, 0, lx, ly); return; }
-    if (id === 12) { blit(ctx, N.deco, 0, lx, ly); return; }
-    const simple = SIMPLE[id];
-    if (simple) blit(ctx, N[simple] || `${theme}/${simple}`, 0, lx, ly);
+    if (a >= 0) animFlat.push(c, r, a);
+    out.animated = Int32Array.from(animFlat);
   }
 
   function redrawCell(c, r) {
-    drawCell(c, r);
-    // Darunter liegende Zelle hängt von der Oberkante ab (Gras/Füllung).
-    drawCell(c, r + 1);
+    if (c < 0 || r < 0 || c >= cols || r >= rows) return;
+    setAnimated(c, r, drawCell(c, r));
   }
 
   function redrawAll() {
-    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) drawCell(c, r);
+    for (let cy = 0; cy < ncy; cy++) {
+      for (let cx = 0; cx < ncx; cx++) {
+        chunks[cy][cx].getContext('2d').clearRect(0, 0, CHUNK_PX, CHUNK_PX);
+      }
+    }
+    animFlat.length = 0;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const a = drawCell(c, r);
+        if (a >= 0) animFlat.push(c, r, a);
+      }
+    }
+    out.animated = Int32Array.from(animFlat);
   }
 
   redrawAll();
-  return { chunks, redrawCell, redrawAll, cellsPerChunk: CELLS_X, chunkWidth: CH_W, chunkHeight: CH_H };
+  return out;
 }
