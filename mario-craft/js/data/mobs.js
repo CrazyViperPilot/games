@@ -32,13 +32,13 @@ export const BOSSES = {
     split: { w: 32, h: 32, count: 2, into: 'slime' },
   },
   // Arena 30×14. Schwebt 4–6 Kacheln über dem Boden (Mitte 5), pendelt ±6 Kacheln (Spitze speed px/s).
-  // Salve alle 3 s, ab halber Energie alle 2 s: 3 Schädel (5), Fächer ±0,3 rad, 80 px/s, Explosion Radius 1,5.
+  // Salve alle 3 s, ab halber Energie alle 2 s: 2 Schädel (Phase 2: 3), Fächer ±0,3 rad, 70 px/s, Explosion Radius 1,5.
   // Nach jeder Salve 1,5 s Sturzflug auf Spielerhöhe, wenn der Spieler nahe ist (diveRange Kacheln).
-  // Stampfer 1 Schaden, Pfeil 1 (10 Treffer). Explosionen wirken nicht (keine Eigenverletzung durch Schädel).
+  // Stampfer 4 Schaden (3 Stampfer), Pfeil 1 (12 Treffer). Explosionen wirken nicht (keine Eigenverletzung durch Schädel).
   dreikopf: {
-    w: 48, h: 40, arena: { w: 30, h: 14 }, hp: 10, stompDmg: 1, arrowDmg: 1, invulnTime: 1.2,
+    w: 48, h: 40, arena: { w: 30, h: 14 }, hp: 12, stompDmg: 4, arrowDmg: 1, invulnTime: 1.2,
     hover: { minH: 4, maxH: 6 }, speed: 60, sway: 6, bobSpeed: 1,
-    shootEvery: 3, shootEveryEnraged: 2, enrageAt: 0.5, skulls: 3, skullsEnraged: 5, skullSpeed: 80, fan: 0.3,
+    shootEvery: 3, shootEveryEnraged: 2, enrageAt: 0.5, skulls: 2, skullsEnraged: 3, skullSpeed: 70, fan: 0.3,
     skullRadius: 1.5, diveTime: 1.5, diveRange: 4, diveFeet: 28, diveSpeed: 150, defeatRadius: 2,
   },
   // Arena 40×18. 4 Kristalle auf Säulen; solange einer steht, unverwundbar. Kristall: Stampfer oder Pfeil,

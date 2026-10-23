@@ -7,9 +7,14 @@
 //   ist eine Kopie des größten lebenden Teils; hp = Anzahl Teile (Anzeige).
 // Treffer: Stampfen (fallend, Füße über der Teil-Mitte) und Pfeil/Explosion teilen ein Teil. Schleime aus einem
 // mittleren Teil sind Mobs mit m.fromBoss = true; der Boss ist besiegt, wenn keine Teile und keine solchen Mobs leben.
+// Dreikopf (dreikopf): schwebt, parts = []. state 'fight' | 'dive' (Sturzflug nach einer Salve, active = true).
+//   hp = Energie (BOSSES.dreikopf.hp), maxHp, phase (1, ab hp ≤ 50 % → 2), invuln (s, Blinken), salvos/shots (Zähler).
+//   Stampfer und Pfeil treffen; Explosionen nicht. Sieg: explode-Radius 2 am Körpermittelpunkt, dann defeatBoss().
 import { PHYS } from '../data/physics.js';
 import { BOSSES } from '../data/mobs.js';
 import { moveAndCollide } from './collide.js';
+import { explode } from './explode.js';
+import { spawnProjectile } from './projectiles.js';
 
 const T = PHYS.tile;
 const ARENA_LEAD = 20 * T;      // px: ab so weit links vom Boss (x des Körpers) ist die Arena aktiv
@@ -36,7 +41,7 @@ export function createBoss(kind, x, y) {
   return KINDS[kind](x, y);
 }
 
-const KINDS = { slimeking: makeSlimeKing };
+const KINDS = { slimeking: makeSlimeKing, dreikopf: makeDreikopf };
 
 function newBoss(kind, x, y, w, h) {
   const b = {
@@ -73,6 +78,27 @@ function makeSlimeKing(x, y) {
   return b;
 }
 
+// Dreikopf: Schwebemitte 5 Kacheln über dem Spawn (Mitte von hover), Sinus um die Spawn-Mitte.
+const DRE = BOSSES.dreikopf;
+const DRE_HOVER = (DRE.hover.minH + DRE.hover.maxH) / 2 * T;  // px: Unterkante des Körpers über dem Spawn-Fuß
+const DRE_BOB = (DRE.hover.maxH - DRE.hover.minH) / 2 * T;    // px: vertikale Amplitude
+const DRE_SWAY = DRE.sway * T;                                 // px: horizontale Amplitude
+const DRE_OMEGA_X = DRE.speed / DRE_SWAY;                      // rad/s: Spitzengeschwindigkeit = speed px/s
+
+function makeDreikopf(x, y) {
+  const w = DRE.w, h = DRE.h;
+  const top = y - DRE_HOVER - h;
+  const b = newBoss('dreikopf', x - w / 2, top, w, h);
+  b.anim = 'boss_dreikopf';
+  b.hp = DRE.hp;
+  b.maxHp = DRE.hp;
+  b.phase = 1;
+  b.salvos = 0;   // Zähler: abgefeuerte Salven
+  b.shots = 0;    // Zähler: erzeugte Schädel
+  b.ai = { homeX: x, homeTop: top, t: 0, shootT: DRE.shootEvery, diveT: 0 };
+  return b;
+}
+
 // ---------- Schritt und Schaden (auch über game.boss) ----------
 
 // Schritt für game.boss (PLAN §6). Ohne Boss passiert nichts.
@@ -88,11 +114,16 @@ export function damageBoss(game, how) {
 function stepBoss(game, b, dt, prevFeet) {
   if (b.state === 'defeated') return;
   if (b.state === 'idle') {
-    if (game.player.x < b.x - ARENA_LEAD) return;
+    if (b.kind === 'dreikopf' ? !nearDreikopf(game, b) : game.player.x < b.x - ARENA_LEAD) return;
     b.state = 'fight';
     b.active = true;
     game.lockArena?.();
     game.emit('bossStart');
+  }
+
+  if (b.kind === 'dreikopf') {
+    stepDreikopf(game, b, dt, prevFeet);
+    return;
   }
 
   const parts = b.parts;
@@ -104,6 +135,10 @@ function stepBoss(game, b, dt, prevFeet) {
 }
 
 function hitBoss(game, b, how) {
+  if (b.kind === 'dreikopf') {
+    if (how === 'arrow') hitFlyer(game, b, DRE.arrowDmg);
+    return;
+  }
   if (b.state !== 'fight') return;
   const target = largestPart(b.parts);
   if (!target || target.invuln > 0) return;
@@ -230,6 +265,107 @@ function checkDefeat(game, b) {
   b.state = 'defeated';
   b.active = false;
   b.hp = 0;
+  game.addScore(DEFEAT_SCORE);
+  game.emit('bossHit', { defeated: true });
+  game.defeatBoss();
+}
+
+// ---------- Dreikopf ----------
+
+// Aktiv, sobald der Spieler in der Arena (halbe Breite um den Spawn) steht.
+function nearDreikopf(game, b) {
+  const p = game.player;
+  return Math.abs(p.x + p.w / 2 - b.ai.homeX) <= (DRE.arena.w / 2) * T;
+}
+
+// Ein Schritt: Salvenzähler, Sturzflug, Schweben (Sinus), Kontakt mit dem Spieler.
+function stepDreikopf(game, b, dt, prevFeet) {
+  const ai = b.ai;
+  const p = game.player;
+  ai.t += dt;
+  b.animTime += dt;
+  b.invuln = Math.max(0, b.invuln - dt);
+  b.phase = b.hp <= DRE.hp * DRE.enrageAt ? 2 : 1;
+
+  const px = p.x + p.w / 2;
+  const hoverTop = ai.homeTop + Math.sin(ai.t * DRE.bobSpeed) * DRE_BOB;
+  const cx = ai.homeX + Math.sin(ai.t * DRE_OMEGA_X) * DRE_SWAY;
+
+  ai.shootT -= dt;
+  if (ai.shootT <= 0) {
+    fireSalvo(game, b);
+    ai.shootT = b.phase === 2 ? DRE.shootEveryEnraged : DRE.shootEvery;
+    ai.diveT = DRE.diveTime;
+    // Sturzflugziel wird beim Start fixiert (sonst liefe der Boss dem Spieler beim Springen hinterher).
+    ai.diveTop = Math.max(hoverTop, p.y + p.h - DRE.diveFeet);
+  }
+  if (ai.diveT > 0) ai.diveT -= dt;
+  b.state = ai.diveT > 0 ? 'dive' : 'fight';
+
+  // Zielhöhe (Oberkante): Schwebehöhe; im Sturzflug das fixierte Ziel, wenn der Spieler nahe ist.
+  let targetTop = hoverTop;
+  if (b.state === 'dive' && Math.abs(px - cx) <= DRE.diveRange * T) targetTop = ai.diveTop;
+  const oldX = b.x, oldY = b.y;
+  const maxStep = DRE.diveSpeed * dt;
+  b.x = cx - b.w / 2;
+  b.y += Math.max(-maxStep, Math.min(maxStep, targetTop - b.y));
+  b.vx = (b.x - oldX) / dt;
+  b.vy = (b.y - oldY) / dt;
+  b.face = px >= cx ? 1 : -1;
+  b.onGround = false;
+
+  touchFlyer(game, b, prevFeet);
+}
+
+// Salve: Schädel vom Körpermittelpunkt in Richtung Spieler, symmetrischer Fächer.
+function fireSalvo(game, b) {
+  const p = game.player;
+  const n = b.phase === 2 ? DRE.skullsEnraged : DRE.skulls;
+  const sx = b.x + b.w / 2;
+  const sy = b.y + b.h / 2;
+  const base = Math.atan2(p.y + p.h / 2 - sy, p.x + p.w / 2 - sx);
+  for (let i = 0; i < n; i++) {
+    const off = n > 1 ? -DRE.fan + (2 * DRE.fan * i) / (n - 1) : 0;
+    const a = base + off;
+    if (spawnProjectile(game, 'skull', sx, sy, Math.cos(a) * DRE.skullSpeed, Math.sin(a) * DRE.skullSpeed)) b.shots++;
+  }
+  b.salvos++;
+}
+
+// Kontakt: Stampfen von oben (Abprall, Schaden), Stern (Schaden), sonst seitlich Schaden für den Spieler.
+function touchFlyer(game, b, prevFeet) {
+  const p = game.player;
+  if (!overlapsPlayer(b, p)) return;
+  if (p.vy > 0 && prevFeet <= b.y + b.h * 0.5) {
+    hitFlyer(game, b, DRE.stompDmg);
+    p.vy = -(game.jumpHeld ? PHYS.stompBounceHold : PHYS.stompBounce);
+    return;
+  }
+  if (p.star > 0) {
+    hitFlyer(game, b, DRE.stompDmg);
+    return;
+  }
+  if (p.invuln <= 0) game.hurtPlayer('boss');
+}
+
+// Treffer: Energie senken, 1,2 s Unverwundbarkeit, 500 Punkte; bei 0 Sieg.
+function hitFlyer(game, b, dmg) {
+  if (b.state !== 'fight' && b.state !== 'dive') return;
+  if (b.invuln > 0) return;
+  b.hp = Math.max(0, b.hp - dmg);
+  b.invuln = DRE.invulnTime;
+  game.addScore(HIT_SCORE);
+  game.emit('bossHit', { hp: b.hp });
+  if (b.hp <= 0) defeatFlyer(game, b);
+}
+
+// Sieg: Zustand zuerst setzen (Explosion trifft den Boss dann nicht mehr), Explosion, Punkte, defeatBoss.
+function defeatFlyer(game, b) {
+  b.state = 'defeated';
+  b.active = false;
+  b.invuln = 0;
+  b.hp = 0;
+  explode(game, b.x + b.w / 2, b.y + b.h / 2, DRE.defeatRadius);
   game.addScore(DEFEAT_SCORE);
   game.emit('bossHit', { defeated: true });
   game.defeatBoss();
