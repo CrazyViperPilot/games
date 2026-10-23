@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#00001a">
     <title>Vibe Squadron - Touch & Upgrades</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
     <style>
         body {
             margin: 0;
@@ -595,6 +599,27 @@
         }
         #startWaveBtn:hover, #startWaveBtn:active { background: #ffcc33; color: #000; }
 
+        #startMenu {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 10, 0.86);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            z-index: 50;
+        }
+        #startMenu h1 {
+            margin: 0 0 6px 0;
+            color: cyan;
+            letter-spacing: 3px;
+            text-shadow: 0 0 16px #00aaff;
+        }
+        #startMenu .sm-sub { margin: 0 0 18px 0; color: #aef7ff; }
+        #startMenu button { width: 70%; max-width: 280px; }
+        #startMenu .sm-best { margin-top: 18px; color: #ffcc33; font-size: 14px; }
+        #startMenu .sm-home { margin-top: 22px; color: #9ab; font-size: 14px; text-decoration: none; }
         #gameOver {
             position: absolute;
             top: 50%;
@@ -689,7 +714,16 @@
         <div id="gameOver">
             <h2>MISSION FAILED</h2>
             <p>Score: <span id="finalScore">0</span></p>
+            <p style="color: #ffcc33;">Bestwert: <span id="finalBest">0</span></p>
             <button id="restartBtn">Neustart</button>
+        </div>
+        <div id="startMenu">
+            <h1>VIBE SQUADRON</h1>
+            <p class="sm-sub">Verteidige das Mutterschiff</p>
+            <button id="continueBtn" style="display:none;">Weiter</button>
+            <button id="newGameBtn">Neues Spiel</button>
+            <div class="sm-best" id="startBest"></div>
+            <a class="sm-home" href="../">‹ Alle Spiele</a>
         </div>
     </div>
 
@@ -3615,6 +3649,8 @@
         }
         renderShop();
         buildPhaseScreen.style.display = 'flex';
+        // Checkpoint between waves (not at the very start and not in the pause shop)
+        if (!pauseMode && wave > 0) saveGame();
     }
 
     function closeBuildPhase() {
@@ -3890,7 +3926,119 @@
         ctx.globalAlpha = 1;
     }
 
-    function init() {
+    // --- SPIELSTAND (localStorage) ---
+    // Gespeichert wird zwischen den Wellen (Bauphase). Wer mitten in einer Welle aufhört,
+    // macht beim nächsten Start in der Bauphase vor dieser Welle weiter.
+    const SAVE_KEY = 'vibesquadron-save';
+    const BEST_KEY = 'vibesquadron-best';
+    const SAVE_VERSION = 1;
+    const PLAYER_SAVE_FIELDS = ['maxHp', 'hp', 'maxShield', 'shield', 'speed', 'damageBonus', 'fireRateBonus',
+        'shieldRegen', 'scrapBonus', 'xpMultiplier', 'currentWeapon'];
+    const MOTHERSHIP_SAVE_FIELDS = ['maxHp', 'hp', 'armor', 'regen', 'maxShield', 'shield', 'shieldRegen'];
+
+    function pick(obj, fields) {
+        const out = {};
+        fields.forEach(f => { out[f] = obj[f]; });
+        return out;
+    }
+
+    function saveGame() {
+        const data = {
+            v: SAVE_VERSION,
+            score, scrap, titan, plasma, level, xp, xpToNext, wave,
+            baseModules, hangar, shipCounter, blueprintDraft,
+            player: {
+                ...pick(player, PLAYER_SAVE_FIELDS),
+                weapons: player.weapons,
+                abilities: Object.fromEntries(ABILITY_ORDER.map(id => [id, player.abilities[id].owned])),
+                moduleTiers: player.moduleTiers,
+                wingmen: player.wingmenSlots.filter(s => s.active).length
+            },
+            mothership: {
+                ...pick(mothership, MOTHERSHIP_SAVE_FIELDS),
+                turrets: mothership.turretSlots.map(s => s.turret ? { type: s.turret.type, level: s.turret.level } : null)
+            }
+        };
+        try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) {}
+    }
+
+    function loadSave() {
+        try {
+            const data = JSON.parse(localStorage.getItem(SAVE_KEY));
+            return data && data.v === SAVE_VERSION && data.wave > 0 ? data : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function clearSave() {
+        try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+    }
+
+    function loadBest() {
+        try { return parseInt(localStorage.getItem(BEST_KEY), 10) || 0; } catch (e) { return 0; }
+    }
+
+    function storeBest(value) {
+        try { localStorage.setItem(BEST_KEY, String(value)); } catch (e) {}
+    }
+
+    // Writes a save onto the freshly reset state from init().
+    function applySave(data) {
+        ({ score, scrap, titan, plasma, level, xp, xpToNext, wave, shipCounter } = data);
+        Object.assign(baseModules, data.baseModules);
+        hangar = data.hangar || [];
+        Object.assign(blueprintDraft, data.blueprintDraft);
+
+        const ps = data.player;
+        PLAYER_SAVE_FIELDS.forEach(f => { if (ps[f] !== undefined) player[f] = ps[f]; });
+        WEAPON_ORDER.forEach(id => { if (ps.weapons[id]) Object.assign(player.weapons[id], ps.weapons[id]); });
+        if (!player.weapons[player.currentWeapon] || !player.weapons[player.currentWeapon].owned) player.currentWeapon = 'blaster';
+        ABILITY_ORDER.forEach(id => { player.abilities[id].owned = !!ps.abilities[id]; });
+        Object.assign(player.moduleTiers, ps.moduleTiers);
+        for (let i = 0; i < ps.wingmen; i++) player.addWingman();
+
+        const ms = data.mothership;
+        MOTHERSHIP_SAVE_FIELDS.forEach(f => { if (ms[f] !== undefined) mothership[f] = ms[f]; });
+        ms.turrets.forEach((t, i) => {
+            if (t && mothership.turretSlots[i] && TURRET_TYPES[t.type]) {
+                mothership.turretSlots[i].turret = { type: t.type, level: t.level, cooldown: 0, aim: -Math.PI / 2 };
+            }
+        });
+    }
+
+    const startMenu = document.getElementById('startMenu');
+    const continueBtn = document.getElementById('continueBtn');
+    const newGameBtn = document.getElementById('newGameBtn');
+    const startBest = document.getElementById('startBest');
+    const finalBestText = document.getElementById('finalBest');
+
+    function showStartMenu() {
+        const save = loadSave();
+        if (save) {
+            continueBtn.innerText = 'Weiter – Welle ' + (save.wave + 1);
+            continueBtn.style.display = '';
+        } else {
+            continueBtn.style.display = 'none';
+        }
+        const best = loadBest();
+        startBest.innerText = best > 0 ? 'Bestwert: ' + best : '';
+        startMenu.style.display = 'flex';
+    }
+
+    function startFromMenu(useSave) {
+        if (startMenu.style.display === 'none') return;
+        const save = useSave ? loadSave() : null;
+        if (!useSave) clearSave();
+        startMenu.style.display = 'none';
+        init(save);
+    }
+    continueBtn.addEventListener('click', () => startFromMenu(true));
+    continueBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startFromMenu(true); }, { passive: false });
+    newGameBtn.addEventListener('click', () => startFromMenu(false));
+    newGameBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startFromMenu(false); }, { passive: false });
+
+    function init(save = null) {
         player = new Player();
         mothership = new Mothership();
         targetX = canvas.width / 2;
@@ -3923,6 +4071,8 @@
 
         shakeTime = 0; shakeMag = 0;
 
+        if (save) applySave(save);
+
         // Reset fixed-timestep loop timing
         lastTime = performance.now();
         accumulator = 0;
@@ -3936,8 +4086,8 @@
         waveText.innerText = wave;
         updateLivesDisplay();
         updateComboDisplay();
-        mothershipBar.style.width = '100%';
-        mothershipShieldWrap.style.display = 'none';
+        mothershipBar.style.width = `${Math.max(0, (mothership.hp / mothership.maxHp) * 100)}%`;
+        mothershipShieldWrap.style.display = mothership.maxShield > 0 ? 'block' : 'none';
         gameOverScreen.style.display = 'none';
         levelUpScreen.style.display = 'none';
         buildPhaseScreen.style.display = 'none';
@@ -3957,7 +4107,11 @@
 
     function animate(now) {
         if (isGameOver) {
+            clearSave();
+            const best = Math.max(loadBest(), score);
+            storeBest(best);
             finalScoreText.innerText = score;
+            finalBestText.innerText = best;
             gameOverScreen.style.display = 'block';
             return;
         }
@@ -4235,7 +4389,11 @@
         ctx.restore();
     }
 
-    init();
+    showStartMenu();
+
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+    }
 </script>
 </body>
 </html>

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#00001a"/>
+      <stop offset="1" stop-color="#000044"/>
+    </linearGradient>
+    <linearGradient id="hull" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#aef7ff"/>
+      <stop offset="1" stop-color="#00a8c8"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <g fill="#fff">
+    <circle cx="80" cy="90" r="4"/><circle cx="420" cy="60" r="3"/><circle cx="450" cy="300" r="4"/>
+    <circle cx="60" cy="330" r="3"/><circle cx="140" cy="440" r="3"/><circle cx="380" cy="450" r="4"/>
+  </g>
+  <rect x="246" y="60" width="20" height="70" rx="10" fill="#00ffff"/>
+  <rect x="150" y="150" width="14" height="50" rx="7" fill="#ffaa33"/>
+  <rect x="348" y="150" width="14" height="50" rx="7" fill="#ffaa33"/>
+  <path d="M256 150 L300 300 L392 360 L392 392 L290 372 L256 410 L222 372 L120 392 L120 360 L212 300 Z" fill="url(#hull)" stroke="#00ffff" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M256 210 L276 290 L256 310 L236 290 Z" fill="#00001a"/>
+  <path d="M232 410 L256 470 L280 410 Z" fill="#ff8800"/>
+</svg>
