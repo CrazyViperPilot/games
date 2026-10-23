@@ -165,6 +165,12 @@ export function parseLevel(def) -> LevelMap
 export function moveAndCollide(body, map, dt) -> { hitHead:{c,r}|null, onGround, hitWall:-1|0|1 }
 //   body = { x, y, w, h, vx, vy }  (x,y = linke obere Ecke). Erst x, dann y, Kachel-AABB. Plattformen ('=') nur von oben,
 //   wenn Unterkante im vorigen Schritt darüber lag. Bewegliche Plattformen über game.platforms (in player.js/enemies.js).
+// game/player.js
+export function createPlayer(x, y, power /* 'small'|'big'|'fire' */) -> Player
+// Player = { x, y, w, h, vx, vy, face: 1|-1, power, onGround, runTimer, coyote, jumpBuffer, jumping, invuln, star,
+//            anim: 'stand'|'walk'|'run'|'jump'|'fall'|'turn'|'crouch', animTime, dead }
+export function updatePlayer(game, dt, input) -> { hitHead:{c,r}|null }   // nutzt nur game.map, game.player, game.platforms
+export function setPower(player, power)   // passt h an (Füße bleiben am selben y)
 // game/game.js
 export class Game {
   constructor({ level /* def */, save, onEvent /* (name, data) */ })
@@ -232,3 +238,15 @@ polnische Texte gegenlesen, PNG-Icons aus `icons/icon.svg` erzeugen. Ergebnisse 
 
 Der Implementer-Agent (`.claude/agents/implementer.md`) ist auf Gate Squad zugeschnitten; vor WP1 bekommt er einen
 spielneutralen Auftrag: „Lies `<spiel>/PLAN.md`, setze nur das genannte Paket um“ (gleiche Regeln, Ordner als Parameter).
+
+## 10. Notizen aus den Arbeitspaketen (verbindlich für spätere Pakete)
+
+**WP1**
+- `createPlayer(x, y, power)`: x, y = **Fußmitte** (wie `map.start`, Spawns, Checkpoint). `player.x/y` = linke obere Ecke.
+- Spawns: `{ type: 'walker'|'beetle'|'hopper'|'spiky'|'lavaball'|'boss', x, y }` mit x = Zellmitte, y = Zellunterkante.
+- `map.platforms`, `map.items` sind unverändert aus der Level-Definition (Kachel-Einheiten); Umrechnen in px macht `Game`.
+- `game.platforms[i] = { x, y, w, h, dx, dy }` in px; `x/y` = Position **vor** dem Schritt, `dx/dy` = Bewegung im Schritt.
+  `Game` bewegt Plattformen vor `updatePlayer`.
+- `moveAndCollide`/`updatePlayer` liefern wiederverwendete Ergebnisobjekte; `hitHead` sofort auswerten.
+- `player.invuln`/`player.star` sind Restzeiten (s), `updatePlayer` zählt sie herunter; setzen tut `Game`.
+- Gemessen: gehaltener Sprung stehend ≈ 5,2 Kacheln, gerannt ≈ 6,2; Rennsprung landet ≈ 8,7 Kacheln weit; kurzer Tipp ≈ 2,1.
