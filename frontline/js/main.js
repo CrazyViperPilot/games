@@ -17,7 +17,6 @@ const DEBUG = params.get('debug') === '1';
 const URL_SEED = Number.parseInt(params.get('seed'), 10);
 const URL_SPEED = Number.parseFloat(params.get('speed'));
 const SPEEDS = DEBUG ? [1, 2, 3, 5, 10] : [1, 2, 3];
-const RES_KEYS = ['money', 'bm', 'mun', 'fuel'];
 const HUMAN = 0; // Blau
 const AI_TEAM = 1; // Rot
 
@@ -113,7 +112,8 @@ const app = {
     const s = session;
     if (!DEBUG || !s) return;
     const team = s.game.teams[HUMAN];
-    for (const k of RES_KEYS) team.res[k] += 1000;
+    team.res.money += 1000;
+    s.game.setStock(HUMAN, { bm: team.res.bm + 1000, mun: team.res.mun + 1000, fuel: team.res.fuel + 1000 });
     s.hud.pushMessage('Debug: +1000 aller Ressourcen');
   },
 };

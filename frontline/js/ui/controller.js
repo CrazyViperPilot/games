@@ -353,13 +353,13 @@ export class Controller {
   }
 
   confirmFob(wx, wy, shift) {
-    const truck = this.selected().find((e) => e.kind === 'unit' && e.type === 'truck');
+    const truck = this.selected().find((e) => e.kind === 'unit' && e.type === 'engineer');
     if (!truck) {
-      this.message('Kein LKW gewählt');
+      this.message('Kein Baufahrzeug gewählt');
       this.setMode('normal');
       return;
     }
-    const r = this.issue({ type: 'buildFob', truckId: truck.id, x: wx, y: wy });
+    const r = this.issue({ type: 'buildFob', ids: [truck.id], x: wx, y: wy });
     if (!r.ok) return;
     this.moveMarker(wx, wy);
     if (shift) this.updatePointer(wx, wy);

@@ -1,9 +1,12 @@
-// Fabriken für Einheiten, Gebäude und Granaten (PLAN.md §4, §5). Reine Funktionen, kein Zugriff auf Game.
+// Fabriken für Einheiten, Gebäude und Granaten (PLAN.md §4, §5, §11). Reine Funktionen, kein Zugriff auf Game.
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 
-/** Einheit. Zusätzliche Felder: goalX/goalY (Ziel der letzten Planung), repathTimer, needPath. */
+/**
+ * Einheit. Zusätzliche Felder: goalX/goalY (Ziel der letzten Planung), repathTimer, needPath.
+ * Vorrat: ammo/fuel (voll beim Spawn), cargo/preset (LKW-Ladung und Ladungsart).
+ */
 export function createUnit(id, type, team, x, y) {
   const def = UNITS[type];
   return {
@@ -32,13 +35,19 @@ export function createUnit(id, type, team, x, y) {
     repathTimer: 0,
     needPath: false,
     speedMul: 1, // 0.25 bei Fahrzeugen ohne Treibstoff (movement.js)
+    ammo: def.ammoMax ?? 0,
+    fuel: def.fuelMax ?? 0,
+    cargo: { bm: 0, mun: 0, fuel: 0 },
+    preset: 'mix', // LKW-Ladungsart: 'mix' | 'bm' | 'mun' | 'fuel'
   };
 }
 
 /**
  * Gebäude als Baustelle (built = false, hp = 10 %) oder fertig – je nach Aufrufer.
  * x, y = Mittelpunkt des Fußabdrucks; Sammelpunkt 2 Zellen unterhalb.
- * Zusätzliches Feld: nodeId (Förderanlage).
+ * Zusätzliche Felder: nodeId (Förderanlage), store (FOB-Lager, Baustellen nutzen es ebenfalls),
+ * payerId (Lager, aus dem bezahlt wurde – für Erstattung), supplied (FOB-Baustelle hat ihr Material),
+ * warnTime (Meldungszeit „Baustelle wartet …“).
  */
 export function createBuilding(id, type, team, cx, cy, tile) {
   const def = BUILDINGS[type];
@@ -62,7 +71,7 @@ export function createBuilding(id, type, team, cx, cy, tile) {
     alive: true,
     built: false,
     progress: 0,
-    queue: [],
+    queue: [], // Einträge { unit, payerId }
     queueTime: 0,
     rallyX: x,
     rallyY: y + (h / 2 + 2) * tile,
@@ -73,6 +82,10 @@ export function createBuilding(id, type, team, cx, cy, tile) {
     nodeId: null,
     lastHitTime: -1e9,
     demolished: false,
+    store: { bm: 0, mun: 0, fuel: 0 },
+    payerId: null,
+    supplied: type !== 'fob', // FOB-Baustelle: erst nach 400 Baumaterial im eigenen Lager
+    warnTime: -1e9,
   };
 }
 

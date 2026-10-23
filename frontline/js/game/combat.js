@@ -1,4 +1,4 @@
-// Kampf: Zielsuche, Direktfeuer, Mörser und Granaten, Flugabwehr, Schaden (PLAN.md §5). Kein DOM.
+// Kampf: Zielsuche, Direktfeuer, Mörser und Granaten, Flugabwehr, Schaden (PLAN.md §5, §11.2). Kein DOM.
 import { BALANCE } from '../data/balance.js';
 import { createShell, inRange, radiusOf } from './entities.js';
 import { buildHash, nearby } from './movement.js';
@@ -6,6 +6,8 @@ import { buildHash, nearby } from './movement.js';
 const SCAN = BALANCE.scanInterval;
 const MAX_UNIT_RADIUS = 16; // größter Einheitenradius (Trefferkreis-Suche)
 const BASE_WARN_INTERVAL = 20; // s zwischen zwei Meldungen „Basis wird angegriffen“
+// Aufträge, bei denen nicht automatisch geschossen wird (Marsch, Bau, Reparatur, Logistik)
+const NO_FIRE = new Set(['move', 'build', 'repair', 'load', 'unload', 'route']);
 
 /** Waffenwerte einer Einheit oder eines Gebäudes; null, wenn unbewaffnet. */
 export function weaponOf(e) {
@@ -26,14 +28,29 @@ export function weaponOf(e) {
 
 const dmgKey = (e) => (e.kind === 'building' ? 'struct' : e.def.armor);
 
-/** Zieht Munition für einen Schuss ab. false (Mangelmeldung) wenn der Teamvorrat nicht reicht; ohne Verbrauch immer true. */
-function takeAmmo(game, s, need, dt) {
+/**
+ * Zieht Munition für einen Schuss ab. Einheiten aus ihrem eigenen Vorrat (u.ammo),
+ * Gebäude aus dem Lager ihres Versorgers (supplierOf). false (Mangelmeldung), wenn es nicht reicht.
+ */
+function takeAmmo(game, s, need) {
   if (!(need > 0)) return true;
-  if (game.teams[s.team].res.mun < need) {
+  const stats = game.teams[s.team].used;
+  if (s.kind === 'unit') {
+    if (s.ammo < need) {
+      game.shortage(s.team, 'mun');
+      return false;
+    }
+    s.ammo -= need;
+    stats.mun += need;
+    return true;
+  }
+  const sup = game.supplierOf(s);
+  if (!sup || sup.store.mun < need) {
     game.shortage(s.team, 'mun');
     return false;
   }
-  game.useRes(s.team, 'mun', need, dt);
+  sup.store.mun -= need;
+  stats.mun += need;
   return true;
 }
 
@@ -110,23 +127,23 @@ function fireShell(game, s, tx, ty, w) {
  * Schießt auf t, wenn Abklingzeit abgelaufen und t in Reichweite (Mörser: Mindestreichweite und Sicht).
  * Ohne Munition wird nicht geschossen; die Abklingzeit läuft dann nicht an.
  */
-function tryFire(game, s, t, w, dt) {
+function tryFire(game, s, t, w) {
   if (s.cooldown > 0) return;
   if (w.shell) {
     const d = Math.hypot(t.x - s.x, t.y - s.y);
     if (d < w.minRange || !inRange(s, t, w.range)) return;
     if (!game.isVisible(s.team, t.x, t.y)) return;
-    if (!takeAmmo(game, s, w.ammoPerShot, dt)) return;
+    if (!takeAmmo(game, s, w.ammoPerShot)) return;
     fireShell(game, s, t.x, t.y, w);
     return;
   }
   if (!inRange(s, t, w.range)) return;
-  if (!takeAmmo(game, s, w.ammoPerShot, dt)) return;
+  if (!takeAmmo(game, s, w.ammoPerShot)) return;
   fireDirect(game, s, t, w);
 }
 
 /** Flugabwehr: jede bereite Flugabwehr fängt die nächste gegnerische Granate in Reichweite mit `chance` ab. */
-function interceptShells(game, dt) {
+function interceptShells(game) {
   for (const b of game.buildings) {
     if (!b.alive || !b.built || !b.def.aa || b.aaCooldown > 0) continue;
     let best = null;
@@ -140,7 +157,7 @@ function interceptShells(game, dt) {
       }
     }
     if (!best) continue;
-    if (!takeAmmo(game, b, b.def.aa.ammoPerShot, dt)) continue;
+    if (!takeAmmo(game, b, b.def.aa.ammoPerShot)) continue;
     b.aaCooldown = b.def.aa.cooldown;
     if (game.rng.next() < b.def.aa.chance) {
       best.alive = false;
@@ -174,7 +191,7 @@ function updateProjectiles(game, dt) {
     p.x = p.sx + (p.tx - p.sx) * f;
     p.y = p.sy + (p.ty - p.sy) * f;
   }
-  interceptShells(game, dt);
+  interceptShells(game);
   for (const p of game.projectiles) {
     if (p.alive && p.t >= p.duration) impact(game, p);
   }
@@ -203,10 +220,10 @@ export function updateCombat(game, dt) {
     const w = weaponOf(u);
     if (!w) continue;
     const o = u.order.type;
-    if (o === 'move' || o === 'buildFob') continue; // Marschierende Einheiten feuern nicht automatisch
+    if (NO_FIRE.has(o)) continue;
     if (o === 'attack') {
       const t = game.getEntity(u.order.targetId);
-      if (t && t.team !== u.team) tryFire(game, u, t, w, dt);
+      if (t && t.team !== u.team) tryFire(game, u, t, w);
       continue;
     }
     // idle / attackMove: automatische Zielsuche
@@ -217,7 +234,7 @@ export function updateCombat(game, dt) {
     }
     if (u.targetId !== null) {
       const t = game.getEntity(u.targetId);
-      if (t) tryFire(game, u, t, w, dt);
+      if (t) tryFire(game, u, t, w);
     }
   }
 
@@ -232,7 +249,7 @@ export function updateCombat(game, dt) {
     }
     if (b.targetId !== null) {
       const t = game.getEntity(b.targetId);
-      if (t) tryFire(game, b, t, w, dt);
+      if (t) tryFire(game, b, t, w);
     }
   }
 

@@ -215,7 +215,7 @@ export function drawBuilding(ctx, b, color, zoom = 1) {
     }
     // Fertigungsfortschritt des ersten Auftrags
     if (b.queue && b.queue.length) {
-      const bt = UNITS[b.queue[0]].buildTime;
+      const bt = UNITS[b.queue[0].unit ?? b.queue[0]].buildTime;
       const frac = clamp(b.queueTime / bt, 0, 1);
       const bh = Math.max(3, 4 / z);
       const by = y0 + h + 3 / z;

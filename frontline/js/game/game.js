@@ -1,4 +1,4 @@
-// Spielzustand, Befehle (issue), Platzierung, Spawn, Aufräumen und Sieg (PLAN.md §4, §5). Kein DOM.
+// Spielzustand, Befehle (issue), Platzierung, Lager, Spawn, Aufräumen und Sieg (PLAN.md §4, §5, §11). Kein DOM.
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
@@ -8,23 +8,34 @@ import { Grid } from './grid.js';
 import { createUnit, createBuilding } from './entities.js';
 import { Fog } from './fog.js';
 import { updateEconomy, smoothIncome } from './economy.js';
-import { updateMovement, nearestPassable, planPath, setIdle } from './movement.js';
+import { updateMovement, nearestPassable, planPath, setIdle, separate } from './movement.js';
 import { updateCombat } from './combat.js';
 import { updateZone } from './zone.js';
+import { updateLogistics, cmdLoad, cmdUnload, cmdRoute, cmdSetPreset, cargoSum } from './logistics.js';
+import { updateConstruction, canBuild, cmdRepair, orderBuild, orderBuildSeq } from './construction.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
 const H = BALANCE.map.height;
-const RES_KEYS = ['money', 'bm', 'mun', 'fuel'];
+const STOCK_KEYS = ['bm', 'mun', 'fuel']; // Lagersorten (team.res.* sind Summen über FOB-Lager)
 const EFFECT_LIFE = { tracer: 0.12, shell: 0.3, explosion: 0.5, intercept: 0.4, muzzle: 0.1 };
 const SHORTAGE_TEXT = {
-  mun: 'Keine Munition – Einheiten feuern nicht',
-  fuel: 'Kein Treibstoff – Fahrzeuge langsam',
+  mun: 'Einheiten ohne Munition',
+  fuel: 'Fahrzeuge ohne Treibstoff',
 };
+const WALL_TYPES = new Set(['wall', 'gate']);
 
 const zeroRes = () => ({ money: 0, bm: 0, mun: 0, fuel: 0 });
 const fail = (reason) => ({ ok: false, reason });
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
+/** Hat das Lager (Gebäude-store oder LKW-cargo) die Kosten (Sorten bm/mun/fuel) ganz? */
+const covers = (stock, cost) => STOCK_KEYS.every((k) => stock[k] >= (cost[k] || 0));
+
+/** Bezahlt die Sorten aus dem Lager (Gebäude → store, LKW → cargo). Geld zahlt das Team separat. */
+function takeStock(e, cost) {
+  const stock = e.kind === 'building' ? e.store : e.cargo;
+  for (const k of STOCK_KEYS) stock[k] -= cost[k] || 0;
+}
 
 /** Zellen einer Geraden zwischen zwei Zellen (Bresenham, inklusive Endpunkte). */
 function lineCells(c0, r0, c1, r1) {
@@ -73,28 +84,39 @@ export class Game {
     this.winReason = null;
     this.winPoints = winPoints;
     this.fogTimer = 0;
-    this.teams = [0, 1].map((id) => ({
-      id,
-      name: BALANCE.teamNames[id],
-      color: BALANCE.teamColors[id],
-      res: { ...BALANCE.startRes },
-      income: zeroRes(),
-      rate: zeroRes(),
-      points: 0,
-      pointProgress: 0,
-      used: { mun: 0, fuel: 0 }, // Summe des Verbrauchs (Statistik)
-      warnAt: { mun: -1e9, fuel: -1e9 }, // Zeitpunkt der letzten Mangelmeldung je Sorte
-      incomeMult: 1,
-      isAI: false,
-      lastWarn: -1e9,
-    }));
+    this.logiTimer = 0; // Takt des Nachfüllens (logistics.js)
+    this.consTimer = 0; // Takt der automatischen Bauzuweisung (construction.js)
+    this.teams = [0, 1].map((id) => {
+      const team = {
+        id,
+        name: BALANCE.teamNames[id],
+        color: BALANCE.teamColors[id],
+        res: { money: BALANCE.startRes.money }, // bm/mun/fuel: unten als Getter
+        income: zeroRes(),
+        rate: zeroRes(),
+        flow: { bm: 0, mun: 0, fuel: 0 }, // Verbrauch aus Lagern je s (Nachfüllen)
+        points: 0,
+        pointProgress: 0,
+        used: { mun: 0, fuel: 0 }, // Summe des Verbrauchs (Statistik)
+        warnAt: {}, // Zeitpunkt der letzten Meldung je Schlüssel (notify)
+        incomeMult: 1,
+        isAI: false,
+        lastWarn: -1e9,
+      };
+      // Lesbare Summe über alle fertigen eigenen FOB-Lager; nie direkt schreiben
+      for (const k of STOCK_KEYS) {
+        Object.defineProperty(team.res, k, { enumerable: true, get: () => this.stockOf(id, k) });
+      }
+      return team;
+    });
     this.zone = { ...this.map.zone, owner: -1, contested: false, counts: [0, 0] };
     this.fog = [new Fog(W, H), new Fog(W, H)];
 
-    // Startzustand: je Team eine fertige FOB auf dem Spawn, Startunits im Halbkreis davor
+    // Startzustand: je Team eine fertige FOB auf dem Spawn (Lager = startRes), Startunits im Halbkreis davor
     for (let t = 0; t < 2; t++) {
       const sp = this.map.spawns[t];
-      this.spawnBuilding('fob', t, this.grid.toCell(sp.x) - 1, this.grid.toCell(sp.y) - 1, { built: true });
+      const fob = this.spawnBuilding('fob', t, this.grid.toCell(sp.x) - 1, this.grid.toCell(sp.y) - 1, { built: true });
+      fob.store = { bm: BALANCE.startRes.bm, mun: BALANCE.startRes.mun, fuel: BALANCE.startRes.fuel };
       const ang0 = Math.atan2(H / 2 - sp.y, W / 2 - sp.x);
       const n = BALANCE.startUnits.length;
       BALANCE.startUnits.forEach((type, i) => {
@@ -125,26 +147,19 @@ export class Game {
   }
 
   /**
-   * Verbraucht `amount` aus dem Teamvorrat (nie unter 0). Die Rate wird netto negativ gebucht:
-   * dt = Tickdauer, so dass ein einmaliger Schuss als Anteil dieses Ticks in team.rate landet.
-   * Liefert die tatsächlich verbrauchte Menge.
+   * Meldung mit Drosselung: je Schlüssel und Team höchstens alle `interval` s (Standard shortageWarn).
    */
-  useRes(team, key, amount, dt) {
+  notify(team, key, text, interval = BALANCE.shortageWarn, x = null, y = null) {
     const t = this.teams[team];
-    const take = Math.min(t.res[key], amount);
-    if (!(take > 0)) return 0;
-    t.res[key] -= take;
-    t.used[key] += take;
-    if (dt > 0) t.rate[key] -= take / dt;
-    return take;
+    const last = t.warnAt[key] ?? -1e9;
+    if (this.time - last < interval) return;
+    t.warnAt[key] = this.time;
+    this.message(team, text, x, y);
   }
 
-  /** Mangelmeldung für Munition oder Treibstoff, höchstens alle `shortageWarn` s je Sorte. */
+  /** Mangelmeldung für Munition oder Treibstoff (gedrosselt). */
   shortage(team, key) {
-    const t = this.teams[team];
-    if (this.time - t.warnAt[key] < BALANCE.shortageWarn) return;
-    t.warnAt[key] = this.time;
-    this.message(team, SHORTAGE_TEXT[key]);
+    this.notify(team, key, SHORTAGE_TEXT[key]);
   }
 
   drainEvents() {
@@ -202,25 +217,135 @@ export class Game {
     return out;
   }
 
+  // ---- Lager, Zahlung, Versorgung ----------------------------------------------------
+
+  /** Summe einer Sorte über alle fertigen eigenen FOB-Lager (Getter von team.res). */
+  stockOf(team, k) {
+    let sum = 0;
+    for (const b of this.buildings) {
+      if (b.alive && b.built && b.team === team && b.type === 'fob') sum += b.store[k];
+    }
+    return sum;
+  }
+
+  /**
+   * Testhilfe: setzt das Lager der Haupt-FOB (älteste fertige) auf {bm, mun, fuel} (fehlende Sorten = 0)
+   * und leert die übrigen fertigen FOB-Lager.
+   */
+  setStock(team, vals) {
+    const fobs = this.buildings.filter((b) => b.alive && b.built && b.team === team && b.type === 'fob');
+    fobs.forEach((f, i) => {
+      for (const k of STOCK_KEYS) f.store[k] = i === 0 ? vals[k] || 0 : 0;
+    });
+  }
+
+  /** Eigene fertige FOBs, deren Bauradius (x, y) enthält. */
+  fobsInRadius(team, x, y) {
+    const R = BALANCE.fob.buildRadius;
+    return this.buildings.filter(
+      (b) => b.alive && b.built && b.team === team && b.type === 'fob' && dist(b.x, b.y, x, y) <= R,
+    );
+  }
+
+  /**
+   * Zahler für Kosten an (x, y): nächste fertige eigene FOB, deren Bauradius (x, y) enthält und deren Lager
+   * die Kosten (bm/mun/fuel) deckt. null, wenn keine.
+   */
+  payerFor(team, x, y, cost) {
+    const R = BALANCE.fob.buildRadius;
+    let best = null;
+    let bestD = Infinity;
+    for (const b of this.buildings) {
+      if (!(b.alive && b.built && b.team === team && b.type === 'fob')) continue;
+      const d = dist(b.x, b.y, x, y);
+      if (d > R || d >= bestD || !covers(b.store, cost)) continue;
+      best = b;
+      bestD = d;
+    }
+    return best;
+  }
+
+  /** Eigener LKW mit Ladung für Kosten, höchstens truckSupplyRange von (x, y) entfernt (Mauer außerhalb der FOB). */
+  truckPayer(team, x, y, cost) {
+    const R = BALANCE.logistics.truckSupplyRange;
+    let best = null;
+    let bestD = Infinity;
+    for (const u of this.units) {
+      if (!(u.alive && u.team === team && u.type === 'truck')) continue;
+      const d = dist(u.x, u.y, x, y);
+      if (d > R || d >= bestD || !covers(u.cargo, cost)) continue;
+      best = u;
+      bestD = d;
+    }
+    return best;
+  }
+
+  /** Erste fertige eigene FOB nahe (x, y) (Erstattung, falls der Zahler tot ist). */
+  nearestFob(team, x, y) {
+    let best = null;
+    let bestD = Infinity;
+    for (const b of this.buildings) {
+      if (!(b.alive && b.built && b.team === team && b.type === 'fob')) continue;
+      const d = dist(b.x, b.y, x, y);
+      if (d < bestD) {
+        best = b;
+        bestD = d;
+      }
+    }
+    return best;
+  }
+
+  /** Versorger eines Gebäudes (Förderanlage, Mörser, Flugabwehr): nächste fertige eigene FOB, wenn ihr Bauradius es enthält. */
+  supplierOf(b) {
+    const f = this.nearestFob(b.team, b.x, b.y);
+    return f && dist(f.x, f.y, b.x, b.y) <= BALANCE.fob.buildRadius ? f : null;
+  }
+
+  /** Begründung, warum die Sorten für (x, y) nicht bezahlt werden können. */
+  stockReason(team, x, y, cost) {
+    const fobs = this.fobsInRadius(team, x, y);
+    if (!fobs.length) return 'Kein FOB-Lager in Reichweite';
+    const miss = STOCK_KEYS.filter((k) => (cost[k] || 0) > 0 && !fobs.some((f) => f.store[k] >= cost[k])).map(
+      (k) => BALANCE.resNames[k],
+    );
+    if (miss.length) return `FOB-Lager: zu wenig ${miss.join(', ')}`;
+    return 'FOB-Lager: keine einzelne FOB deckt alle Kosten';
+  }
+
+  missingMoney() {
+    return `Zu wenig ${BALANCE.resNames.money}`;
+  }
+
+  /** Geld (globaler Vorrat). Sorten werden über payerFor/Lager bezahlt. */
   canAfford(team, cost) {
-    const res = this.teams[team].res;
-    return RES_KEYS.every((k) => (res[k] || 0) >= (cost[k] || 0));
+    return this.teams[team].res.money >= (cost.money || 0);
   }
 
   pay(team, cost) {
-    const res = this.teams[team].res;
-    for (const k of RES_KEYS) res[k] -= cost[k] || 0;
+    this.teams[team].res.money -= cost.money || 0;
   }
 
+  /** Geld-Erstattung (nur money; Sorten gehen über refundStock). */
   refund(team, cost, factor = 1) {
-    const res = this.teams[team].res;
-    for (const k of RES_KEYS) res[k] += (cost[k] || 0) * factor;
+    this.teams[team].res.money += (cost.money || 0) * factor;
   }
 
-  missingRes(team, cost) {
-    const res = this.teams[team].res;
-    const miss = RES_KEYS.filter((k) => (res[k] || 0) < (cost[k] || 0)).map((k) => BALANCE.resNames[k]);
-    return `Zu wenig ${miss.join(', ')}`;
+  /**
+   * Erstattet Sorten an den Zahler `payerId` (eigene Entity mit Lager). Ist er tot oder fremd,
+   * geht es an die nächste eigene FOB bei (x, y); ohne FOB verfällt es. Lager-Obergrenze wird beachtet.
+   */
+  refundStock(team, payerId, cost, factor, x, y) {
+    let target = payerId !== null && payerId !== undefined ? this.getEntity(payerId) : null;
+    if (target && target.team !== team) target = null;
+    if (!target) target = this.nearestFob(team, x, y);
+    if (!target) return;
+    const stock = target.kind === 'building' ? target.store : target.cargo;
+    for (const k of STOCK_KEYS) {
+      const amt = (cost[k] || 0) * factor;
+      if (!(amt > 0)) continue;
+      const room = target.kind === 'building' ? BALANCE.logistics.storeCap - stock[k] : BALANCE.logistics.truckCapacity - cargoSum(stock);
+      stock[k] += Math.max(0, Math.min(amt, room));
+    }
   }
 
   // ---- Entities -----------------------------------------------------------------
@@ -234,10 +359,11 @@ export class Game {
   }
 
   /** Gebäude an Zelle (cx, cy) anlegen und Fußabdruck belegen. Ohne Kostenprüfung (für Befehle und Tests). */
-  spawnBuilding(type, team, cx, cy, { built = true, nodeId = null } = {}) {
+  spawnBuilding(type, team, cx, cy, { built = true, nodeId = null, payerId = null } = {}) {
     const id = this.newId();
     const b = createBuilding(id, type, team, cx, cy, TILE);
     b.nodeId = nodeId;
+    b.payerId = payerId;
     if (built) {
       b.built = true;
       b.progress = 1;
@@ -253,7 +379,9 @@ export class Game {
 
   /**
    * Prüft, ob Gebäude `type` mit Mitte (x, y) gebaut werden darf.
-   * Liefert { ok, reason, cx, cy, x, y, nodeId } (x, y = Mitte des Fußabdrucks).
+   * Liefert { ok, reason, cx, cy, x, y, nodeId, payer } (x, y = Mitte des Fußabdrucks).
+   * payer = { kind: 'fob'|'truck', id } – wer die Sorten zahlt (null bei FOB-Baustellen).
+   * Mauer/Tor außerhalb eines FOB-Radius: eigener LKW mit Ladung ≤ truckSupplyRange.
    */
   canPlace(team, type, x, y) {
     const def = BUILDINGS[type];
@@ -278,7 +406,7 @@ export class Game {
     const cy = g.toCell(py) - Math.floor(def.h / 2);
     const mx = (cx + def.w / 2) * TILE;
     const my = (cy + def.h / 2) * TILE;
-    const bad = (reason) => ({ ok: false, reason, cx, cy, x: mx, y: my, nodeId });
+    const bad = (reason) => ({ ok: false, reason, cx, cy, x: mx, y: my, nodeId, payer: null });
 
     for (let r = cy; r < cy + def.h; r++) {
       for (let c = cx; c < cx + def.w; c++) {
@@ -299,6 +427,7 @@ export class Game {
       }
     }
 
+    let payer = null;
     if (type === 'fob') {
       let count = 0;
       for (const b of this.buildings) {
@@ -312,19 +441,19 @@ export class Game {
           return bad('Zu nah an einem gegnerischen Gebäude');
         }
       }
+    } else if (this.fobsInRadius(team, mx, my).length) {
+      const f = this.payerFor(team, mx, my, def.cost);
+      if (!f) return bad(this.stockReason(team, mx, my, def.cost));
+      payer = { kind: 'fob', id: f.id };
+    } else if (WALL_TYPES.has(type)) {
+      const tr = this.truckPayer(team, mx, my, def.cost);
+      if (!tr) return bad('Außerhalb des Bauradius einer eigenen FOB');
+      payer = { kind: 'truck', id: tr.id };
     } else {
-      const inRadius = this.buildings.some(
-        (b) =>
-          b.alive &&
-          b.built &&
-          b.team === team &&
-          b.type === 'fob' &&
-          dist(b.x, b.y, mx, my) <= BALANCE.fob.buildRadius,
-      );
-      if (!inRadius) return bad('Außerhalb des Bauradius einer eigenen FOB');
+      return bad('Außerhalb des Bauradius einer eigenen FOB');
     }
 
-    return { ok: true, reason: null, cx, cy, x: mx, y: my, nodeId };
+    return { ok: true, reason: null, cx, cy, x: mx, y: my, nodeId, payer };
   }
 
   // ---- Befehle ------------------------------------------------------------------
@@ -348,6 +477,16 @@ export class Game {
         return this.cmdBuildWall(team, cmd);
       case 'buildFob':
         return this.cmdBuildFob(team, cmd);
+      case 'repair':
+        return cmdRepair(this, team, cmd);
+      case 'load':
+        return cmdLoad(this, team, cmd);
+      case 'unload':
+        return cmdUnload(this, team, cmd);
+      case 'route':
+        return cmdRoute(this, team, cmd);
+      case 'setPreset':
+        return cmdSetPreset(this, team, cmd);
       case 'train':
         return this.cmdTrain(team, cmd);
       case 'cancelTrain':
@@ -368,6 +507,20 @@ export class Game {
       if (e && e.alive && e.kind === 'unit' && e.team === team) out.push(e);
     }
     return out;
+  }
+
+  /**
+   * Bauer aus `ids` für Gebäude `type`. Ohne ids: leer (idle Bauer helfen automatisch).
+   * Mit ids, aber ohne passendes Baurecht: Fehlergrund.
+   */
+  pickBuilders(team, ids, type) {
+    if (!ids || !ids.length) return { list: [], reason: null };
+    const list = this.ownUnits(team, ids).filter((u) => canBuild(u.def, type));
+    if (list.length) return { list, reason: null };
+    return {
+      list,
+      reason: WALL_TYPES.has(type) ? 'Nur Infanterie und Baufahrzeuge bauen Mauern und Tore' : 'Nur Baufahrzeuge bauen das',
+    };
   }
 
   /** Freie Formationspunkte im 24-px-Raster um (x, y), nach Entfernung sortiert. */
@@ -429,23 +582,35 @@ export class Game {
     return { ok: true, count: units.length };
   }
 
+  /**
+   * { type: 'build', ids?, building, x, y }: Gebäude als Baustelle (bezahlt aus dem Lager am Bauort).
+   * ids = Bauer, die sofort hinfahren; ohne ids helfen idle Bauer automatisch.
+   */
   cmdBuild(team, cmd) {
     const def = BUILDINGS[cmd.building];
     if (!def || def.buildable === false) return fail('Dieses Gebäude kann nicht gebaut werden');
+    const pick = this.pickBuilders(team, cmd.ids, cmd.building);
+    if (pick.reason) return fail(pick.reason);
     const p = this.canPlace(team, cmd.building, cmd.x, cmd.y);
     if (!p.ok) return fail(p.reason);
-    if (!this.canAfford(team, def.cost)) return fail(this.missingRes(team, def.cost));
+    if (!this.canAfford(team, def.cost)) return fail(this.missingMoney());
     this.pay(team, def.cost);
-    const b = this.spawnBuilding(cmd.building, team, p.cx, p.cy, { built: false, nodeId: p.nodeId });
+    const payer = p.payer ? this.getEntity(p.payer.id) : null;
+    if (payer) takeStock(payer, def.cost);
+    const b = this.spawnBuilding(cmd.building, team, p.cx, p.cy, { built: false, nodeId: p.nodeId, payerId: payer ? payer.id : null });
+    for (const u of pick.list) orderBuild(u, b);
     return { ok: true, id: b.id };
   }
 
+  /** { type: 'buildWall', building: 'wall'|'gate', ids?, x1, y1, x2, y2 }: Linie, Zelle für Zelle bezahlt. */
   cmdBuildWall(team, cmd) {
     if (cmd.building !== 'wall' && cmd.building !== 'gate') return fail('Nur Mauer oder Tor als Linie');
     const def = BUILDINGS[cmd.building];
+    const pick = this.pickBuilders(team, cmd.ids, cmd.building);
+    if (pick.reason) return fail(pick.reason);
     const g = this.grid;
     const cells = lineCells(g.toCell(cmd.x1), g.toCell(cmd.y1), g.toCell(cmd.x2), g.toCell(cmd.y2));
-    let count = 0;
+    const sites = [];
     let lastReason = 'Keine Zelle baubar';
     for (const [c, r] of cells) {
       const p = this.canPlace(team, cmd.building, g.center(c), g.center(r));
@@ -454,49 +619,38 @@ export class Game {
         continue;
       }
       if (!this.canAfford(team, def.cost)) {
-        lastReason = this.missingRes(team, def.cost);
+        lastReason = this.missingMoney();
         break;
       }
       this.pay(team, def.cost);
-      this.spawnBuilding(cmd.building, team, p.cx, p.cy, { built: false });
-      count++;
+      const payer = this.getEntity(p.payer.id);
+      takeStock(payer, def.cost);
+      sites.push(this.spawnBuilding(cmd.building, team, p.cx, p.cy, { built: false, payerId: payer.id }));
     }
-    if (count === 0) return fail(lastReason);
-    return { ok: true, count };
+    if (sites.length === 0) return fail(lastReason);
+    if (pick.list.length) orderBuildSeq(pick.list, sites);
+    return { ok: true, count: sites.length };
   }
 
+  /**
+   * { type: 'buildFob', ids? (Baufahrzeuge), x, y }: legt sofort eine FOB-Baustelle an (nichts wird bezahlt).
+   * Sie braucht 400 Baumaterial im eigenen Lager (per LKW) und ein Baufahrzeug in der Nähe.
+   */
   cmdBuildFob(team, cmd) {
-    const truck = this.getEntity(cmd.truckId);
-    if (!truck || truck.team !== team || truck.type !== 'truck') return fail('Kein eigener LKW gewählt');
+    let list = [];
+    if (cmd.ids && cmd.ids.length) {
+      list = this.ownUnits(team, cmd.ids).filter((u) => u.def.builder === 'all');
+      if (!list.length) return fail('Nur Baufahrzeuge gründen FOB-Baustellen');
+    }
     const p = this.canPlace(team, 'fob', cmd.x, cmd.y);
     if (!p.ok) return fail(p.reason);
-    if (!this.canAfford(team, BUILDINGS.fob.cost)) return fail(this.missingRes(team, BUILDINGS.fob.cost));
-    truck.order = { type: 'buildFob', x: p.x, y: p.y, targetId: null };
-    truck.targetId = null;
-    planPath(this, truck, p.x, p.y);
-    return { ok: true };
+    const site = this.spawnBuilding('fob', team, p.cx, p.cy, { built: false });
+    this.message(team, 'FOB-Baustelle errichtet', p.x, p.y);
+    for (const u of list) orderBuild(u, site);
+    return { ok: true, id: site.id };
   }
 
-  /** LKW am Ziel: Kosten abziehen, LKW verbrauchen, FOB-Baustelle anlegen. Wird von movement.js gerufen. */
-  finishFob(truck) {
-    const o = truck.order;
-    const p = this.canPlace(truck.team, 'fob', o.x, o.y);
-    if (!p.ok) return this.abortFob(truck, p.reason);
-    if (!this.canAfford(truck.team, BUILDINGS.fob.cost)) {
-      return this.abortFob(truck, this.missingRes(truck.team, BUILDINGS.fob.cost));
-    }
-    this.pay(truck.team, BUILDINGS.fob.cost);
-    truck.alive = false;
-    this.spawnBuilding('fob', truck.team, p.cx, p.cy, { built: false });
-    this.message(truck.team, 'FOB-Baustelle errichtet', p.x, p.y);
-  }
-
-  /** FOB-Bau scheitert: Ereignis mit Grund, LKW wird idle. */
-  abortFob(truck, reason) {
-    this.message(truck.team, `FOB-Bau abgebrochen: ${reason}`, truck.x, truck.y);
-    setIdle(truck);
-  }
-
+  /** { type: 'train', buildingId, unit }: FOB zahlt aus eigenem Lager, Halle aus der FOB in Reichweite. */
   cmdTrain(team, cmd) {
     const b = this.getEntity(cmd.buildingId);
     if (!b || b.kind !== 'building' || b.team !== team) return fail('Kein eigenes Gebäude gewählt');
@@ -505,10 +659,13 @@ export class Game {
     if (b.queue.length >= BALANCE.queueMax) return fail('Warteschlange ist voll');
     if (this.unitCount(team) >= BALANCE.unitCap) return fail(`Einheitenlimit erreicht (${BALANCE.unitCap})`);
     const cost = UNITS[cmd.unit].cost;
-    if (!this.canAfford(team, cost)) return fail(this.missingRes(team, cost));
+    if (!this.canAfford(team, cost)) return fail(this.missingMoney());
+    const payer = b.type === 'fob' ? (covers(b.store, cost) ? b : null) : this.payerFor(team, b.x, b.y, cost);
+    if (!payer) return fail(this.stockReason(team, b.x, b.y, cost));
     this.pay(team, cost);
+    takeStock(payer, cost);
     if (b.queue.length === 0) b.queueTime = 0;
-    b.queue.push(cmd.unit);
+    b.queue.push({ unit: cmd.unit, payerId: payer.id });
     return { ok: true };
   }
 
@@ -524,9 +681,11 @@ export class Game {
     const b = this.getEntity(cmd.buildingId);
     if (!b || b.kind !== 'building' || b.team !== team) return fail('Kein eigenes Gebäude gewählt');
     if (b.queue.length === 0) return fail('Nichts in der Warteschlange');
-    const type = b.queue.pop();
+    const entry = b.queue.pop();
     if (b.queue.length === 0) b.queueTime = 0;
-    this.refund(team, UNITS[type].cost);
+    const cost = UNITS[entry.unit].cost;
+    this.refund(team, cost);
+    this.refundStock(team, entry.payerId, cost, 1, b.x, b.y);
     return { ok: true };
   }
 
@@ -538,13 +697,26 @@ export class Game {
     return { ok: true };
   }
 
+  /**
+   * Abriss: Gebäude erstatten 25 % Baumaterial an den Zahler (fertige), Baustellen 100 %.
+   * Ein abgerissenes FOB-Lager geht an die nächste andere eigene FOB (FOBs erstatten kein Material).
+   */
   cmdDemolish(team, cmd) {
     const b = this.getEntity(cmd.buildingId);
     if (!b || b.kind !== 'building' || b.team !== team) return fail('Kein eigenes Gebäude gewählt');
-    this.refund(team, { bm: b.def.cost.bm || 0 }, BALANCE.demolishRefund);
+    const factor = b.built ? BALANCE.demolishRefund : 1;
+    const stock = { bm: b.store.bm, mun: b.store.mun, fuel: b.store.fuel };
     b.demolished = true;
-    b.alive = false;
+    b.alive = false; // vor den Erstattungen, damit die FOB selbst nicht als Ziel gilt
     b.hp = 0;
+    this.grid.release(b); // Fläche sofort frei (cleanup gibt sie nur idempotent erneut frei)
+    if (b.type === 'fob') {
+      // FOB-Baustellen werden nicht von einem Lager bezahlt: nur das eigene Lager geht an die nächste FOB
+      this.refundStock(team, null, stock, 1, b.x, b.y);
+    } else {
+      this.refund(team, b.def.cost, factor);
+      this.refundStock(team, b.payerId, b.def.cost, factor, b.x, b.y);
+    }
     return { ok: true };
   }
 
@@ -557,13 +729,13 @@ export class Game {
     this.message(-1, `${BALANCE.teamNames[winner]} gewinnt ${how}`);
   }
 
-  /** Team ohne FOB (auch Baustellen zählen) und ohne LKW verliert. */
+  /** Team ohne FOB (auch Baustellen zählen) und ohne Baufahrzeug verliert. */
   checkElimination() {
     const lost = [];
     for (let t = 0; t < 2; t++) {
       const hasFob = this.buildings.some((b) => b.alive && b.team === t && b.type === 'fob');
-      const hasTruck = this.units.some((u) => u.alive && u.team === t && u.type === 'truck');
-      if (!hasFob && !hasTruck) lost.push(t);
+      const hasEngineer = this.units.some((u) => u.alive && u.team === t && u.type === 'engineer');
+      if (!hasFob && !hasEngineer) lost.push(t);
     }
     if (lost.length === 0) return;
     const winner = lost.length === 1 ? 1 - lost[0] : this.teams[0].points >= this.teams[1].points ? 0 : 1;
@@ -611,9 +783,12 @@ export class Game {
       return;
     }
     this.time += dt;
-    // Reihenfolge: economy setzt team.rate zurück; movement/combat buchen Verbrauch (negativ) hinein; smoothIncome zuletzt
+    // Reihenfolge: Wirtschaft setzt team.rate zurück; Bewegung, Logistik und Bau fahren; Kampf, Zone, Einkommen zuletzt
     updateEconomy(this, dt);
     updateMovement(this, dt);
+    updateLogistics(this, dt);
+    updateConstruction(this, dt);
+    separate(this);
     updateCombat(this, dt);
     updateZone(this, dt);
     smoothIncome(this, dt);

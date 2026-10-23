@@ -1,10 +1,10 @@
-// Wirtschaft: Bau, Produktion und Einkommen (PLAN.md §5). Kein DOM.
+// Wirtschaft: Produktion, Einkommen und Förderung in FOB-Lager (PLAN.md §5, §11.1). Kein DOM.
+// Baufortschritt: construction.js. Nachfüllen und LKW: logistics.js.
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { planPath, setIdle } from './movement.js';
 
-const RES_KEYS = ['money', 'bm', 'mun', 'fuel'];
-const BUILD_HP_SHARE = 0.9; // Baustellen-HP wächst um 90 % über die Bauzeit (Start 10 %)
+const STOCK_KEYS = ['bm', 'mun', 'fuel'];
 const INCOME_TAU = 2; // Glättungszeitkonstante des angezeigten Einkommens (s)
 
 const zeroRes = () => ({ money: 0, bm: 0, mun: 0, fuel: 0 });
@@ -36,30 +36,22 @@ function spawnSpot(game, b) {
 }
 
 /**
- * Bau, Produktion und Einkommen eines Schritts.
- * `team.rate` = momentane Rate je Sekunde (zone.js ergänzt Zonengeld), `team.income` wird in smoothIncome geglättet.
+ * Produktion und Einkommen eines Schritts.
+ * `team.rate` = momentane Rate je Sekunde: Förderung (+) minus Nachfüllen aus Lagern (`team.flow`, von logistics.js);
+ * zone.js ergänzt Zonengeld. Geld fließt in `team.res.money`, Förderung direkt in das Lager des Versorgers.
  */
 export function updateEconomy(game, dt) {
-  for (const team of game.teams) team.rate = zeroRes();
-
-  // Baustellen
-  for (const b of game.buildings) {
-    if (!b.alive || b.built) continue;
-    b.progress += dt / b.def.buildTime;
-    b.hp = Math.min(b.maxHp, b.hp + (b.maxHp * BUILD_HP_SHARE * dt) / b.def.buildTime);
-    if (b.progress >= 1) {
-      b.progress = 1;
-      b.built = true;
-      b.hp = b.maxHp;
-      game.message(b.team, `${b.def.name} fertig`, b.x, b.y);
-    }
+  for (const team of game.teams) {
+    team.rate = zeroRes();
+    for (const k of STOCK_KEYS) team.rate[k] = -team.flow[k];
   }
 
   // Produktion (nur fertige Gebäude): erster Eintrag der Warteschlange
   for (const b of game.buildings) {
     if (!b.alive || !b.built || b.queue.length === 0) continue;
     b.queueTime += dt;
-    const type = b.queue[0];
+    const entry = b.queue[0];
+    const type = entry.unit;
     const ut = UNITS[type];
     if (b.queueTime < ut.buildTime) continue;
     const spot = spawnSpot(game, b);
@@ -73,27 +65,37 @@ export function updateEconomy(game, dt) {
     game.message(b.team, `${ut.name} bereit`, spot.x, spot.y);
   }
 
-  // Einkommen aus fertigen FOBs und Förderanlagen
+  // Einkommen: FOBs (Geld) und Förderanlagen (Sorte des Vorkommens, in die FOB ihres Bauradius)
   for (const b of game.buildings) {
     if (!b.alive || !b.built) continue;
     const team = game.teams[b.team];
     const mult = team.incomeMult;
     if (b.type === 'fob') {
       team.rate.money += BALANCE.fob.income * mult;
-    } else if (b.nodeId !== null) {
-      const node = game.nodeById.get(b.nodeId);
-      if (node) team.rate[node.type] += (b.def.yields[node.type] || 0) * mult;
+      continue;
     }
+    if (b.nodeId === null) continue;
+    const node = game.nodeById.get(b.nodeId);
+    if (!node) continue;
+    const sup = game.supplierOf(b);
+    if (!sup) {
+      game.notify(b.team, 'noFob', 'Förderanlage ohne FOB', BALANCE.logistics.noFobWarn);
+      continue;
+    }
+    const amount = (b.def.yields[node.type] || 0) * mult;
+    team.rate[node.type] += amount;
+    const cap = BALANCE.logistics.storeCap;
+    sup.store[node.type] = Math.min(cap, sup.store[node.type] + amount * dt);
   }
-  for (const team of game.teams) {
-    for (const k of RES_KEYS) team.res[k] += team.rate[k] * dt;
-  }
+  for (const team of game.teams) team.res.money += team.rate.money * dt;
 }
 
 /** Glättet das angezeigte Einkommen (team.income) gegen die momentane Rate. Nach Zone aufrufen. */
 export function smoothIncome(game, dt) {
   const a = 1 - Math.exp(-dt / INCOME_TAU);
   for (const team of game.teams) {
-    for (const k of RES_KEYS) team.income[k] += (team.rate[k] - team.income[k]) * a;
+    for (const k of ['money', ...STOCK_KEYS]) {
+      team.income[k] += (team.rate[k] - team.income[k]) * a;
+    }
   }
 }

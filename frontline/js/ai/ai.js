@@ -112,7 +112,7 @@ export class AI {
 
     const combat = units.filter((u) => u.def.range > 0);
     const queuedCombat = own.reduce(
-      (n, b) => n + b.queue.filter((u) => UNITS[u].range > 0).length,
+      (n, b) => n + b.queue.filter((e) => UNITS[e.unit ?? e].range > 0).length,
       0,
     );
     const extractors = own.filter((b) => b.type === 'extractor');
@@ -149,7 +149,7 @@ export class AI {
   /** Eingereihte Einheiten eines Typs in den Warteschlangen. */
   queued(s, unitType) {
     let n = 0;
-    for (const b of s.own) for (const u of b.queue) if (u === unitType) n++;
+    for (const b of s.own) for (const e of b.queue) if ((e.unit ?? e) === unitType) n++;
     return n;
   }
 
@@ -318,7 +318,7 @@ export class AI {
     this.jobs = this.jobs.filter((j) => {
       if (s.fobs.some((f) => dist(f.x, f.y, j.x, j.y) < 8)) return false; // Baustelle angelegt
       const truck = g.getEntity(j.truckId);
-      if (!truck || truck.order.type !== 'buildFob') {
+      if (!truck || truck.order.type !== 'build') {
         bad(j);
         return false;
       }
@@ -336,7 +336,8 @@ export class AI {
     const g = this.game;
     const t = this.team;
     for (let k = 0; k < 2; k++) {
-      const idle = s.trucks.filter((u) => u.order.type === 'idle');
+      // FOB-Baustellen setzt das Baufahrzeug (LKW bauen keine FOB mehr)
+      const idle = g.units.filter((u) => u.alive && u.team === t && u.type === 'engineer' && u.order.type === 'idle');
       if (!idle.length) return;
       if (s.fobs.length + this.jobs.length >= this.fobCap()) return;
       if (!this.affordable(BUILDINGS.fob.cost, true)) return;
@@ -348,7 +349,7 @@ export class AI {
 
       let truck = idle[0];
       for (const u of idle) if (dist(u.x, u.y, site.x, site.y) < dist(truck.x, truck.y, site.x, site.y)) truck = u;
-      const r = g.issue(t, { type: 'buildFob', truckId: truck.id, x: site.x, y: site.y });
+      const r = g.issue(t, { type: 'buildFob', ids: [truck.id], x: site.x, y: site.y });
       if (!r.ok) {
         this.badSites.push({ x: site.x, y: site.y, until: g.time + BAD_TIME });
         return;

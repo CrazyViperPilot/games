@@ -1,6 +1,8 @@
-// Einheitenwerte (PLAN.md §3.2).
+// Einheitenwerte (PLAN.md §3.2, §11.2, §11.8).
 // damage: Schaden je Schuss nach Panzerklasse des Ziels. Unbewaffnet: range 0, damage null.
 // cost: fehlende Schlüssel = 0. producedAt: Gebäudetyp, hotkey: Taste im Ausbildungsmenü.
+// ammoMax / fuelMax: Vorrat der Einheit (Munition / Treibstoff). ammoPerShot: Verbrauch je Schuss.
+// builder: 'all' = darf alle Gebäude bauen und reparieren, 'fort' = nur Mauer und Tor, fehlt = kein Bauen.
 export const UNITS = {
   rifleman: {
     name: 'Schütze',
@@ -16,7 +18,9 @@ export const UNITS = {
     buildTime: 8,
     producedAt: 'fob',
     ammoPerShot: 0.25,
+    ammoMax: 10,
     fuelPerSec: 0,
+    builder: 'fort',
     hotkey: 'Q',
   },
   at: {
@@ -33,7 +37,9 @@ export const UNITS = {
     buildTime: 12,
     producedAt: 'fob',
     ammoPerShot: 2,
+    ammoMax: 12,
     fuelPerSec: 0,
+    builder: 'fort',
     hotkey: 'W',
   },
   truck: {
@@ -51,7 +57,27 @@ export const UNITS = {
     producedAt: 'fob',
     ammoPerShot: 0,
     fuelPerSec: 0.2,
+    fuelMax: 30,
     hotkey: 'E',
+  },
+  engineer: {
+    name: 'Baufahrzeug',
+    armor: 'light',
+    hp: 400,
+    speed: 70,
+    radius: 12,
+    sight: 260,
+    range: 0,
+    cooldown: 0,
+    damage: null,
+    cost: { money: 150, fuel: 60 },
+    buildTime: 15,
+    producedAt: 'fob',
+    ammoPerShot: 0,
+    fuelPerSec: 0.3,
+    fuelMax: 40,
+    builder: 'all',
+    hotkey: 'R',
   },
   ifv: {
     name: 'Schützenpanzer',
@@ -67,7 +93,9 @@ export const UNITS = {
     buildTime: 20,
     producedAt: 'depot',
     ammoPerShot: 0.4,
+    ammoMax: 16,
     fuelPerSec: 0.4,
+    fuelMax: 40,
     hotkey: 'Q',
   },
   tank: {
@@ -84,7 +112,9 @@ export const UNITS = {
     buildTime: 35,
     producedAt: 'depot',
     ammoPerShot: 4,
+    ammoMax: 40,
     fuelPerSec: 0.6,
+    fuelMax: 60,
     hotkey: 'W',
   },
 };

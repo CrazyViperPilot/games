@@ -236,12 +236,12 @@ export class Hud {
       if (n) h += `<div class="muted small">Fördert ${NODE_NAME[n.type]} · ${b.def.yields[n.type]}/s</div>`;
     }
     if (b.queue.length) {
-      const ut = UNITS[b.queue[0]];
+      const ut = UNITS[b.queue[0].unit ?? b.queue[0]];
       const shown = Math.min(ut.buildTime, b.queueTime).toFixed(0);
       h +=
         `<div class="queue"><div class="small">${esc(ut.name)}: ${shown} / ${ut.buildTime} s</div>` +
         `${bar(b.queueTime / ut.buildTime, 'prog')}` +
-        `<div class="muted small">Warteschlange: ${b.queue.map((t) => esc(UNITS[t].name)).join(', ')}</div></div>`;
+        `<div class="muted small">Warteschlange: ${b.queue.map((e) => esc(UNITS[e.unit ?? e].name)).join(', ')}</div></div>`;
     }
     return h;
   }

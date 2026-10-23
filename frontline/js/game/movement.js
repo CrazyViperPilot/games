@@ -1,14 +1,17 @@
-// Bewegung: Wegfolgen, Verfolgung, LKW-Bau-Ankunft und Trennung (PLAN.md §5). Kein DOM.
+// Bewegung: Wegfolgen, Verfolgung, Fahrhelfer für LKW/Bauer und Trennung (PLAN.md §5, §11). Kein DOM.
 import { BALANCE } from '../data/balance.js';
 import { findPath } from './pathfinding.js';
 import { inRange } from './entities.js';
 
 const REPATH = 1.0; // Neuplanung bei Verfolgung (s)
 const BLOCK_REPATH = 0.5; // Neuplanung nach blockiertem Wegpunkt (s)
-const FOB_REACH = 48; // LKW gilt als am Ziel
 const ARRIVE = 0.5; // Wegpunkt erreicht (px)
 const FINAL_ARRIVE = 32; // Endziel erreicht (px): Einheiten am selben Sammelpunkt drängeln sich sonst ewig in 'move'
 export const HASH_CELL = 128; // räumliches Hash-Gitter
+const TILE = BALANCE.map.tile;
+
+/** Aufträge, die logistics.js und construction.js selbst fahren (updateMovement lässt sie aus). */
+export const OWN_DRIVERS = new Set(['load', 'unload', 'route', 'build', 'repair']);
 
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 
@@ -28,6 +31,15 @@ export function setIdle(u) {
   u.targetId = null;
   u.path = [];
   u.pathIndex = 0;
+}
+
+/** Abstand Punkt → Fußabdruck eines Gebäudes (0 innerhalb). */
+export function footDist(x, y, b) {
+  const x0 = b.cx * TILE;
+  const y0 = b.cy * TILE;
+  const dx = Math.max(x0 - x, 0, x - (x0 + b.w * TILE));
+  const dy = Math.max(y0 - y, 0, y - (y0 + b.h * TILE));
+  return Math.hypot(dx, dy);
 }
 
 /** Nächste passierbare Zellmitte für `team` (Ringsuche). null, wenn keine gefunden. */
@@ -107,7 +119,7 @@ function stepToward(grid, u, tx, ty, step) {
   return tryMove(grid, u, u.x, ny);
 }
 
-/** Folgt dem Weg mit Tempo `speed * dt`. false, wenn ein Wegpunkt blockiert ist (neu planen). */
+/** Folgt dem Weg mit Tempo `speed * speedMul * dt`. false, wenn ein Wegpunkt blockiert ist (neu planen). */
 function followPath(game, u, dt) {
   const grid = game.grid;
   let budget = u.def.speed * u.speedMul * dt;
@@ -134,6 +146,53 @@ function replanBlocked(game, u) {
   u.repathTimer = BLOCK_REPATH;
 }
 
+/**
+ * Fährt einen Schritt auf dem geplanten Weg. Fahrzeuge verbrauchen Treibstoff aus u.fuel nur,
+ * wenn sie sich wirklich bewegen; leer → Meldung (Tempo wird in updateMovement gesetzt).
+ */
+export function drive(game, u, dt) {
+  const x0 = u.x;
+  const y0 = u.y;
+  const ok = followPath(game, u, dt);
+  if (!ok) replanBlocked(game, u);
+  const fps = u.def.fuelPerSec || 0;
+  if (fps > 0 && (u.x !== x0 || u.y !== y0)) {
+    if (u.fuel > 0) {
+      const used = Math.min(u.fuel, fps * dt);
+      u.fuel -= used;
+      game.teams[u.team].used.fuel += used;
+    }
+    if (u.fuel <= 0) game.shortage(u.team, 'fuel');
+  }
+  return ok;
+}
+
+/**
+ * Fährt zu (tx, ty), bis Abstand ≤ reach. Mit `bld` zählt der Abstand zum Fußabdruck des Gebäudes.
+ * Liefert 'arrived' (Weg gelöscht), 'driving' oder 'stuck' (frische Planung ohne Weg).
+ */
+export function driveTo(game, u, tx, ty, reach, dt, bld = null) {
+  if (bld ? footDist(u.x, u.y, bld) <= reach : dist(u.x, u.y, tx, ty) <= reach) {
+    u.path = [];
+    u.pathIndex = 0;
+    return 'arrived';
+  }
+  const needPlan = u.goalX !== tx || u.goalY !== ty || u.pathIndex >= u.path.length;
+  if (needPlan) {
+    if (u.repathTimer > 0) return 'driving'; // Neuplanung gedrosselt
+    planPath(game, u, tx, ty);
+    u.repathTimer = REPATH;
+    if (u.path.length === 0) return 'stuck';
+  }
+  if (u.pathIndex < u.path.length) drive(game, u, dt);
+  if (bld ? footDist(u.x, u.y, bld) <= reach : dist(u.x, u.y, tx, ty) <= reach) {
+    u.path = [];
+    u.pathIndex = 0;
+    return 'arrived';
+  }
+  return 'driving';
+}
+
 /** Verfolgung eines Ziels: stehen bleiben in Reichweite, sonst Weg höchstens 1×/s neu planen. */
 function chase(game, u, t, dt) {
   if (u.def.range > 0 && inRange(u, t, u.def.range)) {
@@ -147,23 +206,7 @@ function chase(game, u, t, dt) {
     planPath(game, u, t.x, t.y);
     u.repathTimer = REPATH;
   }
-  if (u.pathIndex < u.path.length && !followPath(game, u, dt)) replanBlocked(game, u);
-}
-
-/** LKW mit Befehl buildFob: am Ziel (≤ 48 px) Gebäude errichten, sonst weiterfahren. */
-function stepTruck(game, u, dt) {
-  const o = u.order;
-  const atTarget = () => dist(o.x, o.y, u.x, u.y) <= FOB_REACH;
-  if (atTarget()) {
-    game.finishFob(u);
-    return;
-  }
-  if (u.pathIndex < u.path.length && !followPath(game, u, dt)) replanBlocked(game, u);
-  if (atTarget()) {
-    game.finishFob(u);
-    return;
-  }
-  if (u.pathIndex >= u.path.length) game.abortFob(u, 'Ziel nicht erreichbar');
+  if (u.pathIndex < u.path.length) drive(game, u, dt);
 }
 
 function stepUnit(game, u, dt) {
@@ -175,10 +218,6 @@ function stepUnit(game, u, dt) {
       return;
     }
     chase(game, u, t, dt);
-    return;
-  }
-  if (o.type === 'buildFob') {
-    stepTruck(game, u, dt);
     return;
   }
 
@@ -196,7 +235,7 @@ function stepUnit(game, u, dt) {
     else if (o.type === 'idle') planPath(game, u, u.anchorX, u.anchorY);
   }
 
-  if (u.pathIndex < u.path.length && !followPath(game, u, dt)) replanBlocked(game, u);
+  if (u.pathIndex < u.path.length) drive(game, u, dt);
   if (u.pathIndex >= u.path.length && (o.type === 'move' || o.type === 'attackMove')) setIdle(u);
 }
 
@@ -223,7 +262,8 @@ function resolvePair(grid, a, b) {
   tryMove(grid, b, b.x + nx * push, b.y + ny * push);
 }
 
-function separate(game) {
+/** Trennung aller lebenden Einheiten (nach allen Bewegungsschritten eines Ticks aufrufen). */
+export function separate(game) {
   const grid = game.grid;
   const list = game.units.filter((u) => u.alive);
 
@@ -248,22 +288,15 @@ function separate(game) {
 }
 
 /**
- * Bewegt alle Einheiten um dt und trennt sie danach.
- * Fahrzeuge verbrauchen Treibstoff nur, wenn sie sich tatsächlich bewegen; ohne Vorrat fahren sie langsamer.
+ * Bewegt die Einheiten um dt (ohne LKW- und Bauaufträge; die fahren logistics.js bzw. construction.js).
+ * Setzt Repath-Timer und Tempo (25 % bei Fahrzeugen ohne Treibstoff). Trennung: separate(game).
  */
 export function updateMovement(game, dt) {
   for (const u of game.units) {
     if (!u.alive) continue;
     u.repathTimer = Math.max(0, u.repathTimer - dt);
-    const fuelPerSec = u.def.fuelPerSec || 0;
-    u.speedMul = fuelPerSec > 0 && game.teams[u.team].res.fuel <= 0 ? BALANCE.fuelSlowMul : 1;
-    const x0 = u.x;
-    const y0 = u.y;
+    u.speedMul = (u.def.fuelPerSec || 0) > 0 && u.fuel <= 0 ? BALANCE.fuelSlowMul : 1;
+    if (OWN_DRIVERS.has(u.order.type)) continue;
     stepUnit(game, u, dt);
-    if (fuelPerSec > 0 && (u.x !== x0 || u.y !== y0)) {
-      game.useRes(u.team, 'fuel', fuelPerSec * dt, dt);
-      if (game.teams[u.team].res.fuel <= 0) game.shortage(u.team, 'fuel');
-    }
   }
-  separate(game);
 }
