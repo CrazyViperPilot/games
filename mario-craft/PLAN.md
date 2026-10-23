@@ -306,3 +306,9 @@ Meilenstein 2 = A12–A13, D3–D4 → alle 12 Level, Review, Push nach main.
 - `dig.js`: `game.dig = { active, c, r, progress, stage, failCd, soundCd }`; Pflicht-Methoden am Game: `openChest, collectDiamondAt(x?, y?), spawnMob, addEmeralds, markDirty, emit`;
   optional: `spawnDebris, igniteTnt, startFalling`. `break`-Event mit `{ c, r, id, cause }`. Seitliches Ziel: Fuß-Zeile zuerst, dann Kopf-Zeile.
 - `light.js`: `computeLight(map, out)`, `lightAt(light, map, c, r)`; Wasser dunkelt Himmelslicht um 1/Zelle ab.
+
+**A6/A7b (Review)**
+- `collectDiamondAt(x, y)` bekommt **Weltpixel** (Zellmitte bei Erz). Game ordnet über Abstand dem nächsten `map.gems`-Eintrag mit `diamond: true` zu (Erzblöcke ohne passendes gem zählen als freier Diamant Nr. 1..3 in Reihenfolge des Einsammelns).
+- Game muss Forwarder bereitstellen: `openChest(c,r)`, `startFalling(c,r)`, `spawnDebris(c,r,id)`, `spawnSmoke(x,y)`, `spawnMob(type, footX, footY)`, `igniteTnt(c,r,fuse)`, `givePower(name)`, `givePick(n)`, `addEmeralds(n)`, `gainLife()` (emittiert `oneup`), `hitMob`, `killMob`, `damageBoss`.
+- Pools am game (`pickups`, `particles`, `falling`, `tnt`, `projectiles`) werden lazy von den Modulen angelegt; Game legt sie im Konstruktor an (gleiche Größen), damit Renderer sie lesen kann.
+- Mobs: Stern vor Schaden (Mob stirbt, Spieler unverletzt); nicht stampfbare Mobs (Glutgeist) verletzen beim Stampfen; Zombie nutzt `m.timer` als Wende-Cooldown → andere Typen nutzen eigene Felder (`fuse`, `shootT`, `timer2`).

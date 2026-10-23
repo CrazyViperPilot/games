@@ -211,7 +211,7 @@ test('Diamanterz ruft collectDiamondAt, braucht Diamanthacke-Stufe Gold (minPick
   standAt(g, 5);
   set(g, 5, 7, 'diamondore');
   until(g, DIG, 2, () => g.map.get(5, 7) === AIR);
-  assert.deepEqual(g.diamonds, [[5, 7]]);
+  assert.deepEqual(g.diamonds, [[5 * 16 + 8, 7 * 16 + 8]]);
 });
 
 test('getarnter Stein spawnt ein Silberfischchen', () => {

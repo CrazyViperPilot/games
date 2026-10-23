@@ -144,7 +144,7 @@ export function breakTile(game, c, r, cause) {
     if (typeof drop === 'object') {
       game.addEmeralds(drop.emeralds);
     } else if (drop === 'diamond') {
-      game.collectDiamondAt(c, r);
+      game.collectDiamondAt((c + 0.5) * 16, (r + 0.5) * 16);
     } else if (drop === 'silverfish') {
       game.spawnMob('silverfish', (c + 0.5) * T, (r + 1) * T);
     } else if (drop === 'chest') {
