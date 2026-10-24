@@ -3,7 +3,7 @@
 // Austausch: Dateien in assets/iso/ ersetzen oder die Listen unten anpassen.
 import { ISO_K } from './camera.js';
 import { spriteOverrides } from './isobuild.js';
-import { BUILDING_SPRITES, TRAIN_SPRITES, MODEL_PPU } from './isodata.js';
+import { BUILDING_SPRITES, TRAIN_SPRITES, TEAM_SPRITES, INFANTRY_SPRITES, TEAM_PPU, UNIT_PPU, MODEL_PPU } from './isodata.js';
 
 const ENABLED = typeof Image !== 'undefined' && typeof location !== 'undefined' && new URLSearchParams(location.search).get('sprites') !== '0';
 const url = (p) => new URL(`../../assets/iso/${p}`, import.meta.url).href;
@@ -26,6 +26,13 @@ const TRAIN = {};
 for (const [part, list] of Object.entries(TRAIN_SPRITES)) {
   TRAIN[part] = list.map(([file, ax, ay, w, d]) => ({ img: load(`train/${file}`), ax, ay, w, d }));
 }
+const TEAM_IMG = {};
+for (const [key, [file, ax, ay]] of Object.entries(TEAM_SPRITES)) TEAM_IMG[key] = { img: load(`team/${file}`), ax, ay };
+const INF_IMG = {};
+for (const [key, [file, ax, ay]] of Object.entries(INFANTRY_SPRITES)) INF_IMG[key] = { img: load(`units/${file}`), ax, ay };
+const TEAM_NAME = ['blue', 'red'];
+const TILE_W = 32; // Weltpixel je Kachel (1 Modelleinheit der Gebäudebilder)
+const INFANTRY_UNIT = 9; // Weltpixel je Modelleinheit der Soldaten
 const TREE = load('trees/tree.png');
 
 // Fahrzeuge: je Modell und Team (0 = Blau, 1 = Rot) acht Bilder nach Bildschirmrichtung
@@ -70,6 +77,37 @@ if (ENABLED) {
   };
 }
 
+/** Eigene Gebäude: Zentrale, Mörser, Flak als Bild je Team und Drehung; Mauer und Tor nach Nachbarn ausgerichtet. */
+let teamBuildings = new Map(); // "cx,cy" → Gebäude (Mauer/Tor), vom Renderer je Bild gesetzt
+export function setTeamBuildings(list) {
+  teamBuildings = new Map();
+  for (const b of list) if (b.alive && (b.type === 'wall' || b.type === 'gate')) teamBuildings.set(`${b.cx},${b.cy}`, b);
+}
+function drawTeamImage(ctx, cam, key, x, y) {
+  const m = TEAM_IMG[key];
+  if (!ready(m?.img)) return false;
+  const sc = (TILE_W * cam.zoom) / TEAM_PPU;
+  const p = cam.worldToScreen(x, y);
+  ctx.drawImage(m.img, p.x - m.ax * sc, p.y - m.ay * sc, m.img.naturalWidth * sc, m.img.naturalHeight * sc);
+  return true;
+}
+if (ENABLED) {
+  for (const type of ['fob', 'mortar', 'aa']) {
+    spriteOverrides[type] = (ctx, cam, b) => b.team < 2 && drawTeamImage(ctx, cam, `${type}-${TEAM_NAME[b.team]}-r${cam.rot}`, b.x, b.y);
+  }
+  const wallPiece = (kind) => (ctx, cam, b) => {
+    const has = (dx, dy) => teamBuildings.has(`${b.cx + dx},${b.cy + dy}`);
+    const alongX = has(-1, 0) || has(1, 0);
+    const alongY = has(0, -1) || has(0, 1);
+    const main = kind === 'gate' ? (alongY && !alongX ? 'y' : 'x') : alongX || !alongY ? 'x' : 'y';
+    const ok = drawTeamImage(ctx, cam, `${kind}-${main}-r${cam.rot}`, b.x, b.y);
+    if (ok && kind === 'wall' && alongX && alongY) drawTeamImage(ctx, cam, `wall-y-r${cam.rot}`, b.x, b.y);
+    return ok;
+  };
+  spriteOverrides.wall = wallPiece('wall');
+  spriteOverrides.gate = wallPiece('gate');
+}
+
 /** Baum (aufrecht, Fuß am Weltpunkt). Liefert false, wenn das Bild fehlt. */
 export function drawTreeSprite(ctx, cam, t) {
   if (!ready(TREE)) return false;
@@ -85,8 +123,26 @@ export function drawTreeSprite(ctx, cam, t) {
   return true;
 }
 
+const INFANTRY_NAME = { rifleman: 'rifleman', at: 'at' };
+/** Bildschirmrichtung einer Weltrichtung als Sektor 0–7 (0 = rechts, im Uhrzeigersinn). */
+function headingSector(cam, angle) {
+  const [a, b, c, d] = cam.isoMatrix(1);
+  const cx = Math.cos(angle);
+  const cy = Math.sin(angle);
+  return (Math.round(Math.atan2(b * cx + d * cy, a * cx + c * cy) / (Math.PI / 4)) + 8) % 8;
+}
+function drawInfantry(ctx, cam, u, p, type, aim) {
+  const m = INF_IMG[`${type}-${TEAM_NAME[u.team]}-${SECTORS[headingSector(cam, aim ?? u.angle ?? 0)]}`];
+  if (!ready(m?.img)) return false;
+  const sc = (INFANTRY_UNIT * cam.zoom) / UNIT_PPU;
+  ctx.drawImage(m.img, p.x - m.ax * sc, p.y - m.ay * sc, m.img.naturalWidth * sc, m.img.naturalHeight * sc);
+  return true;
+}
+
 /** Fahrzeug-Sprite je Einheit (aufrecht, Blickrichtung nach Bewegungsrichtung). Liefert false, wenn es keins gibt. */
-export function drawUnitSprite(ctx, cam, u, p) {
+export function drawUnitSprite(ctx, cam, u, p, aim = null) {
+  const inf = INFANTRY_NAME[u.type];
+  if (inf && u.team < 2) return drawInfantry(ctx, cam, u, p, inf, aim);
   const model = UNIT_MODEL[u.type];
   const imgs = model && VEHICLES[model][u.team];
   if (!imgs) return false;

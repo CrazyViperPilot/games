@@ -26,7 +26,7 @@ import {
   buildingHeight,
 } from './iso.js';
 import { drawTownBuilding, drawTeamBuilding } from './isobuild.js';
-import { drawTreeSprite, drawUnitSprite } from './isosprites.js';
+import { drawTreeSprite, drawUnitSprite, setTeamBuildings } from './isosprites.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
@@ -305,6 +305,7 @@ export class Renderer {
       if (b && b.kind === 'building' && b.team === team) this.drawRally(ctx, b, z);
     }
 
+    setTeamBuildings(g.buildings);
     // Objekte mit Höhe, nach Tiefe (x + y) sortiert
     const items = [];
     const town = g.map.town;
@@ -335,7 +336,12 @@ export class Renderer {
       ctx.beginPath();
       ctx.ellipse(p.x, p.y + 1, u.def.radius * z * (u.def.air ? 1.5 : 1.2), u.def.radius * z * (u.def.air ? 0.7 : 0.5), 0, 0, Math.PI * 2);
       ctx.fill();
-      if (drawUnitSprite(ctx, cam, u, { x: p.x, y: p.y })) return;
+      let aim0 = null;
+      if (u.targetId && u.def.range > 0) {
+        const t0 = g.getEntity(u.targetId);
+        if (t0) aim0 = Math.atan2(t0.y - u.y, t0.x - u.x);
+      }
+      if (drawUnitSprite(ctx, cam, u, { x: p.x, y: p.y }, aim0)) return;
       setIsoAt(ctx, cam, dpr, p.x, p.y - lift * z, u.x, u.y, sc);
       let aim = null;
       if (u.targetId && u.def.range > 0) {
