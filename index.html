@@ -38,10 +38,31 @@
       text-transform: uppercase;
     }
     .sub { margin: 0 0 32px; color: var(--muted); }
+    .columns {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 28px 24px;
+      width: min(100%, 440px);
+      align-items: start;
+    }
+    @media (min-width: 720px) {
+      .columns { grid-template-columns: 1fr 1fr; width: min(100%, 980px); }
+    }
+    @media (max-height: 500px) and (orientation: landscape) {
+      body { padding-top: calc(env(safe-area-inset-top) + 16px); }
+      h1 { font-size: 1.8rem; }
+      .sub { margin-bottom: 16px; }
+    }
+    .group h3 {
+      margin: 0 0 4px;
+      font-size: 1.1rem;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .group .hint { margin: 0 0 14px; color: var(--muted); font-size: .85rem; }
     .games {
       display: grid;
       gap: 16px;
-      width: min(100%, 440px);
     }
     .game {
       display: flex;
@@ -102,7 +123,11 @@
   <h1>Games</h1>
   <p class="sub">Wähle ein Spiel</p>
 
-  <main class="games">
+  <main class="columns">
+  <section class="group">
+    <h3>Offline spielbar</h3>
+    <p class="hint">Als App installiert, ohne Internet</p>
+  <div class="games">
     <a class="game gate" href="gate-squad/">
       <img src="gate-squad/icons/icon-192.png" alt="" width="72" height="72">
       <div>
@@ -156,6 +181,12 @@
       </div>
       <span class="arrow" aria-hidden="true">›</span>
     </a>
+  </div>
+  </section>
+  <section class="group">
+    <h3>Online (Server nötig)</h3>
+    <p class="hint">Multiplayer über das PHP-Backend</p>
+  <div class="games">
     <a class="game fruhno" href="fruhno/">
       <img src="fruhno/icons/icon.svg" alt="" width="72" height="72">
       <div>
@@ -172,9 +203,11 @@
       </div>
       <span class="arrow" aria-hidden="true">›</span>
     </a>
+  </div>
+  </section>
   </main>
 
-  <footer>Jedes Spiel lässt sich einzeln als App installieren und offline spielen.</footer>
+  <footer>Jedes Spiel lässt sich einzeln als App installieren; die Online-Spiele brauchen eine Internetverbindung.</footer>
 
   <script>
     // Früher lag Sudoku direkt hier und registrierte ./sw.js für den ganzen Ordner.
