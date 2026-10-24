@@ -8,7 +8,7 @@ export const BALANCE = {
   startUnits: ['truck', 'engineer', 'rifleman', 'rifleman', 'rifleman', 'rifleman'],
   zone: { r: 3300, controlIncome: 6, unitIncome: 0.25, unitIncomeCap: 30 },
   // Hot Zone: kleiner Kreis in der Konfliktzone, wandert zufällig oder zu aktiven Bohrern
-  hot: { r: 300, speed: 40, wanderSpeed: 40 / 3, income: 8, pointInterval: 45, wanderMin: 25, wanderMax: 45 },
+  hot: { r: 300, speed: 40, wanderSpeed: 40 / 3, income: 8, wanderMin: 25, wanderMax: 45 },
   fob: { buildRadius: 450, minDistOwn: 500, minDistEnemy: 700, max: 6, income: 5 },
   queueMax: 5,
   shortageWarn: 20, // s zwischen zwei Meldungen je Sorte und Team

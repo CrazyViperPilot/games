@@ -71,6 +71,7 @@ export class Hud {
     this.timeEl = q('[data-time]');
     this.zoneEl = q('[data-zone]');
     this.hotEl = q('[data-hot]');
+    this.capFill = q('[data-cap]');
     this.speedBtn = q('[data-act=speed]');
     this.pauseBtn = q('[data-act=pause]');
     this.res = {};
@@ -107,7 +108,8 @@ export class Hud {
         <div class="res-row">${res}</div>
         <div class="pts">${pts}</div>
         <div class="zone" data-zone>neutral</div>
-        <div class="zone hotz" data-hot title="Hot Zone: kleiner Kreis in der Konfliktzone, zieht zu aktiven Bohrern. Geld und Punkte für den Besitzer.">HOT</div>
+        <div class="cap" title="Punktebalken: füllt sich für das Team mit mehr Spielern in der Konfliktzone (Hot Zone zählt doppelt). Voll = 1 Punkt."><i data-cap></i></div>
+        <div class="zone hotz" data-hot title="Hot Zone: kleiner Kreis in der Konfliktzone, zieht zu aktiven Bohrern. Geld für den Besitzer, Einheiten darin zählen bei der Punktewertung doppelt.">HOT</div>
         <div class="clock">
           ${this.app.debug ? '<span class="dbg">DEBUG</span>' : ''}
           <span class="time" data-time>00:00</span>
@@ -184,7 +186,6 @@ export class Hud {
       const tm = g.teams[i];
       const p = this.pts[i];
       p.fill.style.width = pct(tm.points / g.winPoints);
-      p.prog.style.width = pct(tm.pointProgress / BALANCE.pointInterval);
       p.num.textContent = `${tm.points} / ${g.winPoints}`;
     }
     const z = g.zone;
@@ -204,6 +205,9 @@ export class Hud {
     this.zoneEl.innerHTML =
       `<span class="zone-state" style="color:${col}">${label}</span>` +
       `<span class="zone-cnt"><b style="color:${c0}">${z.counts[0]}</b><i>:</i><b style="color:${c1}">${z.counts[1]}</b></span>`;
+    const bar = z.bar;
+    this.capFill.style.width = pct(bar.p);
+    this.capFill.style.background = bar.team >= 0 ? BALANCE.teamColors[bar.team] : 'transparent';
     const hz = g.hot;
     const hc = hz.contested ? '#e8ece4' : hz.owner >= 0 ? BALANCE.teamColors[hz.owner] : '#9aa596';
     const hl = hz.contested ? 'HOT umkämpft' : hz.owner >= 0 ? `HOT ${BALANCE.teamNames[hz.owner]}` : 'HOT neutral';

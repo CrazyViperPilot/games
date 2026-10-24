@@ -827,3 +827,30 @@ test('Bohrer ohne Treibstoff in der FOB startet nicht', () => {
   run(g, 31);
   assert.equal(g.issue(0, { type: 'drill', ids: [d.id] }).ok, false);
 });
+
+test('Zonenpunkt: Mehrheit statt Alleinbesitz, Hot Zone zählt doppelt, Balken füllt sich in 30 s', () => {
+  const g = new Game({ seed: 7 });
+  const z = g.zone;
+  g.hot.x = z.x + 2000; // Hot Zone weit weg: nur Zonenmehrheit zählt
+  g.hot.y = z.y;
+  g.hot.tx = g.hot.x;
+  g.hot.ty = g.hot.y;
+  g.hot.wanderT = 1e9;
+  for (let i = 0; i < 3; i++) g.spawnUnit('rifleman', 0, z.x - 300 + i * 20, z.y);
+  g.spawnUnit('rifleman', 1, z.x - 200, z.y + 100);
+  run(g, 15);
+  assert.equal(z.owner, 0, 'Blau führt 3:1');
+  assert.ok(z.bar.team === 0 && z.bar.p > 0.4 && z.bar.p < 0.6, `Balken ${z.bar.p}`);
+  run(g, 16);
+  assert.equal(g.teams[0].points, 1);
+  assert.equal(g.teams[1].points, 0);
+  // Rot setzt zwei Einheiten in die Hot Zone
+  g.hot.x = z.x + 400;
+  g.hot.y = z.y + 400;
+  g.hot.tx = g.hot.x;
+  g.hot.ty = g.hot.y;
+  for (let i = 0; i < 2; i++) g.spawnUnit('rifleman', 1, g.hot.x + i * 10, g.hot.y);
+  g.update(DT);
+  assert.equal(z.weight[1], z.counts[1] + 2, 'zwei Einheiten in der Hot Zone zählen doppelt');
+  assert.equal(z.owner, z.weight[0] > z.weight[1] ? 0 : z.weight[1] > z.weight[0] ? 1 : -1);
+});

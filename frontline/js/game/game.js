@@ -99,7 +99,6 @@ export class Game {
         flow: { bm: 0, mun: 0, fuel: 0 }, // Verbrauch aus Lagern je s (Nachfüllen)
         points: 0,
         pointProgress: 0,
-        hotProgress: 0, // Fortschritt zum nächsten Hot-Zone-Punkt
         used: { mun: 0, fuel: 0 }, // Summe des Verbrauchs (Statistik)
         warnAt: {}, // Zeitpunkt der letzten Meldung je Schlüssel (notify)
         incomeMult: 1,
@@ -112,7 +111,7 @@ export class Game {
       }
       return team;
     });
-    this.zone = { ...this.map.zone, owner: -1, contested: false, counts: [0, 0] };
+    this.zone = { ...this.map.zone, owner: -1, contested: false, counts: [0, 0], weight: [0, 0], bar: { team: -1, p: 0 } };
     this.hot = createHot(this);
     this.fog = [new Fog(W, H), new Fog(W, H)];
 

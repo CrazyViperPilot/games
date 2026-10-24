@@ -22,7 +22,7 @@ Nicht im Umfang: Netzwerk-Multiplayer, Kampagne, Speichern laufender Partien, So
 2. Jede Partei startet in einer Ecke der großen Karte mit **1 FOB** (Lager: 1000 Baumaterial, 400 Munition, 400 Treibstoff), 800 Geld, 1 Baufahrzeug, 1 LKW (leer) und 4 Schützen.
 3. Man baut Förderanlagen auf Ressourcenvorkommen, Fahrzeughalle, Verteidigung, weitere FOBs und eine Armee und hält
    sie mit LKW-Nachschub am Laufen.
-4. In der Mitte liegt die sehr große **Konfliktzone** (eine Stadt). Wer sie beherrscht, bekommt Geld und alle 30 s einen Punkt. In ihr wandert die **Hot Zone** (Abschnitt 7).
+4. In der Mitte liegt die sehr große **Konfliktzone** (eine Stadt). Wer dort mehr Spieler hat (Hot Zone doppelt), füllt den Punktebalken und bekommt Geld. In ihr wandert die **Hot Zone** (Abschnitt 7).
 5. **Sieg:** zuerst die Siegpunktzahl (Standard 100) erreichen – oder der Gegner hat keine FOB und kein Baufahrzeug mehr.
 
 ## 3. Ressourcen & Logistik
@@ -98,16 +98,19 @@ Schadensmodell: Schaden je Schuss nach Panzerklasse des Ziels (Infanterie / leic
 ## 7. Konfliktzone & Punkte
 
 - Kreis in der Kartenmitte, Radius **3300 px** (Karte 9024 × 9024 px), gestaltet als osteuropäische Stadt (Straßenraster, Häuser, Hallen, Fabriken, Parks, Autos, Bäume). Gebäude sind Hindernisse, Straßen und Parks frei. Der Abstand vom Start zum Zonenrand beträgt gut 2000 px.
-- **Kontrolle:** eine Partei hat Einheiten in der Zone, die andere keine. Sind beide drin → umkämpft, niemand kontrolliert.
-- Kontrollierende Partei: **+6 Geld/s** und Punktfortschritt; alle **30 s Kontrolle = 1 Punkt**. Der angefangene
-  Fortschritt bleibt bei Kontrollverlust erhalten.
+- **Gewicht** je Partei = Einheiten in der Zone; Einheiten in der **Hot Zone zählen doppelt** (einmal als Zone, einmal als Hot Zone).
+  Die Partei mit dem größeren Gewicht **führt** (Mehrheit, kein Alleinbesitz nötig); bei Gleichstand führt niemand. „Umkämpft“
+  heißt nur, dass beide Parteien Einheiten in der Zone haben.
+- **Punktebalken** (oben, in der Farbe des Führenden): füllt sich in **30 s**; voll = **1 Punkt** für das Team des Balkens, dann
+  beginnt er von vorn. Wechselt die Führung, leert er sich doppelt so schnell und färbt sich dann um. Bei Gleichstand steht er still.
+- Führende Partei: **+6 Geld/s**.
 - Jede eigene Einheit in der Zone bringt zusätzlich **+0,25 Geld/s** (auch wenn umkämpft, max. 30 Einheiten gezählt).
 
 ### Hot Zone
 - Kleiner Kreis (Radius 300 px) **innerhalb** der Konfliktzone, orange; auch auf der Minimap. Er wandert langsam (13,3 px/s) zu einem
   Zufallspunkt (neues Ziel alle 25–45 s); nur auf dem Weg zu einem aktiven Bohrer ist er mit 40 px/s schneller.
-- **Besitz** wie bei der Zone (nur eine Partei darin). Besitzer: **+8 Geld/s** und alle **45 s ein Siegpunkt** (zusätzlich zur Zone).
-- Oben zeigt „HOT“ den Besitzer und die Einheitenzahl je Team.
+- **Besitz** nur, wenn eine Partei allein darin ist: **+8 Geld/s**. Punkte gibt es nicht separat; die Einheiten darin zählen doppelt für den Punktebalken.
+- Oben zeigt „HOT“ den Besitzer und die Einheitenzahl je Team, daneben der Punktebalken.
 
 ### Bohrer
 - Nach dem Bau **30 s Aufwärmen**, dann per **G** aktivierbar: **2 min aktiv**, danach **5 min Abkühlen**.
@@ -183,6 +186,7 @@ zwischen Überschuss- und Bedarfs-FOBs (v. a. Zonen-FOB), Versorger-LKW folgt de
 - v2: Munitions-/Treibstoffverbrauch; stärkere KI (Wirtschaft zuerst, Zonen-FOB).
 - v3: Logistik – FOB-Lager, Vorrat je Einheit, LKW als Transporter/Versorger/Pendler; Baufahrzeug baut und repariert,
   Infanterie baut Mauern/Tore; Service Worker network-first.
+- v4.1: Punktewertung nach Mehrheit mit Punktebalken, Hot-Zone-Einheiten doppelt (statt Alleinbesitz und eigener Hot-Zone-Punkt).
 - v4 (Okt. 2026): Konfliktzone als Stadt, Radius 1100 → 2200 → 3300, Karte 4800 → 9024; Anzeige der Zonen-Einheiten überarbeitet;
   Mörser mit Zielwahl (20 s); Hubschrauber (Little Bird, Transporthubschrauber, AH-64) und Landeplatz; Flugabwehr schießt
   Hubschrauber ab; Hot Zone (frei 13,3 px/s, zum Bohrer 40 px/s) und Bohrer; Förderrate verdoppelt (8/8/6), Start-Vorrat 1000/400/400 und 800 Geld.
