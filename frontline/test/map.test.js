@@ -61,3 +61,32 @@ test('Spawns sind von der Zone aus über Wege erreichbar', () => {
     assert.ok(lastEnemy && lastEnemy.x === s1.x && lastEnemy.y === s1.y, `Seed ${seed}: Spawns nicht verbunden`);
   }
 });
+
+test('Fabrikgelände: durch die Lücke hinein, um die Fabrik herum und auf der Gegenseite hinaus', () => {
+  for (const seed of [7, 11, 123]) {
+    const map = generateMap(seed);
+    const grid = new Grid(W / TILE, H / TILE, TILE);
+    grid.rasterizeObstacles(map.obstacles);
+    grid.rasterizeRects(map.town.buildings);
+    grid.rasterizeTrees([...map.town.trees, ...map.trees]);
+    const walls = map.town.buildings.filter((b) => b.kind === 'wall');
+    const factories = map.town.buildings.filter((b) => b.kind === 'factory' && walls.some((w) => Math.hypot(w.x - b.x, w.y - b.y) < 300));
+    assert.ok(factories.length >= 6, `Fabrikgelände vorhanden (Seed ${seed})`);
+    for (const f of factories) {
+      const A = f.w / 2 + 80 + 60;
+      const B = f.h / 2 + 80 + 60;
+      let ok = false;
+      for (const [ax, ay, bx, by] of [[f.x - A, f.y, f.x + A, f.y], [f.x, f.y - B, f.x, f.y + B]]) {
+        const p = findPath(grid, ax, ay, bx, by, 0);
+        const reached = p.length > 0 && p[p.length - 1].x === bx && p[p.length - 1].y === by;
+        // der Weg muss ins Gelände führen, nicht um die ganze Mauer herum
+        if (reached && p.some((q) => Math.abs(q.x - f.x) < A - 60 && Math.abs(q.y - f.y) < B - 60)) ok = true;
+      }
+      assert.ok(ok, `Fabrik bei ${f.x},${f.y} (Seed ${seed}) ist durch die Lücken befahrbar`);
+    }
+  }
+});
+
+test('keine Felsen: alle Hindernisse sind Wald (gerader Radius)', () => {
+  for (const o of generateMap(7).obstacles) assert.equal(Math.round(o.r) % 2, 0);
+});

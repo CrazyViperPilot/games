@@ -257,6 +257,10 @@ export function drawTownBuilding(ctx, cam, b) {
   const seed = hash(b.x, b.y);
   const H = TOWN_H[b.kind];
   const z = cam.zoom;
+  if (b.kind === 'wall') {
+    drawBox(ctx, cam, x0, y0, x1, y1, 22, '#a29f94', { roof: '#c4c1b6' });
+    return;
+  }
   if (b.kind === 'train') {
     drawBox(ctx, cam, x0 + 3, y0 + 4, x1 - 3, y1 - 4, 30, TRAIN_PAINT[b.part] ?? '#777', {});
     return;

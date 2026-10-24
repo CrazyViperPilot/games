@@ -41,7 +41,7 @@ function tryBuild(seed) {
   for (let i = 0; i < OBSTACLE_PAIRS; i++) {
     let ob = null;
     for (let t = 0; t < 300 && !ob; t++) {
-      const r = Math.round(rng.range(60, 180));
+      const r = 2 * Math.round(rng.range(30, 90)); // immer gerade: nur Wald, keine Felsen
       const x = Math.round(rng.range(r, W - r));
       const y = Math.round(rng.range(r, H - r));
       if (dist(x, y, CX, CY) < ZONE_R + r + 40) continue; // Stadt bleibt frei von Felsen/Wald
@@ -55,7 +55,9 @@ function tryBuild(seed) {
 
   // 2. Zusammenhang prüfen: Spawn 0 erreicht Zonenmitte und Spawn 1
   const town = buildTown(rng);
-  const trees = scatterTrees(rng, obstacles);
+  const outposts = buildOutposts(rng, obstacles);
+  town.buildings.push(...outposts.buildings);
+  const trees = scatterTrees(rng, obstacles, outposts.areas);
   if (!isConnected(obstacles, town.buildings, [...town.trees, ...trees])) return null;
 
   return {
@@ -220,10 +222,89 @@ function buildTown(rng) {
   return town;
 }
 
+const OUTPOST_HOUSES = 22; // Einzelhäuser außerhalb der Zone (Paare)
+const OUTPOST_HALLS = 6; // freistehende Hallen (Paare)
+const OUTPOST_FACTORIES = 7; // Fabrikgelände mit Mauer (Paare)
+const WALL_T = 16; // Mauerstärke
+const WALL_MARGIN = 80; // Abstand der Mauer zur Fabrik (Platz zum Umfahren)
+const WALL_GAP = 130; // Lücke in der Mauer (zwei gegenüberliegende Seiten)
+
+/**
+ * Vereinzelte Häuser, Hallen und Fabrikgelände außerhalb der Konfliktzone (punktsymmetrisch). Ein Fabrikgelände hat eine Mauer
+ * mit zwei Lücken an gegenüberliegenden Seiten: durch die eine Lücke hinein, um die Fabrik herum, durch die andere hinaus.
+ * @returns {{ buildings: {x,y,w,h,kind}[], areas: {x,y,r}[] }} areas = belegte Kreise (keine Bäume dort)
+ */
+function buildOutposts(rng, obstacles) {
+  const buildings = [];
+  const areas = [];
+  const fits = (x, y, r) =>
+    [[x, y], [W - x, H - y]].every(
+      ([px, py]) =>
+        px > r + 300 &&
+        py > r + 300 &&
+        px < W - r - 300 &&
+        py < H - r - 300 &&
+        !inRail(py, r) &&
+        dist(px, py, CX, CY) > ZONE_R + r + 150 &&
+        SPAWNS.every((sp) => dist(px, py, sp.x, sp.y) > 700 + r) &&
+        obstacles.every((o) => dist(px, py, o.x, o.y) > o.r + r + 40) &&
+        areas.every((a) => dist(px, py, a.x, a.y) > a.r + r + 60)
+    );
+  const place = (r, make) => {
+    for (let t = 0; t < 200; t++) {
+      const x = Math.round(rng.range(r + 300, W - r - 300));
+      const y = Math.round(rng.range(r + 300, H - r - 300));
+      if (!fits(x, y, r)) continue;
+      const list = make(x, y);
+      for (const b of list) buildings.push(b, { ...b, x: W - b.x, y: H - b.y });
+      areas.push({ x, y, r }, { x: W - x, y: H - y, r });
+      return;
+    }
+  };
+  for (let i = 0; i < OUTPOST_FACTORIES; i++) {
+    const flip = rng.next() < 0.5;
+    const fw = flip ? 170 : 260;
+    const fh = flip ? 260 : 170;
+    const gapsOnX = rng.next() < 0.5; // Lücken links/rechts (sonst oben/unten)
+    place(Math.hypot(fw, fh) / 2 + WALL_MARGIN + 30, (x, y) => {
+      const list = [{ x, y, w: fw, h: fh, kind: 'factory' }];
+      const A = fw / 2 + WALL_MARGIN; // halbe Ringbreite (Mitte der Mauer)
+      const B = fh / 2 + WALL_MARGIN;
+      const full = (cx, cy, w, h) => list.push({ x: cx, y: cy, w, h, kind: 'wall' });
+      if (gapsOnX) {
+        full(x, y - B, 2 * A + WALL_T, WALL_T); // Nord- und Südmauer ganz, Ost-/Westmauer mit Lücke
+        full(x, y + B, 2 * A + WALL_T, WALL_T);
+        for (const sx of [-1, 1]) {
+          const len = B - WALL_GAP / 2;
+          full(x + sx * A, y - WALL_GAP / 2 - len / 2, WALL_T, len);
+          full(x + sx * A, y + WALL_GAP / 2 + len / 2, WALL_T, len);
+        }
+      } else {
+        full(x - A, y, WALL_T, 2 * B + WALL_T);
+        full(x + A, y, WALL_T, 2 * B + WALL_T);
+        for (const sy of [-1, 1]) {
+          const len = A - WALL_GAP / 2;
+          full(x - WALL_GAP / 2 - len / 2, y + sy * B, len, WALL_T);
+          full(x + WALL_GAP / 2 + len / 2, y + sy * B, len, WALL_T);
+        }
+      }
+      return list;
+    });
+  }
+  for (let i = 0; i < OUTPOST_HALLS; i++) {
+    const flip = rng.next() < 0.5;
+    place(160, (x, y) => [{ x, y, w: flip ? 100 : 290, h: flip ? 290 : 100, kind: 'hall' }]);
+  }
+  for (let i = 0; i < OUTPOST_HOUSES; i++) {
+    place(80, (x, y) => [{ x, y, w: Math.round(rng.range(80, 100)), h: Math.round(rng.range(64, 86)), kind: 'house' }]);
+  }
+  return { buildings, areas };
+}
+
 const SCATTER_PAIRS = 350;
 
 /** Einzelne Bäume und kleine Gruppen überall außerhalb der Stadt (punktsymmetrisch); sie blockieren wie Gebäude. */
-function scatterTrees(rng, obstacles) {
+function scatterTrees(rng, obstacles, keepOut = []) {
   const trees = [];
   const ok = (x, y) =>
     x > 40 &&
@@ -233,7 +314,8 @@ function scatterTrees(rng, obstacles) {
     !inRail(y, 20) &&
     dist(x, y, CX, CY) > ZONE_R + 30 &&
     SPAWNS.every((s) => dist(x, y, s.x, s.y) > 420) &&
-    obstacles.every((o) => dist(x, y, o.x, o.y) > o.r + 25);
+    obstacles.every((o) => dist(x, y, o.x, o.y) > o.r + 25) &&
+    keepOut.every((a) => dist(x, y, a.x, a.y) > a.r + 25);
   const add = (x, y) => {
     if (!ok(x, y) || !ok(W - x, H - y)) return;
     const r = Math.round(rng.range(10, 19));

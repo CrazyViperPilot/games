@@ -218,6 +218,11 @@ function drawTown(ctx, map, S, iso = false) {
         ctx.lineTo(x + (w * k) / 5, y + h);
       }
       ctx.stroke();
+    } else if (b.kind === 'wall') {
+      ctx.fillStyle = '#a29f94';
+      ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = 'rgba(255,255,255,0.2)';
+      ctx.fillRect(x, y, w, Math.min(h, 2));
     } else if (b.kind === 'train') {
       ctx.fillStyle = TRAIN_COLOR[b.part] ?? '#777';
       ctx.fillRect(x + w * 0.04, y + h * 0.1, w * 0.92, h * 0.8);
