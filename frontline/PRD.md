@@ -14,36 +14,36 @@ Konfliktzone halten“. Zwei Parteien: Spieler (Blau) gegen Computer (Rot).
 | Sprache | Deutsch |
 | Spieler | 1 Mensch gegen 1 KI. Kein Multiplayer. |
 
-Nicht im Umfang: Netzwerk-Multiplayer, Kampagne, Speichern laufender Partien, Lufteinheiten, Sound (optional, „Could“).
+Nicht im Umfang: Netzwerk-Multiplayer, Kampagne, Speichern laufender Partien, Sound (optional, „Could“).
 
 ## 2. Spielablauf
 
 1. Startmenü: Schwierigkeit (Leicht/Normal/Schwer), Siegpunkte (100 Standard; 25/50 für Schnellpartie), Start.
-2. Jede Partei startet in einer Ecke der großen Karte mit **1 FOB** (mit gefülltem Lager), 1 Baufahrzeug, 1 LKW (leer) und 4 Schützen.
+2. Jede Partei startet in einer Ecke der großen Karte mit **1 FOB** (Lager: 1000 Baumaterial, 400 Munition, 400 Treibstoff), 800 Geld, 1 Baufahrzeug, 1 LKW (leer) und 4 Schützen.
 3. Man baut Förderanlagen auf Ressourcenvorkommen, Fahrzeughalle, Verteidigung, weitere FOBs und eine Armee und hält
    sie mit LKW-Nachschub am Laufen.
-4. In der Mitte liegt die sehr große **Konfliktzone**. Wer sie beherrscht, bekommt Geld und alle 30 s einen Punkt.
+4. In der Mitte liegt die sehr große **Konfliktzone** (eine Stadt). Wer sie beherrscht, bekommt Geld und alle 30 s einen Punkt. In ihr wandert die **Hot Zone** (Abschnitt 7).
 5. **Sieg:** zuerst die Siegpunktzahl (Standard 100) erreichen – oder der Gegner hat keine FOB und kein Baufahrzeug mehr.
 
 ## 3. Ressourcen & Logistik
 
 | Ressource | Quelle | Lagerort | Verwendung |
 |---|---|---|---|
-| **Geld** | Konfliktzone, Grundeinkommen 5/s je FOB | global | Einheiten |
+| **Geld** | Konfliktzone, Hot Zone, Grundeinkommen 5/s je FOB | global | Einheiten |
 | **Baumaterial** | Förderanlage auf Baumaterial-Vorkommen | FOB-Lager, LKW | Gebäude, Mauern, Tore, Reparatur; 400 per LKW für eine neue FOB-Baustelle |
 | **Munition** | Förderanlage auf Munitions-Vorkommen | FOB-Lager, Einheiten, LKW | Einheiten-Kosten; **Verbrauch je Schuss** |
 | **Treibstoff** | Förderanlage auf Treibstoff-Vorkommen | FOB-Lager, Fahrzeuge, LKW | Fahrzeug-Kosten; **Verbrauch beim Fahren** |
 
-- **FOB-Lager:** Jede FOB hat ein eigenes Lager (max. 3000 je Sorte). Eine Förderanlage liefert (4 Baumaterial, 4 Munition bzw.
-  3 Treibstoff pro s) in die FOB, in deren Bauradius sie steht. Ressourcen sind **nicht** automatisch überall verfügbar.
+- **FOB-Lager:** Jede FOB hat ein eigenes Lager (max. 3000 je Sorte). Eine Förderanlage liefert (8 Baumaterial, 8 Munition bzw.
+  6 Treibstoff pro s) in die FOB, in deren Bauradius sie steht. Ressourcen sind **nicht** automatisch überall verfügbar.
 - **Bezahlen:** Gebäude zahlen aus einer FOB, deren Bauradius den Bauort enthält; Ausbildung aus dem Lager der ausbildenden FOB
   (Fahrzeughalle: aus der FOB in Reichweite). Geld kommt immer aus dem globalen Vorrat. Abbruch erstattet voll an dieses Lager.
 - **Vorrat der Einheiten:** Jede Einheit trägt Munition, Fahrzeuge zusätzlich Treibstoff. Ohne Munition wird nicht geschossen,
-  ohne Treibstoff fahren Fahrzeuge mit 25 % Tempo. Mörser und Flugabwehr verbrauchen Munition aus dem Lager ihrer FOB;
+  ohne Treibstoff fahren Fahrzeuge mit 25 % Tempo. Mörser und Flugabwehr verbrauchen Munition aus dem Lager ihrer FOB (fehlt sie, schießen sie nicht);
   das MG der FOB schießt kostenlos.
-- **Nachfüllen:** automatisch im Bauradius einer eigenen FOB (aus deren Lager) oder in der Nähe (180 px) eines eigenen LKW mit Ladung.
+- **Nachfüllen:** automatisch im Bauradius einer eigenen FOB (aus deren Lager) oder in der Nähe (180 px) eines eigenen LKW mit Ladung. Das gilt für Soldaten (Munition), Fahrzeuge und Hubschrauber (Treibstoff, Munition). Ist das Lager leer, wird nicht nachgefüllt.
 - Vorkommen sind unerschöpflich. Pro Vorkommen genau eine Förderanlage. Jede Startposition hat je ein Vorkommen jeder Sorte
-  im Bauradius ihrer Start-FOB; weitere liegen verteilt, einige in der Konfliktzone.
+  im Bauradius ihrer Start-FOB; weitere liegen verteilt, einige in der Konfliktzone (dort mehr als früher, die Zone ist groß).
 
 ## 4. FOB & Bauradius
 
@@ -67,8 +67,10 @@ Nicht im Umfang: Netzwerk-Multiplayer, Kampagne, Speichern laufender Partien, Lu
 | Förderanlage | Nur auf freiem Vorkommen; liefert in die FOB, in deren Radius sie steht |
 | Mauer | Blockiert alle Einheiten. Wird per Ziehen als Linie gebaut. |
 | Tor | Wie Mauer, aber eigene Einheiten fahren hindurch |
-| Mörser | Indirektes Feuer, große Reichweite (Mindestreichweite), Flächenschaden; braucht Sicht auf das Ziel |
-| Flugabwehr | Fängt gegnerische Mörsergranaten ab (es gibt keine Lufteinheiten) und beschießt Bodenziele schwach |
+| Mörser | Indirektes Feuer, Reichweite 800 px (Mindestreichweite 200), Flächenschaden. **Ziel wählen** (G oder Rechtsklick auf die Karte): ein Schuss alle **20 s**, solange die FOB Munition hat; ohne Ziel schießt er automatisch auf sichtbare Gegner. Reichweitenkreis und Ziel werden bei Auswahl gezeichnet. Trifft keine Hubschrauber |
+| Flugabwehr | Schießt **Hubschrauber** ab (Reichweite 320, 35 Schaden je Schuss), fängt gegnerische Mörsergranaten ab und beschießt Bodenziele schwach. Munition aus der FOB |
+| Hubschrauberlandeplatz | Baut Little Bird, Transporthubschrauber und AH-64 (3×3, 350 Baumaterial) |
+| Bohrer | Zieht die Hot Zone an (Abschnitt 7); 2×2, 150 Baumaterial, braucht beim Betrieb Treibstoff aus der FOB |
 
 Gebäude können abgerissen werden (Erstattung 25 % Baumaterial). Max. 120 Einheiten je Partei.
 
@@ -81,17 +83,39 @@ Gebäude können abgerissen werden (Erstattung 25 % Baumaterial). Max. 120 Einhe
 | LKW | FOB | Unbewaffnet, schnell. **Logistik:** lädt Ressourcen an einer FOB (400), bringt sie zu einer anderen FOB oder FOB-Baustelle, pendelt auf Routen, versorgt Truppen im Feld |
 | Baufahrzeug | FOB | Unbewaffnet. Setzt FOB-Baustellen, baut alle Gebäude, repariert |
 | Schützenpanzer | Fahrzeughalle | Schnell, gut gegen Infanterie und leichte Fahrzeuge |
-| Kampfpanzer | Fahrzeughalle | Teuer, schwer gepanzert, stark gegen alles |
+| Kampfpanzer | Fahrzeughalle | Teuer, schwer gepanzert, stark gegen alles (kann keine Hubschrauber treffen) |
+| Little Bird | Hubschrauberlandeplatz | Unbewaffnet, schnell, **5 Passagiere** (Infanterie, Baufahrzeug) |
+| Transporthubschrauber | Hubschrauberlandeplatz | Unbewaffnet, **9 Passagiere** und **400 Ressourcen** (laden/entladen/pendeln wie ein LKW) |
+| AH-64 (Kampfhubschrauber) | Hubschrauberlandeplatz | Bordkanone, 650 HP, **begrenzt**: 60 Munition, 70 Treibstoff; Nachtanken/-laden in einer FOB |
+
+**Hubschrauber** fliegen geradeaus über Gelände und Gebäude, brauchen Treibstoff beim Fliegen (ohne: 25 % Tempo) und sind
+Panzerklasse „Luft“: Flugabwehr (stark), Panzerabwehrsoldat (40), SPz (8), Schütze (3) und die FOB-MG (2) treffen sie; Kampfpanzer
+und Mörser nicht. Passagiere steigen per Rechtsklick auf den Hubschrauber ein und werden mit **O** am Zielpunkt abgesetzt;
+stirbt der Hubschrauber, sind die Passagiere verloren.
 
 Schadensmodell: Schaden je Schuss nach Panzerklasse des Ziels (Infanterie / leicht / schwer / Gebäude) – Werte in `PLAN.md`.
 
 ## 7. Konfliktzone & Punkte
 
-- Kreis in der Kartenmitte, Radius 1100 px (Karte 4800 × 4800 px) – deutlich sichtbar.
+- Kreis in der Kartenmitte, Radius **3300 px** (Karte 9024 × 9024 px), gestaltet als osteuropäische Stadt (Straßenraster, Häuser, Hallen, Fabriken, Parks, Autos, Bäume). Gebäude sind Hindernisse, Straßen und Parks frei. Der Abstand vom Start zum Zonenrand beträgt gut 2000 px.
 - **Kontrolle:** eine Partei hat Einheiten in der Zone, die andere keine. Sind beide drin → umkämpft, niemand kontrolliert.
 - Kontrollierende Partei: **+6 Geld/s** und Punktfortschritt; alle **30 s Kontrolle = 1 Punkt**. Der angefangene
   Fortschritt bleibt bei Kontrollverlust erhalten.
 - Jede eigene Einheit in der Zone bringt zusätzlich **+0,25 Geld/s** (auch wenn umkämpft, max. 30 Einheiten gezählt).
+
+### Hot Zone
+- Kleiner Kreis (Radius 300 px) **innerhalb** der Konfliktzone, orange; auch auf der Minimap. Er wandert mit 40 px/s zu einem
+  Zufallspunkt (neues Ziel alle 25–45 s).
+- **Besitz** wie bei der Zone (nur eine Partei darin). Besitzer: **+8 Geld/s** und alle **45 s ein Siegpunkt** (zusätzlich zur Zone).
+- Oben zeigt „HOT“ den Besitzer und die Einheitenzahl je Team.
+
+### Bohrer
+- Nach dem Bau **30 s Aufwärmen**, dann per **G** aktivierbar: **2 min aktiv**, danach **5 min Abkühlen**.
+- Aktiv verbraucht er **1 Treibstoff/s** aus der versorgenden FOB; ohne Treibstoff schaltet er ab (dann ebenfalls 5 min Pause).
+  Start nur, wenn die FOB mindestens 10 Treibstoff hat.
+- Aktive Bohrer ziehen die Hot Zone an (Ziel wird in die Konfliktzone gezogen). Bei mehreren: die FOB mit den meisten aktiven
+  Bohrern, bei Gleichstand die mit dem zuerst aktivierten. Hat sie nur einen aktiven Bohrer, ist das Ziel der Bohrer, sonst die FOB.
+  Ohne aktiven Bohrer wandert die Hot Zone wieder zufällig.
 
 ## 8. Steuerung
 
@@ -101,8 +125,11 @@ Schadensmodell: Schaden je Schuss nach Panzerklasse des Ziels (Infanterie / leic
 | Rechtsklick | Bewegen; auf Gegner = Angreifen; Gebäude gewählt = Sammelpunkt; LKW auf eigene FOB = laden (leer) bzw. entladen; Baufahrzeug/Infanterie auf eigene Baustelle = dort bauen; Baufahrzeug auf beschädigtes eigenes Gebäude = reparieren |
 | A + Linksklick | Angriffsbewegung |
 | S | Stopp |
-| B | Baumenü (Baufahrzeug: alles, Infanterie: nur Mauer/Tor); darin Q Halle, W Förderanlage, E Mauer, R Tor, T Mörser, Z/Y Flugabwehr, F FOB-Baustelle |
-| Q / W / E / R | Ausbildung im gewählten Gebäude (FOB: Schütze/PAK/LKW/Baufahrzeug, Halle: SPz/KPz) |
+| B | Baumenü (Baufahrzeug: alles, Infanterie: nur Mauer/Tor); darin Q Halle, W Förderanlage, E Mauer, R Tor, T Mörser, Z/Y Flugabwehr, G Hubschrauberlandeplatz, X Bohrer, F FOB-Baustelle |
+| Mörser gewählt | G Ziel wählen (oder Rechtsklick auf die Karte) · C Ziel löschen |
+| Bohrer gewählt | G aktivieren |
+| Hubschrauber | Infanterie wählen + Rechtsklick auf Hubschrauber = einsteigen · Transporthubschrauber: O absetzen, L/U/T wie LKW |
+| Q / W / E / R | Ausbildung im gewählten Gebäude (FOB: Schütze/PAK/LKW/Baufahrzeug, Halle: SPz/KPz, Landeplatz: Little Bird/Transporter/AH-64) |
 | LKW gewählt | L Laden · U Entladen · T Pendeln (Start-FOB, dann Ziel-FOB) · Ladung Q Gemischt / W Baumaterial / E Munition / R Treibstoff |
 | Entf | Gebäude abreißen |
 | Esc | Abbrechen / Auswahl aufheben |
@@ -116,7 +143,7 @@ Schadensmodell: Schaden je Schuss nach Panzerklasse des Ziels (Infanterie / leic
 
 ## 9. Oberfläche
 
-- Oben: Summe aller FOB-Lager und Geld mit Netto-Rate/s (rot bei Verlust), Punkte Blau/Rot mit Balken, Zonenstatus,
+- Oben: Summe aller FOB-Lager und Geld mit Netto-Rate/s (rot bei Verlust), Punkte Blau/Rot mit Balken, Zonenstatus, Hot-Zone-Anzeige,
   Spielzeit, Geschwindigkeit.
 - Unten links Minimap, Mitte Auswahlinfo (FOB: Lager; LKW: Ladung und Ladungsart; Einheiten: Munition/Treibstoff),
   rechts Befehlskarte mit Kosten und Tastenkürzeln (nicht bezahlbare Buttons ausgegraut mit Grund).
@@ -132,7 +159,7 @@ Gleiche Regeln und Befehls-Schnittstelle wie der Spieler (Sonderrecht nur: Einko
 ignoriert den Nebel bei der Zielwahl, Mörser brauchen aber Sicht).
 Verhalten: Baufahrzeug setzt Baustellen und baut, Schützen bauen Mauern; Wirtschaft zuerst (Förderanlagen) → früh expandieren, **zuerst eine FOB in der Konfliktzone** (wird neu gebaut,
 wenn verloren), dann FOBs an freien Vorkommen → Fahrzeughalle und gemischte Armee mit Munitionsreserve → Zone halten →
-Verteidigung (Mörser/Flugabwehr/Mauern) erst mit stehender Wirtschaft. **Logistik:** Lieferant bringt Baumaterial zu FOB-Baustellen, Pendler-LKW
+Verteidigung (Mörser/Flugabwehr/Mauern) erst mit stehender Wirtschaft. Die KI baut keine Hubschrauber und keine Bohrer, bekämpft aber deine Hubschrauber mit allem, was ihnen schaden kann. **Logistik:** Lieferant bringt Baumaterial zu FOB-Baustellen, Pendler-LKW
 zwischen Überschuss- und Bedarfs-FOBs (v. a. Zonen-FOB), Versorger-LKW folgt der Armee; Einheiten ohne Munition ziehen sich zurück.
 
 ## 11. Qualitätsanforderungen
@@ -156,3 +183,6 @@ zwischen Überschuss- und Bedarfs-FOBs (v. a. Zonen-FOB), Versorger-LKW folgt de
 - v2: Munitions-/Treibstoffverbrauch; stärkere KI (Wirtschaft zuerst, Zonen-FOB).
 - v3: Logistik – FOB-Lager, Vorrat je Einheit, LKW als Transporter/Versorger/Pendler; Baufahrzeug baut und repariert,
   Infanterie baut Mauern/Tore; Service Worker network-first.
+- v4 (Okt. 2026): Konfliktzone als Stadt, Radius 1100 → 2200 → 3300, Karte 4800 → 9024; Anzeige der Zonen-Einheiten überarbeitet;
+  Mörser mit Zielwahl (20 s); Hubschrauber (Little Bird, Transporthubschrauber, AH-64) und Landeplatz; Flugabwehr schießt
+  Hubschrauber ab; Hot Zone und Bohrer; Förderrate verdoppelt (8/8/6), Start-Vorrat 1000/400/400 und 800 Geld.
