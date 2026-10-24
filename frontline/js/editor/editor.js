@@ -712,6 +712,7 @@ function endPointer(e) {
     }
   }
   const g = cancelGesture();
+  st.needDraw = true; // Boden der Iso-Ansicht wird erst ohne laufende Geste neu gebacken
   if (!g) return;
   if (g.type === 'line' && e.type !== 'pointercancel') {
     if (Math.hypot(g.x2 - g.x1, g.y2 - g.y1) >= 32) {
