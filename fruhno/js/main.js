@@ -231,6 +231,12 @@ function render() {
 
 /* ---------- wiring ---------- */
 $('#btn-chat').addEventListener('click', () => { const c = $('#chat'); c.hidden = !c.hidden; renderChat(); });
+$('#chat-close').addEventListener('click', () => { $('#chat').hidden = true; renderChat(); });
+// A tap anywhere outside the chat panel closes it.
+document.addEventListener('pointerdown', (ev) => {
+  const c = $('#chat');
+  if (!c.hidden && !c.contains(ev.target) && !$('#btn-chat').contains(ev.target)) { c.hidden = true; renderChat(); }
+});
 $('#chat-form').addEventListener('submit', (ev) => {
   ev.preventDefault();
   const input = $('#chat-input');
