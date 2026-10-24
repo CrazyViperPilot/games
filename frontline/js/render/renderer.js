@@ -7,7 +7,6 @@ import { lacksAmmo } from '../game/entities.js';
 import {
   drawUnit,
   drawBuilding,
-  drawNode,
   drawShell,
   drawEffect,
   drawBar,
@@ -144,10 +143,6 @@ export class Renderer {
     this.drawTerrain(ctx, R);
     this.drawZone(ctx, z);
     this.drawHot(ctx, z, now);
-
-    for (const n of g.map.nodes) {
-      if (inRect(n.x, n.y, 40)) drawNode(ctx, n, g.extractorOn(n.id), z);
-    }
 
     if (v.placement) this.drawRadii(ctx, z);
     this.drawSelectedRadii(ctx, z, v);
@@ -318,7 +313,6 @@ export class Renderer {
     for (const t of g.map.trees ?? []) if (inRect(t.x, t.y, PAD)) items.push({ k: cam.depth(t.x, t.y), t: 1, o: t });
     for (const t of this.deco.trees) if (inRect(t.x, t.y, PAD)) items.push({ k: cam.depth(t.x, t.y), t: 1, o: t });
     for (const o of this.deco.rocks) if (inRect(o.x, o.y, PAD)) items.push({ k: cam.depth(o.x, o.y), t: 2, o });
-    for (const n of g.map.nodes) if (inRect(n.x, n.y, 60)) items.push({ k: cam.depth(n.x, n.y), t: 3, o: n });
     for (const b of g.buildings) {
       if (!b.alive || (b.team !== team && !known(b.x, b.y)) || !inRect(b.x, b.y, PAD)) continue;
       items.push({ k: cam.depth(b.x, b.y), t: 4, o: b });
@@ -360,11 +354,7 @@ export class Renderer {
         if (!drawTreeSprite(ctx, cam, it.o)) drawTree(ctx, cam, it.o);
       }
       else if (it.t === 2) drawRock(ctx, cam, it.o);
-      else if (it.t === 3) {
-        const p = cam.worldToScreen(it.o.x, it.o.y);
-        setUprightAt(ctx, cam, dpr, p.x, p.y, it.o.x, it.o.y);
-        drawNode(ctx, it.o, g.extractorOn(it.o.id), z);
-      } else if (it.t === 4) {
+      else if (it.t === 4) {
         const b = it.o;
         drawTeamBuilding(ctx, cam, b, g.teams[b.team].color);
         if (!b.built && b.team === team) {

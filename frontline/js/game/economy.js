@@ -1,4 +1,4 @@
-// Wirtschaft: Produktion, Einkommen und Förderung in FOB-Lager (PLAN.md §5, §11.1). Kein DOM.
+// Wirtschaft: Produktion in der Haupt-FOB und Geldrate (PLAN.md §5, §11.1). Geld kommt nur aus Zone und Hot Zone. Kein DOM.
 // Baufortschritt: construction.js. Nachfüllen und LKW: logistics.js.
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
@@ -37,8 +37,8 @@ function spawnSpot(game, b) {
 
 /**
  * Produktion und Einkommen eines Schritts.
- * `team.rate` = momentane Rate je Sekunde: Förderung (+) minus Nachfüllen aus Lagern (`team.flow`, von logistics.js);
- * zone.js ergänzt Zonengeld. Geld fließt in `team.res.money`, Förderung direkt in das Lager des Versorgers.
+ * `team.rate` = momentane Rate je Sekunde: Nachfüllen aus Lagern (`team.flow`, von logistics.js) als Abfluss;
+ * zone.js ergänzt das Zonengeld in `team.res.money`.
  */
 export function updateEconomy(game, dt) {
   for (const team of game.teams) {
@@ -65,27 +65,10 @@ export function updateEconomy(game, dt) {
     game.message(b.team, `${ut.name} bereit`, spot.x, spot.y);
   }
 
-  // Einkommen: FOBs (Geld) und Förderanlagen (Sorte des Vorkommens, in die FOB ihres Bauradius)
+  // Haupt-FOB: unendlicher Vorrat (das Lager wird immer wieder aufgefüllt; Laden und Nachfüllen haben ihre Raten)
   for (const b of game.buildings) {
-    if (!b.alive || !b.built) continue;
-    const team = game.teams[b.team];
-    const mult = team.incomeMult;
-    if (b.type === 'fob') {
-      team.rate.money += BALANCE.fob.income * mult;
-      continue;
-    }
-    if (b.nodeId === null) continue;
-    const node = game.nodeById.get(b.nodeId);
-    if (!node) continue;
-    const sup = game.supplierOf(b);
-    if (!sup) {
-      game.notify(b.team, 'noFob', 'Förderanlage ohne FOB', BALANCE.logistics.noFobWarn);
-      continue;
-    }
-    const amount = (b.def.yields[node.type] || 0) * mult;
-    team.rate[node.type] += amount;
-    const cap = BALANCE.logistics.storeCap;
-    sup.store[node.type] = Math.min(cap, sup.store[node.type] + amount * dt);
+    if (!b.alive || !b.infinite) continue;
+    for (const k of STOCK_KEYS) b.store[k] = BALANCE.logistics.storeCap;
   }
   for (const team of game.teams) team.res.money += team.rate.money * dt;
 }

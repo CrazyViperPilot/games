@@ -18,7 +18,7 @@ const CARGO_KEYS = ['bm', 'mun', 'fuel']; // Lagersorten (FOB-Lager, LKW-Ladung)
 const SHORT = { money: 'G', bm: 'BM', mun: 'MUN', fuel: 'TS' };
 const HOTKEY_ALIAS = { Y: 'Z' }; // Flugabwehr auch mit Y
 // Kurznamen für die Befehlskarte (der volle Name steht im Tooltip)
-const SHORT_BLD = { depot: 'Fahrzeughalle', extractor: 'Förder­anlage', wall: 'Mauer', gate: 'Tor', mortar: 'Mörser', aa: 'Flak', helipad: 'Heli-Platz', drill: 'Bohrer' };
+const SHORT_BLD = { wall: 'Mauer', gate: 'Tor', mortar: 'Mörser', aa: 'Flak', drill: 'Bohrer' };
 const SHORT_UNIT = { rifleman: 'Schütze', at: 'PAK', truck: 'LKW', engineer: 'Baufz.', ifv: 'SPz', tank: 'KPz', littlebird: 'Little Bird', transporter: 'Transp.-Heli', gunship: 'AH-64' };
 const isCarrier = (u) => u.def.cargoCap > 0; // LKW und Transporthubschrauber
 // Ladungsart: Taste, Kurzname, Bezeichnung
@@ -394,7 +394,7 @@ export class Controller {
         if (this.issue({ type: 'mortarTarget', ids: mortars.map((b) => b.id), x: wx, y: wy }).ok) this.moveMarker(wx, wy);
         return;
       }
-      const producers = sel.filter((e) => e.def.produces.length > 0);
+      const producers = sel.filter((e) => e.produces && e.produces.length > 0);
       for (const b of producers) this.issue({ type: 'rally', buildingId: b.id, x: wx, y: wy });
       if (producers.length) this.moveMarker(wx, wy);
       return;
@@ -467,6 +467,12 @@ export class Controller {
   /** IDs der gewählten Bauer, die `type` bauen dürfen (Baufahrzeug: alles, Infanterie: Mauer/Tor). */
   builderIds(type) {
     return this.selectedUnits().filter((u) => canBuild(u.def, type)).map((u) => u.id);
+  }
+
+  /** Bauen nur Soldaten (zahlen aus getragenem Baumaterial, nur im Bauradius einer FOB)? */
+  carriedFor(type) {
+    const us = this.selectedUnits().filter((u) => canBuild(u.def, type));
+    return us.length > 0 && us.every((u) => u.def.builder === 'fort');
   }
 
   confirmPlace(wx, wy, shift) {
@@ -621,7 +627,7 @@ export class Controller {
   }
 
   placementFor(type, wx, wy) {
-    const p = this.game.canPlace(this.team, type, wx, wy);
+    const p = this.game.canPlace(this.team, type, wx, wy, { carried: this.carriedFor(type) });
     return {
       type,
       x: Number.isFinite(p.x) ? p.x : wx,
@@ -637,10 +643,11 @@ export class Controller {
     const cur = { c: g.toCell(wx), r: g.toCell(wy) };
     const cells = this.wall ? wallLine(this.wall, cur) : [cur];
     const cost = BUILDINGS.wall.cost;
+    const carried = this.carriedFor('wall');
     const affordable = this.game.canAfford(this.team, cost);
     const short = this.moneyReason(cost);
     const list = cells.map(({ c, r }) => {
-      const p = this.game.canPlace(this.team, 'wall', g.center(c), g.center(r));
+      const p = this.game.canPlace(this.team, 'wall', g.center(c), g.center(r), { carried });
       return { cx: c, cy: r, ok: p.ok && affordable, reason: p.ok ? null : p.reason, payer: p.payer || null };
     });
     const ok = list.some((x) => x.ok);
@@ -723,7 +730,7 @@ export class Controller {
 
   /** Ausbildung auf allen gewählten fertigen Gebäuden, die diesen Typ bauen. */
   train(unit) {
-    const producers = this.selected().filter((e) => e.kind === 'building' && e.built && e.def.produces.includes(unit));
+    const producers = this.selected().filter((e) => e.kind === 'building' && e.built && e.produces.includes(unit));
     for (const b of producers) {
       if (!this.issue({ type: 'train', buildingId: b.id, unit }).ok) break;
     }
@@ -777,13 +784,12 @@ export class Controller {
     return this.anyFobCovers(cost) ? '' : this.lagerReason(cost);
   }
 
-  /** Grund für Ausbildung in einem Gebäude: Geld, Lager (FOB selbst bzw. Zahler in Reichweite) oder Limit. */
+  /** Grund für Ausbildung in der Haupt-FOB: Geld oder Einheitenlimit. */
   trainReason(b, cost) {
     const money = this.moneyReason(cost);
     if (money) return money;
     if (this.game.unitCount(this.team) >= BALANCE.unitCap) return `Einheitenlimit erreicht (${BALANCE.unitCap})`;
-    const ok = b.type === 'fob' ? covers(b.store, cost) : !!this.game.payerFor(this.team, b.x, b.y, cost);
-    return ok ? '' : this.game.stockReason(this.team, b.x, b.y, cost);
+    return '';
   }
 
   // ---- Befehlskarte und Tasten --------------------------------------------------
@@ -934,11 +940,11 @@ export class Controller {
     const card = [];
     const types = [];
     for (const b of blds) {
-      for (const u of b.def.produces) if (!types.includes(u)) types.push(u);
+      for (const u of b.produces) if (!types.includes(u)) types.push(u);
     }
     for (const u of types) {
       const def = UNITS[u];
-      const producers = blds.filter((b) => b.def.produces.includes(u));
+      const producers = blds.filter((b) => b.produces.includes(u));
       const ready = producers.find((b) => b.built && b.queue.length < BALANCE.queueMax);
       let reason = '';
       if (!producers.some((b) => b.built)) reason = 'Gebäude ist noch im Bau';

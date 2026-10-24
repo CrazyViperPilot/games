@@ -1,6 +1,6 @@
 // KI-Gegner (PLAN.md §5, §10.2, §11.5). Steuert nur über game.issue und liest den Zustand. Kein DOM.
-// Reihenfolge je Denkschritt: Baustellen pflegen, Verteidigung, Rückzug, Förderanlagen, Expansion (FOB-Baustellen),
-// Halle, Produktion, Verteidigungsgebäude und Mauer, Baufahrzeuge, LKW (Lieferant/Pendler/Versorger), Sammelpunkte, Armee.
+// Reihenfolge je Denkschritt: Baustellen pflegen, Verteidigung, Rückzug, Expansion (FOB-Baustellen: Zone, Relais, Flanken),
+// Produktion (nur Haupt-FOB), Verteidigungsgebäude und Mauer, Baufahrzeuge, LKW (Lieferant/Pendler/Versorger), Sammelpunkte, Armee.
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
@@ -15,23 +15,17 @@ const THREAT_DANGER = 600; // Gegner in dieser Nähe machen ein FOB-Ziel unattra
 const GATHER_DIST = 300; // Sammelpunkt Richtung Zone, vom Zentrum der Haupt-FOB
 const ZONE_GATHER_DIST = 150; // Sammelpunkt an der Zonen-FOB, Richtung eigener Basis
 const RALLY_MOVE = 150; // Sammelpunkt-Befehl nur neu setzen, wenn sich der Punkt so weit verschiebt
-const MAX_FOB_NODE_DIST = 2600; // FOB-Ziele an Vorkommen höchstens so weit von der Haupt-FOB
+const RELAY_STEP = 1000; // Abstand der Relais-FOBs auf dem Weg zur Zone (Bauradien dürfen sich nicht überlappen)
+const FLANK_R = 1000; // Flanken-FOBs: Abstand zur Zonen-FOB
 const SITE_TIMEOUT = 200; // s, eine FOB-Baustelle ohne Material wird danach abgerissen
 const BAD_TIME = 240; // s, Sperre eines fehlgeschlagenen FOB-Ziels
 const ALARM_TIME = 30; // s, Treffer an der Basis gelten als Angriff auf die Basis
-const AMMO_ATTACK = 30; // keine Angriffe bei weniger Munition (Summe der Lager)
-const AMMO_PER_COMBAT = 3; // Munitionsreserve je Kampfeinheit (max. AMMO_RESERVE_MAX)
-const AMMO_RESERVE_MAX = 150;
 const DRY = 0.2; // Einheiten mit weniger Munition/Treibstoff (Anteil) ziehen sich zurück
-const RICH = 1500; // Geld, ab dem zusätzliche Hallen gebaut werden
 const WALL_OFFSET = 4; // Mauer im Abstand (Zellen) vom Zentrum der Haupt-FOB
 const WALL_HALF = 3; // Mauerlinie: 2 × WALL_HALF + 1 Zellen, Tor in der Mitte
 const MIX = { rifleman: 0.5, at: 0.2, ifv: 0.2, tank: 0.1 }; // Zielanteile der Kampfeinheiten
 const THREAT_PER_UNIT = 150; // mittlerer Geldwert einer Kampfeinheit (Mix) für die Schätzung einer Besatzung
-const FOB_CAP = { easy: 3, normal: 6, hard: 6 }; // FOB-Grenze je Schwierigkeit (Spielmaximum 6)
-const DEPOT_CAP = { easy: 1, normal: 2, hard: 3 }; // Fahrzeughallen je Schwierigkeit
-const NODE_W = { bm: 1, mun: 1.5, fuel: 1.5 }; // Gewicht eines freien Vorkommens für den FOB-Wert
-const NEED = { bm: 1000, mun: 300, fuel: 250 }; // Bedarf je Sorte: kleinster Vorrat/Bedarf zuerst
+const FOB_CAP = { easy: 3, normal: 5, hard: 7 }; // FOB-Grenze je Schwierigkeit mit Haupt-FOB (Spielmaximum 10)
 const KEYS = ['bm', 'mun', 'fuel'];
 const CAP = BALANCE.logistics.truckCapacity;
 const ENG_NEAR = 250; // Baufahrzeug näher an einer Baustelle: die automatische Zuweisung übernimmt
@@ -42,13 +36,9 @@ const ROUTE_HOLD = 20; // s, früheste Neuplanung einer Pendler-Route
 const DEG = Math.PI / 180;
 const SITE_ANGLES = [0, 30, -30, 60, -60, 90, -90, 120, -120, 150, -150, 180].map((d) => d * DEG);
 const TWO_PI = Math.PI * 2;
-const RES_KEYS = ['money', 'bm', 'mun', 'fuel'];
 
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 const TILE = BALANCE.map.tile;
-
-/** Mittelpunkt einer Förderanlage am Vorkommen (wie canPlace: 2×2 Zellen, Mitte auf Zellgrenze). */
-const extractorCenter = (n) => ({ x: Math.floor(n.x / TILE) * TILE, y: Math.floor(n.y / TILE) * TILE });
 
 function unitVec(dx, dy) {
   const len = Math.hypot(dx, dy);
@@ -78,9 +68,7 @@ export class AI {
     this.engTarget = new Map(); // Baufahrzeug-ID -> Baustelle, zu der es geschickt wurde
     this.supplyAt = new Map(); // Versorger-ID -> letzter Zielpunkt
     this.memo = new Map(); // Befehlsschlüssel -> Zeitpunkt (gegen Befehls-Spam)
-    this.bmMines = 0; // Baumaterial-Förderanlagen (alive), aus snapshot
     this.hadZoneFob = false; // eine Zonen-FOB (auch Baustelle) existierte im letzten Denkschritt
-    this.avoidZone = false; // Vorkommen-FOBs außerhalb der (feindlich gehaltenen) Zone suchen
     this.zoneBan = 0; // bis dahin keine neue Zonen-FOB (nach Verlust, gegen Nachschub in den Tod)
 
     const t = game.teams[team];
@@ -104,9 +92,7 @@ export class AI {
     this.hadZoneFob = !!s.zoneFob;
     this.defend(s);
     this.retreat(s);
-    this.buildExtractors(s);
     this.expand(s); // FOB-Baustellen setzen (Material liefert der Lieferant)
-    this.buildDepot(s);
     this.produce(s);
     this.buildDefense(s);
     this.buildWall(s);
@@ -125,7 +111,7 @@ export class AI {
     const fobs = own.filter((b) => b.type === 'fob');
     const builtFobs = fobs.filter((b) => b.built).sort((a, b) => a.id - b.id);
     const units = g.units.filter((u) => u.alive && u.team === t);
-    const home = builtFobs[0] ?? null;
+    const home = builtFobs.find((b) => b.main) ?? null; // Haupt-FOB
     const ax = home ? home.x : fobs[0] ? fobs[0].x : g.map.spawns[t].x;
     const ay = home ? home.y : fobs[0] ? fobs[0].y : g.map.spawns[t].y;
     const zone = g.zone;
@@ -136,8 +122,6 @@ export class AI {
 
     const combat = units.filter((u) => u.def.range > 0);
     const queuedCombat = own.reduce((n, b) => n + b.queue.filter((e) => UNITS[e.unit ?? e].range > 0).length, 0);
-    const extractors = own.filter((b) => b.type === 'extractor');
-    this.bmMines = extractors.filter((b) => b.nodeId !== null && g.nodeById.get(b.nodeId)?.type === 'bm').length;
     const zoneFob = fobs.find((f) => dist(f.x, f.y, zone.x, zone.y) <= ZONE_FOB_R + 16) ?? null;
     const alarm =
       !!home &&
@@ -164,10 +148,6 @@ export class AI {
       combatN: combat.length + queuedCombat,
       trucks: units.filter((u) => u.type === 'truck').sort((a, b) => a.id - b.id),
       engineers: units.filter((u) => u.type === 'engineer').sort((a, b) => a.id - b.id),
-      extractors,
-      extBuilt: extractors.filter((b) => b.built).length,
-      depotBuilt: own.some((b) => b.type === 'depot' && b.built),
-      freeNodes: g.map.nodes.filter((n) => !g.extractorOn(n.id)),
       needMat,
       alarm,
     };
@@ -194,28 +174,9 @@ export class AI {
 
   // ---- Geld und Platzsuche ----------------------------------------------------------
 
-  /** Summenprüfung (Geld und Summe der FOB-Lager); der genaue Zahler wird erst von canPlace/train geprüft. */
-  canPay(cost, reserveBm = 0) {
-    const res = this.game.teams[this.team].res;
-    for (const k of RES_KEYS) {
-      if (res[k] < (cost[k] || 0) + (k === 'bm' && cost.bm ? reserveBm : 0)) return false;
-    }
-    return true;
-  }
-
-  /** Baumaterial, das für die nächste FOB zurückgehalten wird (Verteidigung und zweite Halle). */
-  fobReserve(s) {
-    return s.fobs.length < this.fobCap() ? FOB_COST : 0;
-  }
-
-  /** Kampfeinheit ausbilden: Geld da und nach Abzug der Kosten noch Munitionsreserve übrig. */
-  canTrain(type, combatN) {
-    const cost = UNITS[type].cost;
-    const res = this.game.teams[this.team].res;
-    if (res.money < (cost.money || 0)) return false;
-    if (!cost.mun) return true;
-    const reserve = Math.min(AMMO_RESERVE_MAX, AMMO_PER_COMBAT * combatN);
-    return res.mun - cost.mun >= reserve;
+  /** Kampfeinheit ausbilden: Geld da (Einheiten kosten nur Geld). */
+  canTrain(type) {
+    return this.game.teams[this.team].res.money >= (UNITS[type].cost.money || 0);
   }
 
   /** canPlace mit Budget; liefert das Ergebnis, wenn zulässig, sonst null. */
@@ -284,25 +245,6 @@ export class AI {
       return this.freeNear(s.zoneFob.x + v.x * ZONE_GATHER_DIST, s.zoneFob.y + v.y * ZONE_GATHER_DIST);
     }
     return this.freeNear(s.ax + s.dir.x * GATHER_DIST, s.ay + s.dir.y * GATHER_DIST);
-  }
-
-  /** Förderanlage an Vorkommen n wäre im Bauradius einer dieser FOBs (gleiche Geometrie wie canPlace). */
-  inBuildReach(fobs, n) {
-    const c = extractorCenter(n);
-    return fobs.some((f) => dist(f.x, f.y, c.x, c.y) <= DEF_RANGE);
-  }
-
-  /** Summe der Gewichte freier Vorkommen im Bauradius des Punktes (Liste `nodes`). */
-  nodeValue(x, y, nodes) {
-    let v = 0;
-    for (const n of nodes) if (dist(n.x, n.y, x, y) <= DEF_RANGE) v += this.nodeWeight(n.type);
-    return v;
-  }
-
-  /** Gewicht eines Vorkommens: Baumaterial ist Engpass (FOBs, Förderanlagen), solange weniger als 3 stehen. */
-  nodeWeight(type) {
-    if (type === 'bm' && this.bmMines < 3) return 2.5;
-    return NODE_W[type];
   }
 
   /** Gegner (sichtbar) in der Nähe eines Punktes: Malus für FOB-Ziele. */
@@ -398,7 +340,7 @@ export class AI {
     }
   }
 
-  /** FOB-Baustellen setzen: Zonen-FOB zuerst, dann Vorkommen-FOBs; nur wenn Material bereitsteht. */
+  /** FOB-Baustellen setzen: Zonen-FOB zuerst, dann Relais und Flanken; nur wenn Material bereitsteht. */
   expand(s) {
     const g = this.game;
     if (!s.engineers.length || !s.builtFobs.length) return;
@@ -410,17 +352,16 @@ export class AI {
     // Zonen-FOB zuerst – nicht kurz nach einem Verlust und nicht mitten in einer gegnerischen Übermacht
     const zoneHeld = s.zone.counts[1 - this.team] >= 4; // Besatzung der Zone ist öffentlich (wie bei der Zonenwertung)
     const zoneWanted = !s.zoneFob && g.time >= this.zoneBan && !zoneHeld;
-    this.avoidZone = zoneHeld || g.time < this.zoneBan; // Vorkommen-FOBs dann nicht in der Zone bauen
     let site = zoneWanted ? this.zoneSite(s) : null;
-    if (!site) site = this.nodeSite(s);
+    if (!site && s.zoneFob) site = this.frontSite(s);
     if (!site) return;
     const r = g.issue(this.team, { type: 'buildFob', x: site.x, y: site.y });
     if (!r.ok) this.badSites.push({ x: site.x, y: site.y, until: g.time + BAD_TIME });
   }
 
   /**
-   * Zonen-FOB: Mittelpunkt innerhalb 0,6 · r der Zonenmitte, möglichst viele freie Vorkommen im Bauradius,
-   * bei Gleichstand näher an der eigenen Basis.
+   * Zonen-FOB: Mittelpunkt innerhalb 0,6 · r der Zonenmitte, möglichst nah an der eigenen Basis (kurzer Nachschubweg),
+   * ohne Gegner in der Nähe.
    */
   zoneSite(s) {
     const z = s.zone;
@@ -432,10 +373,10 @@ export class AI {
         const a = a0 + (k * TWO_PI) / n;
         const x = z.x + Math.cos(a) * r;
         const y = z.y + Math.sin(a) * r;
-        cands.push({ x, y, v: this.nodeValue(x, y, s.freeNodes), d: dist(x, y, s.ax, s.ay) });
+        cands.push({ x, y, d: dist(x, y, s.ax, s.ay) });
       }
     }
-    cands.sort((a, b) => b.v - a.v || a.d - b.d);
+    cands.sort((a, b) => a.d - b.d);
     for (const c of cands) {
       if (this.budget <= 0) break;
       if (this.isBad(c.x, c.y) || this.danger(s, c.x, c.y)) continue;
@@ -446,106 +387,47 @@ export class AI {
   }
 
   /**
-   * Vorkommen-FOB: Vorkommen, die noch keine FOB im Bauradius haben, nah an der Basis und ohne Gegner.
-   * Standort 150–220 px vom Vorkommen, Richtung eigener Basis zuerst.
+   * Weitere FOBs: Relais auf dem Weg von der Haupt-FOB zur Zonen-FOB (Abstand RELAY_STEP), danach Flanken-FOBs im Kreis um
+   * die Zonen-FOB. Die Bauradien dürfen sich nicht überlappen (canPlace prüft das).
    */
-  nodeSite(s) {
-    const covered = s.fobs.map((f) => ({ x: f.x, y: f.y }));
-    const uncovered = s.freeNodes.filter((n) => !this.inBuildReach(covered, n));
-    if (!uncovered.length) return null;
-    const top = uncovered
-      .filter((n) => dist(n.x, n.y, s.ax, s.ay) <= MAX_FOB_NODE_DIST)
-      .filter((n) => !this.avoidZone || dist(n.x, n.y, s.zone.x, s.zone.y) > s.zone.r + 150)
-      .map((n) => ({ n, v: this.nodeValue(n.x, n.y, uncovered) - dist(n.x, n.y, s.ax, s.ay) / 2000 }))
-      .sort((a, b) => b.v - a.v)
-      .slice(0, 3);
-
-    const cands = [];
-    for (const { n } of top) {
-      const a0 = Math.atan2(s.ay - n.y, s.ax - n.x);
-      for (const r of [150, 220]) {
-        for (const o of [0, 45, -45, 90, -90, 135, -135, 180]) {
-          const a = a0 + o * DEG;
-          const x = n.x + Math.cos(a) * r;
-          const y = n.y + Math.sin(a) * r;
-          if (this.avoidZone && dist(x, y, s.zone.x, s.zone.y) < s.zone.r + 150) continue;
-          const v = this.nodeValue(x, y, uncovered) - dist(x, y, s.ax, s.ay) / 2000 - this.danger(s, x, y);
-          cands.push({ x, y, v });
-        }
+  frontSite(s) {
+    const from = s.home;
+    const to = s.zoneFob ?? { x: s.zone.x, y: s.zone.y };
+    const total = dist(from.x, from.y, to.x, to.y);
+    const v = unitVec(to.x - from.x, to.y - from.y);
+    const anchors = [];
+    for (let d = RELAY_STEP; d < total - 700; d += RELAY_STEP) anchors.push({ x: from.x + v.x * d, y: from.y + v.y * d });
+    if (s.zoneFob) {
+      const a0 = Math.atan2(s.ay - to.y, s.ax - to.x);
+      for (const o of [90, -90, 135, -135, 180]) {
+        const a = a0 + o * DEG;
+        anchors.push({ x: to.x + Math.cos(a) * FLANK_R, y: to.y + Math.sin(a) * FLANK_R });
       }
     }
-    cands.sort((a, b) => b.v - a.v);
-    for (const c of cands) {
-      if (this.budget <= 0) break;
-      if (this.isBad(c.x, c.y)) continue;
-      const p = this.place('fob', c.x, c.y);
-      if (p) return { x: p.x, y: p.y, zone: false };
+    for (const an of anchors) {
+      if (dist(an.x, an.y, s.zone.x, s.zone.y) > s.zone.r + 900) continue;
+      for (const r of [0, 120, 240]) {
+        for (const o of [0, 60, -60, 120, -120, 180]) {
+          if (this.budget <= 0) return null;
+          const x = an.x + Math.cos(o * DEG) * r;
+          const y = an.y + Math.sin(o * DEG) * r;
+          if (this.isBad(x, y) || this.danger(s, x, y)) continue;
+          const p = this.place('fob', x, y);
+          if (p) return { x: p.x, y: p.y, zone: false };
+        }
+      }
     }
     return null;
   }
 
-  // ---- Wirtschaft ------------------------------------------------------------------
-
-  /**
-   * Förderanlagen auf allen freien Vorkommen im Bauradius einer fertigen eigenen FOB, deren Lager das Baumaterial hat.
-   * Reihenfolge: Baumaterial, bis zwei Anlagen stehen; danach nach Knappheit (kleinster Vorrat/Bedarf zuerst).
-   * Höchstens 3 (mit 2 Baufahrzeugen 4) unfertige Förderanlagen gleichzeitig.
-   */
-  buildExtractors(s) {
-    const g = this.game;
-    const t = this.team;
-    if (!s.builtFobs.length) return;
-    let room = (s.engineers.length >= 2 ? 4 : 3) - s.extractors.filter((b) => !b.built).length;
-    if (room <= 0) return;
-    const res = g.teams[t].res;
-    const cands = s.freeNodes.filter((n) => this.inBuildReach(s.builtFobs, n));
-    const key = (n) => (n.type === 'bm' && this.bmMines < 2 ? -1 : res[n.type] / NEED[n.type]);
-    cands.sort((a, b) => key(a) - key(b) || dist(a.x, a.y, s.ax, s.ay) - dist(b.x, b.y, s.ax, s.ay));
-    for (const n of cands) {
-      if (room <= 0) break;
-      const c = extractorCenter(n);
-      if (!g.payerFor(t, c.x, c.y, BUILDINGS.extractor.cost)) continue; // kein Lager mit Baumaterial in Reichweite
-      const r = g.issue(t, { type: 'build', building: 'extractor', x: n.x, y: n.y });
-      if (r.ok) room--;
-    }
-  }
-
-  /**
-   * Fahrzeughalle: die erste ab 2 Förderanlagen. Weitere nur bei Geldüberschuss (> 1500) und genug
-   * Munition/Treibstoff, bis zur Grenze je Schwierigkeit (normal 2, schwer 3).
-   */
-  buildDepot(s) {
-    const g = this.game;
-    const t = this.team;
-    const res = g.teams[t].res;
-    if (!s.home || s.extBuilt < 2) return;
-    const have = s.own.filter((b) => b.type === 'depot').length;
-    // Erst expandieren (Baumaterial für Zonen-FOB), dann die Halle – außer die Expansion ist am Ende
-    const expanded = s.builtFobs.length >= 2 || s.fobs.length >= this.fobCap() || this.game.time > 360;
-    if (have < 1 && !expanded) return;
-    const rich = res.money > RICH && res.mun >= 200 && res.fuel >= 200 && s.extBuilt >= 4;
-    const want = Math.min(DEPOT_CAP[this.difficulty], have < 1 ? 1 : rich ? have + 1 : have);
-    if (have >= want || !this.canPay(BUILDINGS.depot.cost, have < 1 ? 0 : this.fobReserve(s))) return;
-    if (!s.home.store || s.home.store.bm < BUILDINGS.depot.cost.bm) return;
-    const p = this.findSite('depot', s.home.x, s.home.y, 130, 330, {
-      angle: Math.atan2(-s.dir.y, -s.dir.x), // hinter der Haupt-FOB
-      corridor: true,
-    });
-    if (p) g.issue(t, { type: 'build', building: 'depot', x: p.x, y: p.y });
-  }
-
   // ---- Produktion ------------------------------------------------------------------
 
-  /** Beste ausbildende Einrichtung für `type`: Lager deckt die Kosten, kürzeste Warteschlange, dann Zonennähe/ID. */
+  /** Ausbildende Einrichtung für `type` (nur die Haupt-FOB): kürzeste Warteschlange. */
   pickProducer(s, type, qmax, towardZone) {
-    const g = this.game;
-    const cost = UNITS[type].cost;
     let best = null;
     let bestKey = Infinity;
     for (const b of s.own) {
-      if (!b.built || !b.def.produces.includes(type) || b.queue.length >= qmax) continue;
-      const ok = b.type === 'fob' ? KEYS.every((k) => b.store[k] >= (cost[k] || 0)) : !!g.payerFor(this.team, b.x, b.y, cost);
-      if (!ok) continue;
+      if (!b.built || !b.produces.includes(type) || b.queue.length >= qmax) continue;
       const key = b.queue.length * 100000 + (towardZone ? dist(b.x, b.y, s.zone.x, s.zone.y) : b.id);
       if (key < bestKey) {
         bestKey = key;
@@ -556,8 +438,8 @@ export class AI {
   }
 
   /**
-   * Baufahrzeuge (Ersatz zuerst – ohne Baufahrzeug droht die Eliminierung), LKW, dann Kampfeinheiten nach Zielmischung.
-   * Eine Ausbildung zahlt aus dem Lager der ausbildenden FOB: Pendler bringen ihr Munition/Treibstoff.
+   * Baufahrzeuge (Ersatz zuerst – sie gründen FOBs und bauen Verteidigung), LKW, dann Kampfeinheiten nach Zielmischung.
+   * Einheiten kosten nur Geld; ausgebildet wird nur in der Haupt-FOB.
    */
   produce(s) {
     const g = this.game;
@@ -591,7 +473,7 @@ export class AI {
     const avail = new Set();
     for (const b of s.own) {
       if (!b.built || b.queue.length >= qmax) continue;
-      for (const u of b.def.produces) if (MIX[u]) avail.add(u);
+      for (const u of b.produces) if (MIX[u]) avail.add(u);
     }
     if (!avail.size) return;
     let sumW = 0;
@@ -600,7 +482,6 @@ export class AI {
     for (const u of avail) counts[u] = s.units.filter((x) => x.type === u).length + this.queued(s, u);
     let total = 0;
     for (const u of avail) total += counts[u];
-    let combatN = s.combatN;
 
     // Global nach Defizit: der wichtigste Typ bekommt die knappen Mittel. Fehlt er nur an Geld, wird gespart;
     // fehlt es nur im Lager der Produktionsstätten, kommt der nächste Typ dran (Pendler füllen auf).
@@ -611,7 +492,7 @@ export class AI {
       let pick = null;
       for (const e of entries) {
         const b = this.pickProducer(s, e.u, qmax, true);
-        if (b && this.canTrain(e.u, combatN)) {
+        if (b && this.canTrain(e.u)) {
           pick = { b, u: e.u };
           break;
         }
@@ -622,18 +503,17 @@ export class AI {
       if (!r.ok) break;
       counts[pick.u]++;
       total++;
-      combatN++;
     }
   }
 
   // ---- Verteidigungsgebäude und Mauer ---------------------------------------------
 
   /**
-   * Verteidigung erst mit Wirtschaftsbasis (≥ 6 fertige Förderanlagen und fertige Halle).
+   * Verteidigung, sobald eine vordere FOB steht (dort sind Mauern, Mörser und Flak sinnvoll).
    * Ausnahme: Angriff auf die Basis – dann genau eine Flugabwehr oder ein Mörser.
    */
   defenseMode(s) {
-    if (s.extBuilt >= 6 && s.depotBuilt) return 'full';
+    if (s.builtFobs.length >= 2) return 'full';
     if (s.alarm) return 'alarm';
     return null;
   }
@@ -646,7 +526,7 @@ export class AI {
     const mode = this.defenseMode(s);
     if (!mode) return;
     if (mode === 'alarm' && s.own.some((b) => b.type === 'mortar' || b.type === 'aa')) return;
-    if (s.own.filter((b) => !b.built && b.type !== 'extractor' && b.type !== 'fob').length >= 2) return; // Baufahrzeug ausgelastet
+    if (s.own.filter((b) => !b.built && b.type !== 'fob').length >= 2) return; // Baufahrzeug ausgelastet
     const z = s.zone;
     const fobs = [...s.builtFobs].sort((a, b) => dist(a.x, a.y, z.x, z.y) - dist(b.x, b.y, z.x, z.y));
     const toZone = Math.atan2(s.dir.y, s.dir.x);
@@ -654,7 +534,7 @@ export class AI {
     for (const f of fobs) {
       for (const type of ['aa', 'mortar']) {
         const have = s.own.some((b) => b.type === type && dist(b.x, b.y, f.x, f.y) < DEF_RANGE);
-        if (have || !this.canPay(BUILDINGS[type].cost, this.fobReserve(s) + 300)) continue;
+        if (have) continue;
         if (g.fobsInRadius(t, f.x, f.y).every((o) => o.store.bm < BUILDINGS[type].cost.bm || o.store.mun < BUILDINGS[type].cost.mun)) continue;
         const p = this.findSite(type, f.x, f.y, 130, 330, {
           angle: toZone,
@@ -677,7 +557,6 @@ export class AI {
     const t = this.team;
     const h = s.home;
     if (this.difficulty === 'easy' || !h || this.defenseMode(s) !== 'full') return;
-    if (!this.canPay(BUILDINGS.wall.cost, this.fobReserve(s) + 100)) return; // Mauern nur mit Reserve
     if (!this.once('wall', 10)) return;
 
     const grid = g.grid;
@@ -708,7 +587,7 @@ export class AI {
     const mx = (x1 + x2) / 2;
     const my = (y1 + y2) / 2;
     const ids = s.units
-      .filter((u) => u.type === 'rifleman' && u.order.type === 'idle' && !this.dryKind(u) && dist(u.x, u.y, mx, my) <= 700)
+      .filter((u) => u.type === 'rifleman' && u.order.type === 'idle' && !this.dryKind(u) && u.cargo.bm >= BUILDINGS.wall.cost.bm && dist(u.x, u.y, mx, my) <= 700)
       .sort((a, b) => dist(a.x, a.y, mx, my) - dist(b.x, b.y, mx, my) || a.id - b.id)
       .slice(0, 3)
       .map((u) => u.id);
@@ -738,7 +617,7 @@ export class AI {
     const ready = (b) => b.type !== 'fob' || b.supplied || b.store.bm >= FOB_COST || this.hasDelivery(s, b);
     const sites = s.own.filter((b) => !b.built && ready(b));
     if (!sites.length) return;
-    const prio = (b) => (b.type === 'fob' ? 0 : b.type === 'extractor' ? 1 : b.type === 'depot' ? 2 : 3);
+    const prio = (b) => (b.type === 'fob' ? 0 : 1);
     for (const u of s.engineers) {
       if (u.order.type !== 'idle') continue;
       let best = null;
@@ -793,12 +672,11 @@ export class AI {
     }
   }
 
-  /** Soll-Lagerstand einer FOB je Sorte: Zonen-FOB und Haupt-FOB (Ausbildung, Halle) brauchen am meisten. */
+  /** Soll-Lagerstand einer FOB je Sorte: die Zonen-FOB braucht am meisten (Mörser, Flak, Nachladen); die Haupt-FOB ist unendlich. */
   wantOf(s, f) {
-    const nodesFree = s.freeNodes.some((n) => dist(n.x, n.y, f.x, f.y) <= DEF_RANGE);
-    if (f === s.zoneFob) return { bm: nodesFree ? 250 : 150, mun: 250, fuel: 150 };
+    if (f === s.zoneFob) return { bm: 400, mun: 300, fuel: 150 };
     if (f === s.home) return { bm: 300, mun: 200, fuel: 200 };
-    return { bm: nodesFree ? 200 : 80, mun: 80, fuel: 60 };
+    return { bm: 300, mun: 150, fuel: 80 };
   }
 
   manageTrucks(s) {
@@ -969,7 +847,7 @@ export class AI {
     if (!s.home) return;
     const gp = this.gatherPoint(s);
     for (const b of s.own) {
-      if (!b.built || !b.def.produces.length) continue;
+      if (!b.built || !b.produces.length) continue;
       const prev = this.rallyAt.get(b.id);
       if (prev && dist(prev.x, prev.y, gp.x, gp.y) < RALLY_MOVE) continue;
       this.rallyAt.set(b.id, gp);
@@ -980,7 +858,7 @@ export class AI {
   /**
    * Angriff, sobald die Summe der idle Kampfeinheiten (Geldwert) die Schwelle erreicht
    * (bei unbesetzter Zone schon ab 60 %). Nicht zu Hause stehende Einheiten folgen dem Befehl.
-   * Keine Angriffe bei Munition unter AMMO_ATTACK; Einheiten mit fast leerem Vorrat bleiben zum Nachfüllen zurück.
+   * Einheiten mit fast leerem Vorrat bleiben zum Nachfüllen zurück.
    * In der Zone stehende Einheiten verteilen sich auf einem Kreis (r 400) statt im Zentrum zu klumpen.
    */
   army(s) {
@@ -990,7 +868,7 @@ export class AI {
     const idle = s.combat.filter((u) => u.order.type === 'idle' && !this.dryKind(u));
     if (!idle.length) return;
     const inZone = (u) => dist(u.x, u.y, z.x, z.y) <= z.r;
-    const ammoOk = g.teams[t].res.mun >= AMMO_ATTACK;
+    const ammoOk = true; // die Haupt-FOB hat unendlich Munition
 
     // Gegner in der Zone (sichtbar): deren Schwerpunkt ist das Ziel, sonst das Zonenzentrum
     const inside = s.enemies.filter((e) => dist(e.x, e.y, z.x, z.y) <= z.r);

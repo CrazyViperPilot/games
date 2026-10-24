@@ -254,7 +254,7 @@ function stepDropoff(game, h, dt) {
 
 // ---- Nachfüllen -------------------------------------------------------------------
 
-/** Quelle für Munition/Treibstoff: eigene fertige FOB im Bauradius mit Vorrat, sonst eigener LKW mit Ladung in Reichweite. */
+/** Quelle für Munition/Treibstoff/Baumaterial (Soldaten): eigene fertige FOB im Bauradius mit Vorrat, sonst eigener LKW mit Ladung in Reichweite. */
 function findSource(game, u, k) {
   const R = BALANCE.fob.buildRadius;
   for (const b of game.buildings) {
@@ -272,20 +272,21 @@ function findSource(game, u, k) {
 
 /** Füllt eine Sorte einer Einheit aus der Quelle nach (Rate je Sekunde × Takt, begrenzt durch Vorrat und Bedarf). */
 function feed(game, u, k, passDt) {
-  const max = k === 'mun' ? u.def.ammoMax : u.def.fuelMax;
-  const have = k === 'mun' ? u.ammo : u.fuel;
+  const max = k === 'mun' ? u.def.ammoMax : k === 'bm' ? u.def.bmCap : u.def.fuelMax;
+  const have = k === 'mun' ? u.ammo : k === 'bm' ? u.cargo.bm : u.fuel;
   const need = max - have;
   if (!(need > EPS)) return;
   const src = findSource(game, u, k);
   if (!src) return;
   const stock = src.kind === 'building' ? src.store : src.cargo;
-  const rate = k === 'mun' ? L.ammoRate : L.resupplyRate; // Munition fließt schneller (große Magazine)
+  const rate = k === 'mun' ? L.ammoRate : k === 'bm' ? L.bmRate : L.resupplyRate; // Munition fließt schneller (große Magazine)
   const amt = Math.min(rate * passDt, need, stock[k]);
   if (amt <= 0) return;
   stock[k] -= amt;
   if (k === 'mun') addAmmo(u, amt);
+  else if (k === 'bm') u.cargo.bm += amt;
   else u.fuel += amt;
-  game.teams[u.team].flow[k] += amt;
+  if (!src.infinite) game.teams[u.team].flow[k] += amt; // aus der unendlichen Haupt-FOB zählt nicht als Verbrauch
 }
 
 /** Nachfüllen aller Einheiten mit Bedarf; Verbrauch aus den Lagern wird als Rate je Team gemerkt. */
@@ -295,6 +296,7 @@ function resupply(game, passDt) {
     if (!u.alive) continue;
     if (u.def.ammoMax > 0) feed(game, u, 'mun', passDt);
     if (u.def.fuelMax > 0) feed(game, u, 'fuel', passDt);
+    if (u.def.bmCap > 0) feed(game, u, 'bm', passDt);
   }
   for (const t of game.teams) {
     for (const k of CARGO) t.flow[k] /= passDt;

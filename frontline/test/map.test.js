@@ -24,18 +24,12 @@ test('verschiedene Seeds erzeugen verschiedene Karten', () => {
   assert.notDeepStrictEqual(generateMap(10).obstacles, generateMap(1000).obstacles);
 });
 
-test('Hindernisse und Vorkommen sind punktsymmetrisch', () => {
+test('Hindernisse sind punktsymmetrisch', () => {
   const map = generateMap(3);
   for (const o of map.obstacles) {
     assert.ok(
       map.obstacles.some((p) => p.x === W - o.x && p.y === H - o.y && p.r === o.r),
       `kein Partner für Hindernis (${o.x}, ${o.y})`,
-    );
-  }
-  for (const n of map.nodes) {
-    assert.ok(
-      map.nodes.some((p) => p.type === n.type && p.x === W - n.x && p.y === H - n.y),
-      `kein Partner für Vorkommen ${n.id}`,
     );
   }
 });
@@ -49,29 +43,9 @@ test('Spawns liegen auf der Karte und sind punktsymmetrisch', () => {
   assert.deepStrictEqual(map.zone, { x: W / 2, y: H / 2, r: BALANCE.zone.r });
 });
 
-test('jeder Spawn hat je 3 Sorten im FOB-Radius', () => {
-  const map = generateMap(5);
-  for (const s of map.spawns) {
-    const types = new Set(
-      map.nodes
-        .filter((n) => Math.hypot(n.x - s.x, n.y - s.y) <= BALANCE.fob.buildRadius)
-        .map((n) => n.type),
-    );
-    assert.deepStrictEqual([...types].sort(), ['bm', 'fuel', 'mun']);
-  }
-});
-
-test('Vorkommen-IDs sind 1..n und haben Mindestabstand', () => {
+test('die Karte hat keine Ressourcenvorkommen mehr (Haupt-FOB hat unendlich Vorrat)', () => {
   const map = generateMap(6);
-  assert.equal(map.nodes.length, 6 + 2 * 12);
-  map.nodes.forEach((n, i) => assert.equal(n.id, i + 1));
-  for (let i = 0; i < map.nodes.length; i++) {
-    for (let j = i + 1; j < map.nodes.length; j++) {
-      const a = map.nodes[i];
-      const b = map.nodes[j];
-      assert.ok(Math.hypot(a.x - b.x, a.y - b.y) >= 250, `Vorkommen ${a.id} und ${b.id} zu nah`);
-    }
-  }
+  assert.equal(map.nodes, undefined);
 });
 
 test('Spawns sind von der Zone aus über Wege erreichbar', () => {

@@ -1,7 +1,8 @@
 // Einheitenwerte (PLAN.md §3.2, §11.2, §11.8).
 // weapons: Waffen mit rounds (Schuss im Vorrat), munCost (Munition aus dem FOB-Lager je Schuss beim Nachladen), cooldown, damage nach Panzerklasse,
 // optional targets (Klassen, gegen die diese Waffe bevorzugt wird). Daraus entstehen range, damage (bester Wert je Klasse) und ammoMax.
-// cost: fehlende Schlüssel = 0. producedAt: Gebäudetyp, hotkey: Taste im Ausbildungsmenü.
+// cost: fehlende Schlüssel = 0. Alle Einheiten entstehen in der Haupt-FOB; hotkey: Taste im Ausbildungsmenü.
+// buildTime: Ausbildungsrate der Haupt-FOB in Sekunden (eine Ausbildung nach der anderen).
 // fuelMax: Treibstoffvorrat. Alle Einheiten kosten nur Geld und starten voll munitioniert und betankt.
 // builder: 'all' = darf alle Gebäude bauen und reparieren, 'fort' = nur Mauer und Tor, fehlt = kein Bauen.
 export const UNITS = {
@@ -18,10 +19,11 @@ export const UNITS = {
       { id: 'rifle', name: 'Gewehr', range: 200, cooldown: 1.0, rounds: 60, munCost: 1 / 30, damage: { inf: 12, light: 3, heavy: 1, struct: 4, air: 3 } },
     ],
     cost: { money: 60 },
-    buildTime: 8,
+    buildTime: 5,
     producedAt: 'fob',
     fuelPerSec: 0,
     builder: 'fort',
+    bmCap: 50, // Soldaten tragen wenig Baumaterial und bauen daraus Mauern und Tore (im Bauradius einer FOB)
     canRide: true,
     hotkey: 'Q',
   },
@@ -37,10 +39,11 @@ export const UNITS = {
       { id: 'rpg', name: 'RPG', range: 240, cooldown: 3.0, rounds: 5, munCost: 10, damage: { inf: 10, light: 90, heavy: 120, struct: 60, air: 40 } },
     ],
     cost: { money: 120 },
-    buildTime: 12,
+    buildTime: 8,
     producedAt: 'fob',
     fuelPerSec: 0,
     builder: 'fort',
+    bmCap: 50,
     canRide: true,
     hotkey: 'W',
   },
@@ -55,7 +58,7 @@ export const UNITS = {
     cooldown: 0,
     damage: null,
     cost: { money: 80 },
-    buildTime: 10,
+    buildTime: 6,
     producedAt: 'fob',
     ammoPerShot: 0,
     fuelPerSec: 0.2,
@@ -74,7 +77,7 @@ export const UNITS = {
     cooldown: 0,
     damage: null,
     cost: { money: 150 },
-    buildTime: 15,
+    buildTime: 9,
     producedAt: 'fob',
     ammoPerShot: 0,
     fuelPerSec: 0.3,
@@ -96,11 +99,11 @@ export const UNITS = {
       { id: 'mg', name: 'MG', range: 220, cooldown: 0.25, rounds: 300, munCost: 5, damage: { inf: 9, light: 3, heavy: 1, struct: 3, air: 6 } },
     ],
     cost: { money: 250 },
-    buildTime: 20,
-    producedAt: 'depot',
+    buildTime: 12,
+    producedAt: 'fob',
     fuelPerSec: 0.4,
     fuelMax: 40,
-    hotkey: 'Q',
+    hotkey: 'A',
   },
   tank: {
     name: 'Kampfpanzer',
@@ -115,11 +118,11 @@ export const UNITS = {
       { id: 'mg', name: 'MG', range: 220, cooldown: 0.25, rounds: 300, munCost: 5, damage: { inf: 10, light: 3, heavy: 0, struct: 2, air: 3 } },
     ],
     cost: { money: 500 },
-    buildTime: 35,
-    producedAt: 'depot',
+    buildTime: 20,
+    producedAt: 'fob',
     fuelPerSec: 0.6,
     fuelMax: 60,
-    hotkey: 'W',
+    hotkey: 'S',
   },
   // Hubschrauber (armor 'air'): fliegen geradeaus über alles, nur Flugabwehr und leichte Waffen schaden ihnen.
   // seats: Passagiere (Infanterie/Baufahrzeug mit canRide), cargoCap: Ressourcenladung wie ein LKW.
@@ -135,13 +138,13 @@ export const UNITS = {
     cooldown: 0,
     damage: null,
     cost: { money: 350 },
-    buildTime: 25,
-    producedAt: 'helipad',
+    buildTime: 15,
+    producedAt: 'fob',
     ammoPerShot: 0,
     fuelPerSec: 0.5,
     fuelMax: 60,
     seats: 5,
-    hotkey: 'Q',
+    hotkey: 'D',
   },
   transporter: {
     name: 'Transporthubschrauber',
@@ -155,14 +158,14 @@ export const UNITS = {
     cooldown: 0,
     damage: null,
     cost: { money: 600 },
-    buildTime: 35,
-    producedAt: 'helipad',
+    buildTime: 20,
+    producedAt: 'fob',
     ammoPerShot: 0,
     fuelPerSec: 0.7,
     fuelMax: 90,
     seats: 9,
     cargoCap: 400,
-    hotkey: 'W',
+    hotkey: 'F',
   },
   gunship: {
     name: 'Kampfhubschrauber',
@@ -178,11 +181,11 @@ export const UNITS = {
       { id: 'rocket', name: 'Raketen', range: 340, cooldown: 3, rounds: 10, munCost: 100, targets: ['heavy', 'struct', 'air'], damage: { inf: 40, light: 120, heavy: 220, struct: 120, air: 150 } },
     ],
     cost: { money: 900 },
-    buildTime: 45,
-    producedAt: 'helipad',
+    buildTime: 28,
+    producedAt: 'fob',
     fuelPerSec: 0.8,
     fuelMax: 70,
-    hotkey: 'E',
+    hotkey: 'G',
   },
 };
 

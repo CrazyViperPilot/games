@@ -3,7 +3,7 @@
 import { BALANCE } from '../data/balance.js';
 import { buildTerrain } from './terrain.js';
 import { makeFogLayer, updateFogLayer } from './renderer.js';
-import { NODE_COLOR, hexA } from './sprites.js';
+import { hexA } from './sprites.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
@@ -85,14 +85,6 @@ export class Minimap {
     ctx.strokeStyle = hexA('#ffb060', 0.9);
     ctx.lineWidth = 1.2 * px;
     ctx.stroke();
-
-    // Vorkommen
-    for (const n of g.map.nodes) {
-      ctx.fillStyle = NODE_COLOR[n.type] || '#888';
-      ctx.beginPath();
-      ctx.arc(n.x, n.y, 2.2 * px, 0, Math.PI * 2);
-      ctx.fill();
-    }
 
     // Gebäude (eigene immer, fremde wenn erkundet); mindestens ca. 2,5 CSS-Pixel groß
     for (const b of g.buildings) {

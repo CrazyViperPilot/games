@@ -23,6 +23,33 @@ function loadIso() {
     return false;
   }
 }
+// Kasse: Das Geld des Spielers bleibt von Runde zu Runde (localStorage); beide Teams starten mit demselben Betrag.
+const WALLET_KEY = 'frontline-kasse';
+function loadWallet() {
+  if (DEBUG) return BALANCE.startRes.money;
+  try {
+    const v = Number.parseInt(localStorage.getItem(WALLET_KEY), 10);
+    if (Number.isFinite(v)) return Math.min(BALANCE.walletMax, Math.max(BALANCE.startRes.money, v));
+  } catch {
+    /* ohne Speicher: Startgeld */
+  }
+  return BALANCE.startRes.money;
+}
+function saveWallet(v) {
+  if (DEBUG) return;
+  try {
+    localStorage.setItem(WALLET_KEY, String(Math.min(BALANCE.walletMax, Math.max(0, Math.floor(v)))));
+  } catch {
+    /* ohne Speicher: gilt nur für diese Sitzung */
+  }
+}
+function resetWallet() {
+  try {
+    localStorage.removeItem(WALLET_KEY);
+  } catch {
+    /* nichts zu tun */
+  }
+}
 const URL_SEED = Number.parseInt(params.get('seed'), 10);
 const URL_SPEED = Number.parseFloat(params.get('speed'));
 const SPEEDS = DEBUG ? [1, 2, 3, 5, 10] : [1, 2, 3];
@@ -66,7 +93,7 @@ function stopSession() {
 
 function quitToMenu() {
   stopSession();
-  showStartMenu(overlay, startGame);
+  showStartMenu(overlay, startGame, { wallet: loadWallet, resetWallet });
 }
 
 /** Aktionen für Hilfe, Tastatur und HUD. */
@@ -145,8 +172,7 @@ const app = {
     if (!DEBUG || !s) return;
     const team = s.game.teams[HUMAN];
     team.res.money += 1000;
-    s.game.setStock(HUMAN, { bm: team.res.bm + 1000, mun: team.res.mun + 1000, fuel: team.res.fuel + 1000 });
-    s.hud.pushMessage('Debug: +1000 aller Ressourcen');
+    s.hud.pushMessage('Debug: +1000 Geld');
   },
 };
 
@@ -174,6 +200,7 @@ function frame(s) {
   const g = s.game;
   if (g.winner !== null && !s.ended) {
     s.ended = true;
+    saveWallet(g.teams[HUMAN].res.money);
     showEnd(
       overlay,
       {
@@ -193,7 +220,7 @@ function startGame(opts) {
   hideOverlay(overlay);
 
   const seed = Number.isFinite(URL_SEED) ? URL_SEED : Math.floor(Math.random() * 1e9) + 1;
-  const game = new Game({ seed, winPoints: opts.winPoints });
+  const game = new Game({ seed, winPoints: opts.winPoints, startMoney: loadWallet() });
   const ai = new AI(game, AI_TEAM, opts.difficulty);
   const camera = new Camera(BALANCE.map.width, BALANCE.map.height);
   camera.iso = loadIso();

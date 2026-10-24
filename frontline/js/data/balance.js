@@ -3,13 +3,15 @@ export const BALANCE = {
   map: { width: 9024, height: 9024, tile: 32 },
   tickRate: 20, // Simulationsschritte/s
   winPoints: 100,
+  walletMax: 5000, // Obergrenze der Kasse, die von Runde zu Runde bleibt
   pointInterval: 30,
-  startRes: { money: 800, bm: 1000, mun: 400, fuel: 400 }, // bm/mun/fuel = Lager der Start-FOB
+  startRes: { money: 800 }, // Startgeld; die Haupt-FOB hat unendlich Baumaterial, Munition und Treibstoff
   startUnits: ['truck', 'engineer', 'rifleman', 'rifleman', 'rifleman', 'rifleman'],
-  zone: { r: 3300, controlIncome: 6, unitIncome: 0.25, unitIncomeCap: 30 },
+  zone: { r: 3300, controlIncome: 10, unitIncome: 0.25, unitIncomeCap: 30 },
   // Hot Zone: kleiner Kreis in der Konfliktzone, wandert zufällig oder zu aktiven Bohrern
   hot: { r: 300, speed: 40, wanderSpeed: 40 / 3, income: 8, wanderMin: 25, wanderMax: 45 },
-  fob: { buildRadius: 450, minDistOwn: 500, minDistEnemy: 700, max: 6, income: 5 },
+  // Bauradien eigener FOBs dürfen sich nicht überlappen (minDistOwn = 2 × buildRadius); höchstens 10 FOBs mit der Haupt-FOB
+  fob: { buildRadius: 450, minDistOwn: 900, minDistEnemy: 700, max: 10 },
   queueMax: 5,
   shortageWarn: 20, // s zwischen zwei Meldungen je Sorte und Team
   fuelSlowMul: 0.25, // Tempo von Fahrzeugen ohne Treibstoff
@@ -20,11 +22,12 @@ export const BALANCE = {
   leash: 300, // Idle-Einheiten verfolgen max. so weit vom Ankerpunkt
   // Logistik (§11.1–11.3)
   logistics: {
-    storeCap: 3000, // Obergrenze je Sorte und FOB-Lager
+    storeCap: 3000, // Obergrenze je Sorte und FOB-Lager (die Haupt-FOB wird darauf immer wieder aufgefüllt)
     truckCapacity: 400, // Ladung eines LKW (Summe)
     transferRate: 100, // Laden/Entladen je s
     transferReach: 140, // LKW muss so nah an der FOB-Mitte stehen
     resupplyRate: 4, // Nachfüllen Treibstoff je s und Einheit
+    bmRate: 20, // Nachfüllen Baumaterial der Soldaten je s (bmCap)
     ammoRate: 60, // Nachfüllen Munition je s und Einheit (Lagereinheiten; Waffen füllen der Reihe nach)
     resupplyInterval: 0.5, // Takt des Nachfüllens (s)
     truckSupplyRange: 180, // Nachfüllen/Mauerbau aus LKW-Ladung

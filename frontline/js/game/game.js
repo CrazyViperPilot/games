@@ -38,6 +38,20 @@ function takeStock(e, cost) {
   for (const k of STOCK_KEYS) stock[k] -= cost[k] || 0;
 }
 
+/** Tragen alle diese Bauer nur Baumaterial (Soldaten)? Dann zahlen sie Mauern und Tore aus ihrer Ladung. */
+const paysCarried = (list) => list.length > 0 && list.every((u) => u.def.builder === 'fort');
+const carriedBm = (list) => list.reduce((n, u) => n + u.cargo.bm, 0);
+function takeCarried(list, bm) {
+  let left = bm;
+  for (const u of list) {
+    const t = Math.min(u.cargo.bm, left);
+    u.cargo.bm -= t;
+    left -= t;
+    if (left <= 1e-9) break;
+  }
+}
+const NO_CARRIED = 'Zu wenig getragenes Baumaterial (Soldaten laden es in einer FOB)';
+
 /** Zellen einer Geraden zwischen zwei Zellen (Bresenham, inklusive Endpunkte). */
 function lineCells(c0, r0, c1, r1) {
   const out = [];
@@ -65,7 +79,7 @@ function lineCells(c0, r0, c1, r1) {
 }
 
 export class Game {
-  constructor({ seed = 1, winPoints = BALANCE.winPoints } = {}) {
+  constructor({ seed = 1, winPoints = BALANCE.winPoints, startMoney = BALANCE.startRes.money } = {}) {
     this.seed = seed;
     this.rng = makeRng(seed);
     this.map = generateMap(seed);
@@ -73,7 +87,6 @@ export class Game {
     this.grid.rasterizeObstacles(this.map.obstacles);
     this.grid.rasterizeRects(this.map.town?.buildings ?? []);
     this.grid.rasterizeTrees([...(this.map.town?.trees ?? []), ...(this.map.trees ?? [])]);
-    this.nodeById = new Map(this.map.nodes.map((n) => [n.id, n]));
 
     this.time = 0;
     this.nextId = 1;
@@ -94,7 +107,7 @@ export class Game {
         id,
         name: BALANCE.teamNames[id],
         color: BALANCE.teamColors[id],
-        res: { money: BALANCE.startRes.money }, // bm/mun/fuel: unten als Getter
+        res: { money: startMoney }, // bm/mun/fuel: unten als Getter (Summe der Front-Lager ohne Haupt-FOB)
         income: zeroRes(),
         rate: zeroRes(),
         flow: { bm: 0, mun: 0, fuel: 0 }, // Verbrauch aus Lagern je s (Nachfüllen)
@@ -116,11 +129,10 @@ export class Game {
     this.hot = createHot(this);
     this.fog = [new Fog(W, H), new Fog(W, H)];
 
-    // Startzustand: je Team eine fertige FOB auf dem Spawn (Lager = startRes), Startunits im Halbkreis davor
+    // Startzustand: je Team die Haupt-FOB auf dem Spawn (unendlicher Vorrat), Startunits im Halbkreis davor
     for (let t = 0; t < 2; t++) {
       const sp = this.map.spawns[t];
-      const fob = this.spawnBuilding('fob', t, this.grid.toCell(sp.x) - 1, this.grid.toCell(sp.y) - 1, { built: true });
-      fob.store = { bm: BALANCE.startRes.bm, mun: BALANCE.startRes.mun, fuel: BALANCE.startRes.fuel };
+      this.spawnBuilding('fob', t, this.grid.toCell(sp.x) - 1, this.grid.toCell(sp.y) - 1, { built: true, main: true });
       const ang0 = Math.atan2(H / 2 - sp.y, W / 2 - sp.x);
       const n = BALANCE.startUnits.length;
       BALANCE.startUnits.forEach((type, i) => {
@@ -188,24 +200,6 @@ export class Game {
     for (let t = 0; t < this.teams.length; t++) this.fog[t].update(this, t);
   }
 
-  /** Vorkommen im Umkreis r (Standard 32) des Punktes: das nächste oder null. */
-  nodeAt(x, y, r = 32) {
-    let best = null;
-    let bestD = r;
-    for (const n of this.map.nodes) {
-      const d = dist(n.x, n.y, x, y);
-      if (d <= bestD) {
-        best = n;
-        bestD = d;
-      }
-    }
-    return best;
-  }
-
-  extractorOn(nodeId) {
-    return this.buildings.some((b) => b.alive && b.nodeId === nodeId);
-  }
-
   /** Lebende Entities, deren Mittelpunkt im Kreis liegt (Gebäude: plus halbe Größe). */
   query(x, y, r, filter = null) {
     const out = [];
@@ -223,21 +217,26 @@ export class Game {
 
   // ---- Lager, Zahlung, Versorgung ----------------------------------------------------
 
-  /** Summe einer Sorte über alle fertigen eigenen FOB-Lager (Getter von team.res). */
+  /** Summe einer Sorte über die Lager aller fertigen eigenen FOBs außer der Haupt-FOB (Getter von team.res: das Front-Lager). */
   stockOf(team, k) {
     let sum = 0;
     for (const b of this.buildings) {
-      if (b.alive && b.built && b.team === team && b.type === 'fob') sum += b.store[k];
+      if (b.alive && b.built && b.team === team && b.type === 'fob' && !b.infinite) sum += b.store[k];
     }
     return sum;
   }
 
+  /** Haupt-FOB des Teams (lebend) oder null. */
+  mainFob(team) {
+    return this.buildings.find((b) => b.alive && b.team === team && b.main) ?? null;
+  }
+
   /**
-   * Testhilfe: setzt das Lager der Haupt-FOB (älteste fertige) auf {bm, mun, fuel} (fehlende Sorten = 0)
-   * und leert die übrigen fertigen FOB-Lager.
+   * Testhilfe: setzt das Lager der ersten fertigen FOB ohne Haupt-FOB auf {bm, mun, fuel} (fehlende Sorten = 0)
+   * und leert die übrigen Front-Lager. Die Haupt-FOB bleibt unverändert (unendlich).
    */
   setStock(team, vals) {
-    const fobs = this.buildings.filter((b) => b.alive && b.built && b.team === team && b.type === 'fob');
+    const fobs = this.buildings.filter((b) => b.alive && b.built && b.team === team && b.type === 'fob' && !b.infinite);
     fobs.forEach((f, i) => {
       for (const k of STOCK_KEYS) f.store[k] = i === 0 ? vals[k] || 0 : 0;
     });
@@ -363,10 +362,15 @@ export class Game {
   }
 
   /** Gebäude an Zelle (cx, cy) anlegen und Fußabdruck belegen. Ohne Kostenprüfung (für Befehle und Tests). */
-  spawnBuilding(type, team, cx, cy, { built = true, nodeId = null, payerId = null } = {}) {
+  spawnBuilding(type, team, cx, cy, { built = true, main = false, payerId = null } = {}) {
     const id = this.newId();
     const b = createBuilding(id, type, team, cx, cy, TILE);
-    b.nodeId = nodeId;
+    if (main) {
+      b.main = true;
+      b.infinite = true;
+      b.produces = b.def.produces;
+      for (const k of STOCK_KEYS) b.store[k] = BALANCE.logistics.storeCap;
+    }
     b.payerId = payerId;
     if (built) {
       b.built = true;
@@ -383,34 +387,23 @@ export class Game {
 
   /**
    * Prüft, ob Gebäude `type` mit Mitte (x, y) gebaut werden darf.
-   * Liefert { ok, reason, cx, cy, x, y, nodeId, payer } (x, y = Mitte des Fußabdrucks).
+   * Liefert { ok, reason, cx, cy, x, y, payer } (x, y = Mitte des Fußabdrucks).
    * payer = { kind: 'fob'|'truck', id } – wer die Sorten zahlt (null bei FOB-Baustellen).
    * Mauer/Tor außerhalb eines FOB-Radius: eigener LKW mit Ladung ≤ truckSupplyRange.
+   * carried: Soldaten zahlen aus ihrem getragenen Baumaterial (nur Mauer/Tor, nur im Bauradius einer FOB; kein Lager zahlt).
    */
-  canPlace(team, type, x, y) {
+  canPlace(team, type, x, y, { carried = false } = {}) {
     const def = BUILDINGS[type];
     const g = this.grid;
     if (!def) return { ok: false, reason: 'Unbekanntes Gebäude' };
 
-    let px = x;
-    let py = y;
-    let nodeId = null;
-    if (def.yields) {
-      const node = this.nodeAt(x, y, 32);
-      if (!node) return { ok: false, reason: 'Förderanlage nur auf einem Ressourcenvorkommen' };
-      if (this.extractorOn(node.id)) return { ok: false, reason: 'Dieses Vorkommen ist bereits gefördert' };
-      px = node.x;
-      py = node.y;
-      nodeId = node.id;
-    } else if (this.nodeAt(x, y, 48)) {
-      return { ok: false, reason: 'Auf einem Ressourcenvorkommen nur eine Förderanlage' };
-    }
-
+    const px = x;
+    const py = y;
     const cx = g.toCell(px) - Math.floor(def.w / 2);
     const cy = g.toCell(py) - Math.floor(def.h / 2);
     const mx = (cx + def.w / 2) * TILE;
     const my = (cy + def.h / 2) * TILE;
-    const bad = (reason) => ({ ok: false, reason, cx, cy, x: mx, y: my, nodeId, payer: null });
+    const bad = (reason) => ({ ok: false, reason, cx, cy, x: mx, y: my, payer: null });
 
     for (let r = cy; r < cy + def.h; r++) {
       for (let c = cx; c < cx + def.w; c++) {
@@ -446,10 +439,11 @@ export class Game {
         }
       }
     } else if (this.fobsInRadius(team, mx, my).length) {
+      if (carried) return { ok: true, reason: null, cx, cy, x: mx, y: my, payer: null };
       const f = this.payerFor(team, mx, my, def.cost);
       if (!f) return bad(this.stockReason(team, mx, my, def.cost));
       payer = { kind: 'fob', id: f.id };
-    } else if (WALL_TYPES.has(type)) {
+    } else if (WALL_TYPES.has(type) && !carried) {
       const tr = this.truckPayer(team, mx, my, def.cost);
       if (!tr) return bad('Außerhalb des Bauradius einer eigenen FOB');
       payer = { kind: 'truck', id: tr.id };
@@ -457,7 +451,7 @@ export class Game {
       return bad('Außerhalb des Bauradius einer eigenen FOB');
     }
 
-    return { ok: true, reason: null, cx, cy, x: mx, y: my, nodeId, payer };
+    return { ok: true, reason: null, cx, cy, x: mx, y: my, payer };
   }
 
   // ---- Befehle ------------------------------------------------------------------
@@ -615,13 +609,16 @@ export class Game {
     if (!def || def.buildable === false) return fail('Dieses Gebäude kann nicht gebaut werden');
     const pick = this.pickBuilders(team, cmd.ids, cmd.building);
     if (pick.reason) return fail(pick.reason);
-    const p = this.canPlace(team, cmd.building, cmd.x, cmd.y);
+    const carried = paysCarried(pick.list);
+    const p = this.canPlace(team, cmd.building, cmd.x, cmd.y, { carried });
     if (!p.ok) return fail(p.reason);
     if (!this.canAfford(team, def.cost)) return fail(this.missingMoney());
+    if (carried && carriedBm(pick.list) < (def.cost.bm || 0)) return fail(NO_CARRIED);
     this.pay(team, def.cost);
     const payer = p.payer ? this.getEntity(p.payer.id) : null;
     if (payer) takeStock(payer, def.cost);
-    const b = this.spawnBuilding(cmd.building, team, p.cx, p.cy, { built: false, nodeId: p.nodeId, payerId: payer ? payer.id : null });
+    else if (carried) takeCarried(pick.list, def.cost.bm || 0);
+    const b = this.spawnBuilding(cmd.building, team, p.cx, p.cy, { built: false, payerId: payer ? payer.id : null });
     for (const u of pick.list) orderBuild(u, b);
     return { ok: true, id: b.id };
   }
@@ -635,9 +632,10 @@ export class Game {
     const g = this.grid;
     const cells = lineCells(g.toCell(cmd.x1), g.toCell(cmd.y1), g.toCell(cmd.x2), g.toCell(cmd.y2));
     const sites = [];
+    const carried = paysCarried(pick.list);
     let lastReason = 'Keine Zelle baubar';
     for (const [c, r] of cells) {
-      const p = this.canPlace(team, cmd.building, g.center(c), g.center(r));
+      const p = this.canPlace(team, cmd.building, g.center(c), g.center(r), { carried });
       if (!p.ok) {
         lastReason = p.reason;
         continue;
@@ -646,10 +644,15 @@ export class Game {
         lastReason = this.missingMoney();
         break;
       }
+      if (carried && carriedBm(pick.list) < (def.cost.bm || 0)) {
+        lastReason = NO_CARRIED;
+        break;
+      }
       this.pay(team, def.cost);
-      const payer = this.getEntity(p.payer.id);
-      takeStock(payer, def.cost);
-      sites.push(this.spawnBuilding(cmd.building, team, p.cx, p.cy, { built: false, payerId: payer.id }));
+      const payer = p.payer ? this.getEntity(p.payer.id) : null;
+      if (payer) takeStock(payer, def.cost);
+      else if (carried) takeCarried(pick.list, def.cost.bm || 0);
+      sites.push(this.spawnBuilding(cmd.building, team, p.cx, p.cy, { built: false, payerId: payer ? payer.id : null }));
     }
     if (sites.length === 0) return fail(lastReason);
     if (pick.list.length) orderBuildSeq(pick.list, sites);
@@ -709,22 +712,19 @@ export class Game {
     return { ok: true, count: n };
   }
 
-  /** { type: 'train', buildingId, unit }: FOB zahlt aus eigenem Lager, Halle aus der FOB in Reichweite. */
+  /** { type: 'train', buildingId, unit }: nur die Haupt-FOB; Einheiten kosten nur Geld. */
   cmdTrain(team, cmd) {
     const b = this.getEntity(cmd.buildingId);
     if (!b || b.kind !== 'building' || b.team !== team) return fail('Kein eigenes Gebäude gewählt');
     if (!b.built) return fail('Gebäude ist noch im Bau');
-    if (!UNITS[cmd.unit] || !b.def.produces.includes(cmd.unit)) return fail('Dieses Gebäude bildet diese Einheit nicht aus');
+    if (!UNITS[cmd.unit] || !b.produces.includes(cmd.unit)) return fail('Nur die Haupt-FOB bildet Einheiten aus');
     if (b.queue.length >= BALANCE.queueMax) return fail('Warteschlange ist voll');
     if (this.unitCount(team) >= BALANCE.unitCap) return fail(`Einheitenlimit erreicht (${BALANCE.unitCap})`);
     const cost = UNITS[cmd.unit].cost;
     if (!this.canAfford(team, cost)) return fail(this.missingMoney());
-    const payer = b.type === 'fob' ? (covers(b.store, cost) ? b : null) : this.payerFor(team, b.x, b.y, cost);
-    if (!payer) return fail(this.stockReason(team, b.x, b.y, cost));
     this.pay(team, cost);
-    takeStock(payer, cost);
     if (b.queue.length === 0) b.queueTime = 0;
-    b.queue.push({ unit: cmd.unit, payerId: payer.id });
+    b.queue.push({ unit: cmd.unit, payerId: b.id });
     return { ok: true };
   }
 
@@ -765,6 +765,7 @@ export class Game {
   cmdDemolish(team, cmd) {
     const b = this.getEntity(cmd.buildingId);
     if (!b || b.kind !== 'building' || b.team !== team) return fail('Kein eigenes Gebäude gewählt');
+    if (b.main) return fail('Die Haupt-FOB kann nicht abgerissen werden');
     const factor = b.built ? BALANCE.demolishRefund : 1;
     const stock = { bm: b.store.bm, mun: b.store.mun, fuel: b.store.fuel };
     b.demolished = true;
@@ -790,16 +791,10 @@ export class Game {
     this.message(-1, `${BALANCE.teamNames[winner]} gewinnt ${how}`);
   }
 
-  /** Team ohne FOB (auch Baustellen zählen) und ohne Baufahrzeug verliert. */
+  /** Fällt die Haupt-FOB eines Teams, ist es verloren (nur sie bildet Einheiten aus). */
   checkElimination() {
     const lost = [];
-    for (let t = 0; t < 2; t++) {
-      const hasFob = this.buildings.some((b) => b.alive && b.team === t && b.type === 'fob');
-      const hasEngineer = this.units.some(
-        (u) => u.alive && u.team === t && (u.type === 'engineer' || u.passengers.some((p) => p.type === 'engineer')),
-      );
-      if (!hasFob && !hasEngineer) lost.push(t);
-    }
+    for (let t = 0; t < 2; t++) if (!this.mainFob(t)) lost.push(t);
     if (lost.length === 0) return;
     const winner = lost.length === 1 ? 1 - lost[0] : this.teams[0].points >= this.teams[1].points ? 0 : 1;
     this.endGame(winner, 'eliminated');

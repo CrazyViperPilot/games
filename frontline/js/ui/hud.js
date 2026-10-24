@@ -6,10 +6,10 @@ import { lacksAmmo } from '../game/entities.js';
 import { builderState, fobLabel, orderText } from './status.js';
 
 const RES_KEYS = ['money', 'bm', 'mun', 'fuel'];
+const SHORT_RES = { bm: 'BM', mun: 'MUN', fuel: 'TS' }; // Front-Lager: Summe der FOB-Lager ohne Haupt-FOB
 const MSG_LIFE = 6000; // ms
 const MSG_MAX = 5;
 const DOM_EVERY = 200; // ms
-const NODE_NAME = { bm: 'Baumaterial', mun: 'Munition', fuel: 'Treibstoff' };
 const NEG_COLOR = '#e5484d'; // Verbrauch (negative Netto-Rate)
 const COLOR = { bm: '#a0703f', mun: '#7f93ad', fuel: '#9b7bc4', cargo: '#c9a227' };
 const PRESET_NAME = { mix: 'Gemischt', bm: 'Baumaterial', mun: 'Munition', fuel: 'Treibstoff' };
@@ -93,7 +93,7 @@ export class Hud {
     const g = this.game;
     const res = RES_KEYS.map(
       (k) =>
-        `<div class="res res-${k}" data-res="${k}"><i class="dot"></i><span class="lbl">${BALANCE.resNames[k]}</span>` +
+        `<div class="res res-${k}" data-res="${k}"><i class="dot"></i><span class="lbl">${k === 'money' ? BALANCE.resNames[k] : `Front ${SHORT_RES[k]}`}</span>` +
         `<b class="val">0</b><small class="rate">+0/s</small></div>`,
     ).join('');
     const pts = [0, 1]
@@ -184,7 +184,7 @@ export class Hud {
       el.rate.textContent = `${neg ? '−' : '+'}${fmtRate(Math.abs(v))}/s`;
       el.rate.style.color = neg ? NEG_COLOR : '';
       // Lagersorten: Summe aller fertigen FOB-Lager; Geld ist global
-      const lines = [k === 'money' ? 'Geld (global, nicht pro FOB)' : 'Summe aller FOB-Lager'];
+      const lines = [k === 'money' ? 'Geld (global): nur aus Konfliktzone und Hot Zone, bleibt von Runde zu Runde' : 'Front-Lager: Summe der FOB-Lager ohne Haupt-FOB (die hat unendlich)'];
       if (t.used[k] !== undefined) lines.push(`verbraucht: ${Math.floor(t.used[k])}`);
       const tip = lines.join('\n');
       if (el.box.title !== tip) el.box.title = tip;
@@ -258,6 +258,10 @@ export class Hud {
       h += `<div class="muted small">Nachladen in der FOB: ${Math.ceil(u.def.ammoMax - u.ammo)} Munition fehlen</div>`;
       if (lacksAmmo(u)) h += `<div class="warn small">Keine Munition – feuert nicht</div>`;
     }
+    if (u.def.bmCap) {
+      h += gauge('Baumaterial', Math.floor(u.cargo.bm), u.def.bmCap, COLOR.bm);
+      h += `<div class="muted small">Baut Mauern und Tore aus getragenem Baumaterial (nachladen in einer FOB)</div>`;
+    }
     if (u.def.fuelMax) {
       h += gauge('Treibstoff', u.fuel, u.def.fuelMax, COLOR.fuel);
       if (u.fuel <= 0) h += `<div class="warn small">Kein Treibstoff – nur 25 % Tempo</div>`;
@@ -287,22 +291,14 @@ export class Hud {
     } else {
       h += '<div class="muted small">Einsatzbereit</div>';
     }
-    if (b.type === 'fob') {
+    if (b.type === 'fob' && b.infinite) {
+      h += '<div class="muted small lagerhead">Unendlich Baumaterial, Munition und Treibstoff · bildet alle Einheiten aus (nur gegen Geld)</div>';
+    } else if (b.type === 'fob') {
       h +=
-        '<div class="muted small lagerhead">Lager dieser FOB</div>' +
+        '<div class="muted small lagerhead">Lager dieser FOB (LKW füllen es aus der Haupt-FOB)</div>' +
         storeRow('BM', b.store.bm, STORE_CAP, COLOR.bm) +
         storeRow('MUN', b.store.mun, STORE_CAP, COLOR.mun) +
         storeRow('TS', b.store.fuel, STORE_CAP, COLOR.fuel);
-    }
-    if (b.type === 'extractor' && b.nodeId) {
-      const n = g.nodeById.get(b.nodeId);
-      if (n) h += `<div class="muted small">Fördert ${NODE_NAME[n.type]} · ${b.def.yields[n.type]}/s</div>`;
-      if (b.built) {
-        const sup = g.supplierOf(b);
-        h += sup
-          ? `<div class="muted small">Liefert an ${esc(fobLabel(g, sup))}</div>`
-          : `<div class="warn small">Keine FOB in Reichweite – ruht</div>`;
-      }
     }
     if (b.def.weapon && b.def.weapon.shell && b.built) {
       const w = b.def.weapon;

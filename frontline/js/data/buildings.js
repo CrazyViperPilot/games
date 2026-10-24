@@ -1,6 +1,6 @@
 // Gebäudewerte (PLAN.md §3.3). w, h in Zellen. Alle Gebäude haben Rüstung 'struct'.
 // Optional: weapon {range, minRange, cooldown, damage, splash, shell, ammoPerShot}, aa {range, cooldown, chance, ammoPerShot},
-// yields (nur Förderanlage), buildable (false = nur per LKW), blocksAll (Mauer), gate (Tor).
+// buildable (false = nur per LKW), blocksAll (Mauer), gate (Tor).
 // hotkey: Taste im Baumenü, null = keine.
 export const BUILDINGS = {
   fob: {
@@ -13,7 +13,8 @@ export const BUILDINGS = {
     cost: { bm: 400 },
     buildTime: 30,
     hotkey: null,
-    produces: ['rifleman', 'at', 'truck', 'engineer'],
+    // bildet nur die Haupt-FOB aus (entities.js: b.produces); alle anderen FOBs bilden nichts aus
+    produces: ['rifleman', 'at', 'truck', 'engineer', 'ifv', 'tank', 'littlebird', 'transporter', 'gunship'],
     weapon: {
       range: 220,
       minRange: 0,
@@ -24,31 +25,6 @@ export const BUILDINGS = {
       ammoPerShot: 0, // Basis wehrt sich immer
     },
     buildable: false,
-  },
-  depot: {
-    name: 'Fahrzeughalle',
-    armor: 'struct',
-    w: 3,
-    h: 3,
-    hp: 1500,
-    sight: 250,
-    cost: { bm: 300 },
-    buildTime: 25,
-    hotkey: 'Q',
-    produces: ['ifv', 'tank'],
-  },
-  extractor: {
-    name: 'Förderanlage',
-    armor: 'struct',
-    w: 2,
-    h: 2,
-    hp: 600,
-    sight: 200,
-    cost: { bm: 100 },
-    buildTime: 15,
-    hotkey: 'W',
-    produces: [],
-    yields: { bm: 8, mun: 8, fuel: 6 }, // Rate je Sekunde je Sorte des Vorkommens
   },
   wall: {
     name: 'Mauer',
@@ -118,18 +94,6 @@ export const BUILDINGS = {
       shell: false,
       ammoPerShot: 0.25,
     },
-  },
-  helipad: {
-    name: 'Hubschrauberlandeplatz',
-    armor: 'struct',
-    w: 3,
-    h: 3,
-    hp: 1200,
-    sight: 250,
-    cost: { bm: 350 },
-    buildTime: 28,
-    hotkey: 'G',
-    produces: ['littlebird', 'transporter', 'gunship'],
   },
   drill: {
     name: 'Bohrer',

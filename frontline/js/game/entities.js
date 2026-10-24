@@ -38,7 +38,7 @@ export function createUnit(id, type, team, x, y) {
     // Waffen mit eigenem Schussvorrat (rounds) und Abklingzeit (cd); `ammo` ist der Munitionswert aller Schüsse zusammen
     weapons: (def.weapons ?? []).map((spec) => ({ spec, rounds: spec.rounds, cd: 0 })),
     fuel: def.fuelMax ?? 0,
-    cargo: { bm: 0, mun: 0, fuel: 0 },
+    cargo: { bm: def.bmCap ?? 0, mun: 0, fuel: 0 }, // Soldaten starten mit vollem Baumaterial (bmCap)
     preset: 'mix', // LKW-Ladungsart: 'mix' | 'bm' | 'mun' | 'fuel'
     passengers: [], // Hubschrauber: eingestiegene Einheiten (alive = false, solange sie an Bord sind)
   };
@@ -80,7 +80,9 @@ export function lacksAmmo(u) {
 /**
  * Gebäude als Baustelle (built = false, hp = 10 %) oder fertig – je nach Aufrufer.
  * x, y = Mittelpunkt des Fußabdrucks; Sammelpunkt 2 Zellen unterhalb.
- * Zusätzliche Felder: nodeId (Förderanlage), store (FOB-Lager, Baustellen nutzen es ebenfalls),
+ * Zusätzliche Felder: main (Haupt-FOB: bildet alle Einheiten aus, Verlust = Niederlage), infinite (unendliches Lager; bei der Haupt-FOB),
+ * produces (ausbildbare Einheiten; nur die Haupt-FOB),
+ * store (FOB-Lager, Baustellen nutzen es ebenfalls),
  * payerId (Lager, aus dem bezahlt wurde – für Erstattung), supplied (FOB-Baustelle hat ihr Material),
  * warnTime (Meldungszeit „Baustelle wartet …“).
  */
@@ -114,7 +116,9 @@ export function createBuilding(id, type, team, cx, cy, tile) {
     cooldown: 0,
     aaCooldown: 0,
     scanTimer: (id % 5) * 0.05,
-    nodeId: null,
+    main: false,
+    infinite: false,
+    produces: type === 'fob' ? [] : def.produces,
     lastHitTime: -1e9,
     demolished: false,
     store: { bm: 0, mun: 0, fuel: 0 },

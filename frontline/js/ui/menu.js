@@ -15,13 +15,13 @@ const KEYS = [
   ['Rechtsklick auf FOB', 'LKW: leer laden, beladen entladen · Baufahrzeug: an Baustelle helfen, beschädigtes Gebäude reparieren'],
   ['A + Klick', 'Angriffsbewegung'],
   ['S', 'Stopp'],
-  ['B', 'Baumenü: Baufahrzeug alles (Q Fahrzeughalle, W Förderanlage, E Mauer, R Tor, T Mörser, Z Flak, F FOB-Baustelle) · Infanterie nur E Mauer, R Tor'],
-  ['Bauen', 'Gebäude brauchen einen Bauer daneben: Baufahrzeug oder Infanterie (nur Mauer/Tor)'],
-  ['Q / W / E / R', 'Ausbildung im gewählten Gebäude (FOB: Schütze, PAK, LKW, Baufahrzeug · Fahrzeughalle: SPz, KPz)'],
+  ['B', 'Baumenü: Baufahrzeug alles (E Mauer, R Tor, T Mörser, Z Flak, X Bohrer, F FOB-Baustelle) · Soldaten nur E Mauer, R Tor'],
+  ['Bauen', 'Gebäude brauchen einen Bauer daneben: Baufahrzeug oder Soldaten (nur Mauer/Tor, aus getragenem Baumaterial, im Bauradius einer FOB)'],
+  ['Haupt-FOB', 'Ausbildung (nur hier, nur gegen Geld): Q Schütze · W PAK · E LKW · R Baufahrzeug · A SPz · S KPz · D Little Bird · F Transporter · G AH-64'],
   ['L / U / T', 'LKW gewählt: Laden (dann FOB anklicken) · Entladen (FOB oder FOB-Baustelle) · Pendeln (Start-FOB, dann Ziel)'],
   ['Q / W / E / R', 'LKW gewählt: Ladungsart Gemischt · Baumaterial · Munition · Treibstoff'],
   ['Entf', 'Gebäude abreißen (25 % des Baumaterials zurück)'],
-  ['Lager', 'Jede FOB hat ein eigenes Lager. Förderanlagen liefern in die FOB in deren Radius · Gebäude bezahlt die FOB in Reichweite'],
+  ['Lager', 'Die Haupt-FOB hat unendlich Baumaterial, Munition und Treibstoff. Vordere FOBs haben ein eigenes Lager, das LKW füllen · Gebäude bezahlt die FOB in Reichweite · LKW versorgen Einheiten in der Nähe aus ihrer Ladung'],
   ['Munition', 'Jeder Schuss verbraucht Munition · ohne Vorrat feuern Einheiten nicht (FOB-MG kostet nichts)'],
   ['Treibstoff', 'Fahrzeuge verbrauchen Treibstoff nur beim Fahren · ohne Vorrat nur 25 % Tempo'],
   ['Esc', 'Abbrechen · Auswahl aufheben'],
@@ -56,7 +56,7 @@ export function hideOverlay(root) {
 }
 
 /** Startmenü: onStart({difficulty, winPoints}) beim Klick auf Start. */
-export function showStartMenu(root, onStart) {
+export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.money, resetWallet = () => {} } = {}) {
   let difficulty = 'normal';
   let winPoints = BALANCE.winPoints;
   show(
@@ -64,7 +64,7 @@ export function showStartMenu(root, onStart) {
     'start',
     `<section class="menu start">
       <h1 class="logo">FRONTLINE</h1>
-      <p class="tag">Echtzeit-Strategie · FOB bauen, Ressourcen fördern, Konfliktzone halten</p>
+      <p class="tag">Echtzeit-Strategie · Einheiten an die Front bringen, versorgen und die Konfliktzone halten</p>
       <div class="field">
         <span class="flabel">Schwierigkeit</span>
         <div class="seg">${DIFFS.map(([k, l]) => `<button type="button" data-diff="${k}">${l}</button>`).join('')}</div>
@@ -74,17 +74,21 @@ export function showStartMenu(root, onStart) {
         <div class="seg">${POINTS.map((p) => `<button type="button" data-pts="${p}">${p}</button>`).join('')}</div>
       </div>
       <ol class="howto">
-        <li>Baufahrzeug (R): Förderanlagen auf die Vorkommen im Bauradius deiner FOB setzen, daneben stehen lassen.</li>
-        <li>LKW (E): Baumaterial, Munition und Treibstoff aus dem FOB-Lager zu Baustellen und Truppen bringen.</li>
-        <li>Die Konfliktzone in der Mitte halten: Geld, und alle 30 s ein Punkt.</li>
-        <li>Hot Zone (orange): wandert durch die Konfliktzone und gibt dem Besitzer Geld und alle 45 s einen Punkt. Aktive Bohrer (verbrauchen FOB-Treibstoff) ziehen sie an.</li>
-        <li>Mörser: Gebäude wählen, Ziel anklicken – ein Schuss alle 20 s, solange die FOB Munition hat. Hubschrauber aus dem Landeplatz: Little Bird und Transporter nehmen Infanterie mit (Rechtsklick auf den Hubschrauber), der AH-64 kämpft. Flak schießt Hubschrauber ab.</li>
-        <li>Gewinnen: Siegpunkte erreichen oder den Gegner ohne FOB und Baufahrzeug ausschalten.</li>
+        <li>Die Haupt-FOB hat unendlich Baumaterial, Munition und Treibstoff und bildet alle Einheiten aus – nur Geld ist knapp (nur aus Konfliktzone und Hot Zone).</li>
+        <li>LKW (E) bringen Nachschub aus der Haupt-FOB zu den vorderen FOBs und versorgen Einheiten in ihrer Nähe.</li>
+        <li>Baufahrzeug (R): bis zu 10 FOBs (ohne überlappende Bauradien), Mörser, Flak, Bohrer. Soldaten bauen aus wenig getragenem Baumaterial Mauern und Tore.</li>
+        <li>Konfliktzone halten: Geld und alle 30 s ein Punkt. Fällt deine Haupt-FOB, ist die Runde verloren.</li>
       </ol>
+      <p class="muted small center" data-wallet></p>
       <button type="button" class="primary" data-act="start">Start</button>
       <p class="muted small center">Alle Tasten zeigt F1 im Spiel.</p>
     </section>`,
   );
+  const showWallet = () => {
+    const el = root.querySelector('[data-wallet]');
+    if (el) el.innerHTML = `Kasse: <b>${wallet()}</b> Geld (bleibt von Runde zu Runde) · <button type="button" class="btn-sm" data-act="resetWallet">zurücksetzen</button>`;
+  };
+  showWallet();
   const mark = () => {
     root.querySelectorAll('[data-diff]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.diff === difficulty)));
     root.querySelectorAll('[data-pts]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.pts) === winPoints)));
@@ -95,7 +99,10 @@ export function showStartMenu(root, onStart) {
     if (!b) return;
     if (b.dataset.diff) difficulty = b.dataset.diff;
     else if (b.dataset.pts) winPoints = Number(b.dataset.pts);
-    else if (b.dataset.act === 'start') {
+    else if (b.dataset.act === 'resetWallet') {
+      resetWallet();
+      showWallet();
+    } else if (b.dataset.act === 'start') {
       hideOverlay(root);
       onStart({ difficulty, winPoints });
       return;
@@ -150,8 +157,8 @@ export function showEnd(root, { winner, team, reason, stats }, onRestart) {
   const who = BALANCE.teamNames[winner];
   let why;
   if (reason === 'points') why = `${who} hat ${stats.winPoints} Siegpunkte erreicht.`;
-  else if (won) why = 'Der Gegner hat keine FOB und kein Baufahrzeug mehr.';
-  else why = 'Du hast keine FOB und kein Baufahrzeug mehr.';
+  else if (won) why = 'Die Haupt-FOB des Gegners ist zerstört.';
+  else why = 'Deine Haupt-FOB ist zerstört.';
   show(
     root,
     'end',
