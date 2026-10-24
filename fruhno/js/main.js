@@ -222,14 +222,16 @@ function showChat() { $('#chat').hidden = false; renderChat(); startChatTimer();
 function renderChat() {
   if (!S) return;
   const log = $('#chat-log');
-  const lastMsg = S.chat[S.chat.length - 1];
-  if (chatPrimed && $('#chat').hidden && lastMsg && lastMsg.n > lastChatSeen && lastMsg.name !== store.get('name')) showChat();
+  // Quiet action lines ("kind: act") never pop the chat up or set the badge; real messages and Fruhno calls do.
+  const me = store.get('name');
+  const fresh = S.chat.some((m) => m.n > lastChatSeen && m.kind !== 'act' && m.name !== me);
+  if (chatPrimed && $('#chat').hidden && fresh) showChat();
   chatPrimed = true;
   const open = !$('#chat').hidden;
-  log.replaceChildren(...S.chat.map((m) => m.sys ? el('p', { class: 'sys' }, m.text) : el('p', {}, el('b', {}, m.name + ': '), document.createTextNode(m.text))));
+  log.replaceChildren(...S.chat.map((m) => m.kind === 'act' ? el('p', { class: 'act' }, m.text) : m.sys ? el('p', { class: 'sys' }, m.text) : el('p', {}, el('b', {}, m.name + ': '), document.createTextNode(m.text))));
   const newest = S.chat.length ? S.chat[S.chat.length - 1].n : 0;
   if (open) { lastChatSeen = newest; store.set('chatSeen', String(newest)); log.scrollTop = log.scrollHeight; }
-  $('#chat-badge').hidden = open || newest <= lastChatSeen || (S.chat[S.chat.length - 1] || {}).name === store.get('name');
+  $('#chat-badge').hidden = open || !fresh;
 }
 
 function render() {
