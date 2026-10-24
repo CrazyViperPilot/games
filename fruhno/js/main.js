@@ -129,6 +129,7 @@ function renderLobby() {
 function turnMessage(g) {
   const mine = g.turn === S.you;
   if (S.phase === 'finished') return '';
+  if (mine && g.pending) return 'Zieh ' + g.pending + ' Karten – oder lege eine +2 drauf';
   if (mine && g.drawn !== null) return 'Gezogene Karte legen oder passen';
   if (mine) return g.playable.length ? 'Du bist dran' : 'Du bist dran – zieh eine Karte';
   return g.turn + ' ist dran';
@@ -144,7 +145,7 @@ function renderTable() {
 
   const canDraw = mine && g.drawn === null;
   const drawPile = el('div', { class: 'pile' + (canDraw ? ' can' : ''), onclick: () => canDraw && act({ action: 'draw' }) },
-    el('div', { class: 'back' }, '🥞'), el('small', {}, g.drawCount + ' Karten'));
+    el('div', { class: 'back' }, g.pending ? '+' + g.pending : '🥞'), el('small', {}, g.pending ? 'zieh ' + g.pending : g.drawCount + ' Karten'));
   const topPile = el('div', { class: 'pile top' }, renderCard(g.top));
   const colorBadge = el('div', { class: 'colorbadge', style: 'background:' + COLORS[g.color].css }, COLORS[g.color].name);
   const middle = el('div', { class: 'middle' }, drawPile, topPile, el('div', {}, colorBadge, el('div', { class: 'dir' }, g.dir === 1 ? '↻' : '↺')));
