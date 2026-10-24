@@ -1,6 +1,6 @@
 // Eingabe (PLAN §5 ui/input.js): Maus und Tastatur → Controller und Kamera. Hält keinen Spielzustand.
 // `app` (optional) liefert Aktionen aus main.js: overlayOpen, closeOverlay, togglePause, toggleHelp, changeSpeed, debugMoney.
-const DRAG_PX = 6; // ab dieser Strecke ist ein Druck ein Ziehen: Karte verschieben (mit Shift: Rahmenauswahl)
+const DRAG_PX = 6; // ab dieser Strecke ist ein Druck ein Ziehen: Maus links = Rahmenauswahl, Maus rechts und Finger = Karte verschieben
 const EDGE_PX = 10; // Randscrollen: Abstand zum Fensterrand
 const SCROLL_PX = 900; // Kamerageschwindigkeit in Bildschirm-Pixeln je Sekunde
 
@@ -15,6 +15,7 @@ export class Input {
     this.down = null; // linker Druck auf dem Canvas {sx, sy, cx, cy, shift, dragging, mode}; dragging: Rahmen, panning: Karte schieben
     this.touches = new Map(); // aktive Finger (pointerId → Client-Position), zwei Finger = Zoomen und Verschieben
     this.pinch = null; // {dist, cx, cy} der letzten Zweifingergeste
+    this.rdown = null; // rechte Maustaste gedrückt {x, y, wx, wy, panning}: kurz = Befehl, ziehen = Karte schieben
     this.pan = null; // mittlere Maustaste: Verschieben {x, y} (Client-Koordinaten)
     this.mmDrag = null; // Druck auf der Minimap
     this.keys = new Set();
@@ -83,6 +84,7 @@ export class Input {
     this.edgeMouse = null;
     this.down = null;
     this.pan = null;
+    this.rdown = null;
     this.mmDrag = null;
     this.touches.clear();
     this.pinch = null;
@@ -160,7 +162,7 @@ export class Input {
     const p = this.pos(e, this.canvas);
     const w = this.camera.screenToWorld(p.x, p.y);
     if (e.button === 2) {
-      this.rightAt(w.x, w.y);
+      this.rdown = { x: e.clientX, y: e.clientY, wx: w.x, wy: w.y, panning: false };
       return;
     }
     if (e.button !== 0) return;
@@ -184,6 +186,15 @@ export class Input {
     // Ziel des Ereignisses entscheidet: liegt das HUD über dem Canvas, ist der Zeiger nicht „im Spielfeld“.
     this.inCanvas = e.target === this.canvas;
     this.mouse = this.inCanvas ? p : null;
+    const r = this.rdown;
+    if (r) {
+      if (!r.panning && Math.hypot(e.clientX - r.x, e.clientY - r.y) >= DRAG_PX) r.panning = true;
+      if (r.panning) {
+        this.camera.pan(e.clientX - r.x, e.clientY - r.y);
+        r.x = e.clientX;
+        r.y = e.clientY;
+      }
+    }
     if (this.pan) {
       this.camera.pan(e.clientX - this.pan.x, e.clientY - this.pan.y);
       this.pan = { x: e.clientX, y: e.clientY };
@@ -192,9 +203,9 @@ export class Input {
     const d = this.down;
     if (d) {
       if (!d.dragging && !d.panning && d.mode !== 'wall' && Math.hypot(p.x - d.sx, p.y - d.sy) >= DRAG_PX) {
-        // Shift + Ziehen = Rahmenauswahl, sonst schiebt Ziehen die Karte
-        if (d.shift && d.mode === 'normal') d.dragging = true;
-        else d.panning = true;
+        // Maus: Rahmenauswahl; Finger: Ziehen schiebt die Karte
+        if (e.pointerType !== 'touch' && d.mode === 'normal') d.dragging = true;
+        else if (e.pointerType === 'touch') d.panning = true;
       }
       if (d.dragging) this.controller.setDragBox({ x1: d.sx, y1: d.sy, x2: p.x, y2: p.y });
       else if (d.panning) {
@@ -222,6 +233,12 @@ export class Input {
     }
     if (e.button === 1) {
       this.pan = null;
+      return;
+    }
+    if (e.button === 2 && this.rdown) {
+      const r = this.rdown;
+      this.rdown = null;
+      if (!r.panning) this.rightAt(r.wx, r.wy); // kurzer Rechtsklick = Befehl
       return;
     }
     if (e.button === 0 && this.mmDrag !== null) {
