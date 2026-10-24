@@ -1,7 +1,7 @@
 // Eingabe (PLAN §5 ui/input.js): Maus und Tastatur → Controller und Kamera. Hält keinen Spielzustand.
 // `app` (optional) liefert Aktionen aus main.js: overlayOpen, closeOverlay, togglePause, toggleHelp, changeSpeed, debugMoney.
 const DRAG_PX = 6; // ab dieser Strecke ist ein Druck eine Rahmenauswahl
-const EDGE_PX = 10; // Randscrollen: Abstand zum Canvas-Rand
+const EDGE_PX = 10; // Randscrollen: Abstand zum Fensterrand
 const SCROLL_PX = 900; // Kamerageschwindigkeit in Bildschirm-Pixeln je Sekunde
 
 export class Input {
@@ -18,6 +18,7 @@ export class Input {
     this.keys = new Set();
     this.mouse = null; // Mausposition im Canvas (CSS-Pixel), nur wenn darüber
     this.inCanvas = false;
+    this.edgeMouse = null; // Mausposition im Fenster (auch über der Bedienleiste), nur fürs Randscrollen
 
     this.h = {
       down: (e) => this.onCanvasDown(e),
@@ -36,6 +37,9 @@ export class Input {
       key: (e) => this.onKeyDown(e),
       keyUp: (e) => this.keys.delete(e.key),
       blur: () => this.reset(),
+      out: (e) => {
+        if (!e.relatedTarget) this.edgeMouse = null; // Maus hat das Fenster verlassen
+      },
     };
     const h = this.h;
     canvas.addEventListener('mousedown', h.down);
@@ -50,6 +54,7 @@ export class Input {
     window.addEventListener('keydown', h.key);
     window.addEventListener('keyup', h.keyUp);
     window.addEventListener('blur', h.blur);
+    window.addEventListener('mouseout', h.out);
   }
 
   destroy() {
@@ -66,10 +71,12 @@ export class Input {
     window.removeEventListener('keydown', h.key);
     window.removeEventListener('keyup', h.keyUp);
     window.removeEventListener('blur', h.blur);
+    window.removeEventListener('mouseout', h.out);
   }
 
   reset() {
     this.keys.clear();
+    this.edgeMouse = null;
     this.down = null;
     this.pan = null;
     this.mmDrag = null;
@@ -92,13 +99,15 @@ export class Input {
     if (k.has('ArrowRight')) dx += 1;
     if (k.has('ArrowUp')) dy -= 1;
     if (k.has('ArrowDown')) dy += 1;
-    if (!dx && !dy && this.inCanvas && this.mouse && !this.down && !this.pan && this.mmDrag === null) {
-      const { x, y } = this.mouse;
-      const cam = this.camera;
+    // Randscrollen gilt am Fensterrand, auch wenn dort Statusleiste oder Bedienfelder über dem Spielfeld liegen
+    if (!dx && !dy && this.edgeMouse && !this.down && !this.pan && this.mmDrag === null && !this.app.overlayOpen?.()) {
+      const { x, y } = this.edgeMouse;
+      const w = window.innerWidth;
+      const h = window.innerHeight;
       if (x < EDGE_PX) dx -= 1;
-      else if (x > cam.viewW - EDGE_PX) dx += 1;
+      else if (x > w - EDGE_PX) dx += 1;
       if (y < EDGE_PX) dy -= 1;
-      else if (y > cam.viewH - EDGE_PX) dy += 1;
+      else if (y > h - EDGE_PX) dy += 1;
     }
     if (!dx && !dy) return;
     const len = Math.hypot(dx, dy);
@@ -130,6 +139,7 @@ export class Input {
   }
 
   onMove(e) {
+    this.edgeMouse = { x: e.clientX, y: e.clientY };
     const p = this.pos(e, this.canvas);
     // Ziel des Ereignisses entscheidet: liegt das HUD über dem Canvas, ist der Zeiger nicht „im Spielfeld“.
     this.inCanvas = e.target === this.canvas;

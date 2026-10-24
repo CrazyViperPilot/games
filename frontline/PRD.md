@@ -154,7 +154,7 @@ Schadensmodell: Schaden je Schuss nach Panzerklasse des Ziels (Infanterie / leic
 | Entf | Gebäude abreißen |
 | Esc | Abbrechen / Auswahl aufheben |
 | Strg+0–9 / 0–9 | Gruppe speichern / wählen (2× = Kamera hin) |
-| Pfeiltasten, Bildschirmrand, mittlere Maustaste ziehen | Kamera bewegen |
+| Pfeiltasten, Bildschirmrand (10 px am Fensterrand, auch über Statusleiste und Bedienfeldern), mittlere Maustaste ziehen | Kamera bewegen |
 | Mausrad | Zoom |
 | V / Schaltfläche „Ansicht“ | Ansicht umschalten: 2D von oben oder isometrisch (wird gemerkt, `?iso=1` startet isometrisch) |
 | `,` / `.` / Knöpfe ⟲ ⟳ | Isometrische Ansicht in 90°-Schritten nach links / rechts drehen (in 2D ohne Wirkung) |
@@ -202,6 +202,7 @@ zwischen Überschuss- und Bedarfs-FOBs (v. a. Zonen-FOB), Versorger-LKW folgt de
 
 ## Änderungsverlauf
 
+- v4.8: Randscrollen auch oben und unten (Fensterrand statt Canvas-Rand, Statusleiste und Bedienfelder blockieren es nicht mehr); Cache v19.
 - v4.7: Bahnlinie quer über die Karte durch die Zonenmitte (y = Zonenmitte, Schotterbett, Schwellen, Schienen, in 2D und Iso gezeichnet; Straßen kreuzen auf gleicher Höhe, Schienen sind begehbar). In der Kartenmitte steht ein Zug (Panzerwagen, Containerwagen, Lok; 3 Rechtecke, unpassierbar wie Häuser; Iso: Kenney Train Kit, CC0, vorgerendert für alle vier Drehungen). Häuser, Bäume, Felsen und Autos bleiben aus dem Bahnkorridor (±40) heraus. Die Erreichbarkeitsprüfung zielt neben den Zug (Zonenmitte liegt darunter). Cache v18.
 - v4.6: Iso-Ansicht mit freien Kenney-Sprites (CC0): Häuser aus City Kit Commercial, Hallen/Fabriken aus City Kit Industrial, dazu Bäume, LKW und Baufahrzeug; `?sprites=0` zum Vergleich; Cache v17.
 - v1: Grundspiel (FOBs, Ressourcen, Gebäude, Einheiten, Zone, KI).
