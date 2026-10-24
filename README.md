@@ -11,6 +11,7 @@ Live: https://crazyviperpilot.github.io/games/
 | **Go** | [`go/`](go/) | Go gegen den Computer (9×9, 13×13). [README](go/README.md) | `CACHE_NAME` in `go/sw.js`, `go/package.json` |
 | **Sudoku** | [`sudoku/`](sudoku/) | Sudoku, ursprünglich gebaut, um Google Antigravity kennenzulernen | `CACHE_NAME` in `sudoku/sw.js` |
 | **Frontline** | [`frontline/`](frontline/) | Echtzeit-Strategie: FOB bauen, Ressourcen fördern, Konfliktzone halten, gegen den Computer. [README](frontline/README.md) | `CACHE_VERSION` in `frontline/sw.js` |
+| **Fruhno** | [`fruhno/`](fruhno/) | UNO mit Frühstücksthema für Daniel, Lea und Kira (online, Chat, Bot). Backend: PHP im Repo vipervocs unter `fruhno/`. [PRD](fruhno/PRD.md) | `CACHE_VERSION` in `fruhno/sw.js` |
 | **Mario Craft** | [`mario-craft/`](mario-craft/) | Jump'n Run im Pixel-Stil: 3 Welten mit Bossen, Deutsch und Polnisch. [README](mario-craft/README.md) | `CACHE_VERSION` in `mario-craft/sw.js` |
 
 ## Aufbau: jedes Spiel ist eigenständig
@@ -20,7 +21,7 @@ Die Spiele teilen sich nur das Repo und die Domain – sonst nichts.
 - **Code:** Jedes Spiel liegt vollständig in seinem Ordner. Keine gemeinsamen Dateien, keine Imports über Ordnergrenzen
   (auch nicht aus der Startseite). Ein Spiel lässt sich jederzeit herauslösen, indem man seinen Ordner kopiert.
 - **Offline / Installation:** Jedes Spiel hat ein eigenes `manifest.json` (Scope = sein Ordner) und einen eigenen
-  Service Worker mit eigenem Cache-Präfix (`gatesquad-`, `vibesquadron-`, `go-game-`, `sudoku-`, `frontline-`). Ein Service Worker löscht beim
+  Service Worker mit eigenem Cache-Präfix (`gatesquad-`, `vibesquadron-`, `go-game-`, `sudoku-`, `frontline-`, `fruhno-`). Ein Service Worker löscht beim
   Aktualisieren **nur Caches mit seinem eigenen Präfix** – sonst würde er die Offline-Daten der anderen Spiele zerstören.
 - **Speicherstände:** Jedes Spiel nutzt eigene `localStorage`-Schlüssel.
 - **Lebenszyklus:** Änderungen an einem Spiel betreffen nur seinen Ordner. Ein Release = Änderung + Cache-Version

@@ -2,7 +2,7 @@
 
 UNO-artiges Kartenspiel mit Frühstücksthema für 2–3 Spieler (Daniel, Lea, Kira) über das Netz. Teil der Game Suite, komplett unabhängig von den anderen Spielen (eigener Ordner `fruhno/`, eigener Service-Worker-Cache `fruhno-v1`, eigener localStorage-Präfix `fruhno:`).
 
-Status: **Entwurf – wartet auf Daniels Antworten (siehe „Offene Fragen“). Mit den Standardannahmen gebaut, falls er nichts anderes sagt.**
+Status: **v0.2 – von Daniel freigegeben (2026-10-24), umgesetzt. Alle Standardannahmen gelten; zusätzlich Chat und Bot für 1 Spieler; kein Zugtimer.**
 
 ## 1. Ziele
 - Spielbar auf Pixel 8a und Lenovo Tab M11, Querformat, als PWA installierbar.
@@ -11,7 +11,7 @@ Status: **Entwurf – wartet auf Daniels Antworten (siehe „Offene Fragen“). 
 - Spiel-Shell (UI, Karten, Assets) offline verfügbar; Spielen selbst braucht Netz.
 
 ## 2. Nicht-Ziele
-- Keine Konten, keine Registrierung, kein Chat, keine Bots (siehe Offene Fragen), keine Öffentlichkeit.
+- Keine Konten, keine Registrierung, kein Zugtimer, keine Öffentlichkeit.
 
 ## 3. Spieler und Lobby
 - Feste Namen: **Daniel, Lea, Kira**. Beim ersten Start wählt man seinen Namen; er wird lokal gemerkt und ist änderbar.
@@ -20,6 +20,10 @@ Status: **Entwurf – wartet auf Daniels Antworten (siehe „Offene Fragen“). 
 - Der Host kann die Runde **ab 2 Spielern starten** und jederzeit **beenden** (für alle, mit Bestätigung).
 - Jeder Name kann nur einmal belegt sein (kein Doppel-Join). Wer das Spiel verlässt/Verbindung verliert, kann mit demselben Namen wieder einsteigen (Reconnect), solange die Runde läuft.
 - Nach Rundenende: Ergebnisanzeige, danach zurück zu „kein Spiel“.
+
+## 3a. Chat und Bot (v0.2)
+- **Chat**: 💬-Button oben rechts, Panel mit den letzten 30 Nachrichten (max. 200 Zeichen), roter Punkt bei ungelesenen. Der Chat überlebt das Spielende, bis der Host beendet.
+- **Bot**: Der Host kann in der Lobby (oder zwischen Runden) einen Bot 🤖 hinzufügen/entfernen, damit auch allein oder zu zweit gespielt werden kann. Der Bot läuft auf dem Server, spielt nach ~1,2 s, bevorzugt Aktionskarten, wählt die häufigste Farbe seiner Hand und ruft immer „Fruhno!“. Maximal 3 Spieler inkl. Bot.
 
 ## 4. Kartensatz (108 Karten wie UNO)
 Vier „Farben“ = Kategorien, je 25 Karten:
@@ -66,7 +70,7 @@ Vier „Farben“ = Kategorien, je 25 Karten:
 - Gleicher Webspace wie vipervocs (dogado, `phpexpert.de/vocs`), Unterordner **`fruhno/`** davon, d. h. `phpexpert.de/vocs/fruhno/api.php`. Dateibasierter Zustand (eine JSON-Datei mit `flock`), keine Datenbank – wie `stats.php`.
 - Das Frontend läuft auf GitHub Pages (anderer Origin) → API sendet CORS-Header für `https://crazyviperpilot.github.io`.
 - Der Server ist **maßgeblich** (Autorität): prüft Züge, mischt, teilt aus; Clients bekommen nur ihren eigenen Handblick (fremde Hände nie im Response).
-- Zugriffsschutz: gemeinsamer Schlüssel im Header (wie `X-Vocs-Key`), den Daniel einmal in der App eingibt; der Hash liegt in einer vom Deploy geschriebenen `config.php`. Zusätzlich pro Spieler ein zufälliges Session-Token beim Join (verhindert, dass jemand einen anderen Namen übernimmt).
+- Zugriffsschutz: gemeinsamer Schlüssel im Header `X-Fruhno-Key` (Secret `FRUHNO_KEY`, ersatzweise `VOCS_KEY`) (wie `X-Vocs-Key`), den Daniel einmal in der App eingibt; der Hash liegt in einer vom Deploy geschriebenen `config.php`. Zusätzlich pro Spieler ein zufälliges Session-Token beim Join (verhindert, dass jemand einen anderen Namen übernimmt).
 - Endpunkte (Entwurf): `GET state` (mit `?since=<version>`), `POST host`, `POST join`, `POST leave`, `POST start`, `POST end`, `POST play`, `POST draw`, `POST fruhno`, `POST catch`, `POST skip`.
 - Aufräumen: Lobby/Spiel ohne Aktivität für 2 Stunden wird automatisch beendet.
 
@@ -89,5 +93,10 @@ Vier „Farben“ = Kategorien, je 25 Karten:
 4. PWA/Offline-Shell, Spieleliste, Icons.
 5. Deploy-Anbindung (nach Freigabe), Test auf echten Geräten.
 
-## 10. Offene Fragen an Daniel
-Siehe Chat. Standardannahmen oben gelten, bis er anders entscheidet.
+## 10. Umsetzung
+- Frontend: `games/fruhno/` (Vanilla JS: `js/cards.js` Kartendaten/Rendering, `js/api.js` Client, `js/main.js` UI).
+- Backend: Repo `vipervocs`, Ordner `fruhno/` (`engine.php` Regeln, `api.php` Endpunkt, `test.php` Regeltests: `php fruhno/test.php`). Deploy über die bestehende dogado-Action; Zielpfad `…/vocs/fruhno/api.php`.
+- Beim ersten Start gibt jeder Name, Schlüssel und (vorbelegt) Server-URL ein; alles liegt im localStorage (`fruhno:`).
+- Wer ein Spiel hostet, ist Host; verlässt der Host das Spiel, wird der nächste Mensch Host. Ein Name ist nur mit seinem Token (oder nach 25 s Inaktivität) neu belegbar.
+- Aufräumen: nach 2 h ohne Aktivität wird alles zurückgesetzt.
+- Gefundene Einschränkung: Ohne Schlüssel-Secret im Deploy-Environment gibt es kein `config.php` → Deploy bricht ab (Fehlermeldung).
