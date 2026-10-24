@@ -216,23 +216,51 @@ function drawRoads(ctx, map, S) {
   }
 }
 
-/** Bahnlinie: Schotterbett, Schwellen und zwei Schienen (Straßen kreuzen sie auf gleicher Höhe). */
+/** Gleise einer Karte: neue Form `rails` (freie Strecken) oder die ältere `rail` (eine Linie quer über die Karte). */
+export function railList(town) {
+  const list = (town?.rails ?? []).slice();
+  if (town?.rail && Number.isFinite(town.rail.y)) list.push({ x1: 0, y1: town.rail.y, x2: (town.rail.x2 ?? 9024), y2: town.rail.y });
+  return list;
+}
+
+const RAIL_BED = 40;
+
+/** Gleise: Schotterbett, Schwellen und zwei Schienen je Strecke; wo Gleise sich treffen oder kreuzen, ein durchgehendes Bett (Weiche/Kreuzung). */
 function drawRail(ctx, map, S) {
-  const r = map.town?.rail;
-  if (!r) return;
-  const y = r.y * S;
-  const x1 = r.x1 * S;
-  const x2 = r.x2 * S;
-  const bed = 40 * S;
+  const rails = railList(map.town);
+  if (!rails.length) return;
+  const bed = RAIL_BED * S;
+  const each = (fn) => {
+    for (const r of rails) {
+      const len = Math.hypot(r.x2 - r.x1, r.y2 - r.y1);
+      if (len < 1) continue;
+      ctx.save();
+      ctx.translate(r.x1 * S, r.y1 * S);
+      ctx.rotate(Math.atan2(r.y2 - r.y1, r.x2 - r.x1));
+      fn(len * S);
+      ctx.restore();
+    }
+  };
   ctx.fillStyle = '#6b665c';
-  ctx.fillRect(x1, y - bed / 2, x2 - x1, bed);
+  each((l) => ctx.fillRect(0, -bed / 2, l, bed));
+  const joints = roadJunctions(rails.map((r) => ({ ...r, w: RAIL_BED })));
+  ctx.fillStyle = '#6b665c';
+  for (const j of joints) {
+    ctx.beginPath();
+    ctx.arc(j.x * S, j.y * S, (RAIL_BED / 2) * S, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.fillStyle = '#4a3a2c';
   const sw = Math.max(1.5, 3 * S);
-  for (let x = x1; x < x2; x += 12 * S) ctx.fillRect(x, y - bed * 0.45, sw, bed * 0.9);
+  each((l) => {
+    for (let x = 0; x < l; x += 12 * S) ctx.fillRect(x, -bed * 0.45, sw, bed * 0.9);
+  });
   ctx.fillStyle = '#b9bcbd';
   const rw = Math.max(1, 2.2 * S);
-  ctx.fillRect(x1, y - bed * 0.28 - rw / 2, x2 - x1, rw);
-  ctx.fillRect(x1, y + bed * 0.28 - rw / 2, x2 - x1, rw);
+  each((l) => {
+    ctx.fillRect(0, -bed * 0.28 - rw / 2, l, rw);
+    ctx.fillRect(0, bed * 0.28 - rw / 2, l, rw);
+  });
 }
 
 /** Parks, Gebäude (Häuser, Hallen, Fabriken), Autos und Stadtbäume. */

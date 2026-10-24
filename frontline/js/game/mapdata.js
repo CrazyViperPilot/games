@@ -15,7 +15,7 @@ export function createEmptyMap(name = 'Neue Karte') {
   return normalizeMap({
     name,
     obstacles: [],
-    town: { roads: [], buildings: [], parks: [], cars: [], trees: [], rail: null },
+    town: { roads: [], buildings: [], parks: [], cars: [], trees: [], rails: [] },
     trees: [],
     spawns: [
       { x: 700, y: H - 700 },
@@ -38,9 +38,15 @@ export function normalizeMap(src) {
   const spawns = arr(src.spawns).map(pt);
   if (spawns.length !== 2) throw new Error('Eine Karte braucht genau zwei Startpunkte');
   const zone = circ(src.zone ?? { x: W / 2, y: H / 2, r: BALANCE.zone.r }, 200, 4000);
-  const rail = town.rail
-    ? { y: clamp(num(town.rail.y, H / 2), 0, H), x1: 0, x2: W, half: clamp(num(town.rail.half, 40), 20, 100) }
-    : null;
+  // Gleise: freie Strecken; die ältere Form (eine Bahnlinie quer über die Karte, `rail: {y}`) wird übernommen
+  const railSrc = arr(town.rails).slice();
+  if (town.rail && Number.isFinite(town.rail.y)) railSrc.push({ x1: 0, y1: town.rail.y, x2: W, y2: town.rail.y });
+  const rails = railSrc.map((r) => ({
+    x1: clamp(num(r.x1, 0), 0, W),
+    y1: clamp(num(r.y1, 0), 0, H),
+    x2: clamp(num(r.x2, 0), 0, W),
+    y2: clamp(num(r.y2, 0), 0, H),
+  }));
   return {
     name: String(src.name ?? 'Karte').slice(0, 40),
     width: W,
@@ -66,7 +72,7 @@ export function normalizeMap(src) {
       parks: arr(town.parks).map((p) => circ(p, 40, 400)),
       cars: arr(town.cars).map((c) => ({ ...pt(c), vertical: !!c.vertical, color: String(c.color || '#b8b8b0').slice(0, 9) })),
       trees: arr(town.trees).map((t) => circ(t, 6, 40)),
-      rail,
+      rails,
     },
     trees: arr(src.trees).map((t) => circ(t, 6, 40)),
     spawns,

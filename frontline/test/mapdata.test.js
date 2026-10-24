@@ -73,3 +73,13 @@ test('Straßen: Kreuzungen und Einmündungen werden erkannt', async () => {
   assert.equal(j.length, 2, 'Kreuzung und T-Einmündung, die ferne Straße nicht');
   assert.deepEqual(j.map((p) => [Math.round(p.x), Math.round(p.y)]).sort(), [[200, 100], [300, 100]]);
 });
+
+test('Gleise: ältere Einzel-Bahnlinie wird zu einer Strecke, freie Gleise bleiben erhalten', () => {
+  const old = normalizeMap({ spawns: [{ x: 700, y: 8000 }, { x: 8000, y: 700 }], town: { rail: { y: 4000, x1: 0, x2: 9024, half: 40 } } });
+  assert.equal(old.town.rails.length, 1);
+  assert.deepEqual([old.town.rails[0].y1, old.town.rails[0].x2], [4000, 9024]);
+  const free = normalizeMap({ spawns: old.spawns, town: { rails: [{ x1: 100, y1: 100, x2: 900, y2: 400 }, { x1: 500, y1: 0, x2: 500, y2: 9999 }] } });
+  assert.equal(free.town.rails.length, 2);
+  assert.equal(free.town.rails[1].y2, 9024, 'auf die Karte begrenzt');
+  assert.equal(generateMap(5).town.rails.length, 1);
+});

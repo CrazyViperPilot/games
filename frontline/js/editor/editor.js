@@ -31,7 +31,7 @@ const TOOLS = [
   ['loco', 'Lok', 'Zug', '◧', 'Tippen setzt eine Lok (blockiert wie ein Gebäude)'],
   ['container', 'Waggon', 'Zug', '◨', 'Tippen setzt einen Container-Waggon'],
   ['tank', 'Kesselwagen', 'Zug', '◩', 'Tippen setzt einen Kesselwagen'],
-  ['rail', 'Bahnlinie', 'Zug', '═', 'Tippen legt die Bahnlinie quer über die Karte (nur eine)'],
+  ['rail', 'Gleis', 'Zug', '═', 'Von Start- zu Endpunkt ziehen; Gleise rasten aneinander ein, Kreuzungen und Weichen entstehen von selbst'],
   ['road', 'Straße', 'Wege', '▬', 'Von Start- zu Endpunkt ziehen'],
   ['dirt', 'Feldweg', 'Wege', '┅', 'Von Start- zu Endpunkt ziehen'],
   ['park', 'Park', 'Natur', '◌', 'Tippen setzt eine Grünfläche (nur Dekoration)'],
@@ -193,6 +193,7 @@ function listOf(k) {
   switch (k) {
     case 'building': return m.town.buildings;
     case 'road': return m.town.roads;
+    case 'rail': return m.town.rails;
     case 'park': return m.town.parks;
     case 'car': return m.town.cars;
     case 'tree': return m.trees;
@@ -242,6 +243,9 @@ function pickAt(wx, wy, sx = null, sy = null) {
   const hit = circ('tree', m.trees) || circ('townTree', m.town.trees) || circ('obstacle', m.obstacles);
   if (hit) return hit;
   const pk = circ('park', m.town.parks);
+  for (let i = m.town.rails.length - 1; i >= 0; i--) {
+    if (distToSeg(wx, wy, m.town.rails[i]) <= 20 + tol) return { k: 'rail', o: m.town.rails[i] };
+  }
   const road = (() => {
     for (let i = m.town.roads.length - 1; i >= 0; i--) {
       const r = m.town.roads[i];
@@ -250,7 +254,6 @@ function pickAt(wx, wy, sx = null, sy = null) {
     return null;
   })();
   if (road) return road;
-  if (m.town.rail && Math.abs(wy - m.town.rail.y) <= m.town.rail.half + tol) return { k: 'rail', o: m.town.rail };
   if (pk) return pk;
   if (Math.hypot(m.zone.x - wx, m.zone.y - wy) <= 90 + tol) return { k: 'zone', o: m.zone };
   return null;
@@ -258,8 +261,7 @@ function pickAt(wx, wy, sx = null, sy = null) {
 
 function removeSel(sel) {
   if (!sel) return false;
-  if (sel.k === 'rail') st.map.town.rail = null;
-  else if (sel.k === 'spawn' || sel.k === 'zone') return false;
+  if (sel.k === 'spawn' || sel.k === 'zone') return false;
   else {
     const list = listOf(sel.k);
     const i = list.indexOf(sel.o);
@@ -305,9 +307,6 @@ function place(tool, x, y) {
       m.town.cars.push(o);
       return { k: 'car', o };
     }
-    case 'rail':
-      m.town.rail = { y: py, x1: 0, x2: W, half: 40 };
-      return { k: 'rail', o: m.town.rail };
     case 'spawn0':
     case 'spawn1': {
       const i = tool === 'spawn0' ? 0 : 1;
@@ -326,9 +325,7 @@ function place(tool, x, y) {
 
 function moveObj(sel, dx, dy) {
   const o = sel.o;
-  if (sel.k === 'rail') {
-    o.y = clamp(o.y + dy, 0, H);
-  } else if (sel.k === 'road') {
+  if (sel.k === 'road' || sel.k === 'rail') {
     o.x1 += dx; o.y1 += dy; o.x2 += dx; o.y2 += dy;
   } else {
     o.x = clamp(o.x + dx, 0, W);
@@ -439,7 +436,7 @@ function draw() {
   // Vorschau eines Linien-Ziehens
   const g = st.gesture;
   if (g && g.type === 'line') {
-    ctx.strokeStyle = g.dirt ? '#7b6a48' : '#4d504c';
+    ctx.strokeStyle = g.kind === 'rail' ? '#6b665c' : g.dirt ? '#7b6a48' : '#4d504c';
     ctx.lineWidth = g.w;
     ctx.lineCap = 'butt';
     ctx.beginPath();
@@ -469,11 +466,11 @@ function drawSelection(sel, px) {
   const pad = 3 * px;
   if (sel.k === 'building') {
     ctx.strokeRect(o.x - o.w / 2 - pad, o.y - o.h / 2 - pad, o.w + pad * 2, o.h + pad * 2);
-  } else if (sel.k === 'road') {
+  } else if (sel.k === 'road' || sel.k === 'rail') {
     ctx.setLineDash([]);
     for (const [x, y] of [[o.x1, o.y1], [o.x2, o.y2]]) {
       ctx.beginPath();
-      ctx.arc(x, y, Math.max(8 * px, o.w * 0.6), 0, Math.PI * 2);
+      ctx.arc(x, y, Math.max(8 * px, (o.w ?? 40) * 0.6), 0, Math.PI * 2);
       ctx.stroke();
     }
     ctx.setLineDash([6 * px, 4 * px]);
@@ -481,8 +478,6 @@ function drawSelection(sel, px) {
     ctx.moveTo(o.x1, o.y1);
     ctx.lineTo(o.x2, o.y2);
     ctx.stroke();
-  } else if (sel.k === 'rail') {
-    ctx.strokeRect(0, o.y - o.half, W, o.half * 2);
   } else if (sel.k === 'car') {
     const hw = o.vertical ? 9 : 18;
     const hh = o.vertical ? 18 : 9;
@@ -512,12 +507,13 @@ function pos(e) {
 }
 
 /** Straßenpunkt: rastet an Enden und Mittellinien anderer Straßen ein, damit Kreuzungen und Einmündungen sauber schließen. */
-function snapRoad(x, y) {
+function snapRoad(x, y, kind = 'road') {
   const z = st.cam.zoom;
   const tolEnd = 40 / z;
   let best = null;
   let bd = Infinity;
-  for (const r of st.map.town.roads) {
+  const list = kind === 'rail' ? st.map.town.rails : st.map.town.roads;
+  for (const r of list) {
     for (const [ex, ey] of [[r.x1, r.y1], [r.x2, r.y2]]) {
       const d = Math.hypot(ex - x, ey - y);
       if (d < tolEnd && d < bd) {
@@ -527,7 +523,7 @@ function snapRoad(x, y) {
     }
   }
   if (best) return best;
-  for (const r of st.map.town.roads) {
+  for (const r of list) {
     const dx = r.x2 - r.x1;
     const dy = r.y2 - r.y1;
     const l2 = dx * dx + dy * dy || 1;
@@ -535,7 +531,7 @@ function snapRoad(x, y) {
     const qx = r.x1 + t * dx;
     const qy = r.y1 + t * dy;
     const d = Math.hypot(qx - x, qy - y);
-    if (d < r.w / 2 + 28 / z && d < bd) {
+    if (d < (r.w ?? 40) / 2 + 28 / z && d < bd) {
       bd = d;
       best = { x: Math.round(qx), y: Math.round(qy) };
     }
@@ -544,8 +540,8 @@ function snapRoad(x, y) {
 }
 
 function endpointHit(sel, wx, wy) {
-  if (!sel || sel.k !== 'road') return 0;
-  const tol = 22 / st.cam.zoom + sel.o.w / 2;
+  if (!sel || (sel.k !== 'road' && sel.k !== 'rail')) return 0;
+  const tol = 22 / st.cam.zoom + (sel.o.w ?? 40) / 2;
   if (Math.hypot(sel.o.x1 - wx, sel.o.y1 - wy) < tol) return 1;
   if (Math.hypot(sel.o.x2 - wx, sel.o.y2 - wy) < tol) return 2;
   return 0;
@@ -612,9 +608,9 @@ canvas.addEventListener('pointerdown', (e) => {
         updateInfo();
       }
     }
-  } else if (t === 'road' || t === 'dirt') {
-    const a = snapRoad(w.x, w.y);
-    st.gesture = { type: 'line', dirt: t === 'dirt', w: t === 'dirt' ? 52 : 64, x1: a.x, y1: a.y, x2: a.x, y2: a.y };
+  } else if (t === 'road' || t === 'dirt' || t === 'rail') {
+    const a = snapRoad(w.x, w.y, t);
+    st.gesture = { type: 'line', kind: t, dirt: t === 'dirt', w: t === 'dirt' ? 52 : t === 'rail' ? 40 : 64, x1: a.x, y1: a.y, x2: a.x, y2: a.y };
   } else if (t === 'tree') {
     pushHistory();
     place(t, w.x, w.y);
@@ -658,7 +654,7 @@ window.addEventListener('pointermove', (e) => {
       g.started = true;
       pushHistory();
     }
-    if (st.sel.k === 'spawn' || st.sel.k === 'zone' || st.sel.k === 'rail') {
+    if (st.sel.k === 'spawn' || st.sel.k === 'zone') {
       moveObj(st.sel, snap(w.x) - snap(g.x), snap(w.y) - snap(g.y));
     } else {
       moveObj(st.sel, w.x - g.x, w.y - g.y);
@@ -668,12 +664,12 @@ window.addEventListener('pointermove', (e) => {
     st.needDraw = true;
   } else if (g.type === 'endpoint') {
     const r = st.sel.o;
-    const q = snapRoad(w.x, w.y);
+    const q = snapRoad(w.x, w.y, st.sel.k);
     if (g.ep === 1) { r.x1 = q.x; r.y1 = q.y; }
     else { r.x2 = q.x; r.y2 = q.y; }
     st.needDraw = true;
   } else if (g.type === 'line') {
-    const b = snapRoad(w.x, w.y);
+    const b = snapRoad(w.x, w.y, g.kind);
     g.x2 = b.x;
     g.y2 = b.y;
     st.needDraw = true;
@@ -717,9 +713,9 @@ function endPointer(e) {
   if (g.type === 'line' && e.type !== 'pointercancel') {
     if (Math.hypot(g.x2 - g.x1, g.y2 - g.y1) >= 32) {
       pushHistory();
-      const o = { x1: g.x1, y1: g.y1, x2: g.x2, y2: g.y2, w: g.w, ...(g.dirt ? { dirt: true } : {}) };
-      st.map.town.roads.push(o);
-      st.sel = { k: 'road', o };
+      const o = g.kind === 'rail' ? { x1: g.x1, y1: g.y1, x2: g.x2, y2: g.y2 } : { x1: g.x1, y1: g.y1, x2: g.x2, y2: g.y2, w: g.w, ...(g.dirt ? { dirt: true } : {}) };
+      (g.kind === 'rail' ? st.map.town.rails : st.map.town.roads).push(o);
+      st.sel = { k: g.kind === 'rail' ? 'rail' : 'road', o };
       showInspector();
       updateInfo();
     }
@@ -793,7 +789,7 @@ const SEL_NAMES = {
   tree: 'Baum',
   townTree: 'Baum',
   obstacle: 'Hindernis',
-  rail: 'Bahnlinie',
+  rail: 'Gleis',
   spawn: 'Startpunkt',
   zone: 'Konfliktzone',
 };
@@ -827,12 +823,12 @@ function showInspector() {
   } else if (s.k === 'obstacle' || s.k === 'park' || s.k === 'tree' || s.k === 'townTree') {
     rows.push('<div class="row"><button data-i="r-">Kleiner</button><button data-i="r+">Größer</button></div>');
   } else if (s.k === 'rail') {
-    rows.push('<div class="muted small">Ziehen verschiebt die Bahnlinie nach oben/unten.</div>');
+    rows.push('<div class="muted small">Enden ziehen, um das Gleis zu ändern. Neue Gleise rasten an Enden und Gleisen ein.</div>');
   } else if (s.k === 'spawn') {
     rows.push('<div class="muted small">Ziehen verschiebt den Startpunkt. Die Haupt-FOB entsteht hier, Bauradius als Kreis.</div>');
   }
   if (s.k !== 'spawn' && s.k !== 'zone') {
-    rows.push(`<div class="row">${s.k === 'rail' ? '' : '<button data-i="dup">Kopie</button>'}<button data-i="del" class="danger">Löschen</button></div>`);
+    rows.push(`<div class="row"><button data-i="dup">Kopie</button><button data-i="del" class="danger">Löschen</button></div>`);
   }
   el.innerHTML = `<h3>${title}</h3>${rows.join('')}`;
   el.hidden = false;
@@ -876,9 +872,8 @@ function inspectorAction(a) {
     o.r = clamp(o.r + (a === 'r+' ? step : -step), lim[0], lim[1]);
   } else if (a === 'dup') {
     const copy = JSON.parse(JSON.stringify(o));
-    if (s.k === 'road') { copy.x1 += 48; copy.y1 += 48; copy.x2 += 48; copy.y2 += 48; }
-    else if (s.k !== 'rail') { copy.x += 48; copy.y += 48; }
-    if (s.k === 'rail') { st.hist.pop(); return; }
+    if (s.k === 'road' || s.k === 'rail') { copy.x1 += 48; copy.y1 += 48; copy.x2 += 48; copy.y2 += 48; }
+    else { copy.x += 48; copy.y += 48; }
     listOf(s.k).push(copy);
     st.sel = { k: s.k, o: copy };
     updateInfo();

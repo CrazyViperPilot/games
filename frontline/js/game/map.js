@@ -216,7 +216,7 @@ function buildTown(rng) {
     parks,
     cars: free(cars, () => 20),
     trees: free(trees, (t) => t.r),
-    rail: { y: CY, x1: 0, x2: W, half: RAIL_HALF },
+    rails: [{ x1: 0, y1: CY, x2: W, y2: CY }],
   };
   for (const c of TRAIN) town.buildings.push({ x: CX + c.dx, y: CY, w: 96, h: 46, kind: 'train', part: c.part });
   return town;
