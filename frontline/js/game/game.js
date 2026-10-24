@@ -79,10 +79,11 @@ function lineCells(c0, r0, c1, r1) {
 }
 
 export class Game {
-  constructor({ seed = 1, winPoints = BALANCE.winPoints, startMoney = BALANCE.startRes.money } = {}) {
+  /** `map`: fertige Karte (Editor/gespeichert, siehe mapdata.js); ohne sie wird sie aus dem Seed erzeugt. */
+  constructor({ seed = 1, winPoints = BALANCE.winPoints, startMoney = BALANCE.startRes.money, map = null } = {}) {
     this.seed = seed;
     this.rng = makeRng(seed);
-    this.map = generateMap(seed);
+    this.map = map ?? generateMap(seed);
     this.grid = new Grid(W / TILE, H / TILE, TILE);
     this.grid.rasterizeObstacles(this.map.obstacles);
     this.grid.rasterizeRects(this.map.town?.buildings ?? []);

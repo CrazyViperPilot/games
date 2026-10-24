@@ -2,6 +2,7 @@
 // URL: ?seed=N (feste Karte) · ?speed=N (Startgeschwindigkeit) · ?debug=1 (Karte aufgedeckt, M = +1000, bis 10×).
 import { BALANCE } from './data/balance.js';
 import { Game } from './game/game.js';
+import { loadMap } from './game/mapdata.js';
 import { AI } from './ai/ai.js';
 import { createLoop } from './core/loop.js';
 import { Camera } from './render/camera.js';
@@ -220,7 +221,8 @@ function startGame(opts) {
   hideOverlay(overlay);
 
   const seed = Number.isFinite(URL_SEED) ? URL_SEED : Math.floor(Math.random() * 1e9) + 1;
-  const game = new Game({ seed, winPoints: opts.winPoints, startMoney: loadWallet() });
+  const map = opts.mapId && opts.mapId !== 'random' ? loadMap(opts.mapId) : null; // gespeicherte Karte, sonst aus dem Seed
+  const game = new Game({ seed, winPoints: opts.winPoints, startMoney: loadWallet(), map });
   const ai = new AI(game, AI_TEAM, opts.difficulty);
   const camera = new Camera(BALANCE.map.width, BALANCE.map.height);
   camera.iso = loadIso();

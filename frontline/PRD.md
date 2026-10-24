@@ -18,7 +18,7 @@ Nicht im Umfang: Netzwerk-Multiplayer, Kampagne, Speichern laufender Partien, So
 
 ## 2. Spielablauf
 
-1. Startmenü: Schwierigkeit (Leicht/Normal/Schwer), Siegpunkte (100 Standard; 25/50 für Schnellpartie), Start.
+1. Startmenü: Schwierigkeit (Leicht/Normal/Schwer), Siegpunkte (100 Standard; 25/50 für Schnellpartie), **Karte** (Zufall · Gespeichert · Neue Karte, siehe Abschnitt 9a), Start.
 2. Jede Partei startet in einer Ecke der großen Karte mit der **Haupt-FOB** (unendlich Baumaterial, Munition, Treibstoff), Geld (800 oder die Kasse der letzten Runde), 1 Baufahrzeug, 1 LKW (leer) und 4 Schützen.
 3. Nur die Haupt-FOB bildet Einheiten aus (nur gegen Geld). Man bringt Einheiten und Nachschub per LKW an die Front, gründet vordere FOBs
    (Verschanzen mit Mauern und Tore, Mörser, Flak, Nachladen und Tanken) und hält die Zone.
@@ -177,6 +177,13 @@ Schadensmodell: Schaden je Schuss nach Panzerklasse des Ziels (Infanterie / leic
 - **Isometrische Ansicht** (Taste V, drehbar in 90°-Schritten mit `,` `.`): Boden schräg, Gebäude, Bäume und Fahrzeuge mit Höhe, Tiefensortierung, Hubschrauber schweben mit Schatten. Stadtgebäude (Häuser aus Kenney „City Kit Commercial“, Hallen und Fabriken aus „City Kit Industrial“; 3D-Modelle, vorgerendert isometrisch, Daten `js/render/isodata.js`), Bäume sowie LKW und Baufahrzeug (Team Blau/Rot, 8 Blickrichtungen) sind Bilder aus freien Kenney-Paketen (CC0, `assets/iso/`, Lizenztexte `assets/LICENSES/`, `js/render/isosprites.js`; `?sprites=0` schaltet auf die gezeichnete Variante). Spielgebäude und Panzer sind gezeichnet und mit Details versehen: Stadthäuser mit zwei Stockwerken, Fenstern, Tür, Balkon und Satteldach; Hallen mit Rolltoren und Fensterband; Fabriken mit großen Fenstern, Toren, Schornstein; FOB als **Zentrale** (Sockelbau mit Fensterband, Eingang mit Vordach, Leitstellenturm, Radar, Antennen, Flagge); Fahrzeughalle als **Panzerwerkstatt** (Tore mit Panzer, Teamband, Dachkran); Landeplatz mit H, Ring, Randfeuer, Windsack. Unter Zoom 0,5 entfallen Fenster und Türen (Leistung). Die Zeichnung ist pro Gebäudeart durch Sprites ersetzbar (`spriteOverrides` in `js/render/isobuild.js`).
 - Hilfe (F1) listet alle Tasten, auch V und Drehen.
 
+## 9a. Karten und Karteneditor
+
+- **Karte pro Spiel:** *Zufall* erzeugt bei jedem Start eine Karte aus einem Seed (`?seed=N` = feste Karte). *Gespeichert* nimmt eine eigene Karte aus dem Browser-Speicher (localStorage `frontline-karten`), die Auswahl merkt sich das Menü. *Neue Karte* öffnet den Editor mit leerer Karte. Gespeicherte Karten lassen sich im Menü bearbeiten, löschen und aus einer JSON-Datei importieren.
+- **Kartenformat (JSON):** `name`, `obstacles` (Kreise: Wald = gerader Radius, Fels = ungerader), `town` (`roads`, `buildings` mit `kind` house/factory/hall/train, `parks`, `cars`, `trees`, `rail`), `trees`, `spawns` (genau 2), `zone` (Mitte und Radius). Karten sind **nicht** gespiegelt; `Game({ map })` nimmt jede gültige Karte (`js/game/mapdata.js`: Normalisieren, Prüfen, Speicher).
+- **Editor** (`editor.html`, 2D, Maus und Touch): Werkzeuge Hand, Wählen, Löschen; Haus, Fabrik, Halle; Lok, Waggon, Kesselwagen, Bahnlinie; Straße und Feldweg (ziehen), Park, Baum (ziehen malt eine Reihe), Wald, Fels, Auto; Startpunkt Blau/Rot und Konfliktzone verschieben. Gewähltes Objekt: verschieben, Größe/Breite/Höhe, drehen, Art/Farbe, Kopie, Löschen; Straßenenden ziehbar. Rückgängig/Wiederholen (60 Schritte, Strg+Z/Y), Zoom (Rad, Zwei-Finger), Verschieben (Hand, rechte Maustaste, ein Finger auf leerem Grund), Zufallskarte als Ausgangspunkt, Leer, Import/Export als Datei, Speichern, **Spielen**.
+- **Prüfung:** Startpunkte brauchen 180 px freien Platz und Abstand zum Rand, die Startpunkte mindestens 2500 px Abstand, von Start 1 müssen Zonenmitte und Start 2 erreichbar sein (Pfadsuche). Speichern geht immer, **Spielen** nur bei bestandener Prüfung.
+
 ## 10. KI-Gegner
 
 Gleiche Regeln und Befehls-Schnittstelle wie der Spieler (Sonderrecht nur: Einkommensfaktor je Schwierigkeit; die KI
@@ -199,6 +206,7 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 
 ## Änderungsverlauf
 
+- v4.14: **Karteneditor.** Neue Seite `editor.html` mit allen Kartenelementen (ohne Spiegelung), Speichern im Browser, Export/Import; Startmenü mit Kartenwahl Zufall/Gespeichert/Neue Karte; `Game({ map })`; `drawMapObjects` aus `terrain.js` gemeinsam für Spiel und Editor. Cache v25.
 - v4.13: Iso-Ansicht mit fertigen Grafiken auch für Eigenes: Schützen und RPG-Soldaten als Soldaten (Helm, Weste in Teamfarbe; Schütze mit Gewehr, RPG-Soldat mit Rohr auf der Schulter, 8 Blickrichtungen, drehen sich zum Ziel), Zentrale (FOB, mit Teamflagge), Mörser, Flak, Mauer und Tor (nach Nachbarn ausgerichtet) aus Kenney-Kits (CC0, vorgerendert, `assets/iso/units`, `assets/iso/team`). Panzer, Schützenpanzer, Bohrer und Baustellen bleiben gemalt; `?sprites=0` zeigt alles gemalt.
 - v4.12: **Soldaten mitnehmen.** LKW 2, Baufahrzeug 1, Schützenpanzer 6 Plätze (nur Infanterie; Baufahrzeuge steigen weiter nur in Hubschrauber). Einsteigen per Knopf „Einsteigen“ (I) mit Antippen des Fahrzeugs oder per Rechtsklick, Absetzen mit O; Passagiere sind verloren, wenn das Fahrzeug stirbt. Cache v24.
 - v4.11: **Karte ohne Felsen, Gehöfte außerhalb der Zone.** Die grauen Felsen entfallen, Hindernisse sind nur noch Wald. Außerhalb der Konfliktzone (punktsymmetrisch) stehen vereinzelt Häuser (22 Paare), Hallen (6) und Fabrikgelände (7): Fabrik mit Mauer (80 px Abstand, 16 px stark) und zwei Lücken à 130 px an gegenüberliegenden Seiten, sodass Fahrzeuge hinein, um die Fabrik herum und auf der Gegenseite hinausfahren können (Test prüft die Wegfindung). Mauern blockieren wie Häuser; Bäume bleiben aus den Geländen heraus. Cache v22.

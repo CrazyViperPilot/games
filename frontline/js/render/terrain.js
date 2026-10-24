@@ -58,6 +58,29 @@ export function buildTerrain(map, iso = false) {
     ctx.fillRect(rng.next() * w, rng.next() * h, 1, 1);
   }
 
+  drawMapObjects(ctx, map, S, iso, rng);
+
+  // Dezentes Raster alle 4 Zellen (128 px)
+  ctx.strokeStyle = 'rgba(0,0,0,0.07)';
+  ctx.lineWidth = 1;
+  const step = tile * 4 * S;
+  ctx.beginPath();
+  for (let x = 0; x <= w; x += step) {
+    ctx.moveTo(x + 0.5, 0);
+    ctx.lineTo(x + 0.5, h);
+  }
+  for (let y = 0; y <= h; y += step) {
+    ctx.moveTo(0, y + 0.5);
+    ctx.lineTo(w, y + 0.5);
+  }
+  ctx.stroke();
+
+  cache_.set(map, canvas);
+  return canvas;
+}
+
+/** Straßen, Bahn, Stadt, Bäume und Hindernisse einer Karte auf ein Canvas (Maßstab S). Auch der Karteneditor nutzt das. */
+export function drawMapObjects(ctx, map, S, iso, rng) {
   drawRoads(ctx, map, S);
   drawRail(ctx, map, S);
   drawTown(ctx, map, S, iso);
@@ -108,24 +131,6 @@ export function buildTerrain(map, iso = false) {
       ctx.fill();
     }
   }
-
-  // Dezentes Raster alle 4 Zellen (128 px)
-  ctx.strokeStyle = 'rgba(0,0,0,0.07)';
-  ctx.lineWidth = 1;
-  const step = tile * 4 * S;
-  ctx.beginPath();
-  for (let x = 0; x <= w; x += step) {
-    ctx.moveTo(x + 0.5, 0);
-    ctx.lineTo(x + 0.5, h);
-  }
-  for (let y = 0; y <= h; y += step) {
-    ctx.moveTo(0, y + 0.5);
-    ctx.lineTo(w, y + 0.5);
-  }
-  ctx.stroke();
-
-  cache_.set(map, canvas);
-  return canvas;
 }
 
 const TRAIN_COLOR = { loco: '#b3423a', container: '#3f8a5e', tank: '#7c8190' };

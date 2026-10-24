@@ -1,6 +1,7 @@
 // Overlay-Menüs (PLAN §5 ui/menu.js): Start, Pause, Hilfe, Ende. Reines DOM, keine Spiellogik.
 // Jedes Menü setzt root.dataset.kind ('start' | 'pause' | 'help' | 'end'), damit die Tastatur weiß, was offen ist.
 import { BALANCE } from '../data/balance.js';
+import { listMaps, deleteMap, saveMap, normalizeMap, describeMap } from '../game/mapdata.js';
 
 const DIFFS = [
   ['easy', 'Leicht'],
@@ -9,9 +10,11 @@ const DIFFS = [
 ];
 const POINTS = [25, 50, 100];
 const KEYS = [
-  ['Linksklick', 'Auswählen · Shift = hinzufügen · Doppelklick = alle dieses Typs im Bild'],
-  ['Ziehen', 'Rahmenauswahl (nur Einheiten)'],
-  ['Rechtsklick', 'Bewegen · auf Gegner = angreifen · Gebäude gewählt = Sammelpunkt'],
+  ['Linksklick / Tippen', 'Auswählen · Shift = hinzufügen · Doppelklick = alle dieses Typs im Bild · mit gewählten Einheiten: Boden = Gehen, Gegner = Angriff'],
+  ['Ziehen (Maus)', 'Rahmenauswahl (nur Einheiten)'],
+  ['Rechtsklick', 'Bewegen · auf Gegner = angreifen · Gebäude gewählt = Sammelpunkt · halten und ziehen = Karte schieben'],
+  ['Touch', 'Ein Finger ziehen = Karte schieben · zwei Finger = Zoomen und Schieben'],
+  ['I', 'Soldaten gewählt: Einsteigen (dann LKW, Baufahrzeug, Schützenpanzer oder Hubschrauber antippen) · O = Absetzen'],
   ['Rechtsklick auf FOB', 'LKW: leer laden, beladen entladen · Baufahrzeug: an Baustelle helfen, beschädigtes Gebäude reparieren'],
   ['A + Klick', 'Angriffsbewegung'],
   ['S', 'Stopp'],
@@ -26,7 +29,7 @@ const KEYS = [
   ['Treibstoff', 'Fahrzeuge verbrauchen Treibstoff nur beim Fahren · ohne Vorrat nur 25 % Tempo'],
   ['Esc', 'Abbrechen · Auswahl aufheben'],
   ['Strg + 0–9', 'Gruppe speichern · 0–9 wählt · zweimal drücken = Kamera hin'],
-  ['Pfeile / Rand', 'Kamera bewegen · Mausrad = Zoom · mittlere Taste ziehen'],
+  ['Pfeile / Rand', 'Kamera bewegen · Mausrad = Zoom · rechte oder mittlere Taste ziehen'],
   ['Leertaste', 'Kamera auf Auswahl oder letzte Meldung · H = Haupt-FOB'],
   ['+ / −', 'Spielgeschwindigkeit'],
   ['V', 'Ansicht umschalten: 2D von oben / isometrisch'],
@@ -55,9 +58,26 @@ export function hideOverlay(root) {
   root.hidden = true;
 }
 
-/** Startmenü: onStart({difficulty, winPoints}) beim Klick auf Start. */
+const MAPSEL_KEY = 'frontline-kartenwahl';
+function readMapSel() {
+  try {
+    return localStorage.getItem(MAPSEL_KEY) || 'random';
+  } catch {
+    return 'random';
+  }
+}
+function writeMapSel(v) {
+  try {
+    localStorage.setItem(MAPSEL_KEY, v);
+  } catch {
+    /* ohne Speicher: gilt nur für diese Sitzung */
+  }
+}
+
+/** Startmenü: onStart({difficulty, winPoints, mapId}) beim Klick auf Start (mapId 'random' oder Karten-ID). */
 export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.money, resetWallet = () => {} } = {}) {
   let difficulty = 'normal';
+  let mapSel = readMapSel(); // 'random' | Karten-ID
   let winPoints = BALANCE.winPoints;
   show(
     root,
@@ -72,6 +92,15 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
       <div class="field">
         <span class="flabel">Siegpunkte</span>
         <div class="seg">${POINTS.map((p) => `<button type="button" data-pts="${p}">${p}</button>`).join('')}</div>
+      </div>
+      <div class="field">
+        <span class="flabel">Karte</span>
+        <div class="seg">
+          <button type="button" data-mapmode="random">Zufall</button>
+          <button type="button" data-mapmode="saved">Gespeichert</button>
+          <button type="button" data-mapmode="new">Neue Karte</button>
+        </div>
+        <div class="mapbox" data-mapbox></div>
       </div>
       <ol class="howto">
         <li>Die Haupt-FOB hat unendlich Baumaterial, Munition und Treibstoff und bildet alle Einheiten aus – nur Geld ist knapp (nur aus Konfliktzone und Hot Zone).</li>
@@ -93,10 +122,96 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
     root.querySelectorAll('[data-diff]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.diff === difficulty)));
     root.querySelectorAll('[data-pts]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.pts) === winPoints)));
   };
+  const renderMapBox = () => {
+    const box = root.querySelector('[data-mapbox]');
+    const saved = listMaps();
+    if (mapSel !== 'random' && !saved.some((m) => m.id === mapSel)) mapSel = 'random';
+    if (mapSel === 'random') {
+      box.innerHTML = '<p class="muted small">Bei jedem Start wird eine neue Karte erzeugt. <button type="button" class="btn-sm" data-act="editRandom">im Editor öffnen</button></p>';
+    } else {
+      box.innerHTML = '';
+    }
+    root.querySelectorAll('[data-mapmode]').forEach((b) => {
+      const m = b.dataset.mapmode;
+      b.setAttribute('aria-pressed', String(m === 'saved' ? mapSel !== 'random' : m === 'random' && mapSel === 'random'));
+    });
+    if (mapSel !== 'random' || root.dataset.showSaved === '1') {
+      const opts = saved
+        .map((m) => {
+          const d = describeMap(m.map);
+          return `<option value="${esc(m.id)}"${m.id === mapSel ? ' selected' : ''}>${esc(m.name)} (${d.buildings} Gebäude, ${d.trees} Bäume)</option>`;
+        })
+        .join('');
+      box.innerHTML = saved.length
+        ? `<select data-mapsel>${opts}</select>
+           <div class="maprow"><button type="button" class="btn-sm" data-act="mapEdit">Bearbeiten</button>
+           <button type="button" class="btn-sm" data-act="mapDelete">Löschen</button>
+           <label class="btn-sm filebtn">Importieren<input type="file" accept=".json,application/json" data-mapimport hidden></label></div>`
+        : `<p class="muted small">Noch keine Karte gespeichert. <label class="btn-sm filebtn">Importieren<input type="file" accept=".json,application/json" data-mapimport hidden></label></p>`;
+    }
+  };
   mark();
+  renderMapBox();
+  root.onchange = (e) => {
+    if (e.target.matches('[data-mapsel]')) {
+      mapSel = e.target.value;
+      writeMapSel(mapSel);
+    } else if (e.target.matches('[data-mapimport]')) {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      f.text()
+        .then((t) => {
+          const m = normalizeMap(JSON.parse(t));
+          const id = saveMap(m);
+          if (!id) throw new Error('Speicher voll');
+          mapSel = id;
+          writeMapSel(id);
+          renderMapBox();
+        })
+        .catch((err) => {
+          const box = root.querySelector('[data-mapbox]');
+          box.insertAdjacentHTML('beforeend', `<p class="bad small">Import fehlgeschlagen: ${esc(err.message)}</p>`);
+        });
+    }
+  };
   root.onclick = (e) => {
     const b = e.target.closest('button');
     if (!b) return;
+    if (b.dataset.mapmode === 'random') {
+      mapSel = 'random';
+      delete root.dataset.showSaved;
+      writeMapSel(mapSel);
+      renderMapBox();
+      return;
+    }
+    if (b.dataset.mapmode === 'saved') {
+      const saved = listMaps();
+      if (mapSel === 'random' && saved.length) mapSel = saved[0].id;
+      else if (!saved.length) root.dataset.showSaved = '1';
+      writeMapSel(mapSel);
+      renderMapBox();
+      return;
+    }
+    if (b.dataset.mapmode === 'new') {
+      location.href = 'editor.html?new=1';
+      return;
+    }
+    if (b.dataset.act === 'editRandom') {
+      location.href = `editor.html?seed=${Math.floor(Math.random() * 1e9) + 1}`;
+      return;
+    }
+    if (b.dataset.act === 'mapEdit') {
+      location.href = `editor.html?map=${encodeURIComponent(mapSel)}`;
+      return;
+    }
+    if (b.dataset.act === 'mapDelete') {
+      if (!window.confirm('Diese Karte löschen?')) return;
+      deleteMap(mapSel);
+      mapSel = 'random';
+      writeMapSel(mapSel);
+      renderMapBox();
+      return;
+    }
     if (b.dataset.diff) difficulty = b.dataset.diff;
     else if (b.dataset.pts) winPoints = Number(b.dataset.pts);
     else if (b.dataset.act === 'resetWallet') {
@@ -104,7 +219,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
       showWallet();
     } else if (b.dataset.act === 'start') {
       hideOverlay(root);
-      onStart({ difficulty, winPoints });
+      onStart({ difficulty, winPoints, mapId: mapSel });
       return;
     }
     mark();

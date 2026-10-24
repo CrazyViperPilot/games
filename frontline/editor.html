@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#141814">
+  <title>Frontline Karteneditor</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/editor.css">
+</head>
+<body class="ed">
+  <canvas id="edview"></canvas>
+  <header class="edtop">
+    <button type="button" data-act="back" title="Zurück zum Startmenü">‹ Menü</button>
+    <input type="text" data-name maxlength="40" value="Neue Karte" aria-label="Kartenname">
+    <button type="button" data-act="undo" title="Rückgängig (Strg+Z)">↶</button>
+    <button type="button" data-act="redo" title="Wiederholen (Strg+Y)">↷</button>
+    <button type="button" data-act="fit" title="Ganze Karte zeigen">Übersicht</button>
+    <span class="sp"></span>
+    <button type="button" data-act="empty" title="Leere Karte beginnen">Leer</button>
+    <button type="button" data-act="random" title="Zufallskarte als Ausgangspunkt laden">Zufallskarte</button>
+    <label class="btn" title="Karte aus Datei laden">Import<input type="file" accept=".json,application/json" data-import hidden></label>
+    <button type="button" data-act="export" title="Karte als Datei sichern">Export</button>
+    <button type="button" data-act="check" title="Karte auf Spielbarkeit prüfen">Prüfen</button>
+    <button type="button" data-act="save" class="strong">Speichern</button>
+    <button type="button" data-act="play" class="strong primary">Spielen ▶</button>
+  </header>
+  <nav class="edtools" data-tools></nav>
+  <aside class="edinsp" data-insp hidden></aside>
+  <footer class="edstatus"><span data-hint></span><span data-msg class="msg"></span><span data-info class="info"></span></footer>
+  <script type="module" src="js/editor/editor.js"></script>
+</body>
+</html>
