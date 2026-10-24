@@ -832,7 +832,7 @@ function showInspector() {
     rows.push('<div class="muted small">Ziehen verschiebt den Startpunkt. Die Haupt-FOB entsteht hier, Bauradius als Kreis.</div>');
   }
   if (s.k !== 'spawn' && s.k !== 'zone') {
-    rows.push('<div class="row"><button data-i="dup">Kopie</button><button data-i="del" class="danger">Löschen</button></div>');
+    rows.push(`<div class="row">${s.k === 'rail' ? '' : '<button data-i="dup">Kopie</button>'}<button data-i="del" class="danger">Löschen</button></div>`);
   }
   el.innerHTML = `<h3>${title}</h3>${rows.join('')}`;
   el.hidden = false;
