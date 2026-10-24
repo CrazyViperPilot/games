@@ -353,3 +353,32 @@ test('Graben trifft keinen Mob außerhalb der Reichweite oder hinter dem Spieler
   run(g, DIG_RIGHT, 0.3);
   assert.deepEqual(hits, []);
 });
+
+test('Treppe: Springen + Graben + Richtung baut Kopfzeile, Zeile darüber und Decke ab, dann Hüpfer auf die Stufe', () => {
+  const g = makeGame(0);
+  g.player.onGround = true;
+  standAt(g, 5);
+  // Boden Zeile 7; Stufe (6,6) bleibt, darüber 2 Blöcke vorne und einer über dem Kopf.
+  for (let c = 0; c < 16; c++) set(g, c, 7, 'stone');
+  set(g, 6, 6, 'dirt');        // Stufe (Füße-Zeile 6)
+  set(g, 6, 5, 'dirt');        // vorne Kopfzeile
+  set(g, 6, 4, 'dirt');        // vorne darüber
+  set(g, 5, 4, 'dirt');        // über dem eigenen Kopf
+  const STAIR = { left: false, right: true, jump: true, dig: true };
+  until(g, STAIR, 3, () => g.player.vy < 0);   // Mock ohne Physik: nach dem Hüpfer endet der Test
+  assert.equal(g.map.get(6, 5), AIR);
+  assert.equal(g.map.get(6, 4), AIR);
+  assert.equal(g.map.get(5, 4), AIR);
+  assert.notEqual(g.map.get(6, 6), AIR, 'Stufe bleibt stehen');
+  assert.ok(g.player.vy < 0, 'hüpft hoch');
+});
+
+test('Treppe ohne Stufe vorne (offene Lücke): normales Graben', () => {
+  const g = makeGame(0);
+  g.player.onGround = true;
+  standAt(g, 5);
+  set(g, 5, 7, 'stone');
+  const STAIR = { left: false, right: true, jump: true, dig: true };
+  run(g, STAIR, 0.5);
+  assert.equal(g.player.vy, 0);
+});

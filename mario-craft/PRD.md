@@ -46,6 +46,10 @@ Portal**. Level sind 100–250 Blöcke breit und 30–70 Blöcke hoch; die Kamer
 
 - Knopf **Graben** (Spitzhacke) rechts. Allein = Block unter den Füßen; mit ◀/▶ = Block daneben (bei 2 hohen
   Blöcken erst unten, dann oben). Halten: Risse (4 Stufen), dann bricht der Block.
+- **Treppe (schräg nach oben graben):** Springen halten + Graben + ◀/▶ an einer Wand. Die Stufe (Block vor den Füßen)
+  bleibt stehen; abgebaut werden vorne die Kopfzeile, vorne eine Zeile darüber und der Block über dem eigenen Kopf.
+  Ist alles frei, hüpft die Figur automatisch auf die Stufe; mit gehaltenen Tasten geht es Stufe für Stufe weiter hoch.
+  Ohne Stufe vorne (Lücke) gilt normales Graben.
 - **Spitzhacke trifft Mobs:** Graben (allein = nach unten, mit ◀/▶ = zur Seite) besiegt Gegner in 1 Block Reichweite
   (Abklingzeit 0,35 s, 1 Schaden; Bosse nicht). Ein Zischer wird so ohne Explosion erledigt.
 - **Kopfstoß** bricht weiche Blöcke (Erde, Gras, Sand, Blätter, Bretter) sofort.

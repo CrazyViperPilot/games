@@ -46,6 +46,27 @@ function findUnder(map, p) {
   return true;
 }
 
+// Treppe: Springen + Graben + Richtung. Die Kachel vor den Füßen bleibt als Stufe stehen; abgebaut werden
+// vorne Kopfzeile, vorne eine Zeile darüber und über dem eigenen Kopf. Rückgabe: 'target' (TGT gesetzt),
+// 'ready' (alles frei, Stufe da → hochhüpfen) oder 'none' (keine Stufe / Grundgestein im Weg).
+function findStair(map, p, dir) {
+  const c = Math.floor((p.x + p.w / 2) / T);
+  const c1 = c + dir;
+  const feet = Math.floor((p.y + p.h - E) / T);
+  if (!TILE_BY_ID[map.get(c1, feet)].solid) return 'none';
+  const cells = [[c1, feet - 1], [c1, feet - 2], [c, feet - 2]];
+  for (let i = 0; i < cells.length; i++) {
+    const id = map.get(cells[i][0], cells[i][1]);
+    if (isTarget(id)) {
+      TGT.c = cells[i][0];
+      TGT.r = cells[i][1];
+      return 'target';
+    }
+    if (TILE_BY_ID[id].solid) return 'none';
+  }
+  return 'ready';
+}
+
 function digState(game) {
   let d = game.dig;
   if (!d) {
@@ -104,7 +125,22 @@ export function updateDig(game, dt, input) {
 
   const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
   hitMobsWithPick(game, d, p, dir);
-  const found = dir === 0 ? findUnder(game.map, p) : findSide(game.map, p, dir);
+  let found;
+  if (dir !== 0 && input.jump && p.onGround) {
+    const st = findStair(game.map, p, dir);
+    if (st === 'ready') {
+      // Stufe frei: automatisch hochhüpfen (Sprungimpuls wie ein normaler Sprung).
+      p.vy = -PHYS.jumpSpeed;
+      p.onGround = false;
+      p.jumping = true;
+      resetDig(d, p);
+      game.emit('jump');
+      return;
+    }
+    found = st === 'target';
+  } else {
+    found = dir === 0 ? findUnder(game.map, p) : findSide(game.map, p, dir);
+  }
   if (!found) {
     resetDig(d, p);
     return;
