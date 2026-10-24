@@ -43,8 +43,8 @@ test('Hindernisse und Vorkommen sind punktsymmetrisch', () => {
 test('Spawns liegen auf der Karte und sind punktsymmetrisch', () => {
   const map = generateMap(4);
   assert.deepStrictEqual(map.spawns, [
-    { x: 600, y: 4200 },
-    { x: 4200, y: 600 },
+    { x: 700, y: 6900 },
+    { x: 6900, y: 700 },
   ]);
   assert.deepStrictEqual(map.zone, { x: W / 2, y: H / 2, r: BALANCE.zone.r });
 });
@@ -63,7 +63,7 @@ test('jeder Spawn hat je 3 Sorten im FOB-Radius', () => {
 
 test('Vorkommen-IDs sind 1..n und haben Mindestabstand', () => {
   const map = generateMap(6);
-  assert.equal(map.nodes.length, 18);
+  assert.equal(map.nodes.length, 6 + 2 * 9);
   map.nodes.forEach((n, i) => assert.equal(n.id, i + 1));
   for (let i = 0; i < map.nodes.length; i++) {
     for (let j = i + 1; j < map.nodes.length; j++) {

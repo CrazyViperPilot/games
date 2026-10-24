@@ -198,7 +198,10 @@ export class Hud {
       label = 'neutral';
       col = '#9aa596';
     }
-    this.zoneEl.innerHTML = `<span style="color:${col}">${label}</span><small>${BALANCE.teamNames[0]} ${z.counts[0]} · ${BALANCE.teamNames[1]} ${z.counts[1]}</small>`;
+    const [c0, c1] = BALANCE.teamColors;
+    this.zoneEl.innerHTML =
+      `<span class="zone-state" style="color:${col}">${label}</span>` +
+      `<span class="zone-cnt"><b style="color:${c0}">${z.counts[0]}</b><i>:</i><b style="color:${c1}">${z.counts[1]}</b></span>`;
     this.timeEl.textContent = fmtTime(g.time);
     const st = this.app.status ? this.app.status() : { paused: false, speed: 1 };
     this.speedBtn.textContent = `${st.speed}×`;

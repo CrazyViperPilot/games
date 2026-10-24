@@ -500,13 +500,13 @@ test('Erstattung: Abriss fertiger Gebäude 25 % Baumaterial, Baustelle voll, an 
 /** Mörser (Team 0) bei (600, 3800), Feind-Schütze bei (1000, 3800), eigene Sicht durch Fahrzeughalle. */
 function mortarScene(withAA) {
   const g = new Game({ seed: 7 });
-  g.spawnBuilding('mortar', 0, cellOf(600) - 1, cellOf(3800) - 1);
-  g.spawnBuilding('depot', 0, cellOf(1000) - 1, cellOf(3950) - 1);
-  const enemy = g.spawnUnit('rifleman', 1, 1000, 3800);
+  g.spawnBuilding('mortar', 0, cellOf(600) - 1, cellOf(6500) - 1);
+  g.spawnBuilding('depot', 0, cellOf(1000) - 1, cellOf(6650) - 1);
+  const enemy = g.spawnUnit('rifleman', 1, 1000, 6500);
   if (withAA) {
-    g.spawnBuilding('aa', 1, cellOf(800) - 1, cellOf(3950) - 1);
+    g.spawnBuilding('aa', 1, cellOf(800) - 1, cellOf(6650) - 1);
     // Versorger der Flugabwehr: eigene FOB in Reichweite mit Munition
-    const f1 = g.spawnBuilding('fob', 1, cellOf(800) - 5, cellOf(3950) - 1);
+    const f1 = g.spawnBuilding('fob', 1, cellOf(800) - 5, cellOf(6650) - 1);
     f1.store.mun = 200;
   }
   return { g, enemy };

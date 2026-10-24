@@ -56,6 +56,10 @@ export function buildTerrain(map) {
     ctx.fillRect(rng.next() * w, rng.next() * h, 1, 1);
   }
 
+  drawRoads(ctx, map, S);
+  drawTown(ctx, map, S);
+  scatterTrees(ctx, map, S, rng);
+
   // Hindernisse: Wald (Kreis aus Baumkronen) bzw. Fels (grauer Block mit Schatten).
   // Die Art richtet sich nach dem Radius, damit die punktsymmetrischen Partner gleich aussehen.
   for (const o of map.obstacles) {
@@ -119,4 +123,114 @@ export function buildTerrain(map) {
 
   cache.set(map, canvas);
   return canvas;
+}
+
+function disc(ctx, x, y, r, fill) {
+  ctx.fillStyle = fill;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function tree(ctx, x, y, r) {
+  disc(ctx, x + r * 0.2, y + r * 0.25, r, 'rgba(10,22,10,0.35)');
+  disc(ctx, x, y, r, '#2f5028');
+  disc(ctx, x - r * 0.25, y - r * 0.25, r * 0.55, '#43733a');
+}
+
+/** Straßen der Stadt und Feldwege (Asphalt mit Mittellinie bzw. Erdweg). */
+function drawRoads(ctx, map, S) {
+  const roads = map.town?.roads;
+  if (!roads) return;
+  ctx.lineCap = 'butt';
+  for (const r of roads) {
+    ctx.strokeStyle = r.dirt ? '#7b6a48' : '#4d504c';
+    ctx.lineWidth = r.w * S;
+    ctx.beginPath();
+    ctx.moveTo(r.x1 * S, r.y1 * S);
+    ctx.lineTo(r.x2 * S, r.y2 * S);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(230,220,150,0.35)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([6, 6]);
+  ctx.beginPath();
+  for (const r of roads) {
+    if (r.dirt) continue;
+    ctx.moveTo(r.x1 * S, r.y1 * S);
+    ctx.lineTo(r.x2 * S, r.y2 * S);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+/** Parks, Gebäude (Häuser, Hallen, Fabriken), Autos und Stadtbäume. */
+function drawTown(ctx, map, S) {
+  const t = map.town;
+  if (!t) return;
+  for (const p of t.parks) {
+    disc(ctx, p.x * S, p.y * S, p.r * S, 'rgba(110,150,80,0.55)');
+  }
+  for (const b of t.buildings) {
+    const x = (b.x - b.w / 2) * S;
+    const y = (b.y - b.h / 2) * S;
+    const w = b.w * S;
+    const h = b.h * S;
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(x + 2, y + 2.5, w, h);
+    if (b.kind === 'house') {
+      ctx.fillStyle = (b.x + b.y) % 3 < 1 ? '#8c4a38' : (b.x + b.y) % 3 < 2 ? '#a15a3c' : '#7d5a47';
+      ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = 'rgba(0,0,0,0.22)';
+      ctx.fillRect(x + w / 2, y, w / 2, h); // Dachfirst: eine Dachhälfte dunkler
+    } else if (b.kind === 'hall') {
+      ctx.fillStyle = '#8d949a';
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let k = 1; k < 5; k++) {
+        ctx.moveTo(x + (w * k) / 5, y);
+        ctx.lineTo(x + (w * k) / 5, y + h);
+      }
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = '#5f6366';
+      ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = '#74797c';
+      for (let k = 0; k < 3; k++) {
+        if (w >= h) ctx.fillRect(x + 2 + (k * (w - 4)) / 3, y + 2, (w - 4) / 3 - 2, h - 4);
+        else ctx.fillRect(x + 2, y + 2 + (k * (h - 4)) / 3, w - 4, (h - 4) / 3 - 2);
+      }
+      disc(ctx, x + w * 0.85, y + h * 0.2, Math.max(2, 20 * S), '#3b3d3f'); // Schornstein
+    }
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, w, h);
+  }
+  for (const c of t.cars) {
+    const cw = (c.vertical ? 18 : 36) * S;
+    const ch = (c.vertical ? 36 : 18) * S;
+    ctx.fillStyle = c.color;
+    ctx.fillRect(c.x * S - cw / 2, c.y * S - ch / 2, cw, ch);
+  }
+  for (const tr of t.trees) tree(ctx, tr.x * S, tr.y * S, tr.r * S);
+}
+
+/** Einzelne Bäume überall auf der Karte (rein optisch), nicht auf Hindernissen, Vorkommen, Spawns oder in der Stadt. */
+function scatterTrees(ctx, map, S, rng) {
+  const cx = map.zone.x;
+  const cy = map.zone.y;
+  for (let i = 0; i < 260; i++) {
+    const x = rng.next() * map.width;
+    const y = rng.next() * map.height;
+    const r = 10 + rng.next() * 9;
+    if (Math.hypot(x - cx, y - cy) < map.zone.r + 30) continue;
+    if (map.spawns.some((s) => Math.hypot(x - s.x, y - s.y) < 420)) continue;
+    if (map.nodes.some((n) => Math.hypot(x - n.x, y - n.y) < 90)) continue;
+    if (map.obstacles.some((o) => Math.hypot(x - o.x, y - o.y) < o.r + 25)) continue;
+    tree(ctx, x * S, y * S, r * S);
+    // gelegentlich kleine Baumgruppe
+    if (rng.next() < 0.5) tree(ctx, (x + 26) * S, (y + 14) * S, r * 0.85 * S);
+  }
 }

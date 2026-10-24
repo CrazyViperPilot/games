@@ -63,6 +63,24 @@ export class Grid {
     }
   }
 
+  /** Markiert Zellen als Hindernis, deren Mittelpunkt im Rechteck {x,y,w,h} (Mitte, Größe) liegt. */
+  rasterizeRects(rects) {
+    const t = this.tile;
+    for (const o of rects) {
+      const c0 = Math.max(0, Math.floor((o.x - o.w / 2) / t));
+      const c1 = Math.min(this.cols - 1, Math.floor((o.x + o.w / 2) / t));
+      const r0 = Math.max(0, Math.floor((o.y - o.h / 2) / t));
+      const r1 = Math.min(this.rows - 1, Math.floor((o.y + o.h / 2) / t));
+      for (let r = r0; r <= r1; r++) {
+        for (let c = c0; c <= c1; c++) {
+          const dx = Math.abs(this.center(c) - o.x);
+          const dy = Math.abs(this.center(r) - o.y);
+          if (dx <= o.w / 2 && dy <= o.h / 2) this.terrain[this.idx(c, r)] = 1;
+        }
+      }
+    }
+  }
+
   /** Setzt den Fußabdruck eines Gebäudes (Tore zusätzlich mit Teamkennung). */
   occupy(b) {
     const isGate = !!(b.def && b.def.gate);

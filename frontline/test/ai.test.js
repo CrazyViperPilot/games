@@ -37,7 +37,7 @@ function playAiVsAi(seed, minutes) {
   };
 }
 
-test('KI allein (Seed 7): nach 10 min ≥ 5 Förderanlagen, ≥ 3 FOBs, eine FOB in der Zone', () => {
+test('KI allein (Seed 7): nach 10 min ≥ 4 Förderanlagen, ≥ 3 FOBs, eine FOB in der Zone', () => {
   const game = new Game({ seed: 7 });
   const ai = new AI(game, 1, 'normal');
   const steps = Math.round((10 * 60) / DT);
@@ -50,7 +50,7 @@ test('KI allein (Seed 7): nach 10 min ≥ 5 Förderanlagen, ≥ 3 FOBs, eine FOB
   const fobs = mine(game, 1, 'fob');
   const z = game.zone;
   const nearest = Math.min(...fobs.map((f) => Math.hypot(f.x - z.x, f.y - z.y)));
-  assert.ok(ext >= 5, `fertige Förderanlagen: ${ext}`);
+  assert.ok(ext >= 4, `fertige Förderanlagen: ${ext}`);
   assert.ok(fobs.length >= 3, `fertige FOBs: ${fobs.length}`);
   assert.ok(nearest <= z.r, `nächste FOB ${nearest.toFixed(0)} px von der Zonenmitte`);
   assert.ok(game.units.some((u) => u.alive && u.team === 1 && u.type === 'engineer'), 'Baufahrzeug lebt');

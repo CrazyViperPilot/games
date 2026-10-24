@@ -1,12 +1,12 @@
 // Alle globalen Spielzahlen (PLAN.md §3.1, §11).
 export const BALANCE = {
-  map: { width: 4800, height: 4800, tile: 32 },
+  map: { width: 7680, height: 7680, tile: 32 },
   tickRate: 20, // Simulationsschritte/s
   winPoints: 100,
   pointInterval: 30,
   startRes: { money: 400, bm: 600, mun: 150, fuel: 150 }, // bm/mun/fuel = Lager der Start-FOB
   startUnits: ['truck', 'engineer', 'rifleman', 'rifleman', 'rifleman', 'rifleman'],
-  zone: { r: 1100, controlIncome: 6, unitIncome: 0.25, unitIncomeCap: 30 },
+  zone: { r: 2200, controlIncome: 6, unitIncome: 0.25, unitIncomeCap: 30 },
   fob: { buildRadius: 450, minDistOwn: 500, minDistEnemy: 700, max: 6, income: 5 },
   queueMax: 5,
   shortageWarn: 20, // s zwischen zwei Meldungen je Sorte und Team
