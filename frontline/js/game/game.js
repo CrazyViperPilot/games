@@ -72,6 +72,7 @@ export class Game {
     this.grid = new Grid(W / TILE, H / TILE, TILE);
     this.grid.rasterizeObstacles(this.map.obstacles);
     this.grid.rasterizeRects(this.map.town?.buildings ?? []);
+    this.grid.rasterizeTrees([...(this.map.town?.trees ?? []), ...(this.map.trees ?? [])]);
     this.nodeById = new Map(this.map.nodes.map((n) => [n.id, n]));
 
     this.time = 0;

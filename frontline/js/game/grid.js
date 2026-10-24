@@ -81,6 +81,15 @@ export class Grid {
     }
   }
 
+  /** Bäume blockieren die Zelle, in der ihr Stamm steht. */
+  rasterizeTrees(trees) {
+    for (const t of trees) {
+      const c = this.toCell(t.x);
+      const r = this.toCell(t.y);
+      if (this.inBounds(c, r)) this.terrain[this.idx(c, r)] = 1;
+    }
+  }
+
   /** Setzt den Fußabdruck eines Gebäudes (Tore zusätzlich mit Teamkennung). */
   occupy(b) {
     const isGate = !!(b.def && b.def.gate);

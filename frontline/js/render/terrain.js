@@ -58,7 +58,7 @@ export function buildTerrain(map) {
 
   drawRoads(ctx, map, S);
   drawTown(ctx, map, S);
-  scatterTrees(ctx, map, S, rng);
+  for (const t of map.trees ?? []) tree(ctx, t.x * S, t.y * S, t.r * S);
 
   // Hindernisse: Wald (Kreis aus Baumkronen) bzw. Fels (grauer Block mit Schatten).
   // Die Art richtet sich nach dem Radius, damit die punktsymmetrischen Partner gleich aussehen.
@@ -215,22 +215,4 @@ function drawTown(ctx, map, S) {
     ctx.fillRect(c.x * S - cw / 2, c.y * S - ch / 2, cw, ch);
   }
   for (const tr of t.trees) tree(ctx, tr.x * S, tr.y * S, tr.r * S);
-}
-
-/** Einzelne Bäume überall auf der Karte (rein optisch), nicht auf Hindernissen, Vorkommen, Spawns oder in der Stadt. */
-function scatterTrees(ctx, map, S, rng) {
-  const cx = map.zone.x;
-  const cy = map.zone.y;
-  for (let i = 0; i < 260; i++) {
-    const x = rng.next() * map.width;
-    const y = rng.next() * map.height;
-    const r = 10 + rng.next() * 9;
-    if (Math.hypot(x - cx, y - cy) < map.zone.r + 30) continue;
-    if (map.spawns.some((s) => Math.hypot(x - s.x, y - s.y) < 420)) continue;
-    if (map.nodes.some((n) => Math.hypot(x - n.x, y - n.y) < 90)) continue;
-    if (map.obstacles.some((o) => Math.hypot(x - o.x, y - o.y) < o.r + 25)) continue;
-    tree(ctx, x * S, y * S, r * S);
-    // gelegentlich kleine Baumgruppe
-    if (rng.next() < 0.5) tree(ctx, (x + 26) * S, (y + 14) * S, r * 0.85 * S);
-  }
 }

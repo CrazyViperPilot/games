@@ -30,7 +30,7 @@ const reaches = (path, x, y) => path.length > 0 && path[path.length - 1].x === x
 /**
  * Erzeugt eine Karte. Scheitert die Platzierung oder ist die Karte nicht zusammenhängend,
  * wird mit seed + 1, + 2, … neu versucht (max. 20×).
- * @returns {{ width, height, tile, obstacles: {x,y,r}[], town: {roads, buildings, parks, cars, trees}, nodes: {id,type,x,y}[], spawns: {x,y}[], zone: {x,y,r} }}
+ * @returns {{ width, height, tile, obstacles: {x,y,r}[], town: {roads, buildings, parks, cars, trees}, trees: {x,y,r}[] (Bäume außerhalb der Stadt; wie die Stadtbäume blockierend), nodes: {id,type,x,y}[], spawns: {x,y}[], zone: {x,y,r} }}
  */
 export function generateMap(seed) {
   for (let k = 0; k < MAX_ATTEMPTS; k++) {
@@ -127,7 +127,8 @@ function tryBuild(seed) {
 
   // 4. Zusammenhang prüfen: Spawn 0 erreicht Zonenmitte und Spawn 1
   const town = buildTown(rng, nodes);
-  if (!isConnected(obstacles, town.buildings)) return null;
+  const trees = scatterTrees(rng, nodes, obstacles);
+  if (!isConnected(obstacles, town.buildings, [...town.trees, ...trees])) return null;
 
   return {
     width: W,
@@ -135,16 +136,18 @@ function tryBuild(seed) {
     tile: TILE,
     obstacles,
     town,
+    trees,
     nodes: nodes.map((n, i) => ({ id: i + 1, type: n.type, x: n.x, y: n.y })),
     spawns: SPAWNS.map((s) => ({ x: s.x, y: s.y })),
     zone: { x: CX, y: CY, r: ZONE_R },
   };
 }
 
-function isConnected(obstacles, buildings = []) {
+function isConnected(obstacles, buildings = [], trees = []) {
   const grid = new Grid(W / TILE, H / TILE, TILE);
   grid.rasterizeObstacles(obstacles);
   grid.rasterizeRects(buildings);
+  grid.rasterizeTrees(trees);
   const [a, b] = SPAWNS;
   if (!reaches(findPath(grid, a.x, a.y, CX, CY, 0), CX, CY)) return false;
   return reaches(findPath(grid, a.x, a.y, b.x, b.y, 0), b.x, b.y);
@@ -272,4 +275,32 @@ function buildTown(rng, nodes) {
     }
   }
   return { roads, buildings, parks, cars, trees };
+}
+
+const SCATTER_PAIRS = 350;
+
+/** Einzelne Bäume und kleine Gruppen überall außerhalb der Stadt (punktsymmetrisch); sie blockieren wie Gebäude. */
+function scatterTrees(rng, nodes, obstacles) {
+  const trees = [];
+  const ok = (x, y) =>
+    x > 40 &&
+    y > 40 &&
+    x < W - 40 &&
+    y < H - 40 &&
+    dist(x, y, CX, CY) > ZONE_R + 30 &&
+    SPAWNS.every((s) => dist(x, y, s.x, s.y) > 420) &&
+    nodes.every((n) => dist(x, y, n.x, n.y) > 90) &&
+    obstacles.every((o) => dist(x, y, o.x, o.y) > o.r + 25);
+  const add = (x, y) => {
+    if (!ok(x, y) || !ok(W - x, H - y)) return;
+    const r = Math.round(rng.range(10, 19));
+    trees.push({ x, y, r }, { x: W - x, y: H - y, r });
+  };
+  for (let i = 0; i < SCATTER_PAIRS; i++) {
+    const x = Math.round(rng.range(0, W));
+    const y = Math.round(rng.range(0, H));
+    add(x, y);
+    if (rng.next() < 0.5) add(x + 40, y + 20); // Baumgruppe
+  }
+  return trees;
 }
