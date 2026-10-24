@@ -3,6 +3,7 @@
 // Austausch: Dateien in assets/iso/ ersetzen oder die Listen unten anpassen.
 import { ISO_K } from './camera.js';
 import { spriteOverrides } from './isobuild.js';
+import { BUILDING_SPRITES, MODEL_PPU } from './isodata.js';
 
 const ENABLED = typeof Image !== 'undefined' && typeof location !== 'undefined' && new URLSearchParams(location.search).get('sprites') !== '0';
 const url = (p) => new URL(`../../assets/iso/${p}`, import.meta.url).href;
@@ -15,14 +16,12 @@ const load = (p) => {
 const ready = (img) => !!img && img.complete && img.naturalWidth > 0;
 const hash = (x, y = 0) => (Math.imul(Math.round(x) | 0, 73856093) ^ Math.imul(Math.round(y) | 0, 19349663)) >>> 0;
 
-// Stadtgebäude: Kenney „Isometric Buildings“ (je ein Quadrat von 132 px Breite mit Sockel)
-const BUILDING_IDS = {
-  house: ['002', '003', '009', '010', '014', '018', '021', '029', '033', '034', '040', '041'],
-  hall: ['004', '012', '017', '020', '026', '093', '101', '108', '109', '116', '117', '123', '124', '125'],
-  factory: ['011', '019', '027', '035', '046', '025', '028'],
-};
+// Stadtgebäude: vorgerenderte Modelle aus Kenney City Kit (Commercial = Häuser, Industrial = Hallen und Fabriken), siehe isodata.js
+const MAX_H = { house: 100, hall: 100, factory: 130 }; // größte Höhe (Welt-Pixel), damit hohe Modelle nicht alles verdecken
 const BUILDINGS = {};
-for (const [kind, ids] of Object.entries(BUILDING_IDS)) BUILDINGS[kind] = ids.map((n) => load(`buildings/b${n}.png`));
+for (const [kind, list] of Object.entries(BUILDING_SPRITES)) {
+  BUILDINGS[kind] = list.map(([file, ax, ay, w, d, h]) => ({ img: load(`buildings/${file}`), ax, ay, w, d, h }));
+}
 const TREE = load('trees/tree.png');
 
 // Fahrzeuge: je Modell und Team (0 = Blau, 1 = Rot) acht Bilder nach Bildschirmrichtung
@@ -34,34 +33,22 @@ for (const model of new Set(Object.values(UNIT_MODEL))) {
   VEHICLES[model] = TEAM_COLOR.map((c) => SECTORS.map((s) => load(`vehicles/${model}-${c}-${s}.png`)));
 }
 
-const TILE_W = 132; // Breite der Gebäudebilder
-const SLAB_BELOW = 68; // Abstand Bildunterkante → Mitte der Sockeloberfläche
-
-/** Gebäude als Reihe von Kenney-Quadraten entlang der langen Seite (Halle 290×100 → drei Stück). */
+/** Gebäude: Modell mit dem passendsten Seitenverhältnis, so skaliert, dass es das Rechteck ausfüllt. */
 function drawBuildingSprite(kind) {
   return (ctx, cam, b) => {
     const list = BUILDINGS[kind];
-    if (!list.every(ready)) return false;
-    const wide = b.w >= b.h;
-    const long = wide ? b.w : b.h;
-    const short = wide ? b.h : b.w;
-    const n = Math.max(1, Math.round(long / short));
-    const step = long / n;
-    const side = (step + short) / 2;
-    const sc = (2 * ISO_K * side * cam.zoom) / TILE_W;
+    if (!list.every((m) => ready(m.img))) return false;
+    const odd = cam.rot % 2 === 1; // das Bild ist fest für Drehung 0 gerendert: bei 90° Breite und Tiefe tauschen
+    const bw = odd ? b.h : b.w;
+    const bh = odd ? b.w : b.h;
     const seed = hash(b.x, b.y);
-    const cells = [];
-    for (let i = 0; i < n; i++) {
-      const off = -long / 2 + step * (i + 0.5);
-      const x = wide ? b.x + off : b.x;
-      const y = wide ? b.y : b.y + off;
-      cells.push({ x, y, k: cam.depth(x, y), img: list[(seed + i * 7) % list.length] });
-    }
-    cells.sort((p, q) => p.k - q.k);
-    for (const c of cells) {
-      const p = cam.worldToScreen(c.x, c.y);
-      ctx.drawImage(c.img, p.x - (c.img.naturalWidth * sc) / 2, p.y - (c.img.naturalHeight - SLAB_BELOW) * sc, c.img.naturalWidth * sc, c.img.naturalHeight * sc);
-    }
+    const want = Math.log(bw / bh);
+    const ranked = list.map((m, i) => ({ m, i, e: Math.abs(Math.log(m.w / m.d) - want) })).sort((p, q) => p.e - q.e || p.i - q.i);
+    const m = ranked[seed % Math.min(3, ranked.length)].m;
+    const f = Math.min(bw / m.w, bh / m.d, MAX_H[kind] / m.h);
+    const sc = (f * cam.zoom) / MODEL_PPU;
+    const p = cam.worldToScreen(b.x, b.y);
+    ctx.drawImage(m.img, p.x - m.ax * sc, p.y - m.ay * sc, m.img.naturalWidth * sc, m.img.naturalHeight * sc);
     return true;
   };
 }
