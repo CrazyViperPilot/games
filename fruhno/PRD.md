@@ -47,7 +47,8 @@ Vier „Farben“ = Kategorien, je 25 Karten:
 - Start: 7 Karten je Spieler, eine Startkarte aufdecken (Sonderkarte als Startkarte wirkt auf den ersten Spieler; Farbwahl-Karten werden zurückgemischt).
 - Legen: gleiche Farbe, gleiche Nummer oder gleiches Symbol; Farbwahl immer legbar; +4 nur, wenn keine Karte der aktuellen Farbe auf der Hand ist (Annahme: strikte Regel, keine Anzweiflung).
 - Kann man nicht legen: eine Karte ziehen; ist sie legbar, darf sie sofort gelegt werden, sonst Zug vorbei.
-- +2 / +4: Der nächste Spieler zieht und setzt aus (kein Stapeln, Standardannahme). **Ausnahme zu zweit:** Der Gegner zieht, setzt aber nicht aus, damit nach diesen Karten nie derselbe Spieler direkt noch einmal legt (Daniel, 2026-10-24).
+- **+4 (Hausregel, Daniel 2026-10-24):** Der nächste Spieler zieht 4 Karten, setzt **nicht** aus und ist direkt dran; er muss die gewünschte Farbe legen (oder eine Farbwahl/+4, falls erlaubt) oder ziehen. Gilt für 2 und 3 Spieler.
+- +2: Der nächste Spieler zieht und setzt aus (kein Stapeln, Standardannahme). **Ausnahme zu zweit:** Der Gegner zieht, setzt aber nicht aus, damit nach diesen Karten nie derselbe Spieler direkt noch einmal legt (Daniel, 2026-10-24).
 - Farbwunsch: Nach Farbwahl/+4 erscheint für alle eine Chat-Systemmeldung („Daniel wünscht sich Getränke ☕ (+4)“), auch beim Bot.
 - **Aktionsmeldungen im Chat** (Daniel, 2026-10-24): Jede Spielaktion erzeugt automatisch eine Zeile, z. B. „Kira legt Belag 7“, „Daniel legt Frühstücksbuffet und wünscht sich Getränke“, „Daniel legt Doppelte Portion (+2) – Lea zieht 2 Karten“, „Lea zieht eine Karte“, „Lea passt“, „Bot setzt aus“, dazu Beitritt/Start/Ende. Diese Zeilen sind klein und grau und blenden den Chat **nicht** ein; nur echte Nachrichten und Systemmeldungen (Fruhno-Ruf, Erwischt, Rundensieg) tun das und setzen den roten Punkt.
 - Chat-Nachrichten (auch Systemmeldungen) verschwinden nach 5 Minuten (serverseitig).
