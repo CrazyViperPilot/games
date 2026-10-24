@@ -12,6 +12,7 @@ Live: https://crazyviperpilot.github.io/games/
 | **Sudoku** | [`sudoku/`](sudoku/) | Sudoku, ursprünglich gebaut, um Google Antigravity kennenzulernen | `CACHE_NAME` in `sudoku/sw.js` |
 | **Frontline** | [`frontline/`](frontline/) | Echtzeit-Strategie: FOB bauen, Ressourcen fördern, Konfliktzone halten, gegen den Computer. [README](frontline/README.md) | `CACHE_VERSION` in `frontline/sw.js` |
 | **Fruhno** | [`fruhno/`](fruhno/) | UNO mit Frühstücksthema für Daniel, Lea und Kira (online, Chat, Bot). Backend: PHP im Repo vipervocs unter `fruhno/`. [PRD](fruhno/PRD.md) | `CACHE_VERSION` in `fruhno/sw.js` |
+| **Frankfurtopoly** | extern: [phpexpert.de/games/frankfurtopoly](https://phpexpert.de/games/frankfurtopoly/) | Monopoly mit Frankfurter Straßen für Daniel, Lea und Kira (online, Chat, Computergegner). Code, PHP-Backend und Deploy im Repo [frankfurtopoly](https://github.com/CrazyViperPilot/frankfurtopoly) | `CACHE_VERSION` in `frankfurtopoly/sw.js` dort |
 | **Mario Craft** | [`mario-craft/`](mario-craft/) | Jump'n Run im Pixel-Stil: 3 Welten mit Bossen, Deutsch und Polnisch. [README](mario-craft/README.md) | `CACHE_VERSION` in `mario-craft/sw.js` |
 
 ## Aufbau: jedes Spiel ist eigenständig
