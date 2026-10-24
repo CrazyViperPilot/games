@@ -208,9 +208,23 @@ function showResult() {
 }
 
 /* ---------- chat ---------- */
+let chatTimer = null;
+let chatPrimed = false;   // the first state only marks existing messages, it doesn't pop the chat up
+function startChatTimer() {
+  clearTimeout(chatTimer);
+  chatTimer = setTimeout(() => {
+    if (document.activeElement === $('#chat-input')) return;   // typing: stay open until the field loses focus
+    $('#chat').hidden = true; renderChat();
+  }, 3000);
+}
+function showChat() { $('#chat').hidden = false; renderChat(); startChatTimer(); }
+
 function renderChat() {
   if (!S) return;
   const log = $('#chat-log');
+  const lastMsg = S.chat[S.chat.length - 1];
+  if (chatPrimed && $('#chat').hidden && lastMsg && lastMsg.n > lastChatSeen && lastMsg.name !== store.get('name')) showChat();
+  chatPrimed = true;
   const open = !$('#chat').hidden;
   log.replaceChildren(...S.chat.map((m) => el('p', {}, el('b', {}, m.name + ': '), document.createTextNode(m.text))));
   const newest = S.chat.length ? S.chat[S.chat.length - 1].n : 0;
@@ -230,7 +244,9 @@ function render() {
 }
 
 /* ---------- wiring ---------- */
-$('#btn-chat').addEventListener('click', () => { const c = $('#chat'); c.hidden = !c.hidden; renderChat(); });
+$('#btn-chat').addEventListener('click', () => { if ($('#chat').hidden) showChat(); else { clearTimeout(chatTimer); $('#chat').hidden = true; renderChat(); } });
+$('#chat-input').addEventListener('focus', () => clearTimeout(chatTimer));
+$('#chat-input').addEventListener('blur', () => { if (!$('#chat').hidden) startChatTimer(); });
 $('#chat-close').addEventListener('click', () => { $('#chat').hidden = true; renderChat(); });
 // A tap anywhere outside the chat panel closes it.
 document.addEventListener('pointerdown', (ev) => {
