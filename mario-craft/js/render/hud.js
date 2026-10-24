@@ -1,6 +1,7 @@
 // HUD und Bedienknöpfe (PLAN §6, §7, PRD §4, §8). Alles aus dem Atlas: Ziffern und Zeichen sind Pixel-Glyphen
 // (Sprite font_*), kein fillText. Die Sprites werden über bindHud() einmal gesetzt (Renderer ruft es auf).
 import { BOSSES } from '../data/mobs.js';
+import { PHYS } from '../data/physics.js';
 
 let S = null;
 
@@ -43,6 +44,22 @@ export function drawText(ctx, text, x, y) {
     cx += ADV;
   }
   return cx - x;
+}
+
+const PHYS_HEARTS = PHYS.maxHearts;
+// Herz 7×6 Pixel (Zeilen als Bitmaske), mit dunklem Rand für Lesbarkeit auf hellem Hintergrund.
+const HEART = [0b0110110, 0b1111111, 0b1111111, 0b0111110, 0b0011100, 0b0001000];
+function drawHeart(ctx, x, y, full) {
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(x - 1, y - 1, 9, 8);
+  ctx.fillStyle = full ? '#e0383f' : '#4a2a2e';
+  for (let r = 0; r < 6; r++) {
+    for (let c = 0; c < 7; c++) if (HEART[r] & (1 << (6 - c))) ctx.fillRect(x + c, y + r, 1, 1);
+  }
+  if (full) {
+    ctx.fillStyle = '#ff9aa0';
+    ctx.fillRect(x + 1, y + 1, 1, 1);
+  }
 }
 
 // Anteil der Boss-Energie 0..1 (Slimeking: Teile, sonst HP).
@@ -94,6 +111,8 @@ export function drawHud(ctx, game, w, h) {
   blit(ctx, pname, 0, x, y);
   ctx.globalAlpha = 1;
   drawNum(ctx, pick, 1, x + 13, y + 2);
+  // Herzen (zweite Zeile): volle rot, verlorene dunkel
+  for (let i = 0; i < PHYS_HEARTS; i++) drawHeart(ctx, 4 + i * 9, y + 14, i < game.hearts);
   // Pause
   blit(ctx, 'pause', 0, w - PAUSE_X_OFF, PAUSE_Y);
   // Boss-Energie

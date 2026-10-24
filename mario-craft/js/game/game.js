@@ -78,6 +78,7 @@ export class Game {
     this.time = 0;
     this.score = 0;
     this.lives = s.lives ?? PHYS.lives;
+    this.hearts = PHYS.maxHearts;
     this.emeralds = s.emeralds ?? 0;
     this.pick = Math.max(s.pick ?? 0, map.pick);
     this.diamonds = [false, false, false];
@@ -249,6 +250,7 @@ export class Game {
     const at = this.respawnAt;
     this.player = createPlayer(at.x, at.y, 'plain');
     this.player.invuln = RESPAWN_INVULN;
+    this.hearts = PHYS.maxHearts;
     this.dig.active = false;
     this.dig.progress = 0;
     this.dig.stage = 0;
@@ -316,14 +318,15 @@ export class Game {
 
   // ---------- Leben und Schaden ----------
 
-  // Treffer durch Gegner, Geschoss, Explosion: Bogen → Rüstung → ohne Rüstung → Leben verloren.
+  // Treffer durch Gegner, Geschoss, Explosion: kostet Herzen (PHYS.heartDamage, mit Rüstung weniger); bei 0 Herzen Leben verloren.
   hurtPlayer(cause) {
     const p = this.player;
     if (this.state !== 'play' || p.dead) return;
     if (p.invuln > 0 || p.star > 0) return;
-    if (p.power === 'bow') setPower(p, 'armor');
-    else if (p.power === 'armor') setPower(p, 'plain');
-    else { this.loseLife(cause); return; }
+    let dmg = PHYS.heartDamage[cause] ?? 1;
+    if (p.power !== 'plain') dmg = Math.max(1, dmg - 1);
+    this.hearts = Math.max(0, this.hearts - dmg);
+    if (this.hearts <= 0) { this.loseLife(cause); return; }
     p.invuln = PHYS.hurtInvuln;
     this.emit('hurt');
     this.emit('hudChange');
@@ -357,6 +360,7 @@ export class Game {
 
   gainLife() {
     this.lives++;
+    this.hearts = PHYS.maxHearts;
     this.emit('oneup');
     this.emit('hudChange');
   }

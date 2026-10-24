@@ -78,6 +78,11 @@ Portal**. Level sind 100–250 Blöcke breit und 30–70 Blöcke hoch; die Kamer
 | **Glutgeist** (Welt 3) | schwebt, schießt alle 3 s drei Feuerkugeln | nur Pfeil (Stampfen verbrennt) |
 | **Leerenläufer** (Welt 3) | harmlos; berührt man ihn, teleportiert er neben dich und greift an | 2 Stampfer, Pfeil |
 
+**Herzen:** Jedes Leben hat **10 Herzen** (zweite HUD-Zeile unter Smaragden/Leben, rot = voll). Schaden: Zombie/Mob-Berührung
+und Sand 1 Herz, Feuer 2, Explosion und Boss 3. Rüstung/Bogen senken jeden Schaden um 1 (mindestens 1) und bleiben
+beim Treffer erhalten. Nach einem Treffer 1,5 s unverwundbar. Bei 0 Herzen geht ein Leben verloren (Neustart am
+Checkpoint mit vollen Herzen). Kuchen: +1 Leben und volle Herzen. Lava und Abgrund töten weiterhin sofort.
+
 **Explosion** (Zischer, TNT, Schädel): Radius 2,5 Blöcke (Schädel 1,5), zerstört alle Blöcke außer Obsidian und
 Grundgestein, besiegt Gegner, verletzt die Figur, zündet TNT in Reichweite (0,5 s). Bildschirmwackeln, Vibration.
 **Skelett-Dungeons:** Im Schussfeld jedes Skeletts (10 Blöcke, ebenerdig) sind die Decken mindestens 4 Zeilen

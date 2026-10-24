@@ -199,25 +199,35 @@ test('0 Leben: Game Over nach dem Sterben', () => {
   assert.ok(has('gameOver'));
 });
 
-test('hurtPlayer: Bogen → Rüstung → ohne → Leben', () => {
-  const { game, has } = makeGame({}, { power: 'bow' });
+test('hurtPlayer: Zombie-Berührung kostet 1 Herz, bei 0 Herzen geht ein Leben verloren', () => {
+  const { game, has } = makeGame({}, { power: 'plain' });
+  assert.equal(game.hearts, PHYS.maxHearts);
   game.hurtPlayer('mob');
-  assert.equal(game.player.power, 'armor');
+  assert.equal(game.hearts, PHYS.maxHearts - 1);
   assert.ok(game.player.invuln > 0);
 
   // Unverwundbar: kein weiterer Treffer.
   game.hurtPlayer('mob');
-  assert.equal(game.player.power, 'armor');
+  assert.equal(game.hearts, PHYS.maxHearts - 1);
 
+  // Explosion kostet 3 Herzen, Rüstung senkt auf 2.
   game.player.invuln = 0;
-  game.hurtPlayer('mob');
-  assert.equal(game.player.power, 'plain');
+  game.hurtPlayer('explosion');
+  assert.equal(game.hearts, PHYS.maxHearts - 4);
+  game.player.invuln = 0;
+  game.player.power = 'armor';
+  game.hurtPlayer('explosion');
+  assert.equal(game.hearts, PHYS.maxHearts - 6);
+  assert.equal(game.player.power, 'armor', 'Rüstung bleibt erhalten');
 
+  game.hearts = 1;
   game.player.invuln = 0;
   game.hurtPlayer('mob');
   assert.equal(game.state, 'dying');
   assert.equal(game.lives, PHYS.lives, 'Leben wird erst nach dem Timer abgezogen');
   assert.ok(has('die'));
+  runUntil(game, input(), () => game.state === 'play', 2000);
+  assert.equal(game.hearts, PHYS.maxHearts, 'nach dem Neustart wieder volle Herzen');
 });
 
 test('Portal-Berührung: state won und levelDone', () => {
@@ -262,8 +272,10 @@ test('Zombie aus Spawn z wird aktiv und verletzt den Spieler', () => {
   assert.equal(game.mobs.length, 1);
   assert.equal(game.mobs[0].type, 'zombie');
   assert.equal(game.mobs[0].active, true);
-  runUntil(game, input({ right: true }), () => game.state !== 'play', 900);
-  assert.ok(has('die'));
+  runUntil(game, input({ right: true }), () => game.hearts < PHYS.maxHearts, 900);
+  assert.equal(game.hearts, PHYS.maxHearts - 1, 'Zombie nimmt genau 1 Herz');
+  assert.equal(game.state, 'play');
+  assert.ok(!has('die'));
 });
 
 test('jump-Event beim Absprung', () => {

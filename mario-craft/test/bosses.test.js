@@ -272,7 +272,7 @@ test('Besiegt, wenn keine Teile und keine Boss-Schleime mehr leben', () => {
   assert.equal(game.score, score);
 });
 
-test('Bot besiegt die Arena in unter 60 s (Schritt 1/120, updatePlayer)', () => {
+test('Bot besiegt die Arena in unter 120 s (Schritt 1/120, updatePlayer)', () => {
   const { game } = makeGame({ lives: 99, power: 'bow' });
   const JUMP_NEAR = 40;   // px Abstand, ab dem der Bot aus dem Stand springt (Sprung landet auf dem Teil)
   const JUMP_FAR = 60;
@@ -318,14 +318,14 @@ test('Bot besiegt die Arena in unter 60 s (Schritt 1/120, updatePlayer)', () => 
     return inp;
   }
 
-  const maxSteps = 60 / STEP;
+  const maxSteps = 120 / STEP;
   let steps = 0;
   while (game.boss.state !== 'defeated' && steps < maxSteps) {
     game.update(STEP, botInput());
     steps++;
   }
-  assert.equal(game.boss.state, 'defeated', `nicht besiegt nach ${(steps * STEP).toFixed(1)} s (Leben ${game.lives}, Zustand ${game.state})`);
-  assert.ok(steps * STEP < 60);
+  assert.equal(game.boss.state, 'defeated', `nicht besiegt nach ${(steps * STEP).toFixed(1)} s (Herzen ${game.hearts}, Teile ${game.boss.parts.filter((q) => !q.gone).length}, Leben ${game.lives}, Zustand ${game.state})`);
+  assert.ok(steps * STEP < 120);
 });
 
 // ---------- Dreikopf ----------

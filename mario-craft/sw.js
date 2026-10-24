@@ -1,6 +1,6 @@
 // Mario Craft Service Worker: network-first (immer die neueste Version), Cache nur als Offline-Fallback.
 // Bei Änderungen an Dateien CACHE_VERSION erhöhen, damit Clients die neue Version laden.
-const CACHE_VERSION = 'mariocraft-v5';
+const CACHE_VERSION = 'mariocraft-v6';
 const CACHE_PREFIX = 'mariocraft-';
 const CACHE_NAME = CACHE_VERSION;
 
