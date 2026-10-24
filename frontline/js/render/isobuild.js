@@ -2,7 +2,7 @@
 // Spätere Sprites (z. B. freies Grafikpaket oder eigene Entwürfe) lassen sich pro Gebäudeart einhängen:
 // spriteOverrides.house = (ctx, cam, b) => { …; return true; } ersetzt die gemalte Variante (Rückgabe true = erledigt).
 import { BALANCE } from '../data/balance.js';
-import { drawBox, wallPoint, wallQuad, buildingHeight, TOWN_H } from './iso.js';
+import { drawBox, drawRotBox, wallPoint, wallQuad, buildingHeight, TOWN_H } from './iso.js';
 import { shade, tint, hexA } from './sprites.js';
 
 const TILE = BALANCE.map.tile;
@@ -261,6 +261,24 @@ export function drawTownBuilding(ctx, cam, b) {
     drawBox(ctx, cam, x0, y0, x1, y1, 22, '#a29f94', { roof: '#c4c1b6' });
     return;
   }
+  if (b.kind === 'platform') {
+    const ang = b.angle || 0;
+    drawRotBox(ctx, cam, b.x, b.y, b.w, b.h, ang, H, '#a7a8a2', { roof: '#bfbfb7' });
+    // Bahnsteigdach auf Stützen (nur bei genug Zoom)
+    if (z >= DETAIL_ZOOM) {
+      const c = Math.cos(ang);
+      const s = Math.sin(ang);
+      for (const t of [-0.36, 0, 0.36]) {
+        drawRotBox(ctx, cam, b.x + c * b.w * t, b.y + s * b.w * t, 4, 4, ang, 34, '#6d7478', { base: H, noShadow: true });
+      }
+      drawRotBox(ctx, cam, b.x, b.y, b.w * 0.86, b.h * 0.8, ang, 3, '#8d959a', { base: H + 34, noShadow: true, roof: '#a9b0b4' });
+    }
+    return;
+  }
+  if (b.kind === 'train' && b.angle) {
+    drawRotBox(ctx, cam, b.x, b.y, b.w - 6, b.h - 8, b.angle, 30, TRAIN_PAINT[b.part] ?? '#777', {});
+    return;
+  }
   if (b.kind === 'train') {
     drawBox(ctx, cam, x0 + 3, y0 + 4, x1 - 3, y1 - 4, 30, TRAIN_PAINT[b.part] ?? '#777', {});
     return;
@@ -268,8 +286,9 @@ export function drawTownBuilding(ctx, cam, b) {
   let wall;
   if (b.kind === 'house') wall = HOUSE_WALLS[seed % HOUSE_WALLS.length];
   else if (b.kind === 'hall') wall = HALL_WALLS[seed % HALL_WALLS.length];
+  else if (b.kind === 'station') wall = '#cdbb98';
   else wall = FACT_WALLS[seed % FACT_WALLS.length];
-  const opts = { wallS: shade(wall, 0.2), wallE: shade(wall, 0.42), noTop: b.kind === 'house' };
+  const opts = { wallS: shade(wall, 0.2), wallE: shade(wall, 0.42), noTop: b.kind === 'house' || b.kind === 'station' };
   const top = drawBox(ctx, cam, x0, y0, x1, y1, H, wall, { ...opts, roof: b.kind === 'hall' ? '#b3b9bd' : '#6a6e70' });
   top.cam = cam;
   top.color = wall;
@@ -278,6 +297,25 @@ export function drawTownBuilding(ctx, cam, b) {
     const roof = HOUSE_ROOFS[(seed >>> 3) % HOUSE_ROOFS.length];
     gableRoof(ctx, cam, x0, y0, x1, y1, H, 12, roof, wall);
     if (seed % 4 === 0 && z >= DETAIL_ZOOM) roofBox(ctx, cam, x0 + (x1 - x0) * 0.25, y0 + (y1 - y0) * 0.3, 5, H + 4, 14, '#7a5a4a');
+  } else if (b.kind === 'station') {
+    hallDetails(ctx, top, seed);
+    gableRoof(ctx, cam, x0, y0, x1, y1, H, 14, '#7d4b3d', wall);
+    // Uhrenturm am einen Ende
+    const alongX = b.w >= b.h;
+    const tx = alongX ? b.x - hw * 0.72 : b.x;
+    const ty = alongX ? b.y : b.y - hh * 0.72;
+    roofBox(ctx, cam, tx, ty, 11, H, 30, '#b5a789');
+    roofBox(ctx, cam, tx, ty, 13, H + 30, 6, '#6a4034');
+    if (z >= DETAIL_ZOOM) {
+      const c = cam.worldToScreen(tx, ty);
+      ctx.fillStyle = '#f2efe4';
+      ctx.beginPath();
+      ctx.arc(c.x, c.y - (H + 18) * z, 5 * z, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
   } else if (b.kind === 'hall') {
     hallDetails(ctx, top, seed);
     if (z >= DETAIL_ZOOM) {

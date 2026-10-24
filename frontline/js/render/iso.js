@@ -7,7 +7,7 @@ const TILE = BALANCE.map.tile;
 const OUTLINE = 'rgba(0,0,0,0.55)';
 
 /** Höhe (Bildschirm-Pixel bei Zoom 1) der Stadtgebäude und der Spielgebäude je Typ. */
-export const TOWN_H = { house: 46, hall: 60, factory: 92 };
+export const TOWN_H = { house: 46, hall: 60, factory: 92, station: 54, platform: 8 };
 export const BUILD_H = {
   fob: 58,
   depot: 50,
@@ -107,6 +107,63 @@ export function drawBox(ctx, cam, x0, y0, x1, y1, h, color, opts = {}) {
     ctx.stroke();
   }
   top.walls = walls;
+  ctx.restore();
+  return top;
+}
+
+/**
+ * Quader um (cx, cy) mit Länge `len` (entlang `ang`) und Breite `wid`, beliebig gedreht (Züge, Bahnsteige entlang schräger Gleise).
+ * Zeichnet Schatten, die dem Betrachter zugewandten Wände und das Dach. opts.base hebt an, opts.roof/wallS/wallE färben.
+ */
+export function drawRotBox(ctx, cam, cx, cy, len, wid, ang, h, color, opts = {}) {
+  const z = cam.zoom;
+  const H = h * z;
+  const BASE = (opts.base ?? 0) * z;
+  const c = Math.cos(ang);
+  const s = Math.sin(ang);
+  const L = len / 2;
+  const Wd = wid / 2;
+  const world = [[-L, -Wd], [L, -Wd], [L, Wd], [-L, Wd]].map(([lx, ly]) => ({ x: cx + lx * c - ly * s, y: cy + lx * s + ly * c }));
+  const wp = world.map((q) => {
+    const p = cam.worldToScreen(q.x, q.y);
+    return { x: p.x, y: p.y - BASE };
+  });
+  const up = (p) => ({ x: p.x, y: p.y - H });
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = OUTLINE;
+  if (!opts.noShadow && H > 2 && !BASE) {
+    const sh = H * 0.35;
+    poly(ctx, wp.map((p) => ({ x: p.x - sh, y: p.y + sh * 0.5 })));
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    ctx.fill();
+  }
+  for (let i = 0; i < 4; i++) {
+    const A = world[i];
+    const B = world[(i + 1) % 4];
+    const mx = (A.x + B.x) / 2;
+    const my = (A.y + B.y) / 2;
+    let nx = B.y - A.y;
+    let ny = -(B.x - A.x);
+    const nl = Math.hypot(nx, ny) || 1;
+    nx = (nx / nl) * 10;
+    ny = (ny / nl) * 10;
+    if (((mx - cx) * nx + (my - cy) * ny) < 0) { nx = -nx; ny = -ny; }
+    if (cam.depth(mx + nx, my + ny) - cam.depth(mx, my) <= 0) continue; // Rückseite
+    const P = wp[i];
+    const Q = wp[(i + 1) % 4];
+    poly(ctx, [P, Q, up(Q), up(P)]);
+    const left = cam.worldToScreen(mx + nx, my + ny).x < cam.worldToScreen(mx, my).x;
+    ctx.fillStyle = left ? (opts.wallS ?? shade(color, 0.62)) : (opts.wallE ?? shade(color, 0.45));
+    ctx.fill();
+    ctx.stroke();
+  }
+  const top = wp.map(up);
+  poly(ctx, top);
+  ctx.fillStyle = opts.roof ?? tint(color, 0.18);
+  ctx.fill();
+  ctx.stroke();
   ctx.restore();
   return top;
 }

@@ -7,7 +7,8 @@ const W = BALANCE.map.width;
 const H = BALANCE.map.height;
 const TILE = BALANCE.map.tile;
 export const MAP_FORMAT = 1;
-export const BUILDING_KINDS = ['house', 'factory', 'hall', 'train'];
+export const BUILDING_KINDS = ['house', 'factory', 'hall', 'train', 'station', 'platform'];
+const TURNABLE = ['train', 'platform']; // dürfen beliebig gedreht sein (`angle`, Bogenmaß)
 const SPAWN_CLEAR = 180; // freier Platz um einen Startpunkt (Haupt-FOB und Startunits)
 
 /** Leere Karte: nur Startpunkte in den Ecken und die Konfliktzone in der Mitte. */
@@ -67,6 +68,7 @@ export function normalizeMap(src) {
         w: clamp(num(b.w, 90), 24, 600),
         h: clamp(num(b.h, 70), 24, 600),
         kind: BUILDING_KINDS.includes(b.kind) ? b.kind : 'house',
+        ...(TURNABLE.includes(b.kind) && Number.isFinite(b.angle) && Math.abs(b.angle) > 1e-3 ? { angle: clamp(b.angle, -Math.PI * 2, Math.PI * 2) } : {}),
         ...(b.kind === 'train' ? { part: ['loco', 'container', 'tank'].includes(b.part) ? b.part : 'container' } : {}),
       })),
       parks: arr(town.parks).map((p) => circ(p, 40, 400)),
@@ -82,6 +84,19 @@ export function normalizeMap(src) {
 
 export const cloneMap = (m) => normalizeMap(JSON.parse(JSON.stringify(m)));
 
+/** Umschließendes Rechteck eines (evtl. gedrehten) Gebäudes: {x, y, w, h}. */
+export function footprint(b) {
+  if (!b.angle) return { x: b.x, y: b.y, w: b.w, h: b.h };
+  const c = Math.abs(Math.cos(b.angle));
+  const s = Math.abs(Math.sin(b.angle));
+  return { x: b.x, y: b.y, w: b.w * c + b.h * s, h: b.w * s + b.h * c };
+}
+
+/** Rechtecke, die den Weg versperren: alle Gebäude außer Bahnsteigen (begehbar), gedrehte als Umschließendes. */
+export function blockers(buildings) {
+  return buildings.filter((b) => b.kind !== 'platform').map(footprint);
+}
+
 /** Zusammenfassung für Menü und Editor. */
 export function describeMap(m) {
   const t = m.town;
@@ -96,7 +111,7 @@ export function checkMap(map) {
   const problems = [];
   const hit = (x, y, r) => {
     for (const o of map.obstacles) if (Math.hypot(o.x - x, o.y - y) < o.r + r) return true;
-    for (const b of map.town.buildings) if (Math.abs(b.x - x) < b.w / 2 + r && Math.abs(b.y - y) < b.h / 2 + r) return true;
+    for (const b of blockers(map.town.buildings)) if (Math.abs(b.x - x) < b.w / 2 + r && Math.abs(b.y - y) < b.h / 2 + r) return true;
     for (const t of [...map.town.trees, ...map.trees]) if (Math.hypot(t.x - x, t.y - y) < t.r + r) return true;
     return false;
   };
@@ -108,7 +123,7 @@ export function checkMap(map) {
   if (problems.length) return problems;
   const grid = new Grid(W / TILE, H / TILE, TILE);
   grid.rasterizeObstacles(map.obstacles);
-  grid.rasterizeRects(map.town.buildings);
+  grid.rasterizeRects(blockers(map.town.buildings));
   grid.rasterizeTrees([...map.town.trees, ...map.trees]);
   const [a, b] = map.spawns;
   const reaches = (path, x, y) => path.length > 0 && Math.hypot(path[path.length - 1].x - x, path[path.length - 1].y - y) < TILE * 2;

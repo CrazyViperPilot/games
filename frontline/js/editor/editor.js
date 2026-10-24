@@ -28,9 +28,11 @@ const TOOLS = [
   ['house', 'Haus', 'Gebäude', '⌂', 'Tippen setzt ein Haus'],
   ['factory', 'Fabrik', 'Gebäude', '▣', 'Tippen setzt eine Fabrik mit Schornstein'],
   ['hall', 'Halle', 'Gebäude', '▭', 'Tippen setzt eine Halle'],
-  ['loco', 'Lok', 'Zug', '◧', 'Tippen setzt eine Lok (blockiert wie ein Gebäude)'],
-  ['container', 'Waggon', 'Zug', '◨', 'Tippen setzt einen Container-Waggon'],
+  ['loco', 'Lok', 'Zug', '◧', 'Tippen auf ein Gleis setzt eine Lok in Gleisrichtung (blockiert wie ein Gebäude)'],
+  ['container', 'Waggon', 'Zug', '◨', 'Tippen auf ein Gleis setzt einen Waggon, neben einem Zugteil schließt er an'],
   ['tank', 'Kesselwagen', 'Zug', '◩', 'Tippen setzt einen Kesselwagen'],
+  ['platform', 'Bahnsteig', 'Zug', '▱', 'Tippen neben ein Gleis setzt einen Bahnsteig parallel zum Gleis (begehbar, mit Dach)'],
+  ['station', 'Bahnhof', 'Zug', '▦', 'Tippen neben ein gerades Gleis setzt das Bahnhofsgebäude passend zum Gleis'],
   ['rail', 'Gleis', 'Zug', '═', 'Von Start- zu Endpunkt ziehen; Gleise rasten aneinander ein, Kreuzungen und Weichen entstehen von selbst'],
   ['road', 'Straße', 'Wege', '▬', 'Von Start- zu Endpunkt ziehen'],
   ['dirt', 'Feldweg', 'Wege', '┅', 'Von Start- zu Endpunkt ziehen'],
@@ -50,6 +52,8 @@ const BUILD_DEF = {
   loco: { w: 96, h: 46, kind: 'train', part: 'loco' },
   container: { w: 96, h: 46, kind: 'train', part: 'container' },
   tank: { w: 96, h: 46, kind: 'train', part: 'tank' },
+  platform: { w: 300, h: 30, kind: 'platform' },
+  station: { w: 280, h: 110, kind: 'station' },
 };
 
 const $ = (s) => document.querySelector(s);
@@ -233,11 +237,18 @@ function pickAt(wx, wy, sx = null, sy = null) {
   }
   for (let i = m.town.buildings.length - 1; i >= 0; i--) {
     const b = m.town.buildings[i];
-    if (Math.abs(b.x - wx) <= b.w / 2 + tol * 0.4 && Math.abs(b.y - wy) <= b.h / 2 + tol * 0.4) return { k: 'building', o: b };
+    const inside = (px, py, pad) => {
+      const c = Math.cos(b.angle || 0);
+      const sn = Math.sin(b.angle || 0);
+      const lx = (px - b.x) * c + (py - b.y) * sn;
+      const ly = -(px - b.x) * sn + (py - b.y) * c;
+      return Math.abs(lx) <= b.w / 2 + pad && Math.abs(ly) <= b.h / 2 + pad;
+    };
+    if (inside(wx, wy, tol * 0.4)) return { k: 'building', o: b };
     if (st.cam.iso && sx !== null) {
       // Isometrisch: ein Klick aufs Dach liegt auf dem Boden hinter dem Fußabdruck
       const roof = st.cam.screenToWorld(sx, sy + (b.kind === 'train' ? 30 : TOWN_H[b.kind] ?? 40) * st.cam.zoom);
-      if (Math.abs(b.x - roof.x) <= b.w / 2 && Math.abs(b.y - roof.y) <= b.h / 2) return { k: 'building', o: b };
+      if (inside(roof.x, roof.y, 0)) return { k: 'building', o: b };
     }
   }
   const hit = circ('tree', m.trees) || circ('townTree', m.town.trees) || circ('obstacle', m.obstacles);
@@ -278,6 +289,7 @@ function place(tool, x, y) {
   const py = clamp(snap(y), 0, H);
   if (BUILD_DEF[tool]) {
     const o = { x: px, y: py, ...BUILD_DEF[tool] };
+    placeAlongRail(o, tool, x, y);
     m.town.buildings.push(o);
     return { k: 'building', o };
   }
@@ -320,6 +332,68 @@ function place(tool, x, y) {
       return { k: 'zone', o: m.zone };
     default:
       return null;
+  }
+}
+
+/** Nächstes Gleis zum Weltpunkt: {q: Fußpunkt, a: Richtung (-π/2..π/2], side: +1/-1 Seite des Punktes, dist} oder null. */
+function nearestRail(x, y, maxDist) {
+  let best = null;
+  for (const r of st.map.town.rails) {
+    const dx = r.x2 - r.x1;
+    const dy = r.y2 - r.y1;
+    const l2 = dx * dx + dy * dy;
+    if (l2 < 1) continue;
+    const t = clamp(((x - r.x1) * dx + (y - r.y1) * dy) / l2, 0, 1);
+    const q = { x: r.x1 + t * dx, y: r.y1 + t * dy };
+    const d = Math.hypot(q.x - x, q.y - y);
+    if (d > maxDist || (best && d >= best.dist)) continue;
+    let a = Math.atan2(dy, dx);
+    if (a > Math.PI / 2) a -= Math.PI;
+    else if (a <= -Math.PI / 2) a += Math.PI;
+    const side = (x - q.x) * -Math.sin(a) + (y - q.y) * Math.cos(a) >= 0 ? 1 : -1;
+    best = { q, a, side, dist: d };
+  }
+  return best;
+}
+
+/** Zugteile, Bahnsteige und Bahnhof richten sich nach dem nächsten Gleis aus. */
+function placeAlongRail(o, tool, x, y) {
+  const lim = o.kind === 'train' ? 70 : o.kind === 'platform' ? 150 : 280;
+  const r = nearestRail(x, y, lim);
+  if (!r) return;
+  const nx = -Math.sin(r.a);
+  const ny = Math.cos(r.a);
+  if (o.kind === 'train') {
+    o.x = r.q.x;
+    o.y = r.q.y;
+    if (Math.abs(r.a) > 1e-3) o.angle = r.a;
+    // an ein nahes Zugteil anschließen
+    const ux = Math.cos(r.a);
+    const uy = Math.sin(r.a);
+    for (const b of st.map.town.buildings) {
+      if (b.kind !== 'train' || b === o) continue;
+      const along = (x - b.x) * ux + (y - b.y) * uy;
+      const across = (x - b.x) * nx + (y - b.y) * ny;
+      if (Math.abs(across) < 60 && Math.abs(along) < 160) {
+        const gap = (b.w + o.w) / 2 + 4;
+        o.x = b.x + ux * gap * (along >= 0 ? 1 : -1);
+        o.y = b.y + uy * gap * (along >= 0 ? 1 : -1);
+        break;
+      }
+    }
+  } else if (o.kind === 'platform') {
+    const off = 20 + o.h / 2 + 4;
+    o.x = r.q.x + nx * off * r.side;
+    o.y = r.q.y + ny * off * r.side;
+    if (Math.abs(r.a) > 1e-3) o.angle = r.a;
+  } else if (o.kind === 'station') {
+    const horizontal = Math.abs(r.a) < 0.25;
+    const vertical = Math.abs(Math.abs(r.a) - Math.PI / 2) < 0.25;
+    if (!horizontal && !vertical) return;
+    const off = 20 + 30 + 4 + 8 + o.h / 2; // Gleisbett, Bahnsteig, Abstand, halbe Tiefe
+    if (vertical) [o.w, o.h] = [o.h, o.w];
+    o.x = r.q.x + nx * off * r.side;
+    o.y = r.q.y + ny * off * r.side;
   }
 }
 
@@ -465,7 +539,11 @@ function drawSelection(sel, px) {
   ctx.setLineDash([6 * px, 4 * px]);
   const pad = 3 * px;
   if (sel.k === 'building') {
-    ctx.strokeRect(o.x - o.w / 2 - pad, o.y - o.h / 2 - pad, o.w + pad * 2, o.h + pad * 2);
+    ctx.save();
+    ctx.translate(o.x, o.y);
+    ctx.rotate(o.angle || 0);
+    ctx.strokeRect(-o.w / 2 - pad, -o.h / 2 - pad, o.w + pad * 2, o.h + pad * 2);
+    ctx.restore();
   } else if (sel.k === 'road' || sel.k === 'rail') {
     ctx.setLineDash([]);
     for (const [x, y] of [[o.x1, o.y1], [o.x2, o.y2]]) {
@@ -793,7 +871,7 @@ const SEL_NAMES = {
   spawn: 'Startpunkt',
   zone: 'Konfliktzone',
 };
-const KIND_NAMES = { house: 'Haus', factory: 'Fabrik', hall: 'Halle', train: 'Zugteil' };
+const KIND_NAMES = { house: 'Haus', factory: 'Fabrik', hall: 'Halle', train: 'Zugteil', station: 'Bahnhof', platform: 'Bahnsteig' };
 
 function showInspector() {
   const el = $('[data-insp]');
@@ -810,7 +888,12 @@ function showInspector() {
   if (s.k === 'building') {
     rows.push('<div class="row"><button data-i="w-">Breite −</button><button data-i="w+">Breite +</button></div>');
     rows.push('<div class="row"><button data-i="h-">Höhe −</button><button data-i="h+">Höhe +</button></div>');
-    rows.push('<div class="row"><button data-i="turn">Drehen</button>' + (s.o.kind !== 'train' ? '<button data-i="kind">Art</button>' : '') + '</div>');
+    const turnable = s.o.kind === 'train' || s.o.kind === 'platform';
+    rows.push(
+      turnable
+        ? '<div class="row"><button data-i="rot-">↺ 15°</button><button data-i="rot+">↻ 15°</button></div>'
+        : '<div class="row"><button data-i="turn">Drehen</button>' + (s.o.kind !== 'station' ? '<button data-i="kind">Art</button>' : '') + '</div>',
+    );
   } else if (s.k === 'road') {
     rows.push('<div class="row"><button data-i="rw-">Schmaler</button><button data-i="rw+">Breiter</button></div>');
     rows.push('<div class="row"><button data-i="dirt">' + (s.o.dirt ? 'Zur Straße' : 'Zum Feldweg') + '</button></div>');
@@ -861,6 +944,13 @@ function inspectorAction(a) {
     const order = ['house', 'factory', 'hall'];
     o.kind = order[(order.indexOf(o.kind) + 1) % order.length];
   } else if (a === 'color') o.color = CAR_COLORS[(CAR_COLORS.indexOf(o.color) + 1) % CAR_COLORS.length];
+  else if (a === 'rot+' || a === 'rot-') {
+    let ang = (o.angle || 0) + (a === 'rot+' ? 1 : -1) * (Math.PI / 12);
+    if (ang > Math.PI) ang -= Math.PI * 2;
+    if (ang <= -Math.PI) ang += Math.PI * 2;
+    if (Math.abs(ang) < 1e-3) delete o.angle;
+    else o.angle = ang;
+  }
   else if (a === 'rw+') o.w = Math.min(200, o.w + 8);
   else if (a === 'rw-') o.w = Math.max(20, o.w - 8);
   else if (a === 'dirt') {

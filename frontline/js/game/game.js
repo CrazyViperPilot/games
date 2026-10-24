@@ -4,6 +4,7 @@ import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { makeRng } from '../core/rng.js';
 import { generateMap } from './map.js';
+import { blockers } from './mapdata.js';
 import { Grid } from './grid.js';
 import { createUnit, createBuilding } from './entities.js';
 import { Fog } from './fog.js';
@@ -86,7 +87,7 @@ export class Game {
     this.map = map ?? generateMap(seed);
     this.grid = new Grid(W / TILE, H / TILE, TILE);
     this.grid.rasterizeObstacles(this.map.obstacles);
-    this.grid.rasterizeRects(this.map.town?.buildings ?? []);
+    this.grid.rasterizeRects(blockers(this.map.town?.buildings ?? []));
     this.grid.rasterizeTrees([...(this.map.town?.trees ?? []), ...(this.map.trees ?? [])]);
 
     this.time = 0;

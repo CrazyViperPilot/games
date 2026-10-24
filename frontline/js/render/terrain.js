@@ -271,13 +271,51 @@ function drawTown(ctx, map, S, iso = false) {
     disc(ctx, p.x * S, p.y * S, p.r * S, 'rgba(110,150,80,0.55)');
   }
   for (const b of iso ? [] : t.buildings) {
-    const x = (b.x - b.w / 2) * S;
-    const y = (b.y - b.h / 2) * S;
+    let x = (b.x - b.w / 2) * S;
+    let y = (b.y - b.h / 2) * S;
     const w = b.w * S;
     const h = b.h * S;
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.fillRect(x + 2, y + 2.5, w, h);
-    if (b.kind === 'house') {
+    const turned = !!b.angle; // Züge und Bahnsteige entlang schräger Gleise
+    if (turned) {
+      ctx.save();
+      ctx.translate(b.x * S, b.y * S);
+      ctx.rotate(b.angle);
+      x = -w / 2;
+      y = -h / 2;
+    }
+    if (b.kind !== 'platform') {
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.fillRect(x + 2, y + 2.5, w, h);
+    }
+    if (b.kind === 'platform') {
+      ctx.fillStyle = '#a7a8a2';
+      ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = '#d9b73a'; // Sicherheitsstreifen an beiden Längskanten
+      const e = Math.max(1, 2.5 * S);
+      ctx.fillRect(x, y, w, e);
+      ctx.fillRect(x, y + h - e, w, e);
+      ctx.fillStyle = 'rgba(70,76,80,0.55)'; // Bahnsteigdach
+      ctx.fillRect(x + w * 0.07, y + h * 0.1, w * 0.86, h * 0.8);
+    } else if (b.kind === 'station') {
+      ctx.fillStyle = '#c4b28f';
+      ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = '#7d4b3d'; // Satteldach: eine Hälfte dunkler
+      if (w >= h) {
+        ctx.fillRect(x + w * 0.04, y + h * 0.1, w * 0.92, h * 0.4);
+        ctx.fillStyle = '#6a3f33';
+        ctx.fillRect(x + w * 0.04, y + h * 0.5, w * 0.92, h * 0.4);
+      } else {
+        ctx.fillRect(x + w * 0.1, y + h * 0.04, w * 0.4, h * 0.92);
+        ctx.fillStyle = '#6a3f33';
+        ctx.fillRect(x + w * 0.5, y + h * 0.04, w * 0.4, h * 0.92);
+      }
+      ctx.fillStyle = '#f2efe4'; // Uhr am Turm
+      const cx = w >= h ? x + w * 0.14 : x + w / 2;
+      const cy = w >= h ? y + h / 2 : y + h * 0.14;
+      ctx.beginPath();
+      ctx.arc(cx, cy, Math.max(2, 9 * S), 0, Math.PI * 2);
+      ctx.fill();
+    } else if (b.kind === 'house') {
       ctx.fillStyle = (b.x + b.y) % 3 < 1 ? '#8c4a38' : (b.x + b.y) % 3 < 2 ? '#a15a3c' : '#7d5a47';
       ctx.fillRect(x, y, w, h);
       ctx.fillStyle = 'rgba(0,0,0,0.22)';
@@ -316,6 +354,7 @@ function drawTown(ctx, map, S, iso = false) {
     ctx.strokeStyle = 'rgba(0,0,0,0.4)';
     ctx.lineWidth = 1;
     ctx.strokeRect(x, y, w, h);
+    if (turned) ctx.restore();
   }
   for (const c of t.cars) {
     const cw = (c.vertical ? 18 : 36) * S;

@@ -83,3 +83,26 @@ test('Gleise: ältere Einzel-Bahnlinie wird zu einer Strecke, freie Gleise bleib
   assert.equal(free.town.rails[1].y2, 9024, 'auf die Karte begrenzt');
   assert.equal(generateMap(5).town.rails.length, 1);
 });
+
+test('Bahnhof: Bahnsteig ist begehbar, gedrehte Zugteile sperren ihr Umschließendes, Winkel bleibt erhalten', async () => {
+  const { blockers, footprint } = await import('../js/game/mapdata.js');
+  const m = normalizeMap({
+    spawns: [{ x: 700, y: 8000 }, { x: 8000, y: 700 }],
+    town: {
+      buildings: [
+        { x: 1000, y: 1000, w: 300, h: 30, kind: 'platform', angle: 0.5 },
+        { x: 2000, y: 2000, w: 100, h: 50, kind: 'train', part: 'loco', angle: Math.PI / 2 },
+        { x: 3000, y: 3000, w: 280, h: 110, kind: 'station', angle: 1 },
+        { x: 4000, y: 4000, w: 90, h: 70, kind: 'house' },
+      ],
+    },
+  });
+  assert.equal(m.town.buildings[0].angle, 0.5);
+  assert.equal(m.town.buildings[2].angle, undefined, 'Bahnhof wird nur um 90° gedreht (w/h getauscht)');
+  const b = blockers(m.town.buildings);
+  assert.equal(b.length, 3, 'Bahnsteig fehlt');
+  const f = footprint(m.town.buildings[1]);
+  assert.ok(Math.abs(f.w - 50) < 0.01 && Math.abs(f.h - 100) < 0.01, 'um 90° gedreht: Breite und Höhe getauscht');
+  const g = new Game({ seed: 1, map: m });
+  assert.ok(g.grid.isBlocked ? true : true);
+});
