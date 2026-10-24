@@ -1,6 +1,6 @@
 // Fruhno Service Worker: network-first for the app shell, cache only as offline fallback.
 // API calls are never cached. Bump CACHE_VERSION when files change.
-const CACHE_VERSION = 'fruhno-v3';
+const CACHE_VERSION = 'fruhno-v4';
 const CACHE_PREFIX = 'fruhno-';
 const ASSETS = ['./', './index.html', './manifest.json', './css/style.css', './js/cards.js', './js/api.js', './js/main.js',
   './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png'];

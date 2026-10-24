@@ -87,3 +87,4 @@ button.icon { position: relative; padding: 6px 12px; font-size: 1.2rem; }
 .score { border-collapse: collapse; } .score td { padding: 4px 14px; }
 @media (max-height: 380px) { #bar { padding: 2px 10px; } button { min-height: 38px; padding: 6px 14px; } }
 #chat-close { position: absolute; top: 6px; right: 8px; }
+#chat-log p.sys { color: var(--accent); font-weight: 700; }

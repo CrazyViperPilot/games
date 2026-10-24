@@ -48,7 +48,7 @@ Vier „Farben“ = Kategorien, je 25 Karten:
 - Legen: gleiche Farbe, gleiche Nummer oder gleiches Symbol; Farbwahl immer legbar; +4 nur, wenn keine Karte der aktuellen Farbe auf der Hand ist (Annahme: strikte Regel, keine Anzweiflung).
 - Kann man nicht legen: eine Karte ziehen; ist sie legbar, darf sie sofort gelegt werden, sonst Zug vorbei.
 - +2 / +4: Der nächste Spieler zieht und setzt aus (kein Stapeln, Standardannahme).
-- **„UNO“ rufen (Fruhno!)**: Bei der vorletzten Karte muss man den Button „Fruhno!“ drücken. Vergisst man es, kann ein anderer Spieler „Erwischt!“ drücken, bevor der nächste Zug passiert: Strafe +2 Karten. (Standardannahme: aktiv, mit Button.)
+- **„UNO“ rufen (Fruhno!)**: Bei der vorletzten Karte muss man den Button „Fruhno!“ drücken. Beim Drücken erscheint für alle eine Systemmeldung im Chat („Daniel ruft Fruhno! 🥐 Nur noch eine Karte“), auch wenn der Bot ruft. Vergisst man es, kann ein anderer Spieler „Erwischt!“ drücken, bevor der nächste Zug passiert: Strafe +2 Karten. (Standardannahme: aktiv, mit Button.)
 - Rundenende: Wer zuerst keine Karten mehr hat, gewinnt. Punkte (Standardannahme): Gewinner bekommt die Summe der Restkarten der anderen (Zahl = Wert, Aktion = 20, Wild = 50); Punktestand wird über mehrere Runden bis zum Beenden durch den Host gezählt, danach zurückgesetzt.
 - Zugzeit: kein Timer (Standardannahme), der Host kann einen hängenden Spieler per „Überspringen“ weiterschicken.
 

@@ -226,7 +226,7 @@ function renderChat() {
   if (chatPrimed && $('#chat').hidden && lastMsg && lastMsg.n > lastChatSeen && lastMsg.name !== store.get('name')) showChat();
   chatPrimed = true;
   const open = !$('#chat').hidden;
-  log.replaceChildren(...S.chat.map((m) => el('p', {}, el('b', {}, m.name + ': '), document.createTextNode(m.text))));
+  log.replaceChildren(...S.chat.map((m) => m.sys ? el('p', { class: 'sys' }, m.text) : el('p', {}, el('b', {}, m.name + ': '), document.createTextNode(m.text))));
   const newest = S.chat.length ? S.chat[S.chat.length - 1].n : 0;
   if (open) { lastChatSeen = newest; store.set('chatSeen', String(newest)); log.scrollTop = log.scrollHeight; }
   $('#chat-badge').hidden = open || newest <= lastChatSeen || (S.chat[S.chat.length - 1] || {}).name === store.get('name');
