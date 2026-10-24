@@ -9,7 +9,7 @@ import { BUILDINGS } from '../data/buildings.js';
  */
 export function createUnit(id, type, team, x, y) {
   const def = UNITS[type];
-  return {
+  const u = {
     id,
     kind: 'unit',
     type,
@@ -35,12 +35,46 @@ export function createUnit(id, type, team, x, y) {
     repathTimer: 0,
     needPath: false,
     speedMul: 1, // 0.25 bei Fahrzeugen ohne Treibstoff (movement.js)
-    ammo: def.ammoMax ?? 0,
+    // Waffen mit eigenem Schussvorrat (rounds) und Abklingzeit (cd); `ammo` ist der Munitionswert aller Schüsse zusammen
+    weapons: (def.weapons ?? []).map((spec) => ({ spec, rounds: spec.rounds, cd: 0 })),
     fuel: def.fuelMax ?? 0,
     cargo: { bm: 0, mun: 0, fuel: 0 },
     preset: 'mix', // LKW-Ladungsart: 'mix' | 'bm' | 'mun' | 'fuel'
     passengers: [], // Hubschrauber: eingestiegene Einheiten (alive = false, solange sie an Bord sind)
   };
+  // `ammo` = Munitionswert (Lagereinheiten) der vorhandenen Schüsse; Zuweisen füllt alle Waffen im gleichen Verhältnis
+  Object.defineProperty(u, 'ammo', {
+    enumerable: true,
+    get() {
+      let sum = 0;
+      for (const w of this.weapons) sum += w.rounds * w.spec.munCost;
+      return sum;
+    },
+    set(v) {
+      const f = def.ammoMax > 0 ? Math.min(1, Math.max(0, v / def.ammoMax)) : 0;
+      for (const w of this.weapons) w.rounds = w.spec.rounds * f;
+    },
+  });
+  return u;
+}
+
+/** Füllt die Waffen der Reihe nach mit `amount` Munition (Lagereinheiten) auf; liefert, was verbraucht wurde. */
+export function addAmmo(u, amount) {
+  let left = amount;
+  for (const w of u.weapons) {
+    const room = (w.spec.rounds - w.rounds) * w.spec.munCost;
+    if (room <= 1e-9) continue;
+    const take = Math.min(room, left);
+    w.rounds = take >= room - 1e-9 ? w.spec.rounds : w.rounds + take / w.spec.munCost;
+    left -= take;
+    if (left <= 1e-9) break;
+  }
+  return amount - left;
+}
+
+/** Bewaffnet, aber ohne einen einzigen vollen Schuss (nichts zu feuern). */
+export function lacksAmmo(u) {
+  return u.weapons.length > 0 && !u.weapons.some((w) => w.rounds >= 1);
 }
 
 /**

@@ -1,7 +1,8 @@
 // Einheitenwerte (PLAN.md §3.2, §11.2, §11.8).
-// damage: Schaden je Schuss nach Panzerklasse des Ziels. Unbewaffnet: range 0, damage null.
+// weapons: Waffen mit rounds (Schuss im Vorrat), munCost (Munition aus dem FOB-Lager je Schuss beim Nachladen), cooldown, damage nach Panzerklasse,
+// optional targets (Klassen, gegen die diese Waffe bevorzugt wird). Daraus entstehen range, damage (bester Wert je Klasse) und ammoMax.
 // cost: fehlende Schlüssel = 0. producedAt: Gebäudetyp, hotkey: Taste im Ausbildungsmenü.
-// ammoMax / fuelMax: Vorrat der Einheit (Munition / Treibstoff). ammoPerShot: Verbrauch je Schuss.
+// fuelMax: Treibstoffvorrat. Alle Einheiten kosten nur Geld und starten voll munitioniert und betankt.
 // builder: 'all' = darf alle Gebäude bauen und reparieren, 'fort' = nur Mauer und Tor, fehlt = kein Bauen.
 export const UNITS = {
   rifleman: {
@@ -11,14 +12,14 @@ export const UNITS = {
     speed: 45,
     radius: 6,
     sight: 260,
-    range: 200,
-    cooldown: 1.0,
-    damage: { inf: 12, light: 3, heavy: 1, struct: 4, air: 3 },
-    cost: { money: 60, mun: 15 },
+    // Waffen: rounds = Schuss im Vorrat, munCost = Munition (FOB-Lager) je Schuss beim Nachladen.
+    // Gewehr: 2 Magazine à 30 Schuss; 1 Magazin = 1 Munition.
+    weapons: [
+      { id: 'rifle', name: 'Gewehr', range: 200, cooldown: 1.0, rounds: 60, munCost: 1 / 30, damage: { inf: 12, light: 3, heavy: 1, struct: 4, air: 3 } },
+    ],
+    cost: { money: 60 },
     buildTime: 8,
     producedAt: 'fob',
-    ammoPerShot: 0.25,
-    ammoMax: 10,
     fuelPerSec: 0,
     builder: 'fort',
     canRide: true,
@@ -31,14 +32,13 @@ export const UNITS = {
     speed: 40,
     radius: 6,
     sight: 260,
-    range: 240,
-    cooldown: 3.0,
-    damage: { inf: 10, light: 90, heavy: 120, struct: 60, air: 40 }, // Schulterrakete auch gegen Hubschrauber
-    cost: { money: 120, mun: 40 },
+    // Panzerfaust/RPG: 5 Schuss à 10 Munition, auch gegen Hubschrauber
+    weapons: [
+      { id: 'rpg', name: 'RPG', range: 240, cooldown: 3.0, rounds: 5, munCost: 10, damage: { inf: 10, light: 90, heavy: 120, struct: 60, air: 40 } },
+    ],
+    cost: { money: 120 },
     buildTime: 12,
     producedAt: 'fob',
-    ammoPerShot: 2,
-    ammoMax: 12,
     fuelPerSec: 0,
     builder: 'fort',
     canRide: true,
@@ -54,7 +54,7 @@ export const UNITS = {
     range: 0,
     cooldown: 0,
     damage: null,
-    cost: { money: 80, fuel: 40 },
+    cost: { money: 80 },
     buildTime: 10,
     producedAt: 'fob',
     ammoPerShot: 0,
@@ -73,7 +73,7 @@ export const UNITS = {
     range: 0,
     cooldown: 0,
     damage: null,
-    cost: { money: 150, fuel: 60 },
+    cost: { money: 150 },
     buildTime: 15,
     producedAt: 'fob',
     ammoPerShot: 0,
@@ -90,14 +90,14 @@ export const UNITS = {
     speed: 85,
     radius: 12,
     sight: 300,
-    range: 240,
-    cooldown: 0.5,
-    damage: { inf: 14, light: 18, heavy: 4, struct: 10, air: 8 },
-    cost: { money: 250, mun: 50, fuel: 80 },
+    // Granatwerfer: 60 Granaten à 10 Munition; MG: 300 Schuss à 5
+    weapons: [
+      { id: 'grenade', name: 'Granatwerfer', range: 240, cooldown: 2.0, rounds: 60, munCost: 10, targets: ['light', 'heavy', 'struct'], damage: { inf: 30, light: 40, heavy: 10, struct: 25 } },
+      { id: 'mg', name: 'MG', range: 220, cooldown: 0.25, rounds: 300, munCost: 5, damage: { inf: 9, light: 3, heavy: 1, struct: 3, air: 6 } },
+    ],
+    cost: { money: 250 },
     buildTime: 20,
     producedAt: 'depot',
-    ammoPerShot: 0.4,
-    ammoMax: 16,
     fuelPerSec: 0.4,
     fuelMax: 40,
     hotkey: 'Q',
@@ -109,14 +109,14 @@ export const UNITS = {
     speed: 60,
     radius: 15,
     sight: 320,
-    range: 300,
-    cooldown: 2.5,
-    damage: { inf: 45, light: 120, heavy: 150, struct: 120 },
-    cost: { money: 500, mun: 100, fuel: 150 },
+    // Hauptkanone: 30 Schuss à 20 Munition, 6 s Nachladezeit; MG: 300 Schuss à 5
+    weapons: [
+      { id: 'cannon', name: 'Hauptkanone', range: 300, cooldown: 6, rounds: 30, munCost: 20, targets: ['light', 'heavy', 'struct'], damage: { inf: 45, light: 120, heavy: 150, struct: 120 } },
+      { id: 'mg', name: 'MG', range: 220, cooldown: 0.25, rounds: 300, munCost: 5, damage: { inf: 10, light: 3, heavy: 0, struct: 2, air: 3 } },
+    ],
+    cost: { money: 500 },
     buildTime: 35,
     producedAt: 'depot',
-    ammoPerShot: 4,
-    ammoMax: 40,
     fuelPerSec: 0.6,
     fuelMax: 60,
     hotkey: 'W',
@@ -134,7 +134,7 @@ export const UNITS = {
     range: 0,
     cooldown: 0,
     damage: null,
-    cost: { money: 350, fuel: 50 },
+    cost: { money: 350 },
     buildTime: 25,
     producedAt: 'helipad',
     ammoPerShot: 0,
@@ -154,7 +154,7 @@ export const UNITS = {
     range: 0,
     cooldown: 0,
     damage: null,
-    cost: { money: 600, fuel: 90 },
+    cost: { money: 600 },
     buildTime: 35,
     producedAt: 'helipad',
     ammoPerShot: 0,
@@ -172,16 +172,28 @@ export const UNITS = {
     speed: 150,
     radius: 13,
     sight: 400,
-    range: 340,
-    cooldown: 0.5,
-    damage: { inf: 22, light: 26, heavy: 30, struct: 18, air: 10 },
-    cost: { money: 900, mun: 80, fuel: 100 },
+    // Bordkanone: 300 Schuss à 10 Munition; 10 Raketen à 100 Munition (gegen Panzer, Gebäude, Hubschrauber)
+    weapons: [
+      { id: 'cannon', name: 'Bordkanone', range: 340, cooldown: 0.5, rounds: 300, munCost: 10, damage: { inf: 22, light: 26, heavy: 30, struct: 18, air: 10 } },
+      { id: 'rocket', name: 'Raketen', range: 340, cooldown: 3, rounds: 10, munCost: 100, targets: ['heavy', 'struct', 'air'], damage: { inf: 40, light: 120, heavy: 220, struct: 120, air: 150 } },
+    ],
+    cost: { money: 900 },
     buildTime: 45,
     producedAt: 'helipad',
-    ammoPerShot: 1,
-    ammoMax: 60,
     fuelPerSec: 0.8,
     fuelMax: 70,
     hotkey: 'E',
   },
 };
+
+// Abgeleitete Gesamtwerte aus den Waffen: größte Reichweite, bester Schaden je Klasse, Munitionswert des vollen Vorrats.
+for (const def of Object.values(UNITS)) {
+  if (!def.weapons) continue;
+  def.range = Math.max(...def.weapons.map((w) => w.range));
+  def.cooldown = def.weapons[0].cooldown;
+  def.damage = {};
+  for (const w of def.weapons) {
+    for (const [k, v] of Object.entries(w.damage)) def.damage[k] = Math.max(def.damage[k] || 0, v);
+  }
+  def.ammoMax = def.weapons.reduce((sum, w) => sum + w.rounds * w.munCost, 0);
+}

@@ -24,7 +24,8 @@ export const BALANCE = {
     truckCapacity: 400, // Ladung eines LKW (Summe)
     transferRate: 100, // Laden/Entladen je s
     transferReach: 140, // LKW muss so nah an der FOB-Mitte stehen
-    resupplyRate: 4, // Nachfüllen je s und Sorte und Einheit
+    resupplyRate: 4, // Nachfüllen Treibstoff je s und Einheit
+    ammoRate: 60, // Nachfüllen Munition je s und Einheit (Lagereinheiten; Waffen füllen der Reihe nach)
     resupplyInterval: 0.5, // Takt des Nachfüllens (s)
     truckSupplyRange: 180, // Nachfüllen/Mauerbau aus LKW-Ladung
     noFobWarn: 30, // s zwischen zwei Meldungen „Förderanlage ohne FOB“

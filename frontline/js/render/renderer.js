@@ -3,6 +3,7 @@
 import { BALANCE } from '../data/balance.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { buildTerrain } from './terrain.js';
+import { lacksAmmo } from '../game/entities.js';
 import {
   drawUnit,
   drawBuilding,
@@ -677,7 +678,7 @@ export class Renderer {
       if (u.def.ammoMax) drawBar(ctx, x, y + 5 / z, BAR_W, 3 / z, u.ammo / u.def.ammoMax, AMMO_COLOR);
       if (u.def.fuelMax) drawBar(ctx, x, y + 9 / z, BAR_W, 3 / z, u.fuel / u.def.fuelMax, FUEL_COLOR);
     }
-    if (u.def.range > 0 && u.def.ammoMax && u.ammo < u.def.ammoPerShot) {
+    if (lacksAmmo(u)) {
       ctx.save();
       ctx.fillStyle = '#ff4d4d';
       ctx.strokeStyle = 'rgba(0,0,0,0.7)';

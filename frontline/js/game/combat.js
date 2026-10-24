@@ -9,41 +9,20 @@ const BASE_WARN_INTERVAL = 20; // s zwischen zwei Meldungen „Basis wird angegr
 // Aufträge, bei denen nicht automatisch geschossen wird (Marsch, Bau, Reparatur, Logistik)
 const NO_FIRE = new Set(['move', 'build', 'repair', 'load', 'unload', 'route']);
 
-/** Waffenwerte einer Einheit oder eines Gebäudes; null, wenn unbewaffnet. */
+/** Waffenwerte eines Gebäudes; null, wenn unbewaffnet. (Einheiten haben mehrere Waffen: u.weapons.) */
 export function weaponOf(e) {
-  if (e.kind === 'unit') {
-    if (!e.def.range || !e.def.damage) return null;
-    return {
-      range: e.def.range,
-      minRange: 0,
-      cooldown: e.def.cooldown,
-      damage: e.def.damage,
-      splash: 0,
-      shell: false,
-      ammoPerShot: e.def.ammoPerShot || 0,
-    };
-  }
-  return e.def.weapon ?? null;
+  return e.kind === 'unit' ? null : (e.def.weapon ?? null);
 }
 
 const dmgKey = (e) => (e.kind === 'building' ? 'struct' : e.def.armor);
 
 /**
- * Zieht Munition für einen Schuss ab. Einheiten aus ihrem eigenen Vorrat (u.ammo),
- * Gebäude aus dem Lager ihres Versorgers (supplierOf). false (Mangelmeldung), wenn es nicht reicht.
+ * Zieht Munition für einen Schuss eines Gebäudes aus dem Lager seines Versorgers (supplierOf) ab.
+ * false (Mangelmeldung), wenn es nicht reicht.
  */
 function takeAmmo(game, s, need) {
   if (!(need > 0)) return true;
   const stats = game.teams[s.team].used;
-  if (s.kind === 'unit') {
-    if (s.ammo < need) {
-      game.shortage(s.team, 'mun');
-      return false;
-    }
-    s.ammo -= need;
-    stats.mun += need;
-    return true;
-  }
   const sup = game.supplierOf(s);
   if (!sup || sup.store.mun < need) {
     game.shortage(s.team, 'mun');
@@ -116,6 +95,45 @@ function fireDirect(game, s, t, w) {
   }
   s.cooldown = w.cooldown;
   hit(game, t, dmg);
+}
+
+/**
+ * Einheit schießt auf t. Waffenwahl unter den schussbereiten Waffen in Reichweite, die dem Ziel schaden:
+ * zuerst eine Waffe, die für die Panzerklasse des Ziels vorgesehen ist (targets), sonst die mit dem
+ * besten Schaden je Munition. Ohne einen vollen Schuss: Mangelmeldung, keine Abklingzeit.
+ */
+function tryFireUnit(game, u, t) {
+  const key = dmgKey(t);
+  let pick = null;
+  let pickScore = -1;
+  let dry = false;
+  for (const w of u.weapons) {
+    const dmg = w.spec.damage[key] || 0;
+    if (!(dmg > 0) || !inRange(u, t, w.spec.range) || w.cd > 0) continue;
+    if (w.rounds < 1) {
+      dry = true;
+      continue;
+    }
+    const score = (w.spec.targets && w.spec.targets.includes(key) ? 1e6 : 0) + dmg / w.spec.munCost;
+    if (score > pickScore) {
+      pick = w;
+      pickScore = score;
+    }
+  }
+  if (!pick) {
+    if (dry) game.shortage(u.team, 'mun');
+    return;
+  }
+  pick.rounds -= 1;
+  pick.cd = pick.spec.cooldown;
+  game.teams[u.team].used.mun += pick.spec.munCost;
+  if ((pick.spec.damage.light || 0) >= 60) {
+    game.addEffect('shell', u.x, u.y, u.team, t.x, t.y);
+    game.addEffect('explosion', t.x, t.y, u.team);
+  } else {
+    game.addEffect('tracer', u.x, u.y, u.team, t.x, t.y);
+  }
+  hit(game, t, pick.spec.damage[key]);
 }
 
 function fireShell(game, s, tx, ty, w) {
@@ -214,7 +232,7 @@ export function updateCombat(game, dt) {
   const { units, buildings } = game;
   for (const u of units) {
     if (!u.alive) continue;
-    u.cooldown = Math.max(0, u.cooldown - dt);
+    for (const w of u.weapons) w.cd = Math.max(0, w.cd - dt);
     u.scanTimer -= dt;
   }
   for (const b of buildings) {
@@ -227,25 +245,23 @@ export function updateCombat(game, dt) {
   const hash = buildHash(units.filter((u) => u.alive));
 
   for (const u of units) {
-    if (!u.alive) continue;
-    const w = weaponOf(u);
-    if (!w) continue;
+    if (!u.alive || !u.weapons.length) continue;
     const o = u.order.type;
     if (NO_FIRE.has(o)) continue;
     if (o === 'attack') {
       const t = game.getEntity(u.order.targetId);
-      if (t && t.team !== u.team) tryFire(game, u, t, w);
+      if (t && t.team !== u.team) tryFireUnit(game, u, t);
       continue;
     }
     // idle / attackMove: automatische Zielsuche
     if (u.scanTimer <= 0) {
       u.scanTimer = SCAN;
-      const t = findTarget(game, hash, u, u.def.sight, 0, true, w.damage);
+      const t = findTarget(game, hash, u, u.def.sight, 0, true, u.def.damage);
       u.targetId = t ? t.id : null;
     }
     if (u.targetId !== null) {
       const t = game.getEntity(u.targetId);
-      if (t) tryFire(game, u, t, w);
+      if (t) tryFireUnit(game, u, t);
     }
   }
 

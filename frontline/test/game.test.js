@@ -193,7 +193,7 @@ test('Training: Kosten werden aus dem FOB-Lager und Geld abgezogen, Einheit spaw
   const r = g.issue(0, { type: 'train', buildingId: f.id, unit: 'rifleman' });
   assert.equal(r.ok, true);
   assert.equal(g.teams[0].res.money, money - 60);
-  assert.equal(f.store.mun, BALANCE.startRes.mun - 15);
+  assert.equal(f.store.mun, BALANCE.startRes.mun, 'Einheiten kosten nur Geld');
   assert.equal(f.queue.length, 1);
   assert.equal(f.queue[0].unit, 'rifleman');
   assert.equal(f.queue[0].payerId, f.id);
@@ -203,14 +203,18 @@ test('Training: Kosten werden aus dem FOB-Lager und Geld abgezogen, Einheit spaw
   assert.equal(f.queue.length, 0);
 });
 
-test('Training: FOB ohne Munition im Lager bildet nicht aus; Fehlergrund nennt Munition', () => {
+test('Training: Einheiten kosten nur Geld und starten voll munitioniert und betankt', () => {
   const g = new Game({ seed: 7 });
   const f = fobOf(g, 0);
-  g.setStock(0, { bm: 600, mun: 10, fuel: 0 });
-  const r = g.issue(0, { type: 'train', buildingId: f.id, unit: 'rifleman' });
-  assert.equal(r.ok, false);
-  assert.equal(r.reason, 'FOB-Lager: zu wenig Munition');
-  assert.equal(g.teams[0].res.money, BALANCE.startRes.money, 'nichts bezahlt');
+  g.setStock(0, { bm: 0, mun: 0, fuel: 0 });
+  assert.equal(g.issue(0, { type: 'train', buildingId: f.id, unit: 'rifleman' }).ok, true);
+  run(g, 9);
+  const r = unitsOf(g, 0, 'rifleman').at(-1);
+  assert.equal(r.ammo, r.def.ammoMax);
+  assert.equal(r.weapons[0].rounds, 60, 'zwei Magazine à 30');
+  const t = g.spawnUnit('tank', 0, f.x, f.y + 80);
+  assert.deepEqual(t.weapons.map((w) => w.rounds), [30, 300]);
+  assert.equal(t.fuel, t.def.fuelMax);
 });
 
 test('Kampf: Kampfpanzer tötet einen Schützen', () => {
@@ -451,9 +455,8 @@ test('Erstattung an den Zahler: Ausbildung abbrechen erstattet an die FOB, die b
   const money0 = g.teams[0].res.money;
   const r = g.issue(0, { type: 'train', buildingId: f.id, unit: 'rifleman' });
   assert.equal(r.ok, true);
-  assert.equal(f.store.mun, BALANCE.startRes.mun - 15);
   assert.equal(g.issue(0, { type: 'cancelTrain', buildingId: f.id }).ok, true);
-  assert.equal(f.store.mun, BALANCE.startRes.mun, 'Munition an den Zahler zurück');
+  assert.equal(f.store.mun, BALANCE.startRes.mun, 'Lager unverändert');
   assert.equal(far.store.mun, 0, 'andere FOB unberührt');
   assert.equal(g.teams[0].res.money, money0, 'Geld zurück');
 });
@@ -551,19 +554,50 @@ test('Flugabwehr fängt Mörsergranaten ab', () => {
   assert.equal(sawIntercept, true, 'Abfang');
 });
 
-test('Verbrauch: ein Schuss zieht Munition aus dem Einheitenvorrat, nicht aus dem Lager', () => {
+test('Verbrauch: ein Schuss zieht einen Schuss aus dem Einheitenvorrat, nicht aus dem Lager', () => {
   const g = new Game({ seed: 7 });
   const sp = g.map.spawns[0];
   const rifle = g.spawnUnit('rifleman', 0, sp.x + 300, sp.y - 300);
   const enemy = g.spawnUnit('rifleman', 1, rifle.x + 120, rifle.y);
   const stock0 = g.teams[0].res.mun;
-  const ammo0 = rifle.ammo;
   assert.equal(g.issue(0, { type: 'attack', ids: [rifle.id], targetId: enemy.id }).ok, true);
   run(g, DT);
-  assert.ok(Math.abs(rifle.ammo - (ammo0 - UNITS.rifleman.ammoPerShot)) < 1e-9, `Vorrat ${rifle.ammo}`);
+  assert.equal(rifle.weapons[0].rounds, 59, 'ein Schuss weniger');
   assert.equal(g.teams[0].res.mun, stock0, 'Lager unberührt');
-  assert.ok(Math.abs(g.teams[0].used.mun - UNITS.rifleman.ammoPerShot) < 1e-9);
-  assert.ok(rifle.cooldown > 0, 'Abklingzeit läuft nach dem Schuss');
+  assert.ok(Math.abs(g.teams[0].used.mun - 1 / 30) < 1e-9, 'Statistik: 1/30 Munition');
+  assert.ok(rifle.weapons[0].cd > 0, 'Abklingzeit läuft nach dem Schuss');
+});
+
+test('Waffen: Kampfpanzer feuert Hauptkanone alle 6 s (20 Munition je Schuss) und nimmt das MG gegen Infanterie', () => {
+  const g = new Game({ seed: 7 });
+  const sp = { x: g.zone.x, y: g.zone.y }; // weit weg von jeder FOB: kein Nachladen
+  const tank = g.spawnUnit('tank', 0, sp.x + 300, sp.y - 300);
+  const enemy = g.spawnUnit('tank', 1, tank.x + 200, tank.y);
+  enemy.hp = enemy.maxHp = 1e6;
+  g.issue(0, { type: 'attack', ids: [tank.id], targetId: enemy.id });
+  run(g, 13);
+  assert.equal(tank.weapons[0].rounds, 27, 'Schüsse bei 0, 6 und 12 s');
+  assert.equal(tank.weapons[1].rounds, 300, 'MG nicht gegen Panzer');
+  const inf = g.spawnUnit('rifleman', 1, tank.x + 150, tank.y + 20);
+  g.issue(0, { type: 'attack', ids: [tank.id], targetId: inf.id });
+  run(g, 3);
+  assert.ok(tank.weapons[1].rounds < 300, 'MG gegen Infanterie (mehr Schaden je Munition)');
+});
+
+test('Waffen: Kampfhubschrauber nimmt Raketen gegen Panzer und die Bordkanone gegen Infanterie', () => {
+  const g = new Game({ seed: 7 });
+  const sp = { x: g.zone.x, y: g.zone.y }; // weit weg von jeder FOB: kein Nachladen
+  const heli = g.spawnUnit('gunship', 0, sp.x + 300, sp.y - 300);
+  assert.deepEqual(heli.weapons.map((w) => w.rounds), [300, 10]);
+  const tank = g.spawnUnit('tank', 1, heli.x + 200, heli.y);
+  g.issue(0, { type: 'attack', ids: [heli.id], targetId: tank.id });
+  run(g, 1);
+  assert.equal(heli.weapons[1].rounds, 9, 'Rakete gegen Panzer');
+  const inf = g.spawnUnit('rifleman', 1, heli.x + 100, heli.y + 50);
+  g.issue(0, { type: 'attack', ids: [heli.id], targetId: inf.id });
+  run(g, 1);
+  assert.ok(heli.weapons[0].rounds < 300, 'Kanone gegen Infanterie');
+  assert.equal(heli.weapons[1].rounds, 9);
 });
 
 test('Verbrauch: leerer Schütze feuert nicht, Abklingzeit läuft nicht an, Mangelmeldung', () => {
@@ -577,7 +611,7 @@ test('Verbrauch: leerer Schütze feuert nicht, Abklingzeit läuft nicht an, Mang
   assert.equal(g.issue(0, { type: 'attack', ids: [rifle.id], targetId: enemy.id }).ok, true);
   run(g, 3);
   assert.equal(enemy.hp, enemy.maxHp, 'kein Schaden ohne Munition');
-  assert.equal(rifle.cooldown, 0);
+  assert.equal(rifle.weapons[0].cd, 0);
   assert.equal(rifle.ammo, 0);
   assert.ok(g.drainEvents().some((e) => e.text === 'Einheiten ohne Munition'), 'Mangelmeldung');
 });

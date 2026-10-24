@@ -2,6 +2,7 @@
 // Schreibt das DOM höchstens 5× pro Sekunde und nur, wenn sich der HTML-Text geändert hat.
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
+import { lacksAmmo } from '../game/entities.js';
 import { builderState, fobLabel, orderText } from './status.js';
 
 const RES_KEYS = ['money', 'bm', 'mun', 'fuel'];
@@ -248,9 +249,10 @@ export class Hud {
     let h =
       `<div class="title">${esc(u.def.name)}</div>${bar(f, 'hp', hpColor(f))}` +
       `<div class="muted small">${Math.ceil(u.hp)} / ${u.maxHp} HP · ${esc(orderText(this.game, u))}</div>`;
-    if (u.def.ammoMax) {
-      h += gauge('Munition', u.ammo, u.def.ammoMax, COLOR.mun);
-      if (u.def.range > 0 && u.ammo < u.def.ammoPerShot) h += `<div class="warn small">Keine Munition – feuert nicht</div>`;
+    if (u.weapons.length) {
+      for (const w of u.weapons) h += gauge(w.spec.name, Math.floor(w.rounds), w.spec.rounds, COLOR.mun);
+      h += `<div class="muted small">Nachladen in der FOB: ${Math.ceil(u.def.ammoMax - u.ammo)} Munition fehlen</div>`;
+      if (lacksAmmo(u)) h += `<div class="warn small">Keine Munition – feuert nicht</div>`;
     }
     if (u.def.fuelMax) {
       h += gauge('Treibstoff', u.fuel, u.def.fuelMax, COLOR.fuel);
@@ -353,7 +355,7 @@ export class Hud {
     for (const e of sel) counts.set(e.def.name, (counts.get(e.def.name) || 0) + 1);
     const title = [units.length ? `${units.length} Einheiten` : '', blds ? `${blds} Gebäude` : ''].filter(Boolean).join(' · ');
     const chips = [...counts].map(([n, c]) => `<span>${c}× ${esc(n)}</span>`).join('');
-    const noAmmo = units.filter((u) => u.def.range > 0 && u.def.ammoMax && u.ammo < u.def.ammoPerShot).length;
+    const noAmmo = units.filter((u) => lacksAmmo(u)).length;
     const noFuel = units.filter((u) => u.def.fuelMax && u.fuel <= 0).length;
     const warn = [noAmmo ? `${noAmmo} ohne Munition` : '', noFuel ? `${noFuel} ohne Treibstoff` : ''].filter(Boolean);
     return (

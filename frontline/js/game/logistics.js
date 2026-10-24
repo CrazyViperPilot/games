@@ -1,6 +1,7 @@
 // Logistik: LKW laden, entladen, pendeln und das Nachfüllen der Einheiten (PLAN.md §11.2, §11.3). Kein DOM.
 import { BALANCE } from '../data/balance.js';
 import { driveTo, setIdle, nearestPassable } from './movement.js';
+import { addAmmo } from './entities.js';
 
 const L = BALANCE.logistics;
 const CARGO = ['bm', 'mun', 'fuel'];
@@ -278,10 +279,11 @@ function feed(game, u, k, passDt) {
   const src = findSource(game, u, k);
   if (!src) return;
   const stock = src.kind === 'building' ? src.store : src.cargo;
-  const amt = Math.min(L.resupplyRate * passDt, need, stock[k]);
+  const rate = k === 'mun' ? L.ammoRate : L.resupplyRate; // Munition fließt schneller (große Magazine)
+  const amt = Math.min(rate * passDt, need, stock[k]);
   if (amt <= 0) return;
   stock[k] -= amt;
-  if (k === 'mun') u.ammo += amt;
+  if (k === 'mun') addAmmo(u, amt);
   else u.fuel += amt;
   game.teams[u.team].flow[k] += amt;
 }
