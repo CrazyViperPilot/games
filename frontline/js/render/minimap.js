@@ -118,10 +118,14 @@ export class Minimap {
     }
 
     // Kamerarahmen
-    const R = this.camera.visibleRect();
+    const Q = this.camera.visibleQuad();
     ctx.strokeStyle = 'rgba(255,255,255,0.9)';
     ctx.lineWidth = 1.2 * px;
-    ctx.strokeRect(R.x0, R.y0, R.x1 - R.x0, R.y1 - R.y0);
+    ctx.beginPath();
+    ctx.moveTo(Q[0].x, Q[0].y);
+    for (let i = 1; i < 4; i++) ctx.lineTo(Q[i].x, Q[i].y);
+    ctx.closePath();
+    ctx.stroke();
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }

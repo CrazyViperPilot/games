@@ -115,6 +115,7 @@ export class Hud {
           <span class="time" data-time>00:00</span>
           <button type="button" class="btn-sm" data-act="speed" title="Spielgeschwindigkeit (+ / -)">1×</button>
           <button type="button" class="btn-sm" data-act="pause" title="Pause (P)">Pause</button>
+          <button type="button" class="btn-sm" data-act="view" title="Ansicht umschalten: 2D / isometrisch (V)">Ansicht</button>
           <button type="button" class="btn-sm" data-act="help" title="Hilfe (F1)">Hilfe</button>
         </div>
       </header>
@@ -132,6 +133,7 @@ export class Hud {
       if (act.dataset.act === 'speed') this.app.cycleSpeed?.();
       else if (act.dataset.act === 'pause') this.app.togglePause?.();
       else if (act.dataset.act === 'help') this.app.toggleHelp?.();
+      else if (act.dataset.act === 'view') this.app.toggleView?.();
       return;
     }
     const cb = e.target.closest('.cbtn');

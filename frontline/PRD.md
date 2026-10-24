@@ -139,6 +139,7 @@ Schadensmodell: Schaden je Schuss nach Panzerklasse des Ziels (Infanterie / leic
 | Strg+0–9 / 0–9 | Gruppe speichern / wählen (2× = Kamera hin) |
 | Pfeiltasten, Bildschirmrand, mittlere Maustaste ziehen | Kamera bewegen |
 | Mausrad | Zoom |
+| V / Schaltfläche „Ansicht“ | Ansicht umschalten: 2D von oben oder isometrisch (wird gemerkt, `?iso=1` startet isometrisch) |
 | Leertaste / H | Kamera auf Auswahl / Haupt-FOB |
 | P | Pause; `+` / `-` Spielgeschwindigkeit 1×–3× |
 | F1 / ? | Hilfe |
@@ -186,6 +187,7 @@ zwischen Überschuss- und Bedarfs-FOBs (v. a. Zonen-FOB), Versorger-LKW folgt de
 - v2: Munitions-/Treibstoffverbrauch; stärkere KI (Wirtschaft zuerst, Zonen-FOB).
 - v3: Logistik – FOB-Lager, Vorrat je Einheit, LKW als Transporter/Versorger/Pendler; Baufahrzeug baut und repariert,
   Infanterie baut Mauern/Tore; Service Worker network-first.
+- v4.3: Isometrische Ansicht (Prototyp, Schalter „Ansicht“ / Taste V; Standard bleibt 2D): schräger Boden, Gebäude, Bäume und Fahrzeuge mit Höhe, Hubschrauber schweben mit Schatten.
 - v4.2: Bäume sind blockierende Hindernisse (Stadt und Karte).
 - v4.1: Punktewertung nach Mehrheit mit Punktebalken, Hot-Zone-Einheiten doppelt (statt Alleinbesitz und eigener Hot-Zone-Punkt).
 - v4 (Okt. 2026): Konfliktzone als Stadt, Radius 1100 → 2200 → 3300, Karte 4800 → 9024; Anzeige der Zonen-Einheiten überarbeitet;

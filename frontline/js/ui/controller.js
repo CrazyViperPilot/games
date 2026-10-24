@@ -5,6 +5,7 @@ import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { canBuild } from '../game/construction.js';
 import { cargoSum } from '../game/logistics.js';
+import { unitLift, buildingHeight } from '../render/iso.js';
 
 const WALL_MAX = 40; // max. Zellen je Mauerzug (Vorschau und Befehl)
 const DOUBLE_MS = 350; // Doppelklick auf einen Typ = alle dieses Typs im Bild
@@ -172,6 +173,7 @@ export class Controller {
 
   /** Nächste passende Entity an Weltpunkt: zuerst Einheiten, dann Gebäude (Fußabdruck). */
   pick(wx, wy, pred = () => true) {
+    if (this.camera.iso) return this.pickIso(wx, wy, pred);
     const tol = PICK_PX / this.camera.zoom;
     let best = null;
     let bestD = Infinity;
@@ -186,9 +188,38 @@ export class Controller {
     return this.pickB(wx, wy, pred);
   }
 
-  /** Gebäude unter dem Weltpunkt (Fußabdruck) oder null. */
+  /** Isometrisch: Einheiten nach Bildschirmabstand (mit Flughöhe), dann Gebäude (Boden oder Dach). */
+  pickIso(wx, wy, pred) {
+    const cam = this.camera;
+    const sp = cam.worldToScreen(wx, wy);
+    let best = null;
+    let bestD = Infinity;
+    for (const u of this.game.units) {
+      if (!u.alive || !pred(u)) continue;
+      const p = cam.worldToScreen(u.x, u.y);
+      const d = Math.hypot(p.x - sp.x, p.y - unitLift(u) * cam.zoom - sp.y);
+      if (d <= PICK_PX + u.def.radius * cam.zoom * 0.9 && d < bestD) {
+        best = u;
+        bestD = d;
+      }
+    }
+    return best || this.pickB(wx, wy, pred);
+  }
+
+  /** Gebäude unter dem Weltpunkt (Fußabdruck) oder null. Isometrisch zählt auch ein Klick aufs Dach. */
   pickB(wx, wy, pred = () => true) {
     for (const e of this.game.query(wx, wy, 0, (e) => e.kind === 'building' && pred(e))) return e;
+    const cam = this.camera;
+    if (cam.iso) {
+      const sp = cam.worldToScreen(wx, wy);
+      for (const e of this.game.buildings) {
+        if (!e.alive || !pred(e)) continue;
+        const roof = cam.screenToWorld(sp.x, sp.y + buildingHeight(e) * cam.zoom);
+        const hw = (e.w * BALANCE.map.tile) / 2;
+        const hh = (e.h * BALANCE.map.tile) / 2;
+        if (Math.abs(roof.x - e.x) <= hw && Math.abs(roof.y - e.y) <= hh) return e;
+      }
+    }
     return null;
   }
 
@@ -212,11 +243,17 @@ export class Controller {
   /** Rahmenauswahl (Bildschirmkoordinaten): nur eigene Einheiten. */
   selectBox(rect, add) {
     const cam = this.camera;
-    const a = cam.screenToWorld(Math.min(rect.x1, rect.x2), Math.min(rect.y1, rect.y2));
-    const b = cam.screenToWorld(Math.max(rect.x1, rect.x2), Math.max(rect.y1, rect.y2));
-    const units = this.game.units.filter(
-      (u) => u.alive && u.team === this.team && u.x >= a.x && u.x <= b.x && u.y >= a.y && u.y <= b.y,
-    );
+    // Der Rahmen liegt in Bildschirmkoordinaten: Einheiten dorthin projizieren (gilt auch isometrisch, mit Flughöhe)
+    const sx0 = Math.min(rect.x1, rect.x2);
+    const sx1 = Math.max(rect.x1, rect.x2);
+    const sy0 = Math.min(rect.y1, rect.y2);
+    const sy1 = Math.max(rect.y1, rect.y2);
+    const units = this.game.units.filter((u) => {
+      if (!u.alive || u.team !== this.team) return false;
+      const p = cam.worldToScreen(u.x, u.y);
+      const y = cam.iso ? p.y - unitLift(u) * cam.zoom : p.y;
+      return p.x >= sx0 && p.x <= sx1 && y >= sy0 && y <= sy1;
+    });
     const sel = this.view.selection;
     if (!units.length) {
       if (!add) sel.clear();

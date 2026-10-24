@@ -15,6 +15,18 @@ import {
   hexA,
 } from './sprites.js';
 import { builderState } from '../ui/status.js';
+import { makeRng } from '../core/rng.js';
+import {
+  setIsoGround,
+  setIsoAt,
+  setUprightAt,
+  drawTownBuilding,
+  drawTeamBuilding,
+  drawTree,
+  drawRock,
+  unitLift,
+  buildingHeight,
+} from './iso.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
@@ -66,6 +78,8 @@ export class Renderer {
     this.team = team;
     this.revealAll = false; // Debug: kein Nebel, alle Gegner sichtbar
     this.terrain = buildTerrain(game.map);
+    this.terrainIso = null; // Boden ohne Gebäude/Bäume, erst beim ersten Wechsel in die isometrische Ansicht
+    this.deco = null; // Bäume und Felsen der Hindernisse (isometrisch)
     this.fogLayer = makeFogLayer(game.fog[team]);
     this.dpr = 1;
     this.cssW = 0;
@@ -109,6 +123,10 @@ export class Renderer {
     const sel = v.selection instanceof Set ? v.selection : new Set(v.selection || []);
     const hover = v.hoverId ? g.getEntity(v.hoverId) : null;
 
+    if (cam.iso) {
+      this.renderIso(v, now);
+      return;
+    }
     const R = cam.visibleRect();
     const inRect = (x, y, pad = 0) => x >= R.x0 - pad && x <= R.x1 + pad && y >= R.y0 - pad && y <= R.y1 + pad;
     const seen = (x, y) => reveal || g.isVisible(team, x, y);
@@ -216,6 +234,202 @@ export class Renderer {
     }
   }
 
+  /** Isometrisch: danach zeichnen Weltkoordinaten (x, y) aufrecht um den Bildschirmpunkt dieses Weltpunkts, `lift` Pixel höher. */
+  uprightAtWorld(ctx, wx, wy, lift) {
+    const cam = this.camera;
+    const p = cam.worldToScreen(wx, wy);
+    setUprightAt(ctx, cam, this.dpr, p.x, p.y - lift * cam.zoom, wx, wy);
+  }
+
+  /** Bäume und Felsen für Wald- und Felshindernisse (deterministisch aus der Karte). */
+  buildDeco() {
+    const trees = [];
+    const rocks = [];
+    for (const o of this.game.map.obstacles) {
+      if (Math.round(o.r) % 2 === 0) {
+        const rng = makeRng((o.x * 31 + o.y * 17 + o.r) >>> 0);
+        const n = Math.max(5, Math.round(o.r / 7));
+        for (let i = 0; i < n; i++) {
+          const a = rng.next() * Math.PI * 2;
+          const d = Math.sqrt(rng.next()) * o.r * 0.85;
+          trees.push({ x: o.x + Math.cos(a) * d, y: o.y + Math.sin(a) * d, r: 12 + rng.next() * 8 });
+        }
+      } else rocks.push(o);
+    }
+    return { trees, rocks };
+  }
+
+  /** Eine isometrische Ansicht (Prototyp): Boden schräg, Gebäude/Bäume/Einheiten mit Höhe, nach Tiefe sortiert. */
+  renderIso(v, now) {
+    const ctx = this.ctx;
+    const g = this.game;
+    const cam = this.camera;
+    const team = this.team;
+    const dpr = this.dpr;
+    const z = cam.zoom;
+    const reveal = this.revealAll;
+    const sel = v.selection instanceof Set ? v.selection : new Set(v.selection || []);
+    const hover = v.hoverId ? g.getEntity(v.hoverId) : null;
+    const R = cam.visibleRect();
+    const PAD = 260; // hohe Objekte ragen nach oben ins Bild
+    const inRect = (x, y, pad = 0) => x >= R.x0 - pad && x <= R.x1 + pad && y >= R.y0 - pad && y <= R.y1 + pad;
+    const seen = (x, y) => reveal || g.isVisible(team, x, y);
+    const known = (x, y) => reveal || g.isExplored(team, x, y);
+    const shown = (e) => e.team === team || seen(e.x, e.y);
+    if (!this.terrainIso) this.terrainIso = buildTerrain(g.map, true);
+    if (!this.deco) this.deco = this.buildDeco();
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = BG;
+    ctx.fillRect(0, 0, this.cssW, this.cssH);
+    ctx.imageSmoothingEnabled = true;
+
+    // Boden
+    setIsoGround(ctx, cam, dpr);
+    const S = this.terrainIso.width / W;
+    const x0 = Math.max(0, R.x0);
+    const y0 = Math.max(0, R.y0);
+    const x1 = Math.min(W, R.x1);
+    const y1 = Math.min(H, R.y1);
+    if (x1 > x0 && y1 > y0) {
+      ctx.drawImage(this.terrainIso, x0 * S, y0 * S, (x1 - x0) * S, (y1 - y0) * S, x0, y0, x1 - x0, y1 - y0);
+    }
+    this.drawZone(ctx, z);
+    this.drawHot(ctx, z, now);
+    if (v.placement) this.drawRadii(ctx, z);
+    this.drawSelectedRadii(ctx, z, v);
+    this.drawRoutes(ctx, sel, z);
+    for (const id of sel) {
+      const e = g.getEntity(id);
+      if (e && shown(e)) this.drawSelectRing(ctx, e, '#f2f5f2', z, false);
+    }
+    if (hover && !sel.has(hover.id) && shown(hover)) this.drawSelectRing(ctx, hover, 'rgba(255,255,255,0.5)', z, true);
+    for (const id of sel) {
+      const b = g.getEntity(id);
+      if (b && b.kind === 'building' && b.team === team) this.drawRally(ctx, b, z);
+    }
+
+    // Objekte mit Höhe, nach Tiefe (x + y) sortiert
+    const items = [];
+    const town = g.map.town;
+    for (const b of town?.buildings ?? []) if (inRect(b.x, b.y, PAD)) items.push({ k: b.x + b.y, t: 0, o: b });
+    for (const t of town?.trees ?? []) if (inRect(t.x, t.y, PAD)) items.push({ k: t.x + t.y, t: 1, o: t });
+    for (const t of g.map.trees ?? []) if (inRect(t.x, t.y, PAD)) items.push({ k: t.x + t.y, t: 1, o: t });
+    for (const t of this.deco.trees) if (inRect(t.x, t.y, PAD)) items.push({ k: t.x + t.y, t: 1, o: t });
+    for (const o of this.deco.rocks) if (inRect(o.x, o.y, PAD)) items.push({ k: o.x + o.y, t: 2, o });
+    for (const n of g.map.nodes) if (inRect(n.x, n.y, 60)) items.push({ k: n.x + n.y, t: 3, o: n });
+    for (const b of g.buildings) {
+      if (!b.alive || (b.team !== team && !known(b.x, b.y)) || !inRect(b.x, b.y, PAD)) continue;
+      items.push({ k: b.x + b.y, t: 4, o: b });
+    }
+    const air = [];
+    for (const u of g.units) {
+      if (!u.alive || !shown(u) || !inRect(u.x, u.y, PAD)) continue;
+      if (u.def.air) air.push(u);
+      else items.push({ k: u.x + u.y, t: 5, o: u });
+    }
+    items.sort((a, b) => a.k - b.k);
+
+    const drawU = (u) => {
+      const p = cam.worldToScreen(u.x, u.y);
+      const lift = unitLift(u);
+      const sc = 1.35;
+      // Schatten am Boden
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.fillStyle = 'rgba(0,0,0,0.28)';
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y + 1, u.def.radius * z * (u.def.air ? 1.5 : 1.2), u.def.radius * z * (u.def.air ? 0.7 : 0.5), 0, 0, Math.PI * 2);
+      ctx.fill();
+      setIsoAt(ctx, cam, dpr, p.x, p.y - lift * z, u.x, u.y, sc);
+      let aim = null;
+      if (u.targetId && u.def.range > 0) {
+        const t = g.getEntity(u.targetId);
+        if (t) aim = Math.atan2(t.y - u.y, t.x - u.x);
+      }
+      drawUnit(ctx, u, g.teams[u.team].color, z * sc, aim, now, true);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    for (const it of items) {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      if (it.t === 0) drawTownBuilding(ctx, cam, it.o);
+      else if (it.t === 1) drawTree(ctx, cam, it.o);
+      else if (it.t === 2) drawRock(ctx, cam, it.o);
+      else if (it.t === 3) {
+        const p = cam.worldToScreen(it.o.x, it.o.y);
+        setUprightAt(ctx, cam, dpr, p.x, p.y, it.o.x, it.o.y);
+        drawNode(ctx, it.o, g.extractorOn(it.o.id), z);
+      } else if (it.t === 4) {
+        const b = it.o;
+        drawTeamBuilding(ctx, cam, b, g.teams[b.team].color);
+        if (!b.built && b.team === team) {
+          const p = cam.worldToScreen(b.x, b.y);
+          setUprightAt(ctx, cam, dpr, p.x, p.y, b.x, b.y);
+          this.drawSiteMarks(ctx, b, z);
+        }
+      } else drawU(it.o);
+    }
+    for (const u of air) drawU(u);
+
+    // Geschosse fliegen im Bogen, Effekte am Boden
+    for (const p of g.projectiles) {
+      if (!p.alive || !shown(p)) continue;
+      if (!inRect(p.x, p.y, 80) && !inRect(p.tx, p.ty, 80)) continue;
+      const sp = cam.worldToScreen(p.x, p.y);
+      const f = Math.min(1, p.t / p.duration);
+      setUprightAt(ctx, cam, dpr, sp.x, sp.y - (14 + 90 * Math.sin(Math.PI * f)) * z, p.x, p.y);
+      drawShell(ctx, p, z);
+    }
+    setIsoGround(ctx, cam, dpr);
+    for (const e of g.effects) {
+      if (!inRect(e.x, e.y, 120) && !inRect(e.x2 ?? e.x, e.y2 ?? e.y, 120)) continue;
+      if (e.team !== -1 && e.team !== team && !seen(e.x, e.y) && !seen(e.x2 ?? e.x, e.y2 ?? e.y)) continue;
+      drawEffect(ctx, e, z);
+    }
+    this.drawMoveMarker(ctx, v.moveMarker, now, z);
+
+    if (!reveal) {
+      setIsoGround(ctx, cam, dpr);
+      updateFogLayer(this.fogLayer, g.fog[team], false);
+      ctx.drawImage(this.fogLayer.canvas, 0, 0, this.fogLayer.canvas.width, this.fogLayer.canvas.height, 0, 0, W, H);
+    }
+
+    // Balken und Warnzeichen aufrecht über den Objekten
+    const upright = (wx, wy, lift) => {
+      const p = cam.worldToScreen(wx, wy);
+      setUprightAt(ctx, cam, dpr, p.x, p.y - lift * z, wx, wy);
+    };
+    for (const u of g.units) {
+      if (!u.alive || !shown(u) || !inRect(u.x, u.y, PAD)) continue;
+      if (!(sel.has(u.id) || hover === u || u.hp < u.maxHp)) continue;
+      upright(u.x, u.y, unitLift(u));
+      this.drawHp(ctx, u.x - 12, u.y - u.def.radius - HP_OFFSET / z, 24, u.hp / u.maxHp, z);
+    }
+    for (const b of g.buildings) {
+      if (!b.alive || b.team !== team || !inRect(b.x, b.y, PAD)) continue;
+      if (!(sel.has(b.id) || hover === b || b.hp < b.maxHp)) continue;
+      const bw = b.w * TILE * 0.8;
+      upright(b.x, b.cy * TILE, buildingHeight(b) + 8);
+      this.drawHp(ctx, b.x - bw / 2, b.cy * TILE - 8 / z, bw, b.hp / b.maxHp, z);
+    }
+    for (const u of g.units) {
+      if (!u.alive || u.team !== team || !inRect(u.x, u.y, PAD)) continue;
+      upright(u.x, u.y, unitLift(u));
+      this.drawSupply(ctx, u, sel.has(u.id) || hover === u, z);
+    }
+
+    if (v.placement) {
+      setIsoGround(ctx, cam, dpr);
+      this.drawPlacement(ctx, v.placement, z);
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (v.dragBox) this.drawDragBox(ctx, v.dragBox);
+    if (v.placement && !v.placement.ok && v.placement.reason && Number.isFinite(v.placement.x)) {
+      this.drawNote(ctx, cam.worldToScreen(v.placement.x, v.placement.y), v.placement.reason);
+    }
+  }
+
   drawTerrain(ctx, R) {
     const S = this.terrain.width / W;
     const x0 = Math.max(0, R.x0);
@@ -246,6 +460,7 @@ export class Renderer {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.font = '700 56px system-ui, sans-serif';
+    if (this.camera.iso) this.uprightAtWorld(ctx, zn.x, zn.y - zn.r + 110, 0);
     ctx.fillText('KONFLIKTZONE', zn.x, zn.y - zn.r + 110);
     ctx.restore();
   }
@@ -270,6 +485,7 @@ export class Renderer {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.font = '700 34px system-ui, sans-serif';
+    if (this.camera.iso) this.uprightAtWorld(ctx, hz.x, hz.y - hz.r + 40, 0);
     ctx.fillText('HOT ZONE', hz.x, hz.y - hz.r + 40);
     ctx.restore();
   }

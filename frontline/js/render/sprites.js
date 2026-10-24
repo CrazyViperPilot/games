@@ -68,7 +68,7 @@ export function drawBar(ctx, x, y, w, h, frac, color) {
 /**
  * Einheit von oben. u: Entity; color: Teamfarbe; aim: Zielwinkel (Turm/Waffe), sonst Fahrtrichtung.
  */
-export function drawUnit(ctx, u, color, zoom = 1, aim = null, now = 0) {
+export function drawUnit(ctx, u, color, zoom = 1, aim = null, now = 0, iso = false) {
   const z = zoom || 1;
   const dark = shade(color, 0.45);
   const light = tint(color, 0.25);
@@ -98,7 +98,7 @@ export function drawUnit(ctx, u, color, zoom = 1, aim = null, now = 0) {
     ctx.arc(-1, -1, 1.5, 0, Math.PI * 2);
     ctx.fill();
   } else if (u.def && u.def.air) {
-    drawHeli(ctx, u, color, dark, light, hull, turret, now, z);
+    drawHeli(ctx, u, color, dark, light, hull, turret, now, z, iso);
   } else if (u.type === 'truck') {
     ctx.rotate(hull);
     ctx.fillStyle = dark;
@@ -158,12 +158,13 @@ export function drawUnit(ctx, u, color, zoom = 1, aim = null, now = 0) {
 }
 
 /** Hubschrauber von oben: Schatten, Rumpf, Heckausleger, drehende Rotoren. */
-function drawHeli(ctx, u, color, dark, light, hull, turret, now, z) {
+function drawHeli(ctx, u, color, dark, light, hull, turret, now, z, iso = false) {
   const big = u.type === 'transporter';
   const gun = u.type === 'gunship';
   const len = big ? 24 : gun ? 20 : 15;
   const wid = big ? 7 : gun ? 5 : 6;
-  // Schatten auf dem Boden (versetzt)
+  // Schatten auf dem Boden (versetzt); in der isometrischen Ansicht zeichnet der Renderer ihn am Boden
+  if (!iso) {
   ctx.save();
   ctx.translate(7, 9);
   ctx.rotate(hull);
@@ -172,6 +173,7 @@ function drawHeli(ctx, u, color, dark, light, hull, turret, now, z) {
   ctx.ellipse(0, 0, len * 0.8, wid, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
+  }
   ctx.save();
   ctx.rotate(hull);
   ctx.fillStyle = dark;

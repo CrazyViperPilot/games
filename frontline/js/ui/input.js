@@ -103,7 +103,7 @@ export class Input {
     if (!dx && !dy) return;
     const len = Math.hypot(dx, dy);
     const step = (SCROLL_PX * dt) / this.camera.zoom / len;
-    this.camera.centerOn(this.camera.x + dx * step, this.camera.y + dy * step);
+    this.camera.pan(-dx * step * this.camera.zoom, -dy * step * this.camera.zoom);
   }
 
   rightAt(wx, wy) {
@@ -273,6 +273,10 @@ export class Input {
       case 'h':
       case 'H':
         this.goHome();
+        return;
+      case 'v':
+      case 'V':
+        app.toggleView?.();
         return;
       case 'p':
       case 'P':

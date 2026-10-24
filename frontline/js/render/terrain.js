@@ -3,6 +3,7 @@ import { makeRng } from '../core/rng.js';
 
 export const TERRAIN_SCALE = 0.25;
 const cache = new WeakMap();
+const cacheIso = new WeakMap(); // Boden ohne Gebäude und Bäume (die zeichnet die isometrische Ansicht als Körper)
 
 function makeCanvas(w, h) {
   if (typeof document !== 'undefined' && document.createElement) {
@@ -20,8 +21,9 @@ function makeCanvas(w, h) {
  * Deterministisch aus den Hindernissen der Karte. Gleiche Karte → gleiches (gecachtes) Canvas.
  * @returns {HTMLCanvasElement|OffscreenCanvas} Breite = width * TERRAIN_SCALE
  */
-export function buildTerrain(map) {
-  if (cache.has(map)) return cache.get(map);
+export function buildTerrain(map, iso = false) {
+  const cache_ = iso ? cacheIso : cache;
+  if (cache_.has(map)) return cache_.get(map);
   const W = map.width;
   const H = map.height;
   const S = TERRAIN_SCALE;
@@ -57,8 +59,8 @@ export function buildTerrain(map) {
   }
 
   drawRoads(ctx, map, S);
-  drawTown(ctx, map, S);
-  for (const t of map.trees ?? []) tree(ctx, t.x * S, t.y * S, t.r * S);
+  drawTown(ctx, map, S, iso);
+  if (!iso) for (const t of map.trees ?? []) tree(ctx, t.x * S, t.y * S, t.r * S);
 
   // Hindernisse: Wald (Kreis aus Baumkronen) bzw. Fels (grauer Block mit Schatten).
   // Die Art richtet sich nach dem Radius, damit die punktsymmetrischen Partner gleich aussehen.
@@ -121,7 +123,7 @@ export function buildTerrain(map) {
   }
   ctx.stroke();
 
-  cache.set(map, canvas);
+  cache_.set(map, canvas);
   return canvas;
 }
 
@@ -165,13 +167,13 @@ function drawRoads(ctx, map, S) {
 }
 
 /** Parks, Gebäude (Häuser, Hallen, Fabriken), Autos und Stadtbäume. */
-function drawTown(ctx, map, S) {
+function drawTown(ctx, map, S, iso = false) {
   const t = map.town;
   if (!t) return;
   for (const p of t.parks) {
     disc(ctx, p.x * S, p.y * S, p.r * S, 'rgba(110,150,80,0.55)');
   }
-  for (const b of t.buildings) {
+  for (const b of iso ? [] : t.buildings) {
     const x = (b.x - b.w / 2) * S;
     const y = (b.y - b.h / 2) * S;
     const w = b.w * S;
@@ -214,5 +216,5 @@ function drawTown(ctx, map, S) {
     ctx.fillStyle = c.color;
     ctx.fillRect(c.x * S - cw / 2, c.y * S - ch / 2, cw, ch);
   }
-  for (const tr of t.trees) tree(ctx, tr.x * S, tr.y * S, tr.r * S);
+  if (!iso) for (const tr of t.trees) tree(ctx, tr.x * S, tr.y * S, tr.r * S);
 }

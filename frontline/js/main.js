@@ -14,6 +14,15 @@ import { showStartMenu, showPause, showHelp, showEnd, hideOverlay } from './ui/m
 
 const params = new URLSearchParams(location.search);
 const DEBUG = params.get('debug') === '1';
+// Ansicht: ?iso=1 / ?iso=0 oder zuletzt gewählt (V bzw. Schaltfläche); Standard 2D
+function loadIso() {
+  if (params.has('iso')) return params.get('iso') === '1';
+  try {
+    return localStorage.getItem('frontline-iso') === '1';
+  } catch {
+    return false;
+  }
+}
 const URL_SEED = Number.parseInt(params.get('seed'), 10);
 const URL_SPEED = Number.parseFloat(params.get('speed'));
 const SPEEDS = DEBUG ? [1, 2, 3, 5, 10] : [1, 2, 3];
@@ -86,6 +95,19 @@ const app = {
       s.loop.paused = true;
       showPause(overlay, resume, quitToMenu);
     }
+  },
+  toggleView() {
+    const s = session;
+    if (!s) return;
+    s.camera.iso = !s.camera.iso;
+    s.camera.clamp();
+    try {
+      localStorage.setItem('frontline-iso', s.camera.iso ? '1' : '0');
+    } catch {
+      /* ohne Speicher: gilt nur für diese Sitzung */
+    }
+    s.hud.pushMessage(s.camera.iso ? 'Ansicht: isometrisch (V)' : 'Ansicht: 2D von oben (V)');
+    s.hud.refresh();
   },
   toggleHelp() {
     if (overlay.dataset.kind === 'help') {
@@ -164,6 +186,7 @@ function startGame(opts) {
   const game = new Game({ seed, winPoints: opts.winPoints });
   const ai = new AI(game, AI_TEAM, opts.difficulty);
   const camera = new Camera(BALANCE.map.width, BALANCE.map.height);
+  camera.iso = loadIso();
   const renderer = new Renderer(canvas, game, camera, HUMAN);
   const controller = new Controller(game, HUMAN, camera);
   const hud = new Hud(hudRoot, game, HUMAN, controller, app);
