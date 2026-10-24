@@ -5,6 +5,12 @@ export const TERRAIN_SCALE = 0.25;
 const cache = new WeakMap();
 const cacheIso = new WeakMap(); // Boden ohne Gebäude und Bäume (die zeichnet die isometrische Ansicht als Körper)
 
+/** Karte wurde verändert (Editor): zwischengespeicherte Geländebilder verwerfen. */
+export function invalidateTerrain(map) {
+  cache.delete(map);
+  cacheIso.delete(map);
+}
+
 function makeCanvas(w, h) {
   if (typeof document !== 'undefined' && document.createElement) {
     const c = document.createElement('canvas');
@@ -148,7 +154,33 @@ function tree(ctx, x, y, r) {
   disc(ctx, x - r * 0.25, y - r * 0.25, r * 0.55, '#43733a');
 }
 
-/** Straßen der Stadt und Feldwege (Asphalt mit Mittellinie bzw. Erdweg). */
+/** Schnittpunkte und Stoßstellen der Straßen (Kreuzungen, T- und L-Einmündungen): [{x, y, r, dirt}]. */
+export function roadJunctions(roads) {
+  const out = [];
+  const seg = (r) => ({ x: r.x1, y: r.y1, dx: r.x2 - r.x1, dy: r.y2 - r.y1 });
+  for (let i = 0; i < roads.length; i++) {
+    const a = roads[i];
+    const A = seg(a);
+    for (let j = i + 1; j < roads.length; j++) {
+      const b = roads[j];
+      const B = seg(b);
+      const den = A.dx * B.dy - A.dy * B.dx;
+      if (Math.abs(den) < 1e-6) continue; // parallel
+      const t = ((B.x - A.x) * B.dy - (B.y - A.y) * B.dx) / den;
+      const u = ((B.x - A.x) * A.dy - (B.y - A.y) * A.dx) / den;
+      const la = Math.hypot(A.dx, A.dy) || 1;
+      const lb = Math.hypot(B.dx, B.dy) || 1;
+      // Toleranz: Enden dürfen knapp daneben liegen (Breite der anderen Straße)
+      const ta = (b.w / 2 + 4) / la;
+      const tb = (a.w / 2 + 4) / lb;
+      if (t < -ta || t > 1 + ta || u < -tb || u > 1 + tb) continue;
+      out.push({ x: A.x + t * A.dx, y: A.y + t * A.dy, r: Math.max(a.w, b.w) / 2, dirt: !!a.dirt && !!b.dirt });
+    }
+  }
+  return out;
+}
+
+/** Straßen der Stadt und Feldwege (Asphalt mit Mittellinie bzw. Erdweg); an Kreuzungen und Einmündungen eine durchgehende Fläche. */
 function drawRoads(ctx, map, S) {
   const roads = map.town?.roads;
   if (!roads) return;
@@ -172,6 +204,16 @@ function drawRoads(ctx, map, S) {
   }
   ctx.stroke();
   ctx.setLineDash([]);
+  // Kreuzungsfläche über den Mittellinien
+  for (const j of roadJunctions(roads)) {
+    const x = j.x * S;
+    const y = j.y * S;
+    const r = j.r * S;
+    ctx.fillStyle = j.dirt ? '#7b6a48' : '#4d504c';
+    ctx.beginPath();
+    ctx.arc(x, y, r * 1.02, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
 /** Bahnlinie: Schotterbett, Schwellen und zwei Schienen (Straßen kreuzen sie auf gleicher Höhe). */

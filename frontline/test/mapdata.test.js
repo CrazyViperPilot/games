@@ -65,3 +65,11 @@ test('Kartenspeicher: speichern, laden, löschen', () => {
     delete globalThis.localStorage;
   }
 });
+
+test('Straßen: Kreuzungen und Einmündungen werden erkannt', async () => {
+  const { roadJunctions } = await import('../js/render/terrain.js');
+  const h = { x1: 0, y1: 100, x2: 400, y2: 100, w: 64 };
+  const j = roadJunctions([h, { x1: 200, y1: 0, x2: 200, y2: 200, w: 64 }, { x1: 300, y1: 100, x2: 300, y2: 300, w: 64 }, { x1: 50, y1: 400, x2: 90, y2: 400, w: 64 }]);
+  assert.equal(j.length, 2, 'Kreuzung und T-Einmündung, die ferne Straße nicht');
+  assert.deepEqual(j.map((p) => [Math.round(p.x), Math.round(p.y)]).sort(), [[200, 100], [300, 100]]);
+});

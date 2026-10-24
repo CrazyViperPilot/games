@@ -1,9 +1,15 @@
-// Karteneditor (editor.html): alle Kartenelemente frei platzieren, ohne Spiegelung. Zeichnet mit denselben Funktionen wie das Spiel.
+// Karteneditor (editor.html): alle Kartenelemente frei platzieren, ohne Spiegelung. Zeichnet mit denselben Funktionen wie das Spiel,
+// 2D selbst, isometrisch über den Spiel-Renderer mit einem leeren Hilfsspiel (nur Karte).
 // URL: ?new=1 (leere Karte) · ?map=ID (gespeicherte Karte) · ?seed=N (Zufallskarte als Ausgangspunkt)
 import { BALANCE } from '../data/balance.js';
 import { makeRng } from '../core/rng.js';
 import { generateMap } from '../game/map.js';
-import { drawMapObjects } from '../render/terrain.js';
+import { drawMapObjects, invalidateTerrain, roadJunctions } from '../render/terrain.js';
+import { Camera } from '../render/camera.js';
+import { Renderer } from '../render/renderer.js';
+import { setIsoGround, TOWN_H } from '../render/iso.js';
+import { ISO_K } from '../render/camera.js';
+import { Game } from '../game/game.js';
 import { createEmptyMap, normalizeMap, checkMap, describeMap, loadMap, saveMap } from '../game/mapdata.js';
 
 const W = BALANCE.map.width;
@@ -56,7 +62,9 @@ const st = {
   id: null, // ID der gespeicherten Karte
   tool: 'select',
   sel: null, // {k: Art, o: Objekt}
-  view: { x: W / 2, y: H / 2, zoom: 0.1 },
+  cam: new Camera(W, H),
+  renderer: null,
+  groundDirty: false, // Boden der isometrischen Ansicht neu backen (nach Änderungen an Straßen, Parks, Bahn)
   hist: [],
   redo: [],
   dirty: false,
@@ -75,50 +83,58 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const dpr = () => window.devicePixelRatio || 1;
 
 function resize() {
-  const d = dpr();
-  canvas.width = Math.round(window.innerWidth * d);
-  canvas.height = Math.round(window.innerHeight * d);
-  fitMinZoom();
+  const cam = st.cam;
+  if (st.renderer) st.renderer.resize();
+  else cam.resize(window.innerWidth, window.innerHeight);
+  cam.zoomMin = minZoom();
+  cam.zoomMax = ZOOM_MAX;
+  cam.zoom = clamp(cam.zoom, cam.zoomMin, cam.zoomMax);
+  cam.clamp();
   st.needDraw = true;
 }
 
 function minZoom() {
-  return Math.min(window.innerWidth / (W * 1.05), window.innerHeight / (H * 1.05));
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  if (st.cam.iso) return Math.min(vw / (2 * W * ISO_K * 1.05), vh / (W * ISO_K * 1.05));
+  return Math.min(vw / (W * 1.05), vh / (H * 1.05));
 }
 
-function fitMinZoom() {
-  st.view.zoom = clamp(st.view.zoom, minZoom(), ZOOM_MAX);
-}
-
-const toWorld = (sx, sy) => ({
-  x: (sx - window.innerWidth / 2) / st.view.zoom + st.view.x,
-  y: (sy - window.innerHeight / 2) / st.view.zoom + st.view.y,
-});
-
-function clampView() {
-  st.view.x = clamp(st.view.x, 0, W);
-  st.view.y = clamp(st.view.y, 0, H);
-}
+const toWorld = (sx, sy) => st.cam.screenToWorld(sx, sy);
 
 function zoomAt(f, sx, sy) {
-  const before = toWorld(sx, sy);
-  st.view.zoom = clamp(st.view.zoom * f, minZoom(), ZOOM_MAX);
-  const after = toWorld(sx, sy);
-  st.view.x += before.x - after.x;
-  st.view.y += before.y - after.y;
-  clampView();
+  st.cam.zoomAt(f, sx, sy);
   st.needDraw = true;
 }
 
 function panBy(dx, dy) {
-  st.view.x -= dx / st.view.zoom;
-  st.view.y -= dy / st.view.zoom;
-  clampView();
+  st.cam.pan(dx, dy);
   st.needDraw = true;
 }
 
 function fit() {
-  st.view = { x: W / 2, y: H / 2, zoom: minZoom() };
+  const cam = st.cam;
+  cam.zoomMin = minZoom();
+  cam.zoom = cam.zoomMin;
+  cam.centerOn(W / 2, H / 2);
+  st.needDraw = true;
+}
+
+function toggleView() {
+  const cam = st.cam;
+  const c = toWorld(window.innerWidth / 2, window.innerHeight / 2);
+  cam.iso = !cam.iso;
+  cam.zoomMin = minZoom();
+  cam.zoom = clamp(cam.zoom, cam.zoomMin, cam.zoomMax);
+  cam.centerOn(c.x, c.y);
+  st.groundDirty = true;
+  syncButtons();
+  st.needDraw = true;
+}
+
+function rotateView(dir) {
+  if (!st.cam.iso) return;
+  st.cam.rotate(dir);
   st.needDraw = true;
 }
 
@@ -137,6 +153,7 @@ function pushHistory() {
   if (st.hist.length > HISTORY_MAX) st.hist.shift();
   st.redo = [];
   st.dirty = true;
+  st.groundDirty = true;
   syncButtons();
 }
 
@@ -144,6 +161,7 @@ function restore(json) {
   st.map = normalizeMap(JSON.parse(json));
   st.sel = null;
   st.dirty = true;
+  st.groundDirty = true;
   st.needDraw = true;
   showInspector();
   syncButtons();
@@ -164,6 +182,8 @@ function redo() {
 function syncButtons() {
   $('[data-act=undo]').disabled = !st.hist.length;
   $('[data-act=redo]').disabled = !st.redo.length;
+  $('[data-act=view]').textContent = st.cam.iso ? 'Iso' : '2D';
+  document.querySelectorAll('[data-rot]').forEach((b) => (b.hidden = !st.cam.iso));
 }
 
 // ---- Objekte ---------------------------------------------------------------------
@@ -191,8 +211,8 @@ function distToSeg(px, py, r) {
 }
 
 /** Oberstes Objekt unter dem Weltpunkt oder null: Startpunkte und Zone zuerst, dann Gebäude, Bäume, Hindernisse, Parks, Straßen, Bahn. */
-function pickAt(wx, wy) {
-  const tol = 14 / st.view.zoom;
+function pickAt(wx, wy, sx = null, sy = null) {
+  const tol = 14 / st.cam.zoom;
   const m = st.map;
   for (let i = 0; i < 2; i++) {
     if (Math.hypot(m.spawns[i].x - wx, m.spawns[i].y - wy) < 70 + tol) return { k: 'spawn', i, o: m.spawns[i] };
@@ -213,6 +233,11 @@ function pickAt(wx, wy) {
   for (let i = m.town.buildings.length - 1; i >= 0; i--) {
     const b = m.town.buildings[i];
     if (Math.abs(b.x - wx) <= b.w / 2 + tol * 0.4 && Math.abs(b.y - wy) <= b.h / 2 + tol * 0.4) return { k: 'building', o: b };
+    if (st.cam.iso && sx !== null) {
+      // Isometrisch: ein Klick aufs Dach liegt auf dem Boden hinter dem Fußabdruck
+      const roof = st.cam.screenToWorld(sx, sy + (b.kind === 'train' ? 30 : TOWN_H[b.kind] ?? 40) * st.cam.zoom);
+      if (Math.abs(b.x - roof.x) <= b.w / 2 && Math.abs(b.y - roof.y) <= b.h / 2) return { k: 'building', o: b };
+    }
   }
   const hit = circ('tree', m.trees) || circ('townTree', m.town.trees) || circ('obstacle', m.obstacles);
   if (hit) return hit;
@@ -313,109 +338,162 @@ function moveObj(sel, dx, dy) {
 
 // ---- Zeichnen --------------------------------------------------------------------
 
+/** Hilfsspiel nur mit Karte: der Spiel-Renderer zeichnet damit die isometrische Ansicht (ohne Einheiten und Gebäude des Spiels). */
+function makeRenderer() {
+  const game = new Game({ seed: 1, map: st.map });
+  game.units.length = 0;
+  game.buildings.length = 0;
+  game.entities.clear();
+  const r = new Renderer(canvas, game, st.cam, 0);
+  r.revealAll = true;
+  return r;
+}
+
+function syncGhost() {
+  const r = st.renderer;
+  const g = r.game;
+  const m = st.map;
+  if (g.map !== m) {
+    g.map = m;
+    st.groundDirty = true;
+  }
+  g.zone.x = m.zone.x;
+  g.zone.y = m.zone.y;
+  g.zone.r = m.zone.r;
+  g.hot.x = g.hot.y = -1e6; // Hot Zone gibt es erst im Spiel
+  r.deco = null;
+  // Boden (Straßen, Parks, Bahn, Hindernisse) neu backen, aber nicht während des Ziehens
+  if (st.groundDirty && !st.gesture) {
+    invalidateTerrain(m);
+    r.terrainIso = null;
+    r.terrain = null;
+    st.groundDirty = false;
+  }
+}
+
 function draw() {
   st.needDraw = false;
-  const d = dpr();
+  const cam = st.cam;
+  const m = st.map;
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  const z = st.view.zoom;
-  const m = st.map;
-  ctx.setTransform(d, 0, 0, d, 0, 0);
-  ctx.fillStyle = '#2a2f27';
-  ctx.fillRect(0, 0, vw, vh);
-  ctx.save();
-  ctx.translate(vw / 2 - st.view.x * z, vh / 2 - st.view.y * z);
-  // Boden
-  ctx.fillStyle = '#56603f';
-  ctx.fillRect(0, 0, W * z, H * z);
-  drawMapObjects(ctx, m, z, false, makeRng(77));
-  // Raster alle 512 px
+  const z = cam.zoom;
+  const iso = cam.iso;
+  const d = st.renderer.dpr;
+  if (iso) {
+    syncGhost();
+    st.renderer.render({});
+  } else {
+    ctx.setTransform(d, 0, 0, d, 0, 0);
+    ctx.fillStyle = '#2a2f27';
+    ctx.fillRect(0, 0, vw, vh);
+    ctx.save();
+    ctx.translate(vw / 2 - cam.x * z, vh / 2 - cam.y * z);
+    ctx.fillStyle = '#56603f';
+    ctx.fillRect(0, 0, W * z, H * z);
+    drawMapObjects(ctx, m, z, false, makeRng(77));
+    ctx.restore();
+  }
+  // Überlagerungen in Weltkoordinaten (2D: Zoom, Iso: Bodenebene), Linienstärken in Bildschirm-Pixeln
+  const world = () => {
+    if (iso) setIsoGround(ctx, cam, d);
+    else ctx.setTransform(d * z, 0, 0, d * z, d * (vw / 2 - cam.x * z), d * (vh / 2 - cam.y * z));
+  };
+  const px = 1 / z;
+  world();
+  // Raster alle 512 px und Kartenrand
   ctx.strokeStyle = 'rgba(0,0,0,0.12)';
-  ctx.lineWidth = 1;
+  ctx.lineWidth = px;
   ctx.beginPath();
-  for (let x = 0; x <= W; x += 512) { ctx.moveTo(x * z, 0); ctx.lineTo(x * z, H * z); }
-  for (let y = 0; y <= H; y += 512) { ctx.moveTo(0, y * z); ctx.lineTo(W * z, y * z); }
+  for (let x = 0; x <= W; x += 512) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+  for (let y = 0; y <= H; y += 512) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
   ctx.stroke();
   ctx.strokeStyle = '#c9a227';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(0, 0, W * z, H * z);
+  ctx.lineWidth = 2 * px;
+  ctx.strokeRect(0, 0, W, H);
   // Konfliktzone
   ctx.strokeStyle = '#ffd24a';
-  ctx.lineWidth = 2;
-  ctx.setLineDash([10, 8]);
+  ctx.lineWidth = 2 * px;
+  ctx.setLineDash([10 * px, 8 * px]);
   ctx.beginPath();
-  ctx.arc(m.zone.x * z, m.zone.y * z, m.zone.r * z, 0, Math.PI * 2);
+  ctx.arc(m.zone.x, m.zone.y, m.zone.r, 0, Math.PI * 2);
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.fillStyle = '#ffd24a';
-  ctx.font = '600 13px system-ui, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('Konfliktzone', m.zone.x * z, m.zone.y * z - 10);
   ctx.beginPath();
-  ctx.arc(m.zone.x * z, m.zone.y * z, 5, 0, Math.PI * 2);
+  ctx.arc(m.zone.x, m.zone.y, 5 * px, 0, Math.PI * 2);
   ctx.fill();
   // Startpunkte mit Bauradius der Haupt-FOB
-  m.spawns.forEach((s, i) => {
+  m.spawns.forEach((sp, i) => {
     const col = BALANCE.teamColors[i];
     ctx.strokeStyle = col;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2 * px;
     ctx.beginPath();
-    ctx.arc(s.x * z, s.y * z, BALANCE.fob.buildRadius * z, 0, Math.PI * 2);
+    ctx.arc(sp.x, sp.y, BALANCE.fob.buildRadius, 0, Math.PI * 2);
     ctx.stroke();
     ctx.fillStyle = col;
-    const r = Math.max(7, 40 * z);
-    ctx.fillRect(s.x * z - r, s.y * z - r, r * 2, r * 2);
-    ctx.fillStyle = '#fff';
-    ctx.fillText(`Start ${BALANCE.teamNames[i]}`, s.x * z, s.y * z - r - 6);
+    const r = Math.max(7 * px, 40);
+    ctx.fillRect(sp.x - r, sp.y - r, r * 2, r * 2);
   });
-  // Auswahl
-  if (st.sel) drawSelection(st.sel, z);
+  if (st.sel) drawSelection(st.sel, px);
   // Vorschau eines Linien-Ziehens
   const g = st.gesture;
   if (g && g.type === 'line') {
     ctx.strokeStyle = g.dirt ? '#7b6a48' : '#4d504c';
-    ctx.lineWidth = g.w * z;
+    ctx.lineWidth = g.w;
     ctx.lineCap = 'butt';
     ctx.beginPath();
-    ctx.moveTo(g.x1 * z, g.y1 * z);
-    ctx.lineTo(g.x2 * z, g.y2 * z);
+    ctx.moveTo(g.x1, g.y1);
+    ctx.lineTo(g.x2, g.y2);
     ctx.stroke();
   }
-  ctx.restore();
+  // Beschriftungen in Bildschirmkoordinaten
+  ctx.setTransform(d, 0, 0, d, 0, 0);
+  ctx.font = '600 13px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#ffd24a';
+  const zp = cam.worldToScreen(m.zone.x, m.zone.y);
+  ctx.fillText('Konfliktzone', zp.x, zp.y - 12);
+  m.spawns.forEach((sp, i) => {
+    const p = cam.worldToScreen(sp.x, sp.y);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(`Start ${BALANCE.teamNames[i]}`, p.x, p.y - Math.max(14, 44 * z));
+  });
 }
 
-function drawSelection(sel, z) {
+function drawSelection(sel, px) {
   const o = sel.o;
   ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 2;
-  ctx.setLineDash([6, 4]);
+  ctx.lineWidth = 2 * px;
+  ctx.setLineDash([6 * px, 4 * px]);
+  const pad = 3 * px;
   if (sel.k === 'building') {
-    ctx.strokeRect((o.x - o.w / 2) * z - 3, (o.y - o.h / 2) * z - 3, o.w * z + 6, o.h * z + 6);
+    ctx.strokeRect(o.x - o.w / 2 - pad, o.y - o.h / 2 - pad, o.w + pad * 2, o.h + pad * 2);
   } else if (sel.k === 'road') {
     ctx.setLineDash([]);
     for (const [x, y] of [[o.x1, o.y1], [o.x2, o.y2]]) {
       ctx.beginPath();
-      ctx.arc(x * z, y * z, Math.max(8, o.w * z * 0.6), 0, Math.PI * 2);
+      ctx.arc(x, y, Math.max(8 * px, o.w * 0.6), 0, Math.PI * 2);
       ctx.stroke();
     }
-    ctx.setLineDash([6, 4]);
+    ctx.setLineDash([6 * px, 4 * px]);
     ctx.beginPath();
-    ctx.moveTo(o.x1 * z, o.y1 * z);
-    ctx.lineTo(o.x2 * z, o.y2 * z);
+    ctx.moveTo(o.x1, o.y1);
+    ctx.lineTo(o.x2, o.y2);
     ctx.stroke();
   } else if (sel.k === 'rail') {
-    ctx.strokeRect(0, (o.y - o.half) * z, W * z, o.half * 2 * z);
+    ctx.strokeRect(0, o.y - o.half, W, o.half * 2);
   } else if (sel.k === 'car') {
     const hw = o.vertical ? 9 : 18;
     const hh = o.vertical ? 18 : 9;
-    ctx.strokeRect((o.x - hw) * z - 3, (o.y - hh) * z - 3, hw * 2 * z + 6, hh * 2 * z + 6);
+    ctx.strokeRect(o.x - hw - pad, o.y - hh - pad, hw * 2 + pad * 2, hh * 2 + pad * 2);
   } else if (sel.k === 'spawn' || sel.k === 'zone') {
     ctx.beginPath();
-    ctx.arc(o.x * z, o.y * z, Math.max(14, 60 * z), 0, Math.PI * 2);
+    ctx.arc(o.x, o.y, Math.max(14 * px, 60), 0, Math.PI * 2);
     ctx.stroke();
   } else {
     ctx.beginPath();
-    ctx.arc(o.x * z, o.y * z, o.r * z + 3, 0, Math.PI * 2);
+    ctx.arc(o.x, o.y, o.r + pad, 0, Math.PI * 2);
     ctx.stroke();
   }
   ctx.setLineDash([]);
@@ -433,9 +511,41 @@ function pos(e) {
   return { x: e.clientX - r.left, y: e.clientY - r.top };
 }
 
+/** Straßenpunkt: rastet an Enden und Mittellinien anderer Straßen ein, damit Kreuzungen und Einmündungen sauber schließen. */
+function snapRoad(x, y) {
+  const z = st.cam.zoom;
+  const tolEnd = 40 / z;
+  let best = null;
+  let bd = Infinity;
+  for (const r of st.map.town.roads) {
+    for (const [ex, ey] of [[r.x1, r.y1], [r.x2, r.y2]]) {
+      const d = Math.hypot(ex - x, ey - y);
+      if (d < tolEnd && d < bd) {
+        bd = d;
+        best = { x: ex, y: ey };
+      }
+    }
+  }
+  if (best) return best;
+  for (const r of st.map.town.roads) {
+    const dx = r.x2 - r.x1;
+    const dy = r.y2 - r.y1;
+    const l2 = dx * dx + dy * dy || 1;
+    const t = clamp(((x - r.x1) * dx + (y - r.y1) * dy) / l2, 0, 1);
+    const qx = r.x1 + t * dx;
+    const qy = r.y1 + t * dy;
+    const d = Math.hypot(qx - x, qy - y);
+    if (d < r.w / 2 + 28 / z && d < bd) {
+      bd = d;
+      best = { x: Math.round(qx), y: Math.round(qy) };
+    }
+  }
+  return best || { x: clamp(snap(x), 0, W), y: clamp(snap(y), 0, H) };
+}
+
 function endpointHit(sel, wx, wy) {
   if (!sel || sel.k !== 'road') return 0;
-  const tol = 22 / st.view.zoom + sel.o.w / 2;
+  const tol = 22 / st.cam.zoom + sel.o.w / 2;
   if (Math.hypot(sel.o.x1 - wx, sel.o.y1 - wy) < tol) return 1;
   if (Math.hypot(sel.o.x2 - wx, sel.o.y2 - wy) < tol) return 2;
   return 0;
@@ -482,14 +592,14 @@ canvas.addEventListener('pointerdown', (e) => {
       st.gesture = { type: 'endpoint', ep, moved: true };
       return;
     }
-    const hit = pickAt(w.x, w.y);
+    const hit = pickAt(w.x, w.y, p.x, p.y);
     st.sel = hit;
     showInspector();
     st.needDraw = true;
     if (hit) st.gesture = { type: 'move', x: w.x, y: w.y, started: false, sx: p.x, sy: p.y };
     else st.gesture = { type: 'pan', x: p.x, y: p.y };
   } else if (t === 'erase') {
-    const hit = pickAt(w.x, w.y);
+    const hit = pickAt(w.x, w.y, p.x, p.y);
     if (hit) {
       pushHistory();
       if (!removeSel(hit)) {
@@ -503,7 +613,8 @@ canvas.addEventListener('pointerdown', (e) => {
       }
     }
   } else if (t === 'road' || t === 'dirt') {
-    st.gesture = { type: 'line', dirt: t === 'dirt', w: t === 'dirt' ? 52 : 64, x1: snap(w.x), y1: snap(w.y), x2: snap(w.x), y2: snap(w.y) };
+    const a = snapRoad(w.x, w.y);
+    st.gesture = { type: 'line', dirt: t === 'dirt', w: t === 'dirt' ? 52 : 64, x1: a.x, y1: a.y, x2: a.x, y2: a.y };
   } else if (t === 'tree') {
     pushHistory();
     place(t, w.x, w.y);
@@ -534,7 +645,7 @@ window.addEventListener('pointermove', (e) => {
   }
   const w = toWorld(p.x, p.y);
   st.pointer = w;
-  $('[data-info]').textContent = `x ${Math.round(w.x)} · y ${Math.round(w.y)} · Zoom ${Math.round(st.view.zoom * 100)} %`;
+  $('[data-info]').textContent = `x ${Math.round(w.x)} · y ${Math.round(w.y)} · Zoom ${Math.round(st.cam.zoom * 100)} %`;
   const g = st.gesture;
   if (!g) return;
   if (g.type === 'pan') {
@@ -557,12 +668,14 @@ window.addEventListener('pointermove', (e) => {
     st.needDraw = true;
   } else if (g.type === 'endpoint') {
     const r = st.sel.o;
-    if (g.ep === 1) { r.x1 = clamp(snap(w.x), 0, W); r.y1 = clamp(snap(w.y), 0, H); }
-    else { r.x2 = clamp(snap(w.x), 0, W); r.y2 = clamp(snap(w.y), 0, H); }
+    const q = snapRoad(w.x, w.y);
+    if (g.ep === 1) { r.x1 = q.x; r.y1 = q.y; }
+    else { r.x2 = q.x; r.y2 = q.y; }
     st.needDraw = true;
   } else if (g.type === 'line') {
-    g.x2 = snap(w.x);
-    g.y2 = snap(w.y);
+    const b = snapRoad(w.x, w.y);
+    g.x2 = b.x;
+    g.y2 = b.y;
     st.needDraw = true;
   } else if (g.type === 'brush') {
     if (Math.hypot(w.x - g.x, w.y - g.y) >= 34) {
@@ -640,9 +753,12 @@ window.addEventListener('keydown', (e) => {
     st.needDraw = true;
   } else if (k.startsWith('Arrow')) {
     e.preventDefault();
-    const s = 120 * st.view.zoom;
+    const s = 120 * st.cam.zoom;
     panBy(k === 'ArrowLeft' ? s : k === 'ArrowRight' ? -s : 0, k === 'ArrowUp' ? s : k === 'ArrowDown' ? -s : 0);
-  } else if (k === '+' || k === '=') zoomAt(1.2, window.innerWidth / 2, window.innerHeight / 2);
+  } else if (k === 'v' || k === 'V') toggleView();
+  else if (k === ',') rotateView(-1);
+  else if (k === '.') rotateView(1);
+  else if (k === '+' || k === '=') zoomAt(1.2, window.innerWidth / 2, window.innerHeight / 2);
   else if (k === '-') zoomAt(1 / 1.2, window.innerWidth / 2, window.innerHeight / 2);
 });
 
@@ -852,6 +968,9 @@ document.querySelector('.edtop').addEventListener('click', (e) => {
   } else if (a === 'undo') undo();
   else if (a === 'redo') redo();
   else if (a === 'fit') fit();
+  else if (a === 'view') toggleView();
+  else if (a === 'rotl') rotateView(-1);
+  else if (a === 'rotr') rotateView(1);
   else if (a === 'empty') {
     if (confirmDiscard()) setMap(createEmptyMap(), {});
   } else if (a === 'random') {
@@ -922,6 +1041,7 @@ setTool('select');
   setMap(map || createEmptyMap(), { keepId: !!map && !!st.id });
   if (params.has('map') && !st.id) say('Karte nicht gefunden, neue Karte begonnen.', true);
 })();
+st.renderer = makeRenderer();
 resize();
 fit();
 requestAnimationFrame(tick);

@@ -23,6 +23,8 @@ export class Camera {
     this.x = mapW / 2; // Weltmitte im Bild
     this.y = mapH / 2;
     this.zoom = 1;
+    this.zoomMin = ZOOM_MIN; // Karteneditor setzt weitere Grenzen
+    this.zoomMax = ZOOM_MAX;
     this.iso = false; // isometrische Ansicht (Renderer und Eingabe fragen dieses Flag)
     this.rot = 0; // isometrisch: Drehung 0–3 (je 90°)
     this.viewW = 800;
@@ -96,7 +98,7 @@ export class Camera {
   /** Zoomt um `factor`; der Weltpunkt unter (sx, sy) bleibt an derselben Stelle. */
   zoomAt(factor, sx, sy) {
     const before = this.screenToWorld(sx, sy);
-    this.zoom = clamp(this.zoom * factor, ZOOM_MIN, ZOOM_MAX);
+    this.zoom = clamp(this.zoom * factor, this.zoomMin, this.zoomMax);
     // Kamera so setzen, dass der Weltpunkt wieder unter (sx, sy) liegt
     this.x = this.y = 0;
     const now = this.screenToWorld(sx, sy);
