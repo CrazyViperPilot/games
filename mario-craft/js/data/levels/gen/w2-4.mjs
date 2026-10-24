@@ -4,6 +4,7 @@
 // verbunden (Band 1 bis 4, Zeilen 19–21, 27–29, 35–37, 44–46) → Arena unten rechts (Spalten 100–137).
 // Bett und Truhen liegen vor der Arena. Die Arena-Tür `:` (Spalte 99) wird beim Bosskampf zur Barriere.
 import { writeFileSync } from 'node:fs';
+import { ensureHeadroom } from './headroom.mjs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -133,6 +134,9 @@ cells([[82, 46]], 'c');             // Zischer, Band 4
 for (let r = 44; r <= 46; r++) put(99, r, ':');
 
 // ---- Ausgabe ----
+// ---- Kopffreiheit vor Skeletten (Pfeilen ausweichen = springen können), siehe headroom.mjs.
+ensureHeadroom(g, W, H);
+
 const rows = g.map((line) => line.join(''));
 const chestLines = Object.entries(chests).map(([k, v]) => `  '${k}': '${v}',`).join('\n');
 const out = `// Level w2-4 „Dreikopf-Kerker“ (Boss-Level, Welt 2). Erzeugt von js/data/levels/gen/w2-4.mjs – nicht von Hand ändern.

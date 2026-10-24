@@ -581,6 +581,14 @@ export class Renderer {
       this._put(name, frame, p.face < 0, p.x + p.w / 2, p.y + p.h);
       if (filt) ctx.filter = 'none';
     }
+    if (p.stun > 0) {
+      // Gelähmt: drei gelbe Sterne kreisen über dem Kopf.
+      ctx.fillStyle = '#ffe14d';
+      for (let k = 0; k < 3; k++) {
+        const a = game.time * 8 + k * 2.094;
+        ctx.fillRect(Math.round(p.x + p.w / 2 + Math.cos(a) * 7 - 1), Math.round(p.y - 4 + Math.sin(a) * 2), 3, 3);
+      }
+    }
 
     // (11) Geschosse und Partikel.
     const projs = game.projectiles;

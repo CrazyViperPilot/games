@@ -272,3 +272,21 @@ test('jump-Event beim Absprung', () => {
   game.update(DT, input({ jump: true, jumpPressed: true }));
   assert.ok(has('jump'));
 });
+
+test('stunPlayer: Skelett-Pfeil lähmt kurz, kostet weder Leben noch Rüstung', () => {
+  const { game } = makeGame({}, { power: 'armor' });
+  game.stunPlayer();
+  const p = game.player;
+  assert.equal(p.power, 'armor');
+  assert.equal(game.state, 'play');
+  assert.equal(p.stun, PHYS.stunTime);
+  assert.ok(p.invuln >= PHYS.stunTime, 'Schonzeit deckt die Lähmung ab');
+
+  const inp = input({ right: true });
+  const x0 = p.x;
+  run(game, inp, 30);
+  assert.equal(p.x, x0, 'gelähmt: läuft nicht');
+  runUntil(game, inp, () => p.stun === 0, 600);
+  runUntil(game, inp, () => p.x > x0 + 10, 600);
+  assert.ok(p.x > x0 + 10, 'danach wieder beweglich');
+});

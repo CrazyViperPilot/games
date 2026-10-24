@@ -58,7 +58,7 @@ function arrowHit(game, o) {
   if (o.type === 'enemyArrow') {
     const p = game.player;
     if (p && !p.dead && canBeHurt(p) && overlap(bx, by, o.w, o.h, p.x, p.y, p.w, p.h)) {
-      game.hurtPlayer('arrow');
+      game.stunPlayer?.();
       return true;
     }
     return false;

@@ -3,6 +3,7 @@
 // Hauptweg: Wald → Schacht (Leiter) → Eingangshalle → Korridor mit Bett → Schleimnische
 // → Schlucht mit Plattformen und Ranke → Oberfläche rechts → Portal.
 import { writeFileSync } from 'node:fs';
+import { ensureHeadroom } from './headroom.mjs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -99,6 +100,9 @@ put(88, 28, '*');   // Umweg über den Schleimblock (Schleimnische, Kammer)
 for (let r = 0; r <= 36; r++) put(76, r, 'Z');
 
 // ---- Ausgabe.
+// ---- Kopffreiheit vor Skeletten (Pfeilen ausweichen = springen können), siehe headroom.mjs.
+ensureHeadroom(g, W, H);
+
 const rows = g.map((row) => row.join(''));
 const out = `// Level w1-2 „Wald und Höhlen“ – erzeugt von js/data/levels/gen/w1-2.mjs (nicht von Hand ändern).
 export default {

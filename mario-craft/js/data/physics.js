@@ -18,5 +18,8 @@ export const PHYS = {
   arrowSpeed: 260,
   arrowGravity: 120,
   maxArrows: 2,
+  stunTime: 0.9,                                   // Lähmung durch Skelett-Pfeil (statt Schaden)
+  stunInvuln: 1.6,                                 // Schonzeit nach der Lähmung gegen sofortige Wiederholung
+  digHitCooldown: 0.35,                            // s zwischen zwei Pickel-Treffern auf Mobs
   lives: 3, coinsPerLife: 100,
 };

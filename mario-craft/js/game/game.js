@@ -329,6 +329,17 @@ export class Game {
     this.emit('hudChange');
   }
 
+  // Skelett-Pfeil: lähmt kurz (keine Schadens- oder Lebensfolge), danach Schonzeit.
+  stunPlayer() {
+    const p = this.player;
+    if (this.state !== 'play' || p.dead) return;
+    if (p.invuln > 0 || p.star > 0) return;
+    p.stun = PHYS.stunTime;
+    p.invuln = PHYS.stunInvuln;
+    p.vx = 0;
+    this.emit('hurt');
+  }
+
   // Sterben beginnt. Das Leben wird erst nach DEATH_TIME abgezogen (_updateDying).
   loseLife(cause) {
     if (this.state !== 'play') return;

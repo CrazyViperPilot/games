@@ -4,6 +4,7 @@
 // → Zischer-Halle (Truhe Eisenhacke) → Schacht → Ufer → Lavasee über Obsidian-Brücken und Slabs
 // → Ufer rechts mit Bett → Leitern hoch → Oberfläche rechts → Portal.
 import { writeFileSync } from 'node:fs';
+import { ensureHeadroom } from './headroom.mjs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -149,6 +150,9 @@ put(146, 33, 'o');  // Reserve-Smaragd am Ufer-Eingang der Kammer
 if (WALL.c > 0) for (let r = 0; r <= WALL.d; r++) put(WALL.c, r, 'Z');
 
 // ---- Ausgabe.
+// ---- Kopffreiheit vor Skeletten (Pfeilen ausweichen = springen können), siehe headroom.mjs.
+ensureHeadroom(g, W, H);
+
 const rows = g.map((row) => row.join(''));
 const out = `// Level w2-3 „Lavasee“ – erzeugt von js/data/levels/gen/w2-3.mjs (nicht von Hand ändern).
 export default {

@@ -46,6 +46,8 @@ Portal**. Level sind 100–250 Blöcke breit und 30–70 Blöcke hoch; die Kamer
 
 - Knopf **Graben** (Spitzhacke) rechts. Allein = Block unter den Füßen; mit ◀/▶ = Block daneben (bei 2 hohen
   Blöcken erst unten, dann oben). Halten: Risse (4 Stufen), dann bricht der Block.
+- **Spitzhacke trifft Mobs:** Graben (allein = nach unten, mit ◀/▶ = zur Seite) besiegt Gegner in 1 Block Reichweite
+  (Abklingzeit 0,35 s, 1 Schaden; Bosse nicht). Ein Zischer wird so ohne Explosion erledigt.
 - **Kopfstoß** bricht weiche Blöcke (Erde, Gras, Sand, Blätter, Bretter) sofort.
 - Abbauzeit = Härte × Faktor der Spitzhacke. Spitzhacken: Holz (Start) 1,0 → Stein 0,7 → Eisen 0,5 → Diamant 0,35.
   Manche Blöcke brauchen eine Mindest-Spitzhacke (Obsidian: Diamant). Grundgestein nie.
@@ -67,10 +69,10 @@ Portal**. Level sind 100–250 Blöcke breit und 30–70 Blöcke hoch; die Kamer
 
 | Gegner | Verhalten | Besiegen |
 |---|---|---|
-| **Zischer** (explodierender Blockgeist, grün) | läuft ab 8 Blöcken Abstand auf dich zu; ab 1,5 Blöcken: steht, blinkt, zischt 1,5 s → Explosion | Stampfen **zündet** ihn (1 s Flucht), Pfeil besiegt ihn ohne Explosion |
-| **Zombie** | langsam auf dich zu, fällt von Kanten | stampfen, Pfeil |
-| **Skelett** | hält 4–6 Blöcke Abstand, schießt alle 2 s einen Pfeil | stampfen, Pfeil |
-| **Spinne** | schnell, klettert Wände hoch, springt dich ab 3 Blöcken an | stampfen, Pfeil |
+| **Zischer** (explodierender Blockgeist, grün) | läuft ab 8 Blöcken Abstand auf dich zu; ab 1,5 Blöcken: steht, blinkt, zischt 1,5 s → Explosion | Stampfen **zündet** ihn (1 s Flucht), Pfeil oder Spitzhacke besiegen ihn ohne Explosion |
+| **Zombie** | langsam auf dich zu, fällt von Kanten | stampfen, Pfeil, Spitzhacke |
+| **Skelett** | hält 4–6 Blöcke Abstand, spannt 0,8 s sichtbar den Bogen, schießt dann alle 2 s einen (langsamen, 105 px/s) Pfeil. Der Pfeil **lähmt** nur 0,9 s (Sterne über dem Kopf, danach 1,6 s Schonzeit), kostet weder Rüstung noch Leben | stampfen, Pfeil, Spitzhacke |
+| **Spinne** | schnell, klettert Wände hoch, springt dich ab 3 Blöcken an | stampfen, Pfeil, Spitzhacke |
 | **Schleim** | hüpft auf dich zu; groß → 2 klein | stampfen, Pfeil |
 | **Silberfischchen** | klein, flink, aus getarntem Stein | stampfen, Pfeil |
 | **Glutgeist** (Welt 3) | schwebt, schießt alle 3 s drei Feuerkugeln | nur Pfeil (Stampfen verbrennt) |
@@ -78,6 +80,8 @@ Portal**. Level sind 100–250 Blöcke breit und 30–70 Blöcke hoch; die Kamer
 
 **Explosion** (Zischer, TNT, Schädel): Radius 2,5 Blöcke (Schädel 1,5), zerstört alle Blöcke außer Obsidian und
 Grundgestein, besiegt Gegner, verletzt die Figur, zündet TNT in Reichweite (0,5 s). Bildschirmwackeln, Vibration.
+**Skelett-Dungeons:** Im Schussfeld jedes Skeletts (10 Blöcke, ebenerdig) sind die Decken mindestens 4 Zeilen
+hoch (Generator-Schritt `gen/headroom.mjs`), damit man über Pfeile springen kann.
 **Monster-Spawner** erzeugen alle 4 s einen Zombie oder ein Skelett, solange die Figur ≤ 10 Blöcke entfernt ist
 (max. 3 lebende je Spawner). **Lava** tötet sofort.
 

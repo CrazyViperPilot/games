@@ -8,6 +8,7 @@ const T = PHYS.tile;
 const E = 1e-6;
 const OUT = { hitHead: null };
 const SLIME_MIN_VY = 200;
+const STUN_INPUT = { left: false, right: false, jump: false, dig: false, jumpPressed: false, firePressed: false };
 
 function approach(v, target, amount) {
   if (v < target) return Math.min(v + amount, target);
@@ -32,7 +33,7 @@ export function createPlayer(x, y, power = 'plain') {
     vx: 0, vy: 0, face: 1, power,
     onGround: false, inWater: false, climbing: false,
     runTimer: 0, coyote: 0, jumpBuffer: 0, jumping: false,
-    invuln: 0, star: 0,          // Restzeit in s
+    invuln: 0, star: 0, stun: 0,        // Restzeit in s
     anim: 'stand', animTime: 0, dead: false, digging: false,
   };
 }
@@ -68,6 +69,11 @@ export function updatePlayer(game, dt, input) {
     return OUT;
   }
 
+  if (p.stun > 0) {
+    // Gelähmt: keine Eingaben (Schwerkraft und Kollision laufen weiter).
+    p.stun = Math.max(0, p.stun - dt);
+    input = STUN_INPUT;
+  }
   if (p.invuln > 0) p.invuln = Math.max(0, p.invuln - dt);
   if (p.star > 0) p.star = Math.max(0, p.star - dt);
 

@@ -328,3 +328,28 @@ test('breakTile bei Explosion: Obsidian und Grundgestein bleiben, Erde fällt', 
   assert.equal(g.map.get(5, 7), AIR);
   assert.equal(breakTile(g, 5, 7, 'explosion'), false, 'Luft bricht nicht');
 });
+
+test('Graben seitlich trifft Mob in Reichweite (hitMob dig), mit Abklingzeit', () => {
+  const g = makeGame(0);
+  standAt(g, 5);
+  const hits = [];
+  g.mobs = [{ active: true, dead: false, state: 'walk', x: 6 * T + 2, y: g.player.y, w: 12, h: 26 }];
+  g.hitMob = (m, how) => hits.push(how);
+  run(g, DIG_RIGHT, 0.2);
+  assert.deepEqual(hits, ['dig']);
+  run(g, DIG_RIGHT, 0.5);
+  assert.equal(hits.length, 2, 'nächster Treffer erst nach der Abklingzeit');
+});
+
+test('Graben trifft keinen Mob außerhalb der Reichweite oder hinter dem Spieler', () => {
+  const g = makeGame(0);
+  standAt(g, 5);
+  const hits = [];
+  g.mobs = [
+    { active: true, dead: false, state: 'walk', x: 9 * T, y: g.player.y, w: 12, h: 26 },
+    { active: true, dead: false, state: 'walk', x: 3 * T, y: g.player.y, w: 12, h: 26 },
+  ];
+  g.hitMob = (m, how) => hits.push(how);
+  run(g, DIG_RIGHT, 0.3);
+  assert.deepEqual(hits, []);
+});

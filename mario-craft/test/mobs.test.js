@@ -473,7 +473,10 @@ test('Skelett schießt alle 2 s einen Pfeil zum Spieler, wenn er in Sichtlinie i
   step(g, 240); // 2 s: Schusszeit läuft
   assert.equal(enemyArrows(g).length, 0, 'noch kein Pfeil');
   assert.equal(m.anim, 'walk');
-  step(g, 60); // + 0,5 s: Anim 'shoot' ist vorbei, Pfeil ist raus
+  step(g, 6); // Bogen wird sichtbar gespannt
+  assert.equal(m.anim, 'shoot');
+  assert.equal(enemyArrows(g).length, 0, 'Bogen gespannt, noch kein Pfeil');
+  step(g, 96); // + ca. 0,8 s: Anim 'shoot' ist vorbei, Pfeil ist raus
   assert.equal(enemyArrows(g).length, 1, 'ein Pfeil');
   assert.ok(enemyArrows(g)[0].vx < 0, 'fliegt zum Spieler');
   assert.equal(m.face, -1);

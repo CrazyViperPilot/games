@@ -49,7 +49,7 @@ function findUnder(map, p) {
 function digState(game) {
   let d = game.dig;
   if (!d) {
-    d = { active: false, c: 0, r: 0, progress: 0, stage: 0, failCd: 0, soundCd: 0 };
+    d = { active: false, c: 0, r: 0, progress: 0, stage: 0, failCd: 0, soundCd: 0, mobCd: 0 };
     game.dig = d;
   }
   return d;
@@ -63,6 +63,31 @@ function resetDig(d, p) {
   p.digging = false;
 }
 
+// Pickel trifft Mobs in Reichweite (digReach Kacheln seitlich in Laufrichtung bzw. Blickrichtung, ohne Richtung
+// unter den Füßen). Ein Treffer = −1 HP; ein Zischer wird so ohne Explosion erledigt.
+function hitMobsWithPick(game, d, p, dir) {
+  const mobs = game.mobs;
+  if (!mobs || mobs.length === 0 || d.mobCd > 0) return;
+  const reach = PHYS.digReach * T;
+  let x, y, w, h;
+  if (dir === 0) {
+    x = p.x; y = p.y + p.h; w = p.w; h = reach;
+  } else {
+    w = reach; h = p.h; y = p.y;
+    x = dir > 0 ? p.x + p.w : p.x - reach;
+  }
+  for (let i = 0; i < mobs.length; i++) {
+    const m = mobs[i];
+    if (!m.active || m.dead || m.state === 'dead') continue;
+    if (x < m.x + m.w && x + w > m.x && y < m.y + m.h && y + h > m.y) {
+      game.hitMob?.(m, 'dig');
+      d.mobCd = PHYS.digHitCooldown;
+      game.emit('stomp');
+      return;
+    }
+  }
+}
+
 // Graben: Ziel suchen, Fortschritt je nach Hacke, Bruch bei progress >= 1. Schreibt game.dig und player.digging.
 export function updateDig(game, dt, input) {
   const p = game.player;
@@ -70,12 +95,15 @@ export function updateDig(game, dt, input) {
   if (d.failCd > 0) d.failCd = Math.max(0, d.failCd - dt);
   if (d.soundCd > 0) d.soundCd = Math.max(0, d.soundCd - dt);
 
+  if (d.mobCd > 0) d.mobCd = Math.max(0, d.mobCd - dt);
+
   if (!input.dig || p.climbing) {
     resetDig(d, p);
     return;
   }
 
   const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+  hitMobsWithPick(game, d, p, dir);
   const found = dir === 0 ? findUnder(game.map, p) : findSide(game.map, p, dir);
   if (!found) {
     resetDig(d, p);

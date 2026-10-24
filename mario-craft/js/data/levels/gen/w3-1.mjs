@@ -3,6 +3,7 @@
 // Hauptweg: Oberfläche links → Schacht (Leiter) → Korridor (Bogentruhe) → Netherziegel-Halle
 // → Schacht (Leiter) → Lavahöhle mit Bett → Aufstieg (Leiter) → Oberfläche rechts → Portal.
 import { writeFileSync } from 'node:fs';
+import { ensureHeadroom } from './headroom.mjs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -116,6 +117,9 @@ put(96, 22, '4');   // Diamanterz in der Schachtwand (Eisenhacke, Start-Hacke 2)
 for (let r = 0; r <= 34; r++) put(79, r, 'Z');
 
 // ---- Ausgabe.
+// ---- Kopffreiheit vor Skeletten (Pfeilen ausweichen = springen können), siehe headroom.mjs.
+ensureHeadroom(g, W, H);
+
 const rows = g.map((row) => row.join(''));
 const out = `// Level w3-1 „Glutwelt“ – erzeugt von js/data/levels/gen/w3-1.mjs (nicht von Hand ändern).
 export default {
