@@ -500,13 +500,13 @@ test('Erstattung: Abriss fertiger Gebäude 25 % Baumaterial, Baustelle voll, an 
 /** Mörser (Team 0) bei (600, 3800), Feind-Schütze bei (1000, 3800), eigene Sicht durch Fahrzeughalle. */
 function mortarScene(withAA) {
   const g = new Game({ seed: 7 });
-  g.spawnBuilding('mortar', 0, cellOf(600) - 1, cellOf(6500) - 1);
-  g.spawnBuilding('depot', 0, cellOf(1000) - 1, cellOf(6650) - 1);
-  const enemy = g.spawnUnit('rifleman', 1, 1000, 6500);
+  g.spawnBuilding('mortar', 0, cellOf(600) - 1, cellOf(7924) - 1);
+  g.spawnBuilding('depot', 0, cellOf(1000) - 1, cellOf(8074) - 1);
+  const enemy = g.spawnUnit('rifleman', 1, 1000, 7924);
   if (withAA) {
-    g.spawnBuilding('aa', 1, cellOf(800) - 1, cellOf(6650) - 1);
+    g.spawnBuilding('aa', 1, cellOf(800) - 1, cellOf(8074) - 1);
     // Versorger der Flugabwehr: eigene FOB in Reichweite mit Munition
-    const f1 = g.spawnBuilding('fob', 1, cellOf(800) - 5, cellOf(6650) - 1);
+    const f1 = g.spawnBuilding('fob', 1, cellOf(800) - 5, cellOf(8074) - 1);
     f1.store.mun = 200;
   }
   return { g, enemy };
@@ -715,10 +715,10 @@ test('Flugabwehr ohne Munition kann den Hubschrauber nicht abschießen', () => {
 
 test('Hubschrauber fliegen über Hindernisse; Mörsergranaten treffen sie nicht', () => {
   const g = new Game({ seed: 7 });
-  const h = g.spawnUnit('littlebird', 0, 700, 6900);
+  const h = g.spawnUnit("littlebird", 0, 700, 8324);
   g.issue(0, { type: 'move', ids: [h.id], x: g.zone.x, y: g.zone.y });
   run(g, 5);
-  assert.ok(Math.hypot(h.x - 700, h.y - 6900) > 500, 'fliegt los');
+  assert.ok(Math.hypot(h.x - 700, h.y - 8324) > 500, 'fliegt los');
   const m = g.spawnBuilding('mortar', 1, cellOf(h.x + 300), cellOf(h.y));
   g.projectiles.push({ id: 9999, team: 1, sx: h.x, sy: h.y, tx: h.x, ty: h.y, x: h.x, y: h.y, t: 0, duration: 0, damage: m.def.weapon.damage, splash: 200, alive: true });
   g.update(DT);

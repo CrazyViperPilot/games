@@ -1,12 +1,12 @@
 // Alle globalen Spielzahlen (PLAN.md §3.1, §11).
 export const BALANCE = {
-  map: { width: 7680, height: 7680, tile: 32 },
+  map: { width: 9024, height: 9024, tile: 32 },
   tickRate: 20, // Simulationsschritte/s
   winPoints: 100,
   pointInterval: 30,
   startRes: { money: 400, bm: 600, mun: 150, fuel: 150 }, // bm/mun/fuel = Lager der Start-FOB
   startUnits: ['truck', 'engineer', 'rifleman', 'rifleman', 'rifleman', 'rifleman'],
-  zone: { r: 2200, controlIncome: 6, unitIncome: 0.25, unitIncomeCap: 30 },
+  zone: { r: 3300, controlIncome: 6, unitIncome: 0.25, unitIncomeCap: 30 },
   // Hot Zone: kleiner Kreis in der Konfliktzone, wandert zufällig oder zu aktiven Bohrern
   hot: { r: 300, speed: 40, income: 8, pointInterval: 45, wanderMin: 25, wanderMax: 45 },
   fob: { buildRadius: 450, minDistOwn: 500, minDistEnemy: 700, max: 6, income: 5 },

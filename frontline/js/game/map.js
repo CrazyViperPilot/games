@@ -11,15 +11,15 @@ const CX = W / 2;
 const CY = H / 2;
 const ZONE_R = BALANCE.zone.r;
 const SPAWNS = [
-  { x: 700, y: 6900 },
-  { x: 6900, y: 700 },
+  { x: 700, y: 8324 },
+  { x: 8324, y: 700 },
 ];
 const SORTS = ['bm', 'mun', 'fuel'];
 const MIN_GAP = 250; // Mindestabstand zwischen Vorkommen
 const MAX_ATTEMPTS = 20;
-const OBSTACLE_PAIRS = 24;
-const EXTRA_PAIRS = 9;
-const ZONE_PAIRS = 4; // davon liegen so viele Paare in der Konfliktzone
+const OBSTACLE_PAIRS = 32;
+const EXTRA_PAIRS = 12;
+const ZONE_PAIRS = 6; // davon liegen so viele Paare in der Konfliktzone
 const TWO_PI = Math.PI * 2;
 
 const mirror = (p) => ({ x: W - p.x, y: H - p.y });
