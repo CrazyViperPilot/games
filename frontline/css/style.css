@@ -37,6 +37,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   height: 100%;
   display: block;
   background: var(--bg);
+  touch-action: none; /* Touch: Ziehen schiebt die Karte, kein Browser-Scrollen/Zoomen */
 }
 
 .noscript { position: fixed; inset: 0; display: grid; place-items: center; margin: 0; }
@@ -185,7 +186,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 }
 
 .mm { flex: none; width: 180px; height: 178px; overflow: hidden; }
-.mm canvas { display: block; width: 178px; height: 178px; cursor: crosshair; border-radius: 7px; }
+.mm canvas { touch-action: none; display: block; width: 178px; height: 178px; cursor: crosshair; border-radius: 7px; }
 
 .sel {
   flex: 0 1 360px;
@@ -397,8 +398,8 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .sel .lagerhead { margin-top: 6px; }
 .bar.store { height: 7px; margin: 0; }
 
-/* schmale Bildschirme (Telefon quer): Kopfleiste kompakter, damit nichts überläuft */
-@media (max-width: 1100px) {
+/* schmale Bildschirme (iPad, Telefon quer): Kopfleiste kompakter, damit nichts überläuft */
+@media (max-width: 1500px) {
   .top { gap: 10px; padding: 0 8px; }
   .res-row { gap: 8px; }
   .res .lbl, .res .rate { display: none; }

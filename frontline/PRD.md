@@ -7,8 +7,8 @@ Konfliktzone halten“. Zwei Parteien: Spieler (Blau) gegen Computer (Rot).
 
 | | |
 |---|---|
-| Plattform | Google Chrome (Desktop), aktuelle Version. **Offen:** Touch-Bedienung für Android (Pixel 8a, Lenovo Tab M11, Querformat) ist nicht umgesetzt; die App ist als PWA installierbar, die Eingabe kennt aber nur Maus und Tastatur. |
-| Steuerung | Maus + Tastatur |
+| Plattform | Google Chrome (Desktop), Safari auf dem iPad (Air M1), Android-Tablets/-Telefone im Querformat; installierbare PWA. Eingabe über Pointer-Events (Maus, Touch, Stift). |
+| Steuerung | Maus + Tastatur oder Touch (Tippen, Ziehen, Zwei-Finger-Zoom) |
 | Technik | Statische Web-App, Vanilla JS (ES-Module), Canvas 2D, kein Build-Schritt, keine externen Abhängigkeiten |
 | Auslieferung | Ordner `frontline/` im Repo `games`, GitHub Pages, offline spielbar (PWA); immer neueste Version, wenn online |
 | Sprache | Deutsch |
@@ -138,7 +138,9 @@ Schadensmodell: Schaden je Schuss nach Panzerklasse des Ziels (Infanterie / leic
 
 | Eingabe | Aktion |
 |---|---|
-| Linksklick / Ziehen | Auswählen / Rahmenauswahl; Shift = hinzufügen; Doppelklick = alle dieses Typs im Bild |
+| Linksklick / Tippen | Einheit/Gebäude wählen; **mit gewählten Einheiten: Tippen auf Boden = Gehen, auf sichtbaren Gegner = Angriff** (Standardaktion, kein Angriff-Knopf nötig); LKW/Transporter/Baufahrzeug auf eigene Gebäude = Befehl wie Rechtsklick; Doppelklick = alle dieses Typs im Bild; Esc = abwählen |
+| Linksklick halten und ziehen / Finger ziehen | **Karte verschieben**; **Shift + Ziehen** = Rahmenauswahl (nur PC), Shift = hinzufügen |
+| Zwei Finger | Zoomen (Abstand) und Karte verschieben |
 | Rechtsklick | Bewegen; auf Gegner = Angreifen; Gebäude gewählt = Sammelpunkt; LKW auf eigene FOB = laden (leer) bzw. entladen; Baufahrzeug/Infanterie auf eigene Baustelle = dort bauen; Baufahrzeug auf beschädigtes eigenes Gebäude = reparieren |
 | A + Linksklick | Angriffsbewegung |
 | S | Stopp |
@@ -151,7 +153,7 @@ Schadensmodell: Schaden je Schuss nach Panzerklasse des Ziels (Infanterie / leic
 | Entf | Gebäude abreißen |
 | Esc | Abbrechen / Auswahl aufheben |
 | Strg+0–9 / 0–9 | Gruppe speichern / wählen (2× = Kamera hin) |
-| Pfeiltasten, Bildschirmrand (10 px am Fensterrand, auch über Statusleiste und Bedienfeldern), mittlere Maustaste ziehen | Kamera bewegen |
+| Linke Maustaste/Finger ziehen, Pfeiltasten, Bildschirmrand (10 px am Fensterrand, auch über Statusleiste und Bedienfeldern), mittlere Maustaste ziehen | Kamera bewegen |
 | Mausrad | Zoom |
 | V / Schaltfläche „Ansicht“ | Ansicht umschalten: 2D von oben oder isometrisch (wird gemerkt, `?iso=1` startet isometrisch) |
 | `,` / `.` / Knöpfe ⟲ ⟳ | Isometrische Ansicht in 90°-Schritten nach links / rechts drehen (in 2D ohne Wirkung) |
@@ -196,6 +198,7 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 
 ## Änderungsverlauf
 
+- v4.10: **Touch und Standardaktion.** Ziehen mit linker Maustaste oder einem Finger verschiebt die Karte (Rahmenauswahl jetzt Shift + Ziehen), zwei Finger zoomen und verschieben; Tippen auf Boden mit gewählten Einheiten = Gehen, auf Gegner = Angriff; Ansichtsknopf zeigt „2D“/„Iso“ und ist auch am PC sichtbar; Kopfleiste auf Tablets (≤ 1500 px) kompakter, damit alle Knöpfe passen. Hubschrauber ohne Baumenü; Transporthubschrauber pendeln wie LKW (T, auch gemischte Ladung, Test). Cache v21.
 - v4.9: **Logistik statt Wirtschaft.** Haupt-FOB mit unendlichem Lager bildet als Einzige alle Einheiten aus (nur Geld, Raten = Bauzeiten, gekürzt); Ressourcenvorkommen, Förderanlagen, Fahrzeughalle und Landeplatz entfallen; Geld nur aus Zone und Hot Zone (10/s, kein FOB-Grundeinkommen), Kasse bleibt von Runde zu Runde (max. 5000); Soldaten tragen 50 Baumaterial für Mauern/Tore im FOB-Radius; LKW versorgen im Umkreis; höchstens 10 FOBs ohne überlappende Bauradien; Verlust der Haupt-FOB beendet die Runde; KI umgebaut. Cache v20.
 - v4.8: Randscrollen auch oben und unten (Fensterrand statt Canvas-Rand, Statusleiste und Bedienfelder blockieren es nicht mehr); Cache v19.
 - v4.7: Bahnlinie quer über die Karte durch die Zonenmitte (y = Zonenmitte, Schotterbett, Schwellen, Schienen, in 2D und Iso gezeichnet; Straßen kreuzen auf gleicher Höhe, Schienen sind begehbar). In der Kartenmitte steht ein Zug (Panzerwagen, Containerwagen, Lok; 3 Rechtecke, unpassierbar wie Häuser; Iso: Kenney Train Kit, CC0, vorgerendert für alle vier Drehungen). Häuser, Bäume, Felsen und Autos bleiben aus dem Bahnkorridor (±40) heraus. Die Erreichbarkeitsprüfung zielt neben den Zug (Zonenmitte liegt darunter). Cache v18.

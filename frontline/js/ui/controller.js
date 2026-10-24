@@ -366,6 +366,16 @@ export class Controller {
     const hit = this.pick(wx, wy, (e) => e.team === this.team);
     const last = this.lastClick;
     this.lastClick = { t: now, x: wx, y: wy };
+    // Standardaktion mit gewählten Einheiten: Tippen auf Boden = Gehen, auf sichtbaren Gegner = Angriff (ohne Angriff-Knopf)
+    if (!shift && !hit && this.selectedUnits().length) {
+      this.rightClick(wx, wy);
+      return;
+    }
+    // Eigenes Gebäude antippen: LKW/Baufahrzeug/Bauer bekommen den Befehl (laden, hinfahren, reparieren), sonst wählen
+    if (!shift && hit && hit.kind === 'building' && this.selectedUnits().some((u) => u.def.cargoCap || u.def.builder === 'all')) {
+      this.rightClick(wx, wy);
+      return;
+    }
     if (
       hit &&
       hit.kind === 'unit' &&
@@ -876,13 +886,19 @@ export class Controller {
     if (!units.length && blds.length) return this.buildingCard(blds);
 
     const perm = this.buildPermission();
-    const card = [
-      entry('Bauen', 'B', {
-        tip: perm.level ? 'Baumenü öffnen (B)' : perm.reason,
-        enabled: !!perm.level,
-        reason: perm.reason,
-        action: () => this.startBuildMenu(),
-      }),
+    const card = [];
+    // Hubschrauber bauen nicht: ohne Bodeneinheit in der Auswahl entfällt das Baumenü
+    if (!units.length || units.some((u) => !u.def.air)) {
+      card.push(
+        entry('Bauen', 'B', {
+          tip: perm.level ? 'Baumenü öffnen (B)' : perm.reason,
+          enabled: !!perm.level,
+          reason: perm.reason,
+          action: () => this.startBuildMenu(),
+        }),
+      );
+    }
+    card.push(
       entry('Angriff', 'A', {
         tip: 'Angriffsbewegung (A, dann Ziel anklicken)',
         enabled: units.length > 0,
@@ -895,7 +911,7 @@ export class Controller {
         reason: 'Keine Einheit gewählt',
         action: () => this.stop(),
       }),
-    ];
+    );
     const trucks = units.filter(isCarrier);
     if (trucks.length) {
       card.push(

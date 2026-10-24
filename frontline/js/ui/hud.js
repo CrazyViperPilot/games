@@ -75,6 +75,7 @@ export class Hud {
     this.capFill = q('[data-cap]');
     this.speedBtn = q('[data-act=speed]');
     this.pauseBtn = q('[data-act=pause]');
+    this.viewBtn = q('[data-act=view]');
     this.res = {};
     for (const k of RES_KEYS) {
       this.res[k] = { box: q(`[data-res=${k}]`), val: q(`[data-res=${k}] .val`), rate: q(`[data-res=${k}] .rate`) };
@@ -117,7 +118,7 @@ export class Hud {
           <button type="button" class="btn-sm" data-act="speed" title="Spielgeschwindigkeit (+ / -)">1×</button>
           <button type="button" class="btn-sm" data-act="pause" title="Pause (P)">Pause</button>
           <button type="button" class="btn-sm" data-act="rotl" title="Isometrische Ansicht nach links drehen (,)">⟲</button>
-          <button type="button" class="btn-sm" data-act="view" title="Ansicht umschalten: 2D / isometrisch (V)">Ansicht</button>
+          <button type="button" class="btn-sm" data-act="view" title="Ansicht umschalten: 2D / isometrisch (V)">2D</button>
           <button type="button" class="btn-sm" data-act="rotr" title="Isometrische Ansicht nach rechts drehen (.)">⟳</button>
           <button type="button" class="btn-sm" data-act="help" title="Hilfe (F1)">Hilfe</button>
         </div>
@@ -225,6 +226,7 @@ export class Hud {
     const st = this.app.status ? this.app.status() : { paused: false, speed: 1 };
     this.speedBtn.textContent = `${st.speed}×`;
     this.pauseBtn.textContent = st.paused ? 'Weiter' : 'Pause';
+    this.viewBtn.textContent = this.controller.camera.iso ? 'Iso' : '2D';
   }
 
   updateSelection() {

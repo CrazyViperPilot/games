@@ -331,3 +331,18 @@ test('build mit siteId schickt Bauer an eine bestehende Baustelle; Schütze nich
   run(g, 40);
   assert.equal(site.built, true);
 });
+
+test('Transporthubschrauber pendelt wie ein LKW und bringt gemischte Ladung zur Front-FOB', () => {
+  const g = new Game({ seed: 7 });
+  const f = fobOf(g, 0);
+  silence(g, 0);
+  const front = fobRing(g, 0, f.x, f.y);
+  const heli = g.spawnUnit('transporter', 0, f.x + 90, f.y + 90);
+  const r = g.issue(0, { type: 'route', ids: [heli.id], fromId: f.id, toId: front.id, preset: 'mix' });
+  assert.equal(r.ok, true);
+  run(g, 60);
+  const sum = front.store.bm + front.store.mun + front.store.fuel;
+  assert.ok(sum >= heli.def.cargoCap - 1, `Front-Lager ${sum}`);
+  for (const k of ['bm', 'mun', 'fuel']) assert.ok(front.store[k] > 0, `${k} geliefert`);
+  assert.equal(heli.order.type, 'route', 'pendelt weiter');
+});

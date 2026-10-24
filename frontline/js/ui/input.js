@@ -1,6 +1,6 @@
 // Eingabe (PLAN §5 ui/input.js): Maus und Tastatur → Controller und Kamera. Hält keinen Spielzustand.
 // `app` (optional) liefert Aktionen aus main.js: overlayOpen, closeOverlay, togglePause, toggleHelp, changeSpeed, debugMoney.
-const DRAG_PX = 6; // ab dieser Strecke ist ein Druck eine Rahmenauswahl
+const DRAG_PX = 6; // ab dieser Strecke ist ein Druck ein Ziehen: Karte verschieben (mit Shift: Rahmenauswahl)
 const EDGE_PX = 10; // Randscrollen: Abstand zum Fensterrand
 const SCROLL_PX = 900; // Kamerageschwindigkeit in Bildschirm-Pixeln je Sekunde
 
@@ -12,7 +12,9 @@ export class Input {
     this.controller = controller;
     this.hud = hud;
     this.app = app;
-    this.down = null; // linker Druck auf dem Canvas {sx, sy, shift, dragging, mode}
+    this.down = null; // linker Druck auf dem Canvas {sx, sy, cx, cy, shift, dragging, mode}; dragging: Rahmen, panning: Karte schieben
+    this.touches = new Map(); // aktive Finger (pointerId → Client-Position), zwei Finger = Zoomen und Verschieben
+    this.pinch = null; // {dist, cx, cy} der letzten Zweifingergeste
     this.pan = null; // mittlere Maustaste: Verschieben {x, y} (Client-Koordinaten)
     this.mmDrag = null; // Druck auf der Minimap
     this.keys = new Set();
@@ -42,15 +44,16 @@ export class Input {
       },
     };
     const h = this.h;
-    canvas.addEventListener('mousedown', h.down);
+    canvas.addEventListener('pointerdown', h.down);
     canvas.addEventListener('mouseenter', h.enter);
     canvas.addEventListener('mouseleave', h.leave);
     canvas.addEventListener('wheel', h.wheel, { passive: false });
     canvas.addEventListener('contextmenu', h.noMenu);
-    minimap.canvas.addEventListener('mousedown', h.mmDown);
+    minimap.canvas.addEventListener('pointerdown', h.mmDown);
     minimap.canvas.addEventListener('contextmenu', h.noMenu);
-    window.addEventListener('mousemove', h.move);
-    window.addEventListener('mouseup', h.up);
+    window.addEventListener('pointermove', h.move);
+    window.addEventListener('pointerup', h.up);
+    window.addEventListener('pointercancel', h.up);
     window.addEventListener('keydown', h.key);
     window.addEventListener('keyup', h.keyUp);
     window.addEventListener('blur', h.blur);
@@ -59,15 +62,16 @@ export class Input {
 
   destroy() {
     const h = this.h;
-    this.canvas.removeEventListener('mousedown', h.down);
+    this.canvas.removeEventListener('pointerdown', h.down);
     this.canvas.removeEventListener('mouseenter', h.enter);
     this.canvas.removeEventListener('mouseleave', h.leave);
     this.canvas.removeEventListener('wheel', h.wheel);
     this.canvas.removeEventListener('contextmenu', h.noMenu);
-    this.minimap.canvas.removeEventListener('mousedown', h.mmDown);
+    this.minimap.canvas.removeEventListener('pointerdown', h.mmDown);
     this.minimap.canvas.removeEventListener('contextmenu', h.noMenu);
-    window.removeEventListener('mousemove', h.move);
-    window.removeEventListener('mouseup', h.up);
+    window.removeEventListener('pointermove', h.move);
+    window.removeEventListener('pointerup', h.up);
+    window.removeEventListener('pointercancel', h.up);
     window.removeEventListener('keydown', h.key);
     window.removeEventListener('keyup', h.keyUp);
     window.removeEventListener('blur', h.blur);
@@ -80,6 +84,8 @@ export class Input {
     this.down = null;
     this.pan = null;
     this.mmDrag = null;
+    this.touches.clear();
+    this.pinch = null;
     this.controller.setDragBox(null);
   }
 
@@ -120,7 +126,32 @@ export class Input {
     else this.controller.rightClick(wx, wy);
   }
 
+  /** Zwei Finger: Zoomen (Abstand) und Verschieben (Mittelpunkt). */
+  pinchStep() {
+    const [a, b] = [...this.touches.values()];
+    const cx = (a.x + b.x) / 2;
+    const cy = (a.y + b.y) / 2;
+    const dist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+    const last = this.pinch;
+    this.pinch = { dist, cx, cy };
+    if (!last) return;
+    this.camera.pan(cx - last.cx, cy - last.cy);
+    const r = this.canvas.getBoundingClientRect();
+    this.camera.zoomAt(dist / last.dist, cx - r.left, cy - r.top);
+  }
+
   onCanvasDown(e) {
+    if (e.pointerType === 'touch') {
+      this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (this.touches.size >= 2) {
+        // zweiter Finger: laufende Einzelgeste verwerfen
+        this.down = null;
+        this.controller.setDragBox(null);
+        this.pinch = null;
+        this.pinchStep();
+        return;
+      }
+    }
     if (e.button === 1) {
       e.preventDefault();
       this.pan = { x: e.clientX, y: e.clientY };
@@ -134,12 +165,21 @@ export class Input {
     }
     if (e.button !== 0) return;
     const c = this.controller;
-    this.down = { sx: p.x, sy: p.y, shift: e.shiftKey, dragging: false, mode: c.view.mode };
+    this.down = { sx: p.x, sy: p.y, cx: e.clientX, cy: e.clientY, shift: e.shiftKey, dragging: false, panning: false, mode: c.view.mode };
     if (c.view.mode === 'wall') c.beginWall(w.x, w.y);
   }
 
   onMove(e) {
-    this.edgeMouse = { x: e.clientX, y: e.clientY };
+    if (e.pointerType === 'touch') {
+      if (!this.touches.has(e.pointerId)) return;
+      this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (this.touches.size >= 2) {
+        this.pinchStep();
+        return;
+      }
+    } else {
+      this.edgeMouse = { x: e.clientX, y: e.clientY };
+    }
     const p = this.pos(e, this.canvas);
     // Ziel des Ereignisses entscheidet: liegt das HUD über dem Canvas, ist der Zeiger nicht „im Spielfeld“.
     this.inCanvas = e.target === this.canvas;
@@ -151,8 +191,17 @@ export class Input {
     if (this.mmDrag !== null) this.minimapGo(e);
     const d = this.down;
     if (d) {
-      if (!d.dragging && d.mode === 'normal' && Math.hypot(p.x - d.sx, p.y - d.sy) >= DRAG_PX) d.dragging = true;
+      if (!d.dragging && !d.panning && d.mode !== 'wall' && Math.hypot(p.x - d.sx, p.y - d.sy) >= DRAG_PX) {
+        // Shift + Ziehen = Rahmenauswahl, sonst schiebt Ziehen die Karte
+        if (d.shift && d.mode === 'normal') d.dragging = true;
+        else d.panning = true;
+      }
       if (d.dragging) this.controller.setDragBox({ x1: d.sx, y1: d.sy, x2: p.x, y2: p.y });
+      else if (d.panning) {
+        this.camera.pan(e.clientX - d.cx, e.clientY - d.cy);
+        d.cx = e.clientX;
+        d.cy = e.clientY;
+      }
     }
     if (this.inCanvas || d) {
       const w = this.camera.screenToWorld(p.x, p.y);
@@ -161,6 +210,16 @@ export class Input {
   }
 
   onUp(e) {
+    if (e.pointerType === 'touch') {
+      if (!this.touches.delete(e.pointerId)) return;
+      if (e.type === 'pointercancel' || this.pinch) {
+        // Ende einer Zweifingergeste: kein Tipp
+        if (!this.touches.size) this.pinch = null;
+        this.down = null;
+        this.mmDrag = null;
+        return;
+      }
+    }
     if (e.button === 1) {
       this.pan = null;
       return;
@@ -169,11 +228,17 @@ export class Input {
       this.mmDrag = null;
       return;
     }
+    if (e.type === 'pointercancel') {
+      this.down = null;
+      this.controller.setDragBox(null);
+      return;
+    }
     if (e.button !== 0 || !this.down) return;
     const d = this.down;
     this.down = null;
     const c = this.controller;
     c.setDragBox(null);
+    if (d.panning) return; // Karte geschoben: kein Klick
     const p = this.pos(e, this.canvas);
     const w = this.camera.screenToWorld(p.x, p.y);
     if (c.view.mode === 'wall') {
@@ -184,7 +249,7 @@ export class Input {
       c.selectBox({ x1: d.sx, y1: d.sy, x2: p.x, y2: p.y }, e.shiftKey);
       return;
     }
-    if (e.target !== this.canvas && !d.dragging) return; // Loslassen über dem HUD löst keinen Klick aus
+    if (e.target !== this.canvas && !d.dragging && e.pointerType !== 'touch') return; // Loslassen über dem HUD löst keinen Klick aus
     c.leftClickWorld(w.x, w.y, e.shiftKey);
   }
 
