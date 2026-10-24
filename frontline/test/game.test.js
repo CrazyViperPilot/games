@@ -536,10 +536,13 @@ test('Mörser zahlt Munition aus dem Lager seines Versorgers', () => {
 });
 
 test('Flugabwehr fängt Mörsergranaten ab', () => {
-  const { g } = mortarScene(true);
+  const { g, enemy } = mortarScene(true);
+  // Alle 20 s ein Schuss auf das gewählte Ziel: in 90 s mehrere Granaten, die die Flugabwehr abfangen kann
+  const mortar = g.buildings.find((b) => b.type === 'mortar');
+  assert.equal(g.issue(0, { type: 'mortarTarget', ids: [mortar.id], x: enemy.x, y: enemy.y }).ok, true);
   let sawShell = false;
   let sawIntercept = false;
-  for (let i = 0; i < Math.round(15 / DT); i++) {
+  for (let i = 0; i < Math.round(90 / DT); i++) {
     g.update(DT);
     if (g.projectiles.length > 0) sawShell = true;
     if (g.effects.some((e) => e.type === 'intercept')) sawIntercept = true;
@@ -650,4 +653,177 @@ test('Determinismus: gleicher Seed, gleiche Partie', () => {
     return JSON.stringify([g.teams.map((t) => [t.res.money, t.res.bm, t.res.mun]), g.units.map((u) => [u.x, u.y, u.ammo])]);
   };
   assert.equal(play(), play());
+});
+
+// ---- Mörser-Ziel, Hubschrauber, Hot Zone und Bohrer ----
+
+function base(g, team = 0) {
+  return g.buildings.find((b) => b.team === team && b.type === 'fob');
+}
+
+test('Mörser: gewähltes Ziel, ein Schuss alle 20 s, nur in Reichweite', () => {
+  const g = new Game({ seed: 7 });
+  const f = base(g);
+  const m = g.spawnBuilding('mortar', 0, cellOf(f.x + 200), cellOf(f.y - 200));
+  assert.equal(g.issue(0, { type: 'mortarTarget', ids: [m.id], x: m.x + 5000, y: m.y }).ok, false, 'außer Reichweite');
+  assert.equal(g.issue(0, { type: 'mortarTarget', ids: [m.id], x: m.x + 20, y: m.y }).ok, false, 'zu nah');
+  assert.equal(g.issue(0, { type: 'mortarTarget', ids: [m.id], x: m.x + 500, y: m.y }).ok, true);
+  let shells = 0;
+  let prev = 0;
+  for (let i = 0; i < Math.round(45 / DT); i++) {
+    g.update(DT);
+    if (g.projectiles.length > prev) shells++;
+    prev = g.projectiles.length;
+  }
+  assert.ok(shells >= 2 && shells <= 3, `Schüsse in 45 s: ${shells}`);
+  g.issue(0, { type: 'mortarTarget', ids: [m.id] });
+  assert.equal(m.fireTarget, null);
+});
+
+test('Mörser ohne Munition in der FOB feuert nicht auf das gewählte Ziel', () => {
+  const g = new Game({ seed: 7 });
+  const f = base(g);
+  const m = g.spawnBuilding('mortar', 0, cellOf(f.x + 200), cellOf(f.y - 200));
+  g.issue(0, { type: 'mortarTarget', ids: [m.id], x: m.x + 500, y: m.y });
+  g.setStock(0, { bm: 100, mun: 0, fuel: 0 });
+  run(g, 25);
+  assert.equal(g.projectiles.length, 0);
+  assert.equal(g.teams[0].used.mun, 0);
+});
+
+test('Flugabwehr schießt einen feindlichen Hubschrauber ab, wenn die FOB Munition hat', () => {
+  const g = new Game({ seed: 7 });
+  const f = base(g, 1);
+  const aa = g.spawnBuilding('aa', 1, cellOf(f.x + 150), cellOf(f.y - 150));
+  const heli = g.spawnUnit('gunship', 0, aa.x + 250, aa.y);
+  heli.order = { type: 'idle', x: heli.x, y: heli.y, targetId: null };
+  const mun0 = g.stockOf(1, 'mun');
+  run(g, 30);
+  assert.equal(heli.alive, false, 'abgeschossen');
+  assert.ok(g.stockOf(1, 'mun') < mun0, 'Munition aus der FOB verbraucht');
+});
+
+test('Flugabwehr ohne Munition kann den Hubschrauber nicht abschießen', () => {
+  const g = new Game({ seed: 7 });
+  const f = base(g, 1);
+  const aa = g.spawnBuilding('aa', 1, cellOf(f.x + 150), cellOf(f.y - 150));
+  g.setStock(1, { bm: 100, mun: 0, fuel: 0 });
+  const heli = g.spawnUnit('littlebird', 0, aa.x + 250, aa.y);
+  run(g, 15);
+  assert.equal(heli.alive, true);
+});
+
+test('Hubschrauber fliegen über Hindernisse; Mörsergranaten treffen sie nicht', () => {
+  const g = new Game({ seed: 7 });
+  const h = g.spawnUnit('littlebird', 0, 700, 6900);
+  g.issue(0, { type: 'move', ids: [h.id], x: g.zone.x, y: g.zone.y });
+  run(g, 5);
+  assert.ok(Math.hypot(h.x - 700, h.y - 6900) > 500, 'fliegt los');
+  const m = g.spawnBuilding('mortar', 1, cellOf(h.x + 300), cellOf(h.y));
+  g.projectiles.push({ id: 9999, team: 1, sx: h.x, sy: h.y, tx: h.x, ty: h.y, x: h.x, y: h.y, t: 0, duration: 0, damage: m.def.weapon.damage, splash: 200, alive: true });
+  g.update(DT);
+  assert.equal(h.hp, h.maxHp);
+});
+
+test('Little Bird: Infanterie steigt ein (max. 5) und wird abgesetzt', () => {
+  const g = new Game({ seed: 7 });
+  const f = base(g);
+  const heli = g.spawnUnit('littlebird', 0, f.x + 150, f.y - 150);
+  const men = [];
+  for (let i = 0; i < 6; i++) men.push(g.spawnUnit('rifleman', 0, heli.x + 20 + i * 3, heli.y));
+  assert.equal(g.issue(0, { type: 'board', ids: men.map((m) => m.id), heliId: heli.id }).ok, true);
+  run(g, 10);
+  assert.equal(heli.passengers.length, 5, 'fünf Sitze');
+  assert.equal(men.filter((m) => m.alive).length, 1, 'der sechste bleibt draußen');
+  assert.equal(g.units.filter((u) => u.type === 'rifleman' && u.team === 0).length >= 1, true);
+  const tx = heli.x + 400;
+  assert.equal(g.issue(0, { type: 'dropoff', ids: [heli.id], x: tx, y: heli.y }).ok, true);
+  run(g, 10);
+  assert.equal(heli.passengers.length, 0);
+  assert.equal(men.filter((m) => m.alive).length, 6);
+  assert.ok(men.every((m) => g.getEntity(m.id)), 'wieder in der Welt');
+});
+
+test('Transporthubschrauber lädt Ressourcen wie ein LKW', () => {
+  const g = new Game({ seed: 7 });
+  const f = base(g);
+  const heli = g.spawnUnit('transporter', 0, f.x + 80, f.y);
+  assert.equal(g.issue(0, { type: 'load', ids: [heli.id], fobId: f.id }).ok, true);
+  run(g, 10);
+  const c = heli.cargo;
+  assert.ok(c.bm + c.mun + c.fuel > 300, `Ladung ${c.bm + c.mun + c.fuel}`);
+});
+
+test('Soldaten und Fahrzeuge tanken Munition und Treibstoff in der FOB nach', () => {
+  const g = new Game({ seed: 7 });
+  const f = base(g);
+  const r = g.spawnUnit('rifleman', 0, f.x + 100, f.y);
+  const t = g.spawnUnit('tank', 0, f.x + 120, f.y + 40);
+  r.ammo = 0;
+  t.fuel = 0;
+  run(g, 20);
+  assert.equal(r.ammo, r.def.ammoMax);
+  assert.equal(t.fuel, t.def.fuelMax);
+  g.setStock(0, { bm: 0, mun: 0, fuel: 0 });
+  r.ammo = 0;
+  run(g, 5);
+  assert.equal(r.ammo, 0, 'ohne Lagerbestand keine Munition');
+});
+
+test('Hot Zone wandert innerhalb der Konfliktzone und gibt dem Besitzer Geld und Punkte', () => {
+  const g = new Game({ seed: 7 });
+  const hz = g.hot;
+  for (let i = 0; i < Math.round(120 / DT); i++) {
+    g.update(DT);
+    assert.ok(Math.hypot(hz.x - g.zone.x, hz.y - g.zone.y) <= g.zone.r - hz.r + 1, 'bleibt in der Zone');
+  }
+  assert.ok(Math.hypot(hz.x - g.zone.x, hz.y - g.zone.y) > 1, 'hat sich bewegt');
+  const u = g.spawnUnit('rifleman', 0, hz.x, hz.y);
+  u.order = { type: 'idle', x: u.x, y: u.y, targetId: null };
+  const money0 = g.teams[0].res.money;
+  const pts0 = g.teams[0].points;
+  g.update(DT);
+  assert.equal(g.hot.owner, 0);
+  for (let i = 0; i < Math.round(50 / DT); i++) {
+    hz.x = u.x;
+    hz.y = u.y;
+    g.update(DT);
+  }
+  assert.ok(g.teams[0].res.money - money0 > 100, 'Geld');
+  assert.ok(g.teams[0].points >= pts0 + 1, 'Punkt');
+});
+
+test('Bohrer: 30 s Aufwärmen, 2 min aktiv mit Treibstoff aus der FOB, 5 min Pause; Hot Zone zieht zum Bohrer', () => {
+  const g = new Game({ seed: 7 });
+  const f = base(g);
+  const d = g.spawnBuilding('drill', 0, cellOf(f.x + 200), cellOf(f.y - 200));
+  g.update(DT);
+  assert.equal(g.issue(0, { type: 'drill', ids: [d.id] }).ok, false, 'noch im Aufwärmen');
+  run(g, 31);
+  assert.equal(d.drill.state, 'ready');
+  const fuel0 = f.store.fuel;
+  assert.equal(g.issue(0, { type: 'drill', ids: [d.id] }).ok, true);
+  assert.equal(d.drill.state, 'active');
+  const dist0 = Math.hypot(g.hot.x - d.x, g.hot.y - d.y);
+  run(g, 60);
+  assert.ok(f.store.fuel < fuel0 - 50, 'Treibstoff verbraucht');
+  assert.equal(g.hot.drillTarget, true);
+  const target = { x: g.hot.tx, y: g.hot.ty };
+  assert.ok(Math.hypot(target.x - g.zone.x, target.y - g.zone.y) <= g.zone.r - g.hot.r + 1, 'Ziel in der Zone');
+  assert.ok(Math.hypot(g.hot.x - d.x, g.hot.y - d.y) < dist0, 'nähert sich dem Bohrer');
+  run(g, 65);
+  assert.equal(d.drill.state, 'cooldown');
+  run(g, 290);
+  assert.equal(d.drill.state, 'cooldown');
+  run(g, 15);
+  assert.equal(d.drill.state, 'ready');
+});
+
+test('Bohrer ohne Treibstoff in der FOB startet nicht', () => {
+  const g = new Game({ seed: 7 });
+  const f = base(g);
+  const d = g.spawnBuilding('drill', 0, cellOf(f.x + 200), cellOf(f.y - 200));
+  g.setStock(0, { bm: 100, mun: 0, fuel: 0 });
+  run(g, 31);
+  assert.equal(g.issue(0, { type: 'drill', ids: [d.id] }).ok, false);
 });

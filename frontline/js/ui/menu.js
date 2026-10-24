@@ -75,6 +75,8 @@ export function showStartMenu(root, onStart) {
         <li>Baufahrzeug (R): Förderanlagen auf die Vorkommen im Bauradius deiner FOB setzen, daneben stehen lassen.</li>
         <li>LKW (E): Baumaterial, Munition und Treibstoff aus dem FOB-Lager zu Baustellen und Truppen bringen.</li>
         <li>Die Konfliktzone in der Mitte halten: Geld, und alle 30 s ein Punkt.</li>
+        <li>Hot Zone (orange): wandert durch die Konfliktzone und gibt dem Besitzer Geld und alle 45 s einen Punkt. Aktive Bohrer (verbrauchen FOB-Treibstoff) ziehen sie an.</li>
+        <li>Mörser: Gebäude wählen, Ziel anklicken – ein Schuss alle 20 s, solange die FOB Munition hat. Hubschrauber aus dem Landeplatz: Little Bird und Transporter nehmen Infanterie mit (Rechtsklick auf den Hubschrauber), der AH-64 kämpft. Flak schießt Hubschrauber ab.</li>
         <li>Gewinnen: Siegpunkte erreichen oder den Gegner ohne FOB und Baufahrzeug ausschalten.</li>
       </ol>
       <button type="button" class="primary" data-act="start">Start</button>

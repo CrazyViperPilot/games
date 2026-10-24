@@ -39,6 +39,7 @@ export function createUnit(id, type, team, x, y) {
     fuel: def.fuelMax ?? 0,
     cargo: { bm: 0, mun: 0, fuel: 0 },
     preset: 'mix', // LKW-Ladungsart: 'mix' | 'bm' | 'mun' | 'fuel'
+    passengers: [], // Hubschrauber: eingestiegene Einheiten (alive = false, solange sie an Bord sind)
   };
 }
 
@@ -84,6 +85,8 @@ export function createBuilding(id, type, team, cx, cy, tile) {
     demolished: false,
     store: { bm: 0, mun: 0, fuel: 0 },
     payerId: null,
+    fireTarget: null, // Mörser: gewähltes Ziel {x, y}
+    drill: def.drill ? { builtAt: null, state: 'warmup', endAt: 0, readyAt: 0, activatedAt: 0, frac: 0 } : null, // Bohrer
     supplied: type !== 'fob', // FOB-Baustelle: erst nach 400 Baumaterial im eigenen Lager
     warnTime: -1e9,
   };

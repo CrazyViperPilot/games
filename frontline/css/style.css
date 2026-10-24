@@ -103,6 +103,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   border-radius: 6px;
   background: #ffffff0d;
 }
+.hotz { min-width: 96px; border-color: #ff9a1f66; }
 .zone-state { display: block; font-weight: 700; font-size: 11px; white-space: nowrap; }
 .zone-cnt { display: flex; justify-content: center; align-items: baseline; gap: 6px; font-size: 16px; font-variant-numeric: tabular-nums; }
 .zone-cnt b { min-width: 2ch; }
@@ -393,3 +394,13 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .sel .srow .bar { flex: 1; margin: 0; }
 .sel .lagerhead { margin-top: 6px; }
 .bar.store { height: 7px; margin: 0; }
+
+/* schmale Bildschirme (Telefon quer): Kopfleiste kompakter, damit nichts überläuft */
+@media (max-width: 1100px) {
+  .top { gap: 10px; padding: 0 8px; }
+  .res-row { gap: 8px; }
+  .res .lbl, .res .rate { display: none; }
+  .pts { width: 170px; }
+  .zone { min-width: 84px; padding: 2px 6px; }
+  .hotz { min-width: 84px; }
+}

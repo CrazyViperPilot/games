@@ -5,7 +5,7 @@ import { UNITS } from '../data/units.js';
 
 const TILE = BALANCE.map.tile;
 const OUTLINE = 'rgba(0,0,0,0.65)';
-export const BUILD_ABBR = { fob: 'FOB', depot: 'HALLE', extractor: 'FÖR', mortar: 'MÖR', aa: 'FLA' };
+export const BUILD_ABBR = { fob: 'FOB', depot: 'HALLE', extractor: 'FÖR', mortar: 'MÖR', aa: 'FLA', helipad: 'HELI', drill: 'BOHR' };
 export const NODE_COLOR = { bm: '#8b5a2b', mun: '#d9b600', fuel: '#3b2350' };
 export const NODE_LABEL = { bm: 'BM', mun: 'MUN', fuel: 'TS' };
 const WALL_GREY = '#8c9089';
@@ -68,7 +68,7 @@ export function drawBar(ctx, x, y, w, h, frac, color) {
 /**
  * Einheit von oben. u: Entity; color: Teamfarbe; aim: Zielwinkel (Turm/Waffe), sonst Fahrtrichtung.
  */
-export function drawUnit(ctx, u, color, zoom = 1, aim = null) {
+export function drawUnit(ctx, u, color, zoom = 1, aim = null, now = 0) {
   const z = zoom || 1;
   const dark = shade(color, 0.45);
   const light = tint(color, 0.25);
@@ -97,6 +97,8 @@ export function drawUnit(ctx, u, color, zoom = 1, aim = null) {
     ctx.beginPath();
     ctx.arc(-1, -1, 1.5, 0, Math.PI * 2);
     ctx.fill();
+  } else if (u.def && u.def.air) {
+    drawHeli(ctx, u, color, dark, light, hull, turret, now, z);
   } else if (u.type === 'truck') {
     ctx.rotate(hull);
     ctx.fillStyle = dark;
@@ -153,6 +155,68 @@ export function drawUnit(ctx, u, color, zoom = 1, aim = null) {
     ctx.stroke();
   }
   ctx.restore();
+}
+
+/** Hubschrauber von oben: Schatten, Rumpf, Heckausleger, drehende Rotoren. */
+function drawHeli(ctx, u, color, dark, light, hull, turret, now, z) {
+  const big = u.type === 'transporter';
+  const gun = u.type === 'gunship';
+  const len = big ? 24 : gun ? 20 : 15;
+  const wid = big ? 7 : gun ? 5 : 6;
+  // Schatten auf dem Boden (versetzt)
+  ctx.save();
+  ctx.translate(7, 9);
+  ctx.rotate(hull);
+  ctx.fillStyle = 'rgba(0,0,0,0.28)';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, len * 0.8, wid, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  ctx.save();
+  ctx.rotate(hull);
+  ctx.fillStyle = dark;
+  ctx.fillRect(-len, -1.2, len * 0.9, 2.4); // Heckausleger
+  ctx.fillRect(-len, -4, 2, 8); // Heckrotor-Leitwerk
+  if (gun) {
+    ctx.fillRect(-3, -13, 7, 26); // Stummelflügel
+    ctx.strokeRect(-3, -13, 7, 26);
+  }
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, len * 0.5, wid, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = light;
+  ctx.beginPath();
+  ctx.ellipse(len * 0.22, 0, len * 0.16, wid * 0.55, 0, 0, Math.PI * 2); // Kanzel
+  ctx.fill();
+  if (gun) {
+    ctx.rotate(turret);
+    ctx.fillStyle = '#2b2f2b';
+    ctx.fillRect(len * 0.4, -0.9, 7, 1.8); // Bordkanone
+  }
+  ctx.restore();
+  // Rotorkreuz dreht sich; Transporter mit zweitem Rotor hinten
+  const spin = (now / 60 + u.id) % (Math.PI * 2);
+  ctx.strokeStyle = 'rgba(235,240,235,0.75)';
+  ctx.lineWidth = 1.6 / z;
+  const rotor = (cx, cy, r) => {
+    ctx.beginPath();
+    for (let k = 0; k < 2; k++) {
+      const a = spin + (k * Math.PI) / 2;
+      ctx.moveTo(cx - Math.cos(a) * r, cy - Math.sin(a) * r);
+      ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+    }
+    ctx.stroke();
+  };
+  if (big) {
+    const c = Math.cos(hull);
+    const s = Math.sin(hull);
+    rotor(c * 9, s * 9, 12);
+    rotor(-c * 9, -s * 9, 12);
+  } else {
+    rotor(0, 0, gun ? 15 : 13);
+  }
 }
 
 /**
@@ -229,6 +293,17 @@ export function drawBuilding(ctx, b, color, zoom = 1) {
     if (b.hp < b.maxHp) {
       ctx.fillStyle = `rgba(0,0,0,${(1 - b.hp / b.maxHp) * 0.45})`;
       ctx.fillRect(x0 + 1, y0 + 1, w - 2, h - 2);
+    }
+    if (b.drill) {
+      // Bohrer: Phase als Balken über dem Gebäude (aktiv grün und leerlaufend, bereit gelb, sonst grau und füllend)
+      const d = b.drill;
+      const frac = d.frac;
+      const col = d.state === 'active' ? '#7fd36a' : d.state === 'ready' ? '#e8c43a' : '#8a8f88';
+      const bh = Math.max(3, 4 / z);
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillRect(x0, y0 - bh - 3 / z, w, bh);
+      ctx.fillStyle = col;
+      ctx.fillRect(x0, y0 - bh - 3 / z, w * clamp(frac, 0, 1), bh);
     }
     // Fertigungsfortschritt des ersten Auftrags
     if (b.queue && b.queue.length) {

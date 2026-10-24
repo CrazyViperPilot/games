@@ -18,7 +18,7 @@ export const BUILDINGS = {
       range: 220,
       minRange: 0,
       cooldown: 0.6,
-      damage: { inf: 12, light: 4, heavy: 1, struct: 4 },
+      damage: { inf: 12, light: 4, heavy: 1, struct: 4, air: 2 },
       splash: 0,
       shell: false,
       ammoPerShot: 0, // Basis wehrt sich immer
@@ -90,7 +90,7 @@ export const BUILDINGS = {
     weapon: {
       range: 800,
       minRange: 200,
-      cooldown: 4,
+      cooldown: 20, // seltene, gezielte Schüsse (Ziel wählen)
       damage: { inf: 60, light: 50, heavy: 25, struct: 80 },
       splash: 60,
       shell: true, // indirektes Feuer: Flugzeit = Distanz / 300
@@ -110,13 +110,39 @@ export const BUILDINGS = {
     produces: [],
     aa: { range: 350, cooldown: 0.6, chance: 0.7, ammoPerShot: 0.25 }, // je Abfangversuch
     weapon: {
-      range: 260,
+      range: 320,
       minRange: 0,
       cooldown: 0.4,
-      damage: { inf: 10, light: 12, heavy: 2, struct: 4 },
+      damage: { inf: 10, light: 12, heavy: 2, struct: 4, air: 35 }, // schießt Hubschrauber ab (Munition aus der FOB)
       splash: 0,
       shell: false,
       ammoPerShot: 0.25,
     },
+  },
+  helipad: {
+    name: 'Hubschrauberlandeplatz',
+    armor: 'struct',
+    w: 3,
+    h: 3,
+    hp: 1200,
+    sight: 250,
+    cost: { bm: 350 },
+    buildTime: 28,
+    hotkey: 'G',
+    produces: ['littlebird', 'transporter', 'gunship'],
+  },
+  drill: {
+    name: 'Bohrer',
+    armor: 'struct',
+    w: 2,
+    h: 2,
+    hp: 600,
+    sight: 200,
+    cost: { bm: 150 },
+    buildTime: 20,
+    hotkey: 'X',
+    produces: [],
+    // Aufwärmen nach dem Bau, aktiv (zieht die Hot Zone an, braucht Treibstoff aus der FOB), dann Abkühlen (Sekunden)
+    drill: { warmup: 30, active: 120, cooldown: 300, fuelPerSec: 1 },
   },
 };

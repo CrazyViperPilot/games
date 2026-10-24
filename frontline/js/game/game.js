@@ -11,7 +11,8 @@ import { updateEconomy, smoothIncome } from './economy.js';
 import { updateMovement, nearestPassable, planPath, setIdle, separate } from './movement.js';
 import { updateCombat } from './combat.js';
 import { updateZone } from './zone.js';
-import { updateLogistics, cmdLoad, cmdUnload, cmdRoute, cmdSetPreset, cargoSum } from './logistics.js';
+import { createHot, updateHot, cmdDrill } from './hotzone.js';
+import { updateLogistics, cmdLoad, cmdUnload, cmdRoute, cmdSetPreset, cmdBoard, cmdDropoff, cargoSum } from './logistics.js';
 import { updateConstruction, canBuild, cmdRepair, orderBuild, orderBuildSeq } from './construction.js';
 
 const TILE = BALANCE.map.tile;
@@ -98,6 +99,7 @@ export class Game {
         flow: { bm: 0, mun: 0, fuel: 0 }, // Verbrauch aus Lagern je s (Nachfüllen)
         points: 0,
         pointProgress: 0,
+        hotProgress: 0, // Fortschritt zum nächsten Hot-Zone-Punkt
         used: { mun: 0, fuel: 0 }, // Summe des Verbrauchs (Statistik)
         warnAt: {}, // Zeitpunkt der letzten Meldung je Schlüssel (notify)
         incomeMult: 1,
@@ -111,6 +113,7 @@ export class Game {
       return team;
     });
     this.zone = { ...this.map.zone, owner: -1, contested: false, counts: [0, 0] };
+    this.hot = createHot(this);
     this.fog = [new Fog(W, H), new Fog(W, H)];
 
     // Startzustand: je Team eine fertige FOB auf dem Spawn (Lager = startRes), Startunits im Halbkreis davor
@@ -488,6 +491,14 @@ export class Game {
         return cmdRoute(this, team, cmd);
       case 'setPreset':
         return cmdSetPreset(this, team, cmd);
+      case 'mortarTarget':
+        return this.cmdMortarTarget(team, cmd);
+      case 'board':
+        return cmdBoard(this, team, cmd);
+      case 'dropoff':
+        return cmdDropoff(this, team, cmd);
+      case 'drill':
+        return cmdDrill(this, team, cmd);
       case 'train':
         return this.cmdTrain(team, cmd);
       case 'cancelTrain':
@@ -663,6 +674,41 @@ export class Game {
     return { ok: true, id: site.id };
   }
 
+  /**
+   * { type: 'mortarTarget', ids, x, y }: gewählte eigene Mörser feuern auf den Punkt (ohne x/y: Ziel löschen).
+   * Nur Mörser in Reichweite (zwischen minRange und range) nehmen das Ziel an.
+   */
+  cmdMortarTarget(team, cmd) {
+    const mortars = [];
+    for (const id of new Set(cmd.ids || [])) {
+      const b = this.getEntity(id);
+      if (b && b.kind === 'building' && b.team === team && b.def.weapon && b.def.weapon.shell) mortars.push(b);
+    }
+    if (!mortars.length) return fail('Kein Mörser gewählt');
+    if (!Number.isFinite(cmd.x) || !Number.isFinite(cmd.y)) {
+      for (const b of mortars) b.fireTarget = null;
+      return { ok: true, count: mortars.length };
+    }
+    let n = 0;
+    let reason = 'Ziel außer Reichweite';
+    for (const b of mortars) {
+      if (!b.built) {
+        reason = 'Mörser ist noch im Bau';
+        continue;
+      }
+      const d = dist(b.x, b.y, cmd.x, cmd.y);
+      const w = b.def.weapon;
+      if (d > w.range) reason = `Ziel außer Reichweite (max. ${w.range} px)`;
+      else if (d < w.minRange) reason = `Ziel zu nah (min. ${w.minRange} px)`;
+      else {
+        b.fireTarget = { x: cmd.x, y: cmd.y };
+        n++;
+      }
+    }
+    if (!n) return fail(reason);
+    return { ok: true, count: n };
+  }
+
   /** { type: 'train', buildingId, unit }: FOB zahlt aus eigenem Lager, Halle aus der FOB in Reichweite. */
   cmdTrain(team, cmd) {
     const b = this.getEntity(cmd.buildingId);
@@ -685,7 +731,9 @@ export class Game {
   /** Lebende plus in Ausbildung befindliche Einheiten eines Teams. */
   unitCount(team) {
     let n = 0;
-    for (const u of this.units) if (u.alive && u.team === team) n++;
+    for (const u of this.units) {
+      if (u.alive && u.team === team) n += 1 + u.passengers.length;
+    }
     for (const b of this.buildings) if (b.alive && b.team === team) n += b.queue.length;
     return n;
   }
@@ -747,7 +795,9 @@ export class Game {
     const lost = [];
     for (let t = 0; t < 2; t++) {
       const hasFob = this.buildings.some((b) => b.alive && b.team === t && b.type === 'fob');
-      const hasEngineer = this.units.some((u) => u.alive && u.team === t && u.type === 'engineer');
+      const hasEngineer = this.units.some(
+        (u) => u.alive && u.team === t && (u.type === 'engineer' || u.passengers.some((p) => p.type === 'engineer')),
+      );
       if (!hasFob && !hasEngineer) lost.push(t);
     }
     if (lost.length === 0) return;
@@ -804,6 +854,7 @@ export class Game {
     separate(this);
     updateCombat(this, dt);
     updateZone(this, dt);
+    updateHot(this, dt);
     smoothIncome(this, dt);
 
     this.fogTimer += dt;

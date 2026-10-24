@@ -124,6 +124,7 @@ export class Renderer {
 
     this.drawTerrain(ctx, R);
     this.drawZone(ctx, z);
+    this.drawHot(ctx, z, now);
 
     for (const n of g.map.nodes) {
       if (inRect(n.x, n.y, 40)) drawNode(ctx, n, g.extractorOn(n.id), z);
@@ -153,14 +154,17 @@ export class Renderer {
       if (b && b.kind === 'building' && b.team === team) this.drawRally(ctx, b, z);
     }
 
-    for (const u of g.units) {
-      if (!u.alive || !shown(u) || !inRect(u.x, u.y, 30)) continue;
-      let aim = null;
-      if (u.targetId && u.def.range > 0) {
-        const t = g.getEntity(u.targetId);
-        if (t) aim = Math.atan2(t.y - u.y, t.x - u.x);
+    for (const air of [false, true]) {
+      // Hubschrauber zuletzt: sie fliegen über allem
+      for (const u of g.units) {
+        if (!u.alive || !!u.def.air !== air || !shown(u) || !inRect(u.x, u.y, 30)) continue;
+        let aim = null;
+        if (u.targetId && u.def.range > 0) {
+          const t = g.getEntity(u.targetId);
+          if (t) aim = Math.atan2(t.y - u.y, t.x - u.x);
+        }
+        drawUnit(ctx, u, g.teams[u.team].color, z, aim, now);
       }
-      drawUnit(ctx, u, g.teams[u.team].color, z, aim);
     }
 
     this.drawMoveMarker(ctx, v.moveMarker, now, z);
@@ -246,6 +250,30 @@ export class Renderer {
     ctx.restore();
   }
 
+  /** Hot Zone: pulsierender oranger Kreis mit Beschriftung; Besitzfarbe, wenn ein Team sie hält. */
+  drawHot(ctx, z, now) {
+    const hz = this.game.hot;
+    const owned = hz.owner >= 0;
+    const col = owned ? this.game.teams[hz.owner].color : '#ff9a1f';
+    const pulse = 0.5 + 0.5 * Math.sin(now / 400);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(hz.x, hz.y, hz.r, 0, Math.PI * 2);
+    ctx.fillStyle = hexA('#ff7a1a', 0.1 + 0.07 * pulse);
+    ctx.fill();
+    ctx.strokeStyle = hexA(col, 0.9);
+    ctx.lineWidth = 3;
+    ctx.setLineDash([16, 10]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(255,190,110,0.5)';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '700 34px system-ui, sans-serif';
+    ctx.fillText('HOT ZONE', hz.x, hz.y - hz.r + 40);
+    ctx.restore();
+  }
+
   /** Bauradius der eigenen fertigen FOBs (nur bei Platzierung). */
   drawRadii(ctx, z) {
     const g = this.game;
@@ -275,6 +303,10 @@ export class Renderer {
       if (seen.has(id)) continue;
       seen.add(id);
       const b = g.getEntity(id);
+      if (b && b.kind === 'building' && b.def.weapon && b.def.weapon.shell && b.team === this.team) {
+        this.drawMortarRange(ctx, b, z);
+        continue;
+      }
       if (!b || b.kind !== 'building' || b.type !== 'fob') continue;
       const color = g.teams[b.team].color;
       ctx.globalAlpha = b.built ? 1 : 0.5;
@@ -283,6 +315,38 @@ export class Renderer {
       ctx.fillStyle = hexA(color, 0.07);
       ctx.fill();
       ctx.strokeStyle = hexA(color, 0.8);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /** Mörser: Reichweite (außen), Mindestreichweite (innen) und gewähltes Ziel. */
+  drawMortarRange(ctx, b, z) {
+    const w = b.def.weapon;
+    ctx.save();
+    ctx.setLineDash([10 / z, 8 / z]);
+    ctx.lineWidth = 2 / z;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, w.range, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,170,60,0.05)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,170,60,0.75)';
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, w.minRange, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,170,60,0.4)';
+    ctx.stroke();
+    ctx.setLineDash([]);
+    if (b.fireTarget) {
+      const t = b.fireTarget;
+      ctx.strokeStyle = '#ff6a3a';
+      ctx.lineWidth = 2 / z;
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, w.splash || 30, 0, Math.PI * 2);
+      ctx.moveTo(t.x - 14 / z, t.y);
+      ctx.lineTo(t.x + 14 / z, t.y);
+      ctx.moveTo(t.x, t.y - 14 / z);
+      ctx.lineTo(t.x, t.y + 14 / z);
       ctx.stroke();
     }
     ctx.restore();

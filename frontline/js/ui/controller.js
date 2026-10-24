@@ -10,15 +10,16 @@ const WALL_MAX = 40; // max. Zellen je Mauerzug (Vorschau und Befehl)
 const DOUBLE_MS = 350; // Doppelklick auf einen Typ = alle dieses Typs im Bild
 const GROUP_DOUBLE_MS = 500; // Gruppentaste zweimal = Kamera hin
 const PICK_PX = 16; // Trefferradius in Bildschirm-Pixeln
-const TARGET_MODES = ['place', 'wall', 'attackMove', 'fobTarget', 'loadFob', 'unloadFob', 'routeFrom', 'routeTo'];
+const TARGET_MODES = ['place', 'wall', 'attackMove', 'fobTarget', 'loadFob', 'unloadFob', 'routeFrom', 'routeTo', 'mortarTarget', 'dropoff'];
 const BUILD_MENU = Object.keys(BUILDINGS).filter((k) => BUILDINGS[k].hotkey && BUILDINGS[k].buildable !== false);
 const RES_KEYS = ['money', 'bm', 'mun', 'fuel'];
 const CARGO_KEYS = ['bm', 'mun', 'fuel']; // Lagersorten (FOB-Lager, LKW-Ladung)
 const SHORT = { money: 'G', bm: 'BM', mun: 'MUN', fuel: 'TS' };
 const HOTKEY_ALIAS = { Y: 'Z' }; // Flugabwehr auch mit Y
 // Kurznamen für die Befehlskarte (der volle Name steht im Tooltip)
-const SHORT_BLD = { depot: 'Halle', extractor: 'Förder­anlage', wall: 'Mauer', gate: 'Tor', mortar: 'Mörser', aa: 'Flak' };
-const SHORT_UNIT = { rifleman: 'Schütze', at: 'PAK', truck: 'LKW', engineer: 'Baufz.', ifv: 'SPz', tank: 'KPz' };
+const SHORT_BLD = { depot: 'Halle', extractor: 'Förder­anlage', wall: 'Mauer', gate: 'Tor', mortar: 'Mörser', aa: 'Flak', helipad: 'Heli-Platz', drill: 'Bohrer' };
+const SHORT_UNIT = { rifleman: 'Schütze', at: 'PAK', truck: 'LKW', engineer: 'Baufz.', ifv: 'SPz', tank: 'KPz', littlebird: 'Little Bird', transporter: 'Transp.-Heli', gunship: 'AH-64' };
+const isCarrier = (u) => u.def.cargoCap > 0; // LKW und Transporthubschrauber
 // Ladungsart: Taste, Kurzname, Bezeichnung
 const PRESET_BTN = [
   ['mix', 'Q', 'Gemischt', 'Gemischt'],
@@ -310,6 +311,12 @@ export class Controller {
       case 'routeTo':
         this.confirmRouteTo(wx, wy);
         return;
+      case 'mortarTarget':
+        this.confirmMortarTarget(wx, wy);
+        return;
+      case 'dropoff':
+        this.confirmDropoff(wx, wy);
+        return;
       case 'wall':
         return; // Mauerzug läuft über beginWall/endWall
       case 'build':
@@ -345,12 +352,27 @@ export class Controller {
     if (!sel.length) return;
     const units = sel.filter((e) => e.kind === 'unit');
     if (!units.length) {
+      const mortars = sel.filter((e) => e.def.weapon && e.def.weapon.shell);
+      if (mortars.length) {
+        if (this.issue({ type: 'mortarTarget', ids: mortars.map((b) => b.id), x: wx, y: wy }).ok) this.moveMarker(wx, wy);
+        return;
+      }
       const producers = sel.filter((e) => e.def.produces.length > 0);
       for (const b of producers) this.issue({ type: 'rally', buildingId: b.id, x: wx, y: wy });
       if (producers.length) this.moveMarker(wx, wy);
       return;
     }
     let rest = units;
+    // Infanterie/Baufahrzeug auf eigenen Transporthubschrauber: einsteigen
+    const heli = this.pick(wx, wy, (e) => e.kind === 'unit' && e.team === this.team && e.def.seats > 0);
+    if (heli) {
+      const riders = units.filter((u) => u.def.canRide);
+      if (riders.length) {
+        this.issue({ type: 'board', ids: riders.map((u) => u.id), heliId: heli.id });
+        rest = units.filter((u) => !u.def.canRide);
+        if (!rest.length) return;
+      }
+    }
     const own = this.pickB(wx, wy, (e) => e.team === this.team);
     if (own) {
       const done = this.orderOnOwnBuilding(own, units);
@@ -374,7 +396,7 @@ export class Controller {
   orderOnOwnBuilding(b, units) {
     const done = new Set();
     const ids = (list) => list.map((u) => u.id);
-    const trucks = units.filter((u) => u.type === 'truck');
+    const trucks = units.filter(isCarrier);
     if (b.type === 'fob' && trucks.length) {
       if (!b.built) {
         this.issue({ type: 'unload', ids: ids(trucks), fobId: b.id });
@@ -449,7 +471,7 @@ export class Controller {
 
   /** Laden oder Entladen: Klick auf eigene FOB (Entladen auch auf FOB-Baustelle). */
   confirmTruckFob(kind, wx, wy) {
-    const ids = this.selectedUnits().filter((e) => e.type === 'truck').map((e) => e.id);
+    const ids = this.selectedUnits().filter(isCarrier).map((e) => e.id);
     if (!ids.length) {
       this.message('Kein LKW gewählt');
       this.setMode('normal');
@@ -465,7 +487,7 @@ export class Controller {
 
   /** Pendeln, Schritt 1: Start-FOB (fertig). */
   confirmRouteFrom(wx, wy) {
-    const ids = this.selectedUnits().filter((e) => e.type === 'truck');
+    const ids = this.selectedUnits().filter(isCarrier);
     if (!ids.length) {
       this.message('Kein LKW gewählt');
       this.setMode('normal');
@@ -482,7 +504,7 @@ export class Controller {
 
   /** Pendeln, Schritt 2: Ziel-FOB (oder Baustelle). */
   confirmRouteTo(wx, wy) {
-    const ids = this.selectedUnits().filter((e) => e.type === 'truck').map((e) => e.id);
+    const ids = this.selectedUnits().filter(isCarrier).map((e) => e.id);
     const fob = this.pickB(wx, wy, (e) => e.team === this.team && e.type === 'fob');
     if (!fob) {
       this.message('Ziel: eigene FOB oder FOB-Baustelle anklicken');
@@ -493,6 +515,34 @@ export class Controller {
       return;
     }
     if (this.issue({ type: 'route', ids, fromId: this.routeFromId, toId: fob.id }).ok) this.setMode('normal');
+  }
+
+  /** Mörser-Ziel: Klick auf die Karte, alle gewählten Mörser in Reichweite feuern dorthin. */
+  confirmMortarTarget(wx, wy) {
+    const ids = this.selected().filter((e) => e.kind === 'building' && e.def.weapon && e.def.weapon.shell).map((e) => e.id);
+    if (!ids.length) {
+      this.message('Kein Mörser gewählt');
+      this.setMode('normal');
+      return;
+    }
+    if (this.issue({ type: 'mortarTarget', ids, x: wx, y: wy }).ok) {
+      this.moveMarker(wx, wy);
+      this.setMode('normal');
+    }
+  }
+
+  /** Absetzen: Transporthubschrauber fliegt zum Klickpunkt und setzt Passagiere ab. */
+  confirmDropoff(wx, wy) {
+    const ids = this.selectedUnits().filter((e) => e.def.seats > 0).map((e) => e.id);
+    if (!ids.length) {
+      this.message('Kein Transporthubschrauber gewählt');
+      this.setMode('normal');
+      return;
+    }
+    if (this.issue({ type: 'dropoff', ids, x: wx, y: wy }).ok) {
+      this.moveMarker(wx, wy);
+      this.setMode('normal');
+    }
   }
 
   // ---- Platzierung und Mauerzug -------------------------------------------------
@@ -621,8 +671,8 @@ export class Controller {
 
   /** LKW-Modi: 'loadFob' (L), 'unloadFob' (U), 'routeFrom' (T, Start-FOB). */
   startTruckMode(mode) {
-    if (!this.selectedUnits().some((e) => e.type === 'truck')) {
-      this.message('Kein LKW gewählt');
+    if (!this.selectedUnits().some(isCarrier)) {
+      this.message('Kein LKW oder Transporthubschrauber gewählt');
       return;
     }
     this.setMode(mode);
@@ -724,6 +774,10 @@ export class Controller {
         return 'Pendeln: Start-FOB (fertig) anklicken · Esc bricht ab';
       case 'routeTo':
         return 'Pendeln: Ziel-FOB oder FOB-Baustelle anklicken · Esc bricht ab';
+      case 'mortarTarget':
+        return 'Mörser: Ziel auf der Karte anklicken (Kreis zeigt Reichweite) · Esc bricht ab';
+      case 'dropoff':
+        return 'Absetzen: Landepunkt anklicken · Esc bricht ab';
       default:
         return '';
     }
@@ -799,7 +853,7 @@ export class Controller {
         action: () => this.stop(),
       }),
     ];
-    const trucks = units.filter((u) => u.type === 'truck');
+    const trucks = units.filter(isCarrier);
     if (trucks.length) {
       card.push(
         entry('Laden', 'L', {
@@ -825,6 +879,17 @@ export class Controller {
         );
       }
     }
+    const helis = units.filter((u) => u.def.seats > 0);
+    if (helis.length) {
+      card.push(
+        entry('Absetzen', 'O', {
+          tip: 'Passagiere absetzen (O): Landepunkt anklicken. Einsteigen: Infanterie wählen, Rechtsklick auf den Hubschrauber.',
+          enabled: helis.some((h) => h.passengers.length > 0),
+          reason: 'Keine Passagiere an Bord',
+          action: () => this.setMode('dropoff'),
+        }),
+      );
+    }
     return card;
   }
 
@@ -849,6 +914,33 @@ export class Controller {
           enabled: !reason,
           reason,
           action: () => this.train(u),
+        }),
+      );
+    }
+    const mortars = blds.filter((b) => b.built && b.def.weapon && b.def.weapon.shell);
+    if (mortars.length) {
+      card.push(
+        entry('Ziel wählen', 'G', {
+          tip: 'Mörser-Ziel (G): Punkt anklicken oder Rechtsklick. Schießt alle 20 s, solange die FOB Munition hat.',
+          action: () => this.setMode('mortarTarget'),
+        }),
+        entry('Ziel löschen', 'C', {
+          tip: 'Gewähltes Ziel löschen (C): Mörser feuert wieder automatisch',
+          enabled: mortars.some((b) => b.fireTarget),
+          reason: 'Kein Ziel gewählt',
+          action: () => this.issue({ type: 'mortarTarget', ids: mortars.map((b) => b.id) }),
+        }),
+      );
+    }
+    const drills = blds.filter((b) => b.built && b.drill);
+    if (drills.length) {
+      const ready = drills.filter((b) => b.drill.state === 'ready');
+      card.push(
+        entry('Aktivieren', 'G', {
+          tip: 'Bohrer aktivieren (G): 2 min aktiv, braucht Treibstoff aus der FOB, zieht die Hot Zone an; danach 5 min Pause',
+          enabled: ready.length > 0,
+          reason: drills.some((b) => b.drill.state === 'active') ? 'Bohrer läuft bereits' : 'Bohrer wärmt auf oder kühlt ab',
+          action: () => this.issue({ type: 'drill', ids: ready.map((b) => b.id) }),
         }),
       );
     }

@@ -70,6 +70,7 @@ export class Hud {
     this.cmdEl = q('[data-cmd]');
     this.timeEl = q('[data-time]');
     this.zoneEl = q('[data-zone]');
+    this.hotEl = q('[data-hot]');
     this.speedBtn = q('[data-act=speed]');
     this.pauseBtn = q('[data-act=pause]');
     this.res = {};
@@ -106,6 +107,7 @@ export class Hud {
         <div class="res-row">${res}</div>
         <div class="pts">${pts}</div>
         <div class="zone" data-zone>neutral</div>
+        <div class="zone hotz" data-hot title="Hot Zone: kleiner Kreis in der Konfliktzone, zieht zu aktiven Bohrern. Geld und Punkte für den Besitzer.">HOT</div>
         <div class="clock">
           ${this.app.debug ? '<span class="dbg">DEBUG</span>' : ''}
           <span class="time" data-time>00:00</span>
@@ -202,6 +204,12 @@ export class Hud {
     this.zoneEl.innerHTML =
       `<span class="zone-state" style="color:${col}">${label}</span>` +
       `<span class="zone-cnt"><b style="color:${c0}">${z.counts[0]}</b><i>:</i><b style="color:${c1}">${z.counts[1]}</b></span>`;
+    const hz = g.hot;
+    const hc = hz.contested ? '#e8ece4' : hz.owner >= 0 ? BALANCE.teamColors[hz.owner] : '#9aa596';
+    const hl = hz.contested ? 'HOT umkämpft' : hz.owner >= 0 ? `HOT ${BALANCE.teamNames[hz.owner]}` : 'HOT neutral';
+    this.hotEl.innerHTML =
+      `<span class="zone-state" style="color:${hc}">${hl}</span>` +
+      `<span class="zone-cnt"><b style="color:${c0}">${hz.counts[0]}</b><i>:</i><b style="color:${c1}">${hz.counts[1]}</b></span>`;
     this.timeEl.textContent = fmtTime(g.time);
     const st = this.app.status ? this.app.status() : { paused: false, speed: 1 };
     this.speedBtn.textContent = `${st.speed}×`;
@@ -242,10 +250,13 @@ export class Hud {
       h += gauge('Treibstoff', u.fuel, u.def.fuelMax, COLOR.fuel);
       if (u.fuel <= 0) h += `<div class="warn small">Kein Treibstoff – nur 25 % Tempo</div>`;
     }
-    if (u.type === 'truck') {
+    if (u.def.seats) {
+      h += gauge('Passagiere', u.passengers.length, u.def.seats, COLOR.cargo);
+    }
+    if (u.def.cargoCap) {
       const c = u.cargo;
       const sum = c.bm + c.mun + c.fuel;
-      h += gauge('Ladung', sum, TRUCK_CAP, COLOR.cargo);
+      h += gauge('Ladung', sum, u.def.cargoCap, COLOR.cargo);
       h +=
         `<div class="muted small">${Math.floor(c.bm)} BM · ${Math.floor(c.mun)} MUN · ${Math.floor(c.fuel)} TS` +
         ` · Ladungsart: ${PRESET_NAME[u.preset] || u.preset}</div>`;
@@ -281,6 +292,16 @@ export class Hud {
           : `<div class="warn small">Keine FOB in Reichweite – ruht</div>`;
       }
     }
+    if (b.def.weapon && b.def.weapon.shell && b.built) {
+      const w = b.def.weapon;
+      h += b.fireTarget
+        ? `<div class="muted small">Ziel gewählt · Schuss alle ${w.cooldown} s · Reichweite ${w.range} px</div>`
+        : `<div class="muted small">Kein Ziel: G oder Rechtsklick wählt eins · Reichweite ${w.range} px</div>`;
+      const sup = g.supplierOf(b);
+      if (!sup) h += `<div class="warn small">Keine FOB in Reichweite – keine Munition</div>`;
+      else if (sup.store.mun < w.ammoPerShot) h += `<div class="warn small">FOB ohne Munition – feuert nicht</div>`;
+    }
+    if (b.drill && b.built) h += this.drillInfo(b);
     if (b.queue.length) {
       const ut = UNITS[b.queue[0].unit ?? b.queue[0]];
       const shown = Math.min(ut.buildTime, b.queueTime).toFixed(0);
@@ -290,6 +311,21 @@ export class Hud {
         `<div class="muted small">Warteschlange: ${b.queue.map((e) => esc(UNITS[e.unit ?? e].name)).join(', ')}</div></div>`;
     }
     return h;
+  }
+
+  /** Bohrer: Phase und Restzeit. */
+  drillInfo(b) {
+    const g = this.game;
+    const d = b.drill;
+    const cfg = b.def.drill;
+    const left = Math.max(0, Math.ceil((d.state === 'active' ? d.endAt : d.readyAt) - g.time));
+    const txt = {
+      warmup: `Wärmt auf · bereit in ${left} s`,
+      ready: 'Bereit: G aktiviert (braucht Treibstoff in der FOB)',
+      active: `Aktiv · noch ${left} s · ${cfg.fuelPerSec} TS/s aus der FOB`,
+      cooldown: `Abkühlen · bereit in ${left} s`,
+    }[d.state];
+    return `<div class="muted small">${esc(txt)}</div>`;
   }
 
   /** Status einer Baustelle: Material (FOB-Baustelle), dann Baufahrzeug/Bauer, sonst Fortschritt. */

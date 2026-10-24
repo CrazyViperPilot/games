@@ -79,13 +79,14 @@ export function hit(game, target, amount) {
  * Zielsuche für einen Schützen: zuerst Einheiten (nächste sichtbare), sonst Gebäude (ohne Mauern/Tore).
  * Idle-Einheiten suchen nur innerhalb der Leine um ihren Ankerpunkt.
  */
-function findTarget(game, hash, s, radius, minRange, allowBuildings) {
+function findTarget(game, hash, s, radius, minRange, allowBuildings, dmg) {
   const team = s.team;
   const leashed = s.kind === 'unit' && s.order.type === 'idle';
   let best = null;
   let bestD = Infinity;
   const consider = (e) => {
     if (!e.alive || e.team === team) return;
+    if (!(dmg[dmgKey(e)] > 0)) return; // z. B. Mörser und Panzer können keine Hubschrauber treffen
     if (leashed && Math.hypot(e.x - s.anchorX, e.y - s.anchorY) > BALANCE.leash + radiusOf(e)) return;
     const d = Math.hypot(e.x - s.x, e.y - s.y);
     if (d < minRange || d > radius + radiusOf(e)) return;
@@ -140,6 +141,16 @@ function tryFire(game, s, t, w) {
   if (!inRange(s, t, w.range)) return;
   if (!takeAmmo(game, s, w.ammoPerShot)) return;
   fireDirect(game, s, t, w);
+}
+
+/** Mörser mit gewähltem Ziel: schießt alle `cooldown` s dorthin, solange das Lager der FOB Munition hat. */
+function fireAtGround(game, b, w) {
+  if (b.cooldown > 0) return;
+  const t = b.fireTarget;
+  const d = Math.hypot(t.x - b.x, t.y - b.y);
+  if (d < w.minRange || d > w.range) return;
+  if (!takeAmmo(game, b, w.ammoPerShot)) return;
+  fireShell(game, b, t.x, t.y, w);
 }
 
 /** Flugabwehr: jede bereite Flugabwehr fängt die nächste gegnerische Granate in Reichweite mit `chance` ab. */
@@ -229,7 +240,7 @@ export function updateCombat(game, dt) {
     // idle / attackMove: automatische Zielsuche
     if (u.scanTimer <= 0) {
       u.scanTimer = SCAN;
-      const t = findTarget(game, hash, u, u.def.sight, 0, true);
+      const t = findTarget(game, hash, u, u.def.sight, 0, true, w.damage);
       u.targetId = t ? t.id : null;
     }
     if (u.targetId !== null) {
@@ -242,9 +253,13 @@ export function updateCombat(game, dt) {
     if (!b.alive || !b.built) continue;
     const w = weaponOf(b);
     if (!w) continue;
+    if (w.shell && b.fireTarget) {
+      fireAtGround(game, b, w); // gewähltes Ziel: kein automatisches Feuer
+      continue;
+    }
     if (b.scanTimer <= 0) {
       b.scanTimer = SCAN;
-      const t = findTarget(game, hash, b, w.range, w.minRange, true);
+      const t = findTarget(game, hash, b, w.range, w.minRange, true, w.damage);
       b.targetId = t ? t.id : null;
     }
     if (b.targetId !== null) {

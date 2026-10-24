@@ -7,6 +7,8 @@ export const BALANCE = {
   startRes: { money: 400, bm: 600, mun: 150, fuel: 150 }, // bm/mun/fuel = Lager der Start-FOB
   startUnits: ['truck', 'engineer', 'rifleman', 'rifleman', 'rifleman', 'rifleman'],
   zone: { r: 2200, controlIncome: 6, unitIncome: 0.25, unitIncomeCap: 30 },
+  // Hot Zone: kleiner Kreis in der Konfliktzone, wandert zufällig oder zu aktiven Bohrern
+  hot: { r: 300, speed: 40, income: 8, pointInterval: 45, wanderMin: 25, wanderMax: 45 },
   fob: { buildRadius: 450, minDistOwn: 500, minDistEnemy: 700, max: 6, income: 5 },
   queueMax: 5,
   shortageWarn: 20, // s zwischen zwei Meldungen je Sorte und Team

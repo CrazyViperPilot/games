@@ -76,6 +76,16 @@ export class Minimap {
     ctx.lineWidth = 1.5 * px;
     ctx.stroke();
 
+    // Hot Zone
+    const hz = g.hot;
+    ctx.beginPath();
+    ctx.arc(hz.x, hz.y, hz.r, 0, Math.PI * 2);
+    ctx.fillStyle = hexA('#ff7a1a', 0.35);
+    ctx.fill();
+    ctx.strokeStyle = hexA('#ffb060', 0.9);
+    ctx.lineWidth = 1.2 * px;
+    ctx.stroke();
+
     // Vorkommen
     for (const n of g.map.nodes) {
       ctx.fillStyle = NODE_COLOR[n.type] || '#888';

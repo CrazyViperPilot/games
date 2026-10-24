@@ -11,7 +11,7 @@ export const HASH_CELL = 128; // räumliches Hash-Gitter
 const TILE = BALANCE.map.tile;
 
 /** Aufträge, die logistics.js und construction.js selbst fahren (updateMovement lässt sie aus). */
-export const OWN_DRIVERS = new Set(['load', 'unload', 'route', 'build', 'repair']);
+export const OWN_DRIVERS = new Set(['load', 'unload', 'route', 'build', 'repair', 'board', 'dropoff']);
 
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 
@@ -19,6 +19,11 @@ const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 export function planPath(game, u, x, y) {
   u.goalX = x;
   u.goalY = y;
+  if (u.def.air) {
+    u.path = [{ x, y }]; // Hubschrauber fliegen geradeaus
+    u.pathIndex = 0;
+    return;
+  }
   u.path = findPath(game.grid, u.x, u.y, x, y, u.team);
   u.pathIndex = 0;
 }
@@ -120,7 +125,29 @@ function stepToward(grid, u, tx, ty, step) {
 }
 
 /** Folgt dem Weg mit Tempo `speed * speedMul * dt`. false, wenn ein Wegpunkt blockiert ist (neu planen). */
+/** Flug: geradeaus zum Wegpunkt, ohne Gelände- oder Gebäudeprüfung. */
+function followAir(u, dt) {
+  let budget = u.def.speed * u.speedMul * dt;
+  while (budget > 1e-9 && u.pathIndex < u.path.length) {
+    const wp = u.path[u.pathIndex];
+    const d = dist(wp.x, wp.y, u.x, u.y);
+    const arrive = u.pathIndex === u.path.length - 1 ? FINAL_ARRIVE : ARRIVE;
+    if (d < arrive) {
+      u.pathIndex++;
+      continue;
+    }
+    const step = Math.min(d, budget);
+    u.angle = Math.atan2(wp.y - u.y, wp.x - u.x);
+    u.x += ((wp.x - u.x) / d) * step;
+    u.y += ((wp.y - u.y) / d) * step;
+    budget -= step;
+    if (dist(wp.x, wp.y, u.x, u.y) < arrive) u.pathIndex++;
+  }
+  return true;
+}
+
 function followPath(game, u, dt) {
+  if (u.def.air) return followAir(u, dt);
   const grid = game.grid;
   let budget = u.def.speed * u.speedMul * dt;
   while (budget > 1e-9 && u.pathIndex < u.path.length) {
@@ -265,7 +292,7 @@ function resolvePair(grid, a, b) {
 /** Trennung aller lebenden Einheiten (nach allen Bewegungsschritten eines Ticks aufrufen). */
 export function separate(game) {
   const grid = game.grid;
-  const list = game.units.filter((u) => u.alive);
+  const list = game.units.filter((u) => u.alive && !u.def.air); // Hubschrauber schweben über allem
 
   // Einheiten in unpassierbaren Zellen (z. B. durch neue Gebäude) zur nächsten freien Zelle schieben
   for (const u of list) {

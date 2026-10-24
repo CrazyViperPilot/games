@@ -1,11 +1,13 @@
 // Logistik: LKW laden, entladen, pendeln und das Nachfüllen der Einheiten (PLAN.md §11.2, §11.3). Kein DOM.
 import { BALANCE } from '../data/balance.js';
-import { driveTo, setIdle } from './movement.js';
+import { driveTo, setIdle, nearestPassable } from './movement.js';
 
 const L = BALANCE.logistics;
 const CARGO = ['bm', 'mun', 'fuel'];
 export const PRESETS = ['mix', 'bm', 'mun', 'fuel'];
 const TRUCK_ORDERS = new Set(['load', 'unload', 'route']);
+const BOARD_REACH = 45; // Infanterie steigt ein, wenn sie so nah am Hubschrauber ist
+const DROP_RING = 26; // Absetzen: Abstand der Passagiere um den Hubschrauber
 const EPS = 1e-9;
 
 const fail = (reason) => ({ ok: false, reason });
@@ -21,9 +23,9 @@ function giveOrder(u, order) {
   u.pathIndex = 0;
 }
 
-/** Eigene LKW aus den IDs; ohne IDs leer. */
+/** Eigene Lastträger (LKW, Transporthubschrauber) aus den IDs; ohne IDs leer. */
 function trucksOf(game, team, ids) {
-  return game.ownUnits(team, ids).filter((u) => u.type === 'truck');
+  return game.ownUnits(team, ids).filter((u) => u.def.cargoCap > 0);
 }
 
 /** Ladungsart setzen (falls angegeben) und prüfen. Liefert false bei unbekannter Art. */
@@ -100,7 +102,7 @@ export function cmdSetPreset(game, team, cmd) {
  * Preset 'mix': je Tick die Sorte mit der kleinsten Ladung, die im Lager vorhanden ist.
  */
 function loadStep(u, fob, dt) {
-  const cap = L.truckCapacity;
+  const cap = u.def.cargoCap;
   const total = cargoSum(u.cargo);
   if (total >= cap - EPS) return 'full';
   let best = null;
@@ -180,6 +182,75 @@ function stepTruck(game, u, dt) {
   }
 }
 
+// ---- Hubschrauber: Einsteigen und Absetzen ------------------------------------------
+
+/** { type: 'board', ids, heliId }: Infanterie/Baufahrzeuge gehen zu einem eigenen Hubschrauber und steigen ein. */
+export function cmdBoard(game, team, cmd) {
+  const heli = game.getEntity(cmd.heliId);
+  if (!heli || heli.kind !== 'unit' || heli.team !== team || !(heli.def.seats > 0)) return fail('Kein eigener Transporthubschrauber');
+  const riders = game.ownUnits(team, cmd.ids).filter((u) => u.def.canRide);
+  if (!riders.length) return fail('Nur Infanterie und Baufahrzeuge steigen ein');
+  if (heli.passengers.length >= heli.def.seats) return fail('Hubschrauber ist voll');
+  for (const u of riders) giveOrder(u, { type: 'board', x: heli.x, y: heli.y, targetId: heli.id });
+  return { ok: true, count: riders.length };
+}
+
+/** { type: 'dropoff', ids, x, y }: Hubschrauber fliegt zum Punkt und setzt alle Passagiere ab. */
+export function cmdDropoff(game, team, cmd) {
+  const helis = game.ownUnits(team, cmd.ids).filter((u) => u.def.seats > 0);
+  if (!helis.length) return fail('Kein Transporthubschrauber gewählt');
+  if (!helis.some((h) => h.passengers.length > 0)) return fail('Keine Passagiere an Bord');
+  const x = Math.min(Math.max(cmd.x, 0), game.map.width);
+  const y = Math.min(Math.max(cmd.y, 0), game.map.height);
+  for (const h of helis) if (h.passengers.length) giveOrder(h, { type: 'dropoff', x, y, targetId: null });
+  return { ok: true, count: helis.length };
+}
+
+/** Einsteigen: hinlaufen, dann aus der Welt nehmen (alive = false bis zum Absetzen; cleanup räumt auf). */
+function stepBoard(game, u, dt) {
+  const heli = game.getEntity(u.order.targetId);
+  if (!heli || heli.team !== u.team || !(heli.def.seats > 0)) {
+    setIdle(u);
+    return;
+  }
+  const st = driveTo(game, u, heli.x, heli.y, BOARD_REACH, dt);
+  if (st === 'stuck') {
+    game.message(u.team, 'Kein Weg zum Hubschrauber', u.x, u.y);
+    setIdle(u);
+    return;
+  }
+  if (st !== 'arrived') return;
+  if (heli.passengers.length >= heli.def.seats) {
+    game.message(u.team, 'Hubschrauber ist voll', heli.x, heli.y);
+    setIdle(u);
+    return;
+  }
+  setIdle(u);
+  u.alive = false;
+  heli.passengers.push(u);
+}
+
+/** Absetzen: hinfliegen, Passagiere im Kreis ablegen. */
+function stepDropoff(game, h, dt) {
+  const o = h.order;
+  const st = driveTo(game, h, o.x, o.y, 40, dt);
+  if (st !== 'arrived') return;
+  const n = h.passengers.length;
+  h.passengers.forEach((p, i) => {
+    const a = (i / Math.max(1, n)) * Math.PI * 2;
+    const spot = nearestPassable(game.grid, h.x + Math.cos(a) * DROP_RING, h.y + Math.sin(a) * DROP_RING, h.team) || { x: h.x, y: h.y };
+    p.x = spot.x;
+    p.y = spot.y;
+    p.alive = true;
+    setIdle(p);
+    game.units.push(p);
+    game.entities.set(p.id, p);
+  });
+  h.passengers = [];
+  game.message(h.team, 'Truppen abgesetzt', h.x, h.y);
+  setIdle(h);
+}
+
 // ---- Nachfüllen -------------------------------------------------------------------
 
 /** Quelle für Munition/Treibstoff: eigene fertige FOB im Bauradius mit Vorrat, sonst eigener LKW mit Ladung in Reichweite. */
@@ -234,7 +305,11 @@ function resupply(game, passDt) {
  */
 export function updateLogistics(game, dt) {
   for (const u of game.units) {
-    if (u.alive && TRUCK_ORDERS.has(u.order.type)) stepTruck(game, u, dt);
+    if (!u.alive) continue;
+    const o = u.order.type;
+    if (TRUCK_ORDERS.has(o)) stepTruck(game, u, dt);
+    else if (o === 'board') stepBoard(game, u, dt);
+    else if (o === 'dropoff') stepDropoff(game, u, dt);
   }
   game.logiTimer -= dt;
   if (game.logiTimer <= 0) {
