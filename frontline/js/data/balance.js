@@ -4,7 +4,7 @@ export const BALANCE = {
   tickRate: 20, // Simulationsschritte/s
   winPoints: 100,
   pointInterval: 30,
-  startRes: { money: 400, bm: 600, mun: 150, fuel: 150 }, // bm/mun/fuel = Lager der Start-FOB
+  startRes: { money: 800, bm: 1000, mun: 400, fuel: 400 }, // bm/mun/fuel = Lager der Start-FOB
   startUnits: ['truck', 'engineer', 'rifleman', 'rifleman', 'rifleman', 'rifleman'],
   zone: { r: 3300, controlIncome: 6, unitIncome: 0.25, unitIncomeCap: 30 },
   // Hot Zone: kleiner Kreis in der Konfliktzone, wandert zufällig oder zu aktiven Bohrern

@@ -48,7 +48,7 @@ export const BUILDINGS = {
     buildTime: 15,
     hotkey: 'W',
     produces: [],
-    yields: { bm: 4, mun: 4, fuel: 3 }, // Rate je Sekunde je Sorte des Vorkommens
+    yields: { bm: 8, mun: 8, fuel: 6 }, // Rate je Sekunde je Sorte des Vorkommens
   },
   wall: {
     name: 'Mauer',

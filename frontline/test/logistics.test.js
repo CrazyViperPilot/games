@@ -73,9 +73,9 @@ test('Förderanlage füllt das Lager der FOB in deren Bauradius (nicht die einer
   const farBm0 = far.store.bm;
   extractorAt(g, node);
   run(g, 10);
-  // 4 Baumaterial je s bei Förderanlage (Sorte bm), nach 10 s ≈ +40
+  // 8 Baumaterial je s bei Förderanlage (Sorte bm), nach 10 s ≈ +80
   const gain = f.store.bm - bm0;
-  assert.ok(Math.abs(gain - 40) < 1.5, `Lagerzuwachs ${gain}`);
+  assert.ok(Math.abs(gain - 80) < 1.5, `Lagerzuwachs ${gain}`);
   assert.equal(far.store.bm, farBm0, 'andere FOB unberührt');
   assert.ok(g.teams[0].rate.bm > 0, 'Förderung in der Rate');
 });
