@@ -5,7 +5,7 @@ import { UNITS } from '../data/units.js';
 
 const TILE = BALANCE.map.tile;
 const OUTLINE = 'rgba(0,0,0,0.65)';
-export const BUILD_ABBR = { fob: 'FOB', depot: 'HALLE', extractor: 'FÖR', mortar: 'MÖR', aa: 'FLA', helipad: 'HELI', drill: 'BOHR' };
+export const BUILD_ABBR = { fob: 'FOB', depot: 'FZ-HALLE', extractor: 'FÖR', mortar: 'MÖR', aa: 'FLA', helipad: 'HELI', drill: 'BOHR' };
 export const NODE_COLOR = { bm: '#8b5a2b', mun: '#d9b600', fuel: '#3b2350' };
 export const NODE_LABEL = { bm: 'BM', mun: 'MUN', fuel: 'TS' };
 const WALL_GREY = '#8c9089';
@@ -14,6 +14,7 @@ const GATE_GREY = '#7d827b';
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 function rgbOf(hex) {
+  if (hex.startsWith('rgb')) return hex.match(/\d+/g).slice(0, 3).map(Number); // Ergebnis von shade/tint
   const n = parseInt(hex.slice(1), 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }

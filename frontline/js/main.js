@@ -109,6 +109,16 @@ const app = {
     s.hud.pushMessage(s.camera.iso ? 'Ansicht: isometrisch (V)' : 'Ansicht: 2D von oben (V)');
     s.hud.refresh();
   },
+  rotateView(dir) {
+    const s = session;
+    if (!s) return;
+    if (!s.camera.iso) {
+      s.hud.pushMessage('Drehen geht nur in der isometrischen Ansicht (V)');
+      return;
+    }
+    s.camera.rotate(dir);
+    s.hud.pushMessage(`Ansicht gedreht (${s.camera.rot * 90}°)`);
+  },
   toggleHelp() {
     if (overlay.dataset.kind === 'help') {
       hideOverlay(overlay);

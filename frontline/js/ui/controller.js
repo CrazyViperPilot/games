@@ -18,7 +18,7 @@ const CARGO_KEYS = ['bm', 'mun', 'fuel']; // Lagersorten (FOB-Lager, LKW-Ladung)
 const SHORT = { money: 'G', bm: 'BM', mun: 'MUN', fuel: 'TS' };
 const HOTKEY_ALIAS = { Y: 'Z' }; // Flugabwehr auch mit Y
 // Kurznamen für die Befehlskarte (der volle Name steht im Tooltip)
-const SHORT_BLD = { depot: 'Halle', extractor: 'Förder­anlage', wall: 'Mauer', gate: 'Tor', mortar: 'Mörser', aa: 'Flak', helipad: 'Heli-Platz', drill: 'Bohrer' };
+const SHORT_BLD = { depot: 'Fahrzeughalle', extractor: 'Förder­anlage', wall: 'Mauer', gate: 'Tor', mortar: 'Mörser', aa: 'Flak', helipad: 'Heli-Platz', drill: 'Bohrer' };
 const SHORT_UNIT = { rifleman: 'Schütze', at: 'PAK', truck: 'LKW', engineer: 'Baufz.', ifv: 'SPz', tank: 'KPz', littlebird: 'Little Bird', transporter: 'Transp.-Heli', gunship: 'AH-64' };
 const isCarrier = (u) => u.def.cargoCap > 0; // LKW und Transporthubschrauber
 // Ladungsart: Taste, Kurzname, Bezeichnung

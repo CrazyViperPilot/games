@@ -1,8 +1,7 @@
-// Isometrische Darstellung (Prototyp): Transformationen und Körper mit Höhe (Häuser, Hallen, Fabriken, FOB, Bäume).
+// Isometrische Darstellung: Transformationen und Grundkörper mit Höhe (Quader, Bäume, Felsen). Gebäude mit Details: isobuild.js.
 // Die Spiellogik bleibt 2D; hier wird nur gezeichnet. Alle Funktionen zeichnen in CSS-Pixeln (Transform = dpr).
 import { BALANCE } from '../data/balance.js';
-import { ISO_K } from './camera.js';
-import { shade, tint, hexA, fitText, BUILD_ABBR } from './sprites.js';
+import { shade, tint, hexA, fitText } from './sprites.js';
 
 const TILE = BALANCE.map.tile;
 const OUTLINE = 'rgba(0,0,0,0.55)';
@@ -10,8 +9,8 @@ const OUTLINE = 'rgba(0,0,0,0.55)';
 /** Höhe (Bildschirm-Pixel bei Zoom 1) der Stadtgebäude und der Spielgebäude je Typ. */
 export const TOWN_H = { house: 46, hall: 60, factory: 92 };
 export const BUILD_H = {
-  fob: 64,
-  depot: 58,
+  fob: 58,
+  depot: 50,
   helipad: 5,
   extractor: 36,
   drill: 54,
@@ -28,10 +27,8 @@ export const buildingHeight = (b) => BUILD_H[b.type] ?? 40;
 
 /** Transform: Weltpunkt (wx, wy) landet im Bildschirmpunkt (sx, sy), Boden isometrisch, `scale` um diesen Punkt. */
 export function setIsoAt(ctx, cam, dpr, sx, sy, wx, wy, scale = 1) {
-  const z = cam.zoom * scale;
-  const a = z * ISO_K;
-  const b = (z * ISO_K) / 2;
-  ctx.setTransform(dpr * a, dpr * b, -dpr * a, dpr * b, dpr * (sx - (a * wx - a * wy)), dpr * (sy - (b * wx + b * wy)));
+  const [a, b, c, d] = cam.isoMatrix(cam.zoom * scale);
+  ctx.setTransform(dpr * a, dpr * b, dpr * c, dpr * d, dpr * (sx - (a * wx + c * wy)), dpr * (sy - (b * wx + d * wy)));
 }
 
 /** Transform: aufrecht (nicht verzerrt), Weltpunkt (wx, wy) landet in (sx, sy); Maße in Welteinheiten × zoom. */
@@ -42,11 +39,9 @@ export function setUprightAt(ctx, cam, dpr, sx, sy, wx, wy) {
 
 /** Bodenebene der ganzen Welt isometrisch (Gelände, Zone, Nebel …). */
 export function setIsoGround(ctx, cam, dpr) {
-  const c = cam.worldToScreen(0, 0);
-  const z = cam.zoom;
-  const a = z * ISO_K;
-  const b = (z * ISO_K) / 2;
-  ctx.setTransform(dpr * a, dpr * b, -dpr * a, dpr * b, dpr * c.x, dpr * c.y);
+  const o = cam.worldToScreen(0, 0);
+  const [a, b, c, d] = cam.isoMatrix();
+  ctx.setTransform(dpr * a, dpr * b, dpr * c, dpr * d, dpr * o.x, dpr * o.y);
 }
 
 function poly(ctx, pts) {
@@ -58,16 +53,22 @@ function poly(ctx, pts) {
 
 /**
  * Quader mit Grundfläche [x0,x1]×[y0,y1] (Welt) und Höhe h (Bildschirm-Pixel, mit Zoom skaliert).
- * Sichtbar sind Dach und die zwei dem Betrachter zugewandten Wände (Ost x1 und Süd y1).
- * Liefert die Dachecken (Bildschirm) für Beschriftungen.
+ * Sichtbar sind Dach und die zwei dem Betrachter zugewandten Wände (je nach Drehung). opts.base hebt den Quader an (Stockwerk darüber).
+ * Liefert die Dachecken (Bildschirm) für Beschriftungen; `.walls` beschreibt die sichtbaren Wände für Details (siehe wallPoint).
  */
 export function drawBox(ctx, cam, x0, y0, x1, y1, h, color, opts = {}) {
   const z = cam.zoom;
   const H = h * z;
-  const A = cam.worldToScreen(x0, y0);
-  const B = cam.worldToScreen(x1, y0);
-  const C = cam.worldToScreen(x1, y1);
-  const D = cam.worldToScreen(x0, y1);
+  const BASE = (opts.base ?? 0) * z;
+  const wp = [
+    [x0, y0],
+    [x1, y0],
+    [x1, y1],
+    [x0, y1],
+  ].map(([x, y]) => {
+    const p = cam.worldToScreen(x, y);
+    return { x: p.x, y: p.y - BASE };
+  });
   const up = (p) => ({ x: p.x, y: p.y - H });
   const roof = opts.roof ?? tint(color, 0.18);
   ctx.save();
@@ -76,65 +77,62 @@ export function drawBox(ctx, cam, x0, y0, x1, y1, h, color, opts = {}) {
   ctx.strokeStyle = OUTLINE;
   if (opts.alpha !== undefined) ctx.globalAlpha = opts.alpha;
   // Boden-Schatten (versetzt nach links unten, weg vom Licht)
-  if (!opts.noShadow && H > 2) {
+  if (!opts.noShadow && H > 2 && !BASE) {
     const s = H * 0.35;
-    poly(ctx, [A, B, C, D].map((p) => ({ x: p.x - s, y: p.y + s * 0.5 })));
+    poly(ctx, wp.map((p) => ({ x: p.x - s, y: p.y + s * 0.5 })));
     ctx.fillStyle = 'rgba(0,0,0,0.22)';
     ctx.fill();
   }
-  // Wände
-  poly(ctx, [D, C, up(C), up(D)]); // Süd
-  ctx.fillStyle = opts.wallS ?? shade(color, 0.62);
-  ctx.fill();
-  ctx.stroke();
-  poly(ctx, [B, C, up(C), up(B)]); // Ost
-  ctx.fillStyle = opts.wallE ?? shade(color, 0.45);
-  ctx.fill();
-  ctx.stroke();
+  // Die zwei Wände an der vordersten Ecke (größtes y am Bildschirm)
+  let f = 0;
+  for (let i = 1; i < 4; i++) if (wp[i].y > wp[f].y) f = i;
+  const walls = [];
+  for (const i of [(f + 3) % 4, f]) {
+    // Kante i verbindet Ecke i und i+1
+    const P = wp[i];
+    const Q = wp[(i + 1) % 4];
+    poly(ctx, [P, Q, up(Q), up(P)]);
+    const left = (P.x + Q.x) / 2 < wp[f].x;
+    ctx.fillStyle = left ? (opts.wallS ?? shade(color, 0.62)) : (opts.wallE ?? shade(color, 0.45));
+    ctx.fill();
+    ctx.stroke();
+    walls.push({ edge: i, left, z, base: BASE, cam, x0, y0, x1, y1, len: i % 2 ? y1 - y0 : x1 - x0 });
+  }
   // Dach
-  const top = [A, B, C, D].map(up);
-  poly(ctx, top);
-  ctx.fillStyle = roof;
-  ctx.fill();
-  ctx.stroke();
+  const top = wp.map(up);
+  if (!opts.noTop) {
+    poly(ctx, top);
+    ctx.fillStyle = roof;
+    ctx.fill();
+    ctx.stroke();
+  }
+  top.walls = walls;
   ctx.restore();
   return top;
 }
 
-const WALL_COL = { house: '#c9b99a', hall: '#8d949a', factory: '#6b7073' };
-const ROOF_COL = { house: ['#8c4a38', '#a15a3c', '#7d5a47'], hall: ['#9aa2a8'], factory: ['#585c5f'] };
+/**
+ * Punkt auf einer Wand von drawBox: t = Lage entlang der Wand (0–1, in Richtung der Kante), hpx = Höhe über dem Wandfuß in
+ * Bildschirm-Pixeln (bei Zoom 1), off = Abstand von der Wand nach außen in Welt-Pixeln (Balkone, Vordächer).
+ * Kanten: 0 Nord (y0), 1 Ost (x1), 2 Süd (y1), 3 West (x0).
+ */
+export function wallPoint(w, t, hpx, off = 0) {
+  const e = w.edge;
+  let x;
+  let y;
+  let nx = 0;
+  let ny = 0;
+  if (e === 0) { x = w.x0 + (w.x1 - w.x0) * t; y = w.y0; ny = -1; }
+  else if (e === 1) { x = w.x1; y = w.y0 + (w.y1 - w.y0) * t; nx = 1; }
+  else if (e === 2) { x = w.x1 - (w.x1 - w.x0) * t; y = w.y1; ny = 1; }
+  else { x = w.x0; y = w.y1 - (w.y1 - w.y0) * t; nx = -1; }
+  const p = w.cam.worldToScreen(x + nx * off, y + ny * off);
+  return { x: p.x, y: p.y - w.base - hpx * w.z };
+}
 
-/** Gebäude der Stadt (Haus, Halle, Fabrik) als Quader mit Dachfarbe; Fabrik mit Schornstein. */
-export function drawTownBuilding(ctx, cam, b) {
-  const hw = b.w / 2;
-  const hh = b.h / 2;
-  const roofs = ROOF_COL[b.kind];
-  const roof = roofs[Math.abs(Math.round(b.x + b.y)) % roofs.length];
-  const h = TOWN_H[b.kind];
-  const top = drawBox(ctx, cam, b.x - hw, b.y - hh, b.x + hw, b.y + hh, h, WALL_COL[b.kind], {
-    roof,
-    wallS: shade(WALL_COL[b.kind], 0.78),
-    wallE: shade(WALL_COL[b.kind], 0.58),
-  });
-  if (b.kind === 'house') {
-    // Dachfirst
-    const m1 = { x: (top[0].x + top[3].x) / 2, y: (top[0].y + top[3].y) / 2 };
-    const m2 = { x: (top[1].x + top[2].x) / 2, y: (top[1].y + top[2].y) / 2 };
-    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.moveTo(m1.x, m1.y);
-    ctx.lineTo(m2.x, m2.y);
-    ctx.stroke();
-  } else if (b.kind === 'factory') {
-    const c = cam.worldToScreen(b.x + hw * 0.7, b.y - hh * 0.6);
-    const z = cam.zoom;
-    const base = c.y - h * z;
-    ctx.fillStyle = '#3b3d3f';
-    ctx.fillRect(c.x - 5 * z, base - 52 * z, 10 * z, 52 * z);
-    ctx.fillStyle = '#55585b';
-    ctx.fillRect(c.x - 6 * z, base - 56 * z, 12 * z, 5 * z);
-  }
+/** Viereck auf einer Wand (t0–t1 entlang, h0–h1 Höhe in Pixeln, off nach außen). */
+export function wallQuad(w, t0, t1, h0, h1, off = 0) {
+  return [wallPoint(w, t0, h0, off), wallPoint(w, t1, h0, off), wallPoint(w, t1, h1, off), wallPoint(w, t0, h1, off)];
 }
 
 /** Baum: Schatten, Stamm und zwei Kronenkugeln (aufrecht). */
@@ -156,97 +154,6 @@ export function drawTree(ctx, cam, t) {
   ctx.beginPath();
   ctx.arc(p.x - r * 0.25, p.y - r * 1.8, r * 0.75, 0, Math.PI * 2);
   ctx.fill();
-}
-
-/** Spielgebäude (Team): Quader in Teamfarbe mit Kürzel auf dem Dach plus einfache Aufbauten. */
-export function drawTeamBuilding(ctx, cam, b, color) {
-  const x0 = b.cx * TILE;
-  const y0 = b.cy * TILE;
-  const x1 = x0 + b.w * TILE;
-  const y1 = y0 + b.h * TILE;
-  const z = cam.zoom;
-  const h = buildingHeight(b);
-  const isWall = b.type === 'wall' || b.type === 'gate';
-  if (!b.built) {
-    // Baustelle: Gerüst-Quader wächst mit dem Fortschritt
-    const g = Math.max(4, h * (b.progress || 0));
-    drawBox(ctx, cam, x0, y0, x1, y1, g, color, { alpha: 0.55, noShadow: true });
-    return;
-  }
-  const body = isWall ? (b.type === 'gate' ? '#7d827b' : '#8c9089') : color;
-  const top = drawBox(ctx, cam, x0, y0, x1, y1, h, body, { roof: isWall ? '#b3b7b0' : tint(color, 0.25) });
-  const cx = (top[0].x + top[2].x) / 2;
-  const cy = (top[0].y + top[2].y) / 2;
-  if (!isWall) {
-    ctx.save();
-    ctx.fillStyle = 'rgba(255,255,255,0.92)';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    const size = Math.max(8, Math.min(13 * z, (b.w * TILE * z) * 0.45));
-    ctx.font = `700 ${size}px system-ui, sans-serif`;
-    ctx.fillText(BUILD_ABBR[b.type] || b.def.name, cx, cy);
-    ctx.restore();
-  }
-  ctx.save();
-  ctx.strokeStyle = OUTLINE;
-  ctx.lineWidth = 1;
-  if (b.type === 'fob') {
-    // Mast mit Teamflagge
-    ctx.strokeStyle = '#2b2f2b';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(top[1].x - 6 * z, top[1].y + 4 * z);
-    ctx.lineTo(top[1].x - 6 * z, top[1].y - 26 * z);
-    ctx.stroke();
-    ctx.fillStyle = color;
-    ctx.fillRect(top[1].x - 6 * z, top[1].y - 26 * z, 14 * z, 8 * z);
-  } else if (b.type === 'drill') {
-    // Bohrturm: Gittermast
-    ctx.strokeStyle = '#d9d2b0';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(cx - 10 * z, cy + 4 * z);
-    ctx.lineTo(cx, cy - 52 * z);
-    ctx.lineTo(cx + 10 * z, cy + 4 * z);
-    ctx.moveTo(cx - 6 * z, cy - 16 * z);
-    ctx.lineTo(cx + 6 * z, cy - 16 * z);
-    ctx.moveTo(cx - 8 * z, cy - 5 * z);
-    ctx.lineTo(cx + 8 * z, cy - 5 * z);
-    ctx.stroke();
-  } else if (b.type === 'mortar') {
-    ctx.strokeStyle = '#23272a';
-    ctx.lineWidth = 4 * z;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + 8 * z, cy - 20 * z);
-    ctx.stroke();
-  } else if (b.type === 'aa') {
-    ctx.strokeStyle = '#23272a';
-    ctx.lineWidth = 3 * z;
-    ctx.beginPath();
-    ctx.moveTo(cx - 5 * z, cy);
-    ctx.lineTo(cx - 9 * z, cy - 20 * z);
-    ctx.moveTo(cx + 5 * z, cy);
-    ctx.lineTo(cx + 1 * z, cy - 20 * z);
-    ctx.stroke();
-  } else if (b.type === 'extractor') {
-    ctx.fillStyle = '#2b2f2b';
-    ctx.beginPath();
-    ctx.arc(cx, cy - 8 * z, 6 * z, 0, Math.PI * 2);
-    ctx.fill();
-  } else if (b.type === 'helipad') {
-    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, 26 * z, 13 * z, 0, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-  if (b.hp < b.maxHp) {
-    ctx.fillStyle = `rgba(0,0,0,${(1 - b.hp / b.maxHp) * 0.4})`;
-    poly(ctx, top);
-    ctx.fill();
-  }
-  ctx.restore();
 }
 
 /** Fels: Schatten und flacher Brocken (aufrecht). */

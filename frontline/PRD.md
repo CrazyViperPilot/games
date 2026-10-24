@@ -7,7 +7,7 @@ Konfliktzone halten“. Zwei Parteien: Spieler (Blau) gegen Computer (Rot).
 
 | | |
 |---|---|
-| Plattform | Google Chrome (Desktop), aktuelle Version. Kein Mobile/Touch. |
+| Plattform | Google Chrome (Desktop), aktuelle Version. **Offen:** Touch-Bedienung für Android (Pixel 8a, Lenovo Tab M11, Querformat) ist nicht umgesetzt; die App ist als PWA installierbar, die Eingabe kennt aber nur Maus und Tastatur. |
 | Steuerung | Maus + Tastatur |
 | Technik | Statische Web-App, Vanilla JS (ES-Module), Canvas 2D, kein Build-Schritt, keine externen Abhängigkeiten |
 | Auslieferung | Ordner `frontline/` im Repo `games`, GitHub Pages, offline spielbar (PWA); immer neueste Version, wenn online |
@@ -79,14 +79,14 @@ Nicht im Umfang: Netzwerk-Multiplayer, Kampagne, Speichern laufender Partien, So
 
 | Gebäude | Zweck |
 |---|---|
-| FOB | Hauptquartier, Lager, Bauradius, bildet Schützen / Panzerabwehrsoldaten / LKW aus, leichtes MG |
-| Fahrzeughalle | Baut Schützenpanzer und Kampfpanzer |
+| FOB (Zentrale) | Hauptquartier, Lager, Bauradius, bildet Schützen / Panzerabwehrsoldaten / LKW aus, leichtes MG |
+| Fahrzeughalle | Panzerwerkstatt: baut Schützenpanzer und Kampfpanzer |
 | Förderanlage | Nur auf freiem Vorkommen; liefert in die FOB, in deren Radius sie steht |
 | Mauer | Blockiert alle Einheiten. Wird per Ziehen als Linie gebaut. |
 | Tor | Wie Mauer, aber eigene Einheiten fahren hindurch |
 | Mörser | Indirektes Feuer, Reichweite 800 px (Mindestreichweite 200), Flächenschaden. **Ziel wählen** (G oder Rechtsklick auf die Karte): ein Schuss alle **20 s**, solange die FOB Munition hat; ohne Ziel schießt er automatisch auf sichtbare Gegner. Reichweitenkreis und Ziel werden bei Auswahl gezeichnet. Trifft keine Hubschrauber |
 | Flugabwehr | Schießt **Hubschrauber** ab (Reichweite 320, 35 Schaden je Schuss), fängt gegnerische Mörsergranaten ab und beschießt Bodenziele schwach. Munition aus der FOB |
-| Hubschrauberlandeplatz | Baut Little Bird, Transporthubschrauber und AH-64 (3×3, 350 Baumaterial) |
+| Hubschrauberlandeplatz | Betonplatte mit H-Markierung; baut Little Bird, Transporthubschrauber und AH-64 (3×3, 350 Baumaterial) |
 | Bohrer | Zieht die Hot Zone an (Abschnitt 7); 2×2, 150 Baumaterial, braucht beim Betrieb Treibstoff aus der FOB |
 
 Gebäude können abgerissen werden (Erstattung 25 % Baumaterial). Max. 120 Einheiten je Partei.
@@ -145,11 +145,11 @@ Schadensmodell: Schaden je Schuss nach Panzerklasse des Ziels (Infanterie / leic
 | Rechtsklick | Bewegen; auf Gegner = Angreifen; Gebäude gewählt = Sammelpunkt; LKW auf eigene FOB = laden (leer) bzw. entladen; Baufahrzeug/Infanterie auf eigene Baustelle = dort bauen; Baufahrzeug auf beschädigtes eigenes Gebäude = reparieren |
 | A + Linksklick | Angriffsbewegung |
 | S | Stopp |
-| B | Baumenü (Baufahrzeug: alles, Infanterie: nur Mauer/Tor); darin Q Halle, W Förderanlage, E Mauer, R Tor, T Mörser, Z/Y Flugabwehr, G Hubschrauberlandeplatz, X Bohrer, F FOB-Baustelle |
+| B | Baumenü (Baufahrzeug: alles, Infanterie: nur Mauer/Tor); darin Q Fahrzeughalle, W Förderanlage, E Mauer, R Tor, T Mörser, Z/Y Flugabwehr, G Hubschrauberlandeplatz, X Bohrer, F FOB-Baustelle |
 | Mörser gewählt | G Ziel wählen (oder Rechtsklick auf die Karte) · C Ziel löschen |
 | Bohrer gewählt | G aktivieren |
 | Hubschrauber | Infanterie wählen + Rechtsklick auf Hubschrauber = einsteigen · Transporthubschrauber: O absetzen, L/U/T wie LKW |
-| Q / W / E / R | Ausbildung im gewählten Gebäude (FOB: Schütze/PAK/LKW/Baufahrzeug, Halle: SPz/KPz, Landeplatz: Little Bird/Transporter/AH-64) |
+| Q / W / E / R | Ausbildung im gewählten Gebäude (FOB: Schütze/PAK/LKW/Baufahrzeug, Fahrzeughalle: SPz/KPz, Landeplatz: Little Bird/Transporter/AH-64) |
 | LKW gewählt | L Laden · U Entladen · T Pendeln (Start-FOB, dann Ziel-FOB) · Ladung Q Gemischt / W Baumaterial / E Munition / R Treibstoff |
 | Entf | Gebäude abreißen |
 | Esc | Abbrechen / Auswahl aufheben |
@@ -157,6 +157,7 @@ Schadensmodell: Schaden je Schuss nach Panzerklasse des Ziels (Infanterie / leic
 | Pfeiltasten, Bildschirmrand, mittlere Maustaste ziehen | Kamera bewegen |
 | Mausrad | Zoom |
 | V / Schaltfläche „Ansicht“ | Ansicht umschalten: 2D von oben oder isometrisch (wird gemerkt, `?iso=1` startet isometrisch) |
+| `,` / `.` / Knöpfe ⟲ ⟳ | Isometrische Ansicht in 90°-Schritten nach links / rechts drehen (in 2D ohne Wirkung) |
 | Leertaste / H | Kamera auf Auswahl / Haupt-FOB |
 | P | Pause; `+` / `-` Spielgeschwindigkeit 1×–3× |
 | F1 / ? | Hilfe |
@@ -173,6 +174,8 @@ Schadensmodell: Schaden je Schuss nach Panzerklasse des Ziels (Infanterie / leic
 - Meldungen (z. B. „Einheit bereit“, „Basis wird angegriffen“, „Einheiten ohne Munition“, „Route unterbrochen“).
 - Nebel des Krieges: Unerkundet schwarz, erkundet abgedunkelt, gegnerische Einheiten nur in Sicht.
 - Platzierungsvorschau grün/rot mit Bauradien aller eigenen FOBs.
+- **Isometrische Ansicht** (Taste V, drehbar in 90°-Schritten mit `,` `.`): Boden schräg, Gebäude, Bäume und Fahrzeuge mit Höhe, Tiefensortierung, Hubschrauber schweben mit Schatten. Gebäude sind gezeichnet (keine Bilddateien) und mit Details versehen: Stadthäuser mit zwei Stockwerken, Fenstern, Tür, Balkon und Satteldach; Hallen mit Rolltoren und Fensterband; Fabriken mit großen Fenstern, Toren, Schornstein; FOB als **Zentrale** (Sockelbau mit Fensterband, Eingang mit Vordach, Leitstellenturm, Radar, Antennen, Flagge); Fahrzeughalle als **Panzerwerkstatt** (Tore mit Panzer, Teamband, Dachkran); Landeplatz mit H, Ring, Randfeuer, Windsack. Unter Zoom 0,5 entfallen Fenster und Türen (Leistung). Die Zeichnung ist pro Gebäudeart durch Sprites ersetzbar (`spriteOverrides` in `js/render/isobuild.js`).
+- Hilfe (F1) listet alle Tasten, auch V und Drehen.
 
 ## 10. KI-Gegner
 
@@ -204,6 +207,7 @@ zwischen Überschuss- und Bedarfs-FOBs (v. a. Zonen-FOB), Versorger-LKW folgt de
 - v2: Munitions-/Treibstoffverbrauch; stärkere KI (Wirtschaft zuerst, Zonen-FOB).
 - v3: Logistik – FOB-Lager, Vorrat je Einheit, LKW als Transporter/Versorger/Pendler; Baufahrzeug baut und repariert,
   Infanterie baut Mauern/Tore; Service Worker network-first.
+- v4.5: Isometrische Ansicht drehbar (90°-Schritte, `,` `.` und Knöpfe ⟲ ⟳); V in der F1-Hilfe; Gebäude mit Details (Fenster, Türen, Balkone, Tore, Satteldächer); FOB als Zentrale, Fahrzeughalle als Panzerwerkstatt (Name „Fahrzeughalle“ statt „Halle“ in der Oberfläche), Landeplatz mit H-Markierung; Plattformzeile präzisiert (Touch offen).
 - v4.4: Einheiten kosten nur Geld und starten voll; Waffen mit eigenem Schussvorrat und Munitionswert je Schuss (Tabelle in Abschnitt 3); Kampfpanzer-Hauptkanone lädt 6 s nach.
 - v4.3: Isometrische Ansicht (Prototyp, Schalter „Ansicht“ / Taste V; Standard bleibt 2D): schräger Boden, Gebäude, Bäume und Fahrzeuge mit Höhe, Hubschrauber schweben mit Schatten.
 - v4.2: Bäume sind blockierende Hindernisse (Stadt und Karte).

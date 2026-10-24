@@ -278,6 +278,12 @@ export class Input {
       case 'V':
         app.toggleView?.();
         return;
+      case ',':
+        app.rotateView?.(-1);
+        return;
+      case '.':
+        app.rotateView?.(1);
+        return;
       case 'p':
       case 'P':
         app.togglePause?.();

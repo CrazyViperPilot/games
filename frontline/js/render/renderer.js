@@ -21,13 +21,12 @@ import {
   setIsoGround,
   setIsoAt,
   setUprightAt,
-  drawTownBuilding,
-  drawTeamBuilding,
   drawTree,
   drawRock,
   unitLift,
   buildingHeight,
 } from './iso.js';
+import { drawTownBuilding, drawTeamBuilding } from './isobuild.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
@@ -313,21 +312,21 @@ export class Renderer {
     // Objekte mit Höhe, nach Tiefe (x + y) sortiert
     const items = [];
     const town = g.map.town;
-    for (const b of town?.buildings ?? []) if (inRect(b.x, b.y, PAD)) items.push({ k: b.x + b.y, t: 0, o: b });
-    for (const t of town?.trees ?? []) if (inRect(t.x, t.y, PAD)) items.push({ k: t.x + t.y, t: 1, o: t });
-    for (const t of g.map.trees ?? []) if (inRect(t.x, t.y, PAD)) items.push({ k: t.x + t.y, t: 1, o: t });
-    for (const t of this.deco.trees) if (inRect(t.x, t.y, PAD)) items.push({ k: t.x + t.y, t: 1, o: t });
-    for (const o of this.deco.rocks) if (inRect(o.x, o.y, PAD)) items.push({ k: o.x + o.y, t: 2, o });
-    for (const n of g.map.nodes) if (inRect(n.x, n.y, 60)) items.push({ k: n.x + n.y, t: 3, o: n });
+    for (const b of town?.buildings ?? []) if (inRect(b.x, b.y, PAD)) items.push({ k: cam.depth(b.x, b.y), t: 0, o: b });
+    for (const t of town?.trees ?? []) if (inRect(t.x, t.y, PAD)) items.push({ k: cam.depth(t.x, t.y), t: 1, o: t });
+    for (const t of g.map.trees ?? []) if (inRect(t.x, t.y, PAD)) items.push({ k: cam.depth(t.x, t.y), t: 1, o: t });
+    for (const t of this.deco.trees) if (inRect(t.x, t.y, PAD)) items.push({ k: cam.depth(t.x, t.y), t: 1, o: t });
+    for (const o of this.deco.rocks) if (inRect(o.x, o.y, PAD)) items.push({ k: cam.depth(o.x, o.y), t: 2, o });
+    for (const n of g.map.nodes) if (inRect(n.x, n.y, 60)) items.push({ k: cam.depth(n.x, n.y), t: 3, o: n });
     for (const b of g.buildings) {
       if (!b.alive || (b.team !== team && !known(b.x, b.y)) || !inRect(b.x, b.y, PAD)) continue;
-      items.push({ k: b.x + b.y, t: 4, o: b });
+      items.push({ k: cam.depth(b.x, b.y), t: 4, o: b });
     }
     const air = [];
     for (const u of g.units) {
       if (!u.alive || !shown(u) || !inRect(u.x, u.y, PAD)) continue;
       if (u.def.air) air.push(u);
-      else items.push({ k: u.x + u.y, t: 5, o: u });
+      else items.push({ k: cam.depth(u.x, u.y), t: 5, o: u });
     }
     items.sort((a, b) => a.k - b.k);
 

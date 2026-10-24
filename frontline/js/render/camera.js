@@ -6,6 +6,13 @@ const ZOOM_MAX = 1.6;
 // Isometrische Ansicht: Bodenebene um 45° gedreht und in der Höhe halbiert (Weltachse x → rechts unten, y → links unten).
 // Bildschirm = Mitte + zoom · ISO · (Welt − Kamera) mit ISO = [[K, −K], [K/2, K/2]].
 export const ISO_K = Math.SQRT1_2;
+// Drehung der isometrischen Ansicht in 90°-Schritten: Matrix [ra, rb, rc, rd] auf den Abstand zur Kamera (rx = ra·dx + rb·dy, ry = rc·dx + rd·dy).
+const ROT = [
+  [1, 0, 0, 1],
+  [0, -1, 1, 0],
+  [-1, 0, 0, -1],
+  [0, 1, -1, 0],
+];
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
@@ -17,6 +24,7 @@ export class Camera {
     this.y = mapH / 2;
     this.zoom = 1;
     this.iso = false; // isometrische Ansicht (Renderer und Eingabe fragen dieses Flag)
+    this.rot = 0; // isometrisch: Drehung 0–3 (je 90°)
     this.viewW = 800;
     this.viewH = 600;
   }
@@ -32,9 +40,12 @@ export class Camera {
     const dx = x - this.x;
     const dy = y - this.y;
     if (this.iso) {
+      const [ra, rb, rc, rd] = ROT[this.rot];
+      const rx = ra * dx + rb * dy;
+      const ry = rc * dx + rd * dy;
       return {
-        x: (dx - dy) * ISO_K * this.zoom + this.viewW / 2,
-        y: (dx + dy) * ISO_K * 0.5 * this.zoom + this.viewH / 2,
+        x: (rx - ry) * ISO_K * this.zoom + this.viewW / 2,
+        y: (rx + ry) * ISO_K * 0.5 * this.zoom + this.viewH / 2,
       };
     }
     return { x: dx * this.zoom + this.viewW / 2, y: dy * this.zoom + this.viewH / 2 };
@@ -44,10 +55,33 @@ export class Camera {
     const px = (sx - this.viewW / 2) / this.zoom;
     const py = (sy - this.viewH / 2) / this.zoom;
     if (this.iso) {
-      // Umkehrung von ISO: dx = px/(2K) + py/K, dy = −px/(2K) + py/K
-      return { x: this.x + px / (2 * ISO_K) + py / ISO_K, y: this.y - px / (2 * ISO_K) + py / ISO_K };
+      // Umkehrung von ISO: rx = px/(2K) + py/K, ry = −px/(2K) + py/K, dann zurückdrehen (transponierte Drehmatrix)
+      const rx = px / (2 * ISO_K) + py / ISO_K;
+      const ry = -px / (2 * ISO_K) + py / ISO_K;
+      const [ra, rb, rc, rd] = ROT[this.rot];
+      return { x: this.x + ra * rx + rc * ry, y: this.y + rb * rx + rd * ry };
     }
     return { x: this.x + px, y: this.y + py };
+  }
+
+  /** Matrix [a, b, c, d] (ohne Verschiebung) für ctx.setTransform: Welt → Bildschirm isometrisch, mit Zoom `z` und Drehung. */
+  isoMatrix(z = this.zoom) {
+    const [ra, rb, rc, rd] = ROT[this.rot];
+    const k = z * ISO_K;
+    return [k * (ra - rc), (k / 2) * (ra + rc), k * (rb - rd), (k / 2) * (rb + rd)];
+  }
+
+  /** Tiefenwert eines Weltpunkts: größer = näher am Betrachter (Sortierung isometrisch). */
+  depth(x, y) {
+    const [ra, rb, rc, rd] = ROT[this.rot];
+    const dx = x - this.x;
+    const dy = y - this.y;
+    return (ra + rc) * dx + (rb + rd) * dy;
+  }
+
+  /** Dreht die isometrische Ansicht um 90° (dir = ±1); die Kartenmitte im Bild bleibt. */
+  rotate(dir) {
+    this.rot = (this.rot + (dir < 0 ? 3 : 1)) % 4;
   }
 
   /** Verschiebt um Bildschirm-Pixel (Inhalt folgt der Maus). */
