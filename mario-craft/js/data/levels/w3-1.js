@@ -17,7 +17,7 @@ export default {
     'Z..............................................................................Z.....................................................................Z',
     'Z..............................................................................Z.....................................................................Z',
     'Z....ooo....o.........oo......oo............oo....................oo..........oZ........oo..............oo..............oo................oo.........Z',
-    'Z..P.....|NNNN........................................|..........|.............Z.................H........c.....UUU.....s.....?...NNNN......F........Z',
+    'Z..P.....|NNNN...........a........................q...|..........|.........a...Z.................H..q.....c.....UUU.....s....a?...NNNN......F........Z',
     'ZNNNNNNNNNNNNNNNNNH.NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN........NNNNNNNNNNNNNNNZNNNNNNNNNNNNNNNNNHNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNZ',
     'ZNNNNNNNNNNNNNNNNNH.NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN........NNNNNNNNNNNNNNNZNNNNNNNNNNNNNNNNNH..NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNZ',
     'ZNNNNNNNNNNNNNNNNNH.NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNLLLLLLLLNNNNNNNNNNNNNNNZNNNNNNNNNNNNNNNNNH..NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNZ',

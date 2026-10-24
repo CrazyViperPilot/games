@@ -3,6 +3,7 @@
 // Hauptweg: Wald → Schacht (Leiter) → Eingangshalle → Korridor mit Bett → Schleimnische
 // → Schlucht mit Plattformen und Ranke → Oberfläche rechts → Portal.
 import { writeFileSync } from 'node:fs';
+import { addFood } from './food.mjs';
 import { ensureHeadroom } from './headroom.mjs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -100,6 +101,9 @@ put(88, 28, '*');   // Umweg über den Schleimblock (Schleimnische, Kammer)
 for (let r = 0; r <= 36; r++) put(76, r, 'Z');
 
 // ---- Ausgabe.
+// ---- Essen verteilen (Herzen regenerieren), siehe food.mjs.
+addFood(g, W, H);
+
 // ---- Kopffreiheit vor Skeletten (Pfeilen ausweichen = springen können), siehe headroom.mjs.
 ensureHeadroom(g, W, H);
 

@@ -5,6 +5,7 @@
 // → Schacht 3 (Leiter) → Plateau rechts → Portal.
 // Die Oberfläche ist per Grundgesteinswand (Spalte WALL_C) gesperrt, der Weg führt durch den Berg.
 import { writeFileSync } from 'node:fs';
+import { addFood } from './food.mjs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -118,6 +119,9 @@ gems([
 for (let r = 0; r <= WALL_D; r++) put(WALL_C, r, 'Z');
 
 // ---- Ausgabe.
+// ---- Essen verteilen (Herzen regenerieren), siehe food.mjs.
+addFood(g, W, H);
+
 const rows = g.map((row) => row.join(''));
 const out = `// Level w2-1 „Bergpfad“ – erzeugt von js/data/levels/gen/w2-1.mjs (nicht von Hand ändern).
 export default {

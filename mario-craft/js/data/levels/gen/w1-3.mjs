@@ -6,6 +6,7 @@
 // Hauptweg ohne Graben: Eingang → Raum A → Gang → Raum B (Hacke) → Leiter → Raum C → Gang D (TNT)
 // → Raum D → Leiter → Raum E → Schleimschacht → Leiter → Tunnel → Portal.
 import { writeFileSync } from 'node:fs';
+import { addFood } from './food.mjs';
 import { ensureHeadroom } from './headroom.mjs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -117,6 +118,9 @@ dots([[137, 13], [138, 13], [139, 13], [142, 13], [143, 13], [144, 13]], 'o');
 for (let r = 0; r <= 37; r++) put(80, r, 'Z');
 
 // Ausgabe
+// ---- Essen verteilen (Herzen regenerieren), siehe food.mjs.
+addFood(g, W, H);
+
 // ---- Kopffreiheit vor Skeletten (Pfeilen ausweichen = springen können), siehe headroom.mjs.
 ensureHeadroom(g, W, H);
 

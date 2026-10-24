@@ -246,7 +246,33 @@ function hudHeadFrame() {
 const PAL_HUD_GEM = PAL_GEM_G;
 const PAL_HUD_DIA = PAL_GEM_D;
 
+const PAL_BREAD = { k: K, y: '#e8b65a', Y: '#c98a2e', l: '#f6d98a' };
+const BREAD = [
+  '..............',
+  '...yyyyyyyy...',
+  '..ylyyyyyyYy..',
+  '.yylyyylyyyYy.',
+  '.yyyyyyyyyyYy.',
+  '.YyyyyyyyyyYY.',
+  '..YYYYYYYYYY..',
+  '..............',
+];
+const PAL_STEAK = { k: K, r: '#b8322f', R: '#8a2020', w: '#f3e4cf', b: '#5a2a18' };
+const STEAK = [
+  '..............',
+  '....rrrrrr....',
+  '..rrrrrrrrrr..',
+  '.rrwwrrrrrrrR.',
+  '.rrwwrrbbrrrR.',
+  '.rrrrrrbbrrRR.',
+  '..rrrrrrrrRR..',
+  '....RRRRRR....',
+  '..............',
+];
+
 export const ITEM_ART = {
+  it_bread: { pal: PAL_BREAD, frames: [outline(BREAD, 'k')] },
+  it_steak: { pal: PAL_STEAK, frames: [outline(STEAK, 'k')] },
   it_emerald: { pal: PAL_GEM_G, frames: [emeraldFrame(10, 12, [[2, 3]]), emeraldFrame(10, 12, [[6, 7]])] },
   it_diamond: { pal: PAL_GEM_D, frames: [diamondFrame(12, 12, [[3, 2]]), diamondFrame(12, 12, [[8, 4]])] },
   it_armor: { pal: PAL_ARMOR, frames: [armorFrame()] },

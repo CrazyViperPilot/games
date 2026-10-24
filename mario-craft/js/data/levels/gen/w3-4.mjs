@@ -4,6 +4,7 @@
 // Arena: Eingang links (Rampe aufs Obsidian-Deck), vier Säulen mit Kristallen auf dem Deck,
 // Landeplatz (flacher Boden) in der Mitte, Portal rechts am Boden.
 import { writeFileSync } from 'node:fs';
+import { addFood } from './food.mjs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -120,6 +121,9 @@ const gems = [
 for (const [c, r] of gems) put(c, r, 'o');
 
 // ---- Ausgabe ----
+// ---- Essen verteilen (Herzen regenerieren), siehe food.mjs.
+addFood(g, W, H);
+
 const rows = g.map((line) => line.join(''));
 const chestLines = Object.entries(chests).map(([k, v]) => `    '${k}': '${v}',`).join('\n');
 const out = `// Level w3-4 „Leerendrache“ (Boss-Level). Erzeugt von js/data/levels/gen/w3-4.mjs – nicht von Hand ändern.

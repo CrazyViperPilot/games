@@ -4,6 +4,7 @@
 // → Zischer-Halle (Truhe Eisenhacke) → Schacht → Ufer → Lavasee über Obsidian-Brücken und Slabs
 // → Ufer rechts mit Bett → Leitern hoch → Oberfläche rechts → Portal.
 import { writeFileSync } from 'node:fs';
+import { addFood } from './food.mjs';
 import { ensureHeadroom } from './headroom.mjs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -150,6 +151,9 @@ put(146, 33, 'o');  // Reserve-Smaragd am Ufer-Eingang der Kammer
 if (WALL.c > 0) for (let r = 0; r <= WALL.d; r++) put(WALL.c, r, 'Z');
 
 // ---- Ausgabe.
+// ---- Essen verteilen (Herzen regenerieren), siehe food.mjs.
+addFood(g, W, H);
+
 // ---- Kopffreiheit vor Skeletten (Pfeilen ausweichen = springen können), siehe headroom.mjs.
 ensureHeadroom(g, W, H);
 

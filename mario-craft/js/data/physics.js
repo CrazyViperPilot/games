@@ -21,6 +21,7 @@ export const PHYS = {
   stunTime: 0.9,                                   // Lähmung durch Skelett-Pfeil (statt Schaden)
   stunInvuln: 1.6,                                 // Schonzeit nach der Lähmung gegen sofortige Wiederholung
   digHitCooldown: 0.35,                            // s zwischen zwei Pickel-Treffern auf Mobs
+  foodHearts: { bread: 2, steak: 4 },              // Herzen, die Essen im Level heilt
   maxHearts: 10,                                   // Herzen je Leben
   // Schaden in Herzen je Ursache (Standard 1); Rüstung/Bogen senkt jeden Schaden um 1 (mindestens 1).
   heartDamage: { mob: 1, sand: 1, fire: 2, explosion: 3, boss: 3 },

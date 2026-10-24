@@ -4,6 +4,7 @@
 // → unterirdischer Fluss unten → Aufstieg an der rechten Wand (Ranke) → Gang unter der
 // Oberfläche → Höhlenkammer mit Simsen → Schleimsprung → Schacht mit Leiter → Portal rechts.
 import { writeFileSync } from 'node:fs';
+import { addFood } from './food.mjs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -122,6 +123,9 @@ for (const [c, r, ch] of mobs) put(c, r, ch);
 for (let r = 0; r <= 35; r++) put(95, r, 'Z');
 
 // ---- Ausgabe.
+// ---- Essen verteilen (Herzen regenerieren), siehe food.mjs.
+addFood(g, W, H);
+
 const rows = g.map((row) => row.join(''));
 const out = `// Level w2-2 „Die Schlucht“ – erzeugt von js/data/levels/gen/w2-2.mjs (nicht von Hand ändern).
 export default {

@@ -209,11 +209,11 @@ test('Pickups verschwinden nach 30 s, Diamanten nicht', () => {
   assert.equal(d.active, true);
 });
 
-test('Pool hat 16 Plätze, danach null', () => {
+test('Pool hat 40 Plätze, danach null', () => {
   const g = makeGame();
-  for (let i = 0; i < 16; i++) assert.ok(spawnPickup(g, 'emerald', 88, 96));
+  for (let i = 0; i < 40; i++) assert.ok(spawnPickup(g, 'emerald', 88, 96));
   assert.equal(spawnPickup(g, 'emerald', 88, 96), null);
-  assert.equal(g.pickups.length, 16);
+  assert.equal(g.pickups.length, 40);
   assert.equal(g.particles.length, 96);
   assert.equal(g.falling.length, 8);
 });

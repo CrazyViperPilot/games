@@ -9,6 +9,7 @@ const MIN_ROWS = 8;
 
 // Entitäts-Zeichen (keine Kacheln).
 const SINGLE = { P: 'start', F: 'goal', K: 'checkpoint' };
+const FOODS = { a: 'bread', q: 'steak' };
 const GEMS = { o: false, '*': true };
 const SPAWN_TYPES = {
   '@': 'boss', c: 'zischer', z: 'zombie', s: 'skeleton', r: 'spider',
@@ -40,6 +41,7 @@ export function parseLevel(def) {
   const crystals = [];
   const doors = [];
   const spawns = [];
+  const foods = [];
   let start = null;
   let goal = null;
   let checkpoint = null;
@@ -68,6 +70,8 @@ export function parseLevel(def) {
         }
       } else if (Object.hasOwn(GEMS, ch)) {
         gems.push({ x: pos.x, y: pos.y, diamond: GEMS[ch], taken: false });
+      } else if (Object.hasOwn(FOODS, ch)) {
+        foods.push({ kind: FOODS[ch], x: pos.x, y: pos.y });
       } else if (ch === ':') {
         doors.push({ c, r });
       } else if (ch === 'y') {
@@ -123,6 +127,7 @@ export function parseLevel(def) {
     goal,
     spawns,
     gems,
+    foods,
     chests: def.chests || {},
     boss: def.boss,
     crystals,

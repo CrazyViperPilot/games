@@ -4,6 +4,7 @@
 //      → Ausstieg → Wiese 2 (Teich) → Schacht → Höhle 2 (Zombie) → Ausstieg → Wiese 3 (Zischer) → Portal.
 // Grabe-Lernstück: Smaragd-Versteck unter Gras und Erde, Hinweis-Smaragde am Rand. Der Hauptweg braucht kein Graben.
 import { writeFileSync } from 'node:fs';
+import { addFood } from './food.mjs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -116,6 +117,9 @@ const emeralds = [
 for (const [c, r] of emeralds) put(c, r, 'o');
 
 // ---- 8. Ausgabe ----
+// ---- Essen verteilen (Herzen regenerieren), siehe food.mjs.
+addFood(g, COLS, ROWS);
+
 const rows = g.map((row) => row.join(''));
 const chests = { '49,17': 'armor', '83,23': 'pick_stone', '76,23': 'emeralds' };
 

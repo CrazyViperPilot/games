@@ -3,6 +3,7 @@
 // Hauptweg: Oberfläche links → Schacht (Leiter) → Halle mit Bogen-Truhe und Skelett → Brücke über den
 // Lavasee (Lücken ≤ 3, Pfeiler mit Zischern, Bett in der Mitte) → Schleim und Leiter nach oben → Portal rechts.
 import { writeFileSync } from 'node:fs';
+import { addFood } from './food.mjs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -84,6 +85,9 @@ put(150, 31, '*');  // Diamant in der Kaverne am Ende der Brücke
 for (let r = 0; r <= 24; r++) put(44, r, 'Z');
 
 // ---- Ausgabe.
+// ---- Essen verteilen (Herzen regenerieren), siehe food.mjs.
+addFood(g, W, H);
+
 const rows = g.map((row) => row.join(''));
 const out = `// Level w3-2 „Glutbrücke“ – erzeugt von js/data/levels/gen/w3-2.mjs (nicht von Hand ändern).
 export default {

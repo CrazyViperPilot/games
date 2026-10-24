@@ -37,7 +37,7 @@ const MOB_SPRITE = {
 };
 const PICKUP_SPRITE = {
   emerald: 'it_emerald', diamond: 'it_diamond', armor: 'it_armor', bow: 'it_bow', apple: 'it_apple',
-  cake: 'it_cake', pick_stone: 'it_pick_stone', pick_iron: 'it_pick_iron', pick_diamond: 'it_pick_diamond',
+  cake: 'it_cake', bread: 'it_bread', steak: 'it_steak', pick_stone: 'it_pick_stone', pick_iron: 'it_pick_iron', pick_diamond: 'it_pick_diamond',
 };
 const PROJ_SPRITE = { arrow: 'pr_arrow', enemyArrow: 'pr_arrow', skull: 'pr_skull', fire: 'pr_fire' };
 

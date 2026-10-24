@@ -3,6 +3,7 @@
 // Hauptweg: Oberfläche links → Schacht (Leiter) → Korridor (Bogentruhe) → Netherziegel-Halle
 // → Schacht (Leiter) → Lavahöhle mit Bett → Aufstieg (Leiter) → Oberfläche rechts → Portal.
 import { writeFileSync } from 'node:fs';
+import { addFood } from './food.mjs';
 import { ensureHeadroom } from './headroom.mjs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -117,6 +118,9 @@ put(96, 22, '4');   // Diamanterz in der Schachtwand (Eisenhacke, Start-Hacke 2)
 for (let r = 0; r <= 34; r++) put(79, r, 'Z');
 
 // ---- Ausgabe.
+// ---- Essen verteilen (Herzen regenerieren), siehe food.mjs.
+addFood(g, W, H);
+
 // ---- Kopffreiheit vor Skeletten (Pfeilen ausweichen = springen können), siehe headroom.mjs.
 ensureHeadroom(g, W, H);
 

@@ -1,6 +1,7 @@
 // Generator für Level w1-4 „Riesenschleim“ (Boss-Level, Welt 1). Schreibt ../w1-4.js.
 // Aufruf: node js/data/levels/gen/w1-4.mjs
 import { writeFileSync } from 'node:fs';
+import { addFood } from './food.mjs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -107,6 +108,9 @@ for (const [c, r, ch] of mobs) put(c, r, ch);
 for (let r = 40; r <= 42; r++) put(89, r, ':');
 
 // ---- Ausgabe ----
+// ---- Essen verteilen (Herzen regenerieren), siehe food.mjs.
+addFood(g, W, H);
+
 const rows = g.map((line) => line.join(''));
 const chestLines = Object.entries(chests).map(([k, v]) => `    '${k}': '${v}',`).join('\n');
 const out = `// Level w1-4 „Riesenschleim“ (Boss-Level). Erzeugt von js/data/levels/gen/w1-4.mjs – nicht von Hand ändern.

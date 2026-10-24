@@ -5,6 +5,7 @@
 // Aufstieg über Inseln 7–13 (Sprünge bis 3 hoch, Schleim-Katapulte 8 hoch), Slab-Brücke zur letzten
 // Insel, Portal oben rechts. Unter den Inseln ist offene Leere (Zeilen 55–63), Sturz = Leben verloren.
 import { writeFileSync } from 'node:fs';
+import { addFood } from './food.mjs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -129,6 +130,9 @@ put(46, 33, '1');
 put(118, 38, '1');
 
 // ---- Ausgabe.
+// ---- Essen verteilen (Herzen regenerieren), siehe food.mjs.
+addFood(g, W, H);
+
 const rows = g.map((row) => row.join(''));
 const out = `// Level w3-3 „Schwebeinseln“ – erzeugt von js/data/levels/gen/w3-3.mjs (nicht von Hand ändern).
 export default {

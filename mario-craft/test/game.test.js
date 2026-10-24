@@ -68,7 +68,7 @@ function runUntil(game, inp, pred, max = 1200) {
 test('Pools werden im Konstruktor mit PLAN-Größen angelegt', () => {
   const { game } = makeGame();
   assert.equal(game.projectiles.length, 16);
-  assert.equal(game.pickups.length, 16);
+  assert.equal(game.pickups.length, 40);
   assert.equal(game.particles.length, 96);
   assert.equal(game.falling.length, 8);
   assert.equal(game.tnt.length, 8);
@@ -301,4 +301,22 @@ test('stunPlayer: Skelett-Pfeil lähmt kurz, kostet weder Leben noch Rüstung', 
   runUntil(game, inp, () => p.stun === 0, 600);
   runUntil(game, inp, () => p.x > x0 + 10, 600);
   assert.ok(p.x > x0 + 10, 'danach wieder beweglich');
+});
+
+test('Essen im Level (a/q) liegt bereit, heilt Herzen und bleibt bei vollen Herzen liegen', () => {
+  const { game } = makeGame({ cells: { '4,10': 'a', '6,10': 'q' } });
+  assert.equal(game.pickups.filter((i) => i.active).length, 2);
+  game.hearts = 5;
+  game.player.x = 4 * 16; game.player.y = 10 * 16 - game.player.h;
+  run(game, input(), 5);
+  assert.equal(game.hearts, 5 + PHYS.foodHearts.bread);
+  game.player.x = 6 * 16; game.player.y = 10 * 16 - game.player.h;
+  run(game, input(), 5);
+  assert.equal(game.hearts, PHYS.maxHearts, 'Steak füllt bis voll');
+
+  // Voll: nächstes Essen bleibt liegen.
+  const { game: g2 } = makeGame({ cells: { '4,10': 'q' } });
+  g2.player.x = 4 * 16; g2.player.y = 10 * 16 - g2.player.h;
+  run(g2, input(), 5);
+  assert.equal(g2.pickups.filter((i) => i.active).length, 1);
 });

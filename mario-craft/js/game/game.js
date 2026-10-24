@@ -40,7 +40,7 @@ const GOAL_W = 32, GOAL_H = 48;
 const CAM_X_LO = 0.40, CAM_X_HI = 0.55;   // Totzone horizontal (Anteil der Sichtbreite)
 const CAM_Y_LO = 0.40, CAM_Y_HI = 0.60;   // Totzone vertikal (Anteil der Sichthöhe)
 const PROJECTILE_POOL = 16;
-const PICKUP_POOL = 16;
+const PICKUP_POOL = 40;
 const PARTICLE_POOL = 96;
 const FALLING_POOL = 8;
 const TNT_POOL = 8;
@@ -115,6 +115,12 @@ export class Game {
 
     this.projectiles = makePool(PROJECTILE_POOL, newProjectile);
     this.pickups = makePool(PICKUP_POOL, newPickup);
+    // Essen im Level (Zeichen a = Brot, q = Steak) liegt als Gegenstand ohne Verfallszeit.
+    for (let i = 0; i < map.foods.length; i++) {
+      const f = map.foods[i];
+      const it = Items.spawnPickup(this, f.kind, f.x, f.y);
+      if (it) { it.vx = 0; it.vy = 0; }
+    }
     this.particles = makePool(PARTICLE_POOL, newParticle);
     this.falling = makePool(FALLING_POOL, newFalling);
     this.tnt = makePool(TNT_POOL, newTnt);
@@ -356,6 +362,14 @@ export class Game {
     p.vy = DEATH_HOP;
     this.emit('die', { cause });
     this.emit('lifeLost', { cause, lives: this.lives });
+  }
+
+  // Herzen auffüllen. Gibt false zurück, wenn schon alle voll sind.
+  heal(n) {
+    if (this.hearts >= PHYS.maxHearts) return false;
+    this.hearts = Math.min(PHYS.maxHearts, this.hearts + n);
+    this.emit('hudChange');
+    return true;
   }
 
   gainLife() {

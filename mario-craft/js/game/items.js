@@ -15,7 +15,7 @@ const MAXF = PHYS.maxFall;
 const AIR = TILE_IDS.air;
 const CHESTOPEN = TILE_IDS.chestopen;
 
-const PICKUP_POOL = 16;
+const PICKUP_POOL = 40;
 const PARTICLE_POOL = 96;
 const FALLING_POOL = 8;
 const PICKUP_LIFE = 30;          // s, außer Diamanten
@@ -29,7 +29,7 @@ const SMOKE_FRAMES = 4;
 const HURT_VY = 150;             // px/s, schneller fallender Sand verletzt beim Aufprall
 
 const KINDS = new Set([
-  'emerald', 'diamond', 'armor', 'bow', 'apple', 'cake', 'pick_stone', 'pick_iron', 'pick_diamond',
+  'emerald', 'diamond', 'armor', 'bow', 'apple', 'cake', 'bread', 'steak', 'pick_stone', 'pick_iron', 'pick_diamond',
 ]);
 // Würfel-Muster: [x-Versatz, y-Versatz, vx, vy] in px (6 Stück je Block).
 const DEBRIS_PATTERN = [
@@ -107,7 +107,7 @@ export function spawnPickup(game, kind, x, y) {
   it.y = y;
   it.vx = HOP_VX[seq % HOP_VX.length];
   it.vy = PICKUP_HOP;
-  it.life = kind === 'diamond' ? Infinity : PICKUP_LIFE;
+  it.life = kind === 'diamond' || kind === 'bread' || kind === 'steak' ? Infinity : PICKUP_LIFE;
   it.onGround = false;
   return it;
 }
@@ -138,6 +138,11 @@ function collectPickup(game, it) {
       break;
     case 'apple':
       game.player.star = PHYS.starTime;
+      game.emit('powerup');
+      break;
+    case 'bread':
+    case 'steak':
+      if (!game.heal(PHYS.foodHearts[it.kind])) { it.active = true; return; }   // volle Herzen: liegen lassen
       game.emit('powerup');
       break;
     case 'cake':

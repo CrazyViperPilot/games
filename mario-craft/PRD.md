@@ -81,7 +81,8 @@ Portal**. Level sind 100–250 Blöcke breit und 30–70 Blöcke hoch; die Kamer
 **Herzen:** Jedes Leben hat **10 Herzen** (zweite HUD-Zeile unter Smaragden/Leben, rot = voll). Schaden: Zombie/Mob-Berührung
 und Sand 1 Herz, Feuer 2, Explosion und Boss 3. Rüstung/Bogen senken jeden Schaden um 1 (mindestens 1) und bleiben
 beim Treffer erhalten. Nach einem Treffer 1,5 s unverwundbar. Bei 0 Herzen geht ein Leben verloren (Neustart am
-Checkpoint mit vollen Herzen). Kuchen: +1 Leben und volle Herzen. Lava und Abgrund töten weiterhin sofort.
+Checkpoint mit vollen Herzen). **Essen** liegt in jedem Level verteilt (3–7 Stück, Generator-Schritt `gen/food.mjs`,
+Level-Zeichen `a`/`q`): **Brot** +2 Herzen, **Steak** +4 Herzen; bei vollen Herzen bleibt es liegen. Kuchen: +1 Leben und volle Herzen. Lava und Abgrund töten weiterhin sofort.
 
 **Explosion** (Zischer, TNT, Schädel): Radius 2,5 Blöcke (Schädel 1,5), zerstört alle Blöcke außer Obsidian und
 Grundgestein, besiegt Gegner, verletzt die Figur, zündet TNT in Reichweite (0,5 s). Bildschirmwackeln, Vibration.

@@ -4,6 +4,7 @@
 // verbunden (Band 1 bis 4, Zeilen 19–21, 27–29, 35–37, 44–46) → Arena unten rechts (Spalten 100–137).
 // Bett und Truhen liegen vor der Arena. Die Arena-Tür `:` (Spalte 99) wird beim Bosskampf zur Barriere.
 import { writeFileSync } from 'node:fs';
+import { addFood } from './food.mjs';
 import { ensureHeadroom } from './headroom.mjs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -134,6 +135,9 @@ cells([[82, 46]], 'c');             // Zischer, Band 4
 for (let r = 44; r <= 46; r++) put(99, r, ':');
 
 // ---- Ausgabe ----
+// ---- Essen verteilen (Herzen regenerieren), siehe food.mjs.
+addFood(g, W, H);
+
 // ---- Kopffreiheit vor Skeletten (Pfeilen ausweichen = springen können), siehe headroom.mjs.
 ensureHeadroom(g, W, H);
 
