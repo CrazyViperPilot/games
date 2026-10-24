@@ -4,14 +4,14 @@ import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { canBuild } from '../game/construction.js';
-import { cargoSum } from '../game/logistics.js';
+import { cargoSum, canSeat } from '../game/logistics.js';
 import { unitLift, buildingHeight } from '../render/iso.js';
 
 const WALL_MAX = 40; // max. Zellen je Mauerzug (Vorschau und Befehl)
 const DOUBLE_MS = 350; // Doppelklick auf einen Typ = alle dieses Typs im Bild
 const GROUP_DOUBLE_MS = 500; // Gruppentaste zweimal = Kamera hin
 const PICK_PX = 16; // Trefferradius in Bildschirm-Pixeln
-const TARGET_MODES = ['place', 'wall', 'attackMove', 'fobTarget', 'loadFob', 'unloadFob', 'routeFrom', 'routeTo', 'mortarTarget', 'dropoff'];
+const TARGET_MODES = ['board', 'place', 'wall', 'attackMove', 'fobTarget', 'loadFob', 'unloadFob', 'routeFrom', 'routeTo', 'mortarTarget', 'dropoff'];
 const BUILD_MENU = Object.keys(BUILDINGS).filter((k) => BUILDINGS[k].hotkey && BUILDINGS[k].buildable !== false);
 const RES_KEYS = ['money', 'bm', 'mun', 'fuel'];
 const CARGO_KEYS = ['bm', 'mun', 'fuel']; // Lagersorten (FOB-Lager, LKW-Ladung)
@@ -354,6 +354,9 @@ export class Controller {
       case 'dropoff':
         this.confirmDropoff(wx, wy);
         return;
+      case 'board':
+        this.confirmBoard(wx, wy);
+        return;
       case 'wall':
         return; // Mauerzug läuft über beginWall/endWall
       case 'build':
@@ -413,10 +416,10 @@ export class Controller {
     // Infanterie/Baufahrzeug auf eigenen Transporthubschrauber: einsteigen
     const heli = this.pick(wx, wy, (e) => e.kind === 'unit' && e.team === this.team && e.def.seats > 0);
     if (heli) {
-      const riders = units.filter((u) => u.def.canRide);
+      const riders = units.filter((u) => u !== heli && canSeat(heli, u));
       if (riders.length) {
         this.issue({ type: 'board', ids: riders.map((u) => u.id), heliId: heli.id });
-        rest = units.filter((u) => !u.def.canRide);
+        rest = units.filter((u) => !riders.includes(u));
         if (!rest.length) return;
       }
     }
@@ -584,7 +587,23 @@ export class Controller {
     }
   }
 
-  /** Absetzen: Transporthubschrauber fliegt zum Klickpunkt und setzt Passagiere ab. */
+  /** Einsteigen: gewählte Soldaten gehen zum angetippten eigenen Transportfahrzeug (Touch-Weg, sonst Rechtsklick). */
+  confirmBoard(wx, wy) {
+    const veh = this.pick(wx, wy, (e) => e.kind === 'unit' && e.team === this.team && e.def.seats > 0);
+    if (!veh) {
+      this.message('Kein Transportfahrzeug angetippt');
+      return;
+    }
+    const riders = this.selectedUnits().filter((u) => u !== veh && canSeat(veh, u));
+    if (!riders.length) {
+      this.message(veh.def.air ? 'Nur Infanterie und Baufahrzeuge steigen ein' : 'Nur Infanterie steigt hier ein');
+      this.setMode('normal');
+      return;
+    }
+    if (this.issue({ type: 'board', ids: riders.map((u) => u.id), heliId: veh.id }).ok) this.setMode('normal');
+  }
+
+  /** Absetzen: Transportfahrzeug fliegt/fährt zum Klickpunkt und setzt Passagiere ab. */
   confirmDropoff(wx, wy) {
     const ids = this.selectedUnits().filter((e) => e.def.seats > 0).map((e) => e.id);
     if (!ids.length) {
@@ -830,7 +849,9 @@ export class Controller {
       case 'mortarTarget':
         return 'Mörser: Ziel auf der Karte anklicken (Kreis zeigt Reichweite) · Esc bricht ab';
       case 'dropoff':
-        return 'Absetzen: Landepunkt anklicken · Esc bricht ab';
+        return 'Absetzen: Zielpunkt anklicken · Esc bricht ab';
+      case 'board':
+        return 'Einsteigen: eigenes Transportfahrzeug (LKW, Baufahrzeug, SPz, Hubschrauber) anklicken · Esc bricht ab';
       default:
         return '';
     }
@@ -912,6 +933,15 @@ export class Controller {
         action: () => this.stop(),
       }),
     );
+    const riders = units.filter((u) => u.def.canRide);
+    if (riders.length) {
+      card.push(
+        entry('Einsteigen', 'I', {
+          tip: 'Einsteigen (I): danach LKW, Baufahrzeug, Schützenpanzer oder Transporthubschrauber anklicken (oder Rechtsklick auf das Fahrzeug)',
+          action: () => this.setMode('board'),
+        }),
+      );
+    }
     const trucks = units.filter(isCarrier);
     if (trucks.length) {
       card.push(
@@ -942,7 +972,7 @@ export class Controller {
     if (helis.length) {
       card.push(
         entry('Absetzen', 'O', {
-          tip: 'Passagiere absetzen (O): Landepunkt anklicken. Einsteigen: Infanterie wählen, Rechtsklick auf den Hubschrauber.',
+          tip: 'Passagiere absetzen (O): Zielpunkt anklicken. Einsteigen: Infanterie wählen, Einsteigen (I) oder Rechtsklick auf das Fahrzeug.',
           enabled: helis.some((h) => h.passengers.length > 0),
           reason: 'Keine Passagiere an Bord',
           action: () => this.setMode('dropoff'),

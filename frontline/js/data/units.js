@@ -64,6 +64,7 @@ export const UNITS = {
     fuelPerSec: 0.2,
     fuelMax: 30,
     cargoCap: 400, // Ladung (Summe aller Sorten)
+    seats: 2,
     hotkey: 'E',
   },
   engineer: {
@@ -84,6 +85,7 @@ export const UNITS = {
     fuelMax: 40,
     builder: 'all',
     canRide: true,
+    seats: 1,
     hotkey: 'R',
   },
   ifv: {
@@ -103,6 +105,7 @@ export const UNITS = {
     producedAt: 'fob',
     fuelPerSec: 0.4,
     fuelMax: 40,
+    seats: 6,
     hotkey: 'A',
   },
   tank: {
@@ -125,7 +128,7 @@ export const UNITS = {
     hotkey: 'S',
   },
   // Hubschrauber (armor 'air'): fliegen geradeaus über alles, nur Flugabwehr und leichte Waffen schaden ihnen.
-  // seats: Passagiere (Infanterie/Baufahrzeug mit canRide), cargoCap: Ressourcenladung wie ein LKW.
+  // seats: Passagiere (Hubschrauber: Infanterie/Baufahrzeug mit canRide; LKW 2, Baufahrzeug 1, Schützenpanzer 6: nur Infanterie), cargoCap: Ressourcenladung wie ein LKW.
   littlebird: {
     name: 'Little Bird',
     armor: 'air',

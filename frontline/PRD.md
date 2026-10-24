@@ -94,9 +94,9 @@ Gebäude können abgerissen werden (Erstattung 25 % Baumaterial). Max. 120 Einhe
 |---|---|---|
 | Schütze | Haupt-FOB | Billige Infanterie, stark gegen Infanterie; trägt 50 Baumaterial, baut daraus Mauern und Tore |
 | Panzerabwehrsoldat | Haupt-FOB | Langsam feuernd, stark gegen Fahrzeuge und Gebäude; baut Mauern und Tore |
-| LKW | Haupt-FOB | Unbewaffnet, schnell. **Logistik:** lädt Ressourcen an einer FOB (400), bringt sie zu einer anderen FOB oder FOB-Baustelle, pendelt auf Routen, versorgt Truppen im Feld |
-| Baufahrzeug | Haupt-FOB | Unbewaffnet. Setzt FOB-Baustellen, baut alle Gebäude, repariert |
-| Schützenpanzer | Haupt-FOB | Schnell, gut gegen Infanterie und leichte Fahrzeuge |
+| LKW | Haupt-FOB | Unbewaffnet, schnell, **2 Soldaten** Platz. **Logistik:** lädt Ressourcen an einer FOB (400), bringt sie zu einer anderen FOB oder FOB-Baustelle, pendelt auf Routen, versorgt Truppen im Feld |
+| Baufahrzeug | Haupt-FOB | Unbewaffnet, **1 Soldat** Platz. Setzt FOB-Baustellen, baut alle Gebäude, repariert |
+| Schützenpanzer | Haupt-FOB | **6 Soldaten** Platz. Schnell, gut gegen Infanterie und leichte Fahrzeuge |
 | Kampfpanzer | Haupt-FOB | Teuer, schwer gepanzert, stark gegen alles (Hauptkanone trifft keine Hubschrauber, das MG schwach) |
 | Little Bird | Haupt-FOB | Unbewaffnet, schnell, **5 Passagiere** (Infanterie, Baufahrzeug) |
 | Transporthubschrauber | Haupt-FOB | Unbewaffnet, **9 Passagiere** und **400 Ressourcen** (laden/entladen/pendeln wie ein LKW) |
@@ -148,7 +148,7 @@ Schadensmodell: Schaden je Schuss nach Panzerklasse des Ziels (Infanterie / leic
 | B | Baumenü (Baufahrzeug: alles, Soldaten: nur Mauer/Tor); darin E Mauer, R Tor, T Mörser, Z/Y Flugabwehr, X Bohrer, F FOB-Baustelle |
 | Mörser gewählt | G Ziel wählen (oder Rechtsklick auf die Karte) · C Ziel löschen |
 | Bohrer gewählt | G aktivieren |
-| Hubschrauber | Infanterie wählen + Rechtsklick auf Hubschrauber = einsteigen · Transporthubschrauber: O absetzen, L/U/T wie LKW |
+| Transportfahrzeuge | Infanterie wählen + **I** (Einsteigen, dann Fahrzeug antippen) oder Rechtsklick auf LKW / Baufahrzeug / Schützenpanzer / Hubschrauber = einsteigen · Fahrzeug wählen + **O** und Zielpunkt = absetzen · Transporthubschrauber: L/U/T wie LKW |
 | Haupt-FOB gewählt | Ausbildung: Q Schütze · W PAK · E LKW · R Baufahrzeug · A SPz · S KPz · D Little Bird · F Transporter · G AH-64 |
 | LKW gewählt | L Laden · U Entladen · T Pendeln (Start-FOB, dann Ziel-FOB) · Ladung Q Gemischt / W Baumaterial / E Munition / R Treibstoff |
 | Entf | Gebäude abreißen |
@@ -199,6 +199,7 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 
 ## Änderungsverlauf
 
+- v4.12: **Soldaten mitnehmen.** LKW 2, Baufahrzeug 1, Schützenpanzer 6 Plätze (nur Infanterie; Baufahrzeuge steigen weiter nur in Hubschrauber). Einsteigen per Knopf „Einsteigen“ (I) mit Antippen des Fahrzeugs oder per Rechtsklick, Absetzen mit O; Passagiere sind verloren, wenn das Fahrzeug stirbt. Cache v23.
 - v4.11: **Karte ohne Felsen, Gehöfte außerhalb der Zone.** Die grauen Felsen entfallen, Hindernisse sind nur noch Wald. Außerhalb der Konfliktzone (punktsymmetrisch) stehen vereinzelt Häuser (22 Paare), Hallen (6) und Fabrikgelände (7): Fabrik mit Mauer (80 px Abstand, 16 px stark) und zwei Lücken à 130 px an gegenüberliegenden Seiten, sodass Fahrzeuge hinein, um die Fabrik herum und auf der Gegenseite hinausfahren können (Test prüft die Wegfindung). Mauern blockieren wie Häuser; Bäume bleiben aus den Geländen heraus. Cache v22.
 - v4.10: **Touch und Standardaktion.** Rechte Maustaste halten und ziehen oder ein Finger ziehen verschiebt die Karte (Maus: Linksziehen = Rahmenauswahl, Rechts halten und ziehen = Karte schieben), zwei Finger zoomen und verschieben; Tippen auf Boden mit gewählten Einheiten = Gehen, auf Gegner = Angriff; Ansichtsknopf zeigt „2D“/„Iso“ und ist auch am PC sichtbar; Kopfleiste auf Tablets (≤ 1500 px) kompakter, damit alle Knöpfe passen. Hubschrauber ohne Baumenü; Transporthubschrauber pendeln wie LKW (T, auch gemischte Ladung, Test). Cache v22.
 - v4.9: **Logistik statt Wirtschaft.** Haupt-FOB mit unendlichem Lager bildet als Einzige alle Einheiten aus (nur Geld, Raten = Bauzeiten, gekürzt); Ressourcenvorkommen, Förderanlagen, Fahrzeughalle und Landeplatz entfallen; Geld nur aus Zone und Hot Zone (10/s, kein FOB-Grundeinkommen), Kasse bleibt von Runde zu Runde (max. 5000); Soldaten tragen 50 Baumaterial für Mauern/Tore im FOB-Radius; LKW versorgen im Umkreis; höchstens 10 FOBs ohne überlappende Bauradien; Verlust der Haupt-FOB beendet die Runde; KI umgebaut. Cache v20.

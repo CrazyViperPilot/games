@@ -346,3 +346,31 @@ test('Transporthubschrauber pendelt wie ein LKW und bringt gemischte Ladung zur 
   for (const k of ['bm', 'mun', 'fuel']) assert.ok(front.store[k] > 0, `${k} geliefert`);
   assert.equal(heli.order.type, 'route', 'pendelt weiter');
 });
+
+test('Bodenfahrzeuge nehmen Soldaten mit: LKW 2, Baufahrzeug 1, Schützenpanzer 6; Baufahrzeuge steigen nur in Hubschrauber', () => {
+  const g = new Game({ seed: 7 });
+  const f = fobOf(g, 0);
+  silence(g, 0);
+  const at = (type, i) => g.spawnUnit(type, 0, f.x + 100 + (i % 6) * 14, f.y + 100 + Math.floor(i / 6) * 14);
+  const truck = at('truck', 0);
+  const eng = at('engineer', 1);
+  const ifv = at('ifv', 2);
+  const men = Array.from({ length: 13 }, (_, i) => at('rifleman', 6 + i));
+  assert.equal(truck.def.seats, 2);
+  assert.equal(eng.def.seats, 1);
+  assert.equal(ifv.def.seats, 6);
+  const ids = men.map((m) => m.id);
+  assert.equal(g.issue(0, { type: 'board', ids: [eng.id], heliId: truck.id }).ok, false, 'Baufahrzeug nicht in LKW');
+  g.issue(0, { type: 'board', ids: ids.slice(0, 3), heliId: truck.id });
+  g.issue(0, { type: 'board', ids: ids.slice(3, 5), heliId: eng.id });
+  g.issue(0, { type: 'board', ids: ids.slice(5), heliId: ifv.id });
+  run(g, 20);
+  assert.equal(truck.passengers.length, 2, 'LKW voll bei 2');
+  assert.equal(eng.passengers.length, 1, 'Baufahrzeug voll bei 1');
+  assert.equal(ifv.passengers.length, 6, 'SPz voll bei 6');
+  const p0 = truck.passengers[0];
+  g.issue(0, { type: 'dropoff', ids: [truck.id], x: truck.x + 200, y: truck.y });
+  run(g, 20);
+  assert.equal(truck.passengers.length, 0);
+  assert.ok(p0.alive, 'Soldat wieder in der Welt');
+});
