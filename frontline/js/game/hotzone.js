@@ -162,7 +162,7 @@ export function updateHot(game, dt) {
   }
   const d = dist(hot.x, hot.y, hot.tx, hot.ty);
   if (d > 1e-6) {
-    const step = Math.min(d, H.speed * dt);
+    const step = Math.min(d, (hot.drillTarget ? H.speed : H.wanderSpeed) * dt); // frei wandern: 1/3 Tempo
     hot.x += ((hot.tx - hot.x) / d) * step;
     hot.y += ((hot.ty - hot.y) / d) * step;
   }
