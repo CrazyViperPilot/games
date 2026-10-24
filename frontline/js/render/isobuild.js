@@ -9,6 +9,7 @@ const TILE = BALANCE.map.tile;
 const OUTLINE = 'rgba(0,0,0,0.55)';
 const GLASS = '#2f4a63';
 const LIT = '#e6cf7a';
+const TRAIN_PAINT = { loco: '#b3423a', container: '#3f8a5e', tank: '#7c8190' };
 const DETAIL_ZOOM = 0.5; // darunter keine Fenster/Türen (Leistung)
 
 /** Austauschpunkt für Sprites: Schlüssel = Stadtart (house, hall, factory) oder Gebäudetyp (fob, depot, helipad …). */
@@ -256,6 +257,10 @@ export function drawTownBuilding(ctx, cam, b) {
   const seed = hash(b.x, b.y);
   const H = TOWN_H[b.kind];
   const z = cam.zoom;
+  if (b.kind === 'train') {
+    drawBox(ctx, cam, x0 + 3, y0 + 4, x1 - 3, y1 - 4, 30, TRAIN_PAINT[b.part] ?? '#777', {});
+    return;
+  }
   let wall;
   if (b.kind === 'house') wall = HOUSE_WALLS[seed % HOUSE_WALLS.length];
   else if (b.kind === 'hall') wall = HALL_WALLS[seed % HALL_WALLS.length];

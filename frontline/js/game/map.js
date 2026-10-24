@@ -117,6 +117,7 @@ function tryBuild(seed) {
       const x = Math.round(rng.range(r, W - r));
       const y = Math.round(rng.range(r, H - r));
       if (dist(x, y, CX, CY) < ZONE_R + r + 40) continue; // Stadt bleibt frei von Felsen/Wald
+      if (inRail(y, r)) continue; // Bahnlinie bleibt frei
       if (SPAWNS.some((s) => dist(x, y, s.x, s.y) < 600 + r)) continue;
       if (nodes.some((n) => dist(x, y, n.x, n.y) < r + 90)) continue;
       ob = { x, y, r };
@@ -149,11 +150,20 @@ function isConnected(obstacles, buildings = [], trees = []) {
   grid.rasterizeRects(buildings);
   grid.rasterizeTrees(trees);
   const [a, b] = SPAWNS;
-  if (!reaches(findPath(grid, a.x, a.y, CX, CY, 0), CX, CY)) return false;
+  const cy = CY - RAIL_HALF - 20; // Zonenmitte liegt unter dem Zug: Nachbarpunkt prüfen
+  if (!reaches(findPath(grid, a.x, a.y, CX, cy, 0), CX, cy)) return false;
   return reaches(findPath(grid, a.x, a.y, b.x, b.y, 0), b.x, b.y);
 }
 
 // ---- Osteuropäische Stadt in der Konfliktzone (punktsymmetrisch um die Zonenmitte) ----
+// Bahnlinie: gerade quer über die Karte durch die Zonenmitte (y = CY), Schienen sind begehbar, der stehende Zug in der Mitte nicht.
+const RAIL_HALF = 40; // halbe Breite des Bahnkorridors, Gebäude, Bäume und Felsen bleiben davon frei
+const TRAIN = [
+  { part: 'tank', dx: -100 },
+  { part: 'container', dx: 0 },
+  { part: 'loco', dx: 100 },
+];
+const inRail = (y, pad = 0) => Math.abs(y - CY) < RAIL_HALF + pad;
 const BLOCK = 400; // Häuserblock (Straßenraster)
 const ROAD_W = 64;
 const AVENUE_W = 92; // die zwei Straßen am Zentrumsplatz
@@ -274,7 +284,18 @@ function buildTown(rng, nodes) {
       }
     }
   }
-  return { roads, buildings, parks, cars, trees };
+  // Bahnkorridor freiräumen, dann den stehenden Zug (Lok an der Ostseite) auf die Schiene stellen
+  const free = (arr, pad) => arr.filter((o) => !inRail(o.y, pad(o)));
+  const town = {
+    roads,
+    buildings: free(buildings, (b) => b.h / 2),
+    parks,
+    cars: free(cars, () => 20),
+    trees: free(trees, (t) => t.r),
+    rail: { y: CY, x1: 0, x2: W, half: RAIL_HALF },
+  };
+  for (const c of TRAIN) town.buildings.push({ x: CX + c.dx, y: CY, w: 96, h: 46, kind: 'train', part: c.part });
+  return town;
 }
 
 const SCATTER_PAIRS = 350;
@@ -287,6 +308,7 @@ function scatterTrees(rng, nodes, obstacles) {
     y > 40 &&
     x < W - 40 &&
     y < H - 40 &&
+    !inRail(y, 20) &&
     dist(x, y, CX, CY) > ZONE_R + 30 &&
     SPAWNS.every((s) => dist(x, y, s.x, s.y) > 420) &&
     nodes.every((n) => dist(x, y, n.x, n.y) > 90) &&

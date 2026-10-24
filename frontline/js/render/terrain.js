@@ -59,6 +59,7 @@ export function buildTerrain(map, iso = false) {
   }
 
   drawRoads(ctx, map, S);
+  drawRail(ctx, map, S);
   drawTown(ctx, map, S, iso);
   if (!iso) for (const t of map.trees ?? []) tree(ctx, t.x * S, t.y * S, t.r * S);
 
@@ -127,6 +128,8 @@ export function buildTerrain(map, iso = false) {
   return canvas;
 }
 
+const TRAIN_COLOR = { loco: '#b3423a', container: '#3f8a5e', tank: '#7c8190' };
+
 function disc(ctx, x, y, r, fill) {
   ctx.fillStyle = fill;
   ctx.beginPath();
@@ -166,6 +169,25 @@ function drawRoads(ctx, map, S) {
   ctx.setLineDash([]);
 }
 
+/** Bahnlinie: Schotterbett, Schwellen und zwei Schienen (Straßen kreuzen sie auf gleicher Höhe). */
+function drawRail(ctx, map, S) {
+  const r = map.town?.rail;
+  if (!r) return;
+  const y = r.y * S;
+  const x1 = r.x1 * S;
+  const x2 = r.x2 * S;
+  const bed = 40 * S;
+  ctx.fillStyle = '#6b665c';
+  ctx.fillRect(x1, y - bed / 2, x2 - x1, bed);
+  ctx.fillStyle = '#4a3a2c';
+  const sw = Math.max(1.5, 3 * S);
+  for (let x = x1; x < x2; x += 12 * S) ctx.fillRect(x, y - bed * 0.45, sw, bed * 0.9);
+  ctx.fillStyle = '#b9bcbd';
+  const rw = Math.max(1, 2.2 * S);
+  ctx.fillRect(x1, y - bed * 0.28 - rw / 2, x2 - x1, rw);
+  ctx.fillRect(x1, y + bed * 0.28 - rw / 2, x2 - x1, rw);
+}
+
 /** Parks, Gebäude (Häuser, Hallen, Fabriken), Autos und Stadtbäume. */
 function drawTown(ctx, map, S, iso = false) {
   const t = map.town;
@@ -196,6 +218,11 @@ function drawTown(ctx, map, S, iso = false) {
         ctx.lineTo(x + (w * k) / 5, y + h);
       }
       ctx.stroke();
+    } else if (b.kind === 'train') {
+      ctx.fillStyle = TRAIN_COLOR[b.part] ?? '#777';
+      ctx.fillRect(x + w * 0.04, y + h * 0.1, w * 0.92, h * 0.8);
+      ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      ctx.fillRect(x + w * 0.04, y + h * 0.1, w * 0.92, h * 0.25);
     } else {
       ctx.fillStyle = '#5f6366';
       ctx.fillRect(x, y, w, h);

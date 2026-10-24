@@ -619,13 +619,13 @@ test('Verbrauch: leerer Schütze feuert nicht, Abklingzeit läuft nicht an, Mang
 test('Verbrauch: fahrender Panzer verbraucht Treibstoff aus seinem Vorrat, stehender nicht', () => {
   const still = new Game({ seed: 7 });
   const c = still.zone;
-  const t0 = still.spawnUnit('tank', 0, c.x, c.y);
+  const t0 = still.spawnUnit('tank', 0, c.x, c.y - 90);
   run(still, 3);
   assert.equal(t0.fuel, UNITS.tank.fuelMax, 'stehend kein Verbrauch');
 
   const g = new Game({ seed: 7 });
-  const tank = g.spawnUnit('tank', 0, c.x, c.y);
-  assert.equal(g.issue(0, { type: 'move', ids: [tank.id], x: c.x + 600, y: c.y }).ok, true);
+  const tank = g.spawnUnit('tank', 0, c.x, c.y - 90);
+  assert.equal(g.issue(0, { type: 'move', ids: [tank.id], x: c.x + 600, y: c.y - 90 }).ok, true);
   let moved = 0;
   for (let i = 0; i < 40; i++) {
     const x0 = tank.x;
@@ -643,9 +643,9 @@ test('Verbrauch: ohne Treibstoff fährt ein Panzer mit 25 % Tempo, Vorrat wird n
   const travel = (fuel) => {
     const g = new Game({ seed: 7 });
     const c = g.zone;
-    const tank = g.spawnUnit('tank', 0, c.x, c.y);
+    const tank = g.spawnUnit('tank', 0, c.x, c.y - 90);
     tank.fuel = fuel;
-    assert.equal(g.issue(0, { type: 'move', ids: [tank.id], x: c.x + 800, y: c.y }).ok, true);
+    assert.equal(g.issue(0, { type: 'move', ids: [tank.id], x: c.x + 800, y: c.y - 90 }).ok, true);
     let d = 0;
     for (let i = 0; i < 40; i++) {
       const x0 = tank.x;

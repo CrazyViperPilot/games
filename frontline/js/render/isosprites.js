@@ -3,7 +3,7 @@
 // Austausch: Dateien in assets/iso/ ersetzen oder die Listen unten anpassen.
 import { ISO_K } from './camera.js';
 import { spriteOverrides } from './isobuild.js';
-import { BUILDING_SPRITES, MODEL_PPU } from './isodata.js';
+import { BUILDING_SPRITES, TRAIN_SPRITES, MODEL_PPU } from './isodata.js';
 
 const ENABLED = typeof Image !== 'undefined' && typeof location !== 'undefined' && new URLSearchParams(location.search).get('sprites') !== '0';
 const url = (p) => new URL(`../../assets/iso/${p}`, import.meta.url).href;
@@ -21,6 +21,10 @@ const MAX_H = { house: 100, hall: 100, factory: 130 }; // größte Höhe (Welt-P
 const BUILDINGS = {};
 for (const [kind, list] of Object.entries(BUILDING_SPRITES)) {
   BUILDINGS[kind] = list.map(([file, ax, ay, w, d, h]) => ({ img: load(`buildings/${file}`), ax, ay, w, d, h }));
+}
+const TRAIN = {};
+for (const [part, list] of Object.entries(TRAIN_SPRITES)) {
+  TRAIN[part] = list.map(([file, ax, ay, w, d]) => ({ img: load(`train/${file}`), ax, ay, w, d }));
 }
 const TREE = load('trees/tree.png');
 
@@ -53,6 +57,18 @@ function drawBuildingSprite(kind) {
   };
 }
 for (const kind of Object.keys(BUILDINGS)) if (ENABLED) spriteOverrides[kind] = drawBuildingSprite(kind);
+
+/** Zugteil (Lok, Wagen): je Drehung der Ansicht ein eigenes Bild, auf die Länge des Rechtecks skaliert. */
+if (ENABLED) {
+  spriteOverrides.train = (ctx, cam, b) => {
+    const m = TRAIN[b.part]?.[cam.rot];
+    if (!ready(m?.img)) return false;
+    const sc = ((b.w / Math.max(m.w, m.d)) * cam.zoom) / MODEL_PPU;
+    const p = cam.worldToScreen(b.x, b.y);
+    ctx.drawImage(m.img, p.x - m.ax * sc, p.y - m.ay * sc, m.img.naturalWidth * sc, m.img.naturalHeight * sc);
+    return true;
+  };
+}
 
 /** Baum (aufrecht, Fuß am Weltpunkt). Liefert false, wenn das Bild fehlt. */
 export function drawTreeSprite(ctx, cam, t) {
