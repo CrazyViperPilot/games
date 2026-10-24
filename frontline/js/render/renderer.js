@@ -27,6 +27,7 @@ import {
   buildingHeight,
 } from './iso.js';
 import { drawTownBuilding, drawTeamBuilding } from './isobuild.js';
+import { drawTreeSprite, drawUnitSprite } from './isosprites.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
@@ -340,6 +341,7 @@ export class Renderer {
       ctx.beginPath();
       ctx.ellipse(p.x, p.y + 1, u.def.radius * z * (u.def.air ? 1.5 : 1.2), u.def.radius * z * (u.def.air ? 0.7 : 0.5), 0, 0, Math.PI * 2);
       ctx.fill();
+      if (drawUnitSprite(ctx, cam, u, { x: p.x, y: p.y })) return;
       setIsoAt(ctx, cam, dpr, p.x, p.y - lift * z, u.x, u.y, sc);
       let aim = null;
       if (u.targetId && u.def.range > 0) {
@@ -354,7 +356,9 @@ export class Renderer {
     for (const it of items) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       if (it.t === 0) drawTownBuilding(ctx, cam, it.o);
-      else if (it.t === 1) drawTree(ctx, cam, it.o);
+      else if (it.t === 1) {
+        if (!drawTreeSprite(ctx, cam, it.o)) drawTree(ctx, cam, it.o);
+      }
       else if (it.t === 2) drawRock(ctx, cam, it.o);
       else if (it.t === 3) {
         const p = cam.worldToScreen(it.o.x, it.o.y);
