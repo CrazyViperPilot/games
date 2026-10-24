@@ -31,17 +31,34 @@ Nicht im Umfang: Netzwerk-Multiplayer, Kampagne, Speichern laufender Partien, So
 |---|---|---|---|
 | **Geld** | Konfliktzone, Hot Zone, Grundeinkommen 5/s je FOB | global | Einheiten |
 | **Baumaterial** | Förderanlage auf Baumaterial-Vorkommen | FOB-Lager, LKW | Gebäude, Mauern, Tore, Reparatur; 400 per LKW für eine neue FOB-Baustelle |
-| **Munition** | Förderanlage auf Munitions-Vorkommen | FOB-Lager, Einheiten, LKW | Einheiten-Kosten; **Verbrauch je Schuss** |
-| **Treibstoff** | Förderanlage auf Treibstoff-Vorkommen | FOB-Lager, Fahrzeuge, LKW | Fahrzeug-Kosten; **Verbrauch beim Fahren** |
+| **Munition** | Förderanlage auf Munitions-Vorkommen | FOB-Lager, Einheiten, LKW | Mörser/Flak und **Nachladen der Einheiten** (nicht beim Bau) |
+| **Treibstoff** | Förderanlage auf Treibstoff-Vorkommen | FOB-Lager, Fahrzeuge, LKW | **Verbrauch beim Fahren/Fliegen** und Bohrer (nicht beim Bau) |
 
 - **FOB-Lager:** Jede FOB hat ein eigenes Lager (max. 3000 je Sorte). Eine Förderanlage liefert (8 Baumaterial, 8 Munition bzw.
   6 Treibstoff pro s) in die FOB, in deren Bauradius sie steht. Ressourcen sind **nicht** automatisch überall verfügbar.
 - **Bezahlen:** Gebäude zahlen aus einer FOB, deren Bauradius den Bauort enthält; Ausbildung aus dem Lager der ausbildenden FOB
   (Fahrzeughalle: aus der FOB in Reichweite). Geld kommt immer aus dem globalen Vorrat. Abbruch erstattet voll an dieses Lager.
+- **Einheiten kosten nur Geld** (keine Munition/Treibstoff beim Bau) und starten **voll munitioniert und betankt**. Erst was
+  verbraucht wurde, muss aus dem FOB-Lager nachgeladen werden.
+- **Waffen und Munition je Einheit:** Jede Waffe hat einen eigenen Schussvorrat; beim Nachladen kostet jeder Schuss Munition aus dem Lager.
+
+  | Einheit | Waffe | Vorrat | Munition je Schuss | Nachladezeit |
+  |---|---|---|---|---|
+  | Schütze | Gewehr | 2 Magazine à 30 = 60 Schuss (1 Magazin = 1 Munition) | 1/30 | 1 s |
+  | Panzerabwehrsoldat | RPG | 5 Schuss | 10 | 3 s |
+  | Kampfpanzer | Hauptkanone | 30 Schuss | 20 | **6 s** |
+  | Kampfpanzer | MG | 300 Schuss | 5 | 0,25 s |
+  | Schützenpanzer | Granatwerfer | 60 Granaten | 10 | 2 s |
+  | Schützenpanzer | MG | 300 Schuss | 5 | 0,25 s |
+  | Kampfhubschrauber | Bordkanone | 300 Schuss | 10 | 0,5 s |
+  | Kampfhubschrauber | Raketen | 10 | 100 | 3 s |
+
+  Waffenwahl automatisch: die für die Panzerklasse des Ziels vorgesehene Waffe (Kanone/Granaten/Raketen gegen Fahrzeuge und
+  Gebäude, Raketen auch gegen Hubschrauber), sonst die mit dem besten Schaden je Munition (MG, Gewehr, Bordkanone).
 - **Vorrat der Einheiten:** Jede Einheit trägt Munition, Fahrzeuge zusätzlich Treibstoff. Ohne Munition wird nicht geschossen,
   ohne Treibstoff fahren Fahrzeuge mit 25 % Tempo. Mörser und Flugabwehr verbrauchen Munition aus dem Lager ihrer FOB (fehlt sie, schießen sie nicht);
   das MG der FOB schießt kostenlos.
-- **Nachfüllen:** automatisch im Bauradius einer eigenen FOB (aus deren Lager) oder in der Nähe (180 px) eines eigenen LKW mit Ladung. Das gilt für Soldaten (Munition), Fahrzeuge und Hubschrauber (Treibstoff, Munition). Ist das Lager leer, wird nicht nachgefüllt.
+- **Nachfüllen:** automatisch im Bauradius einer eigenen FOB (aus deren Lager) oder in der Nähe (180 px) eines eigenen LKW mit Ladung. Das gilt für Soldaten (Munition), Fahrzeuge und Hubschrauber (Treibstoff, Munition). Munition fließt mit bis zu 60/s je Einheit (Waffe für Waffe), Treibstoff mit 4/s. Ist das Lager leer, wird nicht nachgefüllt.
 - Vorkommen sind unerschöpflich. Pro Vorkommen genau eine Förderanlage. Jede Startposition hat je ein Vorkommen jeder Sorte
   im Bauradius ihrer Start-FOB; weitere liegen verteilt, einige in der Konfliktzone (dort mehr als früher, die Zone ist groß).
 
@@ -83,14 +100,14 @@ Gebäude können abgerissen werden (Erstattung 25 % Baumaterial). Max. 120 Einhe
 | LKW | FOB | Unbewaffnet, schnell. **Logistik:** lädt Ressourcen an einer FOB (400), bringt sie zu einer anderen FOB oder FOB-Baustelle, pendelt auf Routen, versorgt Truppen im Feld |
 | Baufahrzeug | FOB | Unbewaffnet. Setzt FOB-Baustellen, baut alle Gebäude, repariert |
 | Schützenpanzer | Fahrzeughalle | Schnell, gut gegen Infanterie und leichte Fahrzeuge |
-| Kampfpanzer | Fahrzeughalle | Teuer, schwer gepanzert, stark gegen alles (kann keine Hubschrauber treffen) |
+| Kampfpanzer | Fahrzeughalle | Teuer, schwer gepanzert, stark gegen alles (Hauptkanone trifft keine Hubschrauber, das MG schwach) |
 | Little Bird | Hubschrauberlandeplatz | Unbewaffnet, schnell, **5 Passagiere** (Infanterie, Baufahrzeug) |
 | Transporthubschrauber | Hubschrauberlandeplatz | Unbewaffnet, **9 Passagiere** und **400 Ressourcen** (laden/entladen/pendeln wie ein LKW) |
-| AH-64 (Kampfhubschrauber) | Hubschrauberlandeplatz | Bordkanone, 650 HP, **begrenzt**: 60 Munition, 70 Treibstoff; Nachtanken/-laden in einer FOB |
+| AH-64 (Kampfhubschrauber) | Hubschrauberlandeplatz | Bordkanone und 10 Raketen (Tabelle oben), 650 HP, 70 Treibstoff; Nachtanken/-laden in einer FOB |
 
 **Hubschrauber** fliegen geradeaus über Gelände und Gebäude, brauchen Treibstoff beim Fliegen (ohne: 25 % Tempo) und sind
-Panzerklasse „Luft“: Flugabwehr (stark), Panzerabwehrsoldat (40), SPz (8), Schütze (3) und die FOB-MG (2) treffen sie; Kampfpanzer
-und Mörser nicht. Passagiere steigen per Rechtsklick auf den Hubschrauber ein und werden mit **O** am Zielpunkt abgesetzt;
+Panzerklasse „Luft“: Flugabwehr (stark), Panzerabwehrsoldat (40), Raketen des AH-64 (150), SPz-MG (6), Schütze (3), Panzer-MG (3) und die FOB-MG (2) treffen sie; Hauptkanone,
+Granatwerfer und Mörser nicht. Passagiere steigen per Rechtsklick auf den Hubschrauber ein und werden mit **O** am Zielpunkt abgesetzt;
 stirbt der Hubschrauber, sind die Passagiere verloren.
 
 Schadensmodell: Schaden je Schuss nach Panzerklasse des Ziels (Infanterie / leicht / schwer / Gebäude) – Werte in `PLAN.md`.
@@ -187,6 +204,7 @@ zwischen Überschuss- und Bedarfs-FOBs (v. a. Zonen-FOB), Versorger-LKW folgt de
 - v2: Munitions-/Treibstoffverbrauch; stärkere KI (Wirtschaft zuerst, Zonen-FOB).
 - v3: Logistik – FOB-Lager, Vorrat je Einheit, LKW als Transporter/Versorger/Pendler; Baufahrzeug baut und repariert,
   Infanterie baut Mauern/Tore; Service Worker network-first.
+- v4.4: Einheiten kosten nur Geld und starten voll; Waffen mit eigenem Schussvorrat und Munitionswert je Schuss (Tabelle in Abschnitt 3); Kampfpanzer-Hauptkanone lädt 6 s nach.
 - v4.3: Isometrische Ansicht (Prototyp, Schalter „Ansicht“ / Taste V; Standard bleibt 2D): schräger Boden, Gebäude, Bäume und Fahrzeuge mit Höhe, Hubschrauber schweben mit Schatten.
 - v4.2: Bäume sind blockierende Hindernisse (Stadt und Karte).
 - v4.1: Punktewertung nach Mehrheit mit Punktebalken, Hot-Zone-Einheiten doppelt (statt Alleinbesitz und eigener Hot-Zone-Punkt).
