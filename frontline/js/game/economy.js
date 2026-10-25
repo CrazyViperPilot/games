@@ -93,7 +93,7 @@ export function updateEconomy(game, dt) {
 function updateReinforce(game, team, dt) {
   const R = BALANCE.reinforce;
   const b = game.mainFob(team.id);
-  if (!b || !b.built || game.soldierCount(team.id) >= R.soldierMin || game.unitCount(team.id) >= BALANCE.unitCap) {
+  if (!b || !b.built || game.soldierCount(team.id) >= R.soldierMin || game.unitCount(team.id) >= game.unitCap()) {
     team.reinforceTimer = 0;
     return;
   }
