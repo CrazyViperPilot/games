@@ -28,6 +28,7 @@ const TOOLS = [
   ['house', 'Haus', 'Gebäude', '⌂', 'Tippen setzt ein Haus'],
   ['factory', 'Fabrik', 'Gebäude', '▣', 'Tippen setzt eine Fabrik mit Schornstein'],
   ['hall', 'Halle', 'Gebäude', '▭', 'Tippen setzt eine Halle'],
+  ['tower', 'Wachturm', 'Gebäude', '⍋', 'Tippen setzt einen Wachturm auf Stahlgerüst (blockiert)'],
   ['loco', 'Lok', 'Zug', '◧', 'Tippen auf ein Gleis setzt eine Lok in Gleisrichtung (blockiert wie ein Gebäude)'],
   ['container', 'Waggon', 'Zug', '◨', 'Tippen auf ein Gleis setzt einen Waggon, neben einem Zugteil schließt er an'],
   ['tank', 'Kesselwagen', 'Zug', '◩', 'Tippen setzt einen Kesselwagen'],
@@ -49,6 +50,7 @@ const BUILD_DEF = {
   house: { w: 90, h: 70, kind: 'house' },
   factory: { w: 260, h: 170, kind: 'factory' },
   hall: { w: 290, h: 100, kind: 'hall' },
+  tower: { w: 80, h: 80, kind: 'tower' },
   loco: { w: 96, h: 46, kind: 'train', part: 'loco' },
   container: { w: 96, h: 46, kind: 'train', part: 'container' },
   tank: { w: 96, h: 46, kind: 'train', part: 'tank' },
@@ -871,7 +873,7 @@ const SEL_NAMES = {
   spawn: 'Startpunkt',
   zone: 'Konfliktzone',
 };
-const KIND_NAMES = { house: 'Haus', factory: 'Fabrik', hall: 'Halle', train: 'Zugteil', station: 'Bahnhof', platform: 'Bahnsteig' };
+const KIND_NAMES = { house: 'Haus', factory: 'Fabrik', hall: 'Halle', tower: 'Wachturm', train: 'Zugteil', station: 'Bahnhof', platform: 'Bahnsteig' };
 
 function showInspector() {
   const el = $('[data-insp]');

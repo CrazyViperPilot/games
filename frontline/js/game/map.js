@@ -101,6 +101,13 @@ const CAR_COLORS = ['#b8b8b0', '#8a2f2f', '#2f4f7a', '#d0c060', '#3b3b3b', '#d8d
  * Straßenraster, Häuser, Hallen, Fabriken, Parks, geparkte Autos und Bäume.
  * Gebäude (Rechtecke {x,y,w,h,kind}) sind unpassierbar, alles andere ist Dekoration.
  */
+const TOWER_SIZE = 80; // Grundfläche eines Wachturms
+// oben (Mitte) und links (knapp über der Bahnlinie); unten und rechts entstehen als Spiegelbild
+const TOWER_AT = [
+  { x: CX, y: CY - 0.86 * ZONE_R },
+  { x: CX - 0.86 * ZONE_R, y: CY - 190 },
+];
+
 function buildTown(rng) {
   const roads = [];
   const buildings = [];
@@ -206,6 +213,16 @@ function buildTown(rng) {
         if (rng.next() < 0.5) addCar(Math.round(bx + t), Math.round(by + side * 150), false, col);
         else addCar(Math.round(bx + side * 150), Math.round(by + t), true, col);
       }
+    }
+  }
+  // Vier Wachtürme am Rand der Konfliktzone (oben, unten, links, rechts; punktsymmetrisch). Was dort im Weg steht, entfällt.
+  for (const t of TOWER_AT) {
+    for (const p of [t, { x: W - t.x, y: H - t.y }]) {
+      const hit = (o, w, h) => Math.abs(o.x - p.x) < (w + TOWER_SIZE) / 2 + 30 && Math.abs(o.y - p.y) < (h + TOWER_SIZE) / 2 + 30;
+      for (let i = buildings.length - 1; i >= 0; i--) if (hit(buildings[i], buildings[i].w, buildings[i].h)) buildings.splice(i, 1);
+      for (let i = trees.length - 1; i >= 0; i--) if (hit(trees[i], trees[i].r * 2, trees[i].r * 2)) trees.splice(i, 1);
+      for (let i = cars.length - 1; i >= 0; i--) if (hit(cars[i], 40, 40)) cars.splice(i, 1);
+      buildings.push({ x: Math.round(p.x), y: Math.round(p.y), w: TOWER_SIZE, h: TOWER_SIZE, kind: 'tower' });
     }
   }
   // Bahnkorridor freiräumen, dann den stehenden Zug (Lok an der Ostseite) auf die Schiene stellen

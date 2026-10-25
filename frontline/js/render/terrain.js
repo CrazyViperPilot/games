@@ -350,6 +350,16 @@ function drawTown(ctx, map, S, iso = false) {
       ctx.fillRect(x, y, w, h);
       ctx.fillStyle = 'rgba(0,0,0,0.22)';
       ctx.fillRect(x + w / 2, y, w / 2, h); // Dachfirst: eine Dachhälfte dunkler
+    } else if (b.kind === 'tower') {
+      ctx.fillStyle = '#4d565a'; // Stahlgerüst von oben: Beine in den Ecken, Kabine mit grünem Dachrand
+      ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = '#8b9284';
+      ctx.fillRect(x + w * 0.04, y + h * 0.04, w * 0.92, h * 0.92);
+      ctx.strokeStyle = '#68854f';
+      ctx.lineWidth = Math.max(2, 5 * S);
+      ctx.strokeRect(x + w * 0.06, y + h * 0.06, w * 0.88, h * 0.88);
+      ctx.fillStyle = '#777e74';
+      ctx.fillRect(x + w * 0.2, y + h * 0.2, w * 0.38, h * 0.34);
     } else if (b.kind === 'hall') {
       ctx.fillStyle = '#8d949a';
       ctx.fillRect(x, y, w, h);

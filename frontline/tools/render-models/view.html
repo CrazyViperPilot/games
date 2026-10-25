@@ -104,9 +104,61 @@ window.buildLeo=()=>{
   box(0.12,0.06,0.20,top,0,0.73,0.0);
   for(const [x,z] of [[0.22,-0.42],[-0.25,-0.40]]) cyl(0.007,0.60,dark,x,0.98,z);
   return g;};
+window.buildTower=()=>{
+  const M=(c,e)=>new THREE.MeshLambertMaterial({color:c,emissive:e||0x000000});
+  const wall=M(0x8b9284,0x2a2d27),panel=M(0x727a6d,0x20231e),steel=M(0x4d565a,0x15181a),green=M(0x68854f,0x1d2716),glass=M(0x25394d,0x0c1620),roof=M(0x777e74,0x22251f),dark=M(0x2b2f31);
+  const g=new THREE.Group();
+  const box=(w,h,d,mat,x,y,z,rx=0,ry=0,rz=0)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);m.rotation.set(rx,ry,rz);g.add(m);return m;};
+  const cyl=(r,l,mat,x,y,z,rx=0,ry=0,rz=0)=>{const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,l,8),mat);m.position.set(x,y,z);m.rotation.set(rx,ry,rz);g.add(m);return m;};
+  const F=1.0, H1=1.55; // Beinabstand (halb) und Höhe des Gerüsts, Einheiten = Kacheln
+  for(const sx of [-1,1]) for(const sz of [-1,1]){
+    box(0.14,H1,0.14,steel,sx*F,H1/2,sz*F);
+    box(0.34,0.06,0.34,dark,sx*F,0.03,sz*F);
+  }
+  // Querstreben und Diagonalen je Seite, zwei Felder übereinander
+  const beam=(x1,y1,z1,x2,y2,z2)=>{const dx=x2-x1,dy=y2-y1,dz=z2-z1;const len=Math.hypot(dx,dy,dz);const m=new THREE.Mesh(new THREE.BoxGeometry(0.05,len,0.05),steel);m.position.set((x1+x2)/2,(y1+y2)/2,(z1+z2)/2);m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),new THREE.Vector3(dx,dy,dz).normalize());g.add(m);};
+  for(const yh of [0.78,H1]) {
+    beam(-F,yh,-F,F,yh,-F);beam(-F,yh,F,F,yh,F);beam(-F,yh,-F,-F,yh,F);beam(F,yh,-F,F,yh,F);
+  }
+  for(const [y0,y1] of [[0.05,0.78],[0.78,H1]]) for(const s of [-1,1]){
+    beam(-F,y0,s*F,F,y1,s*F);beam(F,y0,s*F,-F,y1,s*F);
+    beam(s*F,y0,-F,s*F,y1,F);beam(s*F,y0,F,s*F,y1,-F);
+  }
+  // Treppe an der +x-Seite, Zwischenpodest
+  box(0.9,0.04,0.55,panel,F-0.05,0.78,0.0);
+  beam(F+0.20,0.05,-0.30,F+0.20,0.78,0.50);
+  box(0.38,0.04,0.42,panel,F+0.20,0.40,0.10,0.0,0.0,0.0);
+  // Kabine mit Dachrand aus grünen Lamellen, Aufbau, Fenster, Paneele
+  box(2.45,0.95,2.45,wall,0,H1+0.50,0);
+  for(const s of [-1,1]){
+    box(2.55,0.14,0.30,green,0,H1+1.03,s*1.18,s*0.28,0,0);
+    box(0.30,0.14,2.55,green,s*1.18,H1+1.03,0,0,0,-s*0.28);
+  }
+  box(2.2,0.04,2.2,roof,0,H1+0.99,0);
+  box(1.05,0.55,0.95,wall,-0.35,H1+1.28,-0.30);
+  box(1.0,0.06,0.9,roof,-0.35,H1+1.58,-0.30);
+  for(const s of [-1,1]){
+    box(1.0,0.22,0.03,glass,-0.2*s,H1+0.62,1.24);
+    box(0.03,0.22,1.0,glass,1.24,H1+0.62,-0.25*s);
+    box(0.50,0.44,0.03,panel,0.55*s,H1+0.40,1.24);
+    box(0.03,0.44,0.50,panel,1.24,H1+0.35,0.62*s);
+  }
+  box(0.6,0.5,0.04,panel,-1.24,H1+0.5,0.2);
+  // Antennen
+  cyl(0.015,0.95,dark,0.5,H1+1.55,-0.5);
+  cyl(0.012,0.70,dark,-0.9,H1+1.35,0.7);
+  box(0.12,0.05,0.12,dark,0.5,H1+1.1,-0.5);
+  return g;};
+window.shotRaw=(az,elev,ppu,size)=>{
+  const scene=new THREE.Scene();const mo=window.obj.clone();mo.rotation.y=-window.rotQ*Math.PI/2;scene.add(mo);
+  scene.add(new THREE.AmbientLight(0xffffff,1.15));const d=new THREE.DirectionalLight(0xffffff,1.5);d.position.set(-3,6,2);scene.add(d);
+  const half=size/(2*ppu);const cam=new THREE.OrthographicCamera(-half,half,half,-half,0.1,100);
+  const a=az*Math.PI/180,e=elev*Math.PI/180;
+  cam.position.set(Math.sin(a)*Math.cos(e)*30,Math.sin(e)*30+1.6,Math.cos(a)*Math.cos(e)*30);cam.lookAt(0,1.6,0);
+  renderer.setSize(size,size);renderer.render(scene,cam);return renderer.domElement.toDataURL('image/png');};
 window.loadModel=async(kind,url,mtl,tex)=>{
   let obj;
-  if(kind==='proc'){obj=url==='puma'?window.buildPuma():url==='leo'?window.buildLeo():window.buildLB();window.obj=obj;return true;}
+  if(kind==='proc'){obj=url==='tower'?window.buildTower():url==='puma'?window.buildPuma():url==='leo'?window.buildLeo():window.buildLB();window.obj=obj;return true;}
   if(kind==='fbx') obj=await new FBXLoader().loadAsync(url);
   else { const l=new OBJLoader(); if(mtl){const m=await new MTLLoader().loadAsync(mtl);m.preload();l.setMaterials(m);} obj=await l.loadAsync(url);}
   const team=new THREE.Color(window.TEAM||0x808080);

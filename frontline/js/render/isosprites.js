@@ -26,6 +26,9 @@ const TRAIN = {};
 for (const [part, list] of Object.entries(TRAIN_SPRITES)) {
   TRAIN[part] = list.map(([file, ax, ay, w, d]) => ({ img: load(`train/${file}`), ax, ay, w, d }));
 }
+// Wachturm (eigenes Modell, assets/iso/README.md): je Drehung der Ansicht ein Bild, 1 Modelleinheit = 1 Kachel
+const TOWER = [0, 1, 2, 3].map((r) => load(`buildings/tower-r${r}.png`));
+const TOWER_VIEW = { ax: 119, ay: 222, ppu: 64, footprint: 78.4 }; // Bodenmitte im Bild, Pixel je Modelleinheit, Kabinenbreite in Welt-Pixeln
 const TEAM_IMG = {};
 for (const [key, [file, ax, ay]] of Object.entries(TEAM_SPRITES)) TEAM_IMG[key] = { img: load(`team/${file}`), ax, ay };
 const INF_IMG = {};
@@ -66,6 +69,17 @@ function drawBuildingSprite(kind) {
   };
 }
 for (const kind of Object.keys(BUILDINGS)) if (ENABLED) spriteOverrides[kind] = drawBuildingSprite(kind);
+
+if (ENABLED) {
+  spriteOverrides.tower = (ctx, cam, b) => {
+    const img = TOWER[cam.rot];
+    if (!ready(img)) return false;
+    const sc = ((b.w / TOWER_VIEW.footprint) * (TILE_W * cam.zoom)) / TOWER_VIEW.ppu;
+    const p = cam.worldToScreen(b.x, b.y);
+    ctx.drawImage(img, p.x - TOWER_VIEW.ax * sc, p.y - TOWER_VIEW.ay * sc, img.naturalWidth * sc, img.naturalHeight * sc);
+    return true;
+  };
+}
 
 /** Zugteil (Lok, Wagen): je Drehung der Ansicht ein eigenes Bild, auf die Länge des Rechtecks skaliert. */
 if (ENABLED) {

@@ -90,3 +90,24 @@ test('Fabrikgelände: durch die Lücke hinein, um die Fabrik herum und auf der G
 test('keine Felsen: alle Hindernisse sind Wald (gerader Radius)', () => {
   for (const o of generateMap(7).obstacles) assert.equal(Math.round(o.r) % 2, 0);
 });
+
+test('vier Wachtürme am Zonenrand (oben, unten, links, rechts), punktsymmetrisch, ohne Überlappung', () => {
+  for (const seed of [1, 7, 21]) {
+    const map = generateMap(seed);
+    const towers = map.town.buildings.filter((b) => b.kind === 'tower');
+    assert.equal(towers.length, 4, `Seed ${seed}`);
+    const { x: zx, y: zy, r } = map.zone;
+    for (const t of towers) {
+      const d = Math.hypot(t.x - zx, t.y - zy);
+      assert.ok(d > r * 0.8 && d < r * 0.95, `Turm ${t.x},${t.y} liegt am Zonenrand (${Math.round(d)})`);
+      assert.ok(towers.some((o) => o.x === W - t.x && o.y === H - t.y), 'Spiegelbild vorhanden');
+      for (const b of map.town.buildings) {
+        if (b === t) continue;
+        const overlap = Math.abs(b.x - t.x) < (b.w + t.w) / 2 && Math.abs(b.y - t.y) < (b.h + t.h) / 2;
+        assert.ok(!overlap, `Turm ${t.x},${t.y} überlappt ein Gebäude (${b.kind})`);
+      }
+    }
+    const dirs = new Set(towers.map((t) => (Math.abs(t.x - zx) > Math.abs(t.y - zy) ? (t.x < zx ? 'links' : 'rechts') : t.y < zy ? 'oben' : 'unten')));
+    assert.equal(dirs.size, 4, 'je ein Turm oben, unten, links, rechts');
+  }
+});

@@ -11,3 +11,5 @@ Kampfhubschrauber (vehicles/apache-*): 3D-Modell „Attack Chopper“ von Cheese
 Little Bird (vehicles/littlebird-*): eigenes, aus Grundformen nachgebautes 3D-Modell nach einem Foto des MH-6/AH-6 (`buildLB` in `tools/render-models/view.html`, `prodlb.mjs`), Teamfarben und 8 Richtungen wie oben; keine fremden Modelldaten, keine Lizenzauflagen.
 
 Schützenpanzer (vehicles/ifv-*, nach einem Foto des Puma) und Kampfpanzer (vehicles/tank-*, nach einem Bild eines Leopard 2 A7): eigene, aus Grundformen nachgebaute Modelle (`buildPuma`, `buildLeo` in `tools/render-models/view.html`; `prodpu.mjs`, `prodle.mjs`), 8 Richtungen und Teamfarben, keine fremden Modelldaten, keine Lizenzauflagen. Das frühere T-12-Modell (CC0) ist ersetzt.
+
+Wachturm (buildings/tower-r0…r3.png): eigenes Modell (`buildTower` in `tools/render-models/view.html`, `prodtw.mjs`) nach einem Bild eines Radar-/Wachturms auf Stahlgerüst; 1 Modelleinheit = 1 Kachel, je Drehung der Ansicht ein Bild (Modell gedreht, Licht fest), Maße in `TOWER_VIEW` (js/render/isosprites.js). Keine fremden Modelldaten, keine Lizenzauflagen.
