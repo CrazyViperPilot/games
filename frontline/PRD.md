@@ -19,7 +19,7 @@ Nicht im Umfang: Netzwerk-Multiplayer, Kampagne, Speichern laufender Partien, So
 ## 2. Spielablauf
 
 1. Startmenü: Schwierigkeit (Leicht/Normal/Schwer), Siegpunkte (100 Standard; 25/50 für Schnellpartie), **Karte** (Zufall · Gespeichert · Neue Karte, siehe Abschnitt 9a), Start.
-2. Jede Partei startet in einer Ecke der großen Karte mit der **Haupt-FOB** (unendlich Baumaterial, Munition, Treibstoff), Geld (800 oder die Kasse der letzten Runde), 1 Baufahrzeug, 1 LKW (leer), **40 Schützen und 10 Panzerabwehrsoldaten** (50 Soldaten, Startaufstellung vor der FOB).
+2. Jede Partei startet in einer Ecke der großen Karte mit der **Haupt-FOB** (unendlich Baumaterial, Munition, Treibstoff), Geld (800 oder die Kasse der letzten Runde), 1 Baufahrzeug, 1 LKW (leer), **2 Kampfpanzern, 3 Schützenpanzern, 22 Schützen und 7 Panzerabwehrsoldaten** (29 Soldaten, Startaufstellung vor der FOB). Zusammen belegen sie die 50 Plätze des Einheitenlimits (siehe §6).
 3. Nur die Haupt-FOB bildet Einheiten aus (nur gegen Geld). Man bringt Einheiten und Nachschub per LKW an die Front, gründet vordere FOBs
    (Verschanzen mit Mauern und Tore, Mörser, Flak, Nachladen und Tanken) und hält die Zone.
 4. In der Mitte liegt die sehr große **Konfliktzone** (eine Stadt). Wer dort mehr Spieler hat (Hot Zone doppelt), füllt den Punktebalken und bekommt Geld. In ihr wandert die **Hot Zone** (Abschnitt 7).
@@ -41,7 +41,7 @@ Nicht im Umfang: Netzwerk-Multiplayer, Kampagne, Speichern laufender Partien, So
 - **Bezahlen:** Gebäude zahlen aus einer FOB, deren Bauradius den Bauort enthält (Baufahrzeug). Einheiten kosten **nur Geld**. Abbruch erstattet an dieses Lager.
 - **Soldaten tragen Baumaterial:** Schütze und PAK tragen **50 Baumaterial** (starten voll, laden im FOB-Bauradius oder nahe einem LKW nach) und bauen daraus **Mauern und Tore, nur im Bauradius einer FOB**.
 - **LKW im Feld:** füllt Einheiten im 180-px-Umkreis aus seiner Ladung auf (Munition, Treibstoff, Baumaterial).
-- **Soldaten-Nachschub (wie im Original: Gefallene steigen wieder ein):** Hat ein Team weniger als **50 Soldaten** (Schützen und PAK, auch in Fahrzeugen und in Ausbildung), stellt die Haupt-FOB **alle 6 s kostenlos einen Schützen** bereit, der zum Sammelpunkt läuft. Die Auswahl der Haupt-FOB zeigt „Nachschub: Schütze in N s (Soldaten x/50)“ bzw. „Nachschub ruht“. Geld bleibt nötig für PAK, Fahrzeuge und Hubschrauber.
+- **Soldaten-Nachschub (wie im Original: Gefallene steigen wieder ein):** Hat ein Team weniger als **29 Soldaten** (Schützen und PAK, auch in Fahrzeugen und in Ausbildung), stellt die Haupt-FOB **alle 6 s kostenlos einen Schützen** bereit, der zum Sammelpunkt läuft. Die Auswahl der Haupt-FOB zeigt „Nachschub: Schütze in N s (Soldaten x/29, Plätze y/50)“ bzw. „Nachschub ruht“. Geld bleibt nötig für PAK, Fahrzeuge und Hubschrauber.
 - **Kasse:** Das Geld am Rundenende wird gespeichert (höchstens 5000) und ist das Startgeld der nächsten Runde (mindestens 800); die KI startet mit demselben Betrag. Im Startmenü lässt sich die Kasse zurücksetzen.
 - Einheiten starten **voll munitioniert, betankt und mit vollem Baumaterial**.
 - **Waffen und Munition je Einheit:** Jede Waffe hat einen eigenen Schussvorrat; beim Nachladen kostet jeder Schuss Munition aus dem Lager.
@@ -87,7 +87,7 @@ Nicht im Umfang: Netzwerk-Multiplayer, Kampagne, Speichern laufender Partien, So
 | Flugabwehr | Schießt **Hubschrauber** ab (Reichweite 320, 35 Schaden je Schuss), fängt gegnerische Mörsergranaten ab und beschießt Bodenziele schwach. Munition aus der FOB |
 | Bohrer | Zieht die Hot Zone an (Abschnitt 7); 2×2, 150 Baumaterial, braucht beim Betrieb Treibstoff aus der FOB |
 
-Gebäude können abgerissen werden (Erstattung 25 % Baumaterial). Es gibt kein Einheitenlimit (seit v4.24).
+Gebäude können abgerissen werden (Erstattung 25 % Baumaterial). **Einheitenlimit (seit v4.39):** Jedes Team hat **50 Plätze** (`BALANCE.slotCap`). Soldat, LKW, Baufahrzeug und Hubschrauber belegen je 1 Platz, Schützenpanzer 3, Kampfpanzer 5 (`slots` in `units.js`). Gezählt werden lebende Einheiten, Passagiere und Einträge der Ausbildungs-Warteschlange; ist kein Platz frei, wird die Ausbildung abgelehnt („Einheitenlimit erreicht“) und der Soldaten-Nachschub pausiert. Gefallene geben ihre Plätze wieder frei.
 
 ## 6. Einheiten
 
@@ -312,6 +312,7 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 
 ## Änderungsverlauf
 
+- v4.39: **Neue Startarmee und Einheitenlimit in Plätzen.** Start mit 2 Kampfpanzern, 3 Schützenpanzern, 22 Schützen, 7 PAK (+ LKW, Baufahrzeug) statt 40/10 Soldaten; 50 Plätze je Team, MBT = 5, SPz = 3, sonst 1. Soldaten-Nachschub-Schwelle 29. Anzeige in der Haupt-FOB (Plätze x/50) und im Tooltip. Cache v51.
 - v4.38: **Scharfschütze** (neue baubare Einheit, Taste T): 1-Schuss-Kill gegen Soldaten, 8 s Nachladen, Reichweite 480, Tarnung (Gegner sehen ihn nur nahe oder 4 s nach einem Schuss); eigenes 3D-Modell nach Ghillie-Foto in 8 Richtungen. Idle-Einheiten schießen bis zur Waffenreichweite statt nur bis zur Leine. Cache v50.
 - v4.37: **Wachturm** als Gebäude (eigenes 3D-Modell, 4 Drehungen), vier Türme am Zonenrand der Zufallskarte, im Karteneditor setzbar, Kartenformat `kind: tower`. Cache v49.
 - v4.36: **Kampfpanzer** als eigenes 3D-Modell (Leopard-2-Anmutung, ersetzt T-12). Cache v48.

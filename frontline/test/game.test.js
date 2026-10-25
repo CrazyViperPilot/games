@@ -7,6 +7,7 @@ import { UNITS } from '../js/data/units.js';
 import { BUILDINGS } from '../js/data/buildings.js';
 import { nearestPassable } from '../js/game/movement.js';
 
+BALANCE.slotCap = 1000; // diese Tests prüfen nicht das Einheitenlimit (siehe economy.test.js)
 const DT = 0.05;
 const mk = (opts) => classic(new Game(opts));
 const TILE = BALANCE.map.tile;
@@ -73,8 +74,8 @@ test('Startzustand: fertige Haupt-FOB mit Lager, Startunits, Geld', () => {
     assert.equal(unitsOf(g, t).length, BALANCE.startUnits.length);
     assert.equal(unitsOf(g, t, 'truck').length, 1);
     assert.equal(unitsOf(g, t, 'engineer').length, 1);
-    assert.equal(unitsOf(g, t, 'rifleman').length, 40);
-    assert.equal(unitsOf(g, t, 'at').length, 10);
+    assert.equal(unitsOf(g, t, 'rifleman').length, 22);
+    assert.equal(unitsOf(g, t, 'at').length, 7);
     assert.deepEqual(f.store, { bm: CLASSIC.bm, mun: CLASSIC.mun, fuel: CLASSIC.fuel });
     assert.equal(g.teams[t].res.money, BALANCE.startRes.money);
     assert.equal(g.teams[t].res.bm, CLASSIC.bm, 'Summe aller FOB-Lager');

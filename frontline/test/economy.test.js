@@ -10,6 +10,17 @@ const DT = 0.05;
 const TILE = BALANCE.map.tile;
 const mk = (opts) => classic(new Game(opts));
 
+/** Test ohne Einheitenlimit (Startarmee füllt die 50 Plätze schon). */
+const roomy = (fn) => () => {
+  const cap = BALANCE.slotCap;
+  BALANCE.slotCap = 1000;
+  try {
+    fn();
+  } finally {
+    BALANCE.slotCap = cap;
+  }
+};
+
 function run(game, seconds) {
   const n = Math.round(seconds / DT);
   for (let i = 0; i < n; i++) game.update(DT);
@@ -76,15 +87,18 @@ test('Zonengeld: kein Deckel – 40 Einheiten in der Zone bringen 16 Geld/s', ()
   assert.equal(g.zone.counts[0], 40);
 });
 
-test('Start: 52 Einheiten je Team (LKW, Baufahrzeug, 40 Schützen, 10 Panzerabwehrsoldaten)', () => {
-  assert.equal(BALANCE.startUnits.length, 52);
+test('Start: 36 Einheiten je Team (LKW, Baufahrzeug, 2 MBT, 3 SPz, 22 Schützen, 7 Panzerabwehrsoldaten) = 50 Plätze', () => {
+  assert.equal(BALANCE.startUnits.length, 36);
   const g = mk({ seed: 7 });
   for (let t = 0; t < 2; t++) {
-    assert.equal(unitsOf(g, t).length, 52);
+    assert.equal(unitsOf(g, t).length, 36);
     assert.equal(unitsOf(g, t, 'truck').length, 1);
     assert.equal(unitsOf(g, t, 'engineer').length, 1);
-    assert.equal(unitsOf(g, t, 'rifleman').length, 40);
-    assert.equal(unitsOf(g, t, 'at').length, 10);
+    assert.equal(unitsOf(g, t, 'tank').length, 2);
+    assert.equal(unitsOf(g, t, 'ifv').length, 3);
+    assert.equal(unitsOf(g, t, 'rifleman').length, 22);
+    assert.equal(unitsOf(g, t, 'at').length, 7);
+    assert.equal(g.slotsUsed(t), BALANCE.slotCap);
     assert.equal(g.teams[t].res.money, BALANCE.startRes.money, 'Startgeld unverändert');
   }
 });
@@ -114,7 +128,7 @@ test('Startaufstellung: keine Einheit auf unpassierbarer Zelle, keine Überlappu
   }
 });
 
-test('Ausbildung: zwei Einträge werden gleichzeitig ausgebildet, je mit eigenem Fortschritt', () => {
+test('Ausbildung: zwei Einträge werden gleichzeitig ausgebildet, je mit eigenem Fortschritt', roomy(() => {
   const g = mk({ seed: 7 });
   const f = fobOf(g, 0);
   const bt = UNITS.rifleman.buildTime;
@@ -137,9 +151,9 @@ test('Ausbildung: zwei Einträge werden gleichzeitig ausgebildet, je mit eigenem
   assert.equal(unitsOf(g, 0, 'rifleman').length, before + 3);
   assert.equal(f.queue.length, 0);
   assert.equal(f.queueTimes.length, 0);
-});
+}));
 
-test('Ausbildung: Abbrechen erstattet den letzten Auftrag, der laufende behält seinen Fortschritt', () => {
+test('Ausbildung: Abbrechen erstattet den letzten Auftrag, der laufende behält seinen Fortschritt', roomy(() => {
   const g = mk({ seed: 7 });
   const f = fobOf(g, 0);
   g.issue(0, { type: 'train', buildingId: f.id, unit: 'rifleman' });
@@ -152,7 +166,7 @@ test('Ausbildung: Abbrechen erstattet den letzten Auftrag, der laufende behält 
   assert.equal(f.queue[0].unit, 'rifleman');
   assert.equal(f.queueTimes.length, 1);
   assert.ok(Math.abs(f.queueTimes[0] - 2) < 0.1, `Fortschritt ${f.queueTimes[0]}`);
-});
+}));
 
 test('KI: setzt die Startarmee sofort ein, die Reserve bleibt an der Haupt-FOB', () => {
   const g = mk({ seed: 7 });
@@ -160,7 +174,7 @@ test('KI: setzt die Startarmee sofort ein, die Reserve bleibt an der Haupt-FOB',
   ai.update(DT); // erster Denkschritt sofort
   const combat = unitsOf(g, 1).filter((u) => u.def.range > 0);
   const moving = combat.filter((u) => u.order.type === 'attackMove');
-  assert.equal(combat.length, 50);
+  assert.equal(combat.length, 34);
   assert.ok(moving.length >= 0.75 * combat.length, `${moving.length} von ${combat.length} rücken aus`);
   assert.ok(moving.length < combat.length, 'Reserve bleibt zurück');
   const home = fobOf(g, 1);
@@ -171,10 +185,10 @@ test('KI: setzt die Startarmee sofort ein, die Reserve bleibt an der Haupt-FOB',
   }
 });
 
-test('Nachschub: nach 6 s bei unter 50 Soldaten, ein Schütze kostenlos an der Haupt-FOB', () => {
+test('Nachschub: nach 6 s bei unter 29 Soldaten, ein Schütze kostenlos an der Haupt-FOB', () => {
   const g = mk({ seed: 7 });
   for (const u of unitsOf(g, 0, 'rifleman').slice(0, 5)) u.alive = false;
-  assert.equal(g.soldierCount(0), 45);
+  assert.equal(g.soldierCount(0), 24);
   const before = unitsOf(g, 0, 'rifleman').length;
   const m0 = g.teams[0].res.money;
   run(g, 5.9);
@@ -182,15 +196,15 @@ test('Nachschub: nach 6 s bei unter 50 Soldaten, ein Schütze kostenlos an der H
   run(g, 0.5);
   assert.equal(unitsOf(g, 0, 'rifleman').length, before + 1, 'ein Schütze nach 6 s');
   assert.equal(g.teams[0].res.money, m0, 'kostenlos');
-  assert.equal(g.soldierCount(0), 46);
+  assert.equal(g.soldierCount(0), 25);
 });
 
-test('Nachschub: keiner bei 50 Soldaten', () => {
+test('Nachschub: keiner bei 29 Soldaten', () => {
   const g = mk({ seed: 7 });
   assert.equal(g.soldierCount(0), BALANCE.reinforce.soldierMin);
   const before = unitsOf(g, 0).length;
   run(g, 20);
-  assert.equal(g.soldierCount(0), 50);
+  assert.equal(g.soldierCount(0), 29);
   assert.equal(unitsOf(g, 0).length, before);
 });
 
@@ -204,16 +218,31 @@ test('Nachschub: keiner ohne lebende Haupt-FOB', () => {
   assert.equal(g.teams[0].reinforceTimer, 0);
 });
 
-test('soldierCount: zählt Passagiere in Fahrzeugen und Infanterie in der Warteschlange', () => {
+test('soldierCount: zählt Passagiere in Fahrzeugen und Infanterie in der Warteschlange', roomy(() => {
   const g = mk({ seed: 7 });
   const f = fobOf(g, 0);
-  assert.equal(g.soldierCount(0), 50);
+  assert.equal(g.soldierCount(0), 29);
   const heli = g.spawnUnit('littlebird', 0, f.x + 150, f.y - 150);
   const man = unitsOf(g, 0, 'rifleman')[0];
   man.alive = false;
   heli.passengers.push(man);
-  assert.equal(g.soldierCount(0), 50, 'Passagier zählt');
+  assert.equal(g.soldierCount(0), 29, 'Passagier zählt');
   assert.equal(g.issue(0, { type: 'train', buildingId: f.id, unit: 'rifleman' }).ok, true);
   assert.equal(g.issue(0, { type: 'train', buildingId: f.id, unit: 'at' }).ok, true);
-  assert.equal(g.soldierCount(0), 52, 'Warteschlange zählt (Schütze und Panzerabwehrsoldat)');
+  assert.equal(g.soldierCount(0), 31, 'Warteschlange zählt (Schütze und Panzerabwehrsoldat)');
+}));
+
+test('Einheitenlimit: 50 Plätze, MBT belegt 5, SPz 3; Ausbildung wird abgelehnt, Tod gibt Plätze frei', () => {
+  const g = mk({ seed: 7 });
+  const f = fobOf(g, 0);
+  assert.equal(UNITS.tank.slots, 5);
+  assert.equal(UNITS.ifv.slots, 3);
+  g.teams[0].res.money = 5000;
+  let r = g.issue(0, { type: 'train', buildingId: f.id, unit: 'tank' });
+  assert.equal(r.ok, false);
+  assert.match(r.reason || r.error || JSON.stringify(r), /limit/i);
+  unitsOf(g, 0, 'tank')[0].alive = false; // 5 Plätze frei
+  assert.equal(g.issue(0, { type: 'train', buildingId: f.id, unit: 'tank' }).ok, true);
+  assert.equal(g.slotsUsed(0), 50);
+  assert.equal(g.issue(0, { type: 'train', buildingId: f.id, unit: 'rifleman' }).ok, false);
 });

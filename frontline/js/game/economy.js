@@ -87,13 +87,13 @@ export function updateEconomy(game, dt) {
 
 /**
  * Nachschub eines Teams: zählt nur, solange eine lebende fertige Haupt-FOB steht, zu wenig Soldaten
- * (< soldierMin) und das Einheitenlimit nicht erreicht ist. Bei `interval` s erscheint ein Schütze an der
+ * (< soldierMin) und das Einheitenlimit (Plätze) nicht erreicht ist. Bei `interval` s erscheint ein Schütze an der
  * Haupt-FOB. Ist kein Feld frei, bleibt der Timer stehen (nächster Schritt). Sonst Timer = 0.
  */
 function updateReinforce(game, team, dt) {
   const R = BALANCE.reinforce;
   const b = game.mainFob(team.id);
-  if (!b || !b.built || game.soldierCount(team.id) >= R.soldierMin) {
+  if (!b || !b.built || game.soldierCount(team.id) >= R.soldierMin || game.slotsUsed(team.id) + 1 > BALANCE.slotCap) {
     team.reinforceTimer = 0;
     return;
   }

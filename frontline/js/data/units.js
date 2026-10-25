@@ -112,6 +112,7 @@ export const UNITS = {
   },
   ifv: {
     name: 'Schützenpanzer',
+    slots: 3,
     armor: 'light',
     hp: 450,
     speed: 85,
@@ -132,6 +133,7 @@ export const UNITS = {
   },
   tank: {
     name: 'Kampfpanzer',
+    slots: 5,
     armor: 'heavy',
     hp: 1100,
     speed: 60,

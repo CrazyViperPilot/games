@@ -344,7 +344,7 @@ export class Hud {
     const R = BALANCE.reinforce;
     const t = g.teams[b.team];
     const soldiers = g.soldierCount(b.team);
-    const label = `Soldaten ${soldiers}/${R.soldierMin}`;
+    const label = `Soldaten ${soldiers}/${R.soldierMin}, Plätze ${g.slotsUsed(b.team)}/${BALANCE.slotCap}`;
     if (soldiers >= R.soldierMin) {
       return `<div class="muted small">Nachschub ruht (${label})</div>`;
     }

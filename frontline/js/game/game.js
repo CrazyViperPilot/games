@@ -774,12 +774,29 @@ export class Game {
     if (!b.built) return fail('Gebäude ist noch im Bau');
     if (!UNITS[cmd.unit] || !b.produces.includes(cmd.unit)) return fail('Nur die Haupt-FOB bildet Einheiten aus');
     if (b.queue.length >= BALANCE.queueMax) return fail('Warteschlange ist voll');
+    if (this.slotsUsed(team) + (UNITS[cmd.unit].slots || 1) > BALANCE.slotCap) return fail('Einheitenlimit erreicht');
     const cost = UNITS[cmd.unit].cost;
     if (!this.canAfford(team, cost)) return fail(this.missingMoney());
     this.pay(team, cost);
     b.queue.push({ unit: cmd.unit, payerId: b.id });
     b.queueTimes.push(0);
     return { ok: true };
+  }
+
+  /** Belegte Plätze eines Teams: lebende Einheiten, Passagiere und Warteschlangen, je nach `slots` der Sorte. */
+  slotsUsed(team) {
+    const s = (def) => def.slots || 1;
+    let n = 0;
+    for (const u of this.units) {
+      if (!u.alive || u.team !== team) continue;
+      n += s(u.def);
+      for (const p of u.passengers) n += s(p.def);
+    }
+    for (const b of this.buildings) {
+      if (!b.alive || b.team !== team) continue;
+      for (const e of b.queue) n += s(UNITS[e.unit]);
+    }
+    return n;
   }
 
   /** Lebende plus in Ausbildung befindliche Einheiten eines Teams. */

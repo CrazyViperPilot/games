@@ -103,7 +103,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
         <div class="mapbox" data-mapbox></div>
       </div>
       <ol class="howto">
-        <li>Du startest mit 50 Soldaten (40 Schützen, 10 Panzerabwehrsoldaten) sowie LKW und Baufahrzeug. Die Haupt-FOB hat unendlich Baumaterial, Munition und Treibstoff und bildet alle Einheiten aus – nur Geld ist knapp.</li>
+        <li>Du startest mit 2 Kampfpanzern, 3 Schützenpanzern, 29 Soldaten (22 Schützen, 7 Panzerabwehrsoldaten) sowie LKW und Baufahrzeug. Das Einheitenlimit beträgt 50 Plätze: Soldat 1, Schützenpanzer 3, Kampfpanzer 5. Die Haupt-FOB hat unendlich Baumaterial, Munition und Treibstoff und bildet alle Einheiten aus – nur Geld ist knapp.</li>
         <li>LKW (E) bringen Nachschub aus der Haupt-FOB zu den vorderen FOBs und versorgen Einheiten in ihrer Nähe.</li>
         <li>Baufahrzeug (R): bis zu 10 FOBs (ohne überlappende Bauradien), Mörser, Flak, Bohrer. Soldaten bauen aus wenig getragenem Baumaterial Mauern und Tore.</li>
         <li>Konfliktzone halten: jede deiner Einheiten dort bringt Geld (0,4/s, in der Hot Zone 0,8/s), alle 30 s ein Punkt. Fällt deine Haupt-FOB, ist die Runde verloren.</li>

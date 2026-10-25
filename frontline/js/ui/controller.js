@@ -879,7 +879,7 @@ export class Controller {
         card.push(
           entry(SHORT_BLD[key] || def.name, def.hotkey, {
             cost: costText(def.cost),
-            tip: `${def.name}: ${longCost(def.cost)}`,
+            tip: `${def.name}: ${longCost(def.cost)}${def.slots > 1 ? `, ${def.slots} Plätze` : ''}`,
             enabled: !reason,
             reason,
             action: () => this.beginPlacement(key),
@@ -995,6 +995,7 @@ export class Controller {
       let reason = '';
       if (!producers.some((b) => b.built)) reason = 'Gebäude ist noch im Bau';
       else if (!ready) reason = 'Warteschlange ist voll';
+      else if (this.game.slotsUsed(ready.team) + (def.slots || 1) > BALANCE.slotCap) reason = 'Einheitenlimit erreicht';
       else reason = this.trainReason(ready, def.cost);
       card.push(
         entry(SHORT_UNIT[u] || def.name, def.hotkey, {

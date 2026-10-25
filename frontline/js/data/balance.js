@@ -8,8 +8,10 @@ export const BALANCE = {
   walletMax: 5000, // Obergrenze der Kasse, die von Runde zu Runde bleibt
   pointInterval: 30,
   startRes: { money: 800 }, // Startgeld; die Haupt-FOB hat unendlich Baumaterial, Munition und Treibstoff
-  // Start mit 50 Soldaten (40 Schützen, 10 Panzerabwehrsoldaten) plus LKW und Baufahrzeug
-  startUnits: ['truck', 'engineer', ...Array(40).fill('rifleman'), ...Array(10).fill('at')],
+  // Einheitenlimit in Plätzen je Team: Soldat/LKW/Baufahrzeug/Hubschrauber 1, Schützenpanzer 3, Kampfpanzer 5 (`slots` in units.js)
+  slotCap: 50,
+  // Start: 2 Kampfpanzer (10 Plätze), 3 Schützenpanzer (9), LKW und Baufahrzeug (2), 29 Soldaten (22 Schützen, 7 Panzerabwehr) = 50 Plätze
+  startUnits: ['truck', 'engineer', 'tank', 'tank', 'ifv', 'ifv', 'ifv', ...Array(22).fill('rifleman'), ...Array(7).fill('at')],
   // Geld je Sekunde und lebende eigene Einheit in der Konfliktzone (auch umkämpft, ohne Deckel)
   zone: { r: 3300, unitIncome: 0.4 },
   // Hot Zone: kleiner Kreis in der Konfliktzone, wandert zufällig oder zu aktiven Bohrern.
@@ -22,7 +24,7 @@ export const BALANCE = {
   shortageWarn: 20, // s zwischen zwei Meldungen je Sorte und Team
   fuelSlowMul: 0.25, // Tempo von Fahrzeugen ohne Treibstoff
   // Soldaten-Nachschub (§12): kostenloser Schütze an der Haupt-FOB alle `interval` s, solange weniger als `soldierMin` Infanterie lebt
-  reinforce: { interval: 6, soldierMin: 50, unit: 'rifleman' },
+  reinforce: { interval: 6, soldierMin: 29, unit: 'rifleman' },
   demolishRefund: 0.25, // Abriss fertiger Gebäude (Baustellen: voll)
   scanInterval: 0.25, // Zielsuche
   fogInterval: 0.25,
