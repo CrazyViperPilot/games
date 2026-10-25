@@ -109,7 +109,7 @@ export function createBuilding(id, type, team, cx, cy, tile) {
     built: false,
     progress: 0,
     queue: [], // Einträge { unit, payerId }
-    queueTime: 0,
+    queueTimes: [], // Fortschritt je Eintrag (s), parallel zu queue; nur die ersten trainSlots laufen
     rallyX: x,
     rallyY: y + (h / 2 + 2) * tile,
     targetId: null,

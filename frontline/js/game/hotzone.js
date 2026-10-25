@@ -1,5 +1,5 @@
 // Hot Zone und Bohrer (Konzept: kleiner Kreis, der in der Konfliktzone umherwandert; aktive Bohrer ziehen ihn an).
-// Einheiten darin zählen bei der Punktewertung (zone.js) doppelt; der Besitzer bekommt zusätzlich Geld. Kein DOM.
+// Einheiten darin zählen bei der Punktewertung (zone.js) doppelt und bringen das doppelte Zonengeld. Kein DOM.
 import { BALANCE } from '../data/balance.js';
 import { makeRng } from '../core/rng.js';
 
@@ -135,7 +135,7 @@ function updateDrills(game, dt) {
   }
 }
 
-/** Ein Schritt: Bohrer, Wanderung der Hot Zone, Besitz, Geld und Punkte. */
+/** Ein Schritt: Bohrer, Wanderung der Hot Zone und Besitz (Geld kommt je Einheit in zone.js). */
 export function updateHot(game, dt) {
   updateDrills(game, dt);
   const hot = game.hot;
@@ -179,9 +179,4 @@ export function updateHot(game, dt) {
   if (!hot.contested) owner = counts[0] > 0 ? 0 : counts[1] > 0 ? 1 : -1;
   if (owner !== hot.owner && owner >= 0) game.message(-1, `${BALANCE.teamNames[owner]} hält die Hot Zone`);
   hot.owner = owner;
-  if (owner < 0) return;
-  const team = game.teams[owner];
-  const perSec = H.income * team.incomeMult;
-  team.rate.money += perSec;
-  team.res.money += perSec * dt;
 }

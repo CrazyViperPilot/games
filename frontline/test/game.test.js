@@ -73,7 +73,8 @@ test('Startzustand: fertige Haupt-FOB mit Lager, Startunits, Geld', () => {
     assert.equal(unitsOf(g, t).length, BALANCE.startUnits.length);
     assert.equal(unitsOf(g, t, 'truck').length, 1);
     assert.equal(unitsOf(g, t, 'engineer').length, 1);
-    assert.equal(unitsOf(g, t, 'rifleman').length, 4);
+    assert.equal(unitsOf(g, t, 'rifleman').length, 40);
+    assert.equal(unitsOf(g, t, 'at').length, 10);
     assert.deepEqual(f.store, { bm: CLASSIC.bm, mun: CLASSIC.mun, fuel: CLASSIC.fuel });
     assert.equal(g.teams[t].res.money, BALANCE.startRes.money);
     assert.equal(g.teams[t].res.bm, CLASSIC.bm, 'Summe aller FOB-Lager');
@@ -248,14 +249,14 @@ test('Kampf: Kampfpanzer tötet einen Schützen', () => {
 test('Zone: nur Team 0 in der Zone bringt nach 30,1 s einen Punkt und Geld', () => {
   const g = mk({ seed: 7 });
   const z = g.zone;
-  g.spawnUnit('rifleman', 0, z.x, z.y);
+  g.spawnUnit('rifleman', 0, z.x + 1000, z.y); // außerhalb der Hot Zone
   const money0 = g.teams[0].res.money;
   run(g, 30.1);
   assert.equal(g.zone.owner, 0);
   assert.equal(g.zone.contested, false);
   assert.equal(g.teams[0].points, 1);
-  // mindestens das Kontrollgeld (6/s) muss gezahlt worden sein
-  assert.ok(g.teams[0].res.money >= money0 + BALANCE.zone.controlIncome * 30);
+  // genau das Zonengeld der einen Einheit (0,4/s), ohne Führungsgeld
+  assert.ok(Math.abs(g.teams[0].res.money - money0 - BALANCE.zone.unitIncome * 30.1) < 0.5);
   assert.ok(g.drainEvents().some((e) => e.text === 'Punkt für Blau'));
 });
 
@@ -864,7 +865,7 @@ test('Soldaten und Fahrzeuge tanken Munition und Treibstoff in der FOB nach', ()
   assert.equal(r.ammo, 0, 'ohne Lagerbestand keine Munition');
 });
 
-test('Hot Zone wandert innerhalb der Konfliktzone und gibt dem Besitzer Geld und Punkte', () => {
+test('Hot Zone wandert innerhalb der Konfliktzone; Einheiten darin bringen doppeltes Geld und Punkte', () => {
   const g = mk({ seed: 7 });
   const hz = g.hot;
   for (let i = 0; i < Math.round(120 / DT); i++) {
@@ -883,7 +884,8 @@ test('Hot Zone wandert innerhalb der Konfliktzone und gibt dem Besitzer Geld und
     hz.y = u.y;
     g.update(DT);
   }
-  assert.ok(g.teams[0].res.money - money0 > 100, 'Geld');
+  // 50 s × 0,8 Geld/s (das Doppelte der Zone, nicht zusätzlich)
+  assert.ok(Math.abs(g.teams[0].res.money - money0 - BALANCE.hot.unitIncome * 50) < 0.5, 'Geld');
   assert.ok(g.teams[0].points >= pts0 + 1, 'Punkt');
 });
 

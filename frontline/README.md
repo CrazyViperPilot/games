@@ -7,8 +7,8 @@ Spezifikation: [PRD.md](PRD.md) · Architektur: [PLAN.md](PLAN.md)
 
 ## Spielprinzip
 
-- Jede Partei startet mit einer FOB (gefülltes Lager), einem LKW, einem Baufahrzeug und vier Schützen.
-- **Ressourcen:** Geld (Konfliktzone, Grundeinkommen der FOB) sowie Baumaterial, Munition und Treibstoff.
+- Jede Partei startet mit einer FOB (gefülltes Lager), einem LKW, einem Baufahrzeug, 40 Schützen und 10 Panzerabwehrsoldaten.
+- **Ressourcen:** Geld (jede Einheit in der Konfliktzone bringt 0,4 Geld/s, in der Hot Zone 0,8 Geld/s) sowie Baumaterial, Munition und Treibstoff.
   Die drei Sorten kommen von Förderanlagen auf den Vorkommen und liegen in den **Lagern der FOBs** (je Sorte max. 3000).
   Eine Förderanlage liefert in die FOB, in deren Bauradius sie steht. Gebäude und Ausbildung zahlt die FOB in Reichweite.
 - **LKW** laden Material an einer FOB, bringen es zu einer anderen FOB oder Baustelle, pendeln auf Routen und
@@ -17,8 +17,8 @@ Spezifikation: [PRD.md](PRD.md) · Architektur: [PLAN.md](PLAN.md)
   baut alles und repariert beschädigte Gebäude; Schützen und PAK bauen Mauern und Tore.
 - Gebäude nur im Bauradius (450 px) einer fertigen eigenen FOB. Eine neue FOB setzt das Baufahrzeug als Baustelle;
   sie braucht 400 Baumaterial im eigenen Lager (per LKW) und wird dann vom Baufahrzeug gebaut (max. 6 FOBs).
-- **Konfliktzone:** Wer dort Einheiten hat (und der Gegner keine), kontrolliert sie: Geld und alle 30 s ein Punkt.
-  Sind beide drin, ist sie umkämpft.
+- **Konfliktzone:** Wer dort mehr Einheiten hat, kontrolliert sie und bekommt alle 30 s einen Punkt. Das Geld je Einheit
+  fließt für beide Seiten, auch wenn sie umkämpft ist.
 - **Sieg:** Siegpunkte erreichen (25, 50 oder 100) oder den Gegner ohne FOB und Baufahrzeug ausschalten.
 
 ## Steuerung

@@ -308,16 +308,19 @@ export function drawBuilding(ctx, b, color, zoom = 1) {
       ctx.fillStyle = col;
       ctx.fillRect(x0, y0 - bh - 3 / z, w * clamp(frac, 0, 1), bh);
     }
-    // Fertigungsfortschritt des ersten Auftrags
+    // Fertigungsfortschritt der laufenden Aufträge (je Ausbildungsplatz eine Leiste)
     if (b.queue && b.queue.length) {
-      const bt = UNITS[b.queue[0].unit ?? b.queue[0]].buildTime;
-      const frac = clamp(b.queueTime / bt, 0, 1);
       const bh = Math.max(3, 4 / z);
-      const by = y0 + h + 3 / z;
-      ctx.fillStyle = 'rgba(0,0,0,0.7)';
-      ctx.fillRect(x0, by, w, bh);
-      ctx.fillStyle = '#7fd36a';
-      ctx.fillRect(x0, by, w * frac, bh);
+      const slots = Math.min(BALANCE.trainSlots, b.queue.length);
+      for (let i = 0; i < slots; i++) {
+        const bt = UNITS[b.queue[i].unit].buildTime;
+        const frac = clamp(b.queueTimes[i] / bt, 0, 1);
+        const by = y0 + h + 3 / z + i * (bh + 1 / z);
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        ctx.fillRect(x0, by, w, bh);
+        ctx.fillStyle = '#7fd36a';
+        ctx.fillRect(x0, by, w * frac, bh);
+      }
     }
   }
   ctx.restore();

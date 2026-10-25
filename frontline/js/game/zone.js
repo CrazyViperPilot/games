@@ -2,24 +2,27 @@
 import { BALANCE } from '../data/balance.js';
 
 const Z = BALANCE.zone;
+const H = BALANCE.hot;
 
 /** Ein Schritt: Zählung der Einheiten in der Zone, Kontrolle, Zonengeld und Punkte. */
 export function updateZone(game, dt) {
   const z = game.zone;
+  const hot = game.hot;
   const counts = [0, 0];
+  const weight = [0, 0];
+  const money = [0, 0]; // Geld je Sekunde je Team (ohne incomeMult)
   for (const u of game.units) {
-    if (u.alive && Math.hypot(u.x - z.x, u.y - z.y) <= z.r) counts[u.team]++;
+    if (!u.alive) continue;
+    const inZone = Math.hypot(u.x - z.x, u.y - z.y) <= z.r;
+    const inHot = !!hot && Math.hypot(u.x - hot.x, u.y - hot.y) <= hot.r;
+    if (inZone) counts[u.team]++;
+    // Gewichtung: Einheiten in der Hot Zone zählen doppelt (sie liegt innerhalb der Konfliktzone)
+    weight[u.team] += (inZone ? 1 : 0) + (inHot ? 1 : 0);
+    // Geld: je Einheit in der Zone; in der Hot Zone das Doppelte statt zusätzlich
+    if (inHot) money[u.team] += H.unitIncome;
+    else if (inZone) money[u.team] += Z.unitIncome;
   }
   z.counts = counts;
-
-  // Gewichtung: Einheiten in der Hot Zone zählen doppelt (sie liegt innerhalb der Konfliktzone)
-  const hot = game.hot;
-  const weight = [counts[0], counts[1]];
-  if (hot) {
-    for (const u of game.units) {
-      if (u.alive && Math.hypot(u.x - hot.x, u.y - hot.y) <= hot.r) weight[u.team]++;
-    }
-  }
   z.weight = weight;
 
   // Mehrheit statt Alleinbesitz: das Team mit dem größeren Gewicht führt (Gleichstand: niemand)
@@ -32,11 +35,10 @@ export function updateZone(game, dt) {
   z.owner = owner;
   z.contested = contested;
 
-  // Geld: Kontrolle (nur Besitzer) plus je Einheit in der Zone (alle Teams, max. unitIncomeCap gezählt)
+  // Geld: jede Einheit in der Zone zahlt, für beide Teams gleichzeitig (auch umkämpft)
   for (let t = 0; t < game.teams.length; t++) {
     const team = game.teams[t];
-    let perSec = Math.min(counts[t], Z.unitIncomeCap) * Z.unitIncome * team.incomeMult;
-    if (owner === t) perSec += Z.controlIncome * team.incomeMult;
+    const perSec = money[t] * team.incomeMult;
     if (perSec > 0) {
       team.rate.money += perSec;
       team.res.money += perSec * dt;

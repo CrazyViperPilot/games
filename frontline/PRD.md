@@ -19,7 +19,7 @@ Nicht im Umfang: Netzwerk-Multiplayer, Kampagne, Speichern laufender Partien, So
 ## 2. Spielablauf
 
 1. Startmenü: Schwierigkeit (Leicht/Normal/Schwer), Siegpunkte (100 Standard; 25/50 für Schnellpartie), **Karte** (Zufall · Gespeichert · Neue Karte, siehe Abschnitt 9a), Start.
-2. Jede Partei startet in einer Ecke der großen Karte mit der **Haupt-FOB** (unendlich Baumaterial, Munition, Treibstoff), Geld (800 oder die Kasse der letzten Runde), 1 Baufahrzeug, 1 LKW (leer) und 4 Schützen.
+2. Jede Partei startet in einer Ecke der großen Karte mit der **Haupt-FOB** (unendlich Baumaterial, Munition, Treibstoff), Geld (800 oder die Kasse der letzten Runde), 1 Baufahrzeug, 1 LKW (leer), **40 Schützen und 10 Panzerabwehrsoldaten** (50 Soldaten, Startaufstellung vor der FOB).
 3. Nur die Haupt-FOB bildet Einheiten aus (nur gegen Geld). Man bringt Einheiten und Nachschub per LKW an die Front, gründet vordere FOBs
    (Verschanzen mit Mauern und Tore, Mörser, Flak, Nachladen und Tanken) und hält die Zone.
 4. In der Mitte liegt die sehr große **Konfliktzone** (eine Stadt). Wer dort mehr Spieler hat (Hot Zone doppelt), füllt den Punktebalken und bekommt Geld. In ihr wandert die **Hot Zone** (Abschnitt 7).
@@ -29,13 +29,13 @@ Nicht im Umfang: Netzwerk-Multiplayer, Kampagne, Speichern laufender Partien, So
 
 | Ressource | Quelle | Lagerort | Verwendung |
 |---|---|---|---|
-| **Geld** | Konfliktzone, Hot Zone, **Abschüsse und fertige Bauten** | global, **bleibt von Runde zu Runde** | Einheiten (Ausbildung) |
+| **Geld** | Einheiten in der Konfliktzone (je Einheit, Hot Zone doppelt), **Abschüsse und fertige Bauten** | global, **bleibt von Runde zu Runde** | Einheiten (Ausbildung) |
 | **Baumaterial** | unendlich in der Haupt-FOB | FOB-Lager, LKW, Soldaten (wenig) | Gebäude, Mauern, Tore, Reparatur; 400 per LKW für eine neue FOB-Baustelle |
 | **Munition** | unendlich in der Haupt-FOB | FOB-Lager, Einheiten, LKW | Mörser/Flak und **Nachladen der Einheiten** |
 | **Treibstoff** | unendlich in der Haupt-FOB | FOB-Lager, Fahrzeuge, LKW | **Verbrauch beim Fahren/Fliegen** und Bohrer |
 
 - **Keine Ressourcenvorkommen, keine Förderanlagen, kein Grundeinkommen je FOB.** Geld gibt es in der Konfliktzone und der Hot Zone (Abschnitt 7) sowie als **Prämie**: Für jede zerstörte gegnerische Einheit zahlt der Gegner (also du) 25 % des Einheitenpreises bei Soldaten, **60 % bei Fahrzeugen und Hubschraubern** (z. B. Schütze 15, Kampfpanzer 300); für zerstörte Gebäude 20 % ihres Baumaterialpreises (Mauern und Tore nichts); für jedes **fertig gebaute** Gebäude 20 % seines Baumaterialpreises (FOB 80, Mörser 40, Flak 36, Bohrer 30; Mauern und Tore nichts, sonst wäre Mauerbau eine Geldquelle). Ab 100 Geld erscheint eine Meldung. Die Prämie gilt für beide Seiten, auch für die KI.
-- **Haupt-FOB:** unendliches Lager. **Raten:** LKW laden/entladen 100/s (400 Ladung in 4 s), Einheiten nachfüllen (Munition 60/s, Treibstoff 4/s, Baumaterial 20/s), Ausbildung eine Einheit nach der anderen
+- **Haupt-FOB:** unendliches Lager. **Raten:** LKW laden/entladen 100/s (400 Ladung in 4 s), Einheiten nachfüllen (Munition 60/s, Treibstoff 4/s, Baumaterial 20/s), Ausbildung **zwei Einheiten gleichzeitig** (2 Ausbildungsplätze, je eigener Fortschritt)
   (Schütze 5 s, PAK 8 s, LKW 6 s, Baufahrzeug 9 s, SPz 12 s, KPz 20 s, Little Bird 15 s, Transporter 20 s, AH-64 28 s; Warteschlange 5).
 - **Vordere FOBs:** eigenes endliches Lager (max. 3000 je Sorte), das nur **LKW oder Transporthubschrauber** füllen. Oben zeigt „Front BM/MUN/TS“ die Summe dieser Lager.
 - **Bezahlen:** Gebäude zahlen aus einer FOB, deren Bauradius den Bauort enthält (Baufahrzeug). Einheiten kosten **nur Geld**. Abbruch erstattet an dieses Lager.
@@ -138,13 +138,12 @@ Direktfeuer richtet sich nach Trefferzahlen (volles Ziel); Seite = Winkel zur Fa
   heißt nur, dass beide Parteien Einheiten in der Zone haben.
 - **Punktebalken** (oben, in der Farbe des Führenden): füllt sich in **30 s**; voll = **1 Punkt** für das Team des Balkens, dann
   beginnt er von vorn. Wechselt die Führung, leert er sich doppelt so schnell und färbt sich dann um. Bei Gleichstand steht er still.
-- Führende Partei: **+10 Geld/s**.
-- Jede eigene Einheit in der Zone bringt zusätzlich **+0,25 Geld/s** (auch wenn umkämpft, max. 30 Einheiten gezählt).
+- **Geld je Einheit:** Jede lebende eigene Einheit in der Zone bringt **0,4 Geld/s** (auch wenn umkämpft; kein Deckel; Hubschrauber zählen mit). Beide Teams verdienen gleichzeitig. Kein Führungsgeld.
 
 ### Hot Zone
 - Kleiner Kreis (Radius 300 px) **innerhalb** der Konfliktzone, orange; auch auf der Minimap. Er wandert langsam (13,3 px/s) zu einem
   Zufallspunkt (neues Ziel alle 25–45 s); nur auf dem Weg zu einem aktiven Bohrer ist er mit 40 px/s schneller.
-- **Besitz** nur, wenn eine Partei allein darin ist: **+8 Geld/s**. Punkte gibt es nicht separat; die Einheiten darin zählen doppelt für den Punktebalken.
+- **Geld:** Einheiten in der Hot Zone bringen **0,8 Geld/s** statt 0,4 (das Doppelte, nicht zusätzlich). **Besitz** nur, wenn eine Partei allein darin ist (Anzeige „HOT“); er bringt kein eigenes Geld. Punkte gibt es nicht separat; die Einheiten darin zählen doppelt für den Punktebalken.
 - Oben zeigt „HOT“ den Besitzer und die Einheitenzahl je Team, daneben der Punktebalken.
 
 ### Bohrer
@@ -186,7 +185,7 @@ Direktfeuer richtet sich nach Trefferzahlen (volles Ziel); Seite = Winkel zur Fa
 
 ## 9. Oberfläche
 
-- Oben: Summe aller FOB-Lager und Geld mit Netto-Rate/s (rot bei Verlust), Punkte Blau/Rot mit Balken, Zonenstatus, Hot-Zone-Anzeige,
+- Oben: Summe aller FOB-Lager und Geld mit Netto-Rate/s (rot bei Verlust), Punkte Blau/Rot mit Balken, Zonenstatus mit Geld/s und Einheitenzahl (Zone, Hot Zone), Hot-Zone-Anzeige,
   Spielzeit, Geschwindigkeit.
 - Unten links Minimap, Mitte Auswahlinfo (FOB: Lager; LKW: Ladung und Ladungsart; Einheiten: Munition/Treibstoff),
   rechts Befehlskarte mit Kosten und Tastenkürzeln (nicht bezahlbare Buttons ausgegraut mit Grund).
@@ -213,7 +212,7 @@ Direktfeuer richtet sich nach Trefferzahlen (volles Ziel); Seite = Winkel zur Fa
 
 Gleiche Regeln und Befehls-Schnittstelle wie der Spieler (Sonderrecht nur: Einkommensfaktor je Schwierigkeit; die KI
 ignoriert den Nebel bei der Zielwahl, Mörser brauchen aber Sicht).
-Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem Baumaterial; **zuerst eine FOB in der Konfliktzone**, dann Relais-FOBs auf dem Weg (1000 px Abstand) und Flanken-FOBs um die Zonen-FOB (Grenze je Schwierigkeit 3/5/7 FOBs); gemischte Armee aus der Haupt-FOB → Zone halten → Verteidigung (Mörser/Flak/Mauern) an vorderen FOBs. **Logistik:** Lieferant bringt Baumaterial zu Baustellen, Pendler-LKW bringen Baumaterial, Munition und Treibstoff aus der Haupt-FOB zu den vorderen FOBs, ein Versorger-LKW folgt der Armee; Einheiten ohne Munition ziehen sich zurück.
+Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem Baumaterial; **zuerst eine FOB in der Konfliktzone**, dann Relais-FOBs auf dem Weg (1000 px Abstand) und Flanken-FOBs um die Zonen-FOB (Grenze je Schwierigkeit 3/5/7 FOBs); gemischte Armee aus der Haupt-FOB → Zone halten → Verteidigung (Mörser/Flak/Mauern) an vorderen FOBs. Die Startarmee rückt sofort aus; ein Fünftel bleibt als Reserve an der Haupt-FOB. **Logistik:** Lieferant bringt Baumaterial zu Baustellen, Pendler-LKW bringen Baumaterial, Munition und Treibstoff aus der Haupt-FOB zu den vorderen FOBs, ein Versorger-LKW folgt der Armee; Einheiten ohne Munition ziehen sich zurück.
 
 ## 11. Qualitätsanforderungen
 
@@ -231,6 +230,7 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 
 ## Änderungsverlauf
 
+- v4.22: **Geld je Einheit, Start mit 50 Soldaten, zwei Ausbildungsplätze.** Wie im Original: Geld pro Tick je Einheit in der Zone, Hot Zone doppelt (0,4 bzw. 0,8 Geld/s; Führungsgeld, Hot-Zone-Besitzgeld und Deckel entfallen). Statt Grundeinkommen Start mit 50 Soldaten (40 Schützen, 10 PAK, LKW, Baufahrzeug) in einer Formation vor der FOB. Haupt-FOB bildet zwei Einheiten gleichzeitig aus. KI rückt mit der Startarmee aus (Reserve 20 %). Punkte unverändert. Cache v35.
 - v4.21: **Treffer bis zum Abschuss** je Waffe, Ziel und Trefferseite (Tabelle in Abschnitt 6). Zonenanzeige zeigt zusätzlich die Wertung (Hot Zone doppelt). Cache v34.
 - v4.20: **Prämien wie in Wardogs.** Geld für Abschüsse (Soldaten 25 %, Fahrzeuge 60 % des Preises, Gebäude 20 % des Baumaterialpreises) und für fertig gebaute Gebäude (20 %); Mauern und Tore ausgenommen. Cache v33.
 - v4.19: Maus: Linksklick auf ein eigenes Gebäude wählt es immer, auch wenn LKW oder Baufahrzeug gewählt sind (Befehle per Rechtsklick); Touch behält den Befehl per Antippen. Cache v32.

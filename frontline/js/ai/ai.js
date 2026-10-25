@@ -17,6 +17,7 @@ const ZONE_GATHER_DIST = 150; // Sammelpunkt an der Zonen-FOB, Richtung eigener 
 const RALLY_MOVE = 150; // Sammelpunkt-Befehl nur neu setzen, wenn sich der Punkt so weit verschiebt
 const RELAY_STEP = 1000; // Abstand der Relais-FOBs auf dem Weg zur Zone (Bauradien dürfen sich nicht überlappen)
 const FLANK_R = 1000; // Flanken-FOBs: Abstand zur Zonen-FOB
+const RESERVE = 0.2; // Anteil der Angriffsgruppe, der als Reserve an der Haupt-FOB bleibt (ab 5 Einheiten)
 const SITE_TIMEOUT = 200; // s, eine FOB-Baustelle ohne Material wird danach abgerissen
 const BAD_TIME = 240; // s, Sperre eines fehlgeschlagenen FOB-Ziels
 const ALARM_TIME = 30; // s, Treffer an der Basis gelten als Angriff auf die Basis
@@ -860,6 +861,7 @@ export class AI {
    * (bei unbesetzter Zone schon ab 60 %). Nicht zu Hause stehende Einheiten folgen dem Befehl.
    * Einheiten mit fast leerem Vorrat bleiben zum Nachfüllen zurück.
    * In der Zone stehende Einheiten verteilen sich auf einem Kreis (r 400) statt im Zentrum zu klumpen.
+   * Ein Fünftel der ausrückenden Gruppe (ab 5 Einheiten) bleibt als Reserve an der Haupt-FOB.
    */
   army(s) {
     const g = this.game;
@@ -890,8 +892,14 @@ export class AI {
       }
       const ready = strength >= need || (z.owner === -1 && strength >= 0.6 * need);
       if (ready) {
-        const go = idle.filter((u) => !inZone(u)).map((u) => u.id);
-        if (go.length) g.issue(t, { type: 'attackMove', ids: go, x: tx, y: ty });
+        let go = idle.filter((u) => !inZone(u));
+        // Reserve: die Einheiten nahe der Haupt-FOB bleiben zur Verteidigung zurück (die große Startarmee rückt trotzdem aus)
+        if (s.home && go.length >= 5) {
+          go.sort((a, b) => dist(a.x, a.y, s.ax, s.ay) - dist(b.x, b.y, s.ax, s.ay));
+          go = go.slice(Math.ceil(go.length * RESERVE));
+        }
+        const ids = go.map((u) => u.id);
+        if (ids.length) g.issue(t, { type: 'attackMove', ids, x: tx, y: ty });
       }
     }
 

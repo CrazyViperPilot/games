@@ -20,6 +20,7 @@ const SITE_BM = BALANCE.construction.fobMaterial;
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const pct = (f) => `${Math.max(0, Math.min(1, f)) * 100}%`;
 const hpColor = (f) => (f > 0.5 ? '#7dd38b' : f > 0.25 ? '#e0b44a' : '#e5484d');
+const fmtDe = (v) => String(v).replace('.', ',');
 const bar = (f, cls = '', color = '') => `<div class="bar ${cls}"><i style="width:${pct(f)}${color ? `;background:${color}` : ''}"></i></div>`;
 
 function fmtRate(v) {
@@ -111,7 +112,7 @@ export class Hud {
         <div class="pts">${pts}</div>
         <div class="zone" data-zone>neutral</div>
         <div class="cap" title="Punktebalken: füllt sich für das Team mit mehr Spielern in der Konfliktzone (Hot Zone zählt doppelt). Voll = 1 Punkt."><i data-cap></i></div>
-        <div class="zone hotz" data-hot title="Hot Zone: kleiner Kreis in der Konfliktzone, zieht zu aktiven Bohrern. Geld für den Besitzer, Einheiten darin zählen bei der Punktewertung doppelt.">HOT</div>
+        <div class="zone hotz" data-hot title="Hot Zone: kleiner Kreis in der Konfliktzone, zieht zu aktiven Bohrern. Einheiten darin bringen doppeltes Zonengeld und zählen bei der Punktewertung doppelt.">HOT</div>
         <div class="clock">
           ${this.app.debug ? '<span class="dbg">DEBUG</span>' : ''}
           <span class="time" data-time>00:00</span>
@@ -185,7 +186,7 @@ export class Hud {
       el.rate.textContent = `${neg ? '−' : '+'}${fmtRate(Math.abs(v))}/s`;
       el.rate.style.color = neg ? NEG_COLOR : '';
       // Lagersorten: Summe aller fertigen FOB-Lager; Geld ist global
-      const lines = [k === 'money' ? 'Geld (global): nur aus Konfliktzone und Hot Zone, bleibt von Runde zu Runde' : 'Front-Lager: Summe der FOB-Lager ohne Haupt-FOB (die hat unendlich)'];
+      const lines = [k === 'money' ? `Geld (global): je Einheit in der Konfliktzone ${fmtDe(BALANCE.zone.unitIncome)}/s, in der Hot Zone ${fmtDe(BALANCE.hot.unitIncome)}/s; bleibt von Runde zu Runde` : 'Front-Lager: Summe der FOB-Lager ohne Haupt-FOB (die hat unendlich)'];
       if (t.used[k] !== undefined) lines.push(`verbraucht: ${Math.floor(t.used[k])}`);
       const tip = lines.join('\n');
       if (el.box.title !== tip) el.box.title = tip;
@@ -210,10 +211,17 @@ export class Hud {
       col = '#9aa596';
     }
     const [c0, c1] = BALANCE.teamColors;
+    // Geld des eigenen Teams aus der Zone: je Einheit in der Zone, in der Hot Zone das Doppelte
+    const me = this.team;
+    const hzCount = g.hot ? g.hot.counts[me] : 0;
+    const inc =
+      `<span class="zone-inc" title="Geld aus der Konfliktzone: je Einheit ${fmtDe(BALANCE.zone.unitIncome)}/s, in der Hot Zone ${fmtDe(BALANCE.hot.unitIncome)}/s">` +
+      `+${fmtRate(t.rate.money)} Geld/s (${z.counts[me]} Einheiten in der Zone, ${hzCount} in der Hot Zone)</span>`;
     this.zoneEl.innerHTML =
       `<span class="zone-state" style="color:${col}">${label}</span>` +
       `<span class="zone-cnt"><b style="color:${c0}">${z.counts[0]}</b><i>:</i><b style="color:${c1}">${z.counts[1]}</b></span>` +
-      `<span class="zone-cnt" title="Wertung (Hot Zone doppelt)"><small>Wertung</small> <b style="color:${c0}">${z.weight[0]}</b><i>:</i><b style="color:${c1}">${z.weight[1]}</b></span>`;
+      `<span class="zone-cnt" title="Wertung (Hot Zone doppelt)"><small>Wertung</small> <b style="color:${c0}">${z.weight[0]}</b><i>:</i><b style="color:${c1}">${z.weight[1]}</b></span>` +
+      inc;
     const bar = z.bar;
     this.capFill.style.width = pct(bar.p);
     this.capFill.style.background = bar.team >= 0 ? BALANCE.teamColors[bar.team] : 'transparent';
@@ -314,12 +322,17 @@ export class Hud {
     }
     if (b.drill && b.built) h += this.drillInfo(b);
     if (b.queue.length) {
-      const ut = UNITS[b.queue[0].unit ?? b.queue[0]];
-      const shown = Math.min(ut.buildTime, b.queueTime).toFixed(0);
-      h +=
-        `<div class="queue"><div class="small">${esc(ut.name)}: ${shown} / ${ut.buildTime} s</div>` +
-        `${bar(b.queueTime / ut.buildTime, 'prog')}` +
-        `<div class="muted small">Warteschlange: ${b.queue.map((e) => esc(UNITS[e.unit ?? e].name)).join(', ')}</div></div>`;
+      // die ersten trainSlots Aufträge laufen gleichzeitig, je mit eigenem Fortschritt
+      const slots = Math.min(BALANCE.trainSlots, b.queue.length);
+      let rows = '';
+      for (let i = 0; i < slots; i++) {
+        const ut = UNITS[b.queue[i].unit];
+        const shown = Math.min(ut.buildTime, b.queueTimes[i]).toFixed(0);
+        rows += `<div class="small">${esc(ut.name)}: ${shown} / ${ut.buildTime} s</div>${bar(b.queueTimes[i] / ut.buildTime, 'prog')}`;
+      }
+      const rest = b.queue.slice(slots);
+      if (rest.length) rows += `<div class="muted small">Warteschlange: ${rest.map((e) => esc(UNITS[e.unit].name)).join(', ')}</div>`;
+      h += `<div class="queue">${rows}</div>`;
     }
     return h;
   }

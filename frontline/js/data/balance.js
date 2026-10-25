@@ -8,13 +8,17 @@ export const BALANCE = {
   walletMax: 5000, // Obergrenze der Kasse, die von Runde zu Runde bleibt
   pointInterval: 30,
   startRes: { money: 800 }, // Startgeld; die Haupt-FOB hat unendlich Baumaterial, Munition und Treibstoff
-  startUnits: ['truck', 'engineer', 'rifleman', 'rifleman', 'rifleman', 'rifleman'],
-  zone: { r: 3300, controlIncome: 10, unitIncome: 0.25, unitIncomeCap: 30 },
-  // Hot Zone: kleiner Kreis in der Konfliktzone, wandert zufällig oder zu aktiven Bohrern
-  hot: { r: 300, speed: 40, wanderSpeed: 40 / 3, income: 8, wanderMin: 25, wanderMax: 45 },
+  // Start mit 50 Soldaten (40 Schützen, 10 Panzerabwehrsoldaten) plus LKW und Baufahrzeug
+  startUnits: ['truck', 'engineer', ...Array(40).fill('rifleman'), ...Array(10).fill('at')],
+  // Geld je Sekunde und lebende eigene Einheit in der Konfliktzone (auch umkämpft, ohne Deckel)
+  zone: { r: 3300, unitIncome: 0.4 },
+  // Hot Zone: kleiner Kreis in der Konfliktzone, wandert zufällig oder zu aktiven Bohrern.
+  // Einheiten darin bringen statt unitIncome das Doppelte (unitIncome = 2 × zone.unitIncome, nicht zusätzlich).
+  hot: { r: 300, speed: 40, wanderSpeed: 40 / 3, unitIncome: 0.8, wanderMin: 25, wanderMax: 45 },
   // Bauradien eigener FOBs dürfen sich nicht überlappen (minDistOwn = 2 × buildRadius); höchstens 10 FOBs mit der Haupt-FOB
   fob: { buildRadius: 450, minDistOwn: 900, minDistEnemy: 700, max: 10 },
   queueMax: 5,
+  trainSlots: 2, // Ausbildungsplätze der Haupt-FOB: so viele Einträge der Warteschlange werden gleichzeitig ausgebildet
   shortageWarn: 20, // s zwischen zwei Meldungen je Sorte und Team
   fuelSlowMul: 0.25, // Tempo von Fahrzeugen ohne Treibstoff
   unitCap: 120, // lebende + in Ausbildung befindliche Einheiten je Team

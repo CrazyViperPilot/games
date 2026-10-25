@@ -28,6 +28,45 @@ const SHORTAGE_TEXT = {
 const WALL_TYPES = new Set(['wall', 'gate']);
 
 const zeroRes = () => ({ money: 0, bm: 0, mun: 0, fuel: 0 });
+
+const START_GAP = 4; // Abstand zwischen Einheiten beim Start (px, über die Radien hinaus)
+const START_STEP = 12; // Rastergröße der Startplätze (px)
+
+/**
+ * Startaufstellung um die Haupt-FOB: je Einheit der erste freie passierbare Platz im Raster, vorn (zur Kartenmitte)
+ * zuerst, nie überlappend. Liefert die Mittelpunkte in der Reihenfolge von `types`.
+ */
+function startFormation(grid, team, cx, cy, types) {
+  let fx = W / 2 - cx;
+  let fy = H / 2 - cy;
+  const fl = Math.hypot(fx, fy) || 1;
+  fx /= fl;
+  fy /= fl;
+  // Kandidaten in Ringen 60–600 px um die FOB (FOB-Mitte liegt im Gebäude und ist nicht passierbar)
+  const cands = [];
+  for (let dy = -600; dy <= 600; dy += START_STEP) {
+    for (let dx = -600; dx <= 600; dx += START_STEP) {
+      const r = Math.hypot(dx, dy);
+      if (r < 60 || r > 600) continue;
+      const x = cx + dx;
+      const y = cy + dy;
+      if (!grid.passable(grid.toCell(x), grid.toCell(y), team)) continue;
+      // vorn näher, seitlich und hinten weiter weg
+      cands.push({ x, y, score: r + 150 * (1 - (dx * fx + dy * fy) / r) });
+    }
+  }
+  cands.sort((a, b) => a.score - b.score || a.x - b.x || a.y - b.y);
+  const placed = [];
+  for (const type of types) {
+    const rad = UNITS[type].radius;
+    const spot = cands.find((c) =>
+      placed.every((p) => Math.hypot(c.x - p.x, c.y - p.y) >= rad + p.rad + START_GAP),
+    );
+    if (spot) placed.push({ x: spot.x, y: spot.y, rad });
+    else placed.push(null);
+  }
+  return placed.map((p) => (p ? { x: p.x, y: p.y } : null));
+}
 const fail = (reason) => ({ ok: false, reason });
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 /** Hat das Lager (Gebäude-store oder LKW-cargo) die Kosten (Sorten bm/mun/fuel) ganz? */
@@ -131,15 +170,13 @@ export class Game {
     this.hot = createHot(this);
     this.fog = [new Fog(W, H), new Fog(W, H)];
 
-    // Startzustand: je Team die Haupt-FOB auf dem Spawn (unendlicher Vorrat), Startunits im Halbkreis davor
+    // Startzustand: je Team die Haupt-FOB auf dem Spawn (unendlicher Vorrat), Startunits als Formation davor
     for (let t = 0; t < 2; t++) {
       const sp = this.map.spawns[t];
       this.spawnBuilding('fob', t, this.grid.toCell(sp.x) - 1, this.grid.toCell(sp.y) - 1, { built: true, main: true });
-      const ang0 = Math.atan2(H / 2 - sp.y, W / 2 - sp.x);
-      const n = BALANCE.startUnits.length;
+      const spots = startFormation(this.grid, t, sp.x, sp.y, BALANCE.startUnits);
       BALANCE.startUnits.forEach((type, i) => {
-        const a = ang0 + (i - (n - 1) / 2) * 0.9;
-        const p = nearestPassable(this.grid, sp.x + Math.cos(a) * 100, sp.y + Math.sin(a) * 100, t) || sp;
+        const p = spots[i] || nearestPassable(this.grid, sp.x, sp.y, t) || sp;
         this.spawnUnit(type, t, p.x, p.y);
       });
     }
@@ -725,8 +762,8 @@ export class Game {
     const cost = UNITS[cmd.unit].cost;
     if (!this.canAfford(team, cost)) return fail(this.missingMoney());
     this.pay(team, cost);
-    if (b.queue.length === 0) b.queueTime = 0;
     b.queue.push({ unit: cmd.unit, payerId: b.id });
+    b.queueTimes.push(0);
     return { ok: true };
   }
 
@@ -745,7 +782,7 @@ export class Game {
     if (!b || b.kind !== 'building' || b.team !== team) return fail('Kein eigenes Gebäude gewählt');
     if (b.queue.length === 0) return fail('Nichts in der Warteschlange');
     const entry = b.queue.pop();
-    if (b.queue.length === 0) b.queueTime = 0;
+    b.queueTimes.pop();
     const cost = UNITS[entry.unit].cost;
     this.refund(team, cost);
     this.refundStock(team, entry.payerId, cost, 1, b.x, b.y);

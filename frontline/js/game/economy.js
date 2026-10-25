@@ -46,23 +46,32 @@ export function updateEconomy(game, dt) {
     for (const k of STOCK_KEYS) team.rate[k] = -team.flow[k];
   }
 
-  // Produktion (nur fertige Gebäude): erster Eintrag der Warteschlange
+  // Produktion (nur fertige Gebäude): die ersten trainSlots Einträge der Warteschlange bilden gleichzeitig aus,
+  // jeder mit eigenem Fortschritt (b.queueTimes[i], parallel zu b.queue)
   for (const b of game.buildings) {
     if (!b.alive || !b.built || b.queue.length === 0) continue;
-    b.queueTime += dt;
-    const entry = b.queue[0];
-    const type = entry.unit;
-    const ut = UNITS[type];
-    if (b.queueTime < ut.buildTime) continue;
-    const spot = spawnSpot(game, b);
-    if (!spot) continue; // alle Felder blockiert, warten
-    b.queue.shift();
-    b.queueTime = 0;
-    const u = game.spawnUnit(type, b.team, spot.x, spot.y);
-    u.order = { type: 'move', x: b.rallyX, y: b.rallyY, targetId: null };
-    planPath(game, u, b.rallyX, b.rallyY);
-    if (u.path.length === 0) setIdle(u);
-    game.message(b.team, `${ut.name} bereit`, spot.x, spot.y);
+    const slots = Math.min(BALANCE.trainSlots, b.queue.length);
+    for (let i = 0; i < slots; i++) b.queueTimes[i] += dt;
+    for (let i = 0; i < slots && i < b.queue.length; ) {
+      const type = b.queue[i].unit;
+      const ut = UNITS[type];
+      if (b.queueTimes[i] < ut.buildTime) {
+        i++;
+        continue;
+      }
+      const spot = spawnSpot(game, b);
+      if (!spot) {
+        i++; // alle Felder blockiert, warten
+        continue;
+      }
+      b.queue.splice(i, 1);
+      b.queueTimes.splice(i, 1);
+      const u = game.spawnUnit(type, b.team, spot.x, spot.y);
+      u.order = { type: 'move', x: b.rallyX, y: b.rallyY, targetId: null };
+      planPath(game, u, b.rallyX, b.rallyY);
+      if (u.path.length === 0) setIdle(u);
+      game.message(b.team, `${ut.name} bereit`, spot.x, spot.y);
+    }
   }
 
   // Haupt-FOB: unendlicher Vorrat (das Lager wird immer wieder aufgefüllt; Laden und Nachfüllen haben ihre Raten)
