@@ -181,6 +181,11 @@
   let press = null;
   cv.addEventListener('pointerdown', (e) => {
     const i = cellAt(e); if (i < 0) return;
+    if (e.pointerType === 'mouse') {
+      // Maus: Linksklick deckt auf (beim Loslassen), Rechtsklick markiert sofort mit Fisch.
+      if (e.button === 2) { act(i, true); press = null; } else if (e.button === 0) press = { i, mouse: true };
+      return;
+    }
     press = { i, x: e.clientX, y: e.clientY, long: false };
     press.t = setTimeout(() => { if (press) { press.long = true; if (navigator.vibrate) navigator.vibrate(25); act(i, true); } }, 380);
   });
@@ -188,7 +193,7 @@
   cv.addEventListener('pointerup', (e) => {
     if (!press) return; clearTimeout(press.t);
     const p = press; press = null;
-    if (!p.long && cellAt(e) === p.i) act(p.i, false);
+    if (e.button === 0 && !p.long && cellAt(e) === p.i) act(p.i, false);
   });
   cv.addEventListener('pointercancel', () => { if (press) clearTimeout(press.t); press = null; });
   cv.addEventListener('contextmenu', (e) => e.preventDefault());

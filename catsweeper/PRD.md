@@ -1,6 +1,6 @@
 # Catsweeper – PRD
 
-Stand: v1 (2026-10-25). Dieses Dokument bei jeder Regel- oder Funktionsänderung aktuell halten.
+Stand: v2 (2026-10-25). Dieses Dokument bei jeder Regel- oder Funktionsänderung aktuell halten.
 
 ## Idee
 Minesweeper (Minensucher) mit Katzen statt Minen. Name und Regeln orientieren sich am Katzen-Minesweeper „Catsweeper“
@@ -17,7 +17,7 @@ Minesweeper (Minensucher) mit Katzen statt Minen. Name und Regeln orientieren si
 - Zahl auf einem offenen Feld = Anzahl Katzen auf den bis zu 8 Nachbarfeldern. Bei 0 werden Nachbarn automatisch aufgedeckt.
 - Gewonnen, wenn alle Felder ohne Katze offen sind.
 - Der erste Zug ist immer sicher (Feld + Nachbarn katzenfrei, Katzen werden erst dann verteilt).
-- Fisch-Markierung (statt Flagge): lang drücken oder Modus-Knopf „Aufdecken/Fisch“. Zähler oben = Katzen minus Fische.
+- Fisch-Markierung (statt Flagge): **Maus: Rechtsklick** (Linksklick deckt auf). **Touch: lang drücken** oder Modus-Knopf „Aufdecken/Fisch“ (Tipp = aufdecken). Zähler oben = Katzen minus Fische.
 - Tipp auf eine Zahl, deren Fisch-Anzahl stimmt (Chord): restliche Nachbarn werden aufgedeckt (falscher Fisch = verloren).
 
 ## Stufen
