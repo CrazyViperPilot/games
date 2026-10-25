@@ -349,7 +349,7 @@ export class Renderer {
         const t0 = g.getEntity(u.targetId);
         if (t0) aim0 = Math.atan2(t0.y - u.y, t0.x - u.x);
       }
-      if (drawUnitSprite(ctx, cam, u, { x: p.x, y: p.y }, aim0)) return;
+      if (drawUnitSprite(ctx, cam, u, { x: p.x, y: p.y }, aim0, lift)) return;
       setIsoAt(ctx, cam, dpr, p.x, p.y - lift * z, u.x, u.y, sc);
       let aim = null;
       if (u.targetId && u.def.range > 0) {

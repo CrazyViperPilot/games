@@ -38,7 +38,9 @@ const TREE = load('trees/tree.png');
 // Fahrzeuge: je Modell und Team (0 = Blau, 1 = Rot) acht Bilder nach Bildschirmrichtung
 const SECTORS = ['e', 'se', 's', 'sw', 'w', 'nw', 'n', 'ne']; // 0° = rechts, im Uhrzeigersinn
 const TEAM_COLOR = ['blue', 'red'];
-const UNIT_MODEL = { truck: 'truck', engineer: 'pickup' };
+const UNIT_MODEL = { truck: 'truck', engineer: 'pickup', tank: 'tank', gunship: 'apache' };
+// 3D-Modelle (T-12-Panzer, Attack Chopper), siehe assets/iso/README.md: span = Bildbreite in Einheitenradien, ax/ay = Bodenpunkt im Bild
+const MODEL_VIEW = { tank: { span: 4.2, ax: 64, ay: 64 }, apache: { span: 5, ax: 64, ay: 47 } };
 const VEHICLES = {};
 for (const model of new Set(Object.values(UNIT_MODEL))) {
   VEHICLES[model] = TEAM_COLOR.map((c) => SECTORS.map((s) => load(`vehicles/${model}-${c}-${s}.png`)));
@@ -140,7 +142,7 @@ function drawInfantry(ctx, cam, u, p, type, aim) {
 }
 
 /** Fahrzeug-Sprite je Einheit (aufrecht, Blickrichtung nach Bewegungsrichtung). Liefert false, wenn es keins gibt. */
-export function drawUnitSprite(ctx, cam, u, p, aim = null) {
+export function drawUnitSprite(ctx, cam, u, p, aim = null, lift = 0) {
   const inf = INFANTRY_NAME[u.type];
   if (inf && u.team < 2) return drawInfantry(ctx, cam, u, p, inf, aim);
   const model = UNIT_MODEL[u.type];
@@ -153,6 +155,12 @@ export function drawUnitSprite(ctx, cam, u, p, aim = null) {
   const img = imgs[sector];
   if (!ready(img)) return false;
   const z = cam.zoom;
+  const view = MODEL_VIEW[model];
+  if (view) {
+    const k = (u.def.radius * view.span * z) / img.naturalWidth;
+    ctx.drawImage(img, p.x - view.ax * k, p.y - lift * z - view.ay * k, img.naturalWidth * k, img.naturalHeight * k);
+    return true;
+  }
   const s = (u.def.radius * 3.6 * z) / 33;
   ctx.drawImage(img, p.x - (img.naturalWidth * s) / 2, p.y - img.naturalHeight * s + 4 * s, img.naturalWidth * s, img.naturalHeight * s);
   return true;

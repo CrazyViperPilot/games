@@ -1,6 +1,6 @@
 // Frontline Service Worker: network-first (immer die neueste Version), Cache nur als Offline-Fallback.
 // Bei Änderungen an Dateien CACHE_VERSION erhöhen, damit Clients die neue Version laden.
-const CACHE_VERSION = 'frontline-v44';
+const CACHE_VERSION = 'frontline-v45';
 const CACHE_PREFIX = 'frontline-';
 const CACHE_NAME = CACHE_VERSION;
 
@@ -188,6 +188,38 @@ const ASSETS = [
   './assets/iso/vehicles/truck-red-se.png',
   './assets/iso/vehicles/truck-red-sw.png',
   './assets/iso/vehicles/truck-red-w.png',
+  './assets/iso/vehicles/tank-blue-e.png',
+  './assets/iso/vehicles/tank-blue-se.png',
+  './assets/iso/vehicles/tank-blue-s.png',
+  './assets/iso/vehicles/tank-blue-sw.png',
+  './assets/iso/vehicles/tank-blue-w.png',
+  './assets/iso/vehicles/tank-blue-nw.png',
+  './assets/iso/vehicles/tank-blue-n.png',
+  './assets/iso/vehicles/tank-blue-ne.png',
+  './assets/iso/vehicles/tank-red-e.png',
+  './assets/iso/vehicles/tank-red-se.png',
+  './assets/iso/vehicles/tank-red-s.png',
+  './assets/iso/vehicles/tank-red-sw.png',
+  './assets/iso/vehicles/tank-red-w.png',
+  './assets/iso/vehicles/tank-red-nw.png',
+  './assets/iso/vehicles/tank-red-n.png',
+  './assets/iso/vehicles/tank-red-ne.png',
+  './assets/iso/vehicles/apache-blue-e.png',
+  './assets/iso/vehicles/apache-blue-se.png',
+  './assets/iso/vehicles/apache-blue-s.png',
+  './assets/iso/vehicles/apache-blue-sw.png',
+  './assets/iso/vehicles/apache-blue-w.png',
+  './assets/iso/vehicles/apache-blue-nw.png',
+  './assets/iso/vehicles/apache-blue-n.png',
+  './assets/iso/vehicles/apache-blue-ne.png',
+  './assets/iso/vehicles/apache-red-e.png',
+  './assets/iso/vehicles/apache-red-se.png',
+  './assets/iso/vehicles/apache-red-s.png',
+  './assets/iso/vehicles/apache-red-sw.png',
+  './assets/iso/vehicles/apache-red-w.png',
+  './assets/iso/vehicles/apache-red-nw.png',
+  './assets/iso/vehicles/apache-red-n.png',
+  './assets/iso/vehicles/apache-red-ne.png',
   './js/render/minimap.js',
   './js/ui/controller.js',
   './js/ui/input.js',
