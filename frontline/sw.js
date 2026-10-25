@@ -1,6 +1,6 @@
 // Frontline Service Worker: network-first (immer die neueste Version), Cache nur als Offline-Fallback.
 // Bei Änderungen an Dateien CACHE_VERSION erhöhen, damit Clients die neue Version laden.
-const CACHE_VERSION = 'frontline-v46';
+const CACHE_VERSION = 'frontline-v48';
 const CACHE_PREFIX = 'frontline-';
 const CACHE_NAME = CACHE_VERSION;
 
@@ -236,6 +236,22 @@ const ASSETS = [
   './assets/iso/vehicles/littlebird-red-nw.png',
   './assets/iso/vehicles/littlebird-red-n.png',
   './assets/iso/vehicles/littlebird-red-ne.png',
+  './assets/iso/vehicles/ifv-blue-e.png',
+  './assets/iso/vehicles/ifv-blue-se.png',
+  './assets/iso/vehicles/ifv-blue-s.png',
+  './assets/iso/vehicles/ifv-blue-sw.png',
+  './assets/iso/vehicles/ifv-blue-w.png',
+  './assets/iso/vehicles/ifv-blue-nw.png',
+  './assets/iso/vehicles/ifv-blue-n.png',
+  './assets/iso/vehicles/ifv-blue-ne.png',
+  './assets/iso/vehicles/ifv-red-e.png',
+  './assets/iso/vehicles/ifv-red-se.png',
+  './assets/iso/vehicles/ifv-red-s.png',
+  './assets/iso/vehicles/ifv-red-sw.png',
+  './assets/iso/vehicles/ifv-red-w.png',
+  './assets/iso/vehicles/ifv-red-nw.png',
+  './assets/iso/vehicles/ifv-red-n.png',
+  './assets/iso/vehicles/ifv-red-ne.png',
   './js/render/minimap.js',
   './js/ui/controller.js',
   './js/ui/input.js',

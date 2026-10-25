@@ -1,5 +1,0 @@
-T-12 soviet light tank lowpoly (3D-Modell)
-
-Quelle: https://opengameart.org/content/t-12-soviet-light-tank-lowpoly
-Lizenz: CC0 (Public Domain), http://creativecommons.org/publicdomain/zero/1.0/
-Im Spiel als Panzer-Sprite verwendet (assets/iso/vehicles/tank-*.png, mit three.js in 8 Richtungen und Teamfarben gerendert).

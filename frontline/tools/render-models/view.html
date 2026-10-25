@@ -39,9 +39,74 @@ window.buildLB=()=>{
   // Sensorkugel unter der Nase
   add(new THREE.SphereGeometry(0.075,14,10),grey,0,0.17,0.43);
   return g;};
+window.buildPuma=()=>{
+  const team=new THREE.Color(window.TEAM||0x808080);
+  const M=(c,e)=>new THREE.MeshLambertMaterial({color:c,emissive:e||0x000000});
+  const body=M(team,team.clone().multiplyScalar(0.3)),top=M(team.clone().multiplyScalar(0.85),team.clone().multiplyScalar(0.22)),dark=M(0x2a2a2a),grey=M(0x6a6a6a),glass=M(0x25394d,0x0c1620);
+  const g=new THREE.Group();
+  const box=(w,h,d,mat,x,y,z,rx=0,ry=0,rz=0)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);m.rotation.set(rx,ry,rz);g.add(m);return m;};
+  const cyl=(r,l,mat,x,y,z,rx=0,ry=0,rz=0)=>{const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,l,14),mat);m.position.set(x,y,z);m.rotation.set(rx,ry,rz);g.add(m);return m;};
+  // Wanne, Bug abgeschrägt (Front = +Z), Heckdeck
+  box(0.78,0.22,1.60,body,0,0.30,-0.05);
+  box(0.74,0.06,0.50,body,0,0.37,0.86,-0.42,0,0);
+  box(0.68,0.10,1.05,top,0,0.47,-0.28);
+  // Ketten, Seitenschürzen mit Modulen, Antriebs- und Leitrad
+  for(const sx of [-1,1]){
+    box(0.14,0.20,1.78,dark,sx*0.36,0.13,-0.02);
+    box(0.05,0.28,1.38,body,sx*0.44,0.29,-0.06);
+    box(0.06,0.20,0.30,top,sx*0.45,0.31,0.50);
+    for(const z of [0.86,-0.88]) cyl(0.11,0.14,dark,sx*0.36,0.13,z,0,0,Math.PI/2);
+    for(let i=0;i<5;i++) cyl(0.07,0.15,grey,sx*0.36,0.10,0.55-i*0.30,0,0,Math.PI/2);
+  }
+  // Heckrampe und Front-Scheinwerfer
+  box(0.5,0.18,0.04,dark,0,0.30,-0.86);
+  for(const sx of [-1,1]) box(0.08,0.06,0.05,glass,sx*0.30,0.34,0.98);
+  // Turm (leicht vor der Mitte), Blende, Maschinenkanone rechts, Sensorkopf, Antenne
+  box(0.50,0.17,0.62,top,0,0.66,0.12);
+  box(0.46,0.13,0.20,top,0,0.67,0.46,0.25,0,0);
+  cyl(0.032,0.80,dark,0.12,0.66,0.88,Math.PI/2);
+  cyl(0.045,0.10,dark,0.12,0.66,0.52,Math.PI/2);
+  box(0.12,0.10,0.14,dark,-0.12,0.80,0.10);
+  box(0.07,0.05,0.07,glass,-0.12,0.86,0.10);
+  box(0.12,0.07,0.26,dark,-0.20,0.76,-0.12);
+  cyl(0.008,0.55,dark,-0.34,0.82,-0.78);
+  return g;};
+window.buildLeo=()=>{
+  const team=new THREE.Color(window.TEAM||0x808080);
+  const M=(c,e)=>new THREE.MeshLambertMaterial({color:c,emissive:e||0x000000});
+  const body=M(team,team.clone().multiplyScalar(0.3)),top=M(team.clone().multiplyScalar(0.85),team.clone().multiplyScalar(0.22)),dark=M(0x262626),grey=M(0x5a5a5a),glass=M(0x25394d,0x0c1620);
+  const g=new THREE.Group();
+  const box=(w,h,d,mat,x,y,z,rx=0,ry=0,rz=0)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);m.rotation.set(rx,ry,rz);g.add(m);return m;};
+  const cyl=(r,l,mat,x,y,z,rx=0,ry=0,rz=0,seg=14)=>{const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,l,seg),mat);m.position.set(x,y,z);m.rotation.set(rx,ry,rz);g.add(m);return m;};
+  // Wanne (Front = +Z) mit schräger Bugplatte und Heckdeck
+  box(0.84,0.20,1.70,body,0,0.30,0);
+  box(0.80,0.05,0.42,body,0,0.37,0.92,-0.45,0,0);
+  box(0.76,0.08,0.60,top,0,0.44,-0.62);
+  // Ketten, Laufrollen, Seitenschürzen (Moduleplatten)
+  for(const sx of [-1,1]){
+    box(0.17,0.22,1.92,dark,sx*0.40,0.14,0);
+    for(let i=0;i<7;i++) cyl(0.085,0.18,grey,sx*0.40,0.12,0.74-i*0.25,0,0,Math.PI/2);
+    for(const z of [1.00,-1.00]) cyl(0.12,0.18,dark,sx*0.40,0.17,z,0,0,Math.PI/2);
+    box(0.05,0.15,1.35,body,sx*0.50,0.30,-0.05);
+    for(let i=0;i<5;i++) box(0.055,0.13,0.24,top,sx*0.52,0.31,0.50-i*0.26);
+  }
+  // Turm: Keilform mit schrägen Seiten, Frontplatten, Blende
+  box(0.62,0.20,0.95,top,0,0.60,-0.02);
+  box(0.50,0.17,0.40,top,0,0.64,0.52,0.28,0,0);
+  box(0.26,0.12,0.22,dark,0,0.60,0.66);
+  for(const sx of [-1,1]) box(0.14,0.17,0.62,top,sx*0.31,0.60,0.22,0,sx*0.32,0);
+  // Rohr mit Mündung, Kommandantenluke mit MG, Ladeschütze, Antennen
+  cyl(0.040,1.15,dark,0,0.60,1.30,Math.PI/2);
+  cyl(0.055,0.12,dark,0,0.60,1.86,Math.PI/2);
+  cyl(0.10,0.07,dark,0.17,0.74,-0.18);
+  box(0.05,0.05,0.16,grey,0.17,0.80,-0.10);
+  cyl(0.08,0.05,dark,-0.18,0.72,-0.28);
+  box(0.12,0.06,0.20,top,0,0.73,0.0);
+  for(const [x,z] of [[0.22,-0.42],[-0.25,-0.40]]) cyl(0.007,0.60,dark,x,0.98,z);
+  return g;};
 window.loadModel=async(kind,url,mtl,tex)=>{
   let obj;
-  if(kind==='proc'){obj=window.buildLB();window.obj=obj;return true;}
+  if(kind==='proc'){obj=url==='puma'?window.buildPuma():url==='leo'?window.buildLeo():window.buildLB();window.obj=obj;return true;}
   if(kind==='fbx') obj=await new FBXLoader().loadAsync(url);
   else { const l=new OBJLoader(); if(mtl){const m=await new MTLLoader().loadAsync(mtl);m.preload();l.setMaterials(m);} obj=await l.loadAsync(url);}
   const team=new THREE.Color(window.TEAM||0x808080);
