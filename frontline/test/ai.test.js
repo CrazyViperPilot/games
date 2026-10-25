@@ -97,3 +97,9 @@ test('KI ersetzt ein verlorenes Baufahrzeug', () => {
   run(90);
   assert.ok(eng().length >= 1, 'kein Ersatz-Baufahrzeug ausgebildet');
 });
+
+test('KI: bildet ab 3 min mit Armee einen Späher (Little Bird) aus', () => {
+  const r = playAiVsAi(2, 8);
+  const scouts = [0, 1].map((t) => r.game.units.filter((u) => u.alive && u.team === t && u.type === 'littlebird').length);
+  assert.ok(scouts[0] + scouts[1] >= 1, `Späher: ${scouts}`);
+});

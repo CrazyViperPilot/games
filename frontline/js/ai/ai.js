@@ -30,6 +30,11 @@ const FOB_CAP = { easy: 3, normal: 5, hard: 7 }; // FOB-Grenze je Schwierigkeit 
 const WAVE_ODDS = 1.2; // Welle greift nur an, wenn ihr Wert mindestens so viel Mal die geschätzte Zonenbesatzung beträgt
 const WAVE_PATIENCE = 600; // s ohne Welle, bis die geforderte Stärke auf WAVE_MIN fällt
 const WAVE_MIN = 0.6; // Untergrenze des Geduld-Faktors
+const SCOUT_MIN_ARMY = 10; // Kampfeinheiten, ab denen sich die KI einen Späher leistet
+const SCOUT_MONEY = UNITS.littlebird.cost.money; // Geld, ab dem ein Späher ausgebildet wird
+const SCOUT_FROM = 180; // s Spielzeit, ab der ein Späher gebaut wird
+const SCOUT_FUEL = 0.35; // Späher kehrt unter diesem Treibstoffanteil zur Haupt-FOB zurück
+const SCOUT_REFILL = 0.9; // und fliegt erst wieder aus, wenn der Tank so voll ist
 const KEYS = ['bm', 'mun', 'fuel'];
 const CAP = BALANCE.logistics.truckCapacity;
 const ENG_NEAR = 250; // Baufahrzeug näher an einer Baustelle: die automatische Zuweisung übernimmt
@@ -73,6 +78,8 @@ export class AI {
     this.supplyAt = new Map(); // Versorger-ID -> letzter Zielpunkt
     this.memo = new Map(); // Befehlsschlüssel -> Zeitpunkt (gegen Befehls-Spam)
     this.hadZoneFob = false; // eine Zonen-FOB (auch Baustelle) existierte im letzten Denkschritt
+    this.saveForScout = false; // produce bildet keine Kampfeinheiten aus, bis der Späher bezahlt ist
+    this.scoutHome = false; // Späher fliegt zum Auftanken heim
     this.lastWave = 0; // Zeitpunkt der letzten Angriffswelle
     this.zoneBan = 0; // bis dahin keine neue Zonen-FOB (nach Verlust, gegen Nachschub in den Tod)
 
@@ -98,6 +105,7 @@ export class AI {
     this.defend(s);
     this.retreat(s);
     this.expand(s); // FOB-Baustellen setzen (Material liefert der Lieferant)
+    this.scout(s); // vor produce: der Späher bekommt das Geld zuerst
     this.produce(s);
     this.buildDefense(s);
     this.buildWall(s);
@@ -472,6 +480,8 @@ export class AI {
       if (b) g.issue(t, { type: 'train', buildingId: b.id, unit: 'truck' });
     }
 
+
+    if (this.saveForScout) return; // Geld für den Späher sparen
 
     // Kampfeinheiten: welche Typen sind gerade ausbildbar?
     const avail = new Set();
@@ -866,6 +876,41 @@ export class AI {
    * In der Zone stehende Einheiten verteilen sich auf einem Kreis (r 400) statt im Zentrum zu klumpen.
    * Ein Fünftel der ausrückenden Gruppe (ab 5 Einheiten) bleibt als Reserve an der Haupt-FOB.
    */
+  /**
+   * Späher (Little Bird, unbewaffnet): fliegt an den Zonenrand auf der Gegnerseite, damit die Besatzung der Zone sichtbar wird
+   * (army schätzt die Gegnerstärke dann aus dem Wert der gesehenen Einheiten). Tank fast leer → heim, auftanken, wieder los.
+   */
+  scout(s) {
+    const g = this.game;
+    const t = this.team;
+    const z = s.zone;
+    const bird = s.units.find((u) => u.type === 'littlebird');
+    if (!bird) {
+      this.saveForScout = false;
+      if (!s.home || s.combat.length < SCOUT_MIN_ARMY || g.time < SCOUT_FROM || this.queued(s, 'littlebird')) return;
+      if (g.teams[t].res.money < SCOUT_MONEY) {
+        this.saveForScout = true; // produce spart, bis der Späher bezahlbar ist
+        return;
+      }
+      const b = this.pickProducer(s, 'littlebird', BALANCE.queueMax - 1, false);
+      if (b) g.issue(t, { type: 'train', buildingId: b.id, unit: 'littlebird' });
+      return;
+    }
+    const fuel = bird.fuel / bird.def.fuelMax;
+    if (fuel < SCOUT_FUEL || (this.scoutHome && fuel < SCOUT_REFILL)) {
+      this.scoutHome = true;
+      if (this.once('scout-home', 10)) g.issue(t, { type: 'move', ids: [bird.id], x: s.ax, y: s.ay });
+      return;
+    }
+    this.scoutHome = false;
+    // Zielpunkt: Zonenrand zur Gegnerseite (vom eigenen Zonenrand aus gesehen auf der anderen Seite)
+    const foe = g.map.spawns[1 - t];
+    const v = unitVec(foe.x - z.x, foe.y - z.y);
+    const x = z.x + v.x * z.r * 0.8;
+    const y = z.y + v.y * z.r * 0.8;
+    if (dist(bird.x, bird.y, x, y) > 120 && this.once('scout-go', 8)) g.issue(t, { type: 'move', ids: [bird.id], x, y });
+  }
+
   army(s) {
     const g = this.game;
     const t = this.team;
@@ -891,7 +936,10 @@ export class AI {
         // Gegner hält die Zone: Gegenangriff schon ab 1,2× seiner Besatzung (Zonengeld ist sein Vorteil).
         // Besitz und Anzahl in der Zone sind öffentlich; die Stärke wird mit dem mittleren Einheitenwert geschätzt.
         // Welle bündeln: nie schwächer losziehen als 1,2× die Besatzung (kleine Gruppen würden nur verheizt).
-        const threat = z.counts[z.owner] * THREAT_PER_UNIT;
+        // Schätzung: sind fast alle Besatzer sichtbar (Späher), zählt ihr echter Wert, sonst Anzahl × Mittelwert.
+        const seen = inside.filter((e) => e.team === z.owner);
+        const seenValue = seen.reduce((sum, e) => sum + (UNITS[e.type].cost.money || 0), 0);
+        const threat = seen.length >= 0.7 * z.counts[z.owner] ? seenValue : z.counts[z.owner] * THREAT_PER_UNIT;
         need = Math.max(need, WAVE_ODDS * threat);
       }
       // Geduld: je länger keine Welle losging, desto weniger Stärke braucht die nächste (nie unter 60 %).
