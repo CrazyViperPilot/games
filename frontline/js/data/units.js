@@ -5,6 +5,9 @@
 // buildTime: Ausbildungsrate der Haupt-FOB in Sekunden (eine Ausbildung nach der anderen).
 // fuelMax: Treibstoffvorrat. Alle Einheiten kosten nur Geld und starten voll munitioniert und betankt.
 // builder: 'all' = darf alle Gebäude bauen und reparieren, 'fort' = nur Mauer und Tor, fehlt = kein Bauen.
+// Treffer bis zum Abschuss je Ziel (Einheitentyp, sonst Panzerklasse): Zahl oder SIDES(vorn, seitlich, hinten).
+const SIDES = (front, side, rear) => ({ front, side, rear });
+
 export const UNITS = {
   rifleman: {
     name: 'Schütze',
@@ -16,7 +19,7 @@ export const UNITS = {
     // Waffen: rounds = Schuss im Vorrat, munCost = Munition (FOB-Lager) je Schuss beim Nachladen.
     // Gewehr: 2 Magazine à 30 Schuss; 1 Magazin = 1 Munition.
     weapons: [
-      { id: 'rifle', name: 'Gewehr', range: 200, cooldown: 1.0, rounds: 60, munCost: 1 / 30, damage: { inf: 12, light: 3, heavy: 1, struct: 4, air: 3 } },
+      { id: 'rifle', name: 'Gewehr', range: 200, cooldown: 1.0, rounds: 60, munCost: 1 / 30, hits: { inf: 4 }, damage: { inf: 12, light: 3, heavy: 1, struct: 4, air: 3 } },
     ],
     cost: { money: 60 },
     buildTime: 5,
@@ -36,7 +39,7 @@ export const UNITS = {
     sight: 260,
     // Panzerfaust/RPG: 5 Schuss à 10 Munition, auch gegen Hubschrauber
     weapons: [
-      { id: 'rpg', name: 'RPG', range: 240, cooldown: 3.0, rounds: 5, munCost: 10, damage: { inf: 10, light: 90, heavy: 120, struct: 60, air: 40 } },
+      { id: 'rpg', name: 'RPG', range: 240, cooldown: 3.0, rounds: 5, munCost: 10, hits: { inf: 1, tank: SIDES(6, 4, 3), ifv: SIDES(4, 3, 2), light: 2 }, damage: { inf: 10, light: 90, heavy: 120, struct: 60, air: 40 } },
     ],
     cost: { money: 120 },
     buildTime: 8,
@@ -97,8 +100,8 @@ export const UNITS = {
     sight: 300,
     // Granatwerfer: 60 Granaten à 10 Munition; MG: 300 Schuss à 5
     weapons: [
-      { id: 'grenade', name: 'Granatwerfer', range: 240, cooldown: 2.0, rounds: 60, munCost: 10, targets: ['light', 'heavy', 'struct'], damage: { inf: 30, light: 40, heavy: 10, struct: 25 } },
-      { id: 'mg', name: 'MG', range: 220, cooldown: 0.25, rounds: 300, munCost: 5, damage: { inf: 9, light: 3, heavy: 1, struct: 3, air: 6 } },
+      { id: 'grenade', name: 'Granatwerfer', range: 240, cooldown: 2.0, rounds: 60, munCost: 10, targets: ['light', 'heavy', 'struct'], hits: { inf: 1, tank: SIDES(10, 8, 7), ifv: SIDES(8, 6, 5), light: 3 }, damage: { inf: 30, light: 40, heavy: 10, struct: 25 } },
+      { id: 'mg', name: 'MG', range: 220, cooldown: 0.25, rounds: 300, munCost: 5, hits: { inf: 2 }, damage: { inf: 9, light: 3, heavy: 1, struct: 3, air: 6 } },
     ],
     cost: { money: 250 },
     buildTime: 12,
@@ -117,8 +120,8 @@ export const UNITS = {
     sight: 320,
     // Hauptkanone: 30 Schuss à 20 Munition, 6 s Nachladezeit; MG: 300 Schuss à 5
     weapons: [
-      { id: 'cannon', name: 'Hauptkanone', range: 300, cooldown: 6, rounds: 30, munCost: 20, targets: ['light', 'heavy', 'struct'], damage: { inf: 45, light: 120, heavy: 150, struct: 120 } },
-      { id: 'mg', name: 'MG', range: 220, cooldown: 0.25, rounds: 300, munCost: 5, damage: { inf: 10, light: 3, heavy: 0, struct: 2, air: 3 } },
+      { id: 'cannon', name: 'Hauptkanone', range: 300, cooldown: 6, rounds: 30, munCost: 20, targets: ['light', 'heavy', 'struct'], hits: { inf: 1, tank: SIDES(4, 3, 2), ifv: SIDES(3, 3, 2), light: 2 }, damage: { inf: 45, light: 120, heavy: 150, struct: 120 } },
+      { id: 'mg', name: 'MG', range: 220, cooldown: 0.25, rounds: 300, munCost: 5, hits: { inf: 2 }, damage: { inf: 10, light: 3, heavy: 0, struct: 2, air: 3 } },
     ],
     cost: { money: 500 },
     buildTime: 20,

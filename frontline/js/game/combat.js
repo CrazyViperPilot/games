@@ -16,6 +16,25 @@ export function weaponOf(e) {
 
 const dmgKey = (e) => (e.kind === 'building' ? 'struct' : e.def.armor);
 
+/** Seite, auf der der Schütze das Ziel trifft: 'front' (±45° zur Fahrtrichtung), 'rear' (±45° hinten), sonst 'side'. */
+export function sectorOf(s, t) {
+  let d = Math.atan2(s.y - t.y, s.x - t.x) - (t.angle || 0);
+  d = Math.abs(Math.atan2(Math.sin(d), Math.cos(d)));
+  return d <= Math.PI / 4 ? 'front' : d >= (3 * Math.PI) / 4 ? 'rear' : 'side';
+}
+
+/**
+ * Schaden eines Direkttreffers. Hat die Waffe für das Ziel (Typ, sonst Panzerklasse) eine Trefferzahl (`hits`),
+ * töten genau so viele Treffer das volle Ziel; sonst gilt die Schadenstabelle der Panzerklasse.
+ */
+export function shotDamage(spec, s, t) {
+  const table = spec.hits;
+  const entry = table && t.kind === 'unit' ? (table[t.type] ?? table[t.def.armor]) : undefined;
+  if (entry === undefined) return spec.damage[dmgKey(t)] || 0;
+  const n = typeof entry === 'number' ? entry : entry[sectorOf(s, t)];
+  return (t.def.hp / n) * 1.001;
+}
+
 /**
  * Zieht Munition für einen Schuss eines Gebäudes aus dem Lager seines Versorgers (supplierOf) ab.
  * false (Mangelmeldung), wenn es nicht reicht.
@@ -88,7 +107,7 @@ function findTarget(game, hash, s, radius, minRange, allowBuildings, dmg) {
 }
 
 function fireDirect(game, s, t, w) {
-  const dmg = w.damage[dmgKey(t)] || 0;
+  const dmg = shotDamage(w, s, t);
   if ((w.damage.light || 0) >= 60) {
     // Panzerabwehr / Kampfpanzer: Geschoss plus kleine Explosion
     game.addEffect('shell', s.x, s.y, s.team, t.x, t.y);
@@ -136,7 +155,7 @@ function tryFireUnit(game, u, t) {
   } else {
     game.addEffect('tracer', u.x, u.y, u.team, t.x, t.y);
   }
-  hit(game, t, pick.spec.damage[key]);
+  hit(game, t, shotDamage(pick.spec, u, t));
 }
 
 function fireShell(game, s, tx, ty, w) {

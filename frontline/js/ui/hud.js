@@ -212,7 +212,8 @@ export class Hud {
     const [c0, c1] = BALANCE.teamColors;
     this.zoneEl.innerHTML =
       `<span class="zone-state" style="color:${col}">${label}</span>` +
-      `<span class="zone-cnt"><b style="color:${c0}">${z.counts[0]}</b><i>:</i><b style="color:${c1}">${z.counts[1]}</b></span>`;
+      `<span class="zone-cnt"><b style="color:${c0}">${z.counts[0]}</b><i>:</i><b style="color:${c1}">${z.counts[1]}</b></span>` +
+      `<span class="zone-cnt" title="Wertung (Hot Zone doppelt)"><small>Wertung</small> <b style="color:${c0}">${z.weight[0]}</b><i>:</i><b style="color:${c1}">${z.weight[1]}</b></span>`;
     const bar = z.bar;
     this.capFill.style.width = pct(bar.p);
     this.capFill.style.background = bar.team >= 0 ? BALANCE.teamColors[bar.team] : 'transparent';

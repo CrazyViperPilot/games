@@ -109,6 +109,27 @@ stirbt der Hubschrauber, sind die Passagiere verloren.
 
 Schadensmodell: Schaden je Schuss nach Panzerklasse des Ziels (Infanterie / leicht / schwer / Gebäude) – Werte in `PLAN.md`.
 
+### Schaden: Treffer bis zum Abschuss
+Direktfeuer richtet sich nach Trefferzahlen (volles Ziel); Seite = Winkel zur Fahrtrichtung des Ziels (vorn ±45°, hinten ±45°, sonst seitlich). Nicht genannte Paarungen nutzen die Schadenstabelle der Panzerklasse (u. a. Hubschrauber, Gebäude, MG gegen Fahrzeuge, Gewehr gegen Fahrzeuge).
+
+| Waffe | Ziel | vorn | seitlich | hinten |
+|---|---|---|---|---|
+| Gewehr | Soldat | 4 | 4 | 4 |
+| Kampfpanzer-Kanone | Soldat | 1 | 1 | 1 |
+| Kampfpanzer-MG | Soldat | 2 | 2 | 2 |
+| Schützenpanzer-Granate | Soldat | 1 | 1 | 1 |
+| Schützenpanzer-MG | Soldat | 2 | 2 | 2 |
+| Kampfpanzer-Kanone | Kampfpanzer | 4 | 3 | 2 |
+| Kampfpanzer-Kanone | Schützenpanzer | 3 | 3 | 2 |
+| Schützenpanzer-Granate | Kampfpanzer | 10 | 8 | 7 |
+| Schützenpanzer-Granate | Schützenpanzer (Annahme) | 8 | 6 | 5 |
+| Schützenpanzer-Granate | LKW/Baufahrzeug (Annahme) | 3 | 3 | 3 |
+| Kampfpanzer-Kanone | LKW/Baufahrzeug (Annahme) | 2 | 2 | 2 |
+| RPG (Annahme) | Soldat | 1 | 1 | 1 |
+| RPG (Annahme) | Kampfpanzer | 6 | 4 | 3 |
+| RPG (Annahme) | Schützenpanzer | 4 | 3 | 2 |
+| RPG (Annahme) | LKW/Baufahrzeug | 2 | 2 | 2 |
+
 ## 7. Konfliktzone & Punkte
 
 - Kreis in der Kartenmitte, Radius **3300 px** (Karte 9024 × 9024 px), gestaltet als osteuropäische Stadt (Straßenraster, Häuser, Hallen, Fabriken, Parks, Autos, Bäume). Gebäude und **Bäume** sind echte Hindernisse (wie Häuser: Einheiten gehen drumherum, Bauen ist dort nicht möglich), Straßen und Parks sind frei. Auch die Bäume außerhalb der Stadt blockieren; Hubschrauber fliegen darüber. Der Abstand vom Start zum Zonenrand beträgt gut 2000 px.
@@ -210,6 +231,7 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 
 ## Änderungsverlauf
 
+- v4.21: **Treffer bis zum Abschuss** je Waffe, Ziel und Trefferseite (Tabelle in Abschnitt 6). Zonenanzeige zeigt zusätzlich die Wertung (Hot Zone doppelt). Cache v34.
 - v4.20: **Prämien wie in Wardogs.** Geld für Abschüsse (Soldaten 25 %, Fahrzeuge 60 % des Preises, Gebäude 20 % des Baumaterialpreises) und für fertig gebaute Gebäude (20 %); Mauern und Tore ausgenommen. Cache v33.
 - v4.19: Maus: Linksklick auf ein eigenes Gebäude wählt es immer, auch wenn LKW oder Baufahrzeug gewählt sind (Befehle per Rechtsklick); Touch behält den Befehl per Antippen. Cache v32.
 - v4.18: **3D-Autos und Park-Ausstattung.** Autos sind in Iso kleine Körper mit Kabine (in 2D mit Scheiben); Parks haben Rundweg, Bäume am Rand und vier Bänke (aus Lage und Größe erzeugt, nur Dekoration, begehbar), in 2D und Iso, im Spiel und im Editor. Cache v31.
