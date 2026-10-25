@@ -241,7 +241,7 @@ Direktfeuer richtet sich nach Trefferzahlen (volles Ziel); Seite = Winkel zur Fa
 - Nebel des Krieges: Unerkundet schwarz, erkundet abgedunkelt, gegnerische Einheiten nur in Sicht.
 - Platzierungsvorschau grün/rot mit Bauradien aller eigenen FOBs.
 - **Isometrische Ansicht** (Taste V, drehbar in 90°-Schritten mit `,` `.`): Boden schräg, Gebäude, Bäume und Fahrzeuge mit Höhe, Tiefensortierung, Hubschrauber schweben mit Schatten. Stadtgebäude (Häuser aus Kenney „City Kit Commercial“, Hallen und Fabriken aus „City Kit Industrial“; 3D-Modelle, vorgerendert isometrisch, Daten `js/render/isodata.js`), Bäume sowie LKW und Baufahrzeug (Team Blau/Rot, 8 Blickrichtungen) sind Bilder aus freien Kenney-Paketen (CC0, `assets/iso/`, Lizenztexte `assets/LICENSES/`, `js/render/isosprites.js`; `?sprites=0` schaltet auf die gezeichnete Variante). Spielgebäude und Panzer sind gezeichnet und mit Details versehen: Stadthäuser mit zwei Stockwerken, Fenstern, Tür, Balkon und Satteldach; Hallen mit Rolltoren und Fensterband; Fabriken mit großen Fenstern, Toren, Schornstein; FOB als **Zentrale** (Sockelbau mit Fensterband, Eingang mit Vordach, Leitstellenturm, Radar, Antennen, Flagge); Fahrzeughalle als **Panzerwerkstatt** (Tore mit Panzer, Teamband, Dachkran); Landeplatz mit H, Ring, Randfeuer, Windsack. Unter Zoom 0,5 entfallen Fenster und Türen (Leistung). Die Zeichnung ist pro Gebäudeart durch Sprites ersetzbar (`spriteOverrides` in `js/render/isobuild.js`).
-- **Grafik (Iso):** Kampfpanzer und AH-64 erscheinen in der isometrischen Ansicht als gerenderte 3D-Modelle (Panzer: „T-12“, CC0; Hubschrauber: „Attack Chopper“ von Geibu3D, CC BY 4.0, Namensnennung in `assets/LICENSES`), 8 Richtungen, Teamfarbe. Schützenpanzer, Little Bird und Transporter bleiben gemalt.
+- **Grafik (Iso):** Kampfpanzer, AH-64 und Little Bird erscheinen in der isometrischen Ansicht als gerenderte 3D-Modelle (Panzer: „T-12“, CC0; Hubschrauber: „Attack Chopper“ von Geibu3D, CC BY 4.0, Namensnennung in `assets/LICENSES`), 8 Richtungen, Teamfarbe. Der **Little Bird** ist ein eigener, nach einem Foto nachgebauter Entwurf (`tools/render-models`). Schützenpanzer und Transporthubschrauber bleiben gemalt.
 - Hilfe (F1) listet alle Tasten, auch V und Drehen.
 
 ## 9a. Karten und Karteneditor
@@ -306,7 +306,7 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 
 ## Änderungsverlauf
 
-- v4.33: **Iso-Grafik:** 3D-Modelle für Kampfpanzer und AH-64 (T-12, Attack Chopper). Cache v45.
+- v4.33: **Iso-Grafik:** 3D-Modelle für Kampfpanzer, AH-64 (T-12, Attack Chopper) und Little Bird (Eigenbau); Cache v46. Cache v45.
 - v4.32: **PRD:** Tabelle aller Waffen mit Schaden je Panzerklasse und Tabelle der KI-Konstanten. Cache v44.
 - v4.31: **Schwierigkeit über Verhalten** statt Einkommensbonus (Schwer: ×1,0). Cache v44.
 - v4.30: **KI verteidigt die Zonen-FOB** zur Gegnerseite, zwei Mörser. Cache v43.

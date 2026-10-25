@@ -38,9 +38,9 @@ const TREE = load('trees/tree.png');
 // Fahrzeuge: je Modell und Team (0 = Blau, 1 = Rot) acht Bilder nach Bildschirmrichtung
 const SECTORS = ['e', 'se', 's', 'sw', 'w', 'nw', 'n', 'ne']; // 0° = rechts, im Uhrzeigersinn
 const TEAM_COLOR = ['blue', 'red'];
-const UNIT_MODEL = { truck: 'truck', engineer: 'pickup', tank: 'tank', gunship: 'apache' };
+const UNIT_MODEL = { truck: 'truck', engineer: 'pickup', tank: 'tank', gunship: 'apache', littlebird: 'littlebird' };
 // 3D-Modelle (T-12-Panzer, Attack Chopper), siehe assets/iso/README.md: span = Bildbreite in Einheitenradien, ax/ay = Bodenpunkt im Bild
-const MODEL_VIEW = { tank: { span: 4.2, ax: 64, ay: 64 }, apache: { span: 5, ax: 64, ay: 47 } };
+const MODEL_VIEW = { tank: { span: 4.2, ax: 64, ay: 64 }, apache: { span: 5, ax: 64, ay: 47 }, littlebird: { span: 5, ax: 64, ay: 55 } };
 const VEHICLES = {};
 for (const model of new Set(Object.values(UNIT_MODEL))) {
   VEHICLES[model] = TEAM_COLOR.map((c) => SECTORS.map((s) => load(`vehicles/${model}-${c}-${s}.png`)));

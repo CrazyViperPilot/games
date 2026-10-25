@@ -1,6 +1,6 @@
 // Frontline Service Worker: network-first (immer die neueste Version), Cache nur als Offline-Fallback.
 // Bei Änderungen an Dateien CACHE_VERSION erhöhen, damit Clients die neue Version laden.
-const CACHE_VERSION = 'frontline-v45';
+const CACHE_VERSION = 'frontline-v46';
 const CACHE_PREFIX = 'frontline-';
 const CACHE_NAME = CACHE_VERSION;
 
@@ -220,6 +220,22 @@ const ASSETS = [
   './assets/iso/vehicles/apache-red-nw.png',
   './assets/iso/vehicles/apache-red-n.png',
   './assets/iso/vehicles/apache-red-ne.png',
+  './assets/iso/vehicles/littlebird-blue-e.png',
+  './assets/iso/vehicles/littlebird-blue-se.png',
+  './assets/iso/vehicles/littlebird-blue-s.png',
+  './assets/iso/vehicles/littlebird-blue-sw.png',
+  './assets/iso/vehicles/littlebird-blue-w.png',
+  './assets/iso/vehicles/littlebird-blue-nw.png',
+  './assets/iso/vehicles/littlebird-blue-n.png',
+  './assets/iso/vehicles/littlebird-blue-ne.png',
+  './assets/iso/vehicles/littlebird-red-e.png',
+  './assets/iso/vehicles/littlebird-red-se.png',
+  './assets/iso/vehicles/littlebird-red-s.png',
+  './assets/iso/vehicles/littlebird-red-sw.png',
+  './assets/iso/vehicles/littlebird-red-w.png',
+  './assets/iso/vehicles/littlebird-red-nw.png',
+  './assets/iso/vehicles/littlebird-red-n.png',
+  './assets/iso/vehicles/littlebird-red-ne.png',
   './js/render/minimap.js',
   './js/ui/controller.js',
   './js/ui/input.js',

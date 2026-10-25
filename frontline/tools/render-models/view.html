@@ -9,8 +9,39 @@ const q=new URLSearchParams(location.search);
 const W=+q.get('size')||256, N=8;
 const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});
 renderer.setSize(W,W);renderer.setClearColor(0,0);document.body.appendChild(renderer.domElement);
+window.buildLB=()=>{
+  const team=new THREE.Color(window.TEAM||0x808080);
+  const M=(c,e)=>new THREE.MeshLambertMaterial({color:c,emissive:e||0x000000});
+  const body=M(team,team.clone().multiplyScalar(0.35)),dark=M(0x2a2a2a),glass=M(0x25394d,0x0c1620),grey=M(0x9a9a9a,0x303030);
+  const g=new THREE.Group();
+  const add=(geo,mat,x,y,z,rx=0,ry=0,rz=0,sx=1,sy=1,sz=1)=>{const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);m.rotation.set(rx,ry,rz);m.scale.set(sx,sy,sz);g.add(m);return m;};
+  // Kabine (Ei) und Glasnase, Front = +Z
+  add(new THREE.SphereGeometry(1,24,16),body,0,0.34,0,0,0,0,0.30,0.30,0.48);
+  add(new THREE.SphereGeometry(1,20,14),glass,0,0.38,0.27,0,0,0,0.23,0.20,0.22);
+  // Heckausleger leicht ansteigend, T-Leitwerk
+  const boom=add(new THREE.CylinderGeometry(0.035,0.07,1.0,12),body,0,0.46,-0.78,Math.PI/2+0.05,0,0);
+  add(new THREE.BoxGeometry(0.46,0.025,0.13),body,0,0.51,-1.28);
+  add(new THREE.BoxGeometry(0.03,0.30,0.20),body,0,0.40,-1.28);
+  add(new THREE.BoxGeometry(0.02,0.30,0.035),dark,0.045,0.33,-1.35,0,0,0.5);
+  add(new THREE.BoxGeometry(0.02,0.30,0.035),dark,0.045,0.33,-1.35,0,0,-0.5+Math.PI/2);
+  // Mast, Nabe, 5 Rotorblätter
+  add(new THREE.CylinderGeometry(0.035,0.045,0.14,10),dark,0,0.68,0.02);
+  add(new THREE.CylinderGeometry(0.07,0.07,0.04,12),dark,0,0.76,0.02);
+  for(let i=0;i<5;i++){const a=i*Math.PI*2/5+0.3;const bl=new THREE.Mesh(new THREE.BoxGeometry(0.95,0.012,0.075),dark);bl.position.set(Math.cos(a)*0.5,0.775,0.02+Math.sin(a)*0.5);bl.rotation.y=-a;g.add(bl);}
+  // Kufen mit Streben
+  for(const sx of [-1,1]){
+    add(new THREE.CylinderGeometry(0.02,0.02,0.8,8),dark,sx*0.30,0.0,0.02,Math.PI/2);
+    add(new THREE.CylinderGeometry(0.02,0.02,0.18,8),dark,sx*0.30,0.04,0.40,0.9,0,0);
+    for(const z of [0.18,-0.14]) add(new THREE.CylinderGeometry(0.016,0.016,0.30,8),dark,sx*0.23,0.14,z,0,0,sx*-0.45);
+    // Waffenträger seitlich
+    add(new THREE.BoxGeometry(0.09,0.09,0.36),dark,sx*0.36,0.24,0.06);
+  }
+  // Sensorkugel unter der Nase
+  add(new THREE.SphereGeometry(0.075,14,10),grey,0,0.17,0.43);
+  return g;};
 window.loadModel=async(kind,url,mtl,tex)=>{
   let obj;
+  if(kind==='proc'){obj=window.buildLB();window.obj=obj;return true;}
   if(kind==='fbx') obj=await new FBXLoader().loadAsync(url);
   else { const l=new OBJLoader(); if(mtl){const m=await new MTLLoader().loadAsync(mtl);m.preload();l.setMaterials(m);} obj=await l.loadAsync(url);}
   const team=new THREE.Color(window.TEAM||0x808080);

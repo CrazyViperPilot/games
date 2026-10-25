@@ -6,7 +6,7 @@ export async function run(jobs){
  const b=await chromium.launch({args:['--use-gl=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist']});
  for(const j of jobs){const p=await b.newPage();p.on('pageerror',e=>console.log('ERR',e.message));p.on('console',m=>{if(m.type()==='error')console.log('C',m.text())});
   await p.goto('http://localhost:8123/view.html?size='+(j.size||256));
-  await p.evaluate(a=>window.loadModel(...a),[j.kind,j.url,j.mtl,j.tex]);
+  await p.evaluate(c=>{window.TEAM=c},j.team||0x5b7a4a);await p.evaluate(a=>window.loadModel(...a),[j.kind,j.url,j.mtl,j.tex]);
   const azs=j.azs||[0,45,90,135,180,225,270,315];
   for(const az of azs){const d=await p.evaluate(a=>window.shot(...a),[az+(j.rot||0),j.elev??30,j.len||2]);fs.mkdirSync(path.dirname(j.out(az)),{recursive:true});fs.writeFileSync(j.out(az),Buffer.from(d.split(',')[1],'base64'));}
   await p.close();}
