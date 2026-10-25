@@ -306,7 +306,8 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 
 ## Änderungsverlauf
 
-- v4.33: **Iso-Grafik:** 3D-Modelle für Kampfpanzer, AH-64 (T-12, Attack Chopper) und Little Bird (Eigenbau); Cache v46. Cache v45.
+- v4.34: **Little Bird** als gerendertes 3D-Modell (Eigenbau nach Foto). Cache v46.
+- v4.33: **Iso-Grafik:** 3D-Modelle für Kampfpanzer und AH-64 (T-12, Attack Chopper). Cache v45.
 - v4.32: **PRD:** Tabelle aller Waffen mit Schaden je Panzerklasse und Tabelle der KI-Konstanten. Cache v44.
 - v4.31: **Schwierigkeit über Verhalten** statt Einkommensbonus (Schwer: ×1,0). Cache v44.
 - v4.30: **KI verteidigt die Zonen-FOB** zur Gegnerseite, zwei Mörser. Cache v43.
