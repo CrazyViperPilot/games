@@ -481,3 +481,30 @@ Eliminierung ohne FOB und ohne Baufahrzeug; KI-gegen-KI läuft weiter fehlerfrei
 - Engine ergänzt: `{ type: 'build', ids, siteId }` schickt Bauer an eine bestehende Baustelle (Rechtsklick Bauer → Baustelle).
 - KI gegen KI (normal): 58–61 min, viel Kampf (je 470–600 gefallene Einheiten), aber Zonenhalter gewinnt 100:0 –
   Balancing bewusst zurückgestellt, weil das HQ-Konzept (unendlicher Nachschub, begrenzte Ladeleistung) die Wirtschaft ändert.
+
+## 12. v4.23: Soldaten-Nachschub (wie im Original: Gefallene steigen wieder ein)
+
+Problem (Messung v4.22, KI gegen KI): Die erste große Schlacht entscheidet; der Verlierer hat kaum Einheiten in der Zone,
+verdient deshalb kaum Geld und kommt nicht zurück (Schneeball). Lösung: kostenloser Grundstock an Soldaten.
+
+- `BALANCE.reinforce = { interval: 6, soldierMin: 50, unit: 'rifleman' }`.
+- `game.soldierCount(team)`: lebende eigene Infanterie (`UNITS[type].armor === 'inf'`, auch Passagiere in Fahrzeugen)
+  plus Infanterie in Ausbildungs-Warteschlangen.
+- In `updateEconomy` (economy.js), je Team mit lebender, fertiger Haupt-FOB: Ist `soldierCount < soldierMin` und
+  `unitCount < unitCap`, zählt `team.reinforceTimer` hoch; bei `>= interval` erscheint ein Schütze kostenlos an der
+  Haupt-FOB (`spawnSpot`, Befehl zum Sammelpunkt wie bei der Ausbildung, keine Meldung) und der Timer startet von vorn.
+  Ist kein Feld frei, bleibt der Timer stehen (Versuch im nächsten Schritt). Sonst (genug Soldaten oder Limit) Timer = 0.
+  Unabhängig von Warteschlange und Ausbildungsplätzen; kostet nichts, zählt nicht als „verdient“.
+- HUD (Haupt-FOB gewählt): Zeile „Nachschub: Schütze in N s (Soldaten x/50)“ bzw. „Nachschub ruht (Soldaten x/50)“.
+- KI: keine Pflichtänderung; neue Schützen sammeln sich am Sammelpunkt und werden wie ausgebildete Einheiten eingesetzt.
+- Kasse (`walletMax` 5000): nach Messung prüfen (beide Seiten starten mit demselben Betrag).
+- Tests (economy.test.js): Nachschub nach 6 s bei < 50 Soldaten, kostenlos; keiner bei ≥ 50; keiner ohne Haupt-FOB;
+  keiner am Einheitenlimit; `soldierCount` zählt Passagiere und Warteschlange.
+
+### 12.1 Review v4.23 (Opus)
+- Umgesetzt von Haiku; 115 Tests grün; Browser: Schütze erscheint nach 6 s, HUD-Zeile korrekt, keine Fehler.
+- KI gegen KI (normal, 20 min): Der Verlierer behält jetzt 25–50 Einheiten (vorher 5–10) und verdient 7.800–9.200 (vorher
+  5.400–6.300). Die Zone gewinnt er aber nicht zurück: Er schickt kleine Gruppen gegen 115 Einheiten in der Zone (0–1 Einheiten
+  in der Zone ab Minute 9–11). Der Sieger hortet weiter (26.000–30.600). Gegenprobe mit `unitCap` 80: kein Unterschied (nicht übernommen).
+- `walletMax` 5000 bleibt: Beide Seiten starten mit demselben Betrag, das Horten verschafft keinen Vorteil gegenüber dem Gegner.
+- Offen: Der Schneeball ist nicht gelöst; nächster Hebel steht zur Entscheidung (KI des Unterlegenen und/oder Spielmechanik).

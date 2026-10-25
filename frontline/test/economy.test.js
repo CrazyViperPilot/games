@@ -170,3 +170,65 @@ test('KI: setzt die Startarmee sofort ein, die Reserve bleibt an der Haupt-FOB',
     assert.ok(dh < 400, `Reserve ${dh.toFixed(0)} px von der Haupt-FOB`);
   }
 });
+
+test('Nachschub: nach 6 s bei unter 50 Soldaten, ein Schütze kostenlos an der Haupt-FOB', () => {
+  const g = mk({ seed: 7 });
+  for (const u of unitsOf(g, 0, 'rifleman').slice(0, 5)) u.alive = false;
+  assert.equal(g.soldierCount(0), 45);
+  const before = unitsOf(g, 0, 'rifleman').length;
+  const m0 = g.teams[0].res.money;
+  run(g, 5.9);
+  assert.equal(unitsOf(g, 0, 'rifleman').length, before, 'vor 6 s noch keiner');
+  run(g, 0.5);
+  assert.equal(unitsOf(g, 0, 'rifleman').length, before + 1, 'ein Schütze nach 6 s');
+  assert.equal(g.teams[0].res.money, m0, 'kostenlos');
+  assert.equal(g.soldierCount(0), 46);
+});
+
+test('Nachschub: keiner bei 50 Soldaten', () => {
+  const g = mk({ seed: 7 });
+  assert.equal(g.soldierCount(0), BALANCE.reinforce.soldierMin);
+  const before = unitsOf(g, 0).length;
+  run(g, 20);
+  assert.equal(g.soldierCount(0), 50);
+  assert.equal(unitsOf(g, 0).length, before);
+});
+
+test('Nachschub: keiner ohne lebende Haupt-FOB', () => {
+  const g = mk({ seed: 7 });
+  g.mainFob(0).alive = false;
+  for (const u of unitsOf(g, 0, 'rifleman').slice(0, 5)) u.alive = false;
+  const before = g.soldierCount(0);
+  run(g, 12);
+  assert.equal(g.soldierCount(0), before, 'kein Nachschub');
+  assert.equal(g.teams[0].reinforceTimer, 0);
+});
+
+test('Nachschub: keiner am Einheitenlimit', () => {
+  const g = mk({ seed: 7 });
+  for (const u of unitsOf(g, 0, 'rifleman').slice(0, 5)) u.alive = false;
+  const z = g.zone;
+  for (let i = 0; g.unitCount(0) < BALANCE.unitCap; i++) {
+    g.spawnUnit('truck', 0, z.x + 2000 + (i % 8) * 20, z.y + Math.floor(i / 8) * 20);
+  }
+  assert.equal(g.unitCount(0), BALANCE.unitCap);
+  assert.ok(g.soldierCount(0) < BALANCE.reinforce.soldierMin);
+  const before = g.soldierCount(0);
+  run(g, 12);
+  assert.equal(g.soldierCount(0), before, 'kein Schütze am Limit');
+  assert.equal(g.teams[0].reinforceTimer, 0);
+});
+
+test('soldierCount: zählt Passagiere in Fahrzeugen und Infanterie in der Warteschlange', () => {
+  const g = mk({ seed: 7 });
+  const f = fobOf(g, 0);
+  assert.equal(g.soldierCount(0), 50);
+  const heli = g.spawnUnit('littlebird', 0, f.x + 150, f.y - 150);
+  const man = unitsOf(g, 0, 'rifleman')[0];
+  man.alive = false;
+  heli.passengers.push(man);
+  assert.equal(g.soldierCount(0), 50, 'Passagier zählt');
+  assert.equal(g.issue(0, { type: 'train', buildingId: f.id, unit: 'rifleman' }).ok, true);
+  assert.equal(g.issue(0, { type: 'train', buildingId: f.id, unit: 'at' }).ok, true);
+  assert.equal(g.soldierCount(0), 52, 'Warteschlange zählt (Schütze und Panzerabwehrsoldat)');
+});

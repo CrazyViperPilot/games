@@ -74,12 +74,38 @@ export function updateEconomy(game, dt) {
     }
   }
 
+  // Soldaten-Nachschub (§12): kostenlos, unabhängig von Warteschlange und Ausbildungsplätzen
+  for (const team of game.teams) updateReinforce(game, team, dt);
+
   // Haupt-FOB: unendlicher Vorrat (das Lager wird immer wieder aufgefüllt; Laden und Nachfüllen haben ihre Raten)
   for (const b of game.buildings) {
     if (!b.alive || !b.infinite) continue;
     for (const k of STOCK_KEYS) b.store[k] = BALANCE.logistics.storeCap;
   }
   for (const team of game.teams) team.res.money += team.rate.money * dt;
+}
+
+/**
+ * Nachschub eines Teams: zählt nur, solange eine lebende fertige Haupt-FOB steht, zu wenig Soldaten
+ * (< soldierMin) und das Einheitenlimit nicht erreicht ist. Bei `interval` s erscheint ein Schütze an der
+ * Haupt-FOB. Ist kein Feld frei, bleibt der Timer stehen (nächster Schritt). Sonst Timer = 0.
+ */
+function updateReinforce(game, team, dt) {
+  const R = BALANCE.reinforce;
+  const b = game.mainFob(team.id);
+  if (!b || !b.built || game.soldierCount(team.id) >= R.soldierMin || game.unitCount(team.id) >= BALANCE.unitCap) {
+    team.reinforceTimer = 0;
+    return;
+  }
+  team.reinforceTimer += dt;
+  if (team.reinforceTimer < R.interval) return;
+  const spot = spawnSpot(game, b);
+  if (!spot) return; // alle Felder blockiert: Timer bleibt stehen
+  team.reinforceTimer = 0;
+  const u = game.spawnUnit(R.unit, b.team, spot.x, spot.y);
+  u.order = { type: 'move', x: b.rallyX, y: b.rallyY, targetId: null };
+  planPath(game, u, b.rallyX, b.rallyY);
+  if (u.path.length === 0) setIdle(u);
 }
 
 /** Glättet das angezeigte Einkommen (team.income) gegen die momentane Rate. Nach Zone aufrufen. */

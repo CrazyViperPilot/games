@@ -304,6 +304,7 @@ export class Hud {
     }
     if (b.type === 'fob' && b.infinite) {
       h += '<div class="muted small lagerhead">Unendlich Baumaterial, Munition und Treibstoff · bildet alle Einheiten aus (nur gegen Geld)</div>';
+      h += this.reinforceInfo(b);
     } else if (b.type === 'fob') {
       h +=
         '<div class="muted small lagerhead">Lager dieser FOB (LKW füllen es aus der Haupt-FOB)</div>' +
@@ -335,6 +336,20 @@ export class Hud {
       h += `<div class="queue">${rows}</div>`;
     }
     return h;
+  }
+
+  /** Haupt-FOB: Soldaten-Nachschub (Restzeit bis zum nächsten Schützen oder Ruhezustand). */
+  reinforceInfo(b) {
+    const g = this.game;
+    const R = BALANCE.reinforce;
+    const t = g.teams[b.team];
+    const soldiers = g.soldierCount(b.team);
+    const label = `Soldaten ${soldiers}/${R.soldierMin}`;
+    if (soldiers >= R.soldierMin || g.unitCount(b.team) >= BALANCE.unitCap) {
+      return `<div class="muted small">Nachschub ruht (${label})</div>`;
+    }
+    const left = Math.max(0, Math.ceil(R.interval - t.reinforceTimer)); // 0, solange kein Feld frei ist
+    return `<div class="muted small">Nachschub: ${esc(UNITS[R.unit].name)} in ${left} s (${label})</div>`;
   }
 
   /** Bohrer: Phase und Restzeit. */

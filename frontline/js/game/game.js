@@ -159,6 +159,7 @@ export class Game {
         incomeMult: 1,
         isAI: false,
         lastWarn: -1e9,
+        reinforceTimer: 0, // Zeit seit dem letzten Soldaten-Nachschub (economy.js)
       };
       // Lesbare Summe über alle fertigen eigenen FOB-Lager; nie direkt schreiben
       for (const k of STOCK_KEYS) {
@@ -774,6 +775,21 @@ export class Game {
       if (u.alive && u.team === team) n += 1 + u.passengers.length;
     }
     for (const b of this.buildings) if (b.alive && b.team === team) n += b.queue.length;
+    return n;
+  }
+
+  /** Lebende Infanterie eines Teams (inkl. Passagiere in Fahrzeugen) plus Infanterie in Ausbildungs-Warteschlangen. */
+  soldierCount(team) {
+    let n = 0;
+    for (const u of this.units) {
+      if (!u.alive || u.team !== team) continue;
+      if (u.def.armor === 'inf') n += 1;
+      for (const p of u.passengers) if (p.def.armor === 'inf') n += 1;
+    }
+    for (const b of this.buildings) {
+      if (!b.alive || b.team !== team) continue;
+      for (const e of b.queue) if (UNITS[e.unit].armor === 'inf') n += 1;
+    }
     return n;
   }
 
