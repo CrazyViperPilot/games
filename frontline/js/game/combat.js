@@ -88,10 +88,10 @@ function findTarget(game, hash, s, radius, minRange, allowBuildings, dmg) {
   const consider = (e) => {
     if (!e.alive || e.team === team) return;
     if (!(dmg[dmgKey(e)] > 0)) return; // z. B. Mörser und Panzer können keine Hubschrauber treffen
-    if (leashed && Math.hypot(e.x - s.anchorX, e.y - s.anchorY) > BALANCE.leash + radiusOf(e)) return;
+    if (leashed && Math.hypot(e.x - s.anchorX, e.y - s.anchorY) > Math.max(BALANCE.leash, radius) + radiusOf(e)) return;
     const d = Math.hypot(e.x - s.x, e.y - s.y);
     if (d < minRange || d > radius + radiusOf(e)) return;
-    if (!game.isVisible(team, e.x, e.y)) return;
+    if (!game.sees(team, e)) return;
     if (d < bestD) {
       best = e;
       bestD = d;
@@ -155,6 +155,7 @@ function tryFireUnit(game, u, t) {
   } else {
     game.addEffect('tracer', u.x, u.y, u.team, t.x, t.y);
   }
+  if (u.def.stealth) u.revealedUntil = game.time + BALANCE.stealth.revealTime; // ein Schuss verrät die Stellung
   hit(game, t, shotDamage(pick.spec, u, t));
 }
 

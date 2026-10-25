@@ -142,7 +142,7 @@ export class AI {
     const zone = g.zone;
     const dir = unitVec(zone.x - ax, zone.y - ay);
     // Gegner nur, soweit das eigene Team sie sieht (Nebel)
-    const enemies = g.units.filter((u) => u.alive && u.team !== t && g.isVisible(t, u.x, u.y));
+    const enemies = g.units.filter((u) => u.alive && u.team !== t && g.sees(t, u));
     this.corridor = home ? { x: home.x, y: home.y, dx: dir.x, dy: dir.y } : null;
 
     const combat = units.filter((u) => u.def.range > 0);

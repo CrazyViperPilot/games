@@ -232,6 +232,21 @@ export class Game {
     return this.fog[team].isVisible(x, y);
   }
 
+  /**
+   * Sieht `team` die Entity e? Eigene immer; fremde, wenn die Zelle im Sichtfeld liegt. Getarnte Einheiten (def.stealth) zusätzlich nur,
+   * wenn eine eigene Einheit oder ein fertiges Gebäude des Teams näher als stealth.detectRange steht oder sie gerade geschossen haben.
+   */
+  sees(team, e) {
+    if (e.team === team) return true;
+    if (!this.fog[team].isVisible(e.x, e.y)) return false;
+    if (!e.def.stealth || e.kind !== 'unit') return true;
+    if (this.time < (e.revealedUntil || 0)) return true;
+    const r2 = BALANCE.stealth.detectRange ** 2;
+    for (const u of this.units) if (u.alive && u.team === team && (u.x - e.x) ** 2 + (u.y - e.y) ** 2 <= r2) return true;
+    for (const b of this.buildings) if (b.alive && b.built && b.team === team && (b.x - e.x) ** 2 + (b.y - e.y) ** 2 <= r2) return true;
+    return false;
+  }
+
   isExplored(team, x, y) {
     return this.fog[team].isExplored(x, y);
   }

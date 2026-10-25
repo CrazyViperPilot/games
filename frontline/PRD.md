@@ -36,7 +36,7 @@ Nicht im Umfang: Netzwerk-Multiplayer, Kampagne, Speichern laufender Partien, So
 
 - **Keine Ressourcenvorkommen, keine Förderanlagen, kein Grundeinkommen je FOB.** Geld gibt es in der Konfliktzone und der Hot Zone (Abschnitt 7) sowie als **Prämie**: Für jede zerstörte gegnerische Einheit zahlt der Gegner (also du) 25 % des Einheitenpreises bei Soldaten, **60 % bei Fahrzeugen und Hubschraubern** (z. B. Schütze 15, Kampfpanzer 300); für zerstörte Gebäude 20 % ihres Baumaterialpreises (Mauern und Tore nichts); für jedes **fertig gebaute** Gebäude 20 % seines Baumaterialpreises (FOB 80, Mörser 40, Flak 36, Bohrer 30; Mauern und Tore nichts, sonst wäre Mauerbau eine Geldquelle). Ab 100 Geld erscheint eine Meldung. Die Prämie gilt für beide Seiten, auch für die KI.
 - **Haupt-FOB:** unendliches Lager. **Raten:** LKW laden/entladen 100/s (400 Ladung in 4 s), Einheiten nachfüllen (Munition 60/s, Treibstoff 4/s, Baumaterial 20/s), Ausbildung **zwei Einheiten gleichzeitig** (2 Ausbildungsplätze, je eigener Fortschritt)
-  (Schütze 5 s, PAK 8 s, LKW 6 s, Baufahrzeug 9 s, SPz 12 s, KPz 20 s, Little Bird 15 s, Transporter 20 s, AH-64 28 s; Warteschlange 5).
+  (Schütze 5 s, PAK 8 s, Scharfschütze 10 s, LKW 6 s, Baufahrzeug 9 s, SPz 12 s, KPz 20 s, Little Bird 15 s, Transporter 20 s, AH-64 28 s; Warteschlange 5).
 - **Vordere FOBs:** eigenes endliches Lager (max. 3000 je Sorte), das nur **LKW oder Transporthubschrauber** füllen. Oben zeigt „Front BM/MUN/TS“ die Summe dieser Lager.
 - **Bezahlen:** Gebäude zahlen aus einer FOB, deren Bauradius den Bauort enthält (Baufahrzeug). Einheiten kosten **nur Geld**. Abbruch erstattet an dieses Lager.
 - **Soldaten tragen Baumaterial:** Schütze und PAK tragen **50 Baumaterial** (starten voll, laden im FOB-Bauradius oder nahe einem LKW nach) und bauen daraus **Mauern und Tore, nur im Bauradius einer FOB**.
@@ -95,6 +95,7 @@ Gebäude können abgerissen werden (Erstattung 25 % Baumaterial). Es gibt kein E
 |---|---|---|
 | Schütze | Haupt-FOB | Billige Infanterie, stark gegen Infanterie; trägt 50 Baumaterial, baut daraus Mauern und Tore |
 | Panzerabwehrsoldat | Haupt-FOB | Langsam feuernd, stark gegen Fahrzeuge und Gebäude; baut Mauern und Tore |
+| Scharfschütze | Haupt-FOB | Getarnt (Ghillie-Anzug), sehr große Reichweite, **ein Treffer tötet jeden Soldaten**, aber nur alle 8 s ein Schuss; gegen Fahrzeuge und Gebäude fast wirkungslos; baut nicht, kann als Passagier mitfahren |
 | LKW | Haupt-FOB | Unbewaffnet, schnell, **2 Soldaten** Platz. **Logistik:** lädt Ressourcen an einer FOB (400), bringt sie zu einer anderen FOB oder FOB-Baustelle, pendelt auf Routen, versorgt Truppen im Feld |
 | Baufahrzeug | Haupt-FOB | Unbewaffnet, **1 Soldat** Platz. Setzt FOB-Baustellen, baut alle Gebäude, repariert |
 | Schützenpanzer | Haupt-FOB | **6 Soldaten** Platz. Schnell, gut gegen Infanterie und leichte Fahrzeuge |
@@ -102,6 +103,8 @@ Gebäude können abgerissen werden (Erstattung 25 % Baumaterial). Es gibt kein E
 | Little Bird | Haupt-FOB | Unbewaffnet, schnell, **5 Passagiere** (Infanterie, Baufahrzeug) |
 | Transporthubschrauber | Haupt-FOB | Unbewaffnet, **9 Passagiere** und **400 Ressourcen** (laden/entladen/pendeln wie ein LKW) |
 | AH-64 (Kampfhubschrauber) | Haupt-FOB | Bordkanone und 10 Raketen (Tabelle oben), 650 HP, 70 Treibstoff; Nachtanken/-laden in einer FOB |
+
+**Scharfschütze und Tarnung:** Der Scharfschütze ist getarnt: Gegner sehen ihn nur, wenn eine ihrer Einheiten oder ein fertiges Gebäude näher als **160 px** an ihm steht, oder **4 s lang nach jedem seiner Schüsse**. Unentdeckt wird er nicht angegriffen und ist weder auf der Karte noch auf der Minimap zu sehen (eigene Einheiten sehen ihn immer). Er sieht selbst 440 px weit, sein Gewehr reicht 480 px, und Einheiten ohne Befehl schießen bis zu dieser Reichweite (nicht nur bis zur Leine von 300 px). Ein Schuss verbraucht 4 Munition; mit seiner Reichweite und der Tarnung ist er gegen Infanterie stark, gegen Fahrzeuge, Gebäude und Hubschrauber nutzlos. Die KI baut ihn nicht, sieht ihn aber nach denselben Tarnregeln. Er zählt zu den Soldaten für den Nachschub (Abschnitt 3).
 
 **Hubschrauber** fliegen geradeaus über Gelände und Gebäude, brauchen Treibstoff beim Fliegen (ohne: 25 % Tempo) und sind
 Panzerklasse „Luft“: Flugabwehr (stark), Panzerabwehrsoldat (40), Raketen des AH-64 (150), SPz-MG (6), Schütze (3), Panzer-MG (3) und die FOB-MG (2) treffen sie; Hauptkanone,
@@ -116,6 +119,7 @@ Schadensmodell: Schaden je Schuss nach Panzerklasse des Ziels (Infanterie / leic
 |---|---|---|---|---|---|---|---|
 | Schütze | 100 | 45 | 260 | 200 | 60 | 5 s | – |
 | Panzerabwehrsoldat | 90 | 40 | 260 | 240 | 120 | 8 s | – |
+| Scharfschütze | 70 | 38 | 440 | 480 | 220 | 10 s | – |
 | LKW | 250 | 110 | 220 | – | 80 | 6 s | 30 / 0,2 |
 | Baufahrzeug | 400 | 70 | 260 | – | 150 | 9 s | 40 / 0,3 |
 | Schützenpanzer | 450 | 85 | 300 | 240 | 250 | 12 s | 40 / 0,4 |
@@ -143,6 +147,7 @@ Schaden je Schuss nach Panzerklasse des Ziels (Inf = Infanterie, Leicht, Schwer,
 |---|---|---|---|---|---|---|---|---|
 | Schütze: Gewehr | 200 | 1,0 | 12 | 3 | 1 | 4 | 3 | – |
 | PAK: RPG | 240 | 3,0 | 10 | 90 | 120 | 60 | 40 | – |
+| Scharfschütze: Gewehr | 480 | 8,0 | 200 (ein Treffer tötet Soldaten) | 6 | 1 | 2 | 2 | – (10 Schuss à 4 Munition) |
 | SPz: Granatwerfer | 240 | 2,0 | 30 | 40 | 10 | 25 | – | Leicht, Schwer, Geb |
 | SPz: MG | 220 | 0,25 | 9 | 3 | 1 | 3 | 6 | – |
 | KPz: Hauptkanone | 300 | 6,0 | 45 | 120 | 150 | 120 | – | Leicht, Schwer, Geb |
@@ -216,7 +221,7 @@ Direktfeuer richtet sich nach Trefferzahlen (volles Ziel); Seite = Winkel zur Fa
 | Mörser gewählt | G Ziel wählen (oder Rechtsklick auf die Karte) · C Ziel löschen |
 | Bohrer gewählt | G aktivieren |
 | Transportfahrzeuge | Infanterie wählen + **I** (Einsteigen, dann Fahrzeug antippen) oder Rechtsklick auf LKW / Baufahrzeug / Schützenpanzer / Hubschrauber = einsteigen · Fahrzeug wählen + **O** und Zielpunkt = absetzen · Transporthubschrauber: L/U/T wie LKW |
-| Haupt-FOB gewählt | Ausbildung: Q Schütze · W PAK · E LKW · R Baufahrzeug · A SPz · S KPz · D Little Bird · F Transporter · G AH-64 |
+| Haupt-FOB gewählt | Ausbildung: Q Schütze · W PAK · T Scharfschütze · E LKW · R Baufahrzeug · A SPz · S KPz · D Little Bird · F Transporter · G AH-64 |
 | LKW gewählt | L Laden · U Entladen · T Pendeln (Start-FOB, dann Ziel-FOB) · Ladung Q Gemischt / W Baumaterial / E Munition / R Treibstoff |
 | Entf | Gebäude abreißen |
 | Esc | Abbrechen / Auswahl aufheben |
@@ -307,6 +312,7 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 
 ## Änderungsverlauf
 
+- v4.38: **Scharfschütze** (neue baubare Einheit, Taste T): 1-Schuss-Kill gegen Soldaten, 8 s Nachladen, Reichweite 480, Tarnung (Gegner sehen ihn nur nahe oder 4 s nach einem Schuss); eigenes 3D-Modell nach Ghillie-Foto in 8 Richtungen. Idle-Einheiten schießen bis zur Waffenreichweite statt nur bis zur Leine. Cache v50.
 - v4.37: **Wachturm** als Gebäude (eigenes 3D-Modell, 4 Drehungen), vier Türme am Zonenrand der Zufallskarte, im Karteneditor setzbar, Kartenformat `kind: tower`. Cache v49.
 - v4.36: **Kampfpanzer** als eigenes 3D-Modell (Leopard-2-Anmutung, ersetzt T-12). Cache v48.
 - v4.35: **Schützenpanzer** als eigenes 3D-Modell (Puma-Anmutung). Cache v47.

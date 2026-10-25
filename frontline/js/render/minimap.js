@@ -97,7 +97,7 @@ export class Minimap {
 
     // Einheiten (fremde nur in Sicht)
     for (const u of g.units) {
-      if (!u.alive || (u.team !== team && !seen(u.x, u.y))) continue;
+      if (!u.alive || (u.team !== team && !reveal && !(seen(u.x, u.y) && g.sees(team, u)))) continue;
       ctx.fillStyle = u.team === team ? '#eaf6ff' : g.teams[u.team].color;
       ctx.beginPath();
       ctx.arc(u.x, u.y, 1.6 * px, 0, Math.PI * 2);

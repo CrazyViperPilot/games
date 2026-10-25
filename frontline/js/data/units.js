@@ -50,6 +50,25 @@ export const UNITS = {
     canRide: true,
     hotkey: 'W',
   },
+  sniper: {
+    name: 'Scharfschütze',
+    armor: 'inf',
+    hp: 70,
+    speed: 38,
+    radius: 5,
+    sight: 440,
+    stealth: true, // getarnt: Gegner sehen ihn nur nahe (BALANCE.stealth) oder kurz nach einem Schuss
+    // Scharfschützengewehr: ein Treffer tötet Infanterie, lange Nachladezeit, hohe Reichweite; gegen Fahrzeuge und Gebäude nahezu wirkungslos
+    weapons: [
+      { id: 'sniper', name: 'Scharfschützengewehr', range: 480, cooldown: 8.0, rounds: 10, munCost: 4, hits: { inf: 1 }, damage: { inf: 200, light: 6, heavy: 1, struct: 2, air: 2 } },
+    ],
+    cost: { money: 220 },
+    buildTime: 10,
+    producedAt: 'fob',
+    fuelPerSec: 0,
+    canRide: true,
+    hotkey: 'T',
+  },
   truck: {
     name: 'LKW',
     armor: 'light',

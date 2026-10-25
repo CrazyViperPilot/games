@@ -1,6 +1,6 @@
 // Frontline Service Worker: network-first (immer die neueste Version), Cache nur als Offline-Fallback.
 // Bei Änderungen an Dateien CACHE_VERSION erhöhen, damit Clients die neue Version laden.
-const CACHE_VERSION = 'frontline-v49';
+const CACHE_VERSION = 'frontline-v50';
 const CACHE_PREFIX = 'frontline-';
 const CACHE_NAME = CACHE_VERSION;
 
@@ -116,6 +116,22 @@ const ASSETS = [
   './assets/iso/units/rifleman-red-se.png',
   './assets/iso/units/rifleman-red-sw.png',
   './assets/iso/units/rifleman-red-w.png',
+  './assets/iso/units/sniper-blue-e.png',
+  './assets/iso/units/sniper-blue-se.png',
+  './assets/iso/units/sniper-blue-s.png',
+  './assets/iso/units/sniper-blue-sw.png',
+  './assets/iso/units/sniper-blue-w.png',
+  './assets/iso/units/sniper-blue-nw.png',
+  './assets/iso/units/sniper-blue-n.png',
+  './assets/iso/units/sniper-blue-ne.png',
+  './assets/iso/units/sniper-red-e.png',
+  './assets/iso/units/sniper-red-se.png',
+  './assets/iso/units/sniper-red-s.png',
+  './assets/iso/units/sniper-red-sw.png',
+  './assets/iso/units/sniper-red-w.png',
+  './assets/iso/units/sniper-red-nw.png',
+  './assets/iso/units/sniper-red-n.png',
+  './assets/iso/units/sniper-red-ne.png',
   './assets/iso/train/container-r0.png',
   './assets/iso/train/container-r1.png',
   './assets/iso/train/container-r2.png',

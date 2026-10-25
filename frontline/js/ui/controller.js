@@ -19,7 +19,7 @@ const SHORT = { money: 'G', bm: 'BM', mun: 'MUN', fuel: 'TS' };
 const HOTKEY_ALIAS = { Y: 'Z' }; // Flugabwehr auch mit Y
 // Kurznamen für die Befehlskarte (der volle Name steht im Tooltip)
 const SHORT_BLD = { wall: 'Mauer', gate: 'Tor', mortar: 'Mörser', aa: 'Flak', drill: 'Bohrer' };
-const SHORT_UNIT = { rifleman: 'Schütze', at: 'PAK', truck: 'LKW', engineer: 'Baufz.', ifv: 'SPz', tank: 'KPz', littlebird: 'Little Bird', transporter: 'Transp.-Heli', gunship: 'AH-64' };
+const SHORT_UNIT = { rifleman: 'Schütze', at: 'PAK', truck: 'LKW', engineer: 'Baufz.', ifv: 'SPz', tank: 'KPz', littlebird: 'Little Bird', transporter: 'Transp.-Heli', gunship: 'AH-64', sniper: 'Scharfschütze' };
 const isCarrier = (u) => u.def.cargoCap > 0; // LKW und Transporthubschrauber
 // Ladungsart: Taste, Kurzname, Bezeichnung
 const PRESET_BTN = [
@@ -431,7 +431,7 @@ export class Controller {
       if (!rest.length) return;
     }
     const ids = rest.map((u) => u.id);
-    const target = this.pick(wx, wy, (e) => e.team !== this.team && this.game.isVisible(this.team, e.x, e.y));
+    const target = this.pick(wx, wy, (e) => e.team !== this.team && this.game.sees(this.team, e));
     if (target) {
       this.issue({ type: 'attack', ids, targetId: target.id });
       return;
@@ -689,7 +689,7 @@ export class Controller {
   /** Vorschau aktualisieren: Hover-Ziel, Platzierung, Mauerzug. Wird bei jeder Mausbewegung gerufen. */
   updatePointer(wx, wy) {
     this.pointer = { x: wx, y: wy };
-    const hover = this.pick(wx, wy, (e) => e.team === this.team || this.game.isVisible(this.team, e.x, e.y));
+    const hover = this.pick(wx, wy, (e) => e.team === this.team || this.game.sees(this.team, e));
     this.view.hoverId = hover ? hover.id : 0;
     switch (this.view.mode) {
       case 'place':

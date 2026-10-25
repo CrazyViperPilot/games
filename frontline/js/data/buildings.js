@@ -14,7 +14,7 @@ export const BUILDINGS = {
     buildTime: 30,
     hotkey: null,
     // bildet nur die Haupt-FOB aus (entities.js: b.produces); alle anderen FOBs bilden nichts aus
-    produces: ['rifleman', 'at', 'truck', 'engineer', 'ifv', 'tank', 'littlebird', 'transporter', 'gunship'],
+    produces: ['rifleman', 'at', 'sniper', 'truck', 'engineer', 'ifv', 'tank', 'littlebird', 'transporter', 'gunship'],
     weapon: {
       range: 220,
       minRange: 0,

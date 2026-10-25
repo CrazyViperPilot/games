@@ -132,7 +132,7 @@ export class Renderer {
     const inRect = (x, y, pad = 0) => x >= R.x0 - pad && x <= R.x1 + pad && y >= R.y0 - pad && y <= R.y1 + pad;
     const seen = (x, y) => reveal || g.isVisible(team, x, y);
     const known = (x, y) => reveal || g.isExplored(team, x, y);
-    const shown = (e) => e.team === team || seen(e.x, e.y);
+    const shown = (e) => e.team === team || reveal || (seen(e.x, e.y) && g.sees(team, e));
 
     // Bildschirm: Hintergrund; danach Welt-Transformation (Kamera)
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -272,7 +272,7 @@ export class Renderer {
     const inRect = (x, y, pad = 0) => x >= R.x0 - pad && x <= R.x1 + pad && y >= R.y0 - pad && y <= R.y1 + pad;
     const seen = (x, y) => reveal || g.isVisible(team, x, y);
     const known = (x, y) => reveal || g.isExplored(team, x, y);
-    const shown = (e) => e.team === team || seen(e.x, e.y);
+    const shown = (e) => e.team === team || reveal || (seen(e.x, e.y) && g.sees(team, e));
     if (!this.terrainIso) this.terrainIso = buildTerrain(g.map, true);
     if (!this.deco) this.deco = this.buildDeco();
 

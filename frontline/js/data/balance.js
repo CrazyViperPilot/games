@@ -58,6 +58,8 @@ export const BALANCE = {
     normal: { think: 2.0, incomeMult: 1.0, attackStrength: 2000, scout: true, counter: true, raid: false, fallback: false },
     hard: { think: 1.0, incomeMult: 1.0, attackStrength: 1600, scout: true, counter: true, raid: true, fallback: true },
   },
+  // Tarnung (Scharfschütze): Gegner sehen die Einheit nur nahe an eigenen Einheiten/Gebäuden oder kurz nach einem Schuss
+  stealth: { detectRange: 160, revealTime: 4 },
   resNames: { money: 'Geld', bm: 'Baumaterial', mun: 'Munition', fuel: 'Treibstoff' },
   teamNames: ['Blau', 'Rot'],
   teamColors: ['#3d8bfd', '#e5484d'],
