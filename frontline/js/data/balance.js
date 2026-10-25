@@ -21,7 +21,7 @@ export const BALANCE = {
   trainSlots: 2, // Ausbildungsplätze der Haupt-FOB: so viele Einträge der Warteschlange werden gleichzeitig ausgebildet
   shortageWarn: 20, // s zwischen zwei Meldungen je Sorte und Team
   fuelSlowMul: 0.25, // Tempo von Fahrzeugen ohne Treibstoff
-  unitCapTotal: 100, // Einheitenlimit insgesamt; je Partei 100 / Anzahl der Parteien (2 Parteien = 50), lebende + in Ausbildung
+  unitCap: 120, // lebende + in Ausbildung befindliche Einheiten je Team
   // Soldaten-Nachschub (§12): kostenloser Schütze an der Haupt-FOB alle `interval` s, solange weniger als `soldierMin` Infanterie lebt
   reinforce: { interval: 6, soldierMin: 50, unit: 'rifleman' },
   demolishRefund: 0.25, // Abriss fertiger Gebäude (Baustellen: voll)

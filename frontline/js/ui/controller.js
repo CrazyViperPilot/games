@@ -818,7 +818,7 @@ export class Controller {
   trainReason(b, cost) {
     const money = this.moneyReason(cost);
     if (money) return money;
-    if (this.game.unitCount(this.team) >= this.game.unitCap()) return `Einheitenlimit erreicht (${this.game.unitCap()})`;
+    if (this.game.unitCount(this.team) >= BALANCE.unitCap) return `Einheitenlimit erreicht (${BALANCE.unitCap})`;
     return '';
   }
 

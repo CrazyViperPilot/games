@@ -41,8 +41,7 @@ Nicht im Umfang: Netzwerk-Multiplayer, Kampagne, Speichern laufender Partien, So
 - **Bezahlen:** Gebäude zahlen aus einer FOB, deren Bauradius den Bauort enthält (Baufahrzeug). Einheiten kosten **nur Geld**. Abbruch erstattet an dieses Lager.
 - **Soldaten tragen Baumaterial:** Schütze und PAK tragen **50 Baumaterial** (starten voll, laden im FOB-Bauradius oder nahe einem LKW nach) und bauen daraus **Mauern und Tore, nur im Bauradius einer FOB**.
 - **LKW im Feld:** füllt Einheiten im 180-px-Umkreis aus seiner Ladung auf (Munition, Treibstoff, Baumaterial).
-- **Soldaten-Nachschub (wie im Original: Gefallene steigen wieder ein):** Hat ein Team weniger als **50 Soldaten** (Schützen und PAK, auch in Fahrzeugen und in Ausbildung), stellt die Haupt-FOB **alle 6 s kostenlos einen Schützen** bereit, der zum Sammelpunkt läuft (nur unterhalb des Einheitenlimits)
-- **Einheitenlimit:** insgesamt 100, je Partei 100 / Anzahl der Parteien; bei zwei Parteien (Spieler gegen Computer) also **50 Einheiten** je Seite.. Die Auswahl der Haupt-FOB zeigt „Nachschub: Schütze in N s (Soldaten x/50)“ bzw. „Nachschub ruht“. Geld bleibt nötig für PAK, Fahrzeuge und Hubschrauber.
+- **Soldaten-Nachschub (wie im Original: Gefallene steigen wieder ein):** Hat ein Team weniger als **50 Soldaten** (Schützen und PAK, auch in Fahrzeugen und in Ausbildung), stellt die Haupt-FOB **alle 6 s kostenlos einen Schützen** bereit, der zum Sammelpunkt läuft (nur unterhalb des Einheitenlimits). Die Auswahl der Haupt-FOB zeigt „Nachschub: Schütze in N s (Soldaten x/50)“ bzw. „Nachschub ruht“. Geld bleibt nötig für PAK, Fahrzeuge und Hubschrauber.
 - **Kasse:** Das Geld am Rundenende wird gespeichert (höchstens 5000) und ist das Startgeld der nächsten Runde (mindestens 800); die KI startet mit demselben Betrag. Im Startmenü lässt sich die Kasse zurücksetzen.
 - Einheiten starten **voll munitioniert, betankt und mit vollem Baumaterial**.
 - **Waffen und Munition je Einheit:** Jede Waffe hat einen eigenen Schussvorrat; beim Nachladen kostet jeder Schuss Munition aus dem Lager.
@@ -233,7 +232,6 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 ## Änderungsverlauf
 
 - v4.23: **Soldaten-Nachschub.** Unter 50 Soldaten stellt die Haupt-FOB alle 6 s kostenlos einen Schützen bereit (Anzeige in der Haupt-FOB). Kasse bleibt bei höchstens 5000, weil beide Seiten mit demselben Betrag starten. Cache v36.
-- v4.24: **Einheitenlimit 100 / Anzahl der Parteien** (bei Spieler gegen Computer 50 je Seite, vorher 120). Cache v37.
 - v4.22: **Geld je Einheit, Start mit 50 Soldaten, zwei Ausbildungsplätze.** Wie im Original: Geld pro Tick je Einheit in der Zone, Hot Zone doppelt (0,4 bzw. 0,8 Geld/s; Führungsgeld, Hot-Zone-Besitzgeld und Deckel entfallen). Statt Grundeinkommen Start mit 50 Soldaten (40 Schützen, 10 PAK, LKW, Baufahrzeug) in einer Formation vor der FOB. Haupt-FOB bildet zwei Einheiten gleichzeitig aus. KI rückt mit der Startarmee aus (Reserve 20 %). Punkte unverändert. Cache v35.
 - v4.21: **Treffer bis zum Abschuss** je Waffe, Ziel und Trefferseite (Tabelle in Abschnitt 6). Zonenanzeige zeigt zusätzlich die Wertung (Hot Zone doppelt). Cache v34.
 - v4.20: **Prämien wie in Wardogs.** Geld für Abschüsse (Soldaten 25 %, Fahrzeuge 60 % des Preises, Gebäude 20 % des Baumaterialpreises) und für fertig gebaute Gebäude (20 %); Mauern und Tore ausgenommen. Cache v33.

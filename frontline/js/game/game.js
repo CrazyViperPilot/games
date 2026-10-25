@@ -759,7 +759,7 @@ export class Game {
     if (!b.built) return fail('Gebäude ist noch im Bau');
     if (!UNITS[cmd.unit] || !b.produces.includes(cmd.unit)) return fail('Nur die Haupt-FOB bildet Einheiten aus');
     if (b.queue.length >= BALANCE.queueMax) return fail('Warteschlange ist voll');
-    if (this.unitCount(team) >= this.unitCap()) return fail(`Einheitenlimit erreicht (${this.unitCap()})`);
+    if (this.unitCount(team) >= BALANCE.unitCap) return fail(`Einheitenlimit erreicht (${BALANCE.unitCap})`);
     const cost = UNITS[cmd.unit].cost;
     if (!this.canAfford(team, cost)) return fail(this.missingMoney());
     this.pay(team, cost);
@@ -769,10 +769,6 @@ export class Game {
   }
 
   /** Lebende plus in Ausbildung befindliche Einheiten eines Teams. */
-  unitCap() {
-    return Math.floor(BALANCE.unitCapTotal / this.teams.length);
-  }
-
   unitCount(team) {
     let n = 0;
     for (const u of this.units) {
