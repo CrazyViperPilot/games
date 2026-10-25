@@ -138,7 +138,7 @@ Schadensmodell: Schaden je Schuss nach Panzerklasse des Ziels (Infanterie / leic
 
 | Eingabe | Aktion |
 |---|---|
-| Linksklick / Tippen | Einheit/Gebäude wählen; **mit gewählten Einheiten: Tippen auf Boden = Gehen, auf sichtbaren Gegner = Angriff** (Standardaktion, kein Angriff-Knopf nötig); LKW/Transporter/Baufahrzeug auf eigene Gebäude = Befehl wie Rechtsklick; Doppelklick = alle dieses Typs im Bild; Esc = abwählen |
+| Linksklick / Tippen | Einheit/Gebäude wählen; **mit gewählten Einheiten: Tippen auf Boden = Gehen, auf sichtbaren Gegner = Angriff** (Standardaktion, kein Angriff-Knopf nötig); LKW/Transporter/Baufahrzeug auf eigene Gebäude: **Maus = Gebäude wählen** (Befehl per Rechtsklick), **Touch = Befehl** (es gibt keinen Rechtsklick); Doppelklick = alle dieses Typs im Bild; Esc = abwählen |
 | Linksklick halten und ziehen (Maus) | Rahmenauswahl; Shift = hinzufügen |
 | Rechtsklick halten und ziehen (Maus) / Finger ziehen | **Karte verschieben** (ein kurzer Rechtsklick bleibt der Befehl Bewegen/Angreifen) |
 | Zwei Finger | Zoomen (Abstand) und Karte verschieben |
@@ -210,6 +210,7 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 
 ## Änderungsverlauf
 
+- v4.19: Maus: Linksklick auf ein eigenes Gebäude wählt es immer, auch wenn LKW oder Baufahrzeug gewählt sind (Befehle per Rechtsklick); Touch behält den Befehl per Antippen. Cache v32.
 - v4.18: **3D-Autos und Park-Ausstattung.** Autos sind in Iso kleine Körper mit Kabine (in 2D mit Scheiben); Parks haben Rundweg, Bäume am Rand und vier Bänke (aus Lage und Größe erzeugt, nur Dekoration, begehbar), in 2D und Iso, im Spiel und im Editor. Cache v31.
 - v4.17: **Bahnhof.** Neue Kartenteile Bahnhofsgebäude und Bahnsteig (2D und Iso), Zugteile richten sich am Gleis aus (beliebiger Winkel, Anschluss aneinander), `drawRotBox` für gedrehte Körper in Iso. Cache v30.
 - v4.16: **Freie Gleise.** Bahnlinien sind jetzt freie Strecken statt einer festen Linie; im Editor wie Straßen zeichenbar, mit Abzweigen und Kreuzungen, in 2D, Iso und im Spiel. Cache v29.

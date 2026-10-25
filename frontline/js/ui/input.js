@@ -267,7 +267,7 @@ export class Input {
       return;
     }
     if (e.target !== this.canvas && !d.dragging && e.pointerType !== 'touch') return; // Loslassen über dem HUD löst keinen Klick aus
-    c.leftClickWorld(w.x, w.y, e.shiftKey);
+    c.leftClickWorld(w.x, w.y, e.shiftKey, e.pointerType);
   }
 
   onWheel(e) {

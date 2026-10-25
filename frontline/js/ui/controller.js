@@ -325,7 +325,7 @@ export class Controller {
   // ---- Klicks und Befehle -------------------------------------------------------
 
   /** Linksklick auf die Welt, je nach Modus: Platzieren, Ziel, Auswahl (mit Doppelklick). */
-  leftClickWorld(wx, wy, shift) {
+  leftClickWorld(wx, wy, shift, pointer = 'mouse') {
     switch (this.view.mode) {
       case 'place':
         this.confirmPlace(wx, wy, shift);
@@ -374,8 +374,9 @@ export class Controller {
       this.rightClick(wx, wy);
       return;
     }
-    // Eigenes Gebäude antippen: LKW/Baufahrzeug/Bauer bekommen den Befehl (laden, hinfahren, reparieren), sonst wählen
-    if (!shift && hit && hit.kind === 'building' && this.selectedUnits().some((u) => u.def.cargoCap || u.def.builder === 'all')) {
+    // Nur Touch: eigenes Gebäude antippen gibt LKW/Baufahrzeug den Befehl (laden, hinfahren, reparieren), da es keinen Rechtsklick gibt.
+    // Mit der Maus wählt der Linksklick das Gebäude, Befehle gibt der Rechtsklick.
+    if (pointer === 'touch' && !shift && hit && hit.kind === 'building' && this.selectedUnits().some((u) => u.def.cargoCap || u.def.builder === 'all')) {
       this.rightClick(wx, wy);
       return;
     }
