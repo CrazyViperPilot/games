@@ -468,7 +468,6 @@ export class AI {
       if (b) g.issue(t, { type: 'train', buildingId: b.id, unit: 'truck' });
     }
 
-    if (g.unitCount(t) >= BALANCE.unitCap) return;
 
     // Kampfeinheiten: welche Typen sind gerade ausbildbar?
     const avail = new Set();

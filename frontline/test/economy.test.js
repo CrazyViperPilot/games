@@ -204,21 +204,6 @@ test('Nachschub: keiner ohne lebende Haupt-FOB', () => {
   assert.equal(g.teams[0].reinforceTimer, 0);
 });
 
-test('Nachschub: keiner am Einheitenlimit', () => {
-  const g = mk({ seed: 7 });
-  for (const u of unitsOf(g, 0, 'rifleman').slice(0, 5)) u.alive = false;
-  const z = g.zone;
-  for (let i = 0; g.unitCount(0) < BALANCE.unitCap; i++) {
-    g.spawnUnit('truck', 0, z.x + 2000 + (i % 8) * 20, z.y + Math.floor(i / 8) * 20);
-  }
-  assert.equal(g.unitCount(0), BALANCE.unitCap);
-  assert.ok(g.soldierCount(0) < BALANCE.reinforce.soldierMin);
-  const before = g.soldierCount(0);
-  run(g, 12);
-  assert.equal(g.soldierCount(0), before, 'kein Schütze am Limit');
-  assert.equal(g.teams[0].reinforceTimer, 0);
-});
-
 test('soldierCount: zählt Passagiere in Fahrzeugen und Infanterie in der Warteschlange', () => {
   const g = mk({ seed: 7 });
   const f = fobOf(g, 0);

@@ -324,7 +324,7 @@ WP 3 und 4 laufen parallel. Danach Review durch Opus (Browser-Test mit Playwrigh
 - **Balancing:** KI-gegen-KI zeigte starken Schneeball – der Zonenhalter hortete ~50 000 Geld, der Gegner verdiente nur 2 Geld/s je FOB.
   Geändert: `fob.income` 2 → 5, `zone.controlIncome` 12 → 6, `zone.unitIncome` 0,5 → 0,25. Danach Partien mit Hin und Her
   (z. B. 100:22, 100:42), Dauer 57–79 min bei 100 Punkten.
-- **Einheitenlimit** `unitCap: 120` je Team (lebend + in Ausbildung), damit Endspiele nicht auf 175+ Einheiten wachsen.
+- **Einheitenlimit:** seit v4.24 entfernt (RTS; Daniel-Entscheidung 2026-10-25).
 - KI-Paket fixte zwei Engine-Fehler: Ankunft am Ziel (Einheiten blieben ewig im `move`) und Spawn-Seite (Blau spawnte zum Kartenrand).
 - `?debug=1` legt den Spielzustand als `window.frontline` ab (für Konsole/Browser-Tests).
 - PNG-Icons aus `icons/icon.svg` erzeugt.
@@ -491,7 +491,7 @@ verdient deshalb kaum Geld und kommt nicht zurück (Schneeball). Lösung: kosten
 - `game.soldierCount(team)`: lebende eigene Infanterie (`UNITS[type].armor === 'inf'`, auch Passagiere in Fahrzeugen)
   plus Infanterie in Ausbildungs-Warteschlangen.
 - In `updateEconomy` (economy.js), je Team mit lebender, fertiger Haupt-FOB: Ist `soldierCount < soldierMin` und
-  `unitCount < unitCap`, zählt `team.reinforceTimer` hoch; bei `>= interval` erscheint ein Schütze kostenlos an der
+  zählt `team.reinforceTimer` hoch; bei `>= interval` erscheint ein Schütze kostenlos an der
   Haupt-FOB (`spawnSpot`, Befehl zum Sammelpunkt wie bei der Ausbildung, keine Meldung) und der Timer startet von vorn.
   Ist kein Feld frei, bleibt der Timer stehen (Versuch im nächsten Schritt). Sonst (genug Soldaten oder Limit) Timer = 0.
   Unabhängig von Warteschlange und Ausbildungsplätzen; kostet nichts, zählt nicht als „verdient“.

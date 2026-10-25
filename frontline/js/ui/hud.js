@@ -345,7 +345,7 @@ export class Hud {
     const t = g.teams[b.team];
     const soldiers = g.soldierCount(b.team);
     const label = `Soldaten ${soldiers}/${R.soldierMin}`;
-    if (soldiers >= R.soldierMin || g.unitCount(b.team) >= BALANCE.unitCap) {
+    if (soldiers >= R.soldierMin) {
       return `<div class="muted small">Nachschub ruht (${label})</div>`;
     }
     const left = Math.max(0, Math.ceil(R.interval - t.reinforceTimer)); // 0, solange kein Feld frei ist
