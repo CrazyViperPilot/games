@@ -245,6 +245,22 @@ function factoryDetails(ctx, top, seed) {
   }
 }
 
+/** Geparktes Auto als kleiner Körper mit Kabine (aufrecht ausgerichtet an x oder y, wie in 2D). */
+export function drawCar(ctx, cam, c) {
+  const lx = c.vertical ? 9 : 18;
+  const ly = c.vertical ? 18 : 9;
+  drawBox(ctx, cam, c.x - lx, c.y - ly, c.x + lx, c.y + ly, 9, c.color, { noShadow: false });
+  const cx = c.vertical ? 8 : 9;
+  const cy = c.vertical ? 9 : 8;
+  drawBox(ctx, cam, c.x - cx, c.y - cy, c.x + cx, c.y + cy, 7, '#34495e', { base: 9, noShadow: true, roof: shade(c.color, 0.85), wallS: '#2b3b4b', wallE: '#22303d' });
+}
+
+/** Parkbank: Sitz und Lehne, ausgerichtet entlang des Rundwegs (b.a), Lehne nach außen (b.rx, b.ry). */
+export function drawBench(ctx, cam, b) {
+  drawRotBox(ctx, cam, b.x, b.y, 18, 6, b.a, 5, '#8a6a45', { noShadow: true });
+  drawRotBox(ctx, cam, b.x + b.rx * 3.5, b.y + b.ry * 3.5, 18, 2, b.a, 11, '#6b4f33', { noShadow: true });
+}
+
 /** Gebäude der Stadt (Haus, Halle, Fabrik) mit Fenstern, Türen, Toren, Balkonen und Dachaufbauten. */
 export function drawTownBuilding(ctx, cam, b) {
   if (spriteOverrides[b.kind]?.(ctx, cam, b)) return;

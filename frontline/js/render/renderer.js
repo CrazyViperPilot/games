@@ -25,7 +25,8 @@ import {
   unitLift,
   buildingHeight,
 } from './iso.js';
-import { drawTownBuilding, drawTeamBuilding } from './isobuild.js';
+import { drawTownBuilding, drawTeamBuilding, drawCar, drawBench } from './isobuild.js';
+import { parkDeco } from './terrain.js';
 import { drawTreeSprite, drawUnitSprite, setTeamBuildings } from './isosprites.js';
 
 const TILE = BALANCE.map.tile;
@@ -313,6 +314,13 @@ export class Renderer {
     for (const t of town?.trees ?? []) if (inRect(t.x, t.y, PAD)) items.push({ k: cam.depth(t.x, t.y), t: 1, o: t });
     for (const t of g.map.trees ?? []) if (inRect(t.x, t.y, PAD)) items.push({ k: cam.depth(t.x, t.y), t: 1, o: t });
     for (const t of this.deco.trees) if (inRect(t.x, t.y, PAD)) items.push({ k: cam.depth(t.x, t.y), t: 1, o: t });
+    for (const c of town?.cars ?? []) if (inRect(c.x, c.y, 60)) items.push({ k: cam.depth(c.x, c.y), t: 6, o: c });
+    for (const p of town?.parks ?? []) {
+      if (!inRect(p.x, p.y, p.r + PAD)) continue;
+      const d = parkDeco(p);
+      for (const t of d.trees) items.push({ k: cam.depth(t.x, t.y), t: 1, o: t });
+      for (const b of d.benches) items.push({ k: cam.depth(b.x, b.y), t: 7, o: b });
+    }
     for (const o of this.deco.rocks) if (inRect(o.x, o.y, PAD)) items.push({ k: cam.depth(o.x, o.y), t: 2, o });
     for (const b of g.buildings) {
       if (!b.alive || (b.team !== team && !known(b.x, b.y)) || !inRect(b.x, b.y, PAD)) continue;
@@ -360,6 +368,8 @@ export class Renderer {
         if (!drawTreeSprite(ctx, cam, it.o)) drawTree(ctx, cam, it.o);
       }
       else if (it.t === 2) drawRock(ctx, cam, it.o);
+      else if (it.t === 6) drawCar(ctx, cam, it.o);
+      else if (it.t === 7) drawBench(ctx, cam, it.o);
       else if (it.t === 4) {
         const b = it.o;
         drawTeamBuilding(ctx, cam, b, g.teams[b.team].color);

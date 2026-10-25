@@ -210,6 +210,7 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 
 ## Änderungsverlauf
 
+- v4.18: **3D-Autos und Park-Ausstattung.** Autos sind in Iso kleine Körper mit Kabine (in 2D mit Scheiben); Parks haben Rundweg, Bäume am Rand und vier Bänke (aus Lage und Größe erzeugt, nur Dekoration, begehbar), in 2D und Iso, im Spiel und im Editor. Cache v31.
 - v4.17: **Bahnhof.** Neue Kartenteile Bahnhofsgebäude und Bahnsteig (2D und Iso), Zugteile richten sich am Gleis aus (beliebiger Winkel, Anschluss aneinander), `drawRotBox` für gedrehte Körper in Iso. Cache v30.
 - v4.16: **Freie Gleise.** Bahnlinien sind jetzt freie Strecken statt einer festen Linie; im Editor wie Straßen zeichenbar, mit Abzweigen und Kreuzungen, in 2D, Iso und im Spiel. Cache v29.
 - v4.15: Editor: Autos und Parks erscheinen in der Iso-Ansicht sofort nach dem Setzen (Neuzeichnen nach der Geste). **Editor isometrisch, Kreuzungen.** Der Karteneditor hat den Ansichtsknopf 2D/Iso (V) mit Drehen (, .), Auswahl auch aufs Dach; Straßen rasten an Enden und Mittellinien anderer Straßen ein, an Kreuzungen und Einmündungen entsteht eine durchgehende Asphaltfläche (auch im Spiel). Cache v28.

@@ -5,6 +5,30 @@ export const TERRAIN_SCALE = 0.25;
 const cache = new WeakMap();
 const cacheIso = new WeakMap(); // Boden ohne Gebäude und Bäume (die zeichnet die isometrische Ansicht als Körper)
 
+/**
+ * Ausstattung eines Parks (deterministisch aus Lage und Größe): Bäume am Rand, vier Bänke am Rundweg.
+ * Nur Dekoration, nicht im Wegenetz. Rundweg: Kreis mit Radius `path`.
+ */
+export function parkDeco(p) {
+  let seed = (Math.round(p.x) * 73856093) ^ (Math.round(p.y) * 19349663) ^ Math.round(p.r * 83492791);
+  const rng = makeRng(seed >>> 0);
+  const path = p.r * 0.55;
+  const trees = [];
+  const n = Math.max(4, Math.round(p.r / 24));
+  for (let i = 0; i < n; i++) {
+    const a = ((i + rng.next() * 0.6) / n) * Math.PI * 2;
+    const d = p.r * (0.74 + rng.next() * 0.16);
+    trees.push({ x: p.x + Math.cos(a) * d, y: p.y + Math.sin(a) * d, r: 11 + rng.next() * 7 });
+  }
+  const benches = [];
+  const a0 = rng.next() * Math.PI;
+  for (let k = 0; k < 4; k++) {
+    const a = a0 + (k * Math.PI) / 2;
+    benches.push({ x: p.x + Math.cos(a) * path, y: p.y + Math.sin(a) * path, a: a + Math.PI / 2, rx: Math.cos(a), ry: Math.sin(a) });
+  }
+  return { trees, benches, path };
+}
+
 /** Karte wurde verändert (Editor): zwischengespeicherte Geländebilder verwerfen. */
 export function invalidateTerrain(map) {
   cache.delete(map);
@@ -269,6 +293,12 @@ function drawTown(ctx, map, S, iso = false) {
   if (!t) return;
   for (const p of t.parks) {
     disc(ctx, p.x * S, p.y * S, p.r * S, 'rgba(110,150,80,0.55)');
+    // Rundweg
+    ctx.strokeStyle = 'rgba(205,195,150,0.55)';
+    ctx.lineWidth = Math.max(1, 12 * S);
+    ctx.beginPath();
+    ctx.arc(p.x * S, p.y * S, p.r * 0.55 * S, 0, Math.PI * 2);
+    ctx.stroke();
   }
   for (const b of iso ? [] : t.buildings) {
     let x = (b.x - b.w / 2) * S;
@@ -356,11 +386,28 @@ function drawTown(ctx, map, S, iso = false) {
     ctx.strokeRect(x, y, w, h);
     if (turned) ctx.restore();
   }
-  for (const c of t.cars) {
-    const cw = (c.vertical ? 18 : 36) * S;
-    const ch = (c.vertical ? 36 : 18) * S;
-    ctx.fillStyle = c.color;
-    ctx.fillRect(c.x * S - cw / 2, c.y * S - ch / 2, cw, ch);
+  if (!iso) {
+    for (const c of t.cars) {
+      const cw = (c.vertical ? 18 : 36) * S;
+      const ch = (c.vertical ? 36 : 18) * S;
+      ctx.fillStyle = c.color;
+      ctx.fillRect(c.x * S - cw / 2, c.y * S - ch / 2, cw, ch);
+      ctx.fillStyle = 'rgba(40,60,80,0.7)'; // Windschutz- und Heckscheibe
+      if (c.vertical) ctx.fillRect(c.x * S - cw * 0.4, c.y * S - ch * 0.22, cw * 0.8, ch * 0.44);
+      else ctx.fillRect(c.x * S - cw * 0.22, c.y * S - ch * 0.4, cw * 0.44, ch * 0.8);
+    }
+    for (const p of t.parks) {
+      const d = parkDeco(p);
+      for (const b of d.benches) {
+        ctx.save();
+        ctx.translate(b.x * S, b.y * S);
+        ctx.rotate(b.a);
+        ctx.fillStyle = '#7a5a3a';
+        ctx.fillRect(-9 * S, -3 * S, 18 * S, 6 * S);
+        ctx.restore();
+      }
+      for (const tr of d.trees) tree(ctx, tr.x * S, tr.y * S, tr.r * S);
+    }
+    for (const tr of t.trees) tree(ctx, tr.x * S, tr.y * S, tr.r * S);
   }
-  if (!iso) for (const tr of t.trees) tree(ctx, tr.x * S, tr.y * S, tr.r * S);
 }
