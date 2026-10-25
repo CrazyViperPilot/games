@@ -29,12 +29,12 @@ Nicht im Umfang: Netzwerk-Multiplayer, Kampagne, Speichern laufender Partien, So
 
 | Ressource | Quelle | Lagerort | Verwendung |
 |---|---|---|---|
-| **Geld** | nur Konfliktzone und Hot Zone | global, **bleibt von Runde zu Runde** | Einheiten (Ausbildung) |
+| **Geld** | Konfliktzone, Hot Zone, **Abschüsse und fertige Bauten** | global, **bleibt von Runde zu Runde** | Einheiten (Ausbildung) |
 | **Baumaterial** | unendlich in der Haupt-FOB | FOB-Lager, LKW, Soldaten (wenig) | Gebäude, Mauern, Tore, Reparatur; 400 per LKW für eine neue FOB-Baustelle |
 | **Munition** | unendlich in der Haupt-FOB | FOB-Lager, Einheiten, LKW | Mörser/Flak und **Nachladen der Einheiten** |
 | **Treibstoff** | unendlich in der Haupt-FOB | FOB-Lager, Fahrzeuge, LKW | **Verbrauch beim Fahren/Fliegen** und Bohrer |
 
-- **Keine Ressourcenvorkommen, keine Förderanlagen, kein Grundeinkommen je FOB.** Geld gibt es nur in der Konfliktzone und der Hot Zone (Abschnitt 7).
+- **Keine Ressourcenvorkommen, keine Förderanlagen, kein Grundeinkommen je FOB.** Geld gibt es in der Konfliktzone und der Hot Zone (Abschnitt 7) sowie als **Prämie**: Für jede zerstörte gegnerische Einheit zahlt der Gegner (also du) 25 % des Einheitenpreises bei Soldaten, **60 % bei Fahrzeugen und Hubschraubern** (z. B. Schütze 15, Kampfpanzer 300); für zerstörte Gebäude 20 % ihres Baumaterialpreises (Mauern und Tore nichts); für jedes **fertig gebaute** Gebäude 20 % seines Baumaterialpreises (FOB 80, Mörser 40, Flak 36, Bohrer 30; Mauern und Tore nichts, sonst wäre Mauerbau eine Geldquelle). Ab 100 Geld erscheint eine Meldung. Die Prämie gilt für beide Seiten, auch für die KI.
 - **Haupt-FOB:** unendliches Lager. **Raten:** LKW laden/entladen 100/s (400 Ladung in 4 s), Einheiten nachfüllen (Munition 60/s, Treibstoff 4/s, Baumaterial 20/s), Ausbildung eine Einheit nach der anderen
   (Schütze 5 s, PAK 8 s, LKW 6 s, Baufahrzeug 9 s, SPz 12 s, KPz 20 s, Little Bird 15 s, Transporter 20 s, AH-64 28 s; Warteschlange 5).
 - **Vordere FOBs:** eigenes endliches Lager (max. 3000 je Sorte), das nur **LKW oder Transporthubschrauber** füllen. Oben zeigt „Front BM/MUN/TS“ die Summe dieser Lager.
@@ -210,6 +210,7 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 
 ## Änderungsverlauf
 
+- v4.20: **Prämien wie in Wardogs.** Geld für Abschüsse (Soldaten 25 %, Fahrzeuge 60 % des Preises, Gebäude 20 % des Baumaterialpreises) und für fertig gebaute Gebäude (20 %); Mauern und Tore ausgenommen. Cache v33.
 - v4.19: Maus: Linksklick auf ein eigenes Gebäude wählt es immer, auch wenn LKW oder Baufahrzeug gewählt sind (Befehle per Rechtsklick); Touch behält den Befehl per Antippen. Cache v32.
 - v4.18: **3D-Autos und Park-Ausstattung.** Autos sind in Iso kleine Körper mit Kabine (in 2D mit Scheiben); Parks haben Rundweg, Bäume am Rand und vier Bänke (aus Lage und Größe erzeugt, nur Dekoration, begehbar), in 2D und Iso, im Spiel und im Editor. Cache v31.
 - v4.17: **Bahnhof.** Neue Kartenteile Bahnhofsgebäude und Bahnsteig (2D und Iso), Zugteile richten sich am Gleis aus (beliebiger Winkel, Anschluss aneinander), `drawRotBox` für gedrehte Körper in Iso. Cache v30.

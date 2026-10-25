@@ -103,7 +103,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
         <div class="mapbox" data-mapbox></div>
       </div>
       <ol class="howto">
-        <li>Die Haupt-FOB hat unendlich Baumaterial, Munition und Treibstoff und bildet alle Einheiten aus – nur Geld ist knapp (nur aus Konfliktzone und Hot Zone).</li>
+        <li>Die Haupt-FOB hat unendlich Baumaterial, Munition und Treibstoff und bildet alle Einheiten aus – nur Geld ist knapp (aus Konfliktzone, Hot Zone, Abschüssen und Bauten).</li>
         <li>LKW (E) bringen Nachschub aus der Haupt-FOB zu den vorderen FOBs und versorgen Einheiten in ihrer Nähe.</li>
         <li>Baufahrzeug (R): bis zu 10 FOBs (ohne überlappende Bauradien), Mörser, Flak, Bohrer. Soldaten bauen aus wenig getragenem Baumaterial Mauern und Tore.</li>
         <li>Konfliktzone halten: Geld und alle 30 s ein Punkt. Fällt deine Haupt-FOB, ist die Runde verloren.</li>

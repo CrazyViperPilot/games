@@ -199,6 +199,8 @@ function progressSite(game, b, dt) {
     b.built = true;
     b.hp = b.maxHp;
     game.message(b.team, `${b.def.name} fertig`, b.x, b.y);
+    // Mauern und Tore bringen kein Geld (sonst Geld aus Mauerbau)
+    if (b.type !== 'wall' && b.type !== 'gate') game.reward(b.team, Math.round((b.def.cost.bm || 0) * BALANCE.bounty.built), `${b.def.name} gebaut`);
   }
 }
 

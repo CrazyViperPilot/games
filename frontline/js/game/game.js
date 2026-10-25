@@ -807,6 +807,27 @@ export class Game {
     this.effects = this.effects.filter((e) => e.t < e.life);
   }
 
+  /** Geld für ein Team (Abschuss, Bau); ab `bounty.notify` mit Meldung. */
+  reward(team, amount, why = '') {
+    if (!(amount > 0)) return;
+    this.teams[team].res.money += amount;
+    this.teams[team].earned = (this.teams[team].earned || 0) + amount;
+    if (why && amount >= BALANCE.bounty.notify) this.message(team, `+${amount} Geld: ${why}`);
+  }
+
+  /** Abschussprämie für den Gegner: Soldaten wenig, Fahrzeuge und Hubschrauber viel (Anteil am Preis), Gebäude außer Mauern und Toren. */
+  bounty(dead) {
+    const B = BALANCE.bounty;
+    const foe = 1 - dead.team;
+    if (foe < 0 || foe > 1 || !this.teams[foe]) return;
+    if (dead.kind === 'unit') {
+      const frac = dead.def.armor === 'inf' ? B.inf : B.vehicle;
+      this.reward(foe, Math.round((dead.def.cost.money || 0) * frac), `${dead.def.name} zerstört`);
+    } else if (dead.type !== 'wall' && dead.type !== 'gate') {
+      this.reward(foe, Math.round((dead.def.cost.bm || 0) * B.building), `${dead.def.name} zerstört`);
+    }
+  }
+
   /** Tote entfernen; Gebäude geben ihren Fußabdruck frei. */
   cleanup() {
     const units = this.units;

@@ -948,3 +948,21 @@ test('Zonenpunkt: Mehrheit statt Alleinbesitz, Hot Zone zählt doppelt, Balken f
   assert.equal(z.weight[1], z.counts[1] + 2, 'zwei Einheiten in der Hot Zone zählen doppelt');
   assert.equal(z.owner, z.weight[0] > z.weight[1] ? 0 : z.weight[1] > z.weight[0] ? 1 : -1);
 });
+
+test('Abschussprämie: Fahrzeuge viel, Soldaten wenig, Mauern nichts; fertiger Bau bringt Geld', async () => {
+  const { hit } = await import('../js/game/combat.js');
+  const g = classic(new Game({ seed: 7 }));
+  const m0 = g.teams[0].res.money;
+  const rifle = g.spawnUnit('rifleman', 1, 3000, 3000);
+  hit(g, rifle, 9999);
+  const afterRifle = g.teams[0].res.money;
+  const tank = g.spawnUnit('tank', 1, 3100, 3000);
+  hit(g, tank, 9999);
+  const afterTank = g.teams[0].res.money;
+  assert.equal(afterRifle - m0, Math.round(60 * BALANCE.bounty.inf));
+  assert.equal(afterTank - afterRifle, Math.round(500 * BALANCE.bounty.vehicle));
+  assert.ok(afterTank - afterRifle > 10 * (afterRifle - m0) / 2, 'Fahrzeug viel mehr als Soldat');
+  assert.equal(g.teams[1].res.money, m0, 'der Verlierer bekommt nichts');
+  hit(g, rifle, 5);
+  assert.equal(g.teams[0].res.money, afterTank, 'Tote zählen nicht doppelt');
+});

@@ -3,6 +3,8 @@ export const BALANCE = {
   map: { width: 9024, height: 9024, tile: 32 },
   tickRate: 20, // Simulationsschritte/s
   winPoints: 100,
+  // Geld für Abschüsse und Bauten (Anteil am Geldpreis der Einheit bzw. am Baumaterialpreis des Gebäudes)
+  bounty: { inf: 0.25, vehicle: 0.6, building: 0.2, built: 0.2, notify: 100 },
   walletMax: 5000, // Obergrenze der Kasse, die von Runde zu Runde bleibt
   pointInterval: 30,
   startRes: { money: 800 }, // Startgeld; die Haupt-FOB hat unendlich Baumaterial, Munition und Treibstoff

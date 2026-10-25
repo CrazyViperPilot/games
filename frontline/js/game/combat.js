@@ -50,7 +50,10 @@ export function hit(game, target, amount) {
   if (!target.alive || !(amount > 0)) return;
   target.hp -= amount;
   target.lastHitTime = game.time;
-  if (target.hp <= 0) target.alive = false;
+  if (target.hp <= 0) {
+    target.alive = false;
+    game.bounty(target);
+  }
   warnBase(game, target);
 }
 
