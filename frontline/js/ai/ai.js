@@ -35,6 +35,8 @@ const SCOUT_MONEY = UNITS.littlebird.cost.money; // Geld, ab dem ein Späher aus
 const SCOUT_FROM = 180; // s Spielzeit, ab der ein Späher gebaut wird
 const SCOUT_FUEL = 0.35; // Späher kehrt unter diesem Treibstoffanteil zur Haupt-FOB zurück
 const SCOUT_REFILL = 0.9; // und fliegt erst wieder aus, wenn der Tank so voll ist
+const COUNTER_MIN = 8; // sichtbare gegnerische Kampfeinheiten, ab denen die Mischung angepasst wird
+const COUNTER_WEIGHT = 0.8; // Stärke der Anpassung (0 = Grundmischung)
 const KEYS = ['bm', 'mun', 'fuel'];
 const CAP = BALANCE.logistics.truckCapacity;
 const ENG_NEAR = 250; // Baufahrzeug näher an einer Baustelle: die automatische Zuweisung übernimmt
@@ -483,15 +485,17 @@ export class AI {
 
     if (this.saveForScout) return; // Geld für den Späher sparen
 
+    const mix = this.counterMix(s);
+
     // Kampfeinheiten: welche Typen sind gerade ausbildbar?
     const avail = new Set();
     for (const b of s.own) {
       if (!b.built || b.queue.length >= qmax) continue;
-      for (const u of b.produces) if (MIX[u]) avail.add(u);
+      for (const u of b.produces) if (mix[u]) avail.add(u);
     }
     if (!avail.size) return;
     let sumW = 0;
-    for (const u of avail) sumW += MIX[u];
+    for (const u of avail) sumW += mix[u];
     const counts = {};
     for (const u of avail) counts[u] = s.units.filter((x) => x.type === u).length + this.queued(s, u);
     let total = 0;
@@ -501,7 +505,7 @@ export class AI {
     // fehlt es nur im Lager der Produktionsstätten, kommt der nächste Typ dran (Pendler füllen auf).
     for (let k = 0; k < 4; k++) {
       const entries = [];
-      for (const u of avail) entries.push({ u, deficit: (MIX[u] / sumW) * (total + 1) - counts[u] });
+      for (const u of avail) entries.push({ u, deficit: (mix[u] / sumW) * (total + 1) - counts[u] });
       entries.sort((a, c) => c.deficit - a.deficit);
       let pick = null;
       for (const e of entries) {
@@ -518,6 +522,20 @@ export class AI {
       counts[pick.u]++;
       total++;
     }
+  }
+
+  /**
+   * Zielmischung der Kampfeinheiten, gegen die gesehene Gegnerarmee angepasst (ab COUNTER_MIN sichtbaren Kampfeinheiten):
+   * viel Gepanzertes → mehr PAK und Panzer, viel Infanterie → mehr Schützen und Schützenpanzer. Sonst die Grundmischung MIX.
+   */
+  counterMix(s) {
+    const foes = s.enemies.filter((e) => e.def.range > 0 && !e.def.air);
+    if (foes.length < COUNTER_MIN) return MIX;
+    const armored = foes.filter((e) => e.def.armor !== 'inf').length / foes.length;
+    // Gepanzerte Gegner: PAK und Panzer rauf (doppelt gewichtet), Schützen und Schützenpanzer runter; bei Infanterie umgekehrt.
+    const shift = COUNTER_WEIGHT * (2 * armored - 1);
+    const f = (u, k) => Math.max(0.05, MIX[u] * (1 + k * shift));
+    return { rifleman: f('rifleman', -1), at: f('at', 2), ifv: f('ifv', -1), tank: f('tank', 2) };
   }
 
   // ---- Verteidigungsgebäude und Mauer ---------------------------------------------

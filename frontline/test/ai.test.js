@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
 import { AI } from '../js/ai/ai.js';
 import { BALANCE } from '../js/data/balance.js';
+import { UNITS } from '../js/data/units.js';
 
 const DT = 0.05;
 const START_UNITS = BALANCE.startUnits.length;
@@ -102,4 +103,16 @@ test('KI: bildet ab 3 min mit Armee einen Späher (Little Bird) aus', () => {
   const r = playAiVsAi(2, 8);
   const scouts = [0, 1].map((t) => r.game.units.filter((u) => u.alive && u.team === t && u.type === 'littlebird').length);
   assert.ok(scouts[0] + scouts[1] >= 1, `Späher: ${scouts}`);
+});
+
+test('KI-Mischung: gegen Gepanzerte mehr PAK/Panzer, gegen Infanterie mehr Schützen; ohne Sicht Grundmischung', () => {
+  const game = new Game({ seed: 3 });
+  const ai = new AI(game, 1, 'normal');
+  const foes = (types) => ({ enemies: types.map((type) => ({ def: UNITS[type] })) });
+  const inf = ai.counterMix(foes(Array(10).fill('rifleman')));
+  const arm = ai.counterMix(foes(Array(10).fill('tank')));
+  assert.ok(arm.at > inf.at && arm.tank > inf.tank, 'gepanzert → mehr PAK und Panzer');
+  assert.ok(inf.rifleman > arm.rifleman, 'Infanterie → mehr Schützen');
+  const few = ai.counterMix(foes(['tank', 'tank']));
+  assert.equal(few.at, 0.2, 'zu wenig gesehen → Grundmischung');
 });
