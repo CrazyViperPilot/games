@@ -352,7 +352,7 @@ export class AI {
    */
   fallBack(s) {
     const g = this.game;
-    if (s.alarm || !s.home || g.time < this.fallbackUntil || s.enemies.length < FALLBACK_MIN_FOES) return;
+    if (!this.cfg.fallback || s.alarm || !s.home || g.time < this.fallbackUntil || s.enemies.length < FALLBACK_MIN_FOES) return;
     const value = (u) => UNITS[u.type].cost.money || 0;
     const foes = s.enemies.filter((e) => e.def.range > 0);
     for (const u of s.combat) {
@@ -569,7 +569,7 @@ export class AI {
    */
   counterMix(s) {
     const foes = s.enemies.filter((e) => e.def.range > 0 && !e.def.air);
-    if (foes.length < COUNTER_MIN) return MIX;
+    if (!this.cfg.counter || foes.length < COUNTER_MIN) return MIX;
     const armored = foes.filter((e) => e.def.armor !== 'inf').length / foes.length;
     // Gepanzerte Gegner: PAK und Panzer rauf (doppelt gewichtet), Schützen und Schützenpanzer runter; bei Infanterie umgekehrt.
     const shift = COUNTER_WEIGHT * (2 * armored - 1);
@@ -945,6 +945,7 @@ export class AI {
     const g = this.game;
     const t = this.team;
     const z = s.zone;
+    if (!this.cfg.scout) return;
     const bird = s.units.find((u) => u.type === 'littlebird');
     if (!bird) {
       this.saveForScout = false;
@@ -999,7 +1000,7 @@ export class AI {
   startRaid(s, go) {
     const g = this.game;
     const z = s.zone;
-    if (this.raid || go.length < RAID_MIN) return go;
+    if (!this.cfg.raid || this.raid || go.length < RAID_MIN) return go;
     const targets = [...this.seenFobs.values()]
       .filter((b) => dist(b.x, b.y, z.x, z.y) > ZONE_FOB_R + 300)
       .sort((a, b) => dist(a.x, a.y, z.x, z.y) - dist(b.x, b.y, z.x, z.y));

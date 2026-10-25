@@ -117,9 +117,9 @@ test('KI-Mischung: gegen Gepanzerte mehr PAK/Panzer, gegen Infanterie mehr Schü
   assert.equal(few.at, 0.2, 'zu wenig gesehen → Grundmischung');
 });
 
-test('KI: Besatzung schickt einen Überfall auf eine gemerkte gegnerische FOB (Seed 3, 10 min)', () => {
-  const game = new Game({ seed: 3 });
-  const ais = [new AI(game, 0, 'normal'), new AI(game, 1, 'normal')];
+test('KI: Besatzung schickt einen Überfall auf eine gemerkte gegnerische FOB (schwer, Seed 1, 10 min)', () => {
+  const game = new Game({ seed: 1 });
+  const ais = [new AI(game, 0, 'hard'), new AI(game, 1, 'hard')];
   let raided = false;
   for (let i = 0; i < (10 * 60) / DT && game.winner === null && !raided; i++) {
     for (const ai of ais) ai.update(DT);
@@ -129,9 +129,9 @@ test('KI: Besatzung schickt einen Überfall auf eine gemerkte gegnerische FOB (S
   assert.ok(raided, 'kein Überfall gestartet');
 });
 
-test('KI: Gruppen-Rückzug bei klarer Unterlegenheit (Seed 1, 20 min) und Sperre der Angriffsbefehle', () => {
+test('KI: Gruppen-Rückzug bei klarer Unterlegenheit (schwer, Seed 1, 20 min) und Sperre der Angriffsbefehle', () => {
   const game = new Game({ seed: 1 });
-  const ais = [new AI(game, 0, 'normal'), new AI(game, 1, 'normal')];
+  const ais = [new AI(game, 0, 'hard'), new AI(game, 1, 'hard')];
   let fell = false;
   for (let i = 0; i < (20 * 60) / DT && game.winner === null && !fell; i++) {
     for (const ai of ais) ai.update(DT);
@@ -152,4 +152,12 @@ test('KI: Zonen-FOB bekommt zwei Mörser (Seed 7, 12 min)', () => {
   assert.ok(zf, 'keine Zonen-FOB');
   const near = game.buildings.filter((b) => b.alive && b.team === 1 && b.type === 'mortar' && Math.hypot(b.x - zf.x, b.y - zf.y) < BALANCE.fob.buildRadius);
   assert.ok(near.length >= 2, `Mörser an der Zonen-FOB: ${near.length}`);
+});
+
+test('KI-Schwierigkeit über Verhalten: leicht ohne Späher/Konter/Überfall/Rückzug, schwer ohne Einkommensbonus', () => {
+  const d = BALANCE.difficulty;
+  assert.deepEqual([d.easy.scout, d.easy.counter, d.easy.raid, d.easy.fallback], [false, false, false, false]);
+  assert.deepEqual([d.normal.scout, d.normal.counter, d.normal.raid, d.normal.fallback], [true, true, false, false]);
+  assert.deepEqual([d.hard.scout, d.hard.counter, d.hard.raid, d.hard.fallback], [true, true, true, true]);
+  assert.equal(d.hard.incomeMult, 1);
 });

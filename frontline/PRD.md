@@ -211,7 +211,7 @@ Direktfeuer richtet sich nach Trefferzahlen (volles Ziel); Seite = Winkel zur Fa
 
 ## 10. KI-Gegner
 
-Gleiche Regeln und Befehls-Schnittstelle wie der Spieler (Sonderrecht nur: Einkommensfaktor je Schwierigkeit; die KI
+Gleiche Regeln und Befehls-Schnittstelle wie der Spieler (Sonderrecht nur: Einkommensfaktor bei Leicht 0,8, sonst 1; die KI
 ignoriert den Nebel bei der Zielwahl, Mörser brauchen aber Sicht).
 Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem Baumaterial; **zuerst eine FOB in der Konfliktzone**, dann Relais-FOBs auf dem Weg (1000 px Abstand) und Flanken-FOBs um die Zonen-FOB (Grenze je Schwierigkeit 3/5/7 FOBs); gemischte Armee aus der Haupt-FOB → Zone halten → Verteidigung (Mörser/Flak/Mauern) an vorderen FOBs. Die Startarmee rückt sofort aus; ein Fünftel bleibt als Reserve an der Haupt-FOB. **Logistik:** Lieferant bringt Baumaterial zu Baustellen, Pendler-LKW bringen Baumaterial, Munition und Treibstoff aus der Haupt-FOB zu den vorderen FOBs, ein Versorger-LKW folgt der Armee; Einheiten ohne Munition ziehen sich zurück.
 - **Angriffswellen:** Die KI bündelt ihre Angriffe. Hält der Gegner die Zone, greift sie erst an, wenn ihr Wert mindestens das 1,2-Fache der geschätzten Besatzung (Anzahl × 150) beträgt, nie darunter. Ging lange keine Welle los, sinkt die geforderte Stärke bis auf 60 % (nach 10 min).
@@ -220,6 +220,7 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 - **Flankenangriff:** Die KI merkt sich gesehene gegnerische FOBs (Standort bleibt bekannt, bis er eingesehen und leer ist oder die FOB zerstört wird). Ist die Zone gegnerfrei und stehen dort mindestens 12 freie Einheiten, zweigen 30 % davon ab und greifen die gemerkte FOB abseits der Zone an, die der Zone am nächsten liegt. Ist das Ziel zerstört, rücken die Überlebenden wieder in die Armee ein. Zudem zählt für die Stärke einer Welle nur, wer noch nicht in der Zone steht.
 - **Gruppen-Rückzug:** Steht eine Gruppe im Feuer (mindestens 4 Gegner sichtbar) und ist der Wert der Gegner mindestens 1,8-mal so hoch wie der der eigenen Einheiten dort, zieht die ganze Gruppe 1400 px Richtung Basis ab (nicht bei Angriff auf die Basis). 30 s lang gibt die KI danach keine Angriffsbefehle, damit sich die Gruppe sammelt; ein laufender Überfall wird abgebrochen. Einheiten werden im Spiel nicht geheilt, der Rückzug rettet sie also nur vor dem Tod.
 - **Zonen-FOB-Verteidigung:** Mörser und Flugabwehr der Zonen-FOB setzt die KI zur Gegnerseite hin (andere FOBs wie bisher zur Zone hin); die Zonen-FOB bekommt zwei Mörser statt einem.
+- **Schwierigkeit über Verhalten:** *Leicht*: langsame Denkschritte (3 s), hohe Angriffsschwelle, kein Späher, kein Konter-Mix, keine Überfälle, kein Rückzug, Einkommen ×0,8. *Normal*: 2 s, Späher und Konter-Mix. *Schwer*: 1 s, niedrigere Angriffsschwelle, dazu Überfälle und Gruppen-Rückzug; **kein Einkommensbonus mehr** (vorher ×1,25).
 
 ## 11. Qualitätsanforderungen
 
@@ -243,6 +244,7 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 - v4.28: **KI-Flankenangriff** auf gemerkte gegnerische FOBs. Cache v41.
 - v4.29: **KI-Gruppen-Rückzug** bei klarer Unterlegenheit. Cache v42.
 - v4.30: **KI verteidigt die Zonen-FOB** zur Gegnerseite, zwei Mörser. Cache v43.
+- v4.31: **Schwierigkeit über Verhalten** statt Einkommensbonus (Schwer: ×1,0). Cache v44.
 - v4.24: **Kein Einheitenlimit mehr** (RTS, kein Shooter; vorher 120 je Team). Cache v37.
 - v4.23: **Soldaten-Nachschub.** Unter 50 Soldaten stellt die Haupt-FOB alle 6 s kostenlos einen Schützen bereit (Anzeige in der Haupt-FOB). Kasse bleibt bei höchstens 5000, weil beide Seiten mit demselben Betrag starten. Cache v36.
 - v4.22: **Geld je Einheit, Start mit 50 Soldaten, zwei Ausbildungsplätze.** Wie im Original: Geld pro Tick je Einheit in der Zone, Hot Zone doppelt (0,4 bzw. 0,8 Geld/s; Führungsgeld, Hot-Zone-Besitzgeld und Deckel entfallen). Statt Grundeinkommen Start mit 50 Soldaten (40 Schützen, 10 PAK, LKW, Baufahrzeug) in einer Formation vor der FOB. Haupt-FOB bildet zwei Einheiten gleichzeitig aus. KI rückt mit der Startarmee aus (Reserve 20 %). Punkte unverändert. Cache v35.
