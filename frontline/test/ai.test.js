@@ -128,3 +128,15 @@ test('KI: Besatzung schickt einen Überfall auf eine gemerkte gegnerische FOB (S
   }
   assert.ok(raided, 'kein Überfall gestartet');
 });
+
+test('KI: Gruppen-Rückzug bei klarer Unterlegenheit (Seed 1, 20 min) und Sperre der Angriffsbefehle', () => {
+  const game = new Game({ seed: 1 });
+  const ais = [new AI(game, 0, 'normal'), new AI(game, 1, 'normal')];
+  let fell = false;
+  for (let i = 0; i < (20 * 60) / DT && game.winner === null && !fell; i++) {
+    for (const ai of ais) ai.update(DT);
+    game.update(DT);
+    fell = ais.some((ai) => ai.fallbackUntil > game.time);
+  }
+  assert.ok(fell, 'kein Rückzug ausgelöst');
+});

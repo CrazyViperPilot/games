@@ -39,6 +39,10 @@ const COUNTER_MIN = 8; // sichtbare gegnerische Kampfeinheiten, ab denen die Mis
 const COUNTER_WEIGHT = 0.8; // Stärke der Anpassung (0 = Grundmischung)
 const RAID_MIN = 12; // Besatzung ab so vielen freien Einheiten schickt einen Überfall auf eine gegnerische FOB
 const RAID_SHARE = 0.3; // Anteil der Besatzung für den Überfall
+const FALLBACK_ODDS = 1.8; // Gruppe zieht ab, wenn die Gegner im Feuer so viel Mal ihren Wert übertreffen
+const FALLBACK_MIN_FOES = 4; // und mindestens so viele Gegner sichtbar sind
+const FALLBACK_DIST = 1400; // Rückzugsstrecke Richtung Basis
+const FALLBACK_HOLD = 30; // s, in denen nach einem Rückzug keine Angriffsbefehle kommen
 const KEYS = ['bm', 'mun', 'fuel'];
 const CAP = BALANCE.logistics.truckCapacity;
 const ENG_NEAR = 250; // Baufahrzeug näher an einer Baustelle: die automatische Zuweisung übernimmt
@@ -85,6 +89,7 @@ export class AI {
     this.saveForScout = false; // produce bildet keine Kampfeinheiten aus, bis der Späher bezahlt ist
     this.scoutHome = false; // Späher fliegt zum Auftanken heim
     this.seenFobs = new Map(); // Gebäude-ID -> gesehene gegnerische FOB
+    this.fallbackUntil = 0; // bis dahin greift army nicht an (Gruppen-Rückzug läuft)
     this.raid = null; // laufender Flankenangriff { ids, targetId }
     this.lastWave = 0; // Zeitpunkt der letzten Angriffswelle
     this.zoneBan = 0; // bis dahin keine neue Zonen-FOB (nach Verlust, gegen Nachschub in den Tod)
@@ -110,6 +115,7 @@ export class AI {
     this.hadZoneFob = !!s.zoneFob;
     this.defend(s);
     this.retreat(s);
+    this.fallBack(s);
     this.expand(s); // FOB-Baustellen setzen (Material liefert der Lieferant)
     this.scout(s); // vor produce: der Späher bekommt das Geld zuerst
     this.produce(s);
@@ -336,6 +342,35 @@ export class AI {
     for (const gr of groups.values()) {
       const p = gr.fob ? this.freeNear(gr.x + (this.rng.next() - 0.5) * 200, gr.y + 120) : { x: gr.x, y: gr.y };
       this.game.issue(this.team, { type: 'move', ids: gr.ids, x: p.x, y: p.y });
+    }
+  }
+
+  /**
+   * Gruppen-Rückzug: Steht eine Gruppe im Feuer und ist die sichtbare Gegnerschaft dort mindestens FALLBACK_ODDS-mal so viel
+   * wert, zieht die ganze Gruppe geschlossen Richtung Basis ab, statt einzeln zu fallen. Danach sperrt FALLBACK_HOLD die
+   * Angriffsbefehle (army), damit sie sich sammelt und Nachschub dazustößt. Nicht bei Angriff auf die Basis.
+   */
+  fallBack(s) {
+    const g = this.game;
+    if (s.alarm || !s.home || g.time < this.fallbackUntil || s.enemies.length < FALLBACK_MIN_FOES) return;
+    const value = (u) => UNITS[u.type].cost.money || 0;
+    const foes = s.enemies.filter((e) => e.def.range > 0);
+    for (const u of s.combat) {
+      if (u.order.type === 'move' || u.def.air) continue;
+      const near = foes.filter((e) => dist(e.x, e.y, u.x, u.y) <= THREAT_RANGE);
+      if (near.length < FALLBACK_MIN_FOES) continue;
+      const cx = near.reduce((a, e) => a + e.x, 0) / near.length;
+      const cy = near.reduce((a, e) => a + e.y, 0) / near.length;
+      const mine = s.combat.filter((m) => !m.def.air && dist(m.x, m.y, cx, cy) <= THREAT_RANGE + 200);
+      const foeValue = near.reduce((a, e) => a + value(e), 0);
+      const myValue = mine.reduce((a, m) => a + value(m), 0);
+      if (foeValue < FALLBACK_ODDS * myValue) continue;
+      const v = unitVec(s.ax - cx, s.ay - cy);
+      const p = this.freeNear(cx + v.x * FALLBACK_DIST, cy + v.y * FALLBACK_DIST);
+      g.issue(this.team, { type: 'move', ids: mine.map((m) => m.id), x: p.x, y: p.y });
+      this.fallbackUntil = g.time + FALLBACK_HOLD;
+      if (this.raid) this.raid = null;
+      return;
     }
   }
 
@@ -978,6 +1013,7 @@ export class AI {
     const z = s.zone;
     this.rememberFobs();
     this.updateRaid(s);
+    if (g.time < this.fallbackUntil) return; // Rückzug läuft: erst sammeln
     const raiding = this.raid ? this.raid.ids : null;
     const idle = s.combat.filter((u) => u.order.type === 'idle' && !this.dryKind(u) && !(raiding && raiding.has(u.id)));
     if (!idle.length) return;

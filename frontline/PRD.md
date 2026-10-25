@@ -218,6 +218,7 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 - **Späher:** Ab 3 min Spielzeit und mit mindestens 10 Kampfeinheiten spart die KI auf einen Little Bird (unbewaffnet). Er hält am Zonenrand auf der Gegnerseite, damit die Besatzung der Zone sichtbar wird; ist ein Großteil der Besatzer (70 %) zu sehen, schätzt die KI die Stärke aus deren echtem Geldwert statt aus Anzahl × 150. Unter 35 % Treibstoff fliegt er heim und tankt auf 90 %.
 - **Konter-Mix:** Sieht die KI mindestens 8 gegnerische Kampfeinheiten am Boden, verschiebt sie die Grundmischung (50 % Schützen, 20 % PAK, 20 % Schützenpanzer, 10 % Panzer): viele Gepanzerte → mehr PAK und Panzer, viel Infanterie → mehr Schützen und Schützenpanzer (jede Sorte mindestens 5 %).
 - **Flankenangriff:** Die KI merkt sich gesehene gegnerische FOBs (Standort bleibt bekannt, bis er eingesehen und leer ist oder die FOB zerstört wird). Ist die Zone gegnerfrei und stehen dort mindestens 12 freie Einheiten, zweigen 30 % davon ab und greifen die gemerkte FOB abseits der Zone an, die der Zone am nächsten liegt. Ist das Ziel zerstört, rücken die Überlebenden wieder in die Armee ein. Zudem zählt für die Stärke einer Welle nur, wer noch nicht in der Zone steht.
+- **Gruppen-Rückzug:** Steht eine Gruppe im Feuer (mindestens 4 Gegner sichtbar) und ist der Wert der Gegner mindestens 1,8-mal so hoch wie der der eigenen Einheiten dort, zieht die ganze Gruppe 1400 px Richtung Basis ab (nicht bei Angriff auf die Basis). 30 s lang gibt die KI danach keine Angriffsbefehle, damit sich die Gruppe sammelt; ein laufender Überfall wird abgebrochen. Einheiten werden im Spiel nicht geheilt, der Rückzug rettet sie also nur vor dem Tod.
 
 ## 11. Qualitätsanforderungen
 
@@ -239,6 +240,7 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 - v4.26: **KI-Späher** (Little Bird) und Stärkeschätzung der Zonenbesatzung aus gesehenen Einheiten. Cache v39.
 - v4.27: **KI-Konter-Mix** gegen die gesehene Gegnerarmee. Cache v40.
 - v4.28: **KI-Flankenangriff** auf gemerkte gegnerische FOBs. Cache v41.
+- v4.29: **KI-Gruppen-Rückzug** bei klarer Unterlegenheit. Cache v42.
 - v4.24: **Kein Einheitenlimit mehr** (RTS, kein Shooter; vorher 120 je Team). Cache v37.
 - v4.23: **Soldaten-Nachschub.** Unter 50 Soldaten stellt die Haupt-FOB alle 6 s kostenlos einen Schützen bereit (Anzeige in der Haupt-FOB). Kasse bleibt bei höchstens 5000, weil beide Seiten mit demselben Betrag starten. Cache v36.
 - v4.22: **Geld je Einheit, Start mit 50 Soldaten, zwei Ausbildungsplätze.** Wie im Original: Geld pro Tick je Einheit in der Zone, Hot Zone doppelt (0,4 bzw. 0,8 Geld/s; Führungsgeld, Hot-Zone-Besitzgeld und Deckel entfallen). Statt Grundeinkommen Start mit 50 Soldaten (40 Schützen, 10 PAK, LKW, Baufahrzeug) in einer Formation vor der FOB. Haupt-FOB bildet zwei Einheiten gleichzeitig aus. KI rückt mit der Startarmee aus (Reserve 20 %). Punkte unverändert. Cache v35.
