@@ -140,3 +140,16 @@ test('KI: Gruppen-Rückzug bei klarer Unterlegenheit (Seed 1, 20 min) und Sperre
   }
   assert.ok(fell, 'kein Rückzug ausgelöst');
 });
+
+test('KI: Zonen-FOB bekommt zwei Mörser (Seed 7, 12 min)', () => {
+  const game = new Game({ seed: 7 });
+  const ai = new AI(game, 1, 'normal');
+  for (let i = 0; i < (12 * 60) / DT; i++) {
+    ai.update(DT);
+    game.update(DT);
+  }
+  const zf = ai.snapshot().zoneFob;
+  assert.ok(zf, 'keine Zonen-FOB');
+  const near = game.buildings.filter((b) => b.alive && b.team === 1 && b.type === 'mortar' && Math.hypot(b.x - zf.x, b.y - zf.y) < BALANCE.fob.buildRadius);
+  assert.ok(near.length >= 2, `Mörser an der Zonen-FOB: ${near.length}`);
+});

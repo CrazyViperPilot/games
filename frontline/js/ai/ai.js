@@ -601,14 +601,18 @@ export class AI {
     const z = s.zone;
     const fobs = [...s.builtFobs].sort((a, b) => dist(a.x, a.y, z.x, z.y) - dist(b.x, b.y, z.x, z.y));
     const toZone = Math.atan2(s.dir.y, s.dir.x);
+    const foe = g.map.spawns[1 - t];
+    // Zonen-FOB: Verteidigung zur Gegnerseite hin; sie ist der Brennpunkt und bekommt einen zweiten Mörser.
+    const towardFoe = (f) => (f === s.zoneFob ? Math.atan2(foe.y - f.y, foe.x - f.x) : toZone);
 
     for (const f of fobs) {
       for (const type of ['aa', 'mortar']) {
-        const have = s.own.some((b) => b.type === type && dist(b.x, b.y, f.x, f.y) < DEF_RANGE);
+        const want = type === 'mortar' && f === s.zoneFob ? 2 : 1;
+        const have = s.own.filter((b) => b.type === type && dist(b.x, b.y, f.x, f.y) < DEF_RANGE).length >= want;
         if (have) continue;
         if (g.fobsInRadius(t, f.x, f.y).every((o) => o.store.bm < BUILDINGS[type].cost.bm || o.store.mun < BUILDINGS[type].cost.mun)) continue;
         const p = this.findSite(type, f.x, f.y, 130, 330, {
-          angle: toZone,
+          angle: towardFoe(f),
           corridor: f === s.home,
         });
         if (p) {
