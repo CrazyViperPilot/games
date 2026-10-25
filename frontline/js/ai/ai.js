@@ -27,6 +27,9 @@ const WALL_HALF = 3; // Mauerlinie: 2 × WALL_HALF + 1 Zellen, Tor in der Mitte
 const MIX = { rifleman: 0.5, at: 0.2, ifv: 0.2, tank: 0.1 }; // Zielanteile der Kampfeinheiten
 const THREAT_PER_UNIT = 150; // mittlerer Geldwert einer Kampfeinheit (Mix) für die Schätzung einer Besatzung
 const FOB_CAP = { easy: 3, normal: 5, hard: 7 }; // FOB-Grenze je Schwierigkeit mit Haupt-FOB (Spielmaximum 10)
+const WAVE_ODDS = 1.2; // Welle greift nur an, wenn ihr Wert mindestens so viel Mal die geschätzte Zonenbesatzung beträgt
+const WAVE_PATIENCE = 600; // s ohne Welle, bis die geforderte Stärke auf WAVE_MIN fällt
+const WAVE_MIN = 0.6; // Untergrenze des Geduld-Faktors
 const KEYS = ['bm', 'mun', 'fuel'];
 const CAP = BALANCE.logistics.truckCapacity;
 const ENG_NEAR = 250; // Baufahrzeug näher an einer Baustelle: die automatische Zuweisung übernimmt
@@ -70,6 +73,7 @@ export class AI {
     this.supplyAt = new Map(); // Versorger-ID -> letzter Zielpunkt
     this.memo = new Map(); // Befehlsschlüssel -> Zeitpunkt (gegen Befehls-Spam)
     this.hadZoneFob = false; // eine Zonen-FOB (auch Baustelle) existierte im letzten Denkschritt
+    this.lastWave = 0; // Zeitpunkt der letzten Angriffswelle
     this.zoneBan = 0; // bis dahin keine neue Zonen-FOB (nach Verlust, gegen Nachschub in den Tod)
 
     const t = game.teams[team];
@@ -886,9 +890,12 @@ export class AI {
       if (z.owner >= 0 && z.owner !== t && z.counts[z.owner] > 0) {
         // Gegner hält die Zone: Gegenangriff schon ab 1,2× seiner Besatzung (Zonengeld ist sein Vorteil).
         // Besitz und Anzahl in der Zone sind öffentlich; die Stärke wird mit dem mittleren Einheitenwert geschätzt.
+        // Welle bündeln: nie schwächer losziehen als 1,2× die Besatzung (kleine Gruppen würden nur verheizt).
         const threat = z.counts[z.owner] * THREAT_PER_UNIT;
-        need = Math.min(need, Math.max(300, 1.2 * threat));
+        need = Math.max(need, WAVE_ODDS * threat);
       }
+      // Geduld: je länger keine Welle losging, desto weniger Stärke braucht die nächste (nie unter 60 %).
+      need *= Math.max(WAVE_MIN, 1 - (g.time - this.lastWave) / WAVE_PATIENCE);
       const ready = strength >= need || (z.owner === -1 && strength >= 0.6 * need);
       if (ready) {
         let go = idle.filter((u) => !inZone(u));
@@ -898,7 +905,10 @@ export class AI {
           go = go.slice(Math.ceil(go.length * RESERVE));
         }
         const ids = go.map((u) => u.id);
-        if (ids.length) g.issue(t, { type: 'attackMove', ids, x: tx, y: ty });
+        if (ids.length) {
+          g.issue(t, { type: 'attackMove', ids, x: tx, y: ty });
+          this.lastWave = g.time;
+        }
       }
     }
 
