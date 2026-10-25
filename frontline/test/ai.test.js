@@ -116,3 +116,15 @@ test('KI-Mischung: gegen Gepanzerte mehr PAK/Panzer, gegen Infanterie mehr Schü
   const few = ai.counterMix(foes(['tank', 'tank']));
   assert.equal(few.at, 0.2, 'zu wenig gesehen → Grundmischung');
 });
+
+test('KI: Besatzung schickt einen Überfall auf eine gemerkte gegnerische FOB (Seed 3, 10 min)', () => {
+  const game = new Game({ seed: 3 });
+  const ais = [new AI(game, 0, 'normal'), new AI(game, 1, 'normal')];
+  let raided = false;
+  for (let i = 0; i < (10 * 60) / DT && game.winner === null && !raided; i++) {
+    for (const ai of ais) ai.update(DT);
+    game.update(DT);
+    raided = ais.some((ai) => ai.raid && ai.raid.ids.size > 0);
+  }
+  assert.ok(raided, 'kein Überfall gestartet');
+});

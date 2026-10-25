@@ -37,6 +37,8 @@ const SCOUT_FUEL = 0.35; // Späher kehrt unter diesem Treibstoffanteil zur Haup
 const SCOUT_REFILL = 0.9; // und fliegt erst wieder aus, wenn der Tank so voll ist
 const COUNTER_MIN = 8; // sichtbare gegnerische Kampfeinheiten, ab denen die Mischung angepasst wird
 const COUNTER_WEIGHT = 0.8; // Stärke der Anpassung (0 = Grundmischung)
+const RAID_MIN = 12; // Besatzung ab so vielen freien Einheiten schickt einen Überfall auf eine gegnerische FOB
+const RAID_SHARE = 0.3; // Anteil der Besatzung für den Überfall
 const KEYS = ['bm', 'mun', 'fuel'];
 const CAP = BALANCE.logistics.truckCapacity;
 const ENG_NEAR = 250; // Baufahrzeug näher an einer Baustelle: die automatische Zuweisung übernimmt
@@ -82,6 +84,8 @@ export class AI {
     this.hadZoneFob = false; // eine Zonen-FOB (auch Baustelle) existierte im letzten Denkschritt
     this.saveForScout = false; // produce bildet keine Kampfeinheiten aus, bis der Späher bezahlt ist
     this.scoutHome = false; // Späher fliegt zum Auftanken heim
+    this.seenFobs = new Map(); // Gebäude-ID -> gesehene gegnerische FOB
+    this.raid = null; // laufender Flankenangriff { ids, targetId }
     this.lastWave = 0; // Zeitpunkt der letzten Angriffswelle
     this.zoneBan = 0; // bis dahin keine neue Zonen-FOB (nach Verlust, gegen Nachschub in den Tod)
 
@@ -929,11 +933,53 @@ export class AI {
     if (dist(bird.x, bird.y, x, y) > 120 && this.once('scout-go', 8)) g.issue(t, { type: 'move', ids: [bird.id], x, y });
   }
 
+  /** Merkt sich gesehene gegnerische FOBs (Standort bleibt bekannt, bis man ihn einsieht und dort nichts mehr steht). */
+  rememberFobs() {
+    const g = this.game;
+    for (const [id, b] of this.seenFobs) if (!b.alive) this.seenFobs.delete(id); // zerstört (auch ungesehen)
+    for (const b of g.buildings) {
+      if (b.team === this.team || b.type !== 'fob') continue;
+      const seen = g.isVisible(this.team, b.x, b.y);
+      if (seen && b.alive) this.seenFobs.set(b.id, b);
+    }
+  }
+
+  /** Laufender Überfall: gefallene Räuber austragen; ist das Ziel zerstört oder niemand mehr übrig, endet er (Überlebende rücken in die Armee ein). */
+  updateRaid(s) {
+    const r = this.raid;
+    if (!r) return;
+    const target = this.game.buildings.find((b) => b.id === r.targetId);
+    for (const id of [...r.ids]) if (!s.combat.some((u) => u.id === id)) r.ids.delete(id);
+    if (!r.ids.size || !target || !target.alive) this.raid = null;
+  }
+
+  /**
+   * Flankenangriff: Steht die Zone gegnerfrei, zweigt von der Besatzung (ab RAID_MIN Einheiten) ein Teil ab und greift
+   * die gemerkte gegnerische FOB abseits der Zone an, die der Zone am nächsten liegt. Liefert die Resteinheiten der Besatzung.
+   */
+  startRaid(s, go) {
+    const g = this.game;
+    const z = s.zone;
+    if (this.raid || go.length < RAID_MIN) return go;
+    const targets = [...this.seenFobs.values()]
+      .filter((b) => dist(b.x, b.y, z.x, z.y) > ZONE_FOB_R + 300)
+      .sort((a, b) => dist(a.x, a.y, z.x, z.y) - dist(b.x, b.y, z.x, z.y));
+    if (!targets.length) return go;
+    const raiders = go.slice(-Math.floor(go.length * RAID_SHARE));
+    const target = targets[0];
+    g.issue(this.team, { type: 'attackMove', ids: raiders.map((u) => u.id), x: target.x, y: target.y });
+    this.raid = { ids: new Set(raiders.map((u) => u.id)), targetId: target.id };
+    return go.slice(0, go.length - raiders.length);
+  }
+
   army(s) {
     const g = this.game;
     const t = this.team;
     const z = s.zone;
-    const idle = s.combat.filter((u) => u.order.type === 'idle' && !this.dryKind(u));
+    this.rememberFobs();
+    this.updateRaid(s);
+    const raiding = this.raid ? this.raid.ids : null;
+    const idle = s.combat.filter((u) => u.order.type === 'idle' && !this.dryKind(u) && !(raiding && raiding.has(u.id)));
     if (!idle.length) return;
     const inZone = (u) => dist(u.x, u.y, z.x, z.y) <= z.r;
     const ammoOk = true; // die Haupt-FOB hat unendlich Munition
@@ -948,7 +994,8 @@ export class AI {
     }
 
     if (ammoOk) {
-      const strength = idle.reduce((sum, u) => sum + (UNITS[u.type].cost.money || 0), 0);
+      // Nur wer noch nicht in der Zone steht, zählt zur Welle (sonst gehen Nachrücker einzeln los, weil die Zonenbesatzung mitzählt).
+      const strength = idle.filter((u) => !inZone(u)).reduce((sum, u) => sum + (UNITS[u.type].cost.money || 0), 0);
       let need = this.cfg.attackStrength;
       if (z.owner >= 0 && z.owner !== t && z.counts[z.owner] > 0) {
         // Gegner hält die Zone: Gegenangriff schon ab 1,2× seiner Besatzung (Zonengeld ist sein Vorteil).
@@ -988,6 +1035,11 @@ export class AI {
       if (lone.length) g.issue(t, { type: 'attackMove', ids: lone, x: tx, y: ty });
       return;
     }
+
+    // Zone ist gegnerfrei: ein Teil der Besatzung überfällt eine gemerkte gegnerische FOB abseits der Zone.
+    const garrison = idle.filter(inZone);
+    const left = this.startRaid(s, garrison);
+    if (left.length < garrison.length) return;
 
     const clumped = idle.filter((u) => dist(u.x, u.y, z.x, z.y) < 200);
     if (clumped.length >= 2) {
