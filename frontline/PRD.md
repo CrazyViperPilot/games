@@ -135,6 +135,26 @@ Schadensmodell: Schaden je Schuss nach Panzerklasse des Ziels (Infanterie / leic
 
 Weitere globale Zahlen (Kartengröße, Zone, Prämien, Logistikraten, Schwierigkeit) stehen in `js/data/balance.js` und sind oben im Text genannt.
 
+### Waffen und Schaden (Quelle: `weapons` in `js/data/units.js`, `weapon` in `js/data/buildings.js`)
+
+Schaden je Schuss nach Panzerklasse des Ziels (Inf = Infanterie, Leicht, Schwer, Geb = Gebäude, Luft). Wo die Tabelle „Treffer bis zum Abschuss“ (unten) eine Paarung nennt, gilt sie statt dieser Werte. Reichweite in px, Kadenz = Sekunden zwischen Schüssen.
+
+| Waffe | Reichweite | Kadenz | Inf | Leicht | Schwer | Geb | Luft | Bevorzugt gegen |
+|---|---|---|---|---|---|---|---|---|
+| Schütze: Gewehr | 200 | 1,0 | 12 | 3 | 1 | 4 | 3 | – |
+| PAK: RPG | 240 | 3,0 | 10 | 90 | 120 | 60 | 40 | – |
+| SPz: Granatwerfer | 240 | 2,0 | 30 | 40 | 10 | 25 | – | Leicht, Schwer, Geb |
+| SPz: MG | 220 | 0,25 | 9 | 3 | 1 | 3 | 6 | – |
+| KPz: Hauptkanone | 300 | 6,0 | 45 | 120 | 150 | 120 | – | Leicht, Schwer, Geb |
+| KPz: MG | 220 | 0,25 | 10 | 3 | 0 | 2 | 3 | – |
+| AH-64: Bordkanone | 340 | 0,5 | 22 | 26 | 30 | 18 | 10 | – |
+| AH-64: Raketen | 340 | 3,0 | 40 | 120 | 220 | 120 | 150 | Schwer, Geb, Luft |
+| FOB-MG | 220 | 0,6 | 12 | 4 | 1 | 4 | 2 | – (schießt immer, kostenlos) |
+| Mörser | 800 (min. 200) | 20 | 60 | 50 | 25 | 80 | – | Flächenschaden 60 px, Granate fliegt Distanz / 300 s |
+| Flugabwehr | 320 | 0,4 | 10 | 12 | 2 | 4 | 35 | fängt zudem Mörsergranaten ab (Reichweite 350, 70 % Chance) |
+
+Das Spiel wählt je Ziel automatisch die Waffe mit dem besten Schaden bzw. die „bevorzugte“ Waffe für die Panzerklasse des Ziels; Waffen ohne Munition schweigen.
+
 ### Schaden: Treffer bis zum Abschuss
 Direktfeuer richtet sich nach Trefferzahlen (volles Ziel); Seite = Winkel zur Fahrtrichtung des Ziels (vorn ±45°, hinten ±45°, sonst seitlich). Nicht genannte Paarungen nutzen die Schadenstabelle der Panzerklasse (u. a. Hubschrauber, Gebäude, MG gegen Fahrzeuge, Gewehr gegen Fahrzeuge).
 
@@ -247,6 +267,28 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 - **Zonen-FOB-Verteidigung:** Mörser und Flugabwehr der Zonen-FOB setzt die KI zur Gegnerseite hin (andere FOBs wie bisher zur Zone hin); die Zonen-FOB bekommt zwei Mörser statt einem.
 - **Schwierigkeit über Verhalten:** *Leicht*: langsame Denkschritte (3 s), hohe Angriffsschwelle, kein Späher, kein Konter-Mix, keine Überfälle, kein Rückzug, Einkommen ×0,8. *Normal*: 2 s, Späher und Konter-Mix. *Schwer*: 1 s, niedrigere Angriffsschwelle, dazu Überfälle und Gruppen-Rückzug; **kein Einkommensbonus mehr** (vorher ×1,25).
 
+### KI-Konstanten (Quelle: `js/ai/ai.js`, `js/data/balance.js`; hier zum Nachschlagen für Erweiterungen)
+
+| Bereich | Konstante | Wert |
+|---|---|---|
+| Takt | Denkschritt `think` | Leicht 3 s · Normal 2 s · Schwer 1 s |
+| Angriff | `attackStrength` (Wert der angreifenden Einheiten in Geld) | Leicht 2500 · Normal 2000 · Schwer 1600 |
+| Angriff | Verhältnis zur Zonenbesatzung (`WAVE_ODDS`) | 1,2 |
+| Angriff | Geduld bis zur Untergrenze (`WAVE_PATIENCE` / `WAVE_MIN`) | 600 s / 60 % |
+| Angriff | Reserve an der Haupt-FOB (`RESERVE`, ab 5 Einheiten) | 20 % |
+| Besatzungsschätzung | mittlerer Einheitenwert (`THREAT_PER_UNIT`) | 150 Geld |
+| Sammelpunkt | Abstand von der Haupt-FOB zur Zone / von der Zonen-FOB zur Basis | 300 px / 150 px |
+| Armeemischung | Schützen / PAK / SPz / KPz (`MIX`) | 50 / 20 / 20 / 10 % |
+| Konter-Mix | Mindestzahl gesehener Gegner / Gewicht / Mindestanteil | 8 / 0,8 / 5 % |
+| Späher | Start ab / Mindestarmee / Heimflug unter / Tankziel | 180 s / 10 Einheiten / 35 % / 90 % |
+| Flankenangriff | Mindestbesatzung / Anteil | 12 / 30 % |
+| Gruppen-Rückzug | Wertverhältnis / Mindestgegner / Strecke / Angriffssperre | 1,8 / 4 / 1400 px / 30 s |
+| Expansion | FOB-Grenze Leicht/Normal/Schwer · Relais-Abstand · Flanken-FOB-Abstand | 3/5/7 · 1000 px · 1000 px |
+| Bedrohung | Reaktionsreichweite / FOB-Gefahrenradius | 900 px / 600 px |
+| Baustellen | Abriss ohne Material / Sperre fehlgeschlagener Orte | 200 s / 240 s |
+| Mauer | Abstand von der Haupt-FOB / halbe Länge | 4 / 3 Zellen (Tor in der Mitte) |
+| Rückzug (Vorrat) | Einheiten unter diesem Vorratsanteil ziehen sich zurück | 20 % |
+
 ## 11. Qualitätsanforderungen
 
 - 60 FPS bei ~200 Einheiten auf einem normalen Laptop. Simulation mit fester Schrittweite (20 Hz), unabhängig vom Rendern.
@@ -263,6 +305,7 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 
 ## Änderungsverlauf
 
+- v4.32: **PRD:** Tabelle aller Waffen mit Schaden je Panzerklasse und Tabelle der KI-Konstanten. Cache v44.
 - v4.31: **Schwierigkeit über Verhalten** statt Einkommensbonus (Schwer: ×1,0). Cache v44.
 - v4.30: **KI verteidigt die Zonen-FOB** zur Gegnerseite, zwei Mörser. Cache v43.
 - v4.29: **KI-Gruppen-Rückzug** bei klarer Unterlegenheit. Cache v42.
