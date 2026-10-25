@@ -1,0 +1,23 @@
+# Tests für CrazyViperMahjong – läuft nur, wenn sich etwas in crazyviper-mahjong/ ändert.
+name: Test CrazyViperMahjong
+
+on:
+  push:
+    branches: ["main"]
+    paths: ["crazyviper-mahjong/**", ".github/workflows/test-crazyviper-mahjong.yml"]
+  pull_request:
+    paths: ["crazyviper-mahjong/**", ".github/workflows/test-crazyviper-mahjong.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node crazyviper-mahjong/test/logic.test.js

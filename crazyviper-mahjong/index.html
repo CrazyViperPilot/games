@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0b1d33">
+  <meta name="description" content="CrazyViperMahjong: Mahjong Solitaire mit Kampfjets statt Schriftzeichen – offline spielbar.">
+  <title>CrazyViperMahjong</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header id="bar">
+    <button id="btn-menu" aria-label="Menü">☰</button>
+    <div class="stat"><span id="time">0:00</span></div>
+    <div class="stat"><span id="left">0</span> Kacheln</div>
+    <div class="stat"><span id="moves">0</span> Züge</div>
+    <div class="spacer"></div>
+    <button id="btn-undo" aria-label="Zug zurück">↶ Zurück</button>
+    <button id="btn-hint" aria-label="Hinweis">💡 Hinweis</button>
+    <button id="btn-shuffle" aria-label="Mischen">🔀 Mischen</button>
+    <button id="btn-sound" aria-label="Ton">🔊</button>
+  </header>
+  <canvas id="board" aria-label="Spielfeld"></canvas>
+
+  <div id="menu" class="overlay">
+    <div class="card">
+      <h1>CrazyViper<span>Mahjong</span></h1>
+      <p class="tag">Finde gleiche Kampfjets und räume das Feld ab.</p>
+      <button id="btn-resume" class="primary" hidden>Weiterspielen</button>
+      <div id="layouts" class="layouts"></div>
+      <details>
+        <summary>Spielregeln</summary>
+        <p>Tippe zwei <b>gleiche</b> Kacheln an, um sie zu entfernen. Eine Kachel ist frei, wenn nichts auf ihr liegt und sie links <i>oder</i> rechts frei steht. Gewonnen hast du, wenn alle Kacheln weg sind. Gesperrte Kacheln sind etwas dunkler.</p>
+      </details>
+    </div>
+  </div>
+
+  <div id="msg" class="overlay" hidden>
+    <div class="card small">
+      <h2 id="msg-title"></h2>
+      <p id="msg-text"></p>
+      <div id="msg-actions" class="row"></div>
+    </div>
+  </div>
+
+  <noscript><p class="noscript">CrazyViperMahjong braucht JavaScript.</p></noscript>
+  <script src="jets.js"></script>
+  <script src="logic.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
