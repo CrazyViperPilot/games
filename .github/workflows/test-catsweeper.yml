@@ -1,0 +1,23 @@
+# Tests für Catsweeper – läuft nur, wenn sich etwas in catsweeper/ ändert.
+name: Test Catsweeper
+
+on:
+  push:
+    branches: ["main"]
+    paths: ["catsweeper/**", ".github/workflows/test-catsweeper.yml"]
+  pull_request:
+    paths: ["catsweeper/**", ".github/workflows/test-catsweeper.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node catsweeper/test/logic.test.js

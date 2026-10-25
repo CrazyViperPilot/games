@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#2b1d3a">
+  <meta name="description" content="Catsweeper: Minesweeper mit Katzen – finde alle versteckten Katzen, ohne sie zu erschrecken. Offline spielbar.">
+  <title>Catsweeper</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header id="bar">
+    <button id="btn-menu" aria-label="Menü">☰</button>
+    <div class="stat">🐱 <span id="left">0</span></div>
+    <div class="stat">⏱ <span id="time">0:00</span></div>
+    <div class="spacer"></div>
+    <button id="btn-mode" aria-label="Modus wechseln">👆 Aufdecken</button>
+    <button id="btn-hint" aria-label="Hinweis">💡 Hinweis</button>
+    <button id="btn-new" aria-label="Neues Spiel">↻ Neu</button>
+    <button id="btn-sound" aria-label="Ton">🔊</button>
+  </header>
+  <canvas id="board" aria-label="Spielfeld"></canvas>
+
+  <div id="menu" class="overlay">
+    <div class="card">
+      <h1>Cat<span>sweeper</span></h1>
+      <p class="tag">Finde alle versteckten Katzen – ohne eine zu wecken.</p>
+      <button id="btn-resume" class="primary" hidden>Weiterspielen</button>
+      <div id="levels" class="levels"></div>
+      <details>
+        <summary>Spielregeln</summary>
+        <p>Tippe ein Feld an, um es aufzudecken. Auf jedem Feld mit Zahl steht, <b>wie viele Katzen</b> auf den bis zu 8 Nachbarfeldern sitzen. Deckst du eine Katze auf, ist das Spiel vorbei. Gewonnen hast du, wenn alle Felder ohne Katze offen sind.</p>
+        <p><b>Fisch-Markierung:</b> Wo du eine Katze vermutest, legst du einen Fisch hin – <b>lange drücken</b> oder oben auf „Aufdecken/Fisch“ umschalten. Tippst du auf eine Zahl, deren Katzen alle mit Fischen markiert sind, werden die restlichen Nachbarn auf einmal aufgedeckt. Das erste Feld ist immer sicher.</p>
+      </details>
+    </div>
+  </div>
+
+  <div id="msg" class="overlay" hidden>
+    <div class="card small">
+      <h2 id="msg-title"></h2>
+      <p id="msg-text"></p>
+      <div id="msg-actions" class="row"></div>
+    </div>
+  </div>
+
+  <noscript><p class="noscript">Catsweeper braucht JavaScript.</p></noscript>
+  <script src="logic.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
