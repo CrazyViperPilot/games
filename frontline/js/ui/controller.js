@@ -7,6 +7,7 @@ import { canBuild } from '../game/construction.js';
 import { cargoSum, canSeat } from '../game/logistics.js';
 import { canGarrison, canEnter } from '../game/garrison.js';
 import { canCarry } from '../game/crates.js';
+import { FORMATIONS, FORMATION_NAMES } from '../game/formation.js';
 import { unitLift, buildingHeight, TOWN_H } from '../render/iso.js';
 
 const WALL_MAX = 40; // max. Zellen je Mauerzug (Vorschau und Befehl)
@@ -110,6 +111,7 @@ export class Controller {
     this.lastClick = null;
     this.lastGroup = null;
     this.lastEvent = null; // Position der letzten Meldung (Leertaste)
+    this.formation = 'loose'; // Formation für Marsch- und Angriffsbefehle (F schaltet weiter)
     this.onMessage = null; // Callback für HUD-Meldungen (text)
   }
 
@@ -518,7 +520,8 @@ export class Controller {
       this.issue({ type: 'attack', ids, targetId: target.id });
       return;
     }
-    if (this.issue({ type: 'move', ids, x: wx, y: wy }).ok) this.moveMarker(wx, wy);
+    const r = this.issue({ type: 'move', ids, x: wx, y: wy, formation: this.formation });
+    if (r.ok) this.moveMarker(wx, wy, r.slots);
   }
 
   /**
@@ -561,8 +564,15 @@ export class Controller {
     return done;
   }
 
-  moveMarker(x, y) {
-    this.view.moveMarker = { x, y, t: performance.now() };
+  /** Zielmarke; slots = Zielplätze der einzelnen Einheiten (Formation), als Punkte gezeichnet. */
+  moveMarker(x, y, slots = null) {
+    this.view.moveMarker = { x, y, t: performance.now(), slots: slots && slots.length > 1 ? slots : null };
+  }
+
+  /** Nächste Formation (Locker → Linie → Keil → Kolonne). */
+  cycleFormation() {
+    this.formation = FORMATIONS[(FORMATIONS.indexOf(this.formation) + 1) % FORMATIONS.length];
+    this.message(`Formation: ${FORMATION_NAMES[this.formation]}`);
   }
 
   /** IDs der gewählten Bauer, die `type` bauen dürfen (Baufahrzeug: alles, Infanterie: Mauer/Tor). */
@@ -592,9 +602,9 @@ export class Controller {
       this.setMode('normal');
       return;
     }
-    const r = this.issue({ type: 'attackMove', ids, x: wx, y: wy });
+    const r = this.issue({ type: 'attackMove', ids, x: wx, y: wy, formation: this.formation });
     if (!r.ok) return;
-    this.moveMarker(wx, wy);
+    this.moveMarker(wx, wy, r.slots);
     if (!shift) this.setMode('normal');
   }
 
@@ -1039,6 +1049,13 @@ export class Controller {
         enabled: units.length > 0,
         reason: 'Keine Einheit gewählt',
         action: () => this.stop(),
+      }),
+      entry(FORMATION_NAMES[this.formation], 'F', {
+        tip: 'Formation (F): Locker, Linie, Keil oder Kolonne für Marsch- und Angriffsbefehle. Panzer vorn, Infanterie dahinter; die Gruppe hält das Tempo der langsamsten Einheit.',
+        active: this.formation !== 'loose',
+        enabled: units.filter((u) => !u.def.air).length >= 2,
+        reason: 'Formation braucht mindestens zwei Bodeneinheiten',
+        action: () => this.cycleFormation(),
       }),
     );
     const riders = units.filter((u) => u.def.canRide);

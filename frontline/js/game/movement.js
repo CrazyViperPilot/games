@@ -7,6 +7,8 @@ const REPATH = 1.0; // Neuplanung bei Verfolgung (s)
 const BLOCK_REPATH = 0.5; // Neuplanung nach blockiertem Wegpunkt (s)
 const ARRIVE = 0.5; // Wegpunkt erreicht (px)
 const FINAL_ARRIVE = 32; // Endziel erreicht (px): Einheiten am selben Sammelpunkt drängeln sich sonst ewig in 'move'
+const SETTLE_DONE = 4; // Formation: so nah am eigenen Platz gilt er als erreicht (px)
+const SETTLE_TIME = 3; // s, höchstens so lange rückt eine Einheit am Ende auf ihren Platz nach
 const CORNER = 48; // nahe einer Wegecke: bei freier Sicht gleich zum nächsten Wegpunkt (sonst Stau an der Ecke)
 export const HASH_CELL = 128; // räumliches Hash-Gitter
 const TILE = BALANCE.map.tile;
@@ -320,7 +322,19 @@ function stepUnit(game, u, dt) {
   }
 
   if (u.pathIndex < u.path.length) drive(game, u, dt);
-  if (u.pathIndex >= u.path.length && (o.type === 'move' || o.type === 'attackMove')) setIdle(u);
+  if (u.pathIndex >= u.path.length && (o.type === 'move' || o.type === 'attackMove')) {
+    if (o.form && settle(game, u, o.x, o.y, dt)) return; // Formation: genau auf den eigenen Platz
+    setIdle(u);
+  }
+}
+
+/** Letzte Schritte einer Formation: vom Ende des Weges gerade auf den Platz (der Weg endet bis FINAL_ARRIVE davor). */
+function settle(game, u, x, y, dt) {
+  const d = dist(u.x, u.y, x, y);
+  const o = u.order;
+  o.settle = (o.settle || 0) + dt;
+  if (d <= SETTLE_DONE || d > FINAL_ARRIVE * 2 || o.settle > SETTLE_TIME) return false; // nicht ewig drängeln
+  return stepToward(game.grid, u, x, y, Math.min(d, u.def.speed * u.speedMul * dt));
 }
 
 // Trennung: überlappende Einheiten auseinanderschieben, nie in unpassierbare Zellen.
@@ -381,6 +395,7 @@ export function updateMovement(game, dt) {
     u.repathTimer = Math.max(0, u.repathTimer - dt);
     u.speedMul = (u.def.fuelPerSec || 0) > 0 && u.fuel <= 0 ? BALANCE.fuelSlowMul : 1;
     if (u.crate) u.speedMul *= BALANCE.crates.carrySpeed; // Kistenträger gehen langsamer
+    if (u.order.form && u.formMul) u.speedMul *= u.formMul; // Formation fährt geschlossen (formation.js)
     if (u.house || OWN_DRIVERS.has(u.order.type)) continue; // Besatzer eines Hauses bewegen sich nicht
     stepUnit(game, u, dt);
   }

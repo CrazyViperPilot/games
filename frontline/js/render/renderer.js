@@ -55,6 +55,7 @@ const BAR_W = 24; // Balkenbreite über Einheiten (Welt-px)
 const HP_OFFSET = 14; // Abstand Lebensbalken-Oberkante zum Einheitenrand (Bildschirm-px); darunter Vorrat
 const FOG_EXPLORED_ALPHA = 150; // erkundet: abgedunkelt, nicht schwarz
 const MARKER_LIFE = 0.8; // s, Lebensdauer des Wegziel-Markers
+const SLOT_LIFE = 1.6; // s, so lange zeigen Punkte die Formationsplätze
 const SC = BALANCE.scars;
 const SMOKE_AT = 0.6; // Gebäude und Häuser rauchen unter diesem Lebensanteil, Fahrzeuge unter VEHICLE_SMOKE
 const VEHICLE_SMOKE = 0.5;
@@ -580,7 +581,7 @@ export class Renderer {
       drawSmoke(ctx, p.x, y, q.s * z, q.k, t, q.seed);
     }
     if (relief && v.moveMarker) this.groundAt(ctx, v.moveMarker.x, v.moveMarker.y);
-    this.drawMoveMarker(ctx, v.moveMarker, now, z);
+    this.drawMoveMarker(ctx, v.moveMarker, now, z, relief ? (x, y) => this.groundAt(ctx, x, y) : null);
 
     if (!reveal) {
       if (relief) {
@@ -1127,18 +1128,30 @@ export class Renderer {
   }
 
   /** Wegziel-Markierung: wächst und verblasst über MARKER_LIFE. */
-  drawMoveMarker(ctx, m, now, z) {
+  /** Wegziel: Ring am Klickpunkt, bei Formationen kurz Punkte auf den Zielplätzen. at(x, y) setzt im Relief die Bodenebene dort. */
+  drawMoveMarker(ctx, m, now, z, at = null) {
     if (!m || !Number.isFinite(m.t)) return;
     const age = (now - m.t) / 1000;
-    if (!(age >= 0 && age < MARKER_LIFE)) return;
-    const k = age / MARKER_LIFE;
-    const r = (6 + 10 * k) / z;
+    if (!(age >= 0 && age < Math.max(MARKER_LIFE, m.slots ? SLOT_LIFE : 0))) return;
     ctx.save();
-    ctx.strokeStyle = `rgba(150,255,180,${1 - k})`;
-    ctx.lineWidth = 2 / z;
-    ctx.beginPath();
-    ctx.arc(m.x, m.y, r, 0, Math.PI * 2);
-    ctx.stroke();
+    if (m.slots) {
+      ctx.fillStyle = `rgba(150,255,180,${0.85 * (1 - age / SLOT_LIFE)})`;
+      for (const p of m.slots) {
+        at?.(p.x, p.y);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 3 / z, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      at?.(m.x, m.y);
+    }
+    if (age < MARKER_LIFE) {
+      const k = age / MARKER_LIFE;
+      ctx.strokeStyle = `rgba(150,255,180,${1 - k})`;
+      ctx.lineWidth = 2 / z;
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, (6 + 10 * k) / z, 0, Math.PI * 2);
+      ctx.stroke();
+    }
     ctx.restore();
   }
 

@@ -20,6 +20,7 @@ import { createHouses, updateGarrison, cmdGarrison, cmdUngarrison, dropOccupant 
 import { createCrates, updateCrates, updateCrateIntel, cmdPickup, cmdDeliver, cmdDropCrate } from './crates.js';
 import { createScars, updateScars, updateScarIntel, addUnitWreck, addBuildingWreck, clearWrecksUnder } from './scars.js';
 import { createAnimals, updateAnimals } from './animals.js';
+import { FORMATIONS, formationSlots, updateFormations } from './formation.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
@@ -144,6 +145,8 @@ export class Game {
     this.projectiles = [];
     this.effects = [];
     createScars(this); // Wracks und Krater (sichtbarer Schaden)
+    this.formations = new Map(); // Formation → { id, speed, ids } (formation.js)
+    this.formationSeq = 0;
     this.events = [];
     this.winner = null;
     this.winReason = null;
@@ -652,21 +655,34 @@ export class Game {
     return out;
   }
 
+  /**
+   * { type: 'move'|'attackMove', ids, x, y, formation? }: ohne Formation (oder 'loose') je Einheit der nächste freie Rasterpunkt um das
+   * Ziel; mit 'line', 'wedge' oder 'column' (ab zwei Bodeneinheiten) Plätze der Formation, die Gruppe fährt geschlossen (formation.js).
+   * Liefert die Zielpunkte (slots) für die Wegmarke.
+   */
   cmdMove(team, cmd) {
     const units = this.ownUnits(team, cmd.ids);
     if (!units.length) return fail('Keine eigenen Einheiten gewählt');
     const tx = Math.min(Math.max(cmd.x, 0), W);
     const ty = Math.min(Math.max(cmd.y, 0), H);
+    const go = (u, x, y, form) => {
+      u.targetId = null;
+      u.order = { type: cmd.type, x, y, targetId: null, ...(form ? { form } : {}) };
+      planPath(this, u, x, y);
+      if (u.path.length === 0) setIdle(u);
+    };
+    const kind = FORMATIONS.includes(cmd.formation) ? cmd.formation : 'loose';
+    if (kind !== 'loose' && units.filter((u) => !u.def.air).length >= 2) {
+      const { slots, speed } = formationSlots(this, team, units, tx, ty, kind);
+      const id = ++this.formationSeq;
+      this.formations.set(id, { id, speed, ids: slots.filter((p) => !p.u.def.air).map((p) => p.u.id) });
+      for (const p of slots) go(p.u, p.x, p.y, p.u.def.air ? 0 : id);
+      return { ok: true, count: units.length, formation: kind, slots: slots.map((p) => ({ x: p.x, y: p.y })) };
+    }
     units.sort((a, b) => dist(a.x, a.y, tx, ty) - dist(b.x, b.y, tx, ty) || a.id - b.id);
     const spots = this.formationSpots(team, tx, ty, units.length);
-    units.forEach((u, i) => {
-      const s = spots[i];
-      u.targetId = null;
-      u.order = { type: cmd.type, x: s.x, y: s.y, targetId: null };
-      planPath(this, u, s.x, s.y);
-      if (u.path.length === 0) setIdle(u);
-    });
-    return { ok: true, count: units.length };
+    units.forEach((u, i) => go(u, spots[i].x, spots[i].y, 0));
+    return { ok: true, count: units.length, formation: 'loose', slots: spots };
   }
 
   cmdAttack(team, cmd) {
@@ -991,6 +1007,7 @@ export class Game {
     // Reihenfolge: Wirtschaft setzt team.rate zurück; Bewegung, Logistik und Bau fahren; Kampf, Zone, Einkommen zuletzt
     updateEconomy(this, dt);
     updateGarrison(this, dt);
+    updateFormations(this);
     updateMovement(this, dt);
     updateCrates(this, dt);
     updateLogistics(this, dt);

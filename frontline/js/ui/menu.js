@@ -20,6 +20,7 @@ const KEYS = [
   ['Rechtsklick auf FOB', 'LKW: leer laden, beladen entladen · Baufahrzeug: an Baustelle helfen, beschädigtes Gebäude reparieren'],
   ['A + Klick', 'Angriffsbewegung'],
   ['S', 'Stopp'],
+  ['F', 'Formation wechseln: Locker, Linie, Keil, Kolonne (Panzer vorn, Gruppe marschiert geschlossen)'],
   ['B', 'Baumenü: Baufahrzeug alles (E Mauer, R Tor, T Mörser, Z Flak, X Bohrer, F FOB-Baustelle) · Soldaten nur E Mauer, R Tor'],
   ['Bauen', 'Gebäude brauchen einen Bauer daneben: Baufahrzeug oder Soldaten (nur Mauer/Tor, aus getragenem Baumaterial, im Bauradius einer FOB)'],
   ['Haupt-FOB', 'Ausbildung (nur hier, nur gegen Geld, zwei Einheiten gleichzeitig): Q Schütze · W PAK · T Scharfschütze · E LKW · R Baufahrzeug · A SPz · S KPz · D Little Bird · F Transporter · G AH-64'],

@@ -1178,7 +1178,7 @@ export class AI {
         }
         const ids = go.map((u) => u.id);
         if (ids.length) {
-          g.issue(t, { type: 'attackMove', ids, x: tx, y: ty });
+          g.issue(t, { type: 'attackMove', ids, x: tx, y: ty, formation: 'wedge' }); // im Keil: Panzer vorn, alle kommen zusammen an
           this.lastWave = g.time;
         }
       }
