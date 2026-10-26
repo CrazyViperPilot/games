@@ -6,6 +6,7 @@ import { makeRng } from '../core/rng.js';
 import { generateMap } from './map.js';
 import { blockers } from './mapdata.js';
 import { Grid } from './grid.js';
+import { reliefOf } from './relief.js';
 import { createUnit, createBuilding } from './entities.js';
 import { Fog } from './fog.js';
 import { updateEconomy, smoothIncome } from './economy.js';
@@ -128,6 +129,7 @@ export class Game {
     this.grid.rasterizeObstacles(this.map.obstacles);
     this.grid.rasterizeRects(blockers(this.map.town?.buildings ?? []));
     this.grid.rasterizeTrees([...(this.map.town?.trees ?? []), ...(this.map.trees ?? [])]);
+    this.grid.rasterizeRelief(reliefOf(this.map)); // steile Hänge und Seen
 
     this.time = 0;
     this.nextId = 1;

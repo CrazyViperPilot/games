@@ -118,16 +118,29 @@ test('KI-Mischung: gegen Gepanzerte mehr PAK/Panzer, gegen Infanterie mehr Schü
   assert.equal(few.at, 0.2, 'zu wenig gesehen → Grundmischung');
 });
 
-test('KI: Besatzung schickt einen Überfall auf eine gemerkte gegnerische FOB (schwer, Seed 1, 10 min)', () => {
+test('KI: Besatzung schickt einen Überfall auf eine gemerkte gegnerische FOB (schwer, Seed 1)', () => {
+  // Die KI hält die Zone allein; danach steht eine gegnerische FOB abseits der Zone, die sie schon gesehen hat.
   const game = new Game({ seed: 1 });
-  const ais = [new AI(game, 0, 'hard'), new AI(game, 1, 'hard')];
-  let raided = false;
-  for (let i = 0; i < (10 * 60) / DT && game.winner === null && !raided; i++) {
-    for (const ai of ais) ai.update(DT);
-    game.update(DT);
-    raided = ais.some((ai) => ai.raid && ai.raid.ids.size > 0);
+  const ai = new AI(game, 1, 'hard');
+  const run = (sec, stop = () => false) => {
+    for (let i = 0; i < sec / DT && !stop(); i++) {
+      ai.update(DT);
+      game.update(DT);
+    }
+  };
+  run(5 * 60);
+  const z = game.zone;
+  let fob = null;
+  for (let k = 0; k < 16 && !fob; k++) {
+    const a = (k * Math.PI) / 8;
+    const p = game.canPlace(0, 'fob', z.x + Math.cos(a) * (z.r + 600), z.y + Math.sin(a) * (z.r + 600));
+    if (p.ok) fob = game.spawnBuilding('fob', 0, p.cx, p.cy, { built: true });
   }
-  assert.ok(raided, 'kein Überfall gestartet');
+  assert.ok(fob, 'Platz für die gegnerische FOB');
+  ai.seenFobs.set(fob.id, fob);
+  run(5 * 60, () => ai.raid && ai.raid.ids.size > 0);
+  assert.ok(ai.raid && ai.raid.ids.size > 0, 'kein Überfall gestartet');
+  assert.equal(ai.raid.targetId, fob.id);
 });
 
 test('KI: Gruppen-Rückzug bei klarer Unterlegenheit (schwer, Seed 1, 20 min) und Sperre der Angriffsbefehle', () => {

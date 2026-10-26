@@ -37,9 +37,10 @@ export function setUprightAt(ctx, cam, dpr, sx, sy, wx, wy) {
   ctx.setTransform(dpr * z, 0, 0, dpr * z, dpr * (sx - z * wx), dpr * (sy - z * wy));
 }
 
-/** Bodenebene der ganzen Welt isometrisch (Gelände, Zone, Nebel …). */
+/** Bodenebene der ganzen Welt isometrisch (Gelände, Zone, Nebel …); mit Gelände auf der festen Höhe von cam.pin() (sonst 0). */
 export function setIsoGround(ctx, cam, dpr) {
-  const o = cam.worldToScreen(0, 0);
+  const o = cam.worldToScreenFlat(0, 0);
+  if (cam.relief && cam.pinned !== null) o.y -= cam.pinned * cam.zoom;
   const [a, b, c, d] = cam.isoMatrix();
   ctx.setTransform(dpr * a, dpr * b, dpr * c, dpr * d, dpr * o.x, dpr * o.y);
 }

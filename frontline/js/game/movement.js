@@ -1,12 +1,13 @@
 // Bewegung: Wegfolgen, Verfolgung, Fahrhelfer für LKW/Bauer und Trennung (PLAN.md §5, §11). Kein DOM.
 import { BALANCE } from '../data/balance.js';
-import { findPath } from './pathfinding.js';
+import { findPath, lineOfSight } from './pathfinding.js';
 import { inRange } from './entities.js';
 
 const REPATH = 1.0; // Neuplanung bei Verfolgung (s)
 const BLOCK_REPATH = 0.5; // Neuplanung nach blockiertem Wegpunkt (s)
 const ARRIVE = 0.5; // Wegpunkt erreicht (px)
 const FINAL_ARRIVE = 32; // Endziel erreicht (px): Einheiten am selben Sammelpunkt drängeln sich sonst ewig in 'move'
+const CORNER = 48; // nahe einer Wegecke: bei freier Sicht gleich zum nächsten Wegpunkt (sonst Stau an der Ecke)
 export const HASH_CELL = 128; // räumliches Hash-Gitter
 const TILE = BALANCE.map.tile;
 
@@ -153,16 +154,24 @@ function followPath(game, u, dt) {
   while (budget > 1e-9 && u.pathIndex < u.path.length) {
     const wp = u.path[u.pathIndex];
     if (!grid.passable(grid.toCell(wp.x), grid.toCell(wp.y), u.team)) return false;
-    const arrive = u.pathIndex === u.path.length - 1 ? FINAL_ARRIVE : ARRIVE;
+    const final = u.pathIndex === u.path.length - 1;
     const d = dist(wp.x, wp.y, u.x, u.y);
-    if (d < arrive) {
+    if (d < (final ? FINAL_ARRIVE : ARRIVE)) {
       u.pathIndex++;
       continue;
+    }
+    // Ecke abkürzen: drängeln sich viele Einheiten um denselben Eckpunkt, erreicht ihn sonst keine genau
+    if (!final && d < CORNER) {
+      const nx = u.path[u.pathIndex + 1];
+      if (lineOfSight(grid, u.x, u.y, nx.x, nx.y, u.team)) {
+        u.pathIndex++;
+        continue;
+      }
     }
     const step = Math.min(d, budget);
     if (!stepToward(grid, u, wp.x, wp.y, step)) return false;
     budget -= step;
-    if (dist(wp.x, wp.y, u.x, u.y) < arrive) u.pathIndex++;
+    if (dist(wp.x, wp.y, u.x, u.y) < (final ? FINAL_ARRIVE : ARRIVE)) u.pathIndex++;
   }
   return true;
 }

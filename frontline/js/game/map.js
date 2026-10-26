@@ -3,6 +3,8 @@ import { BALANCE } from '../data/balance.js';
 import { makeRng } from '../core/rng.js';
 import { Grid } from './grid.js';
 import { findPath } from './pathfinding.js';
+import { setRelief } from './relief.js';
+import { buildLandscape, groundOk, countRoutes } from './landscape.js';
 
 const W = BALANCE.map.width;
 const H = BALANCE.map.height;
@@ -16,6 +18,8 @@ const SPAWNS = [
 ];
 const MAX_ATTEMPTS = 20;
 const OBSTACLE_PAIRS = 32;
+const MIN_ROUTES = 3; // so viele getrennte Wege führen mindestens von jedem Start in die Konfliktzone
+const ZONE_SLOPE = 0.25; // in der Stadt ist kein Hang steiler (alle Wege gut befahrbar)
 const TWO_PI = Math.PI * 2;
 
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
@@ -24,7 +28,7 @@ const reaches = (path, x, y) => path.length > 0 && path[path.length - 1].x === x
 /**
  * Erzeugt eine Karte. Scheitert die Platzierung oder ist die Karte nicht zusammenhängend,
  * wird mit seed + 1, + 2, … neu versucht (max. 20×).
- * @returns {{ width, height, tile, obstacles: {x,y,r}[], town: {roads, buildings, parks, cars, trees}, trees: {x,y,r}[] (Bäume außerhalb der Stadt; wie die Stadtbäume blockierend), spawns: {x,y}[], zone: {x,y,r} }}
+ * @returns {{ width, height, tile, obstacles: {x,y,r}[], town: {roads, buildings, parks, cars, trees}, trees: {x,y,r}[] (Bäume außerhalb der Stadt; wie die Stadtbäume blockierend), spawns: {x,y}[], zone: {x,y,r}, relief: string (Höhengelände, relief.js) }}
  */
 export function generateMap(seed) {
   for (let k = 0; k < MAX_ATTEMPTS; k++) {
@@ -36,7 +40,10 @@ export function generateMap(seed) {
 
 function tryBuild(seed) {
   const rng = makeRng(seed);
-  // 1. Hindernispaare (Felsen/Wald)
+  // 0. Gelände: Hügel, Bergrücken und Seen; Zufahrten, Bahn, Startpunkte und Stadt bleiben frei befahrbar
+  const { relief } = buildLandscape(seed, { spawns: SPAWNS, zone: { x: CX, y: CY, r: ZONE_R }, roads: accessRoads(), railY: CY });
+  if (!gentleZone(relief)) return null;
+  // 1. Hindernispaare (Wald), nur auf festem, nicht zu steilem Grund
   const obstacles = [];
   for (let i = 0; i < OBSTACLE_PAIRS; i++) {
     let ob = null;
@@ -47,20 +54,21 @@ function tryBuild(seed) {
       if (dist(x, y, CX, CY) < ZONE_R + r + 40) continue; // Stadt bleibt frei von Felsen/Wald
       if (inRail(y, r)) continue; // Bahnlinie bleibt frei
       if (SPAWNS.some((s) => dist(x, y, s.x, s.y) < 600 + r)) continue;
+      if (!groundOk(relief, x, y, r) || !groundOk(relief, W - x, H - y, r)) continue;
       ob = { x, y, r };
     }
     if (!ob) return null;
     obstacles.push(ob, { x: W - ob.x, y: H - ob.y, r: ob.r });
   }
 
-  // 2. Zusammenhang prüfen: Spawn 0 erreicht Zonenmitte und Spawn 1
+  // 2. Zusammenhang prüfen: Spawn 0 erreicht Zonenmitte (auf mehreren Wegen) und Spawn 1
   const town = buildTown(rng);
-  const outposts = buildOutposts(rng, obstacles);
+  const outposts = buildOutposts(rng, obstacles, relief);
   town.buildings.push(...outposts.buildings);
-  const trees = scatterTrees(rng, obstacles, outposts.areas);
-  if (!isConnected(obstacles, town.buildings, [...town.trees, ...trees])) return null;
+  const trees = scatterTrees(rng, obstacles, outposts.areas, relief);
+  if (!isConnected(obstacles, town.buildings, [...town.trees, ...trees], relief)) return null;
 
-  return {
+  const map = {
     width: W,
     height: H,
     tile: TILE,
@@ -70,17 +78,44 @@ function tryBuild(seed) {
     spawns: SPAWNS.map((s) => ({ x: s.x, y: s.y })),
     zone: { x: CX, y: CY, r: ZONE_R },
   };
+  setRelief(map, relief);
+  return map;
 }
 
-function isConnected(obstacles, buildings = [], trees = []) {
+/** Die Feldwege von den Startpunkten zur Stadtkante (dieselben Linien wie in buildTown). */
+function accessRoads() {
+  return SPAWNS.map((s) => {
+    const a = Math.atan2(CY - s.y, CX - s.x);
+    return { x1: s.x, y1: s.y, x2: CX - Math.cos(a) * (ZONE_R - 80), y2: CY - Math.sin(a) * (ZONE_R - 80) };
+  });
+}
+
+/** In der Konfliktzone ist das Gelände überall sanft (keine Zelle steiler als ZONE_SLOPE, kein Wasser). */
+function gentleZone(relief) {
+  const c0 = Math.floor((CX - ZONE_R) / TILE);
+  const c1 = Math.ceil((CX + ZONE_R) / TILE);
+  for (let r = c0; r < c1; r++) {
+    for (let c = c0; c < c1; c++) {
+      if (dist((c + 0.5) * TILE, (r + 0.5) * TILE, CX, CY) > ZONE_R) continue;
+      if (relief.cellSlope(c, r) > ZONE_SLOPE || relief.cellBlocked(c, r)) return false;
+    }
+  }
+  return true;
+}
+
+function isConnected(obstacles, buildings = [], trees = [], relief = null) {
   const grid = new Grid(W / TILE, H / TILE, TILE);
   grid.rasterizeObstacles(obstacles);
   grid.rasterizeRects(buildings);
   grid.rasterizeTrees(trees);
+  grid.rasterizeRelief(relief);
   const [a, b] = SPAWNS;
   const cy = CY - RAIL_HALF - 20; // Zonenmitte liegt unter dem Zug: Nachbarpunkt prüfen
   if (!reaches(findPath(grid, a.x, a.y, CX, cy, 0), CX, cy)) return false;
-  return reaches(findPath(grid, a.x, a.y, b.x, b.y, 0), b.x, b.y);
+  if (!reaches(findPath(grid, a.x, a.y, b.x, b.y, 0), b.x, b.y)) return false;
+  // Mehrere getrennte Zugänge zur Zone (die Karte ist punktsymmetrisch: Start 0 genügt)
+  const keepOut = [{ x: a.x, y: a.y, r: 900 }, { x: CX, y: CY, r: ZONE_R }];
+  return countRoutes(grid, a, { x: CX, y: cy }, { want: MIN_ROUTES, keepOut }) >= MIN_ROUTES;
 }
 
 // ---- Osteuropäische Stadt in der Konfliktzone (punktsymmetrisch um die Zonenmitte) ----
@@ -251,7 +286,7 @@ const WALL_GAP = 130; // Lücke in der Mauer (zwei gegenüberliegende Seiten)
  * mit zwei Lücken an gegenüberliegenden Seiten: durch die eine Lücke hinein, um die Fabrik herum, durch die andere hinaus.
  * @returns {{ buildings: {x,y,w,h,kind}[], areas: {x,y,r}[] }} areas = belegte Kreise (keine Bäume dort)
  */
-function buildOutposts(rng, obstacles) {
+function buildOutposts(rng, obstacles, relief = null) {
   const buildings = [];
   const areas = [];
   const fits = (x, y, r) =>
@@ -265,10 +300,11 @@ function buildOutposts(rng, obstacles) {
         dist(px, py, CX, CY) > ZONE_R + r + 150 &&
         SPAWNS.every((sp) => dist(px, py, sp.x, sp.y) > 700 + r) &&
         obstacles.every((o) => dist(px, py, o.x, o.y) > o.r + r + 40) &&
-        areas.every((a) => dist(px, py, a.x, a.y) > a.r + r + 60)
+        areas.every((a) => dist(px, py, a.x, a.y) > a.r + r + 60) &&
+        groundOk(relief, px, py, r, 0.22)
     );
   const place = (r, make) => {
-    for (let t = 0; t < 200; t++) {
+    for (let t = 0; t < 600; t++) {
       const x = Math.round(rng.range(r + 300, W - r - 300));
       const y = Math.round(rng.range(r + 300, H - r - 300));
       if (!fits(x, y, r)) continue;
@@ -321,7 +357,7 @@ function buildOutposts(rng, obstacles) {
 const SCATTER_PAIRS = 350;
 
 /** Einzelne Bäume und kleine Gruppen überall außerhalb der Stadt (punktsymmetrisch); sie blockieren wie Gebäude. */
-function scatterTrees(rng, obstacles, keepOut = []) {
+function scatterTrees(rng, obstacles, keepOut = [], relief = null) {
   const trees = [];
   const ok = (x, y) =>
     x > 40 &&
@@ -332,7 +368,8 @@ function scatterTrees(rng, obstacles, keepOut = []) {
     dist(x, y, CX, CY) > ZONE_R + 30 &&
     SPAWNS.every((s) => dist(x, y, s.x, s.y) > 420) &&
     obstacles.every((o) => dist(x, y, o.x, o.y) > o.r + 25) &&
-    keepOut.every((a) => dist(x, y, a.x, a.y) > a.r + 25);
+    keepOut.every((a) => dist(x, y, a.x, a.y) > a.r + 25) &&
+    groundOk(relief, x, y);
   const add = (x, y) => {
     if (!ok(x, y) || !ok(W - x, H - y)) return;
     const r = Math.round(rng.range(10, 19));

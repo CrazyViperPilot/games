@@ -1,9 +1,12 @@
 // Geländebild der Karte in 1/4 Maßstab (PLAN §5 render/terrain.js). Einmal pro Karte erzeugt, zwischengespeichert.
 import { makeRng } from '../core/rng.js';
+import { reliefOf } from '../game/relief.js';
+import { reliefLayers } from './reliefimg.js';
 
 export const TERRAIN_SCALE = 0.25;
-const cache = new WeakMap();
-const cacheIso = new WeakMap(); // Boden ohne Gebäude und Bäume (die zeichnet die isometrische Ansicht als Körper)
+// Je Ansicht ein Bild: '2d' mit Gebäuden und Bäumen, 'iso' ohne (die zeichnet die isometrische Ansicht als Körper),
+// 'gl' wie 'iso', aber ohne Schummerung, Fels und Wasser (die rechnet der WebGL-Boden selbst)
+const caches = { '2d': new WeakMap(), iso: new WeakMap(), gl: new WeakMap() };
 
 /**
  * Ausstattung eines Parks (deterministisch aus Lage und Größe): Bäume am Rand, vier Bänke am Rundweg.
@@ -31,8 +34,7 @@ export function parkDeco(p) {
 
 /** Karte wurde verändert (Editor): zwischengespeicherte Geländebilder verwerfen. */
 export function invalidateTerrain(map) {
-  cache.delete(map);
-  cacheIso.delete(map);
+  for (const c of Object.values(caches)) c.delete(map);
 }
 
 function makeCanvas(w, h) {
@@ -47,12 +49,15 @@ function makeCanvas(w, h) {
 }
 
 /**
- * Bodenbild: Bodenrauschen, Hindernisse (Felsen grau, Wald dunkelgrün), dezentes Raster.
- * Deterministisch aus den Hindernissen der Karte. Gleiche Karte → gleiches (gecachtes) Canvas.
+ * Bodenbild: Bodenrauschen, Gelände (Fels, Seen, Schummerung), Hindernisse (Felsen grau, Wald dunkelgrün), dezentes Raster.
+ * Deterministisch aus der Karte. Gleiche Karte → gleiches (gecachtes) Canvas. mode: '2d', 'iso' oder 'gl' (true = 'iso').
  * @returns {HTMLCanvasElement|OffscreenCanvas} Breite = width * TERRAIN_SCALE
  */
-export function buildTerrain(map, iso = false) {
-  const cache_ = iso ? cacheIso : cache;
+export function buildTerrain(map, mode = '2d') {
+  if (mode === true) mode = 'iso';
+  else if (!mode) mode = '2d';
+  const iso = mode !== '2d';
+  const cache_ = caches[mode];
   if (cache_.has(map)) return cache_.get(map);
   const W = map.width;
   const H = map.height;
@@ -88,6 +93,14 @@ export function buildTerrain(map, iso = false) {
     ctx.fillRect(rng.next() * w, rng.next() * h, 1, 1);
   }
 
+  // Gelände: Fels, Ufer und Seen unter Straßen und Stadt, die Schummerung zuletzt über alles
+  const relief = mode === 'gl' ? null : reliefOf(map);
+  const layers = relief ? reliefLayers(relief, W, H) : null;
+  if (layers) {
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(layers.mat, 0, 0, w, h);
+  }
+
   drawMapObjects(ctx, map, S, iso, rng);
 
   // Dezentes Raster alle 4 Zellen (128 px)
@@ -104,6 +117,12 @@ export function buildTerrain(map, iso = false) {
     ctx.lineTo(w, y + 0.5);
   }
   ctx.stroke();
+
+  if (layers) {
+    ctx.globalCompositeOperation = 'soft-light';
+    ctx.drawImage(layers.shade, 0, 0, w, h);
+    ctx.globalCompositeOperation = 'source-over';
+  }
 
   cache_.set(map, canvas);
   return canvas;

@@ -4,6 +4,7 @@ import { generateMap } from '../js/game/map.js';
 import { BALANCE } from '../js/data/balance.js';
 import { Grid } from '../js/game/grid.js';
 import { findPath } from '../js/game/pathfinding.js';
+import { reliefOf } from '../js/game/relief.js';
 
 const W = BALANCE.map.width;
 const H = BALANCE.map.height;
@@ -69,9 +70,10 @@ test('Fabrikgelände: durch die Lücke hinein, um die Fabrik herum und auf der G
     grid.rasterizeObstacles(map.obstacles);
     grid.rasterizeRects(map.town.buildings);
     grid.rasterizeTrees([...map.town.trees, ...map.trees]);
+    grid.rasterizeRelief(reliefOf(map));
     const walls = map.town.buildings.filter((b) => b.kind === 'wall');
     const factories = map.town.buildings.filter((b) => b.kind === 'factory' && walls.some((w) => Math.hypot(w.x - b.x, w.y - b.y) < 300));
-    assert.ok(factories.length >= 6, `Fabrikgelände vorhanden (Seed ${seed})`);
+    assert.ok(factories.length >= 4, `Fabrikgelände vorhanden (Seed ${seed})`); // Hänge lassen weniger Platz
     for (const f of factories) {
       const A = f.w / 2 + 80 + 60;
       const B = f.h / 2 + 80 + 60;

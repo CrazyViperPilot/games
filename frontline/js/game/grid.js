@@ -81,6 +81,14 @@ export class Grid {
     }
   }
 
+  /** Gelände (relief.js): zu steile Hänge und Seen sind Hindernisse. relief = null (flache Karte) ändert nichts. */
+  rasterizeRelief(relief) {
+    if (!relief) return;
+    for (let r = 0; r < this.rows; r++) {
+      for (let c = 0; c < this.cols; c++) if (relief.cellBlocked(c, r)) this.terrain[this.idx(c, r)] = 1;
+    }
+  }
+
   /** Bäume blockieren die Zelle, in der ihr Stamm steht. */
   rasterizeTrees(trees) {
     for (const t of trees) {

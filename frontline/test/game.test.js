@@ -118,7 +118,10 @@ test('Platzierung: Bauradius und Hindernisse', () => {
 test('FOB: Bauradien eigener FOBs dürfen sich nicht überlappen, höchstens 10 FOBs', () => {
   const g = mk({ seed: 7 });
   const f = fobOf(g, 0);
-  const near = g.canPlace(0, 'fob', f.x + 700, f.y);
+  // 700 px neben der Haupt-FOB (eine Richtung ohne Hang oder Hindernis wählen)
+  const near = [0, 1, 2, 3, 4, 5, 6, 7]
+    .map((k) => g.canPlace(0, 'fob', f.x + Math.cos((k * Math.PI) / 4) * 700, f.y + Math.sin((k * Math.PI) / 4) * 700))
+    .find((p) => !/Gelände|belegt/.test(p.reason ?? ''));
   assert.equal(near.ok, false);
   assert.match(near.reason, /Zu nah/);
   const R = BALANCE.fob.buildRadius;

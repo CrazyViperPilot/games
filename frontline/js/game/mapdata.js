@@ -2,6 +2,8 @@
 import { BALANCE } from '../data/balance.js';
 import { Grid } from './grid.js';
 import { findPath } from './pathfinding.js';
+import { Relief, reliefOf } from './relief.js';
+import { countRoutes } from './landscape.js';
 
 const W = BALANCE.map.width;
 const H = BALANCE.map.height;
@@ -79,6 +81,8 @@ export function normalizeMap(src) {
     trees: arr(src.trees).map((t) => circ(t, 6, 40)),
     spawns,
     zone,
+    // Höhengelände (relief.js) als Text; fehlt es oder ist es kaputt, ist die Karte flach
+    ...(typeof src.relief === 'string' && Relief.decode(src.relief) ? { relief: src.relief } : {}),
   };
 }
 
@@ -120,11 +124,23 @@ export function checkMap(map) {
     if (hit(s.x, s.y, SPAWN_CLEAR)) problems.push(`Startpunkt ${i + 1}: Gebäude, Bäume oder Hindernisse im Umkreis von ${SPAWN_CLEAR} px`);
   });
   if (Math.hypot(map.spawns[0].x - map.spawns[1].x, map.spawns[0].y - map.spawns[1].y) < 2500) problems.push('Die Startpunkte liegen zu nah beieinander');
+  const relief = reliefOf(map);
+  if (relief) {
+    map.spawns.forEach((s, i) => {
+      const c0 = Math.floor((s.x - SPAWN_CLEAR) / TILE);
+      const r0 = Math.floor((s.y - SPAWN_CLEAR) / TILE);
+      let bad = false;
+      for (let r = r0; r <= Math.floor((s.y + SPAWN_CLEAR) / TILE) && !bad; r++) {
+        for (let c = c0; c <= Math.floor((s.x + SPAWN_CLEAR) / TILE) && !bad; c++) {
+          if (c < 0 || r < 0 || c >= W / TILE || r >= H / TILE) continue;
+          if (Math.hypot((c + 0.5) * TILE - s.x, (r + 0.5) * TILE - s.y) <= SPAWN_CLEAR && relief.cellBlocked(c, r)) bad = true;
+        }
+      }
+      if (bad) problems.push(`Startpunkt ${i + 1}: Gelände zu steil oder unter Wasser`);
+    });
+  }
   if (problems.length) return problems;
-  const grid = new Grid(W / TILE, H / TILE, TILE);
-  grid.rasterizeObstacles(map.obstacles);
-  grid.rasterizeRects(blockers(map.town.buildings));
-  grid.rasterizeTrees([...map.town.trees, ...map.trees]);
+  const grid = mapGrid(map);
   const [a, b] = map.spawns;
   const reaches = (path, x, y) => path.length > 0 && Math.hypot(path[path.length - 1].x - x, path[path.length - 1].y - y) < TILE * 2;
   if (hit(map.zone.x, map.zone.y, 40)) {
@@ -137,6 +153,49 @@ export function checkMap(map) {
   if (!reaches(findPath(grid, a.x, a.y, b.x, b.y, 0), b.x, b.y)) problems.push('Startpunkt 2 ist von Startpunkt 1 nicht erreichbar');
   if (!reaches(findPath(grid, b.x, b.y, map.zone.x, map.zone.y, 0), map.zone.x, map.zone.y) && !problems.length) problems.push('Die Konfliktzone ist von Startpunkt 2 nicht erreichbar');
   return problems;
+}
+
+/** Raster mit allen Hindernissen der Karte (Gelände eingeschlossen), wie im Spiel. */
+function mapGrid(map) {
+  const grid = new Grid(W / TILE, H / TILE, TILE);
+  grid.rasterizeObstacles(map.obstacles);
+  grid.rasterizeRects(blockers(map.town.buildings));
+  grid.rasterizeTrees([...map.town.trees, ...map.trees]);
+  grid.rasterizeRelief(reliefOf(map));
+  return grid;
+}
+
+/**
+ * Getrennte Zugänge von jedem Startpunkt in die Konfliktzone (höchstens want), wie der Kartengenerator sie zählt: Wege,
+ * die sich außerhalb von Startgelände und Zone nicht berühren. Für „Prüfen“ im Editor.
+ */
+export function accessRoutes(map, want = 4) {
+  const grid = mapGrid(map);
+  const z = map.zone;
+  // Ziel: freie Zelle nächst der Zonenmitte (die Mitte selbst kann verbaut sein)
+  let to = null;
+  const zc = grid.toCell(z.x);
+  const zr = grid.toCell(z.y);
+  for (let d = 0; d < 30 && !to; d++) {
+    for (let r = zr - d; r <= zr + d && !to; r++) {
+      for (let c = zc - d; c <= zc + d; c++) {
+        if (Math.max(Math.abs(c - zc), Math.abs(r - zr)) === d && grid.passable(c, r, 0)) {
+          to = { x: grid.center(c), y: grid.center(r) };
+          break;
+        }
+      }
+    }
+  }
+  if (!to) return map.spawns.map(() => 0);
+  return map.spawns.map((s) =>
+    countRoutes(grid, s, to, {
+      want,
+      keepOut: [
+        { x: s.x, y: s.y, r: 900 },
+        { x: z.x, y: z.y, r: z.r },
+      ],
+    }),
+  );
 }
 
 // ---- Speicher (localStorage) ------------------------------------------------------

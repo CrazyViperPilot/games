@@ -10,7 +10,9 @@ import { Renderer } from '../render/renderer.js';
 import { setIsoGround, TOWN_H } from '../render/iso.js';
 import { ISO_K } from '../render/camera.js';
 import { Game } from '../game/game.js';
-import { createEmptyMap, normalizeMap, checkMap, describeMap, loadMap, saveMap } from '../game/mapdata.js';
+import { createEmptyMap, normalizeMap, checkMap, accessRoutes, describeMap, loadMap, saveMap } from '../game/mapdata.js';
+import { Relief, RELIEF, COARSE_N, reliefOf, setRelief } from '../game/relief.js';
+import { reliefTiles, updateReliefTiles, drawReliefTiles } from '../render/reliefimg.js';
 
 const W = BALANCE.map.width;
 const H = BALANCE.map.height;
@@ -42,6 +44,10 @@ const TOOLS = [
   ['forest', 'Wald', 'Natur', '♠', 'Tippen setzt einen Wald (blockiert)'],
   ['rock', 'Fels', 'Natur', '●', 'Tippen setzt einen Felsen (blockiert)'],
   ['car', 'Auto', 'Natur', '▰', 'Tippen setzt ein geparktes Auto (Dekoration)'],
+  ['raise', 'Heben', 'Gelände', '▲', 'Gedrückt halten oder ziehen hebt das Gelände (Pinsel rechts einstellen)'],
+  ['lower', 'Senken', 'Gelände', '▼', 'Gedrückt halten oder ziehen senkt das Gelände, unter dem Wasserspiegel entsteht ein See'],
+  ['smooth', 'Glätten', 'Gelände', '∿', 'Ziehen glättet Kanten und steile Hänge'],
+  ['flatten', 'Ebnen', 'Gelände', '—', 'Ziehen ebnet auf die Höhe am Startpunkt ein, etwa für einen Weg über einen Hügel'],
   ['spawn0', 'Start Blau', 'Spiel', '①', 'Tippen setzt den Startpunkt von Blau (Haupt-FOB)'],
   ['spawn1', 'Start Rot', 'Spiel', '②', 'Tippen setzt den Startpunkt von Rot (Haupt-FOB)'],
   ['zone', 'Zone', 'Spiel', '◎', 'Tippen setzt die Mitte der Konfliktzone'],
@@ -57,6 +63,17 @@ const BUILD_DEF = {
   platform: { w: 300, h: 30, kind: 'platform' },
   station: { w: 280, h: 110, kind: 'station' },
 };
+
+// Geländepinsel: Radius (px) und Stärke; Heben/Senken in Höhe je Sekunde in der Pinselmitte
+const TERRAIN_TOOLS = new Set(['raise', 'lower', 'smooth', 'flatten']);
+const BRUSH_SIZES = [128, 192, 256, 384, 512, 768];
+const BRUSH_POWER = [
+  ['sanft', 0.45],
+  ['mittel', 1],
+  ['stark', 2],
+];
+const RAISE_RATE = 150;
+const H_MAX = RELIEF.min + 255 * RELIEF.q;
 
 const $ = (s) => document.querySelector(s);
 const canvas = $('#edview');
@@ -80,6 +97,8 @@ const st = {
   touches: new Map(),
   pinch: null,
   carVertical: false,
+  brush: { size: 2, power: 1 }, // Indizes in BRUSH_SIZES und BRUSH_POWER
+  reliefImg: null, // { relief, canvas }: Geländebild der 2D-Ansicht
 };
 
 // ---- Kleinkram -------------------------------------------------------------------
@@ -439,6 +458,7 @@ function syncGhost() {
   if (st.groundDirty && !st.gesture) {
     invalidateTerrain(m);
     r.terrainIso = null;
+    r.terrainGL = null;
     r.terrain = null;
     st.groundDirty = false;
   }
@@ -464,13 +484,31 @@ function draw() {
     ctx.translate(vw / 2 - cam.x * z, vh / 2 - cam.y * z);
     ctx.fillStyle = '#56603f';
     ctx.fillRect(0, 0, W * z, H * z);
+    // Gelände wie im Spiel: Fels, Ufer und Seen unter Straßen und Stadt, die Schummerung über alles
+    const tiles = reliefImage();
+    const relief2d = (layer) => {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.imageSmoothingEnabled = true;
+      drawReliefTiles(ctx, tiles, layer, d * (vw / 2 - cam.x * z), d * (vh / 2 - cam.y * z), d * z, vw * d, vh * d);
+      ctx.setTransform(d, 0, 0, d, d * (vw / 2 - cam.x * z), d * (vh / 2 - cam.y * z));
+    };
+    if (tiles) relief2d('mat');
     drawMapObjects(ctx, m, z, false, makeRng(77));
+    if (tiles) {
+      ctx.globalCompositeOperation = 'soft-light';
+      relief2d('shade');
+      ctx.globalCompositeOperation = 'source-over';
+    }
     ctx.restore();
   }
   // Überlagerungen in Weltkoordinaten (2D: Zoom, Iso: Bodenebene), Linienstärken in Bildschirm-Pixeln
-  const world = () => {
-    if (iso) setIsoGround(ctx, cam, d);
-    else ctx.setTransform(d * z, 0, 0, d * z, d * (vw / 2 - cam.x * z), d * (vh / 2 - cam.y * z));
+  // ax, ay: Bodenpunkt, auf dessen Geländehöhe die Zeichnung liegt (isometrisch mit Gelände)
+  const world = (ax = null, ay = null) => {
+    if (iso) {
+      if (ax !== null) cam.pinAt(ax, ay);
+      setIsoGround(ctx, cam, d);
+      cam.unpin();
+    } else ctx.setTransform(d * z, 0, 0, d * z, d * (vw / 2 - cam.x * z), d * (vh / 2 - cam.y * z));
   };
   const px = 1 / z;
   world();
@@ -484,34 +522,40 @@ function draw() {
   ctx.strokeStyle = '#c9a227';
   ctx.lineWidth = 2 * px;
   ctx.strokeRect(0, 0, W, H);
-  // Konfliktzone
+  // Konfliktzone und Startpunkte mit Bauradius der Haupt-FOB (Kreise liegen auf dem Gelände)
+  ctx.setTransform(d, 0, 0, d, 0, 0);
   ctx.strokeStyle = '#ffd24a';
-  ctx.lineWidth = 2 * px;
-  ctx.setLineDash([10 * px, 8 * px]);
-  ctx.beginPath();
-  ctx.arc(m.zone.x, m.zone.y, m.zone.r, 0, Math.PI * 2);
+  ctx.lineWidth = 2;
+  ctx.setLineDash([10, 8]);
+  groundCircle(m.zone.x, m.zone.y, m.zone.r);
   ctx.stroke();
   ctx.setLineDash([]);
+  m.spawns.forEach((sp, i) => {
+    ctx.strokeStyle = BALANCE.teamColors[i];
+    groundCircle(sp.x, sp.y, BALANCE.fob.buildRadius);
+    ctx.stroke();
+  });
+  world(m.zone.x, m.zone.y);
   ctx.fillStyle = '#ffd24a';
   ctx.beginPath();
   ctx.arc(m.zone.x, m.zone.y, 5 * px, 0, Math.PI * 2);
   ctx.fill();
-  // Startpunkte mit Bauradius der Haupt-FOB
   m.spawns.forEach((sp, i) => {
-    const col = BALANCE.teamColors[i];
-    ctx.strokeStyle = col;
-    ctx.lineWidth = 2 * px;
-    ctx.beginPath();
-    ctx.arc(sp.x, sp.y, BALANCE.fob.buildRadius, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.fillStyle = col;
+    world(sp.x, sp.y);
+    ctx.fillStyle = BALANCE.teamColors[i];
     const r = Math.max(7 * px, 40);
     ctx.fillRect(sp.x - r, sp.y - r, r * 2, r * 2);
   });
-  if (st.sel) drawSelection(st.sel, px);
+  if (st.sel) {
+    const o = st.sel.o;
+    if (o.x1 !== undefined) world((o.x1 + o.x2) / 2, (o.y1 + o.y2) / 2);
+    else world(o.x, o.y);
+    drawSelection(st.sel, px);
+  }
   // Vorschau eines Linien-Ziehens
   const g = st.gesture;
   if (g && g.type === 'line') {
+    world((g.x1 + g.x2) / 2, (g.y1 + g.y2) / 2);
     ctx.strokeStyle = g.kind === 'rail' ? '#6b665c' : g.dirt ? '#7b6a48' : '#4d504c';
     ctx.lineWidth = g.w;
     ctx.lineCap = 'butt';
@@ -520,8 +564,22 @@ function draw() {
     ctx.lineTo(g.x2, g.y2);
     ctx.stroke();
   }
-  // Beschriftungen in Bildschirmkoordinaten
+  // Beschriftungen und Pinselkreis in Bildschirmkoordinaten
   ctx.setTransform(d, 0, 0, d, 0, 0);
+  if (TERRAIN_TOOLS.has(st.tool) && st.pointer) {
+    const bp = g && g.type === 'terrain' ? g : st.pointer;
+    const r = BRUSH_SIZES[st.brush.size];
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+    groundCircle(bp.x, bp.y, r);
+    ctx.stroke();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = st.tool === 'lower' ? '#9fd0ff' : st.tool === 'raise' ? '#ffe9a8' : '#ffffff';
+    ctx.setLineDash([6, 5]);
+    groundCircle(bp.x, bp.y, r);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
   ctx.font = '600 13px system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.fillStyle = '#ffd24a';
@@ -532,6 +590,101 @@ function draw() {
     ctx.fillStyle = '#fff';
     ctx.fillText(`Start ${BALANCE.teamNames[i]}`, p.x, p.y - Math.max(14, 44 * z));
   });
+}
+
+/** Kreis auf dem Boden als Pfad in Bildschirmkoordinaten (folgt isometrisch dem Gelände). */
+function groundCircle(x, y, r) {
+  const cam = st.cam;
+  ctx.beginPath();
+  const n = Math.max(32, Math.min(160, Math.round(r / 24)));
+  for (let i = 0; i <= n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    const p = cam.worldToScreen(x + Math.cos(a) * r, y + Math.sin(a) * r);
+    if (i) ctx.lineTo(p.x, p.y);
+    else ctx.moveTo(p.x, p.y);
+  }
+  ctx.closePath();
+}
+
+// ---- Gelände ------------------------------------------------------------------------
+
+/** Gelände der Karte; eine flache Karte bekommt beim ersten Pinselstrich ein (flaches) Höhenraster. */
+function ensureRelief() {
+  let relief = reliefOf(st.map);
+  if (!relief) {
+    relief = new Relief();
+    setRelief(st.map, relief);
+  }
+  return relief;
+}
+
+/** Geländebild der 2D-Ansicht (Schummerung, Fels, Seen; Kacheln) oder null für eine flache Karte. */
+function reliefImage() {
+  const relief = reliefOf(st.map);
+  if (!relief) return null;
+  if (!st.reliefImg || st.reliefImg.relief !== relief) st.reliefImg = { relief, tiles: reliefTiles(relief, W, H) };
+  return st.reliefImg.tiles;
+}
+
+/** Einen Pinselschritt (dt Sekunden) am Gestenpunkt anwenden: Grobraster ändern, Feinraster und 2D-Bild nachziehen. */
+function applyBrush(g, dt) {
+  const relief = reliefOf(st.map);
+  if (!relief || dt <= 0) return;
+  const R = BRUSH_SIZES[st.brush.size];
+  const pw = BRUSH_POWER[st.brush.power][1];
+  const res = RELIEF.res;
+  const n = COARSE_N;
+  const C = relief.coarse;
+  const i0 = clamp(Math.floor((g.x - R) / res), 0, n - 1);
+  const i1 = clamp(Math.ceil((g.x + R) / res), 0, n - 1);
+  const j0 = clamp(Math.floor((g.y - R) / res), 0, n - 1);
+  const j1 = clamp(Math.ceil((g.y + R) / res), 0, n - 1);
+  const src = g.tool === 'smooth' ? C.slice() : C; // Glätten liest die alten Werte, damit die Richtung keine Rolle spielt
+  const at = (i, j) => src[clamp(j, 0, n - 1) * n + clamp(i, 0, n - 1)];
+  const k = 1 - Math.exp(-dt * (g.tool === 'smooth' ? 7 : 5) * pw);
+  for (let j = j0; j <= j1; j++) {
+    for (let i = i0; i <= i1; i++) {
+      const t = Math.hypot(i * res - g.x, j * res - g.y) / R;
+      if (t >= 1) continue;
+      const wgt = (1 - t * t) ** 2;
+      const idx = j * n + i;
+      let v = C[idx];
+      if (g.tool === 'raise') v += RAISE_RATE * pw * dt * wgt;
+      else if (g.tool === 'lower') v -= RAISE_RATE * pw * dt * wgt;
+      else if (g.tool === 'flatten') v += (g.target - v) * k * wgt;
+      else {
+        const avg = (at(i - 1, j) + at(i + 1, j) + at(i, j - 1) + at(i, j + 1) + at(i - 1, j - 1) + at(i + 1, j - 1) + at(i - 1, j + 1) + at(i + 1, j + 1) + at(i, j) * 2) / 10;
+        v += (avg - v) * k * wgt;
+      }
+      C[idx] = clamp(v, RELIEF.min, H_MAX);
+    }
+  }
+  relief.refine(i0, j0, i1, j1);
+  if (st.reliefImg && st.reliefImg.relief === relief) {
+    const m = 2 * res; // das Feinraster reicht zwei Grobpunkte weiter
+    updateReliefTiles(st.reliefImg.tiles, relief, i0 * res - m, j0 * res - m, i1 * res + m, j1 * res + m);
+  }
+  st.dirty = true;
+  st.needDraw = true;
+}
+
+/** Pinselstrich fertig: Gelände in die Karte schreiben (Verlauf, Speichern), Boden ohne WebGL neu backen. */
+function finishTerrain() {
+  const relief = reliefOf(st.map);
+  if (relief) setRelief(st.map, relief);
+  st.groundDirty = true;
+  st.needDraw = true;
+}
+
+/** Höhe und Begehbarkeit am Weltpunkt für die Statuszeile. */
+function heightInfo(x, y) {
+  const relief = reliefOf(st.map);
+  if (!relief) return '';
+  const h = relief.heightAt(x, y);
+  const g = relief.gradAt(x, y);
+  const sl = Math.hypot(g.x, g.y);
+  const what = h < RELIEF.water ? 'See' : h > RELIEF.peak || sl > RELIEF.steep ? 'unpassierbar' : sl > RELIEF.rock ? 'steil' : '';
+  return ` · Höhe ${Math.round(h)}${what ? ` (${what})` : ''}`;
 }
 
 function drawSelection(sel, px) {
@@ -575,6 +728,12 @@ function drawSelection(sel, px) {
 }
 
 function tick() {
+  const g = st.gesture;
+  if (g && g.type === 'terrain') {
+    const now = performance.now();
+    applyBrush(g, Math.min(0.1, (now - g.last) / 1000));
+    g.last = now;
+  }
   if (st.needDraw) draw();
   requestAnimationFrame(tick);
 }
@@ -691,6 +850,11 @@ canvas.addEventListener('pointerdown', (e) => {
   } else if (t === 'road' || t === 'dirt' || t === 'rail') {
     const a = snapRoad(w.x, w.y, t);
     st.gesture = { type: 'line', kind: t, dirt: t === 'dirt', w: t === 'dirt' ? 52 : t === 'rail' ? 40 : 64, x1: a.x, y1: a.y, x2: a.x, y2: a.y };
+  } else if (TERRAIN_TOOLS.has(t)) {
+    pushHistory();
+    const relief = ensureRelief();
+    st.gesture = { type: 'terrain', tool: t, x: w.x, y: w.y, target: relief.heightAt(w.x, w.y), last: performance.now() };
+    applyBrush(st.gesture, 1 / 20);
   } else if (t === 'tree') {
     pushHistory();
     place(t, w.x, w.y);
@@ -721,7 +885,8 @@ window.addEventListener('pointermove', (e) => {
   }
   const w = toWorld(p.x, p.y);
   st.pointer = w;
-  $('[data-info]').textContent = `x ${Math.round(w.x)} · y ${Math.round(w.y)} · Zoom ${Math.round(st.cam.zoom * 100)} %`;
+  $('[data-info]').textContent = `x ${Math.round(w.x)} · y ${Math.round(w.y)}${heightInfo(w.x, w.y)} · Zoom ${Math.round(st.cam.zoom * 100)} %`;
+  if (TERRAIN_TOOLS.has(st.tool)) st.needDraw = true; // Pinselkreis folgt dem Zeiger
   const g = st.gesture;
   if (!g) return;
   if (g.type === 'pan') {
@@ -753,6 +918,10 @@ window.addEventListener('pointermove', (e) => {
     g.x2 = b.x;
     g.y2 = b.y;
     st.needDraw = true;
+  } else if (g.type === 'terrain') {
+    // Weltpunkt nur bei Bewegung neu: beim Heben wandert sonst der Punkt unter dem stehenden Finger mit
+    g.x = w.x;
+    g.y = w.y;
   } else if (g.type === 'brush') {
     if (Math.hypot(w.x - g.x, w.y - g.y) >= 34) {
       place('tree', w.x, w.y);
@@ -775,6 +944,7 @@ window.addEventListener('pointermove', (e) => {
 function cancelGesture() {
   const g = st.gesture;
   st.gesture = null;
+  if (g && g.type === 'terrain') finishTerrain();
   return g;
 }
 
@@ -835,6 +1005,7 @@ window.addEventListener('keydown', (e) => {
   } else if (k === 'v' || k === 'V') toggleView();
   else if (k === ',') rotateView(-1);
   else if (k === '.') rotateView(1);
+  else if ((k === '[' || k === ']') && TERRAIN_TOOLS.has(st.tool)) brushAction(k === ']' ? 'size+' : 'size-');
   else if (k === '+' || k === '=') zoomAt(1.2, window.innerWidth / 2, window.innerHeight / 2);
   else if (k === '-') zoomAt(1 / 1.2, window.innerWidth / 2, window.innerHeight / 2);
 });
@@ -856,6 +1027,9 @@ function buildTools() {
 
 function setTool(t) {
   st.tool = t;
+  if (TERRAIN_TOOLS.has(t)) st.sel = null;
+  if (st.map) showInspector();
+  st.needDraw = true;
   document.querySelectorAll('[data-tool]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tool === t)));
   const def = TOOLS.find((x) => x[0] === t);
   $('[data-hint]').textContent = def ? def[4] : '';
@@ -878,6 +1052,19 @@ const KIND_NAMES = { house: 'Haus', factory: 'Fabrik', hall: 'Halle', tower: 'Wa
 function showInspector() {
   const el = $('[data-insp]');
   const s = st.sel;
+  if (!s && TERRAIN_TOOLS.has(st.tool)) {
+    const [pname] = BRUSH_POWER[st.brush.power];
+    el.innerHTML =
+      '<h3>Geländepinsel</h3>' +
+      '<div class="row"><button data-b="size-">Kleiner</button><button data-b="size+">Größer</button></div>' +
+      `<div class="muted small">Größe ${BRUSH_SIZES[st.brush.size] * 2} px</div>` +
+      `<div class="row"><button data-b="power">Stärke: ${pname}</button></div>` +
+      '<div class="muted small">Steile Hänge werden zu Fels und sind unpassierbar, ebenso Gipfel und Seen. ' +
+      'Wege in die Konfliktzone frei lassen, „Prüfen“ zählt die Zugänge.</div>' +
+      (reliefOf(st.map) ? '<div class="row"><button data-b="flat" class="danger">Alles eben</button></div>' : '');
+    el.hidden = false;
+    return;
+  }
   if (!s) {
     el.hidden = true;
     return;
@@ -977,7 +1164,23 @@ function inspectorAction(a) {
 $('[data-insp]').addEventListener('click', (e) => {
   const b = e.target.closest('[data-i]');
   if (b) inspectorAction(b.dataset.i);
+  const p = e.target.closest('[data-b]');
+  if (p) brushAction(p.dataset.b);
 });
+
+function brushAction(a) {
+  const br = st.brush;
+  if (a === 'size+') br.size = Math.min(BRUSH_SIZES.length - 1, br.size + 1);
+  else if (a === 'size-') br.size = Math.max(0, br.size - 1);
+  else if (a === 'power') br.power = (br.power + 1) % BRUSH_POWER.length;
+  else if (a === 'flat' && reliefOf(st.map)) {
+    pushHistory();
+    setRelief(st.map, null);
+    say('Gelände eingeebnet (Rückgängig holt es zurück).');
+  }
+  showInspector();
+  st.needDraw = true;
+}
 $('[data-tools]').addEventListener('click', (e) => {
   const b = e.target.closest('[data-tool]');
   if (b) setTool(b.dataset.tool);
@@ -1028,7 +1231,12 @@ function check(announce = true) {
   const p = problems();
   if (announce) {
     if (p.length) say(`Nicht spielbar: ${p.join(' · ')}`, true);
-    else say('Karte ist spielbar: Startpunkte frei, Zone und Gegner erreichbar.');
+    else {
+      const routes = accessRoutes(st.map, 4);
+      const n = routes.map((v) => (v >= 4 ? '4+' : String(v)));
+      const few = Math.min(...routes) < 2 ? ' Wenige Wege: die Zone ist leicht abzuriegeln.' : '';
+      say(`Karte ist spielbar. Getrennte Zugänge zur Zone: ${BALANCE.teamNames[0]} ${n[0]}, ${BALANCE.teamNames[1]} ${n[1]}.${few}`);
+    }
   }
   return p;
 }

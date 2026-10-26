@@ -28,11 +28,14 @@ import {
 import { drawTownBuilding, drawTeamBuilding, drawCar, drawBench } from './isobuild.js';
 import { parkDeco } from './terrain.js';
 import { drawTreeSprite, drawUnitSprite, setTeamBuildings } from './isosprites.js';
+import { reliefOf } from '../game/relief.js';
+import { getGround, LIGHT_ELEV } from './ground.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
 const H = BALANCE.map.height;
 const BG = '#0d110d';
+const BG_RGB = [13, 17, 13];
 const ACCENT = '#c9a227';
 const SITE_BM = BALANCE.construction.fobMaterial; // Material, das eine FOB-Baustelle braucht
 const CARGO_COLOR = { bm: '#a0703f', mun: '#d9b600', fuel: '#9b7bc4' }; // LKW-Ladung je Sorte
@@ -80,6 +83,9 @@ export class Renderer {
     this.revealAll = false; // Debug: kein Nebel, alle Gegner sichtbar
     this.terrain = buildTerrain(game.map);
     this.terrainIso = null; // Boden ohne Gebäude/Bäume, erst beim ersten Wechsel in die isometrische Ansicht
+    this.terrainGL = null; // dasselbe ohne Gelände-Schattierung: Textur des WebGL-Bodens
+    this.ground = null; // WebGL-Boden (ground.js), wenn die Karte Gelände hat und WebGL verfügbar ist
+    this.fogBytes = null; // Nebel je Zelle (0 frei … 255 schwarz) für den WebGL-Nebel
     this.deco = null; // Bäume und Felsen der Hindernisse (isometrisch)
     this.fogLayer = makeFogLayer(game.fog[team]);
     this.dpr = 1;
@@ -124,6 +130,7 @@ export class Renderer {
     const sel = v.selection instanceof Set ? v.selection : new Set(v.selection || []);
     const hover = v.hoverId ? g.getEntity(v.hoverId) : null;
 
+    this.syncRelief();
     if (cam.iso) {
       this.renderIso(v, now);
       return;
@@ -231,6 +238,81 @@ export class Renderer {
     }
   }
 
+  /**
+   * Gelände der Karte: mit WebGL steht die isometrische Ansicht auf echten Hügeln (Kamera hebt Punkte an), ohne WebGL bleibt
+   * der Boden flach und das Gelände nur aufgemalt. Der Editor ändert das Gelände laufend, darum bei jedem Bild.
+   */
+  syncRelief() {
+    const relief = reliefOf(this.game.map);
+    this.ground = relief ? getGround() : null;
+    this.camera.relief = this.ground ? relief : null;
+  }
+
+  /** Bodenmarkierungen folgen dem Gelände (isometrisch mit WebGL-Boden): dann Pfade in Bildschirmkoordinaten. */
+  draping() {
+    return this.camera.iso && !!this.camera.relief;
+  }
+
+  /** Kreis auf dem Boden als Pfad: flach per arc, mit Gelände als Linienzug in Bildschirmkoordinaten (Transformation dpr). */
+  groundArc(ctx, x, y, r) {
+    ctx.beginPath();
+    if (!this.draping()) {
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      return;
+    }
+    const cam = this.camera;
+    const n = Math.max(24, Math.min(256, Math.round(r / 30)));
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const p = cam.worldToScreen(x + Math.cos(a) * r, y + Math.sin(a) * r);
+      if (i) ctx.lineTo(p.x, p.y);
+      else ctx.moveTo(p.x, p.y);
+    }
+    ctx.closePath();
+  }
+
+  /** Strecke auf dem Boden (wie groundArc): flach gerade, mit Gelände alle 48 px ein Stützpunkt. Ohne beginPath. */
+  groundLine(ctx, x1, y1, x2, y2) {
+    if (!this.draping()) {
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      return;
+    }
+    const cam = this.camera;
+    const n = Math.max(1, Math.ceil(Math.hypot(x2 - x1, y2 - y1) / 48));
+    for (let i = 0; i <= n; i++) {
+      const p = cam.worldToScreen(x1 + ((x2 - x1) * i) / n, y1 + ((y2 - y1) * i) / n);
+      if (i) ctx.lineTo(p.x, p.y);
+      else ctx.moveTo(p.x, p.y);
+    }
+  }
+
+  /** Bodenebene für eine Markierung am Weltpunkt (isometrisch auf dessen Geländehöhe). */
+  groundAt(ctx, x, y) {
+    const cam = this.camera;
+    cam.pinAt(x, y);
+    setIsoGround(ctx, cam, this.dpr);
+    cam.unpin();
+  }
+
+  /** Lichtrichtung (Welt, z nach oben) für den WebGL-Boden: kommt von rechts oben im Bild, wie die Schatten der Gebäude. */
+  lightVec() {
+    const [, , rc, rd] = [[1, 0, 0, 1], [0, -1, 1, 0], [-1, 0, 0, -1], [0, 1, -1, 0]][this.camera.rot];
+    // Bildschirm „rechts oben“ entspricht der Weltrichtung (−rc, −rd); etwas nach rechts gedreht, damit Kämme nicht flach wirken
+    const a = Math.atan2(-rd, -rc) + 0.35;
+    const k = Math.sqrt(1 - LIGHT_ELEV * LIGHT_ELEV);
+    return [Math.cos(a) * k, Math.sin(a) * k, LIGHT_ELEV];
+  }
+
+  /** Nebel als Bytes je Zelle für den WebGL-Nebel (gleiche Stufen wie updateFogLayer). */
+  fogData(fog) {
+    const n = fog.cols * fog.rows;
+    if (!this.fogBytes || this.fogBytes.length !== n) this.fogBytes = new Uint8Array(n);
+    const d = this.fogBytes;
+    for (let i = 0; i < n; i++) d[i] = fog.visible[i] ? 0 : fog.explored[i] ? FOG_EXPLORED_ALPHA : 255;
+    return { cols: fog.cols, rows: fog.rows, data: d };
+  }
+
   /** Isometrisch: danach zeichnen Weltkoordinaten (x, y) aufrecht um den Bildschirmpunkt dieses Weltpunkts, `lift` Pixel höher. */
   uprightAtWorld(ctx, wx, wy, lift) {
     const cam = this.camera;
@@ -256,7 +338,10 @@ export class Renderer {
     return { trees, rocks };
   }
 
-  /** Eine isometrische Ansicht (Prototyp): Boden schräg, Gebäude/Bäume/Einheiten mit Höhe, nach Tiefe sortiert. */
+  /**
+   * Isometrische Ansicht: Boden schräg (mit Gelände als WebGL-Netz, sonst flaches Bild), Gebäude/Bäume/Einheiten mit Höhe,
+   * nach Tiefe sortiert und auf ihrer Geländehöhe; der Nebel liegt zuletzt über allem (mit Gelände ebenfalls aus WebGL).
+   */
   renderIso(v, now) {
     const ctx = this.ctx;
     const g = this.game;
@@ -273,34 +358,48 @@ export class Renderer {
     const seen = (x, y) => reveal || g.isVisible(team, x, y);
     const known = (x, y) => reveal || g.isExplored(team, x, y);
     const shown = (e) => e.team === team || reveal || (seen(e.x, e.y) && g.sees(team, e));
-    if (!this.terrainIso) this.terrainIso = buildTerrain(g.map, true);
+    const relief = cam.relief; // gesetzt nur mit WebGL-Boden
     if (!this.deco) this.deco = this.buildDeco();
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = BG;
-    ctx.fillRect(0, 0, this.cssW, this.cssH);
     ctx.imageSmoothingEnabled = true;
-
-    // Boden
-    setIsoGround(ctx, cam, dpr);
-    const S = this.terrainIso.width / W;
-    const x0 = Math.max(0, R.x0);
-    const y0 = Math.max(0, R.y0);
-    const x1 = Math.min(W, R.x1);
-    const y1 = Math.min(H, R.y1);
-    if (x1 > x0 && y1 > y0) {
-      ctx.drawImage(this.terrainIso, x0 * S, y0 * S, (x1 - x0) * S, (y1 - y0) * S, x0, y0, x1 - x0, y1 - y0);
+    if (relief) {
+      if (!this.terrainGL) this.terrainGL = buildTerrain(g.map, 'gl');
+      const img = this.ground.render(cam, this.cssW, this.cssH, dpr, relief, this.terrainGL, this.lightVec(), now / 1000, BG_RGB);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(img, 0, 0);
+    } else {
+      if (!this.terrainIso) this.terrainIso = buildTerrain(g.map, 'iso');
+      ctx.fillStyle = BG;
+      ctx.fillRect(0, 0, this.cssW, this.cssH);
+      setIsoGround(ctx, cam, dpr);
+      const S = this.terrainIso.width / W;
+      const x0 = Math.max(0, R.x0);
+      const y0 = Math.max(0, R.y0);
+      const x1 = Math.min(W, R.x1);
+      const y1 = Math.min(H, R.y1);
+      if (x1 > x0 && y1 > y0) {
+        ctx.drawImage(this.terrainIso, x0 * S, y0 * S, (x1 - x0) * S, (y1 - y0) * S, x0, y0, x1 - x0, y1 - y0);
+      }
     }
+    setIsoGround(ctx, cam, dpr);
     this.drawZone(ctx, z);
     this.drawHot(ctx, z, now);
+    setIsoGround(ctx, cam, dpr);
     if (v.placement) this.drawRadii(ctx, z);
     this.drawSelectedRadii(ctx, z, v);
     this.drawRoutes(ctx, sel, z);
+    setIsoGround(ctx, cam, dpr);
     for (const id of sel) {
       const e = g.getEntity(id);
-      if (e && shown(e)) this.drawSelectRing(ctx, e, '#f2f5f2', z, false);
+      if (!e || !shown(e)) continue;
+      if (relief) this.groundAt(ctx, e.x, e.y);
+      this.drawSelectRing(ctx, e, '#f2f5f2', z, false);
     }
-    if (hover && !sel.has(hover.id) && shown(hover)) this.drawSelectRing(ctx, hover, 'rgba(255,255,255,0.5)', z, true);
+    if (hover && !sel.has(hover.id) && shown(hover)) {
+      if (relief) this.groundAt(ctx, hover.x, hover.y);
+      this.drawSelectRing(ctx, hover, 'rgba(255,255,255,0.5)', z, true);
+    }
     for (const id of sel) {
       const b = g.getEntity(id);
       if (b && b.kind === 'building' && b.team === team) this.drawRally(ctx, b, z);
@@ -363,6 +462,8 @@ export class Renderer {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     for (const it of items) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      // Jedes Objekt steht eben auf seiner Geländehöhe (Gebäude auf der tiefsten Ecke, damit nichts schwebt)
+      if (relief) cam.pin(this.baseHeight(it));
       if (it.t === 0) drawTownBuilding(ctx, cam, it.o);
       else if (it.t === 1) {
         if (!drawTreeSprite(ctx, cam, it.o)) drawTree(ctx, cam, it.o);
@@ -379,6 +480,7 @@ export class Renderer {
           this.drawSiteMarks(ctx, b, z);
         }
       } else drawU(it.o);
+      cam.unpin();
     }
     for (const u of air) drawU(u);
 
@@ -395,14 +497,27 @@ export class Renderer {
     for (const e of g.effects) {
       if (!inRect(e.x, e.y, 120) && !inRect(e.x2 ?? e.x, e.y2 ?? e.y, 120)) continue;
       if (e.team !== -1 && e.team !== team && !seen(e.x, e.y) && !seen(e.x2 ?? e.x, e.y2 ?? e.y)) continue;
+      if (relief) {
+        // Strecken (Leuchtspur) auf der mittleren Höhe beider Enden
+        cam.pin(e.x2 === undefined ? relief.displayAt(e.x, e.y) : (relief.displayAt(e.x, e.y) + relief.displayAt(e.x2, e.y2)) / 2);
+        setIsoGround(ctx, cam, dpr);
+        cam.unpin();
+      }
       drawEffect(ctx, e, z);
     }
+    if (relief && v.moveMarker) this.groundAt(ctx, v.moveMarker.x, v.moveMarker.y);
     this.drawMoveMarker(ctx, v.moveMarker, now, z);
 
     if (!reveal) {
-      setIsoGround(ctx, cam, dpr);
-      updateFogLayer(this.fogLayer, g.fog[team], false);
-      ctx.drawImage(this.fogLayer.canvas, 0, 0, this.fogLayer.canvas.width, this.fogLayer.canvas.height, 0, 0, W, H);
+      if (relief) {
+        const img = this.ground.renderFog(cam, this.cssW, this.cssH, dpr, relief, this.fogData(g.fog[team]));
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.drawImage(img, 0, 0);
+      } else {
+        setIsoGround(ctx, cam, dpr);
+        updateFogLayer(this.fogLayer, g.fog[team], false);
+        ctx.drawImage(this.fogLayer.canvas, 0, 0, this.fogLayer.canvas.width, this.fogLayer.canvas.height, 0, 0, W, H);
+      }
     }
 
     // Balken und Warnzeichen aufrecht über den Objekten
@@ -420,7 +535,9 @@ export class Renderer {
       if (!b.alive || b.team !== team || !inRect(b.x, b.y, PAD)) continue;
       if (!(sel.has(b.id) || hover === b || b.hp < b.maxHp)) continue;
       const bw = b.w * TILE * 0.8;
+      if (relief) cam.pin(this.baseHeight({ t: 4, o: b }));
       upright(b.x, b.cy * TILE, buildingHeight(b) + 8);
+      cam.unpin();
       this.drawHp(ctx, b.x - bw / 2, b.cy * TILE - 8 / z, bw, b.hp / b.maxHp, z);
     }
     for (const u of g.units) {
@@ -430,7 +547,8 @@ export class Renderer {
     }
 
     if (v.placement) {
-      setIsoGround(ctx, cam, dpr);
+      if (relief && Number.isFinite(v.placement.x)) this.groundAt(ctx, v.placement.x, v.placement.y);
+      else setIsoGround(ctx, cam, dpr);
       this.drawPlacement(ctx, v.placement, z);
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -438,6 +556,29 @@ export class Renderer {
     if (v.placement && !v.placement.ok && v.placement.reason && Number.isFinite(v.placement.x)) {
       this.drawNote(ctx, cam.worldToScreen(v.placement.x, v.placement.y), v.placement.reason);
     }
+  }
+
+  /** Geländehöhe, auf der ein Objekt der Tiefenliste steht: Gebäude auf ihrer tiefsten Ecke, sonst am Fußpunkt. */
+  baseHeight(it) {
+    const relief = this.camera.relief;
+    const o = it.o;
+    let x0;
+    let y0;
+    let x1;
+    let y1;
+    if (it.t === 4) {
+      x0 = o.cx * TILE;
+      y0 = o.cy * TILE;
+      x1 = x0 + o.w * TILE;
+      y1 = y0 + o.h * TILE;
+    } else if (it.t === 0) {
+      const r = Math.max(o.w, o.h) / 2;
+      x0 = o.x - (o.angle ? r : o.w / 2);
+      x1 = o.x + (o.angle ? r : o.w / 2);
+      y0 = o.y - (o.angle ? r : o.h / 2);
+      y1 = o.y + (o.angle ? r : o.h / 2);
+    } else return relief.displayAt(o.x, o.y);
+    return Math.min(relief.displayAt(x0, y0), relief.displayAt(x1, y0), relief.displayAt(x0, y1), relief.displayAt(x1, y1));
   }
 
   drawTerrain(ctx, R) {
@@ -455,14 +596,16 @@ export class Renderer {
     const zn = g.zone;
     const owned = zn.owner >= 0;
     const col = owned ? g.teams[zn.owner].color : '#e8ece8';
+    const drape = this.draping();
+    const k = drape ? z : 1; // Längen in Bildschirm-Pixeln, wenn der Kreis dem Gelände folgt
     ctx.save();
-    ctx.beginPath();
-    ctx.arc(zn.x, zn.y, zn.r, 0, Math.PI * 2);
+    if (drape) ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    this.groundArc(ctx, zn.x, zn.y, zn.r);
     ctx.fillStyle = hexA(col, owned ? 0.12 : 0.05);
     ctx.fill();
     ctx.strokeStyle = hexA(col, 0.85);
-    ctx.lineWidth = 4;
-    if (zn.contested) ctx.setLineDash([28, 18]);
+    ctx.lineWidth = drape ? Math.max(1.5, 3 * z) : 4;
+    if (zn.contested) ctx.setLineDash([28 * k, 18 * k]);
     ctx.stroke();
     ctx.setLineDash([]);
     // Beschriftung nahe dem oberen Rand, damit sie nicht über den Einheiten in der Mitte liegt
@@ -481,14 +624,16 @@ export class Renderer {
     const owned = hz.owner >= 0;
     const col = owned ? this.game.teams[hz.owner].color : '#ff9a1f';
     const pulse = 0.5 + 0.5 * Math.sin(now / 400);
+    const drape = this.draping();
+    const k = drape ? z : 1;
     ctx.save();
-    ctx.beginPath();
-    ctx.arc(hz.x, hz.y, hz.r, 0, Math.PI * 2);
+    if (drape) ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    this.groundArc(ctx, hz.x, hz.y, hz.r);
     ctx.fillStyle = hexA('#ff7a1a', 0.1 + 0.07 * pulse);
     ctx.fill();
     ctx.strokeStyle = hexA(col, 0.9);
-    ctx.lineWidth = 3;
-    ctx.setLineDash([16, 10]);
+    ctx.lineWidth = drape ? Math.max(1.5, 2.4 * z) : 3;
+    ctx.setLineDash([16 * k, 10 * k]);
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.fillStyle = 'rgba(255,190,110,0.5)';
@@ -503,14 +648,15 @@ export class Renderer {
   /** Bauradius der eigenen fertigen FOBs (nur bei Platzierung). */
   drawRadii(ctx, z) {
     const g = this.game;
+    const k = this.draping() ? z : 1;
     ctx.save();
-    ctx.setLineDash([10 / z, 8 / z]);
+    if (this.draping()) ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.setLineDash([(10 / z) * k, (8 / z) * k]);
     ctx.strokeStyle = 'rgba(120,190,255,0.4)';
-    ctx.lineWidth = 2 / z;
+    ctx.lineWidth = (2 / z) * k;
     for (const b of g.buildings) {
       if (!b.alive || !b.built || b.team !== this.team || b.type !== 'fob') continue;
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, BALANCE.fob.buildRadius, 0, Math.PI * 2);
+      this.groundArc(ctx, b.x, b.y, BALANCE.fob.buildRadius);
       ctx.stroke();
     }
     ctx.restore();
@@ -522,9 +668,11 @@ export class Renderer {
     const ids = v.selection ? [...v.selection] : [];
     if (v.hoverId) ids.push(v.hoverId);
     const seen = new Set();
+    const k = this.draping() ? z : 1;
     ctx.save();
-    ctx.lineWidth = 2 / z;
-    ctx.setLineDash([10 / z, 8 / z]);
+    if (this.draping()) ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.lineWidth = (2 / z) * k;
+    ctx.setLineDash([(10 / z) * k, (8 / z) * k]);
     for (const id of ids) {
       if (seen.has(id)) continue;
       seen.add(id);
@@ -536,8 +684,7 @@ export class Renderer {
       if (!b || b.kind !== 'building' || b.type !== 'fob') continue;
       const color = g.teams[b.team].color;
       ctx.globalAlpha = b.built ? 1 : 0.5;
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, BALANCE.fob.buildRadius, 0, Math.PI * 2);
+      this.groundArc(ctx, b.x, b.y, BALANCE.fob.buildRadius);
       ctx.fillStyle = hexA(color, 0.07);
       ctx.fill();
       ctx.strokeStyle = hexA(color, 0.8);
@@ -549,22 +696,24 @@ export class Renderer {
   /** Mörser: Reichweite (außen), Mindestreichweite (innen) und gewähltes Ziel. */
   drawMortarRange(ctx, b, z) {
     const w = b.def.weapon;
+    const drape = this.draping();
+    const k = drape ? z : 1;
     ctx.save();
-    ctx.setLineDash([10 / z, 8 / z]);
-    ctx.lineWidth = 2 / z;
-    ctx.beginPath();
-    ctx.arc(b.x, b.y, w.range, 0, Math.PI * 2);
+    if (drape) ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.setLineDash([(10 / z) * k, (8 / z) * k]);
+    ctx.lineWidth = (2 / z) * k;
+    this.groundArc(ctx, b.x, b.y, w.range);
     ctx.fillStyle = 'rgba(255,170,60,0.05)';
     ctx.fill();
     ctx.strokeStyle = 'rgba(255,170,60,0.75)';
     ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(b.x, b.y, w.minRange, 0, Math.PI * 2);
+    this.groundArc(ctx, b.x, b.y, w.minRange);
     ctx.strokeStyle = 'rgba(255,170,60,0.4)';
     ctx.stroke();
     ctx.setLineDash([]);
     if (b.fireTarget) {
       const t = b.fireTarget;
+      if (drape) this.groundAt(ctx, t.x, t.y);
       ctx.strokeStyle = '#ff6a3a';
       ctx.lineWidth = 2 / z;
       ctx.beginPath();
@@ -598,6 +747,7 @@ export class Renderer {
   drawRoutes(ctx, sel, z) {
     const g = this.game;
     const seen = new Set();
+    const drape = this.draping();
     ctx.save();
     ctx.strokeStyle = 'rgba(201,162,39,0.85)';
     ctx.fillStyle = 'rgba(201,162,39,0.85)';
@@ -612,10 +762,22 @@ export class Renderer {
       const key = `${a.id}>${b.id}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-      ctx.stroke();
+      if (drape) {
+        ctx.save();
+        ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+        ctx.lineWidth = 2;
+        ctx.setLineDash([10, 7]);
+        ctx.beginPath();
+        this.groundLine(ctx, a.x, a.y, b.x, b.y);
+        ctx.stroke();
+        ctx.restore();
+        this.groundAt(ctx, b.x, b.y);
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+      }
       ctx.setLineDash([]);
       const ang = Math.atan2(b.y - a.y, b.x - a.x);
       const hx = b.x - Math.cos(ang) * 30;
@@ -704,10 +866,22 @@ export class Renderer {
     ctx.fillStyle = ACCENT;
     ctx.lineWidth = 1.5 / z;
     ctx.setLineDash([5 / z, 4 / z]);
-    ctx.beginPath();
-    ctx.moveTo(b.x, b.y);
-    ctx.lineTo(b.rallyX, b.rallyY);
-    ctx.stroke();
+    if (this.draping()) {
+      ctx.save();
+      ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      this.groundLine(ctx, b.x, b.y, b.rallyX, b.rallyY);
+      ctx.stroke();
+      ctx.restore();
+      this.groundAt(ctx, b.rallyX, b.rallyY);
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(b.x, b.y);
+      ctx.lineTo(b.rallyX, b.rallyY);
+      ctx.stroke();
+    }
     ctx.setLineDash([]);
     const px = b.rallyX;
     const py = b.rallyY;

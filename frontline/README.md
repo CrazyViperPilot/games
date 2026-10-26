@@ -50,6 +50,7 @@ Spezifikation: [PRD.md](PRD.md) · Architektur: [PLAN.md](PLAN.md)
   Geschwindigkeit bis 10×.
 - `?seed=N`: feste Karte (gleicher Seed = gleiche Partie).
 - `?speed=N`: Startgeschwindigkeit.
+- `?gl=0`: Gelände der Iso-Ansicht ohne WebGL (flach, nur aufgemalt).
 
 Beispiel: `http://localhost:8765/frontline/?debug=1&seed=123&speed=3`
 
@@ -66,4 +67,6 @@ Die Tests liegen in `test/` und laufen per `.github/workflows/test-frontline.yml
 
 - `js/data/` Spielwerte, `js/core/` RNG und Schleife, `js/game/` Simulation (ohne DOM), `js/ai/` Computergegner
 - `js/render/` Canvas-Zeichnung, Kamera, Minimap · `js/ui/` Steuerung, Eingabe, HUD, Menüs
+- Gelände: `js/game/relief.js` (Höhenraster, Begehbarkeit), `js/game/landscape.js` (Berge, Hügel, Seen der Zufallskarte),
+  `js/render/ground.js` (WebGL-Boden der Iso-Ansicht), `js/render/reliefimg.js` (Geländebild für 2D, Minimap, Editor)
 - `sw.js` Service Worker (Cache-Präfix `frontline-`, Version `CACHE_VERSION`)
