@@ -12,6 +12,7 @@ export const MAP_FORMAT = 1;
 export const BUILDING_KINDS = ['house', 'factory', 'hall', 'tower', 'train', 'station', 'platform', 'wall']; // wall: Mauer um Fabrikgelände
 const TURNABLE = ['train', 'platform']; // dürfen beliebig gedreht sein (`angle`, Bogenmaß)
 const SPAWN_CLEAR = 180; // freier Platz um einen Startpunkt (Haupt-FOB und Startunits)
+export const MAX_CRATES = 24; // Versorgungskisten je Karte
 
 /** Leere Karte: nur Startpunkte in den Ecken und die Konfliktzone in der Mitte. */
 export function createEmptyMap(name = 'Neue Karte') {
@@ -25,6 +26,7 @@ export function createEmptyMap(name = 'Neue Karte') {
       { x: W - 700, y: 700 },
     ],
     zone: { x: W / 2, y: H / 2, r: BALANCE.zone.r },
+    crates: [],
   });
 }
 
@@ -81,6 +83,7 @@ export function normalizeMap(src) {
     trees: arr(src.trees).map((t) => circ(t, 6, 40)),
     spawns,
     zone,
+    crates: arr(src.crates).slice(0, MAX_CRATES).map(pt), // Versorgungskisten (crates.js); ältere Karten haben keine
     // Höhengelände (relief.js) als Text; fehlt es oder ist es kaputt, ist die Karte flach
     ...(typeof src.relief === 'string' && Relief.decode(src.relief) ? { relief: src.relief } : {}),
   };

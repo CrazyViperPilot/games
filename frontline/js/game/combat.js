@@ -8,7 +8,7 @@ const SCAN = BALANCE.scanInterval;
 const MAX_UNIT_RADIUS = 16; // größter Einheitenradius (Trefferkreis-Suche)
 const BASE_WARN_INTERVAL = 20; // s zwischen zwei Meldungen „Basis wird angegriffen“
 // Aufträge, bei denen nicht automatisch geschossen wird (Marsch, Bau, Reparatur, Logistik)
-const NO_FIRE = new Set(['move', 'build', 'repair', 'load', 'unload', 'route']);
+const NO_FIRE = new Set(['move', 'build', 'repair', 'load', 'unload', 'route', 'pickup', 'deliver']);
 const GAR = BALANCE.garrison;
 
 /** Waffenwerte eines Gebäudes; null, wenn unbewaffnet. (Einheiten haben mehrere Waffen: u.weapons.) */
@@ -312,7 +312,7 @@ export function updateCombat(game, dt) {
   const hash = buildHash(units.filter((u) => u.alive));
 
   for (const u of units) {
-    if (!u.alive || !u.weapons.length) continue;
+    if (!u.alive || !u.weapons.length || u.crate) continue; // Kistenträger haben die Hände voll
     const o = u.order.type;
     if (NO_FIRE.has(o)) continue;
     if (o === 'attack') {

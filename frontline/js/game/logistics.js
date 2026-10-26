@@ -187,7 +187,7 @@ function stepTruck(game, u, dt) {
 
 /** Darf `rider` in `vehicle` einsteigen? Hubschrauber nehmen Infanterie und Baufahrzeuge, Bodenfahrzeuge nur Infanterie. */
 export function canSeat(vehicle, rider) {
-  return rider.def.canRide && (vehicle.def.air || rider.def.builder === 'fort');
+  return rider.def.canRide && !rider.crate && (vehicle.def.air || rider.def.builder === 'fort');
 }
 
 /** { type: 'board', ids, heliId }: Infanterie/Baufahrzeuge gehen zu einem eigenen Hubschrauber und steigen ein. */
@@ -195,7 +195,10 @@ export function cmdBoard(game, team, cmd) {
   const heli = game.getEntity(cmd.heliId);
   if (!heli || heli.kind !== 'unit' || heli.team !== team || !(heli.def.seats > 0)) return fail('Kein eigenes Transportfahrzeug');
   const riders = game.ownUnits(team, cmd.ids).filter((u) => u !== heli && canSeat(heli, u));
-  if (!riders.length) return fail(heli.def.air ? 'Nur Infanterie und Baufahrzeuge steigen ein' : 'Nur Infanterie steigt hier ein');
+  if (!riders.length) {
+    if (game.ownUnits(team, cmd.ids).some((u) => u.crate)) return fail('Kistenträger steigen nicht ein');
+    return fail(heli.def.air ? 'Nur Infanterie und Baufahrzeuge steigen ein' : 'Nur Infanterie steigt hier ein');
+  }
   if (heli.passengers.length >= heli.def.seats) return fail('Fahrzeug ist voll');
   for (const u of riders) giveOrder(u, { type: 'board', x: heli.x, y: heli.y, targetId: heli.id });
   return { ok: true, count: riders.length };

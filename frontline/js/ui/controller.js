@@ -6,6 +6,7 @@ import { BUILDINGS } from '../data/buildings.js';
 import { canBuild } from '../game/construction.js';
 import { cargoSum, canSeat } from '../game/logistics.js';
 import { canGarrison, canEnter } from '../game/garrison.js';
+import { canCarry } from '../game/crates.js';
 import { unitLift, buildingHeight, TOWN_H } from '../render/iso.js';
 
 const WALL_MAX = 40; // max. Zellen je Mauerzug (Vorschau und Befehl)
@@ -241,6 +242,28 @@ export class Controller {
     return null;
   }
 
+  /** Versorgungskiste am Boden unter dem Punkt (nur bekannte: in Sicht oder im Lagebild an derselben Stelle) oder null. */
+  pickCrate(wx, wy) {
+    const g = this.game;
+    const cam = this.camera;
+    const mem = g.crateSeen?.[this.team];
+    const sp = cam.worldToScreen(wx, wy);
+    let best = null;
+    let bd = Infinity;
+    for (const c of g.crates ?? []) {
+      if (c.state !== 'ground') continue;
+      const m = mem?.get(c.id);
+      if (!g.isVisible(this.team, c.x, c.y) && !(m && m.x === c.x && m.y === c.y)) continue;
+      const p = cam.worldToScreen(c.x, c.y);
+      const d = Math.hypot(p.x - sp.x, p.y - (cam.iso ? 8 * cam.zoom : 0) - sp.y); // isometrisch: Mitte der Kiste über dem Boden
+      if (d <= PICK_PX + 10 * cam.zoom && d < bd) {
+        best = c;
+        bd = d;
+      }
+    }
+    return best;
+  }
+
   /** Eigene Besatzer des Hauses wählen (Klick aufs eigene besetzte Haus). */
   selectHouse(h, add) {
     const sel = this.view.selection;
@@ -462,6 +485,12 @@ export class Controller {
         if (!rest.length) return;
       }
     }
+    // Versorgungskiste: der nächste Soldat ohne Kiste holt sie, die übrigen gehen mit
+    const crate = this.pickCrate(wx, wy);
+    if (crate && rest.some(canCarry)) {
+      if (this.issue({ type: 'pickup', ids: rest.map((u) => u.id), crateId: crate.id }).ok) this.moveMarker(crate.x, crate.y);
+      return;
+    }
     const own = this.pickB(wx, wy, (e) => e.team === this.team);
     if (own) {
       const done = this.orderOnOwnBuilding(own, units);
@@ -500,6 +529,11 @@ export class Controller {
   orderOnOwnBuilding(b, units) {
     const done = new Set();
     const ids = (list) => list.map((u) => u.id);
+    const carriers = units.filter((u) => u.crate);
+    if (b.type === 'fob' && b.built && carriers.length && this.issue({ type: 'deliver', ids: ids(carriers), fobId: b.id }).ok) {
+      this.moveMarker(b.x, b.y);
+      for (const u of carriers) done.add(u.id);
+    }
     const trucks = units.filter(isCarrier);
     if (b.type === 'fob' && trucks.length) {
       if (!b.built) {
@@ -762,6 +796,7 @@ export class Controller {
     this.pointer = { x: wx, y: wy };
     const hover =
       this.pick(wx, wy, (e) => e.team === this.team || this.game.sees(this.team, e)) ||
+      this.pickCrate(wx, wy) ||
       this.pickHouse(wx, wy, (h) => h.team >= 0 && this.game.sees(this.team, h));
     this.view.hoverId = hover ? hover.id : 0;
     switch (this.view.mode) {
@@ -1040,6 +1075,15 @@ export class Controller {
           }),
         );
       }
+    }
+    const carriers = units.filter((u) => u.crate);
+    if (carriers.length) {
+      card.push(
+        entry('Ablegen', 'K', {
+          tip: 'Kiste ablegen (K): sie bleibt liegen, bis jemand sie wieder aufhebt. Rechtsklick auf eine eigene FOB bringt sie dorthin.',
+          action: () => this.issue({ type: 'dropCrate', ids: carriers.map((u) => u.id) }),
+        }),
+      );
     }
     const inside = units.filter((u) => u.house);
     const helis = units.filter((u) => u.def.seats > 0);

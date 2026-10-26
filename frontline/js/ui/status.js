@@ -37,6 +37,7 @@ export function orderText(game, u) {
   switch (o.type) {
     case 'idle':
       if (u.house) return 'Im Gebäude';
+      if (u.crate) return 'Trägt eine Versorgungskiste';
       return u.def.builder ? 'Bereit (hilft bei Baustellen)' : 'Bereit';
     case 'move':
       return 'Bewegung';
@@ -48,6 +49,10 @@ export function orderText(game, u) {
       const h = game.getEntity(o.targetId);
       return h ? `Unterwegs ins Gebäude (${h.def.name})` : 'Bereit';
     }
+    case 'pickup':
+      return 'Holt eine Versorgungskiste';
+    case 'deliver':
+      return `Bringt die Kiste zu ${fobLabel(game, game.getEntity(o.targetId))}`;
     case 'build': {
       const s = game.getEntity(o.targetId);
       return s ? `Baut ${s.type === 'fob' ? fobLabel(game, s) : s.def.name}` : 'Baustelle fertig';

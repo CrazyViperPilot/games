@@ -3,7 +3,7 @@
 import { BALANCE } from '../data/balance.js';
 import { buildTerrain } from './terrain.js';
 import { makeFogLayer, updateFogLayer } from './renderer.js';
-import { hexA } from './sprites.js';
+import { hexA, CRATE_MARK } from './sprites.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
@@ -107,6 +107,17 @@ export class Minimap {
     if (!reveal) {
       updateFogLayer(this.fogLayer, g.fog[team], false);
       ctx.drawImage(this.fogLayer.canvas, 0, 0, this.fogLayer.canvas.width, this.fogLayer.canvas.height, 0, 0, W, H);
+    }
+
+    // Versorgungskisten am Boden (Lagebild: Fundorte von der Karte, danach zuletzt gesehen), auch im Nebel
+    const crates = reveal ? (g.crates ?? []).filter((c) => c.state === 'ground') : [...(g.crateSeen?.[team]?.values() ?? [])];
+    ctx.fillStyle = CRATE_MARK;
+    ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+    ctx.lineWidth = 0.8 * px;
+    for (const c of crates) {
+      const s = 3.6 * px;
+      ctx.fillRect(c.x - s / 2, c.y - s / 2, s, s);
+      ctx.strokeRect(c.x - s / 2, c.y - s / 2, s, s);
     }
 
     // Kamerarahmen

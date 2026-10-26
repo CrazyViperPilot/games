@@ -15,6 +15,7 @@ const KEYS = [
   ['Rechtsklick', 'Bewegen · auf Gegner = angreifen · Gebäude gewählt = Sammelpunkt · halten und ziehen = Karte schieben'],
   ['Touch', 'Ein Finger ziehen = Karte schieben · zwei Finger = Zoomen und Schieben'],
   ['I', 'Soldaten gewählt: Einsteigen (dann LKW, Baufahrzeug, Schützenpanzer, Hubschrauber oder ein Haus der Stadt antippen) · O = Absetzen bzw. Raus aus dem Haus'],
+  ['Kisten', 'Versorgungskisten (gelbe Quadrate auf der Minimap) liegen abseits der Zone: Soldaten gewählt, Rechtsklick oder Tippen auf die Kiste – der nächste holt sie, die übrigen begleiten ihn. Der Träger geht langsamer, schießt nicht und bringt sie zur nächsten eigenen FOB · jede eingelagerte Kiste +1 Geld/s · K = ablegen · fällt der Träger oder die FOB, liegt die Kiste wieder am Boden'],
   ['Häuserkampf', 'Soldaten gewählt: Rechtsklick oder Tippen auf ein Haus der Stadt besetzt es (Wohnhaus 4, Halle und Bahnhof 8, Fabrik 10 Plätze). Drinnen geschützt, ein Stockwerk höher, Reichweite ab der Hauswand · Klick aufs eigene Haus wählt die Besatzung · O oder ein Marschbefehl = Raus · Handwaffen kratzen nur, Kanonen, RPG, Granaten und Mörser bringen das Haus zum Einsturz (Besatzung verletzt)'],
   ['Rechtsklick auf FOB', 'LKW: leer laden, beladen entladen · Baufahrzeug: an Baustelle helfen, beschädigtes Gebäude reparieren'],
   ['A + Klick', 'Angriffsbewegung'],

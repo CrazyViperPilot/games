@@ -11,8 +11,8 @@ const CORNER = 48; // nahe einer Wegecke: bei freier Sicht gleich zum nächsten 
 export const HASH_CELL = 128; // räumliches Hash-Gitter
 const TILE = BALANCE.map.tile;
 
-/** Aufträge, die logistics.js, construction.js und garrison.js selbst fahren (updateMovement lässt sie aus). */
-export const OWN_DRIVERS = new Set(['load', 'unload', 'route', 'build', 'repair', 'board', 'dropoff', 'garrison']);
+/** Aufträge, die logistics.js, construction.js, garrison.js und crates.js selbst fahren (updateMovement lässt sie aus). */
+export const OWN_DRIVERS = new Set(['load', 'unload', 'route', 'build', 'repair', 'board', 'dropoff', 'garrison', 'pickup', 'deliver']);
 
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 
@@ -373,13 +373,14 @@ export function separate(game) {
 
 /**
  * Bewegt die Einheiten um dt (ohne LKW- und Bauaufträge; die fahren logistics.js bzw. construction.js).
- * Setzt Repath-Timer und Tempo (25 % bei Fahrzeugen ohne Treibstoff). Trennung: separate(game).
+ * Setzt Repath-Timer und Tempo (25 % bei Fahrzeugen ohne Treibstoff, carrySpeed mit Kiste). Trennung: separate(game).
  */
 export function updateMovement(game, dt) {
   for (const u of game.units) {
     if (!u.alive) continue;
     u.repathTimer = Math.max(0, u.repathTimer - dt);
     u.speedMul = (u.def.fuelPerSec || 0) > 0 && u.fuel <= 0 ? BALANCE.fuelSlowMul : 1;
+    if (u.crate) u.speedMul *= BALANCE.crates.carrySpeed; // Kistenträger gehen langsamer
     if (u.house || OWN_DRIVERS.has(u.order.type)) continue; // Besatzer eines Hauses bewegen sich nicht
     stepUnit(game, u, dt);
   }

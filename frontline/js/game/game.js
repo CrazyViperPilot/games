@@ -17,6 +17,7 @@ import { createHot, updateHot, cmdDrill } from './hotzone.js';
 import { updateLogistics, cmdLoad, cmdUnload, cmdRoute, cmdSetPreset, cmdBoard, cmdDropoff, cargoSum } from './logistics.js';
 import { updateConstruction, canBuild, cmdRepair, orderBuild, orderBuildSeq } from './construction.js';
 import { createHouses, updateGarrison, cmdGarrison, cmdUngarrison, dropOccupant } from './garrison.js';
+import { createCrates, updateCrates, updateCrateIntel, cmdPickup, cmdDeliver, cmdDropCrate } from './crates.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
@@ -186,6 +187,7 @@ export class Game {
       });
     }
     createHouses(this); // Stadthäuser zum Besetzen (Häuserkampf)
+    createCrates(this); // Versorgungskisten der Karte
     this.updateFog();
   }
 
@@ -264,6 +266,7 @@ export class Game {
 
   updateFog() {
     for (let t = 0; t < this.teams.length; t++) this.fog[t].update(this, t);
+    updateCrateIntel(this);
   }
 
   /** Lebende Entities, deren Mittelpunkt im Kreis liegt (Gebäude: plus halbe Größe). */
@@ -559,6 +562,12 @@ export class Game {
         return cmdGarrison(this, team, cmd);
       case 'ungarrison':
         return cmdUngarrison(this, team, cmd);
+      case 'pickup':
+        return cmdPickup(this, team, cmd);
+      case 'deliver':
+        return cmdDeliver(this, team, cmd);
+      case 'dropCrate':
+        return cmdDropCrate(this, team, cmd);
       case 'dropoff':
         return cmdDropoff(this, team, cmd);
       case 'drill':
@@ -657,8 +666,9 @@ export class Game {
   cmdAttack(team, cmd) {
     const t = this.getEntity(cmd.targetId);
     if (!isFoe(team, t)) return fail('Ziel ungültig');
-    const units = this.ownUnits(team, cmd.ids).filter((u) => u.def.range > 0);
-    if (!units.length) return fail('Keine bewaffnete Einheit gewählt');
+    const armed = this.ownUnits(team, cmd.ids).filter((u) => u.def.range > 0);
+    const units = armed.filter((u) => !u.crate); // Kistenträger schießen nicht
+    if (!units.length) return fail(armed.length ? 'Kistenträger schießen nicht' : 'Keine bewaffnete Einheit gewählt');
     const aim = t.house ? this.getEntity(t.house) : t;
     for (const u of units) {
       // Besatzer bleiben im Haus, solange das Ziel aus den Fenstern erreichbar ist; sonst gehen sie hinaus und verfolgen es
@@ -974,6 +984,7 @@ export class Game {
     updateEconomy(this, dt);
     updateGarrison(this, dt);
     updateMovement(this, dt);
+    updateCrates(this, dt);
     updateLogistics(this, dt);
     updateConstruction(this, dt);
     separate(this);

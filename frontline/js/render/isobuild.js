@@ -668,6 +668,44 @@ export { hexA };
  * Ruine eines eingestürzten Stadthauses (Häuserkampf): Schuttfläche, ein Mauerrest in der Farbe des Hauses und Trümmerbrocken,
  * nach Tiefe sortiert. Zufall fest aus der Lage, damit die Ruine bei jedem Bild gleich aussieht.
  */
+/**
+ * Versorgungskiste (isometrisch): olivgrüne Holzkiste mit Gurten und gelbem Schloss auf dem Deckel. base = Höhe über dem Boden
+ * (auf dem Rücken eines Trägers), glow = liegt am Boden (pulsierender Schimmer).
+ */
+export function drawCrate(ctx, cam, x, y, s = 16, base = 0, glow = 0) {
+  const h = s * 0.72;
+  const x0 = x - s / 2;
+  const y0 = y - s / 2;
+  if (glow > 0) {
+    const p = cam.worldToScreen(x, y);
+    ctx.save();
+    ctx.fillStyle = `rgba(232,184,48,${0.22 * glow})`;
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y, s * 1.4 * cam.zoom, s * 0.7 * cam.zoom, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  drawBox(ctx, cam, x0, y0, x0 + s, y0 + s, h, '#66713c', { roof: '#7c8848', base, noShadow: base > 0 });
+  const top = base + h;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = 'rgba(40,44,22,0.85)';
+  ctx.lineWidth = Math.max(1, s * 0.1 * cam.zoom);
+  ctx.beginPath();
+  for (const f of [0.3, 0.7]) {
+    const a = planePt(cam, x0 + s * f, y0, top);
+    const b = planePt(cam, x0 + s * f, y0 + s, top);
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+  }
+  ctx.stroke();
+  const c = planePt(cam, x, y, top);
+  const r = Math.max(1.2, s * 0.13 * cam.zoom);
+  ctx.fillStyle = '#e8b830';
+  ctx.fillRect(c.x - r, c.y - r * 0.6, r * 2, r * 1.2);
+  ctx.restore();
+}
+
 export function drawRubble(ctx, cam, b) {
   const hw = b.w / 2;
   const hh = b.h / 2;

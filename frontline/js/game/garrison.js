@@ -9,8 +9,8 @@ const TILE = BALANCE.map.tile;
 const fail = (reason) => ({ ok: false, reason });
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 
-/** Nur Infanterie besetzt Häuser. */
-export const canGarrison = (u) => u.def.armor === 'inf';
+/** Nur Infanterie besetzt Häuser (Kistenträger nicht). */
+export const canGarrison = (u) => u.def.armor === 'inf' && !u.crate;
 
 /**
  * Häuser aus den Stadtgebäuden der Karte (Arten aus BALANCE.garrison, nicht gedreht, keine Mauern). Sie sind Entities mit
@@ -81,7 +81,9 @@ export function cmdGarrison(game, team, cmd) {
   if (!canEnter(h, team)) return fail('Gebäude ist vom Gegner besetzt');
   const list = game.ownUnits(team, cmd.ids).filter((u) => canGarrison(u) && u.house !== h.id);
   if (!list.length) {
-    return fail(game.ownUnits(team, cmd.ids).some(canGarrison) ? 'Schon im Gebäude' : 'Nur Infanterie besetzt Gebäude');
+    const all = game.ownUnits(team, cmd.ids);
+    if (all.some(canGarrison)) return fail('Schon im Gebäude');
+    return fail(all.some((u) => u.crate) ? 'Kistenträger besetzen keine Gebäude' : 'Nur Infanterie besetzt Gebäude');
   }
   const free = freeSeats(game, h, team);
   if (free <= 0) return fail('Gebäude ist voll');

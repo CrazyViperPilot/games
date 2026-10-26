@@ -42,6 +42,7 @@ export function createUnit(id, type, team, x, y) {
     preset: 'mix', // LKW-Ladungsart: 'mix' | 'bm' | 'mun' | 'fuel'
     passengers: [], // Hubschrauber: eingestiegene Einheiten (alive = false, solange sie an Bord sind)
     house: 0, // ID des besetzten Stadthauses (garrison.js; Häuser haben negative IDs), 0 = draußen
+    crate: 0, // ID der getragenen Versorgungskiste (crates.js; negativ), 0 = keine
   };
   // `ammo` = Munitionswert (Lagereinheiten) der vorhandenen Schüsse; Zuweisen füllt alle Waffen im gleichen Verhältnis
   Object.defineProperty(u, 'ammo', {

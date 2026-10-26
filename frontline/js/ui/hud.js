@@ -2,7 +2,8 @@
 // Schreibt das DOM höchstens 5× pro Sekunde und nur, wenn sich der HTML-Text geändert hat.
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
-import { lacksAmmo } from '../game/entities.js';
+import { lacksAmmo, isFoe } from '../game/entities.js';
+import { storedCrates } from '../game/crates.js';
 import { heightMult } from '../game/combat.js';
 import { builderState, fobLabel, orderText } from './status.js';
 
@@ -187,7 +188,7 @@ export class Hud {
       el.rate.textContent = `${neg ? '−' : '+'}${fmtRate(Math.abs(v))}/s`;
       el.rate.style.color = neg ? NEG_COLOR : '';
       // Lagersorten: Summe aller fertigen FOB-Lager; Geld ist global
-      const lines = [k === 'money' ? `Geld (global): je Einheit in der Konfliktzone ${fmtDe(BALANCE.zone.unitIncome)}/s, in der Hot Zone ${fmtDe(BALANCE.hot.unitIncome)}/s; bleibt von Runde zu Runde` : 'Front-Lager: Summe der FOB-Lager ohne Haupt-FOB (die hat unendlich)'];
+      const lines = [k === 'money' ? `Geld (global): je Einheit in der Konfliktzone ${fmtDe(BALANCE.zone.unitIncome)}/s, in der Hot Zone ${fmtDe(BALANCE.hot.unitIncome)}/s, je eingelagerte Versorgungskiste ${fmtDe(BALANCE.crates.income)}/s; bleibt von Runde zu Runde` : 'Front-Lager: Summe der FOB-Lager ohne Haupt-FOB (die hat unendlich)'];
       if (t.used[k] !== undefined) lines.push(`verbraucht: ${Math.floor(t.used[k])}`);
       const tip = lines.join('\n');
       if (el.box.title !== tip) el.box.title = tip;
@@ -215,9 +216,11 @@ export class Hud {
     // Geld des eigenen Teams aus der Zone: je Einheit in der Zone, in der Hot Zone das Doppelte
     const me = this.team;
     const hzCount = g.hot ? g.hot.counts[me] : 0;
+    const nCrates = storedCrates(g, me);
+    const crateTxt = nCrates ? `, ${nCrates} Kiste${nCrates > 1 ? 'n' : ''}` : '';
     const inc =
-      `<span class="zone-inc" title="Geld aus der Konfliktzone: je Einheit ${fmtDe(BALANCE.zone.unitIncome)}/s, in der Hot Zone ${fmtDe(BALANCE.hot.unitIncome)}/s">` +
-      `+${fmtRate(t.rate.money)} Geld/s (${z.counts[me]} Einheiten in der Zone, ${hzCount} in der Hot Zone)</span>`;
+      `<span class="zone-inc" title="Geld aus der Konfliktzone (je Einheit ${fmtDe(BALANCE.zone.unitIncome)}/s, in der Hot Zone ${fmtDe(BALANCE.hot.unitIncome)}/s) und aus Versorgungskisten (je ${fmtDe(BALANCE.crates.income)}/s)">` +
+      `+${fmtRate(t.rate.money)} Geld/s (${z.counts[me]} Einheiten in der Zone, ${hzCount} in der Hot Zone${crateTxt})</span>`;
     this.zoneEl.innerHTML =
       `<span class="zone-state" style="color:${col}">${label}</span>` +
       `<span class="zone-cnt"><b style="color:${c0}">${z.counts[0]}</b><i>:</i><b style="color:${c1}">${z.counts[1]}</b></span>` +
@@ -266,6 +269,7 @@ export class Hud {
       `<div class="title">${esc(u.def.name)}</div>${bar(f, 'hp', hpColor(f))}` +
       `<div class="muted small">${Math.ceil(u.hp)} / ${u.maxHp} HP · ${esc(orderText(this.game, u))}</div>`;
     if (u.house) h += this.houseInfo(u);
+    if (u.crate) h += `<div class="muted small">Trägt eine Versorgungskiste: ${Math.round(BALANCE.crates.carrySpeed * 100)} % Tempo, schießt nicht · K = ablegen</div>`;
     if (this.game.relief && !u.def.air) h += this.heightInfo(u);
     if (u.weapons.length) {
       for (const w of u.weapons) h += gauge(w.spec.name, Math.floor(w.rounds), w.spec.rounds, COLOR.mun);
@@ -311,7 +315,7 @@ export class Hud {
     const g = this.game;
     let line = `Standhöhe ${Math.round(g.groundHeight(u) + (u.house ? BALANCE.garrison.floor : 0))}`;
     const t = g.getEntity(this.controller.view.hoverId);
-    if (t && t.team !== u.team && u.weapons.length && g.sees(u.team, t)) {
+    if (isFoe(u.team, t) && u.weapons.length && g.sees(u.team, t)) {
       const m = heightMult(g, u, t);
       const p = Math.round(Math.abs(m - 1) * 100);
       if (p >= 1) line += m > 1 ? ` · Ziel tiefer: +${p} % Schaden` : ` · Ziel höher: −${p} % Schaden`;
@@ -330,6 +334,8 @@ export class Hud {
     } else {
       h += '<div class="muted small">Einsatzbereit</div>';
     }
+    const crates = b.type === 'fob' ? storedCrates(g, b.team, b.id) : 0;
+    if (crates) h += `<div class="muted small">${crates} Versorgungskiste${crates > 1 ? 'n' : ''} eingelagert: +${fmtDe(crates * BALANCE.crates.income)} Geld/s</div>`;
     if (b.type === 'fob' && b.infinite) {
       h += '<div class="muted small lagerhead">Unendlich Baumaterial, Munition und Treibstoff · bildet alle Einheiten aus (nur gegen Geld)</div>';
       h += this.reinforceInfo(b);

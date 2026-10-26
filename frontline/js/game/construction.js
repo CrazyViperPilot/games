@@ -130,7 +130,7 @@ function autoAssign(game) {
     if (u.alive && u.order.type === 'build') assigned.set(u.order.targetId, (assigned.get(u.order.targetId) || 0) + 1);
   }
   for (const u of game.units) {
-    if (!u.alive || u.order.type !== 'idle' || u.targetId !== null || !u.def.builder || u.house) continue;
+    if (!u.alive || u.order.type !== 'idle' || u.targetId !== null || !u.def.builder || u.house || u.crate) continue;
     let best = null;
     let bestD = C.autoHelpRange;
     for (const s of sites) {

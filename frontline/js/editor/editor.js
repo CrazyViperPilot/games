@@ -10,7 +10,8 @@ import { Renderer } from '../render/renderer.js';
 import { setIsoGround, TOWN_H } from '../render/iso.js';
 import { ISO_K } from '../render/camera.js';
 import { Game } from '../game/game.js';
-import { createEmptyMap, normalizeMap, checkMap, accessRoutes, describeMap, loadMap, saveMap } from '../game/mapdata.js';
+import { createEmptyMap, normalizeMap, checkMap, accessRoutes, describeMap, loadMap, saveMap, MAX_CRATES } from '../game/mapdata.js';
+import { drawCrate } from '../render/sprites.js';
 import { Relief, RELIEF, COARSE_N, reliefOf, setRelief } from '../game/relief.js';
 import { reliefTiles, updateReliefTiles, drawReliefTiles } from '../render/reliefimg.js';
 
@@ -51,6 +52,7 @@ const TOOLS = [
   ['spawn0', 'Start Blau', 'Spiel', '①', 'Tippen setzt den Startpunkt von Blau (Haupt-FOB)'],
   ['spawn1', 'Start Rot', 'Spiel', '②', 'Tippen setzt den Startpunkt von Rot (Haupt-FOB)'],
   ['zone', 'Zone', 'Spiel', '◎', 'Tippen setzt die Mitte der Konfliktzone'],
+  ['crate', 'Kiste', 'Spiel', '⊠', `Tippen setzt eine Versorgungskiste (Soldaten bringen sie zur FOB, +1 Geld/s; höchstens ${MAX_CRATES}). Für eine faire Karte gleich weit von beiden Starts setzen`],
 ];
 const BUILD_DEF = {
   house: { w: 90, h: 70, kind: 'house' },
@@ -224,6 +226,7 @@ function listOf(k) {
     case 'tree': return m.trees;
     case 'townTree': return m.town.trees;
     case 'obstacle': return m.obstacles;
+    case 'crate': return m.crates;
     default: return null;
   }
 }
@@ -242,6 +245,9 @@ function pickAt(wx, wy, sx = null, sy = null) {
   const m = st.map;
   for (let i = 0; i < 2; i++) {
     if (Math.hypot(m.spawns[i].x - wx, m.spawns[i].y - wy) < 70 + tol) return { k: 'spawn', i, o: m.spawns[i] };
+  }
+  for (let i = m.crates.length - 1; i >= 0; i--) {
+    if (Math.hypot(m.crates[i].x - wx, m.crates[i].y - wy) < 18 + tol) return { k: 'crate', o: m.crates[i] };
   }
   const circ = (k, list, grow = 0) => {
     for (let i = list.length - 1; i >= 0; i--) {
@@ -351,6 +357,15 @@ function place(tool, x, y) {
       m.zone.x = px;
       m.zone.y = py;
       return { k: 'zone', o: m.zone };
+    case 'crate': {
+      if (m.crates.length >= MAX_CRATES) {
+        say(`Höchstens ${MAX_CRATES} Versorgungskisten je Karte`, true);
+        return null;
+      }
+      const o = { x: px, y: py };
+      m.crates.push(o);
+      return { k: 'crate', o };
+    }
     default:
       return null;
   }
@@ -435,6 +450,7 @@ function makeRenderer() {
   const game = new Game({ seed: 1, map: st.map });
   game.units.length = 0;
   game.buildings.length = 0;
+  game.crates = []; // Kisten zeichnet der Editor selbst (sie ändern sich beim Bearbeiten)
   game.entities.clear();
   const r = new Renderer(canvas, game, st.cam, 0);
   r.revealAll = true;
@@ -546,6 +562,10 @@ function draw() {
     const r = Math.max(7 * px, 40);
     ctx.fillRect(sp.x - r, sp.y - r, r * 2, r * 2);
   });
+  for (const c of m.crates) {
+    world(c.x, c.y);
+    drawCrate(ctx, c.x, c.y, Math.max(12 * px, 18), z, 1);
+  }
   if (st.sel) {
     const o = st.sel.o;
     if (o.x1 !== undefined) world((o.x1 + o.x2) / 2, (o.y1 + o.y2) / 2);
@@ -718,6 +738,10 @@ function drawSelection(sel, px) {
   } else if (sel.k === 'spawn' || sel.k === 'zone') {
     ctx.beginPath();
     ctx.arc(o.x, o.y, Math.max(14 * px, 60), 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (sel.k === 'crate') {
+    ctx.beginPath();
+    ctx.arc(o.x, o.y, Math.max(12 * px, 20), 0, Math.PI * 2);
     ctx.stroke();
   } else {
     ctx.beginPath();
@@ -1046,6 +1070,7 @@ const SEL_NAMES = {
   rail: 'Gleis',
   spawn: 'Startpunkt',
   zone: 'Konfliktzone',
+  crate: 'Versorgungskiste',
 };
 const KIND_NAMES = { house: 'Haus', factory: 'Fabrik', hall: 'Halle', tower: 'Wachturm', train: 'Zugteil', station: 'Bahnhof', platform: 'Bahnsteig' };
 
@@ -1098,6 +1123,9 @@ function showInspector() {
     rows.push('<div class="muted small">Enden ziehen, um das Gleis zu ändern. Neue Gleise rasten an Enden und Gleisen ein.</div>');
   } else if (s.k === 'spawn') {
     rows.push('<div class="muted small">Ziehen verschiebt den Startpunkt. Die Haupt-FOB entsteht hier, Bauradius als Kreis.</div>');
+  } else if (s.k === 'crate') {
+    const d = st.map.spawns.map((sp) => Math.round(Math.hypot(sp.x - s.o.x, sp.y - s.o.y)));
+    rows.push(`<div class="muted small">Ziehen verschiebt die Kiste. Abstand zu den Starts: ${d[0]} / ${d[1]} px. Auf freien Boden setzen (sonst rückt sie im Spiel zur nächsten freien Stelle).</div>`);
   }
   if (s.k !== 'spawn' && s.k !== 'zone') {
     rows.push(`<div class="row"><button data-i="dup">Kopie</button><button data-i="del" class="danger">Löschen</button></div>`);
@@ -1191,7 +1219,7 @@ $('[data-tools]').addEventListener('click', (e) => {
 function updateInfo() {
   const d = describeMap(st.map);
   $('[data-msg]').classList.remove('bad');
-  $('[data-info]').textContent = `${d.buildings} Gebäude · ${d.roads} Straßen · ${d.trees} Bäume · ${d.obstacles} Hindernisse`;
+  $('[data-info]').textContent = `${d.buildings} Gebäude · ${d.roads} Straßen · ${d.trees} Bäume · ${d.obstacles} Hindernisse · ${st.map.crates.length} Kisten`;
 }
 
 function setMap(map, { keepId = false } = {}) {

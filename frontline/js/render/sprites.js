@@ -356,6 +356,45 @@ export function drawNode(ctx, node, occupied = false, zoom = 1) {
   ctx.restore();
 }
 
+export const CRATE_COLOR = '#66713c'; // Versorgungskiste: olivgrünes Holz
+export const CRATE_MARK = '#e8b830'; // Markierung (Gurtschloss, Minimap)
+
+/**
+ * Versorgungskiste von oben: olivgrüne Kiste (Kantenlänge s) mit zwei Gurten und gelbem Schloss; glow = liegt am Boden
+ * (pulsierender Schimmer, damit man sie findet).
+ */
+export function drawCrate(ctx, x, y, s = 16, zoom = 1, glow = 0) {
+  const z = zoom || 1;
+  const h = s / 2;
+  ctx.save();
+  if (glow > 0) {
+    ctx.fillStyle = hexA(CRATE_MARK, 0.18 * glow);
+    ctx.beginPath();
+    ctx.arc(x, y, s * 1.25, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.fillRect(x - h + 2, y - h + 2.5, s, s);
+  ctx.fillStyle = CRATE_COLOR;
+  ctx.fillRect(x - h, y - h, s, s);
+  ctx.fillStyle = tint(CRATE_COLOR, 0.18);
+  ctx.fillRect(x - h + 2, y - h + 2, s - 4, s - 4);
+  ctx.strokeStyle = shade(CRATE_COLOR, 0.45);
+  ctx.lineWidth = Math.max(1, s * 0.12);
+  ctx.beginPath();
+  ctx.moveTo(x - h * 0.4, y - h);
+  ctx.lineTo(x - h * 0.4, y + h);
+  ctx.moveTo(x + h * 0.4, y - h);
+  ctx.lineTo(x + h * 0.4, y + h);
+  ctx.stroke();
+  ctx.fillStyle = CRATE_MARK;
+  ctx.fillRect(x - s * 0.12, y - s * 0.12, s * 0.24, s * 0.24);
+  ctx.lineWidth = 1.2 / z;
+  ctx.strokeStyle = OUTLINE;
+  ctx.strokeRect(x - h, y - h, s, s);
+  ctx.restore();
+}
+
 /** Mörsergranate in der Luft: Spur vom Abschuss, Kopf, Markierung am Ziel. */
 export function drawShell(ctx, s, zoom = 1) {
   const z = zoom || 1;

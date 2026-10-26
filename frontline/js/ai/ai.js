@@ -53,6 +53,9 @@ const ROUTE_HOLD = 20; // s, früheste Neuplanung einer Pendler-Route
 const GARRISON_SHARE = 0.4; // Anteil der Infanterie in der Zone, der Stadthäuser besetzt (Häuserkampf)
 const GARRISON_RANGE = 500; // ein Soldat geht nur in ein Haus in diesem Umkreis
 const GARRISON_EVERY = 8; // s zwischen zwei Besetzungsrunden
+const CRATE_EVERY = 6; // s zwischen zwei Runden der Kistensuche
+const CRATE_RANGE = 4500; // ein Soldat holt nur Kisten in diesem Umkreis
+const CRATE_PICKERS = { easy: 1, normal: 2, hard: 3 }; // so viele Soldaten holen oder tragen gleichzeitig Kisten
 const DEG = Math.PI / 180;
 const SITE_ANGLES = [0, 30, -30, 60, -60, 90, -90, 120, -120, 150, -150, 180].map((d) => d * DEG);
 const TWO_PI = Math.PI * 2;
@@ -129,6 +132,7 @@ export class AI {
     this.rally(s);
     this.garrisonZone(s);
     this.army(s);
+    this.collectCrates(s); // nach der Welle: Kisten holen nur, die zurückbleiben (Reserve, Nachschub)
   }
 
   // ---- Lesen des Zustands ---------------------------------------------------------
@@ -149,7 +153,7 @@ export class AI {
     const enemies = g.units.filter((u) => u.alive && u.team !== t && g.sees(t, u));
     this.corridor = home ? { x: home.x, y: home.y, dx: dir.x, dy: dir.y } : null;
 
-    const combat = units.filter((u) => u.def.range > 0);
+    const combat = units.filter((u) => u.def.range > 0 && !u.crate); // Kistenträger kämpfen nicht
     const queuedCombat = own.reduce((n, b) => n + b.queue.filter((e) => UNITS[e.unit ?? e].range > 0).length, 0);
     const zoneFob = fobs.find((f) => dist(f.x, f.y, zone.x, zone.y) <= ZONE_FOB_R + 16) ?? null;
     const alarm =
@@ -1076,6 +1080,53 @@ export class AI {
       if (!best || !g.issue(t, { type: 'garrison', ids: [u.id], houseId: best.id }).ok) continue;
       pending.set(best.id, (pending.get(best.id) || 0) + 1);
       want--;
+    }
+  }
+
+  /**
+   * Versorgungskisten: freie Soldaten (lieber außerhalb der Zone, wo sie kein Zonengeld bringen) holen Kisten in der Nähe; sie
+   * tragen sie von selbst zur nächsten FOB. Die KI weiß wie der Spieler nur, was im Lagebild steht (Fundorte, zuletzt gesehen).
+   */
+  collectCrates(s) {
+    const g = this.game;
+    if (!g.crates || !g.crates.length || !s.builtFobs.length || !this.once('crates', CRATE_EVERY)) return;
+    const t = this.team;
+    const busy = s.units.filter((u) => u.crate || u.order.type === 'pickup');
+    let free = CRATE_PICKERS[this.difficulty] - busy.length;
+    if (free <= 0) return;
+    const taken = new Set(busy.map((u) => u.order.targetId));
+    const raiding = this.raid ? this.raid.ids : null;
+    const z = s.zone;
+    const known = g.crateSeen[t];
+    const crates = g.crates.filter((c) => {
+      const m = known.get(c.id);
+      return c.state === 'ground' && m && !taken.has(c.id) && !this.danger(s, m.x, m.y);
+    });
+    // frei: untätig oder auf dem Weg zum Sammelpunkt (frisch ausgebildet); nicht in einem Haus, nicht beim Überfall
+    const pool = s.units.filter(
+      (u) =>
+        u.def.armor === 'inf' &&
+        !u.crate &&
+        !u.house &&
+        (u.order.type === 'idle' || u.order.type === 'move') &&
+        !this.dryKind(u) &&
+        !(raiding && raiding.has(u.id)),
+    );
+    for (const c of crates) {
+      if (free <= 0) break;
+      let best = null;
+      let bd = CRATE_RANGE;
+      for (const u of pool) {
+        // Soldaten in der Zone verdienen dort Geld: sie zählen, als stünden sie weiter weg
+        const d = dist(u.x, u.y, c.x, c.y) + (dist(u.x, u.y, z.x, z.y) <= z.r ? 800 : 0);
+        if (d < bd) {
+          best = u;
+          bd = d;
+        }
+      }
+      if (!best || !g.issue(t, { type: 'pickup', ids: [best.id], crateId: c.id }).ok) continue;
+      pool.splice(pool.indexOf(best), 1);
+      free--;
     }
   }
 

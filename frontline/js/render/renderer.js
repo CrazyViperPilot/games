@@ -10,6 +10,7 @@ import {
   drawShell,
   drawEffect,
   drawBar,
+  drawCrate as drawCrateTop,
   fitText,
   hpColor,
   hexA,
@@ -26,7 +27,7 @@ import {
   buildingHeight,
   TOWN_H,
 } from './iso.js';
-import { drawTownBuilding, drawTeamBuilding, drawCar, drawBench, drawRubble } from './isobuild.js';
+import { drawTownBuilding, drawTeamBuilding, drawCar, drawBench, drawRubble, drawCrate } from './isobuild.js';
 import { parkDeco } from './terrain.js';
 import { drawTreeSprite, drawUnitSprite, setTeamBuildings } from './isosprites.js';
 import { reliefOf } from '../game/relief.js';
@@ -165,6 +166,10 @@ export class Renderer {
       drawBuilding(ctx, b, g.teams[b.team].color, z);
       if (!b.built && b.team === team) this.drawSiteMarks(ctx, b, z);
     }
+    const glow = 0.6 + 0.4 * Math.sin(now / 350);
+    for (const m of this.crateMarks(seen, known)) {
+      if (inRect(m.x, m.y, 30)) drawCrateTop(ctx, m.x, m.y, m.ground ? 16 : 13, z, m.ground ? glow : 0);
+    }
 
     // Auswahl und Hover (unter den Einheiten); Besatzer eines Hauses: Rahmen ums Haus
     for (const e of this.ringed(sel)) if (shown(e)) this.drawSelectRing(ctx, e, '#f2f5f2', z, false);
@@ -186,6 +191,7 @@ export class Renderer {
           if (t) aim = Math.atan2(t.y - u.y, t.x - u.x);
         }
         drawUnit(ctx, u, g.teams[u.team].color, z, aim, now);
+        if (u.crate) drawCrateTop(ctx, u.x + 4, u.y - 6, 10, z); // Kiste auf dem Rücken
       }
     }
 
@@ -429,6 +435,8 @@ export class Renderer {
       if (!b.alive || (b.team !== team && !known(b.x, b.y)) || !inRect(b.x, b.y, PAD)) continue;
       items.push({ k: cam.depth(b.x, b.y), t: 4, o: b });
     }
+    for (const m of this.crateMarks(seen, known)) if (inRect(m.x, m.y, 40)) items.push({ k: cam.depth(m.x, m.y), t: 8, o: m });
+    const glow = 0.6 + 0.4 * Math.sin(now / 350);
     const air = [];
     for (const u of g.units) {
       if (!u.alive || u.house || !shown(u) || !inRect(u.x, u.y, PAD)) continue;
@@ -479,6 +487,7 @@ export class Renderer {
       else if (it.t === 2) drawRock(ctx, cam, it.o);
       else if (it.t === 6) drawCar(ctx, cam, it.o);
       else if (it.t === 7) drawBench(ctx, cam, it.o);
+      else if (it.t === 8) drawCrate(ctx, cam, it.o.x, it.o.y, it.o.ground ? 16 : 13, 0, it.o.ground ? glow : 0);
       else if (it.t === 4) {
         const b = it.o;
         drawTeamBuilding(ctx, cam, b, g.teams[b.team].color);
@@ -487,7 +496,13 @@ export class Renderer {
           setUprightAt(ctx, cam, dpr, p.x, p.y, b.x, b.y);
           this.drawSiteMarks(ctx, b, z);
         }
-      } else drawU(it.o);
+      } else {
+        drawU(it.o);
+        if (it.o.crate) {
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          drawCrate(ctx, cam, it.o.x, it.o.y, 10, unitLift(it.o) + 14); // Kiste auf dem Rücken
+        }
+      }
       cam.unpin();
     }
     for (const u of air) drawU(u);
@@ -572,6 +587,21 @@ export class Renderer {
     if (v.placement && !v.placement.ok && v.placement.reason && Number.isFinite(v.placement.x)) {
       this.drawNote(ctx, cam.worldToScreen(v.placement.x, v.placement.y), v.placement.reason);
     }
+  }
+
+  /**
+   * Kisten zum Zeichnen: am Boden, wie das Team sie zuletzt gesehen hat (nur in erkundeten Zellen; Debug: alle), und eingelagerte bei
+   * eigenen FOBs oder in Sicht. Getragene zeichnet die Einheit. → [{ x, y, ground }]
+   */
+  crateMarks(seen, known) {
+    const g = this.game;
+    const out = [];
+    for (const c of g.crates ?? []) {
+      if (c.state === 'stored' && (c.holder === this.team || seen(c.x, c.y))) out.push({ x: c.x, y: c.y, ground: false });
+      else if (c.state === 'ground' && this.revealAll) out.push({ x: c.x, y: c.y, ground: true });
+    }
+    if (!this.revealAll) for (const m of g.crateSeen?.[this.team]?.values() ?? []) if (known(m.x, m.y)) out.push({ x: m.x, y: m.y, ground: true });
+    return out;
   }
 
   /** Geländehöhe, auf der ein Objekt der Tiefenliste steht: Gebäude auf ihrer tiefsten Ecke, sonst am Fußpunkt. */
@@ -826,6 +856,10 @@ export class Renderer {
       ctx.stroke();
     } else if (e.kind === 'house') {
       ctx.strokeRect(e.x - e.pw / 2 - 3, e.y - e.ph / 2 - 3, e.pw + 6, e.ph + 6);
+    } else if (e.kind === 'crate') {
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, 15, 0, Math.PI * 2);
+      ctx.stroke();
     } else {
       const half = (Math.max(e.w, e.h) * TILE) / 2 + 3;
       ctx.strokeRect(e.x - half, e.y - half, half * 2, half * 2);

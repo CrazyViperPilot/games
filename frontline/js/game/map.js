@@ -28,7 +28,7 @@ const reaches = (path, x, y) => path.length > 0 && path[path.length - 1].x === x
 /**
  * Erzeugt eine Karte. Scheitert die Platzierung oder ist die Karte nicht zusammenhängend,
  * wird mit seed + 1, + 2, … neu versucht (max. 20×).
- * @returns {{ width, height, tile, obstacles: {x,y,r}[], town: {roads, buildings, parks, cars, trees}, trees: {x,y,r}[] (Bäume außerhalb der Stadt; wie die Stadtbäume blockierend), spawns: {x,y}[], zone: {x,y,r}, relief: string (Höhengelände, relief.js) }}
+ * @returns {{ width, height, tile, obstacles: {x,y,r}[], town: {roads, buildings, parks, cars, trees}, trees: {x,y,r}[] (Bäume außerhalb der Stadt; wie die Stadtbäume blockierend), spawns: {x,y}[], zone: {x,y,r}, crates: {x,y}[] (Versorgungskisten), relief: string (Höhengelände, relief.js) }}
  */
 export function generateMap(seed) {
   for (let k = 0; k < MAX_ATTEMPTS; k++) {
@@ -66,7 +66,10 @@ function tryBuild(seed) {
   const outposts = buildOutposts(rng, obstacles, relief);
   town.buildings.push(...outposts.buildings);
   const trees = scatterTrees(rng, obstacles, outposts.areas, relief);
-  if (!isConnected(obstacles, town.buildings, [...town.trees, ...trees], relief)) return null;
+  const grid = blockGrid(obstacles, town.buildings, [...town.trees, ...trees], relief);
+  if (!isConnected(grid)) return null;
+  // 3. Versorgungskisten zuletzt: die Zufallszahlen davor (und damit alle bisherigen Karten) bleiben gleich
+  const crates = placeCrates(rng, grid);
 
   const map = {
     width: W,
@@ -77,6 +80,7 @@ function tryBuild(seed) {
     trees,
     spawns: SPAWNS.map((s) => ({ x: s.x, y: s.y })),
     zone: { x: CX, y: CY, r: ZONE_R },
+    crates,
   };
   setRelief(map, relief);
   return map;
@@ -103,12 +107,17 @@ function gentleZone(relief) {
   return true;
 }
 
-function isConnected(obstacles, buildings = [], trees = [], relief = null) {
+/** Raster mit allem, was den Weg versperrt (wie im Spiel). */
+function blockGrid(obstacles, buildings, trees, relief) {
   const grid = new Grid(W / TILE, H / TILE, TILE);
   grid.rasterizeObstacles(obstacles);
   grid.rasterizeRects(buildings);
   grid.rasterizeTrees(trees);
   grid.rasterizeRelief(relief);
+  return grid;
+}
+
+function isConnected(grid) {
   const [a, b] = SPAWNS;
   const cy = CY - RAIL_HALF - 20; // Zonenmitte liegt unter dem Zug: Nachbarpunkt prüfen
   if (!reaches(findPath(grid, a.x, a.y, CX, cy, 0), CX, cy)) return false;
@@ -382,4 +391,67 @@ function scatterTrees(rng, obstacles, keepOut = [], relief = null) {
     if (rng.next() < 0.5) add(x + 40, y + 20); // Baumgruppe
   }
   return trees;
+}
+
+const CRATE_CLEAR = 40; // so weit ringsum ist der Boden um eine Kiste frei und erreichbar
+const CRATE_ZONE = 350; // Abstand zur Zonenkante
+const CRATE_SPAWN = 1300; // Abstand zu den Startpunkten
+const CRATE_GAP = 900; // Abstand der Kisten untereinander
+
+/** Zellen, die Start 0 zu Fuß erreicht (Breitensuche über die Nachbarzellen). */
+function reachable(grid, from) {
+  const seen = new Uint8Array(grid.cols * grid.rows);
+  const c0 = grid.toCell(from.x);
+  const r0 = grid.toCell(from.y);
+  if (!grid.passable(c0, r0, 0)) return seen;
+  const queue = [grid.idx(c0, r0)];
+  seen[queue[0]] = 1;
+  for (let k = 0; k < queue.length; k++) {
+    const i = queue[k];
+    const c = i % grid.cols;
+    const r = (i - c) / grid.cols;
+    for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nc = c + dc;
+      const nr = r + dr;
+      if (!grid.passable(nc, nr, 0)) continue;
+      const j = grid.idx(nc, nr);
+      if (seen[j]) continue;
+      seen[j] = 1;
+      queue.push(j);
+    }
+  }
+  return seen;
+}
+
+/**
+ * Versorgungskisten (BALANCE.crates.pairs Paare, punktsymmetrisch) abseits von Zone und Startpunkten, auf freiem Boden, den Start 0
+ * erreicht (das Spiegelbild erreicht Start 1 genauso). Findet sich für ein Paar kein Platz, gibt es eben weniger Kisten.
+ */
+function placeCrates(rng, grid) {
+  const reach = reachable(grid, SPAWNS[0]);
+  const open = (x, y) =>
+    [[0, 0], [CRATE_CLEAR, 0], [-CRATE_CLEAR, 0], [0, CRATE_CLEAR], [0, -CRATE_CLEAR]].every(([dx, dy]) => {
+      const c = grid.toCell(x + dx);
+      const r = grid.toCell(y + dy);
+      return grid.inBounds(c, r) && reach[grid.idx(c, r)] === 1;
+    });
+  const crates = [];
+  for (let i = 0; i < BALANCE.crates.pairs; i++) {
+    for (let t = 0; t < 300; t++) {
+      const x = Math.round(rng.range(400, W - 400));
+      const y = Math.round(rng.range(400, H - 400));
+      const ok = [[x, y], [W - x, H - y]].every(
+        ([px, py]) =>
+          dist(px, py, CX, CY) > ZONE_R + CRATE_ZONE &&
+          !inRail(py, 80) &&
+          SPAWNS.every((s) => dist(px, py, s.x, s.y) > CRATE_SPAWN) &&
+          crates.every((c) => dist(px, py, c.x, c.y) > CRATE_GAP) &&
+          open(px, py),
+      );
+      if (!ok) continue;
+      crates.push({ x, y }, { x: W - x, y: H - y });
+      break;
+    }
+  }
+  return crates;
 }
