@@ -7,6 +7,7 @@ import { BUILDINGS } from '../data/buildings.js';
 import { makeRng } from '../core/rng.js';
 import { hasCommander } from '../game/commander.js';
 import { radioEta } from '../game/radio.js';
+import { weatherSight } from '../game/weather.js';
 
 const MAX_PLACE = 100; // canPlace-Aufrufe je Denkschritt (Budget für die Platzsuche)
 const DEF_RANGE = BALANCE.fob.buildRadius; // Bauradius = Verteidigungsradius einer FOB
@@ -37,6 +38,11 @@ const SCOUT_MONEY = UNITS.littlebird.cost.money; // Geld, ab dem ein Späher aus
 const SCOUT_FROM = 180; // s Spielzeit, ab der ein Späher gebaut wird
 const SCOUT_FUEL = 0.35; // Späher kehrt unter diesem Treibstoffanteil zur Haupt-FOB zurück
 const SCOUT_REFILL = 0.9; // und fliegt erst wieder aus, wenn der Tank so voll ist
+const WX_SCOUT_SIGHT = 0.9; // Sichtfaktor (Wetter), unter dem der Späher früher kommt:
+const WX_SCOUT_ARMY = 5; // schon ab so vielen Kampfeinheiten
+const WX_SCOUT_FROM = 90; // und ab dieser Spielzeit (s)
+const WX_FOG_SIGHT = 0.7; // Sichtfaktor (Nebel), bis zu dem die Welle die Deckung nutzt:
+const WX_FOG_WAVE = 0.85; // sie geht schon mit diesem Anteil der geforderten Stärke los
 const COUNTER_MIN = 8; // sichtbare gegnerische Kampfeinheiten, ab denen die Mischung angepasst wird
 const COUNTER_WEIGHT = 0.8; // Stärke der Anpassung (0 = Grundmischung)
 const RAID_MIN = 12; // Besatzung ab so vielen freien Einheiten schickt einen Überfall auf eine gegnerische FOB
@@ -998,7 +1004,10 @@ export class AI {
     const bird = s.units.find((u) => u.type === 'littlebird');
     if (!bird) {
       this.saveForScout = false;
-      if (!s.home || s.combat.length < SCOUT_MIN_ARMY || g.time < SCOUT_FROM || this.queued(s, 'littlebird')) return;
+      // schlechte Sicht (Regen, Nebel, Schnee): der Späher ist mehr wert und kommt früher
+      const bad = this.cfg.weather && weatherSight(g) < WX_SCOUT_SIGHT;
+      const minArmy = bad ? WX_SCOUT_ARMY : SCOUT_MIN_ARMY;
+      if (!s.home || s.combat.length < minArmy || g.time < (bad ? WX_SCOUT_FROM : SCOUT_FROM) || this.queued(s, 'littlebird')) return;
       if (g.teams[t].res.money < SCOUT_MONEY) {
         this.saveForScout = true; // produce spart, bis der Späher bezahlbar ist
         return;
@@ -1257,6 +1266,29 @@ export class AI {
     g.issue(this.team, { type: 'move', ids: [c.id], x: goal.x, y: goal.y });
   }
 
+  /** Geforderte Stärke (Geldwert) der nächsten Welle; inside = sichtbare Gegner in der Zone. */
+  waveNeed(inside) {
+    const g = this.game;
+    const t = this.team;
+    const z = g.zone;
+    let need = this.cfg.attackStrength;
+    if (z.owner >= 0 && z.owner !== t && z.counts[z.owner] > 0) {
+      // Gegner hält die Zone: Gegenangriff schon ab 1,2× seiner Besatzung (Zonengeld ist sein Vorteil).
+      // Besitz und Anzahl in der Zone sind öffentlich; die Stärke wird mit dem mittleren Einheitenwert geschätzt.
+      // Welle bündeln: nie schwächer losziehen als 1,2× die Besatzung (kleine Gruppen würden nur verheizt).
+      // Schätzung: sind fast alle Besatzer sichtbar (Späher), zählt ihr echter Wert, sonst Anzahl × Mittelwert.
+      const seen = inside.filter((e) => e.team === z.owner);
+      const seenValue = seen.reduce((sum, e) => sum + (UNITS[e.type].cost.money || 0), 0);
+      const threat = seen.length >= 0.7 * z.counts[z.owner] ? seenValue : z.counts[z.owner] * THREAT_PER_UNIT;
+      need = Math.max(need, WAVE_ODDS * threat);
+    }
+    // Geduld: je länger keine Welle losging, desto weniger Stärke braucht die nächste (nie unter 60 %).
+    need *= Math.max(WAVE_MIN, 1 - (g.time - this.lastWave) / WAVE_PATIENCE);
+    // Nebel als Deckung: der Gegner sieht die Welle erst spät, sie geht schon mit weniger Stärke los
+    if (this.cfg.weather && weatherSight(g) <= WX_FOG_SIGHT) need *= WX_FOG_WAVE;
+    return need;
+  }
+
   army(s) {
     const g = this.game;
     const t = this.team;
@@ -1282,19 +1314,7 @@ export class AI {
     if (ammoOk) {
       // Nur wer noch nicht in der Zone steht, zählt zur Welle (sonst gehen Nachrücker einzeln los, weil die Zonenbesatzung mitzählt).
       const strength = idle.filter((u) => !inZone(u)).reduce((sum, u) => sum + (UNITS[u.type].cost.money || 0), 0);
-      let need = this.cfg.attackStrength;
-      if (z.owner >= 0 && z.owner !== t && z.counts[z.owner] > 0) {
-        // Gegner hält die Zone: Gegenangriff schon ab 1,2× seiner Besatzung (Zonengeld ist sein Vorteil).
-        // Besitz und Anzahl in der Zone sind öffentlich; die Stärke wird mit dem mittleren Einheitenwert geschätzt.
-        // Welle bündeln: nie schwächer losziehen als 1,2× die Besatzung (kleine Gruppen würden nur verheizt).
-        // Schätzung: sind fast alle Besatzer sichtbar (Späher), zählt ihr echter Wert, sonst Anzahl × Mittelwert.
-        const seen = inside.filter((e) => e.team === z.owner);
-        const seenValue = seen.reduce((sum, e) => sum + (UNITS[e.type].cost.money || 0), 0);
-        const threat = seen.length >= 0.7 * z.counts[z.owner] ? seenValue : z.counts[z.owner] * THREAT_PER_UNIT;
-        need = Math.max(need, WAVE_ODDS * threat);
-      }
-      // Geduld: je länger keine Welle losging, desto weniger Stärke braucht die nächste (nie unter 60 %).
-      need *= Math.max(WAVE_MIN, 1 - (g.time - this.lastWave) / WAVE_PATIENCE);
+      const need = this.waveNeed(inside);
       const ready = strength >= need || (z.owner === -1 && strength >= 0.6 * need);
       if (ready) {
         let go = idle.filter((u) => !inZone(u));

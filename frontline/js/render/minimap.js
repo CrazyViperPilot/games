@@ -2,6 +2,7 @@
 // Zeichnet in Weltkoordinaten (Transformation Welt → Canvas) und nutzt dieselben Sichtregeln wie der Hauptrenderer.
 import { BALANCE } from '../data/balance.js';
 import { buildTerrain } from './terrain.js';
+import { seasonal } from './season.js';
 import { makeFogLayer, updateFogLayer } from './renderer.js';
 import { hexA, CRATE_MARK } from './sprites.js';
 
@@ -18,7 +19,7 @@ export class Minimap {
     this.camera = camera;
     this.team = team;
     this.revealAll = false; // wie Renderer.revealAll, von main.js mitsetzen
-    this.terrain = buildTerrain(game.map);
+    this.terrain = seasonal(buildTerrain(game.map), game.weather?.season ?? 'summer'); // Herbst- und Winterfarben
     this.fogLayer = makeFogLayer(game.fog[team]);
     this.dpr = 1;
     this.cssW = DEFAULT_SIZE;

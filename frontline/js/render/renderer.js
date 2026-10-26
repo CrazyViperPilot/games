@@ -41,6 +41,8 @@ import { drawTreeSprite, drawUnitSprite, drawWreckSprite, setTeamBuildings } fro
 import { scarAlpha } from '../game/scars.js';
 import { reliefOf } from '../game/relief.js';
 import { getGround, LIGHT_ELEV } from './ground.js';
+import { seasonal, setRoofSnow } from './season.js';
+import { drawWeather } from './weatherfx.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
@@ -102,7 +104,8 @@ export class Renderer {
     this.camera = camera;
     this.team = team;
     this.revealAll = false; // Debug: kein Nebel, alle Gegner sichtbar
-    this.terrain = buildTerrain(game.map);
+    this.season = game.weather?.season ?? 'summer'; // Herbst- und Winterfarben (season.js)
+    this.terrain = seasonal(buildTerrain(game.map), this.season);
     this.terrainIso = null; // Boden ohne Gebäude/Bäume, erst beim ersten Wechsel in die isometrische Ansicht
     this.terrainGL = null; // dasselbe ohne Gelände-Schattierung: Textur des WebGL-Bodens
     this.ground = null; // WebGL-Boden (ground.js), wenn die Karte Gelände hat und WebGL verfügbar ist
@@ -239,6 +242,10 @@ export class Renderer {
       updateFogLayer(this.fogLayer, g.fog[team], false);
       ctx.drawImage(this.fogLayer.canvas, 0, 0, this.fogLayer.canvas.width, this.fogLayer.canvas.height, 0, 0, W, H);
     }
+    // Regen, Schnee und Nebel über der Welt (Bildschirmkoordinaten), danach wieder die Welt-Transformation
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawWeather(ctx, g.weather, this.cssW, this.cssH, now, cam);
+    ctx.setTransform(dpr * z, 0, 0, dpr * z, (cam.viewW / 2 - cam.x * z) * dpr, (cam.viewH / 2 - cam.y * z) * dpr);
 
     // Lebensbalken: bei Auswahl, Hover oder Schaden
     for (const u of g.units) {
@@ -404,12 +411,13 @@ export class Renderer {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = true;
     if (relief) {
-      if (!this.terrainGL) this.terrainGL = buildTerrain(g.map, 'gl');
-      const img = this.ground.render(cam, this.cssW, this.cssH, dpr, relief, this.terrainGL, this.lightVec(), now / 1000, BG_RGB);
+      if (!this.terrainGL) this.terrainGL = seasonal(buildTerrain(g.map, 'gl'), this.season);
+      const snow = this.season === 'winter' ? 1 : 0;
+      const img = this.ground.render(cam, this.cssW, this.cssH, dpr, relief, this.terrainGL, this.lightVec(), now / 1000, BG_RGB, snow);
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.drawImage(img, 0, 0);
     } else {
-      if (!this.terrainIso) this.terrainIso = buildTerrain(g.map, 'iso');
+      if (!this.terrainIso) this.terrainIso = seasonal(buildTerrain(g.map, 'iso'), this.season);
       ctx.fillStyle = BG;
       ctx.fillRect(0, 0, this.cssW, this.cssH);
       setIsoGround(ctx, cam, dpr);
@@ -519,10 +527,14 @@ export class Renderer {
       if (it.t === 0) {
         const hs = g.houseBySrc?.get(it.o);
         if (hs && hs.ruined && known(hs.x, hs.y)) drawRubble(ctx, cam, it.o);
-        else drawTownBuilding(ctx, cam, it.o);
+        else {
+          setRoofSnow(this.season === 'winter'); // Winter: Schnee auf den Dächern der Stadt
+          drawTownBuilding(ctx, cam, it.o);
+          setRoofSnow(false);
+        }
       }
       else if (it.t === 1) {
-        if (!drawTreeSprite(ctx, cam, it.o)) drawTree(ctx, cam, it.o);
+        if (!drawTreeSprite(ctx, cam, it.o, this.season)) drawTree(ctx, cam, it.o, this.season);
       }
       else if (it.t === 2) drawRock(ctx, cam, it.o);
       else if (it.t === 6) drawCar(ctx, cam, it.o);
@@ -601,6 +613,8 @@ export class Renderer {
         ctx.drawImage(this.fogLayer.canvas, 0, 0, this.fogLayer.canvas.width, this.fogLayer.canvas.height, 0, 0, W, H);
       }
     }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawWeather(ctx, g.weather, this.cssW, this.cssH, now, cam); // Regen, Schnee und Nebel über der Welt
 
     // Balken und Warnzeichen aufrecht über den Objekten
     const upright = (wx, wy, lift) => {

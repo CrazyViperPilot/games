@@ -2,6 +2,7 @@
 // Die Spiellogik bleibt 2D; hier wird nur gezeichnet. Alle Funktionen zeichnen in CSS-Pixeln (Transform = dpr).
 import { BALANCE } from '../data/balance.js';
 import { shade, tint, hexA, fitText } from './sprites.js';
+import { snowy } from './season.js';
 
 const TILE = BALANCE.map.tile;
 const OUTLINE = 'rgba(0,0,0,0.55)';
@@ -72,7 +73,7 @@ export function drawBox(ctx, cam, x0, y0, x1, y1, h, color, opts = {}) {
     return { x: p.x, y: p.y - BASE };
   });
   const up = (p) => ({ x: p.x, y: p.y - H });
-  const roof = opts.roof ?? tint(color, 0.18);
+  const roof = snowy(opts.roof ?? tint(color, 0.18));
   ctx.save();
   ctx.lineJoin = 'round';
   ctx.lineWidth = 1;
@@ -163,7 +164,7 @@ export function drawRotBox(ctx, cam, cx, cy, len, wid, ang, h, color, opts = {})
   }
   const top = wp.map(up);
   poly(ctx, top);
-  ctx.fillStyle = opts.roof ?? tint(color, 0.18);
+  ctx.fillStyle = snowy(opts.roof ?? tint(color, 0.18));
   ctx.fill();
   ctx.stroke();
   ctx.restore();
@@ -194,8 +195,15 @@ export function wallQuad(w, t0, t1, h0, h1, off = 0) {
   return [wallPoint(w, t0, h0, off), wallPoint(w, t1, h0, off), wallPoint(w, t1, h1, off), wallPoint(w, t0, h1, off)];
 }
 
-/** Baum: Schatten, Stamm und zwei Kronenkugeln (aufrecht). */
-export function drawTree(ctx, cam, t) {
+// Kronenfarben je Jahreszeit (Ersatz, solange das Baum-Bild lädt): [unten, oben]; Herbst je Baum eine der Farben
+const CROWNS = {
+  summer: [['#244a22', '#34693a']],
+  autumn: [['#8a4a1c', '#b5702a'], ['#9a6a1e', '#c99a34'], ['#6f3a1a', '#9c4f22']],
+  winter: [['#55645a', '#e3e9ee']],
+};
+
+/** Baum: Schatten, Stamm und zwei Kronenkugeln (aufrecht), Krone nach Jahreszeit. */
+export function drawTree(ctx, cam, t, season = 'summer') {
   const z = cam.zoom;
   const p = cam.worldToScreen(t.x, t.y);
   const r = t.r * z;
@@ -205,11 +213,13 @@ export function drawTree(ctx, cam, t) {
   ctx.fill();
   ctx.fillStyle = '#4a3624';
   ctx.fillRect(p.x - r * 0.18, p.y - r * 1.1, r * 0.36, r * 1.1);
-  ctx.fillStyle = '#244a22';
+  const crowns = CROWNS[season] ?? CROWNS.summer;
+  const [lo, hi] = crowns[Math.abs(Math.round(t.x * 7 + t.y * 13)) % crowns.length];
+  ctx.fillStyle = lo;
   ctx.beginPath();
   ctx.arc(p.x, p.y - r * 1.5, r * 1.1, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = '#34693a';
+  ctx.fillStyle = hi;
   ctx.beginPath();
   ctx.arc(p.x - r * 0.25, p.y - r * 1.8, r * 0.75, 0, Math.PI * 2);
   ctx.fill();

@@ -5,6 +5,7 @@ import { buildHash, nearby } from './movement.js';
 import { damageHouse } from './garrison.js';
 import { addCrater } from './scars.js';
 import { auraCooldown } from './commander.js';
+import { weatherSight } from './weather.js';
 
 const SCAN = BALANCE.scanInterval;
 const MAX_UNIT_RADIUS = 16; // größter Einheitenradius (Trefferkreis-Suche)
@@ -313,6 +314,7 @@ export function updateCombat(game, dt) {
   }
 
   const hash = buildHash(units.filter((u) => u.alive));
+  const sightMul = weatherSight(game); // Regen, Nebel und Schnee verkürzen die Zielsuche
 
   for (const u of units) {
     if (!u.alive || !u.weapons.length || u.crate) continue; // Kistenträger haben die Hände voll
@@ -326,7 +328,7 @@ export function updateCombat(game, dt) {
     // idle / attackMove: automatische Zielsuche
     if (u.scanTimer <= 0) {
       u.scanTimer = SCAN;
-      const t = findTarget(game, hash, u, u.def.sight + reachBonus(game, u), 0, true, u.def.damage);
+      const t = findTarget(game, hash, u, u.def.sight * sightMul + reachBonus(game, u), 0, true, u.def.damage);
       u.targetId = t ? t.id : null;
     }
     if (u.targetId !== null) {

@@ -2,6 +2,7 @@
 // Jedes Menü setzt root.dataset.kind ('start' | 'pause' | 'help' | 'end'), damit die Tastatur weiß, was offen ist.
 import { BALANCE } from '../data/balance.js';
 import { listMaps, deleteMap, saveMap, normalizeMap, describeMap } from '../game/mapdata.js';
+import { WEATHER_SETTINGS } from '../game/weather.js';
 
 const DIFFS = [
   ['easy', 'Leicht'],
@@ -9,6 +10,7 @@ const DIFFS = [
   ['hard', 'Schwer'],
 ];
 const POINTS = [25, 50, 100];
+const WEATHER_LABELS = { off: 'Aus', random: 'Zufall', summer: 'Sommer', autumn: 'Herbst', winter: 'Winter' };
 const KEYS = [
   ['Linksklick / Tippen', 'Auswählen · Shift = hinzufügen · Doppelklick = alle dieses Typs im Bild · mit gewählten Einheiten: Boden = Gehen, Gegner = Angriff'],
   ['Ziehen (Maus)', 'Rahmenauswahl (nur Einheiten)'],
@@ -21,6 +23,7 @@ const KEYS = [
   ['A + Klick', 'Angriffsbewegung'],
   ['S', 'Stopp'],
   ['F', 'Formation wechseln: Locker, Linie, Keil, Kolonne (Panzer vorn, Gruppe marschiert geschlossen)'],
+  ['Wetter', 'Falls im Startmenü an: Regen und Schnee −20 % Sicht, Nebel −35 % · Schneefall bremst Fahrzeuge um 20 %, Winterboden um 10 % · das Wetter wechselt alle paar Minuten (Anzeige oben, antippen erklärt es) · bei schlechter Sicht lohnt ein Späher'],
   ['B', 'Baumenü: Baufahrzeug alles (E Mauer, R Tor, T Mörser, Z Flak, X Bohrer, G Sendemast, F FOB-Baustelle) · Soldaten nur E Mauer, R Tor'],
   ['Bauen', 'Gebäude brauchen einen Bauer daneben: Baufahrzeug oder Soldaten (nur Mauer/Tor, aus getragenem Baumaterial, im Bauradius einer FOB)'],
   ['Haupt-FOB', 'Ausbildung (nur hier, nur gegen Geld, zwei Einheiten gleichzeitig): Q Schütze · W PAK · T Scharfschütze · E LKW · R Baufahrzeug · A SPz · S KPz · D Little Bird · F Transporter · G AH-64 · C Kommandeur (einmalig)'],
@@ -63,6 +66,7 @@ export function hideOverlay(root) {
 
 const MAPSEL_KEY = 'frontline-kartenwahl';
 const RADIO_KEY = 'frontline-radio'; // Startmenü: Sendemast-Sieg an/aus
+const WEATHER_KEY = 'frontline-wetter'; // Startmenü: Wetter aus, Zufall oder feste Jahreszeit
 function readMapSel() {
   try {
     return localStorage.getItem(MAPSEL_KEY) || 'random';
@@ -86,6 +90,22 @@ function writeFlag(key, on) {
     /* ohne Speicher: gilt nur für diese Sitzung */
   }
 }
+/** Gemerkte Auswahl des Startmenüs (eine von `allowed`, sonst dflt). */
+function readChoice(key, allowed, dflt) {
+  try {
+    const v = localStorage.getItem(key);
+    return allowed.includes(v) ? v : dflt;
+  } catch {
+    return dflt;
+  }
+}
+function writeChoice(key, v) {
+  try {
+    localStorage.setItem(key, v);
+  } catch {
+    /* ohne Speicher: gilt nur für diese Sitzung */
+  }
+}
 function writeMapSel(v) {
   try {
     localStorage.setItem(MAPSEL_KEY, v);
@@ -94,12 +114,16 @@ function writeMapSel(v) {
   }
 }
 
-/** Startmenü: onStart({difficulty, winPoints, mapId, radio}) beim Klick auf Start (mapId 'random' oder Karten-ID, radio = Sendemast-Sieg). */
+/**
+ * Startmenü: onStart({difficulty, winPoints, mapId, radio, weather}) beim Klick auf Start (mapId 'random' oder Karten-ID, radio =
+ * Sendemast-Sieg, weather = 'off' | 'random' | Jahreszeit).
+ */
 export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.money, resetWallet = () => {} } = {}) {
   let difficulty = 'normal';
   let mapSel = readMapSel(); // 'random' | Karten-ID
   let winPoints = BALANCE.winPoints;
   let radio = readFlag(RADIO_KEY, true);
+  let weather = readChoice(WEATHER_KEY, WEATHER_SETTINGS, 'random');
   show(
     root,
     'start',
@@ -117,6 +141,10 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
       <div class="field">
         <span class="flabel" title="Sendemast: bauen und ${Math.round(BALANCE.radio.hold / 60)} min halten gewinnt ebenfalls">Sendemast-Sieg</span>
         <div class="seg"><button type="button" data-radio="1">An</button><button type="button" data-radio="0">Aus</button></div>
+      </div>
+      <div class="field">
+        <span class="flabel" title="Jahreszeit und wechselndes Wetter: Regen, Nebel und Schnee senken die Sicht, Schnee bremst Fahrzeuge">Wetter</span>
+        <div class="seg">${WEATHER_SETTINGS.map((k) => `<button type="button" data-weather="${k}">${WEATHER_LABELS[k]}</button>`).join('')}</div>
       </div>
       <div class="field">
         <span class="flabel">Karte</span>
@@ -147,6 +175,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
     root.querySelectorAll('[data-diff]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.diff === difficulty)));
     root.querySelectorAll('[data-pts]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.pts) === winPoints)));
     root.querySelectorAll('[data-radio]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.radio === '1') === radio)));
+    root.querySelectorAll('[data-weather]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.weather === weather)));
   };
   const renderMapBox = () => {
     const box = root.querySelector('[data-mapbox]');
@@ -243,13 +272,16 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
     else if (b.dataset.radio) {
       radio = b.dataset.radio === '1';
       writeFlag(RADIO_KEY, radio);
+    } else if (b.dataset.weather) {
+      weather = b.dataset.weather;
+      writeChoice(WEATHER_KEY, weather);
     }
     else if (b.dataset.act === 'resetWallet') {
       resetWallet();
       showWallet();
     } else if (b.dataset.act === 'start') {
       hideOverlay(root);
-      onStart({ difficulty, winPoints, mapId: mapSel, radio });
+      onStart({ difficulty, winPoints, mapId: mapSel, radio, weather });
       return;
     }
     mark();

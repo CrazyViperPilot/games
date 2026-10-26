@@ -44,6 +44,7 @@ uniform vec3 uLight;
 uniform float uTime;
 uniform float uWater;
 uniform float uSkirt;
+uniform float uSnow; // Winter (1): Schnee auf flachem Fels, Ufer und am Rand der Seen Eis
 varying vec2 vPos;
 varying float vH;
 varying vec2 vG;
@@ -64,7 +65,7 @@ void main() {
   float n1 = nz(vPos, 5.75);
   float n2 = nz(vPos + 91.0, 1.1);
   // Gras: oben trockener und heller
-  base *= mix(vec3(1.0), vec3(1.10, 1.05, 0.84), hh);
+  base *= mix(vec3(1.0), vec3(1.10, 1.05, 0.84), hh * (1.0 - uSnow));
   vec3 n = normalize(vec3(-vG * 1.9, 1.0));
   float lit = clamp(1.0 + 1.05 * (dot(n, uLight) - uLight.z), 0.6, 1.35);
   float rk = max(smoothstep(${RELIEF.rock.toFixed(2)}, ${(RELIEF.steep + 0.03).toFixed(2)}, slope + (n1 - 0.5) * 0.1), smoothstep(${(RELIEF.peak - 40).toFixed(1)}, ${RELIEF.peak.toFixed(1)}, vH));
@@ -83,15 +84,18 @@ void main() {
     float rl = clamp(1.0 + 1.35 * (dot(nr, uLight) - uLight.z), 0.42, 1.45);
     vec3 rock = mix(vec3(0.36, 0.34, 0.30), vec3(0.58, 0.55, 0.49), clamp(0.15 + hh * 0.35 + n1 * 0.35, 0.0, 1.0));
     rock *= (0.5 + 0.6 * v1.b) * (0.85 + 0.2 * v2.b);
+    // Winter: auf den flacheren Blöcken liegt Schnee, steile Wände bleiben dunkel
+    float drift = uSnow * (1.0 - smoothstep(${RELIEF.rock.toFixed(2)}, ${(RELIEF.steep + 0.08).toFixed(2)}, slope - (v1.b - 0.5) * 0.12));
+    rock = mix(rock, vec3(0.80, 0.83, 0.87) * (0.9 + 0.2 * v2.b), drift * 0.75);
     col = mix(col, rock, rk);
     shade = mix(lit, rl, rk);
   }
   // Geröll am Fuß der Felsen
   float scree = smoothstep(${(RELIEF.rock - 0.1).toFixed(2)}, ${RELIEF.rock.toFixed(2)}, slope) * (1.0 - rk);
-  col = mix(col, vec3(0.42, 0.40, 0.33) * (0.85 + 0.3 * n2), scree * 0.45);
-  // Ufer: Sand und nasser Kies
+  col = mix(col, vec3(0.42, 0.40, 0.33) * (0.85 + 0.3 * n2), scree * 0.45 * (1.0 - 0.6 * uSnow));
+  // Ufer: Sand und nasser Kies (im Winter verschneit)
   float shore = 1.0 - smoothstep(uWater + 1.0, uWater + 10.0, vH);
-  col = mix(col, vec3(0.60, 0.55, 0.41), shore * 0.85);
+  col = mix(col, mix(vec3(0.60, 0.55, 0.41), vec3(0.80, 0.83, 0.86), uSnow * 0.8), shore * 0.85);
   col *= shade * (0.95 + 0.1 * nz(vPos + 37.0, 0.5));
   if (vH < uWater) {
     float dpt = uWater - vH;
@@ -101,6 +105,9 @@ void main() {
     w += vec3(0.06, 0.08, 0.08) * smoothstep(1.1, 1.55, rip);
     w += vec3(0.05, 0.06, 0.06) * (1.0 - smoothstep(0.0, 14.0, dpt)); // heller Saum im flachen Wasser
     w = mix(w, vec3(0.78, 0.84, 0.82), (1.0 - smoothstep(0.0, 2.2, dpt)) * 0.55);
+    // Winter: kälteres Wasser, am Ufer ein Eisrand
+    w = mix(w, w * vec3(0.82, 0.95, 1.08), uSnow);
+    w = mix(w, vec3(0.80, 0.87, 0.92), uSnow * (1.0 - smoothstep(2.0, 9.0 + 6.0 * n2, dpt)) * 0.85);
     col = w;
   }
   gl_FragColor = vec4(col, 1.0);
@@ -434,10 +441,11 @@ class Ground {
   }
 
   /**
-   * Boden zeichnen. tex = Bodenbild (Canvas ohne Gebäude und Bäume), light = Lichtvektor in Weltkoordinaten (z nach oben).
+   * Boden zeichnen. tex = Bodenbild (Canvas ohne Gebäude und Bäume), light = Lichtvektor in Weltkoordinaten (z nach oben),
+   * snow = 1 im Winter (Schnee auf Fels und Ufer, Eisrand an den Seen).
    * Liefert das Canvas (Hintergrund bg außerhalb der Karte).
    */
-  render(cam, cssW, cssH, dpr, relief, tex, light, time, bg) {
+  render(cam, cssW, cssH, dpr, relief, tex, light, time, bg, snow = 0) {
     const gl = this.gl;
     if (tex !== this.texSrc) this.uploadTexture(tex);
     const u = this.begin(cam, cssW, cssH, dpr, relief, this.ground);
@@ -452,6 +460,7 @@ class Ground {
     gl.uniform1i(u.uNoise, 2);
     gl.uniform3f(u.uLight, light[0], light[1], light[2]);
     gl.uniform1f(u.uTime, time);
+    gl.uniform1f(u.uSnow, snow);
     gl.uniform1f(u.uSkirt, 0);
     this.bindMesh(this.posBuf, this.hBuf, this.idxBuf);
     gl.drawElements(gl.TRIANGLES, this.count, gl.UNSIGNED_INT, 0);

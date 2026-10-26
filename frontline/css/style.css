@@ -118,6 +118,22 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .clock { margin-left: auto; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 .time { font-weight: 700; font-variant-numeric: tabular-nums; min-width: 44px; text-align: right; }
+.wx {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: #ffffff0d;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.wx svg { width: 16px; height: 16px; flex: none; }
+.wx-name { color: var(--text); white-space: nowrap; }
+.wx-name small { color: var(--muted); font-weight: 600; }
 .dbg {
   padding: 2px 6px;
   border-radius: 4px;
@@ -426,6 +442,8 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .hotz, .radioz { min-width: 0; }
   .clock { gap: 4px; }
   .clock .btn-sm { padding: 0 7px; }
+  .wx { padding: 0 5px; }
+  .wx-name { display: none; }
 }
 
 /* Kartenwahl im Startmenü */

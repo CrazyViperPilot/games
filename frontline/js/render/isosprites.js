@@ -3,6 +3,7 @@
 // Austausch: Dateien in assets/iso/ ersetzen oder die Listen unten anpassen.
 import { ISO_K } from './camera.js';
 import { spriteOverrides } from './isobuild.js';
+import { seasonal } from './season.js';
 import { BUILDING_SPRITES, TRAIN_SPRITES, TEAM_SPRITES, INFANTRY_SPRITES, TEAM_PPU, UNIT_PPU, MODEL_PPU } from './isodata.js';
 
 const ENABLED = typeof Image !== 'undefined' && typeof location !== 'undefined' && new URLSearchParams(location.search).get('sprites') !== '0';
@@ -125,8 +126,10 @@ if (ENABLED) {
 }
 
 /** Baum (aufrecht, Fuß am Weltpunkt). Liefert false, wenn das Bild fehlt. */
-export function drawTreeSprite(ctx, cam, t) {
+export function drawTreeSprite(ctx, cam, t, season = 'summer') {
   if (!ready(TREE)) return false;
+  // Jahreszeit: Herbstlaub in drei Färbungen (je Baum fest), Winter mit Schnee auf der Krone (season.js)
+  const img = seasonal(TREE, season, 'tree', 2, season === 'autumn' ? hash(t.x, t.y) % 3 : 0);
   const z = cam.zoom;
   const p = cam.worldToScreen(t.x, t.y);
   const r = t.r * z;
@@ -135,7 +138,7 @@ export function drawTreeSprite(ctx, cam, t) {
   ctx.beginPath();
   ctx.ellipse(p.x, p.y + r * 0.1, r * 0.9, r * 0.45, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.drawImage(TREE, p.x - (TREE.naturalWidth * s) / 2, p.y - TREE.naturalHeight * s + 3 * s, TREE.naturalWidth * s, TREE.naturalHeight * s);
+  ctx.drawImage(img, p.x - (TREE.naturalWidth * s) / 2, p.y - TREE.naturalHeight * s + 3 * s, TREE.naturalWidth * s, TREE.naturalHeight * s);
   return true;
 }
 

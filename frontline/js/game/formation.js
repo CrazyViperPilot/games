@@ -3,6 +3,7 @@
 // langsamsten Bodeneinheit, wer vorausläuft, bremst, wer zurückliegt, holt mit eigenem Tempo auf. Hubschrauber fliegen locker mit.
 import { BALANCE } from '../data/balance.js';
 import { nearestPassable } from './movement.js';
+import { weatherSpeed } from './weather.js';
 
 export const FORMATIONS = ['loose', 'line', 'wedge', 'column'];
 export const FORMATION_NAMES = { loose: 'Locker', line: 'Linie', wedge: 'Keil', column: 'Kolonne' };
@@ -131,16 +132,19 @@ function pathLeft(u) {
  * Tempo der Formationen je Schritt (vor der Bewegung): Grundtempo der langsamsten Einheit. Maßstab ist der Nachzügler (größter
  * Restweg): wer mehr als `lead` px vor ihm liegt, bremst bis auf `slowest`, damit die Formation geschlossen bleibt; wer mehr als `lag` px
  * hinter dem Mittel (Median) liegt, fährt sein eigenes Tempo und holt auf. Wer seit `stuck` s nicht vorankommt (festgefahren), zählt
- * nicht als Nachzügler. Setzt u.formMul. Aufgelöste Gruppen (kein Mitglied mehr im Formationsbefehl) werden entfernt.
+ * nicht als Nachzügler. Setzt u.formMul. Aufgelöste Gruppen (kein Mitglied mehr im Formationsbefehl) werden entfernt. Bremst Schnee
+ * die Fahrzeuge unter das Grundtempo, gilt deren Tempo (weather.js).
  */
 export function updateFormations(game) {
   for (const [id, f] of game.formations) {
     const members = [];
+    let slow = f.speed;
     for (const uid of f.ids) {
       const u = game.getEntity(uid);
       if (!u || u.order.form !== id) continue;
       if (u.order.type !== 'move' && u.order.type !== 'attackMove') continue;
       u.formMul = 1;
+      if (!u.def.air) slow = Math.min(slow, u.def.speed * weatherSpeed(game, u));
       if (u.targetId !== null || u.pathIndex >= u.path.length) continue; // im Gefecht oder angekommen
       const left = pathLeft(u);
       const p = (f.progress ??= new Map()).get(uid);
@@ -156,7 +160,7 @@ export function updateFormations(game) {
     const moving = members.filter((m) => !m.stuck);
     const rear = moving.length ? Math.max(...moving.map((m) => m.left)) : median;
     for (const m of members) {
-      let k = f.speed / m.u.def.speed;
+      let k = slow / (m.u.def.speed * weatherSpeed(game, m.u));
       const lead = rear - m.left; // > 0: vor dem Nachzügler
       if (m.left - median > F.lag) k = 1;
       else if (lead > F.lead) k *= Math.max(F.slowest, 1 - (lead - F.lead) / F.brake);

@@ -6,6 +6,16 @@ import { lacksAmmo, isFoe } from '../game/entities.js';
 import { storedCrates } from '../game/crates.js';
 import { heightMult } from '../game/combat.js';
 import { radios, radioLeft } from '../game/radio.js';
+import { SEASON_NAMES, WEATHER_NAMES, weatherEffect } from '../game/weather.js';
+
+// Wettersymbole (16 × 16, Strichfarbe = currentColor)
+const WX_ICON = {
+  clear: '<circle cx="8" cy="8" r="3" fill="currentColor"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/>',
+  rain: '<path d="M4.5 9.5h7a2.4 2.4 0 0 0 .2-4.8A3.4 3.4 0 0 0 5.2 4.6 2.5 2.5 0 0 0 4.5 9.5z" fill="currentColor" stroke="none"/><path d="M5.5 11.5l-1 2.5M8.5 11.5l-1 2.5M11.5 11.5l-1 2.5"/>',
+  fog: '<path d="M2 4.5h12M3.5 8h10M2 11.5h12"/>',
+  snow: '<path d="M8 1.8v12.4M2.6 4.9l10.8 6.2M2.6 11.1l10.8-6.2M6.6 2.6L8 4l1.4-1.4M6.6 13.4L8 12l1.4 1.4"/>',
+};
+const WX_COLOR = { clear: '#f2c94c', rain: '#8fb3d9', fog: '#c8ccc4', snow: '#e8f1fb' };
 import { builderState, fobLabel, orderText } from './status.js';
 
 const RES_KEYS = ['money', 'bm', 'mun', 'fuel'];
@@ -77,6 +87,8 @@ export class Hud {
     this.zoneEl = q('[data-zone]');
     this.hotEl = q('[data-hot]');
     this.radioEl = q('[data-radio]');
+    this.wxEl = q('[data-wx]');
+    this.wxKey = '';
     this.capFill = q('[data-cap]');
     this.speedBtn = q('[data-act=speed]');
     this.pauseBtn = q('[data-act=pause]');
@@ -120,6 +132,7 @@ export class Hud {
         <div class="zone radioz" data-radio hidden title="Sendemast: steht er die volle Zeit, gewinnt sein Team. Zerstören setzt die Zeit zurück."></div>
         <div class="clock">
           ${this.app.debug ? '<span class="dbg">DEBUG</span>' : ''}
+          ${g.weather?.on ? '<button type="button" class="wx" data-act="weather" data-wx></button>' : ''}
           <span class="time" data-time>00:00</span>
           <button type="button" class="btn-sm" data-act="speed" title="Spielgeschwindigkeit (+ / -)">1×</button>
           <button type="button" class="btn-sm" data-act="pause" title="Pause (P)">Pause</button>
@@ -146,6 +159,7 @@ export class Hud {
       else if (act.dataset.act === 'view') this.app.toggleView?.();
       else if (act.dataset.act === 'rotl') this.app.rotateView?.(-1);
       else if (act.dataset.act === 'rotr') this.app.rotateView?.(1);
+      else if (act.dataset.act === 'weather') this.controller.message(this.weatherText());
       return;
     }
     const cb = e.target.closest('.cbtn');
@@ -250,11 +264,33 @@ export class Hud {
         .map((b) => `<span class="radio-row" style="color:${BALANCE.teamColors[b.team]}">Mast ${BALANCE.teamNames[b.team]} <b>${fmtTime(radioLeft(b))}</b></span>`)
         .join('');
     }
+    this.updateWeather();
     this.timeEl.textContent = fmtTime(g.time);
     const st = this.app.status ? this.app.status() : { paused: false, speed: 1 };
     this.speedBtn.textContent = `${st.speed}×`;
     this.pauseBtn.textContent = st.paused ? 'Weiter' : 'Pause';
     this.viewBtn.textContent = this.controller.camera.iso ? 'Iso' : '2D';
+  }
+
+  /** Wetter in Worten: „Winter, Nebel: Sicht −35 %, Fahrzeuge −10 %“. */
+  weatherText() {
+    const w = this.game.weather;
+    const eff = weatherEffect(w.kind, w.season);
+    return `${SEASON_NAMES[w.season]}, ${WEATHER_NAMES[w.kind]}${eff ? `: ${eff}` : ': keine Einschränkung'}`;
+  }
+
+  /** Wetteranzeige oben (Symbol und Name; nur neu, wenn sich etwas ändert). */
+  updateWeather() {
+    const w = this.game.weather;
+    if (!this.wxEl || !w?.on) return;
+    const key = `${w.season}/${w.kind}`;
+    if (key === this.wxKey) return;
+    this.wxKey = key;
+    this.wxEl.style.color = WX_COLOR[w.kind];
+    this.wxEl.title = `${this.weatherText()} (antippen für Details)`;
+    this.wxEl.innerHTML =
+      `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">${WX_ICON[w.kind]}</svg>` +
+      `<span class="wx-name"><small>${SEASON_NAMES[w.season]}</small> ${WEATHER_NAMES[w.kind]}</span>`;
   }
 
   updateSelection() {

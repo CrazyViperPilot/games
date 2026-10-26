@@ -2,6 +2,7 @@
 import { BALANCE } from '../data/balance.js';
 import { findPath, lineOfSight } from './pathfinding.js';
 import { inRange, resolveTarget, isFoe } from './entities.js';
+import { weatherSpeed } from './weather.js';
 
 const REPATH = 1.0; // Neuplanung bei Verfolgung (s)
 const BLOCK_REPATH = 0.5; // Neuplanung nach blockiertem Wegpunkt (s)
@@ -387,7 +388,8 @@ export function separate(game) {
 
 /**
  * Bewegt die Einheiten um dt (ohne LKW- und Bauaufträge; die fahren logistics.js bzw. construction.js).
- * Setzt Repath-Timer und Tempo (25 % bei Fahrzeugen ohne Treibstoff, carrySpeed mit Kiste). Trennung: separate(game).
+ * Setzt Repath-Timer und Tempo (25 % bei Fahrzeugen ohne Treibstoff, carrySpeed mit Kiste, Schnee und Winterboden bremsen
+ * Bodenfahrzeuge). Trennung: separate(game).
  */
 export function updateMovement(game, dt) {
   for (const u of game.units) {
@@ -395,6 +397,7 @@ export function updateMovement(game, dt) {
     u.repathTimer = Math.max(0, u.repathTimer - dt);
     u.speedMul = (u.def.fuelPerSec || 0) > 0 && u.fuel <= 0 ? BALANCE.fuelSlowMul : 1;
     if (u.crate) u.speedMul *= BALANCE.crates.carrySpeed; // Kistenträger gehen langsamer
+    u.speedMul *= weatherSpeed(game, u); // Schnee und Winterboden (weather.js)
     if (u.order.form && u.formMul) u.speedMul *= u.formMul; // Formation fährt geschlossen (formation.js)
     if (u.house || OWN_DRIVERS.has(u.order.type)) continue; // Besatzer eines Hauses bewegen sich nicht
     stepUnit(game, u, dt);

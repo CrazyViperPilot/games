@@ -23,6 +23,7 @@ import { createAnimals, updateAnimals } from './animals.js';
 import { FORMATIONS, formationSlots, updateFormations } from './formation.js';
 import { hasCommander, updateCommanders, commanderFallen } from './commander.js';
 import { updateRadio, radioStarted, radioLost } from './radio.js';
+import { createWeather, updateWeather } from './weather.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
@@ -130,7 +131,8 @@ function lineCells(c0, r0, c1, r1) {
 export class Game {
   /** `map`: fertige Karte (Editor/gespeichert, siehe mapdata.js); ohne sie wird sie aus dem Seed erzeugt. */
   /** radio: Sendemast als zweite Siegbedingung (Startmenü; ohne Angabe aus). */
-  constructor({ seed = 1, winPoints = BALANCE.winPoints, startMoney = BALANCE.startRes.money, map = null, radio = false } = {}) {
+  /** weather: 'off' | 'random' | 'summer' | 'autumn' | 'winter' (Wetter und Jahreszeit, weather.js; ohne Angabe aus). */
+  constructor({ seed = 1, winPoints = BALANCE.winPoints, startMoney = BALANCE.startRes.money, map = null, radio = false, weather = 'off' } = {}) {
     this.seed = seed;
     this.rng = makeRng(seed);
     this.map = map ?? generateMap(seed);
@@ -200,6 +202,7 @@ export class Game {
     createHouses(this); // Stadthäuser zum Besetzen (Häuserkampf)
     createCrates(this); // Versorgungskisten der Karte
     createAnimals(this); // Rehe und Wildschweine (nur Optik)
+    createWeather(this, weather); // Jahreszeit und Wetter (eigener Zufall)
     this.updateFog();
   }
 
@@ -1024,7 +1027,9 @@ export class Game {
       return;
     }
     this.time += dt;
-    // Reihenfolge: Wirtschaft setzt team.rate zurück; Bewegung, Logistik und Bau fahren; Kampf, Zone, Einkommen zuletzt
+    // Reihenfolge: Wetter zuerst (Sicht und Tempo); Wirtschaft setzt team.rate zurück; Bewegung, Logistik und Bau fahren; Kampf, Zone,
+    // Einkommen zuletzt
+    updateWeather(this, dt);
     updateEconomy(this, dt);
     updateGarrison(this, dt);
     updateFormations(this);

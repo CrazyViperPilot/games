@@ -4,6 +4,7 @@
 import { BALANCE } from '../data/balance.js';
 import { drawBox, drawRotBox, wallPoint, wallQuad, buildingHeight, TOWN_H } from './iso.js';
 import { shade, tint, hexA } from './sprites.js';
+import { snowy } from './season.js';
 
 const TILE = BALANCE.map.tile;
 const OUTLINE = 'rgba(0,0,0,0.55)';
@@ -112,6 +113,7 @@ function plinth(ctx, w, color, floorAt = 0) {
 /** Satteldach über dem Quader (First entlang der langen Seite); keine Rückseiten. */
 function gableRoof(ctx, cam, x0, y0, x1, y1, H, rh, roofCol, wallCol) {
   const z = cam.zoom;
+  roofCol = snowy(roofCol); // Winter: Schnee auf dem Dach (season.js)
   const P = (x, y, h) => {
     const p = cam.worldToScreen(x, y);
     return { x: p.x, y: p.y - h * z };
