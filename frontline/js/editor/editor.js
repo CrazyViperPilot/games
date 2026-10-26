@@ -10,7 +10,10 @@ import { Renderer } from '../render/renderer.js';
 import { setIsoGround, TOWN_H } from '../render/iso.js';
 import { ISO_K } from '../render/camera.js';
 import { Game } from '../game/game.js';
-import { createEmptyMap, normalizeMap, checkMap, accessRoutes, describeMap, loadMap, saveMap, MAX_CRATES, MAX_FIELDS, FIELD_CROPS } from '../game/mapdata.js';
+import { createEmptyMap, normalizeMap, checkMap, accessRoutes, describeMap, loadMap, saveMap, MAX_CRATES, MAX_FIELDS, FIELD_CROPS, MAX_FORDS, MAX_BRIDGES, BRIDGE_LEN } from '../game/mapdata.js';
+import { RIVER_SIZE, riverHeight } from '../game/landscape.js';
+import { bridgeShape } from '../game/river.js';
+import { drawBridgeTop, fordPosts, drawFordPostTop } from '../render/bridge.js';
 import { drawCrate } from '../render/sprites.js';
 import { Relief, RELIEF, COARSE_N, reliefOf, setRelief } from '../game/relief.js';
 import { reliefTiles, updateReliefTiles, drawReliefTiles } from '../render/reliefimg.js';
@@ -50,6 +53,9 @@ const TOOLS = [
   ['lower', 'Senken', 'Gelände', '▼', 'Gedrückt halten oder ziehen senkt das Gelände, unter dem Wasserspiegel entsteht ein See'],
   ['smooth', 'Glätten', 'Gelände', '∿', 'Ziehen glättet Kanten und steile Hänge'],
   ['flatten', 'Ebnen', 'Gelände', '—', 'Ziehen ebnet auf die Höhe am Startpunkt ein, etwa für einen Weg über einen Hügel'],
+  ['river', 'Fluss', 'Fluss', '≈', 'Ziehen gräbt ein Flussbett mit Ufern (Wasser ist unpassierbar); mehrere Striche ergeben einen gewundenen Fluss'],
+  ['ford', 'Furt', 'Fluss', '⋯', `Tippen auf den Fluss legt eine Furt an: seichtes Wasser, durch das Bodeneinheiten mit halbem Tempo kommen (höchstens ${MAX_FORDS})`],
+  ['bridge', 'Brücke', 'Fluss', '⊟', `Von Ufer zu Ufer über das Wasser ziehen (${BRIDGE_LEN[0]}–${BRIDGE_LEN[1]} px, beide Enden auf festem Grund): zerstörbar, Baufahrzeuge bauen sie wieder auf`],
   ['spawn0', 'Start Blau', 'Spiel', '①', 'Tippen setzt den Startpunkt von Blau (Haupt-FOB)'],
   ['spawn1', 'Start Rot', 'Spiel', '②', 'Tippen setzt den Startpunkt von Rot (Haupt-FOB)'],
   ['zone', 'Zone', 'Spiel', '◎', 'Tippen setzt die Mitte der Konfliktzone'],
@@ -230,6 +236,8 @@ function listOf(k) {
     case 'townTree': return m.town.trees;
     case 'obstacle': return m.obstacles;
     case 'crate': return m.crates;
+    case 'ford': return (m.fords ??= []);
+    case 'bridge': return (m.bridges ??= []);
     default: return null;
   }
 }
@@ -252,6 +260,7 @@ function pickAt(wx, wy, sx = null, sy = null) {
   for (let i = m.crates.length - 1; i >= 0; i--) {
     if (Math.hypot(m.crates[i].x - wx, m.crates[i].y - wy) < 18 + tol) return { k: 'crate', o: m.crates[i] };
   }
+  for (const b of m.bridges ?? []) if (distToSeg(wx, wy, b) <= BALANCE.river.deck / 2 + tol) return { k: 'bridge', o: b };
   const circ = (k, list, grow = 0) => {
     for (let i = list.length - 1; i >= 0; i--) {
       const o = list[i];
@@ -305,6 +314,7 @@ function pickAt(wx, wy, sx = null, sy = null) {
     if (Math.abs(lx) <= f.w / 2 + tol * 0.4 && Math.abs(ly) <= f.h / 2 + tol * 0.4) return { k: 'field', o: f };
   }
   if (Math.hypot(m.zone.x - wx, m.zone.y - wy) <= 90 + tol) return { k: 'zone', o: m.zone };
+  for (const f of m.fords ?? []) if (Math.hypot(f.x - wx, f.y - wy) <= f.r + tol) return { k: 'ford', o: f };
   return null;
 }
 
@@ -381,6 +391,21 @@ function place(tool, x, y) {
       m.zone.x = px;
       m.zone.y = py;
       return { k: 'zone', o: m.zone };
+    case 'ford': {
+      if ((m.fords ?? []).length >= MAX_FORDS) {
+        say(`Höchstens ${MAX_FORDS} Furten je Karte`, true);
+        return null;
+      }
+      const relief = reliefOf(m);
+      if (!relief || relief.heightAt(x, y) >= RELIEF.water) {
+        say('Eine Furt gehört ins Wasser: erst mit „Fluss“ ein Flussbett graben, dann darauf tippen.', true);
+        return null;
+      }
+      const o = { x: Math.round(x), y: Math.round(y), r: RIVER_SIZE.fordR };
+      (m.fords ??= []).push(o);
+      shapeFord(o);
+      return { k: 'ford', o };
+    }
     case 'crate': {
       if (m.crates.length >= MAX_CRATES) {
         say(`Höchstens ${MAX_CRATES} Versorgungskisten je Karte`, true);
@@ -459,7 +484,7 @@ function placeAlongRail(o, tool, x, y) {
 
 function moveObj(sel, dx, dy) {
   const o = sel.o;
-  if (sel.k === 'road' || sel.k === 'rail') {
+  if (sel.k === 'road' || sel.k === 'rail' || sel.k === 'bridge') {
     o.x1 += dx; o.y1 += dy; o.x2 += dx; o.y2 += dy;
   } else {
     o.x = clamp(o.x + dx, 0, W);
@@ -494,6 +519,7 @@ function syncGhost() {
   g.zone.y = m.zone.y;
   g.zone.r = m.zone.r;
   g.hot.x = g.hot.y = -1e6; // Hot Zone gibt es erst im Spiel
+  g.bridges = (m.bridges ?? []).map((src, k) => bridgeShape(src, reliefOf(m), -10000 - k)); // Brücken folgen der Karte
   r.deco = null;
   // Boden (Straßen, Parks, Bahn, Hindernisse) neu backen, aber nicht während des Ziehens
   if (st.groundDirty && !st.gesture) {
@@ -591,6 +617,22 @@ function draw() {
     world(c.x, c.y);
     drawCrate(ctx, c.x, c.y, Math.max(12 * px, 18), z, 1);
   }
+  if (!iso) {
+    // Brücken und Furten (isometrisch zeichnet sie der Spiel-Renderer)
+    world();
+    const relief = reliefOf(m);
+    (m.bridges ?? []).forEach((src, k) => drawBridgeTop(ctx, bridgeShape(src, relief, -10000 - k)));
+    for (const p of fordPosts(m, relief)) drawFordPostTop(ctx, p);
+    ctx.strokeStyle = 'rgba(200,235,255,0.55)';
+    ctx.lineWidth = 1.5 * px;
+    ctx.setLineDash([8 * px, 6 * px]);
+    for (const f of m.fords ?? []) {
+      ctx.beginPath();
+      ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
   if (st.sel) {
     const o = st.sel.o;
     if (o.x1 !== undefined) world((o.x1 + o.x2) / 2, (o.y1 + o.y2) / 2);
@@ -601,9 +643,9 @@ function draw() {
   const g = st.gesture;
   if (g && g.type === 'line') {
     world((g.x1 + g.x2) / 2, (g.y1 + g.y2) / 2);
-    ctx.strokeStyle = g.kind === 'rail' ? '#6b665c' : g.dirt ? '#7b6a48' : '#4d504c';
+    ctx.strokeStyle = g.kind === 'river' ? 'rgba(70,130,170,0.6)' : g.kind === 'bridge' ? 'rgba(150,145,135,0.85)' : g.kind === 'rail' ? '#6b665c' : g.dirt ? '#7b6a48' : '#4d504c';
     ctx.lineWidth = g.w;
-    ctx.lineCap = 'butt';
+    ctx.lineCap = g.kind === 'river' ? 'round' : 'butt';
     ctx.beginPath();
     ctx.moveTo(g.x1, g.y1);
     ctx.lineTo(g.x2, g.y2);
@@ -713,6 +755,70 @@ function applyBrush(g, dt) {
   st.needDraw = true;
 }
 
+/** Grobpunkte im Rechteck um (x0, y0)–(x1, y1) plus pad mit f(i, j, x, y, h) → neue Höhe ändern, Feinraster und Bild nachziehen. */
+function editCoarse(x0, y0, x1, y1, pad, f) {
+  const relief = ensureRelief();
+  const res = RELIEF.res;
+  const n = COARSE_N;
+  const C = relief.coarse;
+  const i0 = clamp(Math.floor((Math.min(x0, x1) - pad) / res), 0, n - 1);
+  const i1 = clamp(Math.ceil((Math.max(x0, x1) + pad) / res), 0, n - 1);
+  const j0 = clamp(Math.floor((Math.min(y0, y1) - pad) / res), 0, n - 1);
+  const j1 = clamp(Math.ceil((Math.max(y0, y1) + pad) / res), 0, n - 1);
+  for (let j = j0; j <= j1; j++) {
+    for (let i = i0; i <= i1; i++) C[j * n + i] = clamp(f(i * res, j * res, C[j * n + i]), RELIEF.min, H_MAX);
+  }
+  relief.refine(i0, j0, i1, j1);
+  if (st.reliefImg && st.reliefImg.relief === relief) {
+    const m = 2 * res;
+    updateReliefTiles(st.reliefImg.tiles, relief, i0 * res - m, j0 * res - m, i1 * res + m, j1 * res + m);
+  }
+  finishTerrain();
+}
+
+/** Flussbett entlang der Strecke graben (wie der Kartengenerator: Wasser, dann sanfter Uferhang). */
+function carveRiver(g) {
+  const seg = { x1: g.x1, y1: g.y1, x2: g.x2, y2: g.y2 };
+  editCoarse(g.x1, g.y1, g.x2, g.y2, RIVER_SIZE.reach, (x, y, h) => riverHeight(h, distToSeg(x, y, seg)));
+}
+
+/** Furt: das Wasser im Kreis wird seicht (tiefe Stellen bis zum Furtgrund aufgefüllt, zum Rand hin weich auslaufend). */
+function shapeFord(f) {
+  const bed = RIVER_SIZE.fordBed;
+  editCoarse(f.x, f.y, f.x, f.y, f.r + 70, (x, y, h) => {
+    if (h >= bed) return h;
+    const d = Math.hypot(x - f.x, y - f.y);
+    const k = 1 - Math.min(1, Math.max(0, (d - f.r * 0.85) / 80));
+    return h + (bed - h) * k;
+  });
+}
+
+/** Linie für Fluss oder Brücke fertig gezogen. */
+function finishWaterLine(g) {
+  const len = Math.hypot(g.x2 - g.x1, g.y2 - g.y1);
+  if (g.kind === 'river') {
+    if (len < 16) return;
+    pushHistory();
+    carveRiver(g);
+    say('Flussbett gegraben. Furten und Brücken machen es passierbar.');
+    return;
+  }
+  if (len < BRIDGE_LEN[0] || len > BRIDGE_LEN[1]) {
+    say(`Eine Brücke ist ${BRIDGE_LEN[0]}–${BRIDGE_LEN[1]} px lang (diese: ${Math.round(len)} px).`, true);
+    return;
+  }
+  if ((st.map.bridges ?? []).length >= MAX_BRIDGES) {
+    say(`Höchstens ${MAX_BRIDGES} Brücken je Karte`, true);
+    return;
+  }
+  pushHistory();
+  const o = { x1: Math.round(g.x1), y1: Math.round(g.y1), x2: Math.round(g.x2), y2: Math.round(g.y2) };
+  (st.map.bridges ??= []).push(o);
+  st.sel = { k: 'bridge', o };
+  showInspector();
+  updateInfo();
+}
+
 /** Pinselstrich fertig: Gelände in die Karte schreiben (Verlauf, Speichern), Boden ohne WebGL neu backen. */
 function finishTerrain() {
   const relief = reliefOf(st.map);
@@ -744,7 +850,7 @@ function drawSelection(sel, px) {
     ctx.rotate(o.angle || 0);
     ctx.strokeRect(-o.w / 2 - pad, -o.h / 2 - pad, o.w + pad * 2, o.h + pad * 2);
     ctx.restore();
-  } else if (sel.k === 'road' || sel.k === 'rail') {
+  } else if (sel.k === 'road' || sel.k === 'rail' || sel.k === 'bridge') {
     ctx.setLineDash([]);
     for (const [x, y] of [[o.x1, o.y1], [o.x2, o.y2]]) {
       ctx.beginPath();
@@ -828,7 +934,7 @@ function snapRoad(x, y, kind = 'road') {
 }
 
 function endpointHit(sel, wx, wy) {
-  if (!sel || (sel.k !== 'road' && sel.k !== 'rail')) return 0;
+  if (!sel || (sel.k !== 'road' && sel.k !== 'rail' && sel.k !== 'bridge')) return 0;
   const tol = 22 / st.cam.zoom + (sel.o.w ?? 40) / 2;
   if (Math.hypot(sel.o.x1 - wx, sel.o.y1 - wy) < tol) return 1;
   if (Math.hypot(sel.o.x2 - wx, sel.o.y2 - wy) < tol) return 2;
@@ -896,9 +1002,10 @@ canvas.addEventListener('pointerdown', (e) => {
         updateInfo();
       }
     }
-  } else if (t === 'road' || t === 'dirt' || t === 'rail') {
-    const a = snapRoad(w.x, w.y, t);
-    st.gesture = { type: 'line', kind: t, dirt: t === 'dirt', w: t === 'dirt' ? 52 : t === 'rail' ? 40 : 64, x1: a.x, y1: a.y, x2: a.x, y2: a.y };
+  } else if (t === 'road' || t === 'dirt' || t === 'rail' || t === 'river' || t === 'bridge') {
+    const a = t === 'river' ? { x: Math.round(w.x), y: Math.round(w.y) } : snapRoad(w.x, w.y, t);
+    const lw = { dirt: 52, rail: 40, river: RIVER_SIZE.halfW * 2, bridge: BALANCE.river.deck }[t] ?? 64;
+    st.gesture = { type: 'line', kind: t, dirt: t === 'dirt', w: lw, x1: a.x, y1: a.y, x2: a.x, y2: a.y };
   } else if (TERRAIN_TOOLS.has(t)) {
     pushHistory();
     const relief = ensureRelief();
@@ -963,7 +1070,7 @@ window.addEventListener('pointermove', (e) => {
     else { r.x2 = q.x; r.y2 = q.y; }
     st.needDraw = true;
   } else if (g.type === 'line') {
-    const b = snapRoad(w.x, w.y, g.kind);
+    const b = g.kind === 'river' ? { x: Math.round(w.x), y: Math.round(w.y) } : snapRoad(w.x, w.y, g.kind);
     g.x2 = b.x;
     g.y2 = b.y;
     st.needDraw = true;
@@ -1009,7 +1116,9 @@ function endPointer(e) {
   const g = cancelGesture();
   st.needDraw = true; // Boden der Iso-Ansicht wird erst ohne laufende Geste neu gebacken
   if (!g) return;
-  if (g.type === 'line' && e.type !== 'pointercancel') {
+  if (g.type === 'line' && e.type !== 'pointercancel' && (g.kind === 'river' || g.kind === 'bridge')) {
+    finishWaterLine(g);
+  } else if (g.type === 'line' && e.type !== 'pointercancel') {
     if (Math.hypot(g.x2 - g.x1, g.y2 - g.y1) >= 32) {
       pushHistory();
       const o = g.kind === 'rail' ? { x1: g.x1, y1: g.y1, x2: g.x2, y2: g.y2 } : { x1: g.x1, y1: g.y1, x2: g.x2, y2: g.y2, w: g.w, ...(g.dirt ? { dirt: true } : {}) };
@@ -1097,6 +1206,8 @@ const SEL_NAMES = {
   zone: 'Konfliktzone',
   crate: 'Versorgungskiste',
   field: 'Feld',
+  bridge: 'Brücke',
+  ford: 'Furt',
 };
 const FIELD_NAMES = { wheat: 'Weizenfeld', green: 'Junge Saat', soil: 'Acker (gepflügt)', rape: 'Rapsfeld', pasture: 'Weide' };
 const FIELD_ORDER = [...FIELD_CROPS, 'pasture']; // „Frucht“ schaltet der Reihe nach weiter
@@ -1157,6 +1268,11 @@ function showInspector() {
     rows.push('<div class="muted small">Enden ziehen, um das Gleis zu ändern. Neue Gleise rasten an Enden und Gleisen ein.</div>');
   } else if (s.k === 'spawn') {
     rows.push('<div class="muted small">Ziehen verschiebt den Startpunkt. Die Haupt-FOB entsteht hier, Bauradius als Kreis.</div>');
+  } else if (s.k === 'bridge') {
+    const len = Math.round(Math.hypot(s.o.x2 - s.o.x1, s.o.y2 - s.o.y1));
+    rows.push(`<div class="muted small">Länge ${len} px (${BRIDGE_LEN[0]}–${BRIDGE_LEN[1]}). Enden ziehen, um die Brücke zu ändern; beide Enden gehören auf festen Grund. Im Spiel zerstörbar (A + Klick), ein Baufahrzeug baut sie für ${BALANCE.river.rebuildCost} Geld wieder auf.</div>`);
+  } else if (s.k === 'ford') {
+    rows.push(`<div class="muted small">Seichtes Wasser im Kreis (Radius ${s.o.r} px): Bodeneinheiten kommen mit halbem Tempo hindurch. Rot-weiße Stangen markieren die Furt im Spiel.</div>`);
   } else if (s.k === 'crate') {
     const d = st.map.spawns.map((sp) => Math.round(Math.hypot(sp.x - s.o.x, sp.y - s.o.y)));
     rows.push(`<div class="muted small">Ziehen verschiebt die Kiste. Abstand zu den Starts: ${d[0]} / ${d[1]} px. Auf freien Boden setzen (sonst rückt sie im Spiel zur nächsten freien Stelle).</div>`);
@@ -1224,7 +1340,7 @@ function inspectorAction(a) {
     o.r = clamp(o.r + (a === 'r+' ? step : -step), lim[0], lim[1]);
   } else if (a === 'dup') {
     const copy = JSON.parse(JSON.stringify(o));
-    if (s.k === 'road' || s.k === 'rail') { copy.x1 += 48; copy.y1 += 48; copy.x2 += 48; copy.y2 += 48; }
+    if (s.k === 'road' || s.k === 'rail' || s.k === 'bridge') { copy.x1 += 48; copy.y1 += 48; copy.x2 += 48; copy.y2 += 48; }
     else { copy.x += 48; copy.y += 48; }
     listOf(s.k).push(copy);
     st.sel = { k: s.k, o: copy };
@@ -1405,7 +1521,7 @@ setTool('select');
   }
   if (!map && params.has('seed')) {
     const seed = Number.parseInt(params.get('seed'), 10) || 1;
-    map = normalizeMap({ ...generateMap(seed), name: `Zufallskarte ${seed}` });
+    map = normalizeMap({ ...generateMap(seed, { river: params.get('river') === '1' }), name: `Zufallskarte ${seed}` });
   }
   setMap(map || createEmptyMap(), { keepId: !!map && !!st.id });
   if (params.has('map') && !st.id) say('Karte nicht gefunden, neue Karte begonnen.', true);

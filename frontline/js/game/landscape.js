@@ -1,5 +1,6 @@
-// Landschaft der Zufallskarte: Höhengelände mit welligem Grund, Hügeln, Bergrücken (Fels, unpassierbar) und Seen.
-// Punktsymmetrisch wie die übrige Karte. Dazu die Prüfung, ob mehrere getrennte Wege in die Konfliktzone führen. Kein DOM.
+// Landschaft der Zufallskarte: Höhengelände mit welligem Grund, Hügeln, Bergrücken (Fels, unpassierbar), Seen und (wahlweise) je
+// einem Fluss vor jeder Startecke mit Brücken und Furten. Punktsymmetrisch wie die übrige Karte. Dazu die Prüfung, ob mehrere
+// getrennte Wege in die Konfliktzone führen. Kein DOM.
 import { BALANCE } from '../data/balance.js';
 import { makeRng } from '../core/rng.js';
 import { Relief, RELIEF, COARSE_N } from './relief.js';
@@ -17,6 +18,23 @@ const SPAWN_FLAT = 650; // ebene Fläche um die Startpunkte, danach weicher Übe
 const SPAWN_BLEND = 1050;
 const BASE_LEVEL = 36; // mittlere Höhe des Grundes über dem Wasserspiegel-Bezug 0
 const DRY_LEVEL = RELIEF.water + 22; // Mindesthöhe an Wegen, in der Stadt und an den Startpunkten
+// Fluss (v4.53): Bogen um jede Startecke zwischen Startgelände und Konfliktzone, vom einen Kartenrand zum anderen. Wasser halfW px
+// beiderseits der Mitte, Uferhang bank px, Mitte depth unter dem Spiegel. Brücken und Furten an festen Winkeln des Bogens (Grad von
+// der Seitenkante aus; die mittlere Brücke trägt den Feldweg zur Stadt), je ±shift Grad auf das niedrigste Gelände verschoben.
+const RIVER = {
+  halfW: 92,
+  bank: 330,
+  depth: 40,
+  r: [2280, 2520], // Abstand der Flussmitte von der Kartenecke
+  bridges: [16, 45, 74],
+  fords: [30.5, 59.5],
+  shift: 4,
+  ramp: 0.16, // Steigung der Zufahrten an Brücken und Furten (befahrbar)
+  fordBed: RELIEF.water - 1.5, // Furt: so tief steht das Wasser (seicht, man sieht die Strömung über den Steinen)
+  fordR: 150, // Radius der Furt (Kartenformat `fords`)
+  deckOver: 62, // Brücke reicht so weit über die Wasserkante hinaus auf festen Grund
+  maxH: 165, // höchstes Gelände unter dem Flusslauf (sonst neuer Versuch: kein Fluss durch einen Bergrücken)
+};
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const smooth = (a, b, v) => {
@@ -65,9 +83,12 @@ function makeNoise(rng) {
  * Höhengelände der Zufallskarte.
  * @param {number} seed
  * @param {{ spawns: {x,y}[], zone: {x,y,r}, roads: {x1,y1,x2,y2}[], railY: number }} keep Bereiche, die frei bleiben
- * @returns {{ relief: Relief, ridges: object[], lakes: object[], hills: object[] }}
+ * @param {{ river?: boolean }} opts river: je ein Fluss vor jeder Startecke (eigener Zufall; ohne ihn bleibt alles wie zuvor)
+ * @returns {{ relief: Relief, ridges: object[], lakes: object[], hills: object[], fords: {x,y,r}[], bridges: {x1,y1,x2,y2}[],
+ *   clearings: {x,y,r}[], crossings: {kind,x,y,nx,ny}[] }} clearings = Zufahrten von Brücken und Furten (dort kein Wald, keine Bäume,
+ *   keine Gebäude); crossings = Mitte und Querrichtung jeder Brücke und Furt (Prüfung im Kartengenerator)
  */
-export function buildLandscape(seed, keep) {
+export function buildLandscape(seed, keep, { river = false } = {}) {
   const rng = makeRng((seed * 2654435761) ^ 0x5bd1e995);
   const noise = makeNoise(rng);
   const { spawns, zone, roads, railY } = keep;
@@ -236,6 +257,8 @@ export function buildLandscape(seed, keep) {
       }
     }
   }
+  // Flüsse mit Brücken und Furten (eigener Zufall)
+  const water = river ? carveRivers(coarse, seed, keep) : { fords: [], bridges: [], clearings: [], crossings: [] };
   // Exakt punktsymmetrisch (Rundungsreste der Mittelung ausgleichen)
   for (let j = 0; j < n; j++) {
     for (let i = 0; i < n; i++) {
@@ -244,7 +267,200 @@ export function buildLandscape(seed, keep) {
       if (a < b) coarse[a] = coarse[b] = (coarse[a] + coarse[b]) / 2;
     }
   }
-  return { relief: new Relief(coarse), ridges, lakes, hills };
+  return { relief: new Relief(coarse), ridges, lakes, hills, ...water };
+}
+
+/** Maße des Flusses für den Karteneditor: halbe Wasserbreite, Reichweite des Uferhangs, Furt (Wasserstand, Radius). */
+export const RIVER_SIZE = { halfW: RIVER.halfW, reach: RIVER.halfW + RIVER.bank, fordBed: RIVER.fordBed, fordR: RIVER.fordR };
+
+/** Gelände im Flusslauf: d = Abstand zur Flussmitte, h0 = Höhe vorher (Wasser bis halfW, dann der Uferhang bis halfW + bank). */
+export function riverHeight(h0, d) {
+  const RW = RIVER.halfW;
+  if (d < RW) return Math.min(h0, RELIEF.water - 3 - RIVER.depth * (1 - (d / RW) ** 2));
+  if (d < RW + RIVER.bank) return Math.min(h0, RELIEF.water + 2 + (h0 - RELIEF.water - 2) * smooth(RW, RW + RIVER.bank, d));
+  return h0;
+}
+
+/** Höhe im Grobraster (bilinear). */
+function coarseAt(coarse, x, y) {
+  const n = COARSE_N;
+  const u = clamp(x / RELIEF.res, 0, n - 1.001);
+  const v = clamp(y / RELIEF.res, 0, n - 1.001);
+  const i = u | 0;
+  const j = v | 0;
+  const fu = u - i;
+  const fv = v - j;
+  const k = j * n + i;
+  return (coarse[k] * (1 - fu) + coarse[k + 1] * fu) * (1 - fv) + (coarse[k + n] * (1 - fu) + coarse[k + n + 1] * fu) * fv;
+}
+
+/**
+ * Gräbt je einen Fluss um die Startecke von Start 0 und spiegelbildlich um die von Start 1 ins Grobraster: Bogen im Abstand
+ * RIVER.r von der Ecke mit sanften Schwüngen, Wasser und Uferhang wie oben beschrieben. An den Brücken und Furten flache
+ * Zufahrten (RIVER.ramp), in den Furten seichtes Wasser. Liefert Furten, Brücken (Fahrbahn von Ufer zu Ufer) und die Zufahrten.
+ */
+function carveRivers(coarse, seed, keep) {
+  const rng = makeRng((Math.imul(seed | 0, 2246822519) ^ 0x7f4a7c15) >>> 0);
+  const { spawns, zone } = keep;
+  const s0 = spawns[0];
+  const corner = { x: s0.x < W / 2 ? 0 : W, y: s0.y < H / 2 ? 0 : H };
+  // Richtungen: u entlang der einen Seitenkante (zur Kartenmitte hin), v entlang der anderen
+  const u = { x: 0, y: corner.y === 0 ? 1 : -1 };
+  const v = { x: corner.x === 0 ? 1 : -1, y: 0 };
+  const DEG = Math.PI / 180;
+  const RW = RIVER.halfW;
+  const reach = RW + RIVER.bank;
+  const make = (p) => {
+    const R = (th) => p.r0 + p.a1 * Math.sin(p.k1 * th + p.f1) + p.a2 * Math.sin(p.k2 * th + p.f2);
+    const at = (th) => {
+      const r = R(th);
+      return { x: corner.x + r * (Math.cos(th) * u.x + Math.sin(th) * v.x), y: corner.y + r * (Math.cos(th) * u.y + Math.sin(th) * v.y) };
+    };
+    const pts = [];
+    for (let d = -12; d <= 102; d += 1.5) pts.push(at(d * DEG));
+    return { at, pts };
+  };
+  const ok = (rv) =>
+    rv.pts.every((q) => {
+      if (q.x < -50 || q.y < -50 || q.x > W + 50 || q.y > H + 50) return true;
+      return (
+        dist(q.x, q.y, s0.x, s0.y) > SPAWN_BLEND + RW &&
+        dist(q.x, q.y, zone.x, zone.y) > zone.r + reach + 40 &&
+        coarseAt(coarse, q.x, q.y) < RIVER.maxH
+      );
+    });
+  let rv = null;
+  for (let t = 0; t < 60 && !rv; t++) {
+    const p = {
+      r0: rng.range(...RIVER.r),
+      a1: rng.range(60, 150),
+      k1: rng.range(2.5, 4.5),
+      f1: rng.next() * TWO_PI,
+      a2: rng.range(20, 50),
+      k2: rng.range(7, 11),
+      f2: rng.next() * TWO_PI,
+    };
+    const cand = make(p);
+    if (ok(cand)) rv = cand;
+  }
+  rv ??= make({ r0: (RIVER.r[0] + RIVER.r[1]) / 2, a1: 0, k1: 1, f1: 0, a2: 0, k2: 1, f2: 0 });
+  const mirror = (q) => ({ x: W - q.x, y: H - q.y });
+  const lines = [rv.pts, rv.pts.map(mirror)];
+
+  // Brücken und Furten: Winkel ±shift auf das niedrigste Gelände, Querrichtung = Normale des Bogens (mittlere Brücke: zur Ecke)
+  const site = (deg, straight) => {
+    let best = deg;
+    let bestH = Infinity;
+    if (!straight) {
+      for (let d = deg - RIVER.shift; d <= deg + RIVER.shift + 1e-9; d += 1) {
+        const q = rv.at(d * DEG);
+        const l = Math.hypot(q.x - corner.x, q.y - corner.y) || 1;
+        const nx = (q.x - corner.x) / l; // quer zum Fluss (radial zur Ecke)
+        const ny = (q.y - corner.y) / l;
+        let hmax = -Infinity;
+        let wet = 0; // Seen hinter dem Ufer: dort führte die Zufahrt ins Wasser
+        for (const s of [-1, 1]) {
+          for (let k = 1; k <= 6; k++) {
+            const h = coarseAt(coarse, q.x + nx * s * (RW + 110 * k), q.y + ny * s * (RW + 110 * k));
+            if (k <= 4) hmax = Math.max(hmax, h);
+            if (h < RELIEF.water + 4) wet++;
+          }
+        }
+        hmax += wet * 1000;
+        if (hmax < bestH) {
+          bestH = hmax;
+          best = d;
+        }
+      }
+    }
+    const c = rv.at(best * DEG);
+    const a = rv.at((best - 0.5) * DEG);
+    const b = rv.at((best + 0.5) * DEG);
+    let nx;
+    let ny;
+    if (straight) {
+      nx = c.x - corner.x;
+      ny = c.y - corner.y;
+    } else {
+      nx = -(b.y - a.y);
+      ny = b.x - a.x;
+      if (nx * (c.x - corner.x) + ny * (c.y - corner.y) < 0) {
+        nx = -nx;
+        ny = -ny;
+      }
+    }
+    const l = Math.hypot(nx, ny) || 1;
+    return { x: c.x, y: c.y, nx: nx / l, ny: ny / l };
+  };
+  const sites = [
+    ...RIVER.bridges.map((d) => ({ ...site(d, d === 45), kind: 'bridge' })),
+    ...RIVER.fords.map((d) => ({ ...site(d, false), kind: 'ford' })),
+  ];
+  const all = [...sites, ...sites.map((q) => ({ ...q, ...mirror(q), nx: -q.nx, ny: -q.ny }))];
+
+  // Abstand zum nächsten Flusslauf (beide Flüsse)
+  const nearLine = (x, y) => {
+    let best = Infinity;
+    for (const pts of lines) {
+      for (let k = 0; k < pts.length - 1; k++) {
+        const a = pts[k];
+        const b = pts[k + 1];
+        if (Math.abs(x - a.x) > reach + 700 || Math.abs(y - a.y) > reach + 700) continue;
+        best = Math.min(best, segDist(x, y, a.x, a.y, b.x, b.y).d);
+      }
+    }
+    return best;
+  };
+  const n = COARSE_N;
+  const res = RELIEF.res;
+  for (let j = 0; j < n; j++) {
+    for (let i = 0; i < n; i++) {
+      const x = i * res;
+      const y = j * res;
+      const d = nearLine(x, y);
+      if (d > reach + 700) continue;
+      const k = j * n + i;
+      const h0 = coarse[k];
+      let h = riverHeight(h0, d);
+      // flache Zufahrten an Brücken und Furten; in der Furt seichtes Wasser
+      for (const q of all) {
+        const e = dist(x, y, q.x, q.y);
+        if (e > 900) continue;
+        const along = Math.sqrt(Math.max(0, e * e - d * d));
+        const w = (1 - smooth(130, 250, along)) * (1 - smooth(RW + 450, RW + 650, d));
+        if (w <= 0) continue;
+        const ford = q.kind === 'ford';
+        if (d < RW && !ford) continue; // unter der Brücke bleibt das Wasser tief
+        const ramp = (ford ? RIVER.fordBed : RELIEF.water + 3) + Math.max(0, d - RW) * RIVER.ramp;
+        // In der Furt immer seicht; an Land die Zufahrt: Hügel abgetragen, Senken und Seen knapp übers Wasser aufgefüllt
+        const target = d < RW ? RIVER.fordBed : Math.min(Math.max(h0, RELIEF.water + 6), ramp);
+        h += (target - h) * w;
+      }
+      coarse[k] = Math.max(-118, h);
+    }
+  }
+  const fords = all.filter((q) => q.kind === 'ford').map((q) => ({ x: Math.round(q.x), y: Math.round(q.y), r: RIVER.fordR }));
+  const span = RW + RIVER.deckOver;
+  const bridges = all
+    .filter((q) => q.kind === 'bridge')
+    .map((q) => ({
+      x1: Math.round(q.x - q.nx * span),
+      y1: Math.round(q.y - q.ny * span),
+      x2: Math.round(q.x + q.nx * span),
+      y2: Math.round(q.y + q.ny * span),
+    }));
+  const clearings = [];
+  for (const q of all) {
+    if (q.kind === 'ford') {
+      for (const s of [-1, 1]) clearings.push({ x: q.x + q.nx * s * (RW + 180), y: q.y + q.ny * s * (RW + 180), r: 260 });
+      clearings.push({ x: q.x, y: q.y, r: 220 });
+    } else {
+      for (const s of [-1, 1]) clearings.push({ x: q.x + q.nx * s * (span + 90), y: q.y + q.ny * s * (span + 90), r: 200 });
+      clearings.push({ x: q.x, y: q.y, r: span });
+    }
+  }
+  const crossings = all.map((q) => ({ kind: q.kind, x: q.x, y: q.y, nx: q.nx, ny: q.ny }));
+  return { fords, bridges, clearings, crossings };
 }
 
 /** Gelände um (x, y) im Radius r eignet sich für Wald, Gehöfte oder Bäume: kein Wasser, nicht steiler als maxSlope. */

@@ -4,6 +4,7 @@ import { Grid } from './grid.js';
 import { findPath } from './pathfinding.js';
 import { Relief, reliefOf } from './relief.js';
 import { countRoutes } from './landscape.js';
+import { openBridges } from './river.js';
 
 const W = BALANCE.map.width;
 const H = BALANCE.map.height;
@@ -15,6 +16,9 @@ const SPAWN_CLEAR = 180; // freier Platz um einen Startpunkt (Haupt-FOB und Star
 export const MAX_CRATES = 24; // Versorgungskisten je Karte
 export const FIELD_CROPS = ['wheat', 'green', 'soil', 'rape']; // Ackerarten: Weizen, junge Saat, gepflügt, Raps
 export const MAX_FIELDS = 300; // Felder und Weiden je Karte
+export const MAX_FORDS = 24; // Furten je Karte (Fluss, river.js)
+export const MAX_BRIDGES = 24; // Brücken je Karte
+export const BRIDGE_LEN = [96, 900]; // kürzeste und längste Brücke (px)
 
 /** Leere Karte: nur Startpunkte in den Ecken und die Konfliktzone in der Mitte. */
 export function createEmptyMap(name = 'Neue Karte') {
@@ -54,6 +58,16 @@ export function normalizeMap(src) {
     x2: clamp(num(r.x2, 0), 0, W),
     y2: clamp(num(r.y2, 0), 0, H),
   }));
+  const fords = arr(src.fords).slice(0, MAX_FORDS).map((f) => circ(f, 60, 400));
+  const bridges = arr(src.bridges)
+    .map((b) => ({
+      x1: Math.round(clamp(num(b.x1, 0), 0, W)),
+      y1: Math.round(clamp(num(b.y1, 0), 0, H)),
+      x2: Math.round(clamp(num(b.x2, 0), 0, W)),
+      y2: Math.round(clamp(num(b.y2, 0), 0, H)),
+    }))
+    .filter((b) => Math.hypot(b.x2 - b.x1, b.y2 - b.y1) >= BRIDGE_LEN[0])
+    .slice(0, MAX_BRIDGES);
   return {
     name: String(src.name ?? 'Karte').slice(0, 40),
     width: W,
@@ -95,6 +109,9 @@ export function normalizeMap(src) {
     spawns,
     zone,
     crates: arr(src.crates).slice(0, MAX_CRATES).map(pt), // Versorgungskisten (crates.js); ältere Karten haben keine
+    // Furten und Brücken über Flüsse (river.js); Karten ohne Fluss haben die Felder nicht
+    ...(fords.length ? { fords } : {}),
+    ...(bridges.length ? { bridges } : {}),
     // Höhengelände (relief.js) als Text; fehlt es oder ist es kaputt, ist die Karte flach
     ...(typeof src.relief === 'string' && Relief.decode(src.relief) ? { relief: src.relief } : {}),
   };
@@ -153,6 +170,11 @@ export function checkMap(map) {
       if (bad) problems.push(`Startpunkt ${i + 1}: Gelände zu steil oder unter Wasser`);
     });
   }
+  (map.bridges ?? []).forEach((br, i) => {
+    if (Math.hypot(br.x2 - br.x1, br.y2 - br.y1) > BRIDGE_LEN[1]) problems.push(`Brücke ${i + 1} ist zu lang (höchstens ${BRIDGE_LEN[1]} px)`);
+    const dry = (x, y) => !relief || !relief.cellBlocked(Math.min(W / TILE - 1, Math.floor(x / TILE)), Math.min(H / TILE - 1, Math.floor(y / TILE)));
+    if (!dry(br.x1, br.y1) || !dry(br.x2, br.y2)) problems.push(`Brücke ${i + 1}: beide Enden müssen auf festem Grund liegen`);
+  });
   if (problems.length) return problems;
   const grid = mapGrid(map);
   const [a, b] = map.spawns;
@@ -169,13 +191,15 @@ export function checkMap(map) {
   return problems;
 }
 
-/** Raster mit allen Hindernissen der Karte (Gelände eingeschlossen), wie im Spiel. */
+/** Raster mit allen Hindernissen der Karte (Gelände eingeschlossen, Furten passierbar, Brücken offen), wie im Spiel. */
 function mapGrid(map) {
   const grid = new Grid(W / TILE, H / TILE, TILE);
+  const relief = reliefOf(map);
   grid.rasterizeObstacles(map.obstacles);
   grid.rasterizeRects(blockers(map.town.buildings));
   grid.rasterizeTrees([...map.town.trees, ...map.trees]);
-  grid.rasterizeRelief(reliefOf(map));
+  grid.rasterizeRelief(relief, map.fords ?? []);
+  openBridges(grid, map.bridges ?? [], relief);
   return grid;
 }
 

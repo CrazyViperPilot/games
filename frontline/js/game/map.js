@@ -3,8 +3,9 @@ import { BALANCE } from '../data/balance.js';
 import { makeRng } from '../core/rng.js';
 import { Grid } from './grid.js';
 import { findPath } from './pathfinding.js';
-import { setRelief } from './relief.js';
-import { buildLandscape, groundOk, countRoutes } from './landscape.js';
+import { setRelief, RELIEF } from './relief.js';
+import { buildLandscape, groundOk, countRoutes, RIVER_SIZE } from './landscape.js';
+import { openBridges } from './river.js';
 
 const W = BALANCE.map.width;
 const H = BALANCE.map.height;
@@ -28,21 +29,24 @@ const reaches = (path, x, y) => path.length > 0 && path[path.length - 1].x === x
 /**
  * Erzeugt eine Karte. Scheitert die Platzierung oder ist die Karte nicht zusammenhängend,
  * wird mit seed + 1, + 2, … neu versucht (max. 20×).
- * @returns {{ width, height, tile, obstacles: {x,y,r}[], town: {roads, buildings, parks, cars, trees, fields}, trees: {x,y,r}[] (Bäume außerhalb der Stadt; wie die Stadtbäume blockierend), spawns: {x,y}[], zone: {x,y,r}, crates: {x,y}[] (Versorgungskisten), relief: string (Höhengelände, relief.js) }}
+ * river: je ein Fluss vor jeder Startecke mit Brücken und Furten (v4.53; ohne ihn bleibt jede Karte wie zuvor).
+ * @returns {{ width, height, tile, obstacles: {x,y,r}[], town: {roads, buildings, parks, cars, trees, fields}, trees: {x,y,r}[] (Bäume außerhalb der Stadt; wie die Stadtbäume blockierend), spawns: {x,y}[], zone: {x,y,r}, crates: {x,y}[] (Versorgungskisten), relief: string (Höhengelände, relief.js), fords?: {x,y,r}[], bridges?: {x1,y1,x2,y2}[] (nur mit Fluss) }}
  */
-export function generateMap(seed) {
+export function generateMap(seed, { river = false } = {}) {
   for (let k = 0; k < MAX_ATTEMPTS; k++) {
-    const map = tryBuild(seed + k);
+    const map = tryBuild(seed + k, river);
     if (map) return map;
   }
   throw new Error('Karte konnte nicht erzeugt werden');
 }
 
-function tryBuild(seed) {
+function tryBuild(seed, river = false) {
   const rng = makeRng(seed);
-  // 0. Gelände: Hügel, Bergrücken und Seen; Zufahrten, Bahn, Startpunkte und Stadt bleiben frei befahrbar
-  const { relief } = buildLandscape(seed, { spawns: SPAWNS, zone: { x: CX, y: CY, r: ZONE_R }, roads: accessRoads(), railY: CY });
+  // 0. Gelände: Hügel, Bergrücken und Seen (wahlweise Flüsse); Zufahrten, Bahn, Startpunkte und Stadt bleiben frei befahrbar
+  const land = buildLandscape(seed, { spawns: SPAWNS, zone: { x: CX, y: CY, r: ZONE_R }, roads: accessRoads(), railY: CY }, { river });
+  const { relief, fords, bridges, clearings, crossings } = land;
   if (!gentleZone(relief)) return null;
+  const cleared = (x, y, r) => clearings.some((c) => dist(x, y, c.x, c.y) < c.r + r); // Zufahrt einer Brücke oder Furt
   // 1. Hindernispaare (Wald), nur auf festem, nicht zu steilem Grund
   const obstacles = [];
   for (let i = 0; i < OBSTACLE_PAIRS; i++) {
@@ -55,6 +59,7 @@ function tryBuild(seed) {
       if (inRail(y, r)) continue; // Bahnlinie bleibt frei
       if (SPAWNS.some((s) => dist(x, y, s.x, s.y) < 600 + r)) continue;
       if (!groundOk(relief, x, y, r) || !groundOk(relief, W - x, H - y, r)) continue;
+      if (cleared(x, y, r)) continue; // die Zufahrten sind punktsymmetrisch: das Spiegelbild ist damit auch frei
       ob = { x, y, r };
     }
     if (!ob) return null;
@@ -63,11 +68,13 @@ function tryBuild(seed) {
 
   // 2. Zusammenhang prüfen: Spawn 0 erreicht Zonenmitte (auf mehreren Wegen) und Spawn 1
   const town = buildTown(rng);
-  const outposts = buildOutposts(rng, obstacles, relief);
+  if (river) town.roads = cutRoads(town.roads, relief); // Feldwege enden am Ufer, die Brücke trägt sie hinüber
+  const outposts = buildOutposts(rng, obstacles, relief, clearings);
   town.buildings.push(...outposts.buildings);
-  const trees = scatterTrees(rng, obstacles, outposts.areas, relief);
-  const grid = blockGrid(obstacles, town.buildings, [...town.trees, ...trees], relief);
+  const trees = scatterTrees(rng, obstacles, [...outposts.areas, ...clearings], relief);
+  const grid = blockGrid(obstacles, town.buildings, [...town.trees, ...trees], relief, fords, bridges);
   if (!isConnected(grid)) return null;
+  if (river && !crossingsOk(grid, crossings)) return null;
   // 3. Versorgungskisten zuletzt: die Zufallszahlen davor (und damit alle bisherigen Karten) bleiben gleich
   const crates = placeCrates(rng, grid);
   // 4. Äcker, Weiden und Feldwege mit eigenem Zufall (nur Boden): auch die Kisten bleiben je Seed, wo sie waren
@@ -83,9 +90,90 @@ function tryBuild(seed) {
     spawns: SPAWNS.map((s) => ({ x: s.x, y: s.y })),
     zone: { x: CX, y: CY, r: ZONE_R },
     crates,
+    ...(river ? { fords, bridges } : {}),
   };
   setRelief(map, relief);
   return map;
+}
+
+const CROSS_REGION = 1500; // so viele Zellen erreicht man von jedem Ufer einer Querung mindestens (sonst liegt sie in einer Tasche)
+
+/** Zellen, die von (x, y) aus erreichbar sind, höchstens cap (Breitensuche); within: nur in diesem Kreis {x, y, r}. */
+function regionSize(grid, x, y, cap, within = null, goal = null) {
+  const c0 = grid.toCell(x);
+  const r0 = grid.toCell(y);
+  if (!grid.passable(c0, r0, 0)) return { n: 0, hit: false };
+  const gi = goal ? grid.idx(grid.toCell(goal.x), grid.toCell(goal.y)) : -1;
+  const seen = new Set([grid.idx(c0, r0)]);
+  const queue = [grid.idx(c0, r0)];
+  for (let k = 0; k < queue.length && seen.size < cap; k++) {
+    const i = queue[k];
+    if (i === gi) return { n: seen.size, hit: true };
+    const c = i % grid.cols;
+    const r = (i - c) / grid.cols;
+    for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nc = c + dc;
+      const nr = r + dr;
+      if (!grid.passable(nc, nr, 0)) continue;
+      if (within && dist(grid.center(nc), grid.center(nr), within.x, within.y) > within.r) continue;
+      const j = grid.idx(nc, nr);
+      if (seen.has(j)) continue;
+      seen.add(j);
+      queue.push(j);
+    }
+  }
+  return { n: seen.size, hit: seen.has(gi) };
+}
+
+/**
+ * Jede Brücke und Furt führt wirklich hinüber: beide Ufer (RW + 250 px quer zur Mitte) sind frei, auf kurzem Weg über die Querung
+ * verbunden und gehören, wenn alle Querungen gesperrt sind, je zu einem großen Gebiet (keine Tasche hinter Fels oder See).
+ */
+function crossingsOk(grid, crossings) {
+  const off = RIVER_SIZE.halfW + 250;
+  const banks = crossings.map((q) => [
+    { x: q.x - q.nx * off, y: q.y - q.ny * off },
+    { x: q.x + q.nx * off, y: q.y + q.ny * off },
+  ]);
+  for (let k = 0; k < crossings.length; k++) {
+    const [a, b] = banks[k];
+    if (!regionSize(grid, a.x, a.y, Infinity, { x: crossings[k].x, y: crossings[k].y, r: off + 200 }, b).hit) return false;
+  }
+  // alle Querungen zu: Brücken wieder gesperrt, Furten auch
+  const closed = new Grid(grid.cols, grid.rows, grid.tile);
+  closed.terrain.set(grid.terrain);
+  closed.struct.set(grid.struct);
+  for (const i of grid.bridgeCells ?? []) closed.terrain[i] = 1;
+  if (grid.ford) for (let i = 0; i < grid.ford.length; i++) if (grid.ford[i]) closed.terrain[i] = 1;
+  return banks.every((pair) => pair.every((p) => regionSize(closed, p.x, p.y, CROSS_REGION).n >= CROSS_REGION));
+}
+
+/** Straßen ohne ihre Stücke über Wasser (Abtastung alle 8 px); was kürzer als 40 px bleibt, entfällt. */
+function cutRoads(roads, relief) {
+  const out = [];
+  for (const r of roads) {
+    const len = Math.hypot(r.x2 - r.x1, r.y2 - r.y1);
+    const n = Math.max(1, Math.ceil(len / 8));
+    const wet = (i) => relief.heightAt(r.x1 + ((r.x2 - r.x1) * i) / n, r.y1 + ((r.y2 - r.y1) * i) / n) < RELIEF.water + 1;
+    let start = null;
+    const push = (i0, i1) => {
+      if (((i1 - i0) / n) * len < 40) return;
+      const at = (i) => [Math.round(r.x1 + ((r.x2 - r.x1) * i) / n), Math.round(r.y1 + ((r.y2 - r.y1) * i) / n)];
+      const [x1, y1] = at(i0);
+      const [x2, y2] = at(i1);
+      out.push({ ...r, x1, y1, x2, y2 });
+    };
+    for (let i = 0; i <= n; i++) {
+      if (!wet(i)) start ??= i;
+      else if (start !== null) {
+        push(start, i - 1);
+        start = null;
+      }
+    }
+    if (start === 0) out.push(r);
+    else if (start !== null) push(start, n);
+  }
+  return out;
 }
 
 /** Die Feldwege von den Startpunkten zur Stadtkante (dieselben Linien wie in buildTown). */
@@ -109,13 +197,14 @@ function gentleZone(relief) {
   return true;
 }
 
-/** Raster mit allem, was den Weg versperrt (wie im Spiel). */
-function blockGrid(obstacles, buildings, trees, relief) {
+/** Raster mit allem, was den Weg versperrt (wie im Spiel: Furten passierbar, Brücken offen). */
+function blockGrid(obstacles, buildings, trees, relief, fords = [], bridges = []) {
   const grid = new Grid(W / TILE, H / TILE, TILE);
   grid.rasterizeObstacles(obstacles);
   grid.rasterizeRects(buildings);
   grid.rasterizeTrees(trees);
-  grid.rasterizeRelief(relief);
+  grid.rasterizeRelief(relief, fords);
+  grid.bridgeCells = openBridges(grid, bridges, relief).flat(); // geöffnete Fahrbahnzellen (Prüfung der Querungen)
   return grid;
 }
 
@@ -297,10 +386,11 @@ const WALL_GAP = 130; // Lücke in der Mauer (zwei gegenüberliegende Seiten)
  * mit zwei Lücken an gegenüberliegenden Seiten: durch die eine Lücke hinein, um die Fabrik herum, durch die andere hinaus.
  * @returns {{ buildings: {x,y,w,h,kind}[], areas: {x,y,r}[] }} areas = belegte Kreise (keine Bäume dort)
  */
-function buildOutposts(rng, obstacles, relief = null) {
+function buildOutposts(rng, obstacles, relief = null, clearings = []) {
   const buildings = [];
   const areas = [];
   const fits = (x, y, r) =>
+    clearings.every((c) => dist(x, y, c.x, c.y) > c.r + r) && // Zufahrten der Brücken und Furten (punktsymmetrisch)
     [[x, y], [W - x, H - y]].every(
       ([px, py]) =>
         px > r + 300 &&

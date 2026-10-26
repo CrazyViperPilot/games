@@ -1,12 +1,13 @@
 // Kampf: Zielsuche, Direktfeuer, Mörser und Granaten, Flugabwehr, Schaden (PLAN.md §5, §11.2). Kein DOM.
 import { BALANCE } from '../data/balance.js';
-import { createShell, inRange, radiusOf, isFoe, resolveTarget } from './entities.js';
+import { createShell, inRange, radiusOf, isFoe, canAttack, resolveTarget } from './entities.js';
 import { buildHash, nearby } from './movement.js';
 import { damageHouse } from './garrison.js';
 import { addCrater } from './scars.js';
 import { auraCooldown } from './commander.js';
 import { weatherSight } from './weather.js';
 import { armorMul, opticsMul } from './research.js';
+import { damageBridge, deckDist } from './river.js';
 
 const SCAN = BALANCE.scanInterval;
 const MAX_UNIT_RADIUS = 16; // größter Einheitenradius (Trefferkreis-Suche)
@@ -41,7 +42,7 @@ export function sectorOf(s, t) {
  * mult (z. B. Höhenvorteil): Schaden × mult, bei Trefferzahlen gerundet n / mult Treffer (mindestens 1).
  */
 export function shotDamage(spec, s, t, mult = 1) {
-  if (t.kind === 'house') return (spec.damage.struct || 0) * mult * houseMult(spec.damage);
+  if (t.kind === 'house' || t.kind === 'bridge') return (spec.damage.struct || 0) * mult * houseMult(spec.damage);
   const table = spec.hits;
   const entry = table && t.kind === 'unit' ? (table[t.type] ?? table[t.def.armor]) : undefined;
   if (entry === undefined) return (spec.damage[dmgKey(t)] || 0) * mult;
@@ -100,11 +101,15 @@ function warnBase(game, target) {
   game.message(target.team, 'Basis wird angegriffen', target.x, target.y);
 }
 
-/** Fügt Schaden zu, setzt lastHitTime und markiert Tote. Stadthäuser: garrison.damageHouse. Einheiten: erforschte Panzerung. */
+/** Fügt Schaden zu, setzt lastHitTime und markiert Tote. Stadthäuser: garrison.damageHouse, Brücken: river.damageBridge. Einheiten: erforschte Panzerung. */
 export function hit(game, target, amount) {
   if (!target.alive || !(amount > 0)) return;
   if (target.kind === 'house') {
     damageHouse(game, target, amount);
+    return;
+  }
+  if (target.kind === 'bridge') {
+    damageBridge(game, target, amount);
     return;
   }
   if (target.kind === 'unit') amount *= armorMul(game, target, amount);
@@ -264,7 +269,7 @@ function interceptShells(game) {
   }
 }
 
-/** Einschlag: Flächenschaden mit linearem Abfall über `splash` an alle gegnerischen Entities (Besatzer schützt ihr Haus). */
+/** Einschlag: Flächenschaden mit linearem Abfall über `splash` an alle gegnerischen Entities (Besatzer schützt ihr Haus) und an Brücken. */
 function impact(game, p) {
   p.alive = false;
   game.addEffect('explosion', p.tx, p.ty, p.team);
@@ -274,6 +279,11 @@ function impact(game, p) {
     if (!h.alive || !isFoe(p.team, h)) continue;
     const d = Math.hypot(Math.max(0, Math.abs(h.x - p.tx) - h.pw / 2), Math.max(0, Math.abs(h.y - p.ty) - h.ph / 2));
     if (d < R) hit(game, h, (p.damage.struct || 0) * houseMult(p.damage) * (1 - d / R));
+  }
+  for (const b of game.bridges ?? []) {
+    if (b.broken) continue;
+    const d = deckDist(b, p.tx, p.ty);
+    if (d < R) hit(game, b, (p.damage.struct || 0) * houseMult(p.damage) * (1 - d / R));
   }
   for (const list of [game.units, game.buildings]) {
     for (const e of list) {
@@ -326,7 +336,7 @@ export function updateCombat(game, dt) {
     if (NO_FIRE.has(o)) continue;
     if (o === 'attack') {
       const t = resolveTarget(game, u.order.targetId);
-      if (isFoe(u.team, t)) tryFireUnit(game, u, t);
+      if (canAttack(u.team, t)) tryFireUnit(game, u, t);
       continue;
     }
     // idle / attackMove: automatische Zielsuche

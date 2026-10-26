@@ -20,7 +20,8 @@ const KEYS = [
   ['Kisten', 'Versorgungskisten (gelbe Quadrate auf der Minimap) liegen abseits der Zone: Soldaten gewählt, Rechtsklick oder Tippen auf die Kiste – der nächste holt sie, die übrigen begleiten ihn. Der Träger geht langsamer, schießt nicht und bringt sie zur nächsten eigenen FOB · jede eingelagerte Kiste +1 Geld/s · K = ablegen · fällt der Träger oder die FOB, liegt die Kiste wieder am Boden'],
   ['Häuserkampf', 'Soldaten gewählt: Rechtsklick oder Tippen auf ein Haus der Stadt besetzt es (Wohnhaus 4, Halle und Bahnhof 8, Fabrik 10 Plätze). Drinnen geschützt, ein Stockwerk höher, Reichweite ab der Hauswand · Klick aufs eigene Haus wählt die Besatzung · O oder ein Marschbefehl = Raus · Handwaffen kratzen nur, Kanonen, RPG, Granaten und Mörser bringen das Haus zum Einsturz (Besatzung verletzt)'],
   ['Rechtsklick auf FOB', 'LKW: leer laden, beladen entladen · Baufahrzeug: an Baustelle helfen, beschädigtes Gebäude reparieren'],
-  ['A + Klick', 'Angriffsbewegung'],
+  ['A + Klick', 'Angriffsbewegung · auf eine Brücke: beschießen, bis sie einstürzt'],
+  ['Fluss', `Falls im Startmenü an: auf Zufallskarten trennt je ein Fluss die Startecken von der Zone · drei Brücken und zwei Furten führen hinüber (in der Furt halbes Tempo) · Brücken greift nur an, wer es befiehlt (A + Klick); eingestürzt sperren sie, bis ein Baufahrzeug sie wieder aufbaut (Rechtsklick oder Tippen auf die Trümmer, ${BALANCE.river.rebuildCost} Geld, ${BALANCE.river.rebuild} s)`],
   ['S', 'Stopp'],
   ['F', 'Formation wechseln: Locker, Linie, Keil, Kolonne (Panzer vorn, Gruppe marschiert geschlossen)'],
   ['Wetter', 'Falls im Startmenü an: Regen und Schnee −20 % Sicht, Nebel −35 % · Schneefall bremst Fahrzeuge um 20 %, Winterboden um 10 % · das Wetter wechselt alle paar Minuten (Anzeige oben, antippen erklärt es) · bei schlechter Sicht lohnt ein Späher'],
@@ -69,6 +70,7 @@ const MAPSEL_KEY = 'frontline-kartenwahl';
 const RADIO_KEY = 'frontline-radio'; // Startmenü: Sendemast-Sieg an/aus
 const WEATHER_KEY = 'frontline-wetter'; // Startmenü: Wetter aus, Zufall oder feste Jahreszeit
 const RESEARCH_KEY = 'frontline-forschung'; // Startmenü: Forschungsstufen an/aus
+const RIVER_KEY = 'frontline-fluss'; // Startmenü: Flüsse auf Zufallskarten an/aus
 function readMapSel() {
   try {
     return localStorage.getItem(MAPSEL_KEY) || 'random';
@@ -117,8 +119,8 @@ function writeMapSel(v) {
 }
 
 /**
- * Startmenü: onStart({difficulty, winPoints, mapId, radio, weather, research}) beim Klick auf Start (mapId 'random' oder Karten-ID,
- * radio = Sendemast-Sieg, weather = 'off' | 'random' | Jahreszeit, research = Forschungsstufen).
+ * Startmenü: onStart({difficulty, winPoints, mapId, radio, weather, research, river}) beim Klick auf Start (mapId 'random' oder Karten-ID,
+ * radio = Sendemast-Sieg, weather = 'off' | 'random' | Jahreszeit, research = Forschungsstufen, river = Flüsse auf Zufallskarten).
  */
 export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.money, resetWallet = () => {} } = {}) {
   let difficulty = 'normal';
@@ -127,6 +129,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
   let radio = readFlag(RADIO_KEY, true);
   let weather = readChoice(WEATHER_KEY, WEATHER_SETTINGS, 'random');
   let research = readFlag(RESEARCH_KEY, true);
+  let river = readFlag(RIVER_KEY, true);
   show(
     root,
     'start',
@@ -154,6 +157,10 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
         <div class="seg"><button type="button" data-research="1">An</button><button type="button" data-research="0">Aus</button></div>
       </div>
       <div class="field">
+        <span class="flabel" title="Zufallskarten: je ein Fluss vor jeder Startecke mit drei zerstörbaren Brücken und zwei Furten">Fluss</span>
+        <div class="seg"><button type="button" data-river="1">An</button><button type="button" data-river="0">Aus</button></div>
+      </div>
+      <div class="field">
         <span class="flabel">Karte</span>
         <div class="seg">
           <button type="button" data-mapmode="random">Zufall</button>
@@ -166,6 +173,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
         <li>Du startest mit 2 Kampfpanzern, 3 Schützenpanzern, 29 Soldaten (22 Schützen, 7 Panzerabwehrsoldaten), LKW, Baufahrzeug und deinem Kommandeur (goldener Stern: in seiner Nähe schießen deine Einheiten schneller und Verwundete heilen; fällt er, bekommt der Gegner 5 Punkte). Das Einheitenlimit beträgt 50 Plätze: Soldat 1, Schützenpanzer 3, Kampfpanzer 5. Die Haupt-FOB hat unendlich Baumaterial, Munition und Treibstoff und bildet alle Einheiten aus – nur Geld ist knapp. Ist oben Forschung an, gibt es Schützenpanzer und Hubschrauber erst ab Stufe 2, Kampfpanzer und Kampfhubschrauber ab Stufe 3 (die Startarmee bleibt).</li>
         <li>LKW (E) bringen Nachschub aus der Haupt-FOB zu den vorderen FOBs und versorgen Einheiten in ihrer Nähe.</li>
         <li>Baufahrzeug (R): bis zu 10 FOBs (ohne überlappende Bauradien), Mörser, Flak, Bohrer und – falls oben an – einen Sendemast: steht er fertig 5 Minuten, ist die Partie gewonnen. Soldaten bauen aus wenig getragenem Baumaterial Mauern und Tore.</li>
+        <li>Ist oben Fluss an, liegt vor jeder Startecke ein Fluss: über drei Brücken oder langsam durch zwei Furten. Brücken lassen sich sprengen (A, dann Brücke anklicken) und von Baufahrzeugen wieder aufbauen.</li>
         <li>Konfliktzone halten: jede deiner Einheiten dort bringt Geld (0,4/s, in der Hot Zone 0,8/s), alle 30 s ein Punkt. Fällt deine Haupt-FOB, ist die Runde verloren.</li>
       </ol>
       <p class="muted small center" data-wallet></p>
@@ -184,6 +192,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
     root.querySelectorAll('[data-radio]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.radio === '1') === radio)));
     root.querySelectorAll('[data-weather]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.weather === weather)));
     root.querySelectorAll('[data-research]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.research === '1') === research)));
+    root.querySelectorAll('[data-river]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.river === '1') === river)));
   };
   const renderMapBox = () => {
     const box = root.querySelector('[data-mapbox]');
@@ -260,7 +269,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
       return;
     }
     if (b.dataset.act === 'editRandom') {
-      location.href = `editor.html?seed=${Math.floor(Math.random() * 1e9) + 1}`;
+      location.href = `editor.html?seed=${Math.floor(Math.random() * 1e9) + 1}${river ? '&river=1' : ''}`;
       return;
     }
     if (b.dataset.act === 'mapEdit') {
@@ -286,13 +295,16 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
     } else if (b.dataset.research) {
       research = b.dataset.research === '1';
       writeFlag(RESEARCH_KEY, research);
+    } else if (b.dataset.river) {
+      river = b.dataset.river === '1';
+      writeFlag(RIVER_KEY, river);
     }
     else if (b.dataset.act === 'resetWallet') {
       resetWallet();
       showWallet();
     } else if (b.dataset.act === 'start') {
       hideOverlay(root);
-      onStart({ difficulty, winPoints, mapId: mapSel, radio, weather, research });
+      onStart({ difficulty, winPoints, mapId: mapSel, radio, weather, research, river });
       return;
     }
     mark();

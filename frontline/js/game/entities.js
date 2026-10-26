@@ -158,6 +158,19 @@ export function createShell(id, team, sx, sy, tx, ty, def) {
 /** Gegner von `team`? Leere Stadthäuser (team −1) sind niemandes Gegner. */
 export const isFoe = (team, e) => !!e && e.team >= 0 && e.team !== team;
 
+/** Ziel eines Angriffsbefehls: ein Gegner oder eine intakte Brücke (river.js; die greift niemand von selbst an). */
+export const canAttack = (team, e) => isFoe(team, e) || (!!e && e.kind === 'bridge' && !e.broken);
+
+const BRIDGE_HALF = BALANCE.river.deck / 2;
+
+/** Abstand eines Punktes zur Fahrbahn einer Brücke (Achse x1,y1–x2,y2 mit halber Breite). */
+function bridgeDist(b, x, y) {
+  const dx = b.x2 - b.x1;
+  const dy = b.y2 - b.y1;
+  const t = Math.min(1, Math.max(0, ((x - b.x1) * dx + (y - b.y1) * dy) / (dx * dx + dy * dy || 1)));
+  return Math.max(0, Math.hypot(x - b.x1 - t * dx, y - b.y1 - t * dy) - BRIDGE_HALF);
+}
+
 /** Lebendes Ziel hinter einer ID: wer in einem Haus sitzt, wird über das Haus getroffen. */
 export function resolveTarget(game, id) {
   const t = game.getEntity(id);
@@ -169,7 +182,8 @@ export function radiusOf(e) {
   return e.kind === 'unit' ? e.def.radius : (Math.max(e.w, e.h) * BALANCE.map.tile) / 2;
 }
 
-/** Mittelpunkte: b ist in Reichweite `range` von a (Zielradius wird addiert). */
+/** Mittelpunkte: b ist in Reichweite `range` von a (Zielradius wird addiert; Brücken: Abstand zur Fahrbahn). */
 export function inRange(a, b, range) {
+  if (b.kind === 'bridge') return bridgeDist(b, a.x, a.y) <= range;
   return Math.hypot(b.x - a.x, b.y - a.y) <= range + radiusOf(b);
 }

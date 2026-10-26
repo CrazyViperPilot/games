@@ -110,6 +110,19 @@ export class Minimap {
       ctx.drawImage(this.fogLayer.canvas, 0, 0, this.fogLayer.canvas.width, this.fogLayer.canvas.height, 0, 0, W, H);
     }
 
+    // Brücken (Kartenmerkmal, auch im Nebel): intakt hell, zerstört rot gestrichelt
+    ctx.lineCap = 'round';
+    for (const b of g.bridges ?? []) {
+      ctx.strokeStyle = b.broken ? '#e0553a' : '#efe4c2';
+      ctx.lineWidth = 2.6 * px;
+      ctx.setLineDash(b.broken ? [2 * px, 2.5 * px] : []);
+      ctx.beginPath();
+      ctx.moveTo(b.x1, b.y1);
+      ctx.lineTo(b.x2, b.y2);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
     // Versorgungskisten am Boden (Lagebild: Fundorte von der Karte, danach zuletzt gesehen), auch im Nebel
     const crates = reveal ? (g.crates ?? []).filter((c) => c.state === 'ground') : [...(g.crateSeen?.[team]?.values() ?? [])];
     ctx.fillStyle = CRATE_MARK;

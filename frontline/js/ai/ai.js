@@ -1,6 +1,6 @@
 // KI-Gegner (PLAN.md §5, §10.2, §11.5). Steuert nur über game.issue und liest den Zustand. Kein DOM.
 // Reihenfolge je Denkschritt: Baustellen pflegen, Verteidigung, Rückzug, Expansion (FOB-Baustellen: Zone, Relais, Flanken),
-// Forschung, Produktion (nur Haupt-FOB), Verteidigungsgebäude und Mauer, Baufahrzeuge, LKW (Lieferant/Pendler/Versorger), Sammelpunkte, Armee.
+// Forschung, Produktion (nur Haupt-FOB), Verteidigungsgebäude und Mauer, Brücken, Baufahrzeuge, LKW (Lieferant/Pendler/Versorger), Sammelpunkte, Armee.
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
@@ -79,6 +79,8 @@ const RADIO_GATHER_R = 600; // Sammelradius; ab RADIO_GATHER_SHARE der Armee dar
 const RADIO_GATHER_SHARE = 0.7;
 const UPGRADES = ['vests', 'optics', 'composite']; // Reihenfolge der Verbesserungen (Forschung)
 const UPGRADE_RESERVE = 400; // Geld, das nach einer Verbesserung übrig bleiben soll (sie kommt nur aus Überschuss)
+const BRIDGE_EVERY = 10; // s zwischen zwei Prüfungen der eigenen Brücken
+const BRIDGE_RESERVE = 150; // Geld, das nach dem Wiederaufbau einer Brücke übrig bleiben soll
 const DEG = Math.PI / 180;
 const SITE_ANGLES = [0, 30, -30, 60, -60, 90, -90, 120, -120, 150, -150, 180].map((d) => d * DEG);
 const TWO_PI = Math.PI * 2;
@@ -155,6 +157,7 @@ export class AI {
     this.produce(s);
     this.buildDefense(s);
     this.buildWall(s);
+    this.rebuildBridges(s);
     this.manageEngineers(s);
     this.manageTrucks(s);
     this.rally(s);
@@ -774,6 +777,29 @@ export class AI {
       const near = this.freeNear(best.x, best.y + half + 40);
       g.issue(this.team, { type: 'move', ids: [u.id], x: near.x, y: near.y });
       this.engTarget.set(u.id, best.id);
+    }
+  }
+
+  /**
+   * Zerstörte Brücken auf der eigenen Seite (näher an der eigenen Haupt-FOB als am gegnerischen Start): ein untätiges
+   * Baufahrzeug baut sie wieder auf, wenn das Geld reicht. Brücken auf der Seite des Gegners bleiben, wie sie sind.
+   */
+  rebuildBridges(s) {
+    const g = this.game;
+    if (!g.bridges?.length || !s.engineers.length || !this.once('bridges', BRIDGE_EVERY)) return;
+    const foe = g.map.spawns[1 - this.team];
+    const cost = BALANCE.river.rebuildCost;
+    for (const b of g.bridges) {
+      if (!b.broken || dist(b.x, b.y, s.ax, s.ay) >= dist(b.x, b.y, foe.x, foe.y)) continue;
+      if (s.engineers.some((u) => u.order.type === 'repairBridge' && u.order.targetId === b.id)) continue;
+      if (!b.rebuild && g.teams[this.team].res.money < cost + BRIDGE_RESERVE) return;
+      let best = null;
+      for (const u of s.engineers) {
+        if (u.order.type !== 'idle') continue;
+        if (!best || dist(u.x, u.y, b.x, b.y) < dist(best.x, best.y, b.x, b.y)) best = u;
+      }
+      if (!best) return;
+      g.issue(this.team, { type: 'repairBridge', ids: [best.id], bridgeId: b.id });
     }
   }
 

@@ -1,7 +1,7 @@
 // Bewegung: Wegfolgen, Verfolgung, Fahrhelfer für LKW/Bauer und Trennung (PLAN.md §5, §11). Kein DOM.
 import { BALANCE } from '../data/balance.js';
 import { findPath, lineOfSight } from './pathfinding.js';
-import { inRange, resolveTarget, isFoe } from './entities.js';
+import { inRange, resolveTarget, isFoe, canAttack } from './entities.js';
 import { weatherSpeed } from './weather.js';
 import { opticsMul } from './research.js';
 
@@ -16,7 +16,7 @@ export const HASH_CELL = 128; // räumliches Hash-Gitter
 const TILE = BALANCE.map.tile;
 
 /** Aufträge, die logistics.js, construction.js, garrison.js und crates.js selbst fahren (updateMovement lässt sie aus). */
-export const OWN_DRIVERS = new Set(['load', 'unload', 'route', 'build', 'repair', 'board', 'dropoff', 'garrison', 'pickup', 'deliver']);
+export const OWN_DRIVERS = new Set(['load', 'unload', 'route', 'build', 'repair', 'board', 'dropoff', 'garrison', 'pickup', 'deliver', 'repairBridge']);
 
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 
@@ -301,7 +301,7 @@ function stepUnit(game, u, dt) {
   const o = u.order;
   if (o.type === 'attack') {
     const t = resolveTarget(game, o.targetId);
-    if (!isFoe(u.team, t)) {
+    if (!canAttack(u.team, t)) {
       setIdle(u);
       return;
     }
@@ -390,15 +390,17 @@ export function separate(game) {
 /**
  * Bewegt die Einheiten um dt (ohne LKW- und Bauaufträge; die fahren logistics.js bzw. construction.js).
  * Setzt Repath-Timer und Tempo (25 % bei Fahrzeugen ohne Treibstoff, carrySpeed mit Kiste, Schnee und Winterboden bremsen
- * Bodenfahrzeuge). Trennung: separate(game).
+ * Bodenfahrzeuge, in einer Furt river.ford). Trennung: separate(game).
  */
 export function updateMovement(game, dt) {
+  const grid = game.grid;
   for (const u of game.units) {
     if (!u.alive) continue;
     u.repathTimer = Math.max(0, u.repathTimer - dt);
     u.speedMul = (u.def.fuelPerSec || 0) > 0 && u.fuel <= 0 ? BALANCE.fuelSlowMul : 1;
     if (u.crate) u.speedMul *= BALANCE.crates.carrySpeed; // Kistenträger gehen langsamer
     u.speedMul *= weatherSpeed(game, u); // Schnee und Winterboden (weather.js)
+    if (grid.ford && !u.def.air && grid.isFord(grid.toCell(u.x), grid.toCell(u.y))) u.speedMul *= BALANCE.river.ford; // durchs seichte Wasser
     if (u.order.form && u.formMul) u.speedMul *= u.formMul; // Formation fährt geschlossen (formation.js)
     if (u.house || OWN_DRIVERS.has(u.order.type)) continue; // Besatzer eines Hauses bewegen sich nicht
     stepUnit(game, u, dt);

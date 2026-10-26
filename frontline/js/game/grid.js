@@ -1,5 +1,9 @@
 // Zellenraster für Terrain, Gebäude und Tore. Kein DOM.
 import { BALANCE } from '../data/balance.js';
+import { RELIEF } from './relief.js';
+
+const RELIEF_WATER = RELIEF.water;
+const RELIEF_STEEP = RELIEF.steep;
 
 export class Grid {
   constructor(cols, rows, tile) {
@@ -11,6 +15,8 @@ export class Grid {
     this.struct = new Int32Array(n); // Gebäude-ID oder 0
     this.gateTeam = new Int8Array(n).fill(-1); // Team des Tors oder -1
     this.cost = null; // Zusatzkosten je Zelle in Zehnteln (Hänge, rasterizeRelief); null = überall 0
+    this.ford = null; // 1 = Furt (seichtes Wasser, passierbar); null = keine Furten
+    this.deck = null; // 1 = unter einer Brückenfahrbahn (river.createBridges); null = keine Brücken
   }
 
   idx(c, r) {
@@ -86,18 +92,37 @@ export class Grid {
   /**
    * Gelände (relief.js): zu steile Hänge und Seen sind Hindernisse; Hänge kosten die Wegsuche mehr (Talwege werden bevorzugt,
    * am Hang sind Einheiten langsamer). relief = null (flache Karte) ändert nichts.
+   * fords: Furten {x, y, r}: seichtes Wasser darin (bis river.fordDepth unter dem Spiegel, nicht zu steil) bleibt passierbar,
+   * kostet die Wegsuche river.fordCost mehr und ist in `ford` markiert (Bodeneinheiten langsamer, movement.js).
    */
-  rasterizeRelief(relief) {
+  rasterizeRelief(relief, fords = []) {
     if (!relief) return;
     const k = BALANCE.slope.pathCost * 10;
+    const R = BALANCE.river;
     this.cost = new Uint8Array(this.cols * this.rows);
+    this.ford = fords.length ? new Uint8Array(this.cols * this.rows) : null;
+    const t = this.tile;
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         const i = this.idx(c, r);
-        if (relief.cellBlocked(c, r)) this.terrain[i] = 1;
-        else this.cost[i] = Math.min(255, Math.round(relief.cellSlope(c, r) * k));
+        const slope = relief.cellSlope(c, r);
+        if (relief.cellBlocked(c, r)) {
+          const h = relief.cellHeight(c, r);
+          const x = this.center(c);
+          const y = this.center(r);
+          const shallow = h < RELIEF_WATER && h >= RELIEF_WATER - R.fordDepth && slope <= RELIEF_STEEP;
+          if (shallow && fords.some((f) => (f.x - x) ** 2 + (f.y - y) ** 2 <= (f.r + t / 2) ** 2)) {
+            this.ford[i] = 1;
+            this.cost[i] = Math.min(255, R.fordCost + Math.round(slope * k));
+          } else this.terrain[i] = 1;
+        } else this.cost[i] = Math.min(255, Math.round(slope * k));
       }
     }
+  }
+
+  /** Furtzelle (seichtes Wasser, passierbar, langsam)? */
+  isFord(c, r) {
+    return !!this.ford && this.inBounds(c, r) && this.ford[this.idx(c, r)] === 1;
   }
 
   /** Bäume blockieren die Zelle, in der ihr Stamm steht. */

@@ -7,7 +7,7 @@ import { generateMap } from './map.js';
 import { blockers } from './mapdata.js';
 import { Grid } from './grid.js';
 import { reliefOf } from './relief.js';
-import { createUnit, createBuilding, isFoe, inRange } from './entities.js';
+import { createUnit, createBuilding, isFoe, canAttack, inRange } from './entities.js';
 import { Fog } from './fog.js';
 import { updateEconomy, smoothIncome } from './economy.js';
 import { updateMovement, nearestPassable, planPath, setIdle, separate, exitHouse } from './movement.js';
@@ -25,6 +25,7 @@ import { hasCommander, updateCommanders, commanderFallen } from './commander.js'
 import { updateRadio, radioStarted, radioLost } from './radio.js';
 import { createWeather, updateWeather } from './weather.js';
 import { createResearch, updateResearch, cmdResearch, cmdCancelResearch, unitLocked, lockReason, opticsMul } from './research.js';
+import { createBridges, updateBridges, cmdRepairBridge, bridgeUnder } from './river.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
@@ -134,16 +135,17 @@ export class Game {
   /** radio: Sendemast als zweite Siegbedingung (Startmenü; ohne Angabe aus). */
   /** weather: 'off' | 'random' | 'summer' | 'autumn' | 'winter' (Wetter und Jahreszeit, weather.js; ohne Angabe aus). */
   /** research: Forschungsstufen (research.js; ohne Angabe aus: alle Einheiten frei, keine Verbesserungen). */
-  constructor({ seed = 1, winPoints = BALANCE.winPoints, startMoney = BALANCE.startRes.money, map = null, radio = false, weather = 'off', research = false } = {}) {
+  /** river: Zufallskarte mit Flüssen, Brücken und Furten (river.js; ohne Angabe aus). Fertige Karten bringen ihre eigenen mit. */
+  constructor({ seed = 1, winPoints = BALANCE.winPoints, startMoney = BALANCE.startRes.money, map = null, radio = false, weather = 'off', research = false, river = false } = {}) {
     this.seed = seed;
     this.rng = makeRng(seed);
-    this.map = map ?? generateMap(seed);
+    this.map = map ?? generateMap(seed, { river });
     this.grid = new Grid(W / TILE, H / TILE, TILE);
     this.grid.rasterizeObstacles(this.map.obstacles);
     this.grid.rasterizeRects(blockers(this.map.town?.buildings ?? []));
     this.grid.rasterizeTrees([...(this.map.town?.trees ?? []), ...(this.map.trees ?? [])]);
     this.relief = reliefOf(this.map); // Höhengelände oder null (flache Karte)
-    this.grid.rasterizeRelief(this.relief); // steile Hänge und Seen, Hangkosten der Wegsuche
+    this.grid.rasterizeRelief(this.relief, this.map.fords ?? []); // steile Hänge, Seen und Flüsse (Furten passierbar), Hangkosten
 
     this.time = 0;
     this.nextId = 1;
@@ -152,6 +154,7 @@ export class Game {
     this.buildings = [];
     this.projectiles = [];
     this.effects = [];
+    createBridges(this); // Brücken über die Flüsse (Fahrbahn offen, zerstörbar)
     createScars(this); // Wracks und Krater (sichtbarer Schaden)
     this.formations = new Map(); // Formation → { id, speed, ids } (formation.js)
     this.formationSeq = 0;
@@ -278,9 +281,11 @@ export class Game {
     return false;
   }
 
-  /** Geländehöhe unter einer Entity (Wasseroberfläche bei Seen); 0 auf flachen Karten. */
+  /** Geländehöhe unter einer Entity (Wasseroberfläche bei Seen, Fahrbahn auf Brücken); 0 auf flachen Karten. */
   groundHeight(e) {
-    return this.relief ? this.relief.displayAt(e.x, e.y) : 0;
+    if (!this.relief) return 0;
+    const b = this.bridges.length && !(e.kind === 'unit' && e.def.air) ? bridgeUnder(this, e.x, e.y) : null;
+    return b ? b.deckH : this.relief.displayAt(e.x, e.y);
   }
 
   isExplored(team, x, y) {
@@ -507,6 +512,7 @@ export class Game {
         const i = g.idx(c, r);
         if (g.terrain[i]) return bad('Gelände blockiert');
         if (g.struct[i]) return bad('Fläche bereits belegt');
+        if (g.ford?.[i] || g.deck?.[i]) return bad('Nicht auf Brücken und in Furten');
       }
     }
 
@@ -573,6 +579,8 @@ export class Game {
         return this.cmdBuildFob(team, cmd);
       case 'repair':
         return cmdRepair(this, team, cmd);
+      case 'repairBridge':
+        return cmdRepairBridge(this, team, cmd);
       case 'load':
         return cmdLoad(this, team, cmd);
       case 'unload':
@@ -707,9 +715,10 @@ export class Game {
     return { ok: true, count: units.length, formation: 'loose', slots: spots };
   }
 
+  /** { type: 'attack', ids, targetId }: gegnerische Einheit, Gebäude, besetztes Haus oder eine intakte Brücke (nur auf Befehl). */
   cmdAttack(team, cmd) {
     const t = this.getEntity(cmd.targetId);
-    if (!isFoe(team, t)) return fail('Ziel ungültig');
+    if (!canAttack(team, t)) return fail('Ziel ungültig');
     const armed = this.ownUnits(team, cmd.ids).filter((u) => u.def.range > 0);
     const units = armed.filter((u) => !u.crate); // Kistenträger schießen nicht
     if (!units.length) return fail(armed.length ? 'Kistenträger schießen nicht' : 'Keine bewaffnete Einheit gewählt');
@@ -1035,7 +1044,7 @@ export class Game {
       return;
     }
     this.time += dt;
-    // Reihenfolge: Wetter zuerst (Sicht und Tempo), dann Forschung; Wirtschaft setzt team.rate zurück; Bewegung, Logistik und Bau fahren; Kampf, Zone,
+    // Reihenfolge: Wetter zuerst (Sicht und Tempo), dann Forschung; Wirtschaft setzt team.rate zurück; Bewegung, Logistik, Bau und Brückenbau fahren; Kampf, Zone,
     // Einkommen zuletzt
     updateWeather(this, dt);
     updateResearch(this, dt);
@@ -1046,6 +1055,7 @@ export class Game {
     updateCrates(this, dt);
     updateLogistics(this, dt);
     updateConstruction(this, dt);
+    updateBridges(this, dt);
     separate(this);
     updateCommanders(this, dt);
     updateCombat(this, dt);

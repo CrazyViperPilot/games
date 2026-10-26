@@ -43,6 +43,8 @@ import { reliefOf } from '../game/relief.js';
 import { getGround, LIGHT_ELEV } from './ground.js';
 import { seasonal, setRoofSnow } from './season.js';
 import { drawWeather } from './weatherfx.js';
+import { drawBridgeTop, drawBridgeIso, drawBridgeBar, bridgeBar, fordPosts, drawFordPostTop, drawFordPostIso } from './bridge.js';
+import { bridgeUnder } from '../game/river.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
@@ -174,6 +176,8 @@ export class Renderer {
     ctx.imageSmoothingEnabled = true;
 
     this.drawTerrain(ctx, R);
+    for (const b of g.bridges ?? []) if (inRect(b.x, b.y, b.len / 2 + 40)) drawBridgeTop(ctx, b); // über dem Fluss, unter allem anderen
+    for (const p of fordPosts(g.map, reliefOf(g.map))) if (inRect(p.x, p.y, 10)) drawFordPostTop(ctx, p); // Furtstangen
     this.drawRuins(ctx, R, known);
     this.drawScars(ctx, inRect, z);
     this.drawZone(ctx, z);
@@ -272,8 +276,13 @@ export class Renderer {
 
     if (v.placement) this.drawPlacement(ctx, v.placement, z);
 
-    // Bildschirmkoordinaten: Besatzung der Häuser, Auswahlrahmen, Hinweistext zur Platzierung
+    // Bildschirmkoordinaten: Brückenbalken, Besatzung der Häuser, Auswahlrahmen, Hinweistext zur Platzierung
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    for (const b of g.bridges ?? []) {
+      if (!bridgeBar(b) || !inRect(b.x, b.y, 60)) continue;
+      const p = cam.worldToScreen(b.x, b.y);
+      drawBridgeBar(ctx, p.x, p.y - 34, b);
+    }
     for (const h of g.garrisoned ?? []) {
       if (!inRect(h.x, h.y, 200) || !(h.team === team || reveal || g.sees(team, h))) continue;
       const p = cam.worldToScreen(h.x, h.y - h.ph / 2);
@@ -337,7 +346,9 @@ export class Renderer {
   /** Bodenebene für eine Markierung am Weltpunkt (isometrisch auf dessen Geländehöhe). */
   groundAt(ctx, x, y) {
     const cam = this.camera;
-    cam.pinAt(x, y);
+    const br = this.game.bridges?.length ? bridgeUnder(this.game, x, y) : null; // auf einer Brücke: ihre Fahrbahn
+    if (br) cam.pin(br.deckH);
+    else cam.pinAt(x, y);
     setIsoGround(ctx, cam, this.dpr);
     cam.unpin();
   }
@@ -436,6 +447,7 @@ export class Renderer {
       else setIsoGround(ctx, cam, dpr);
       drawCrater(ctx, c, scarAlpha(c, g.time, SC.craterLife, SC.craterFade));
     }
+    for (const b of g.bridges ?? []) if (inRect(b.x, b.y, b.len / 2 + PAD)) drawBridgeIso(ctx, cam, dpr, b); // Einheiten fahren darüber
     setIsoGround(ctx, cam, dpr);
     this.drawZone(ctx, z);
     this.drawHot(ctx, z, now);
@@ -483,6 +495,7 @@ export class Renderer {
       if (this.scarShown(w) && inRect(w.x, w.y, PAD)) items.push({ k: cam.depth(w.x, w.y), t: w.kind === 'building' ? 10 : 9, o: w });
     }
     for (const a of g.animals ?? []) if (inRect(a.x, a.y, 40) && seen(a.x, a.y)) items.push({ k: cam.depth(a.x, a.y), t: 11, o: a });
+    for (const p of fordPosts(g.map, relief)) if (inRect(p.x, p.y, 30)) items.push({ k: cam.depth(p.x, p.y), t: 12, o: p });
     const [ia, , ic] = cam.isoMatrix(1); // Blickrichtung der Tiere im Bild
     const glow = 0.6 + 0.4 * Math.sin(now / 350);
     const air = [];
@@ -540,6 +553,7 @@ export class Renderer {
       else if (it.t === 6) drawCar(ctx, cam, it.o);
       else if (it.t === 7) drawBench(ctx, cam, it.o);
       else if (it.t === 8) drawCrate(ctx, cam, it.o.x, it.o.y, it.o.ground ? 16 : 13, 0, it.o.ground ? glow : 0);
+      else if (it.t === 12) drawFordPostIso(ctx, cam, it.o);
       else if (it.t === 11) {
         const a = it.o;
         const p = cam.worldToScreen(a.x, a.y);
@@ -647,6 +661,13 @@ export class Renderer {
       this.drawSupply(ctx, u, sel.has(u.id) || hover === u, z);
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    for (const b of g.bridges ?? []) {
+      if (!bridgeBar(b) || !inRect(b.x, b.y, PAD)) continue;
+      cam.pin(b.deckH);
+      const p = cam.worldToScreen(b.x, b.y);
+      cam.unpin();
+      drawBridgeBar(ctx, p.x, p.y - 34 * Math.max(0.6, z), b);
+    }
     for (const h of g.garrisoned ?? []) {
       if (!inRect(h.x, h.y, PAD) || !(h.team === team || reveal || g.sees(team, h))) continue;
       if (relief) cam.pin(this.baseHeight({ t: 0, o: h.src }));
@@ -758,7 +779,8 @@ export class Renderer {
       x1 = o.x + (o.angle ? r : o.w / 2);
       y0 = o.y - (o.angle ? r : o.h / 2);
       y1 = o.y + (o.angle ? r : o.h / 2);
-    } else return relief.displayAt(o.x, o.y);
+    } else if (it.t === 5) return this.game.groundHeight(o); // Einheiten: auf Brücken die Fahrbahn
+    else return relief.displayAt(o.x, o.y);
     return Math.min(relief.displayAt(x0, y0), relief.displayAt(x1, y0), relief.displayAt(x0, y1), relief.displayAt(x1, y1));
   }
 

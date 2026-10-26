@@ -10,6 +10,7 @@ import { canCarry } from '../game/crates.js';
 import { FORMATIONS, FORMATION_NAMES } from '../game/formation.js';
 import { hasCommander } from '../game/commander.js';
 import { researchBlock, researchEffect, unitLocked, lockReason } from '../game/research.js';
+import { deckDist } from '../game/river.js';
 import { unitLift, buildingHeight, TOWN_H } from '../render/iso.js';
 
 const WALL_MAX = 40; // max. Zellen je Mauerzug (Vorschau und Befehl)
@@ -254,6 +255,23 @@ export class Controller {
       }
     }
     return null;
+  }
+
+  /** Brücke unter dem Weltpunkt (Fahrbahn mit Fangradius), die pred erfüllt, oder null. Die nächste gewinnt. */
+  pickBridge(wx, wy, pred = () => true) {
+    if (!this.game.bridges?.length) return null;
+    const tol = PICK_PX / this.camera.zoom;
+    let best = null;
+    let bestD = Infinity;
+    for (const b of this.game.bridges) {
+      if (!pred(b)) continue;
+      const d = deckDist(b, wx, wy);
+      if (d <= tol && d < bestD) {
+        best = b;
+        bestD = d;
+      }
+    }
+    return best;
   }
 
   /** Versorgungskiste am Boden unter dem Punkt (nur bekannte: in Sicht oder im Lagebild an derselben Stelle) oder null. */
@@ -512,6 +530,16 @@ export class Controller {
       rest = units.filter((u) => !done.has(u.id));
       if (!rest.length) return;
     }
+    // Zerstörte Brücke: Baufahrzeuge bauen sie wieder auf (die übrigen gehen hin)
+    const broken = this.pickBridge(wx, wy, (b) => b.broken);
+    if (broken) {
+      const eng = rest.filter((u) => u.def.builder === 'all');
+      if (eng.length && this.issue({ type: 'repairBridge', ids: eng.map((u) => u.id), bridgeId: broken.id }).ok) {
+        this.moveMarker(broken.x, broken.y);
+        rest = rest.filter((u) => !eng.includes(u));
+        if (!rest.length) return;
+      }
+    }
     // Stadthaus: vom Gegner besetzt und sichtbar = angreifen; leer oder eigen = Soldaten besetzen es, die übrigen gehen hin
     const house = this.pickHouse(wx, wy);
     if (house && house.team >= 0 && house.team !== this.team) {
@@ -613,6 +641,14 @@ export class Controller {
     if (!ids.length) {
       this.message('Keine Einheit gewählt');
       this.setMode('normal');
+      return;
+    }
+    // Intakte Brücke angeklickt: beschießen (nur so greift jemand eine Brücke an)
+    const bridge = this.pickBridge(wx, wy, (b) => !b.broken);
+    if (bridge) {
+      if (!this.issue({ type: 'attack', ids, targetId: bridge.id }).ok) return;
+      this.message('Brücke wird beschossen');
+      if (!shift) this.setMode('normal');
       return;
     }
     const r = this.issue({ type: 'attackMove', ids, x: wx, y: wy, formation: this.formation });
@@ -982,7 +1018,7 @@ export class Controller {
       case 'wall':
         return `Mauer: Maus gedrückt halten und ziehen (max. ${WALL_MAX} Zellen)`;
       case 'attackMove':
-        return 'Angriffsbewegung: Ziel anklicken · Esc bricht ab';
+        return 'Angriffsbewegung: Ziel anklicken (auf eine Brücke: sprengen) · Esc bricht ab';
       case 'fobTarget':
         return 'FOB-Baustelle: Standort anklicken · Esc bricht ab';
       case 'loadFob':
@@ -1108,7 +1144,7 @@ export class Controller {
     }
     card.push(
       entry('Angriff', 'A', {
-        tip: 'Angriffsbewegung (A, dann Ziel anklicken)',
+        tip: 'Angriffsbewegung (A, dann Ziel anklicken). Auf eine Brücke geklickt: die Einheiten beschießen sie, bis sie einstürzt.',
         enabled: units.length > 0,
         reason: 'Keine Einheit gewählt',
         action: () => this.startAttackMove(),
