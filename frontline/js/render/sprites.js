@@ -660,3 +660,151 @@ export function drawFire(ctx, x, y, s, t, seed) {
   }
   ctx.restore();
 }
+
+// ---- Tiere -------------------------------------------------------------------------------
+const DEER = { body: '#8b5e34', dark: '#6e4827', belly: '#c9a77a', rump: '#efe5d2' };
+const BOAR = { body: '#4b3c30', dark: '#33281f', snout: '#7a6152' };
+
+/** Tier von oben (Weltkoordinaten, gedreht nach Laufrichtung): Reh mit hellem Spiegel, Wildschwein gedrungen mit Rüssel. */
+export function drawAnimalTop(ctx, a, zoom = 1) {
+  const z = zoom || 1;
+  const deer = a.kind === 'deer';
+  const bob = a.speed > 0 ? Math.sin(a.step * 0.35) * 0.5 : 0;
+  ctx.save();
+  ctx.translate(a.x, a.y);
+  ctx.rotate(a.angle);
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.beginPath();
+  ctx.ellipse(1.5, 2, deer ? 8 : 7, deer ? 3.6 : 4.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE;
+  ctx.lineWidth = 0.8 / z;
+  if (deer) {
+    ctx.fillStyle = DEER.body;
+    ctx.beginPath();
+    ctx.ellipse(bob, 0, 7.5, 3.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = DEER.dark;
+    ctx.beginPath();
+    ctx.ellipse(8.5 + bob, 0, 2.6, 1.9, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillRect(9 + bob, -2.6, 1.2, 1.2); // Ohren
+    ctx.fillRect(9 + bob, 1.4, 1.2, 1.2);
+    ctx.fillStyle = DEER.rump;
+    ctx.beginPath();
+    ctx.arc(-6.5 + bob, 0, 1.6, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.fillStyle = BOAR.body;
+    ctx.beginPath();
+    ctx.ellipse(bob, 0, 6.5, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = BOAR.dark;
+    ctx.fillRect(-5 + bob, -0.6, 9, 1.2); // Borstenkamm
+    ctx.beginPath();
+    ctx.moveTo(4.5 + bob, -3);
+    ctx.lineTo(9.5 + bob, -1.2);
+    ctx.lineTo(9.5 + bob, 1.2);
+    ctx.lineTo(4.5 + bob, 3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = BOAR.snout;
+    ctx.fillRect(9.2 + bob, -1, 1.4, 2);
+  }
+  ctx.restore();
+}
+
+/**
+ * Tier in der Seitenansicht (isometrisch, Bildschirmkoordinaten): Fußpunkt (x, y), k = Maßstab (Zoom), right = Blick nach rechts.
+ * Beine schwingen mit dem zurückgelegten Weg; Rehe mit Hals, Kopf und Ohren, Wildschweine tief und breit mit Rüssel.
+ */
+export function drawAnimalSide(ctx, a, x, y, k, right) {
+  const deer = a.kind === 'deer';
+  const run = a.speed > 60;
+  const swing = a.speed > 0 ? Math.sin(a.step * (deer ? 0.28 : 0.4)) * (run ? 3.2 : 1.8) : 0;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(right ? k : -k, k);
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, deer ? 8 : 7, deer ? 2.4 : 2.6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.lineCap = 'round';
+  if (deer) {
+    const legTop = -8;
+    ctx.strokeStyle = DEER.dark;
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    for (const [lx, ph] of [[-5, 1], [-3.5, -1], [4, -1], [5.5, 1]]) {
+      ctx.moveTo(lx, legTop);
+      ctx.lineTo(lx + swing * ph, 0);
+    }
+    ctx.stroke();
+    ctx.fillStyle = DEER.body;
+    ctx.beginPath();
+    ctx.ellipse(0, -10, 7.5, 3.4, run ? -0.08 : 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = DEER.belly;
+    ctx.beginPath();
+    ctx.ellipse(0, -8.2, 5.5, 1.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = DEER.rump;
+    ctx.beginPath();
+    ctx.ellipse(-6.9, -10, 1.1, 1.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Hals und Kopf (beim Grasen gesenkt)
+    const graze = a.state === 'graze';
+    const hx = graze ? 9.5 : 8.5;
+    const hy = graze ? -5 : -17;
+    ctx.strokeStyle = DEER.body;
+    ctx.lineWidth = 2.6;
+    ctx.beginPath();
+    ctx.moveTo(5.5, -11);
+    ctx.lineTo(hx - 1, hy + 1.5);
+    ctx.stroke();
+    ctx.fillStyle = DEER.dark;
+    ctx.beginPath();
+    ctx.ellipse(hx, hy, 2.6, 1.6, graze ? 0.6 : 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(hx - 1.5, hy - 1);
+    ctx.lineTo(hx - 2.5, hy - 4);
+    ctx.lineTo(hx - 0.5, hy - 1.5);
+    ctx.fill();
+  } else {
+    ctx.strokeStyle = BOAR.dark;
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    for (const [lx, ph] of [[-4, 1], [-2.5, -1], [3, -1], [4.5, 1]]) {
+      ctx.moveTo(lx, -4);
+      ctx.lineTo(lx + swing * ph * 0.7, 0);
+    }
+    ctx.stroke();
+    ctx.fillStyle = BOAR.body;
+    ctx.beginPath();
+    ctx.ellipse(0, -6.5, 6.8, 4.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#5d4a3a';
+    ctx.beginPath();
+    ctx.ellipse(-0.5, -5.2, 5, 2, 0, 0, Math.PI * 2); // hellere Flanke
+    ctx.fill();
+    ctx.fillStyle = BOAR.dark;
+    ctx.beginPath();
+    ctx.ellipse(-0.5, -9.9, 5.2, 0.9, 0, 0, Math.PI * 2); // Borstenkamm
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(4.5, -9.5);
+    ctx.lineTo(10, -5.5);
+    ctx.lineTo(10, -3.2);
+    ctx.lineTo(5, -3.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = BOAR.snout;
+    ctx.fillRect(9.6, -5.6, 1.3, 2.3);
+    ctx.fillStyle = '#eee6d6';
+    ctx.fillRect(8.4, -3.8, 1.6, 0.7); // Hauer
+  }
+  ctx.restore();
+}

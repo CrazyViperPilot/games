@@ -19,6 +19,8 @@ import {
   drawWreckRubble,
   drawSmoke,
   drawFire,
+  drawAnimalTop,
+  drawAnimalSide,
 } from './sprites.js';
 import { builderState } from '../ui/status.js';
 import { makeRng } from '../core/rng.js';
@@ -183,6 +185,7 @@ export class Renderer {
     for (const m of this.crateMarks(seen, known)) {
       if (inRect(m.x, m.y, 30)) drawCrateTop(ctx, m.x, m.y, m.ground ? 16 : 13, z, m.ground ? glow : 0);
     }
+    for (const a of g.animals ?? []) if (inRect(a.x, a.y, 20) && seen(a.x, a.y)) drawAnimalTop(ctx, a, z); // nur in Sicht
 
     // Auswahl und Hover (unter den Einheiten); Besatzer eines Hauses: Rahmen ums Haus
     for (const e of this.ringed(sel)) if (shown(e)) this.drawSelectRing(ctx, e, '#f2f5f2', z, false);
@@ -463,6 +466,8 @@ export class Renderer {
     for (const w of g.wrecks ?? []) {
       if (this.scarShown(w) && inRect(w.x, w.y, PAD)) items.push({ k: cam.depth(w.x, w.y), t: w.kind === 'building' ? 10 : 9, o: w });
     }
+    for (const a of g.animals ?? []) if (inRect(a.x, a.y, 40) && seen(a.x, a.y)) items.push({ k: cam.depth(a.x, a.y), t: 11, o: a });
+    const [ia, , ic] = cam.isoMatrix(1); // Blickrichtung der Tiere im Bild
     const glow = 0.6 + 0.4 * Math.sin(now / 350);
     const air = [];
     for (const u of g.units) {
@@ -515,7 +520,11 @@ export class Renderer {
       else if (it.t === 6) drawCar(ctx, cam, it.o);
       else if (it.t === 7) drawBench(ctx, cam, it.o);
       else if (it.t === 8) drawCrate(ctx, cam, it.o.x, it.o.y, it.o.ground ? 16 : 13, 0, it.o.ground ? glow : 0);
-      else if (it.t === 9 || it.t === 10) {
+      else if (it.t === 11) {
+        const a = it.o;
+        const p = cam.worldToScreen(a.x, a.y);
+        drawAnimalSide(ctx, a, p.x, p.y, z * 1.1, ia * Math.cos(a.angle) + ic * Math.sin(a.angle) >= 0);
+      } else if (it.t === 9 || it.t === 10) {
         const w = it.o;
         ctx.globalAlpha = scarAlpha(w, g.time, SC.wreckLife, SC.wreckFade);
         if (it.t === 10) drawRubble(ctx, cam, { x: w.x, y: w.y, w: w.w, h: w.h, kind: w.small ? 'wall' : 'wreck', hgt: w.small ? 18 : 36 }, !w.small);

@@ -475,6 +475,7 @@ function makeRenderer() {
   game.units.length = 0;
   game.buildings.length = 0;
   game.crates = []; // Kisten zeichnet der Editor selbst (sie ändern sich beim Bearbeiten)
+  game.animals = []; // Tiere gibt es erst im Spiel
   game.entities.clear();
   const r = new Renderer(canvas, game, st.cam, 0);
   r.revealAll = true;

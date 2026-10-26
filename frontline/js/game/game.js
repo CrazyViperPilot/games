@@ -19,6 +19,7 @@ import { updateConstruction, canBuild, cmdRepair, orderBuild, orderBuildSeq } fr
 import { createHouses, updateGarrison, cmdGarrison, cmdUngarrison, dropOccupant } from './garrison.js';
 import { createCrates, updateCrates, updateCrateIntel, cmdPickup, cmdDeliver, cmdDropCrate } from './crates.js';
 import { createScars, updateScars, updateScarIntel, addUnitWreck, addBuildingWreck, clearWrecksUnder } from './scars.js';
+import { createAnimals, updateAnimals } from './animals.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
@@ -190,6 +191,7 @@ export class Game {
     }
     createHouses(this); // Stadthäuser zum Besetzen (Häuserkampf)
     createCrates(this); // Versorgungskisten der Karte
+    createAnimals(this); // Rehe und Wildschweine (nur Optik)
     this.updateFog();
   }
 
@@ -1005,6 +1007,7 @@ export class Game {
       this.updateFog();
     }
 
+    updateAnimals(this, dt);
     this.ageEffects(dt);
     this.cleanup();
     updateScars(this);
