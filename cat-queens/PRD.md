@@ -1,6 +1,6 @@
 # Katzen-Queens – PRD
 
-Stand: v0.1 (2026-10-26), Phase 1: Generator, Solver, Logik und Tests fertig. Oberfläche folgt nach Daniels Ok.
+Stand: v1.0 (2026-10-26): Generator, Solver, Logik, Hinweise und Oberfläche fertig, live unter /games/cat-queens/.
 Dieses Dokument bei jeder Regel- oder Funktionsänderung aktuell halten.
 
 ## Idee
@@ -12,8 +12,10 @@ Kein Backend, keine Werbung, kein Tracking.
   Cache-Präfix `catqueens-`, localStorage-Schlüssel `catqueens-*`).
 - Zielgeräte: Pixel 8a und Lenovo Tab M11, Querformat, Touch.
 - TypeScript + Vite (ohne Framework), Tests mit Vitest. Als einziges Spiel der Sammlung mit Build-Schritt:
-  GitHub Pages baut `cat-queens/` mit `npm run build` und veröffentlicht `dist/` (wird mit der Oberfläche eingerichtet;
-  bis dahin schließt `pages.yml` den Ordner aus).
+  `.github/workflows/pages.yml` baut `cat-queens/` mit `npm ci && npm run build` und veröffentlicht nur `dist/`.
+- Service Worker wird beim Build erzeugt (`vite.config.ts`): lädt beim Installieren alle Dateien in den Cache,
+  Cache-Name = `catqueens-` + Hash aller Dateien, löscht nur eigene alte Caches. Seite: Netz zuerst, Dateien: Cache zuerst.
+  Eine Version muss also nicht von Hand erhöht werden.
 
 ## Regeln
 - N×N-Gitter (N = 5 bis 10), aufgeteilt in N zusammenhängende Farbregionen.
@@ -56,16 +58,29 @@ Seed = `daily-JJJJ-MM-TT` (Ortszeit). Schwierigkeit nach Wochentag: Mo/Di leicht
 1. Falsch gesetzte Katze oder X auf einem Katzenfeld → dieses Feld zeigen.
 2. Sonst den nächsten Logikschritt mit der leichtesten Technik zeigen (mit deutscher Erklärung), nicht einfach die Lösung.
 
-## Bedienung (Phase 2, geplant)
-- Tippen: leer → X → Katze → leer. Wischen über mehrere Felder: alle als X.
-- Regelverstöße sofort rot (zwei Katzen in Zeile/Spalte/Region oder berührend).
-- Rückgängig, Neustart, Hinweis, Timer, Zähler „x/N Katzen gesetzt“.
-- Tagesrätsel und freies Spiel nach Schwierigkeit. Statistik in localStorage (gelöste Rätsel, Bestzeiten, Streak).
-- Hell- und Dunkelmodus, farbenblind-freundliche Palette plus Muster in den Regionen.
-- Katzengesichter als eigene, einfache SVGs.
-- Generator läuft in einem Web Worker; das nächste Rätsel je Stufe wird im Hintergrund vorbereitet
-  (Schwer 10×10 braucht auf dem PC im Schnitt ~0,2 s, im Einzelfall bis ~1,5 s).
+## Bedienung
+- Tippen: leer → X → Katze → leer. Wischen über mehrere Felder: alle leeren Felder werden X
+  (beginnt das Wischen auf einem X, werden X entfernt). Eine Geste = ein Rückgängig-Schritt.
+- Sofort rot: Katzen, die sich eine Zeile/Spalte/Region teilen oder berühren, und Zeilen/Spalten/Regionen voller X.
+- Rückgängig, Neustart (lässt sich rückgängig machen), Hinweis, Timer, Zähler „Katzen x/N“.
+- Hinweis zeigt das Feld mit pulsierendem Rahmen, hebt die begründenden Zeilen/Spalten/Regionen hervor (Rest wird
+  abgedunkelt) und erklärt den Schritt. Regionen heißen dabei nach ihrer Farbe (Orange, Blau, Grün, Gelb, Lila,
+  Rosa, Türkis, Sand, Grau, Rot).
+- Sieg: Katzen hüpfen, Fenster mit Zeit, Bestzeit-Meldung, Tages-Serie; „Nächstes Rätsel“ im freien Spiel.
+
+## Menü, Spielstände, Statistik
+- Menü: Tagesrätsel (mit Datum, Stufe, Zeit wenn gelöst), freies Spiel Leicht/Mittel/Schwer (mit Bestzeit,
+  „▶ weiter“ wenn ein Spiel offen ist), Regeln, Statistik, Theme (Auto/Hell/Dunkel), Muster an/aus, Link zur Spielesammlung.
+- Je Modus ein eigener Spielstand (`catqueens-game-daily-JJJJ-MM-TT`, `catqueens-game-free-<stufe>`) mit Markierungen,
+  Rückgängig-Liste, Zeit und Hinweisen. Alte Tagesrätsel-Stände werden beim Start gelöscht.
+- Zeit läuft nur, solange das Spielfeld sichtbar ist (pausiert im Menü, in Fenstern und im Hintergrund).
+- Statistik (`catqueens-stats`): gelöste Rätsel je Stufe, Bestzeit je Stufe (nur ohne Hinweis), gelöste Tagesrätsel,
+  aktuelle und beste Tages-Serie, benutzte Hinweise.
+- Farbenblind-freundlich: dicke Grenzen zwischen Regionen, je Region ein eigenes Muster (abschaltbar), eigene Palette für Dunkel.
+- Rätsel entstehen in einem Web Worker. Je Stufe liegt ein fertiges nächstes Rätsel bereit (`catqueens-next-<stufe>`),
+  dadurch startet auch „Schwer“ sofort.
 
 ## Tests
 `npm test` (Vitest): Solver gegen rohe Aufzählung, Eindeutigkeit, Gültigkeit, Zusammenhang der Regionen,
-Determinismus, Korrektheit jedes Logikschritts, Hinweise bis zur Lösung. `npm run report` misst den Generator.
+Determinismus, Korrektheit jedes Logikschritts, Hinweise bis zur Lösung, Spielzustand (Tippen, Wischen,
+Rückgängig, Fehler, Sieg, Speichern) und Statistik (Bestzeiten, Serie). `npm run report` misst den Generator.

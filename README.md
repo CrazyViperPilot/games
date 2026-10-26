@@ -15,6 +15,7 @@ Live: https://crazyviperpilot.github.io/games/
 | **Frankfurtopoly** | extern: [phpexpert.de/games/frankfurtopoly](https://phpexpert.de/games/frankfurtopoly/) | Monopoly mit Frankfurter Straßen für Daniel, Lea und Kira (online, Chat, Computergegner). Code, PHP-Backend und Deploy im Repo [frankfurtopoly](https://github.com/CrazyViperPilot/frankfurtopoly) | `CACHE_VERSION` in `frankfurtopoly/sw.js` dort |
 | **CrazyViperMahjong** | [`crazyviper-mahjong/`](crazyviper-mahjong/) | Mahjong Solitaire mit 36 Kampfjet-Typen statt Schriftzeichen, 4 Layouts. [PRD](crazyviper-mahjong/PRD.md) | `CACHE_NAME` in `crazyviper-mahjong/sw.js` |
 | **Catsweeper** | [`catsweeper/`](catsweeper/) | Minesweeper mit Katzen und Fisch-Markierung, 3 Stufen. [PRD](catsweeper/PRD.md) | `CACHE_NAME` in `catsweeper/sw.js` |
+| **Katzen-Queens** | [`cat-queens/`](cat-queens/) | Logikrätsel (Queens / Star Battle) mit Katzen: Tagesrätsel, 3 Stufen, Hinweise. TypeScript + Vite, wird in `pages.yml` gebaut. [PRD](cat-queens/PRD.md) | Hash aller Dateien, automatisch in `cat-queens/dist/sw.js` |
 | **Mario Craft** | [`mario-craft/`](mario-craft/) | Jump'n Run im Pixel-Stil: 3 Welten mit Bossen, Deutsch und Polnisch. [README](mario-craft/README.md) | `CACHE_VERSION` in `mario-craft/sw.js` |
 
 ## Aufbau: jedes Spiel ist eigenständig
@@ -24,7 +25,7 @@ Die Spiele teilen sich nur das Repo und die Domain – sonst nichts.
 - **Code:** Jedes Spiel liegt vollständig in seinem Ordner. Keine gemeinsamen Dateien, keine Imports über Ordnergrenzen
   (auch nicht aus der Startseite). Ein Spiel lässt sich jederzeit herauslösen, indem man seinen Ordner kopiert.
 - **Offline / Installation:** Jedes Spiel hat ein eigenes `manifest.json` (Scope = sein Ordner) und einen eigenen
-  Service Worker mit eigenem Cache-Präfix (`gatesquad-`, `vibesquadron-`, `go-game-`, `sudoku-`, `frontline-`, `fruhno-`, `crazyvipermahjong-`, `catsweeper-`). Ein Service Worker löscht beim
+  Service Worker mit eigenem Cache-Präfix (`gatesquad-`, `vibesquadron-`, `go-game-`, `sudoku-`, `frontline-`, `fruhno-`, `crazyvipermahjong-`, `catsweeper-`, `catqueens-`). Ein Service Worker löscht beim
   Aktualisieren **nur Caches mit seinem eigenen Präfix** – sonst würde er die Offline-Daten der anderen Spiele zerstören.
 - **Speicherstände:** Jedes Spiel nutzt eigene `localStorage`-Schlüssel.
 - **Lebenszyklus:** Änderungen an einem Spiel betreffen nur seinen Ordner. Ein Release = Änderung + Cache-Version
@@ -46,3 +47,5 @@ Vibe Squadron ebenso aus `CrazyViperPilot/CrazyScrollShooter`.
 
 `.github/workflows/pages.yml` veröffentlicht bei jedem Push auf `main` die Startseite und alle Spiele
 (Settings → Pages → Source: „GitHub Actions“). Tests, `package.json` und `node_modules` werden nicht veröffentlicht.
+Katzen-Queens ist das einzige Spiel mit Build-Schritt: Der Workflow baut `cat-queens/` (`npm ci && npm run build`)
+und veröffentlicht nur `cat-queens/dist/`.

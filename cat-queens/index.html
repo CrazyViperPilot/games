@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#f6f1ea">
+  <meta name="description" content="Katzen-Queens: Logikrätsel mit Katzen. Eine Katze pro Zeile, Spalte und Farbregion, keine zwei berühren sich. Offline spielbar.">
+  <title>Katzen-Queens</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+</head>
+<body>
+  <section id="screen-menu" class="screen menu">
+    <div class="menu-side">
+      <a class="suite" href="../">‹ Alle Spiele</a>
+      <div class="brand">
+        <div id="logo" class="logo"></div>
+        <h1>Katzen<span>-Queens</span></h1>
+        <p class="tag">Eine Katze pro Zeile, Spalte und Farbe.<br>Keine zwei dürfen sich berühren.</p>
+      </div>
+      <div class="menu-links">
+        <button id="btn-rules">? Regeln</button>
+        <button id="btn-stats">▤ Statistik</button>
+        <button id="btn-theme">◐ Auto</button>
+        <button id="btn-patterns">▦ Muster an</button>
+      </div>
+    </div>
+    <div class="menu-main">
+      <button id="btn-daily" class="mode daily">
+        <span class="mode-title">Tagesrätsel</span>
+        <span id="daily-sub" class="mode-sub"></span>
+        <span id="daily-state" class="mode-state"></span>
+      </button>
+      <p id="streak" class="streak"></p>
+      <h2 class="free-title">Freies Spiel</h2>
+      <div class="free">
+        <div class="free-item"><button id="free-easy" class="mode easy"><span class="mode-title">Leicht</span><span class="size mode-sub"></span><span class="best mode-state"></span></button><button class="resume">▶ weiter</button></div>
+        <div class="free-item"><button id="free-medium" class="mode medium"><span class="mode-title">Mittel</span><span class="size mode-sub"></span><span class="best mode-state"></span></button><button class="resume">▶ weiter</button></div>
+        <div class="free-item"><button id="free-hard" class="mode hard"><span class="mode-title">Schwer</span><span class="size mode-sub"></span><span class="best mode-state"></span></button><button class="resume">▶ weiter</button></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-play" class="screen play" hidden>
+    <div class="board-wrap"><div id="board" class="board" role="grid" aria-label="Spielfeld"></div></div>
+    <aside class="panel">
+      <div class="panel-top">
+        <button id="btn-back" aria-label="Menü">‹ Menü</button>
+        <div id="play-title" class="play-title"></div>
+      </div>
+      <div class="counters">
+        <div class="counter"><span class="label">Zeit</span><span id="timer" class="value">0:00</span></div>
+        <div class="counter"><span class="label">Katzen</span><span id="count" class="value">0/0</span></div>
+      </div>
+      <div id="hint-box" class="hint-box" hidden></div>
+      <div class="actions">
+        <button id="btn-hint" class="primary">💡 Hinweis</button>
+        <button id="btn-undo">↶ Rückgängig</button>
+        <button id="btn-restart">⟲ Neustart</button>
+      </div>
+    </aside>
+  </section>
+
+  <div id="modal" class="modal" hidden><div id="modal-card" class="card"></div></div>
+  <noscript><p class="noscript">Katzen-Queens braucht JavaScript.</p></noscript>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
