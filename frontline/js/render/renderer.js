@@ -181,7 +181,7 @@ export class Renderer {
     this.drawRoutes(ctx, sel, z);
 
     for (const b of g.buildings) {
-      if (!b.alive || (b.team !== team && !known(b.x, b.y))) continue;
+      if (!b.alive || (!g.alwaysVisible(team, b) && !known(b.x, b.y))) continue;
       if (!inRect(b.x, b.y, (Math.max(b.w, b.h) * TILE) / 2)) continue;
       drawBuilding(ctx, b, g.teams[b.team].color, z);
       if (!b.built && b.team === team) this.drawSiteMarks(ctx, b, z);
@@ -467,7 +467,7 @@ export class Renderer {
     }
     for (const o of this.deco.rocks) if (inRect(o.x, o.y, PAD)) items.push({ k: cam.depth(o.x, o.y), t: 2, o });
     for (const b of g.buildings) {
-      if (!b.alive || (b.team !== team && !known(b.x, b.y)) || !inRect(b.x, b.y, PAD)) continue;
+      if (!b.alive || (!g.alwaysVisible(team, b) && !known(b.x, b.y)) || !inRect(b.x, b.y, PAD)) continue;
       items.push({ k: cam.depth(b.x, b.y), t: 4, o: b });
     }
     for (const m of this.crateMarks(seen, known)) if (inRect(m.x, m.y, 40)) items.push({ k: cam.depth(m.x, m.y), t: 8, o: m });

@@ -22,7 +22,8 @@ const CARGO_KEYS = ['bm', 'mun', 'fuel']; // Lagersorten (FOB-Lager, LKW-Ladung)
 const SHORT = { money: 'G', bm: 'BM', mun: 'MUN', fuel: 'TS' };
 const HOTKEY_ALIAS = { Y: 'Z' }; // Flugabwehr auch mit Y
 // Kurznamen für die Befehlskarte (der volle Name steht im Tooltip)
-const SHORT_BLD = { wall: 'Mauer', gate: 'Tor', mortar: 'Mörser', aa: 'Flak', drill: 'Bohrer' };
+const SHORT_BLD = { wall: 'Mauer', gate: 'Tor', mortar: 'Mörser', aa: 'Flak', drill: 'Bohrer', radio: 'Sendemast' };
+const RADIO_TIP = `. Zweite Siegbedingung: steht er fertig ${Math.round(BALANCE.radio.hold / 60)} min, gewinnst du. Der Gegner sieht ihn dann überall. Nur einer je Team.`;
 const CMD = BALANCE.commander;
 const COMMANDER_TIP = `. Einmalig, belegt keinen Platz. Aura ${CMD.aura} px: eigene Einheiten schießen ${Math.round((CMD.fireRate - 1) * 100)} % schneller, verletzte Infanterie heilt. Fällt er, bekommt der Gegner ${CMD.deathPoints} Punkte.`;
 const SHORT_UNIT = { rifleman: 'Schütze', at: 'PAK', truck: 'LKW', engineer: 'Baufz.', ifv: 'SPz', tank: 'KPz', littlebird: 'Little Bird', transporter: 'Transp.-Heli', gunship: 'AH-64', sniper: 'Scharfschütze', commander: 'Kommandeur' };
@@ -928,7 +929,9 @@ export class Controller {
 
   /** Grund für ein Gebäude im Baumenü: Geld, dann Lager (Mauer/Tor prüft die Platzierung selbst). */
   buildReason(key) {
-    const cost = BUILDINGS[key].cost;
+    const def = BUILDINGS[key];
+    if (def.unique && this.game.buildings.some((b) => b.alive && b.team === this.team && b.type === key)) return `Nur ein ${def.name} je Team`;
+    const cost = def.cost;
     const money = this.moneyReason(cost);
     if (money) return money;
     if (key === 'wall' || key === 'gate') return '';
@@ -996,11 +999,12 @@ export class Controller {
       for (const key of BUILD_MENU) {
         if (perm.level === 'fort' && !canBuild({ builder: 'fort' }, key)) continue;
         const def = BUILDINGS[key];
+        if (def.radio && !this.game.radioWin) continue; // Sendemast nur, wenn in der Partie eingeschaltet
         const reason = this.buildReason(key);
         card.push(
           entry(SHORT_BLD[key] || def.name, def.hotkey, {
             cost: costText(def.cost),
-            tip: `${def.name}: ${longCost(def.cost)}${def.slots > 1 ? `, ${def.slots} Plätze` : ''}`,
+            tip: `${def.name}: ${longCost(def.cost)}${def.slots > 1 ? `, ${def.slots} Plätze` : ''}${def.radio ? RADIO_TIP : ''}`,
             enabled: !reason,
             reason,
             action: () => this.beginPlacement(key),

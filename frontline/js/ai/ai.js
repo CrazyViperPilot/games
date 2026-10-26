@@ -6,6 +6,7 @@ import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { makeRng } from '../core/rng.js';
 import { hasCommander } from '../game/commander.js';
+import { radioEta } from '../game/radio.js';
 
 const MAX_PLACE = 100; // canPlace-Aufrufe je Denkschritt (Budget für die Platzsuche)
 const DEF_RANGE = BALANCE.fob.buildRadius; // Bauradius = Verteidigungsradius einer FOB
@@ -62,6 +63,13 @@ const CMD_DANGER = 450; // sichtbare Gegner so nah: der Kommandeur weicht zur Ha
 const CMD_MOVE = 200; // neuer Marschbefehl erst, wenn der Wunschplatz so weit vom alten Ziel liegt
 const CMD_RESERVE = 300; // Geld, das nach der Ausbildung eines neuen Kommandeurs übrig bleiben soll
 const CMD_FROM = 90; // s Spielzeit, ab der ein gefallener Kommandeur ersetzt wird
+const RADIO_FROM = { easy: Infinity, normal: 720, hard: 540 }; // s Spielzeit, ab der die KI einen Sendemast baut (Leicht nie)
+const RADIO_SITE = [220, 460]; // Abstand des Masts von der Haupt-FOB, zur Rückseite (weg von der Zone)
+const RADIO_NEAR = 500; // so nah am gegnerischen Mast greifen Einheiten ihn direkt an
+const RADIO_EVERY = 5; // s zwischen zwei Angriffsrunden auf den gegnerischen Mast
+const RADIO_GATHER = 40; // s höchstens sammelt sich die Armee vor dem Schlag gegen den Mast
+const RADIO_GATHER_R = 600; // Sammelradius; ab RADIO_GATHER_SHARE der Armee darin geht es los
+const RADIO_GATHER_SHARE = 0.7;
 const DEG = Math.PI / 180;
 const SITE_ANGLES = [0, 30, -30, 60, -60, 90, -90, 120, -120, 150, -150, 180].map((d) => d * DEG);
 const TWO_PI = Math.PI * 2;
@@ -99,6 +107,7 @@ export class AI {
     this.memo = new Map(); // Befehlsschlüssel -> Zeitpunkt (gegen Befehls-Spam)
     this.hadZoneFob = false; // eine Zonen-FOB (auch Baustelle) existierte im letzten Denkschritt
     this.saveForScout = false; // produce bildet keine Kampfeinheiten aus, bis der Späher bezahlt ist
+    this.saveForRadio = false; // ebenso, bis der Sendemast bezahlt ist
     this.scoutHome = false; // Späher fliegt zum Auftanken heim
     this.seenFobs = new Map(); // Gebäude-ID -> gesehene gegnerische FOB
     this.fallbackUntil = 0; // bis dahin greift army nicht an (Gruppen-Rückzug läuft)
@@ -130,6 +139,7 @@ export class AI {
     this.fallBack(s);
     this.expand(s); // FOB-Baustellen setzen (Material liefert der Lieferant)
     this.scout(s); // vor produce: der Späher bekommt das Geld zuerst
+    this.buildRadio(s);
     this.replaceCommander(s);
     this.produce(s);
     this.buildDefense(s);
@@ -138,7 +148,7 @@ export class AI {
     this.manageTrucks(s);
     this.rally(s);
     this.garrisonZone(s);
-    this.army(s);
+    if (!this.attackRadio(s)) this.army(s); // steht ein gegnerischer Sendemast, gilt ihm der ganze Angriff
     this.guardCommander(s);
     this.collectCrates(s); // nach der Welle: Kisten holen nur, die zurückbleiben (Reserve, Nachschub)
   }
@@ -561,7 +571,7 @@ export class AI {
     }
 
 
-    if (this.saveForScout) return; // Geld für den Späher sparen
+    if (this.saveForScout || this.saveForRadio) return; // Geld für den Späher bzw. den Sendemast sparen
 
     const mix = this.counterMix(s);
 
@@ -1138,6 +1148,76 @@ export class AI {
       pool.splice(pool.indexOf(best), 1);
       free--;
     }
+  }
+
+  /**
+   * Sendemast (zweite Siegbedingung): ab RADIO_FROM spart die KI darauf (nicht bei Alarm an der Haupt-FOB) und setzt ihn hinter die
+   * Haupt-FOB, weg von der Zone. Das Baufahrzeug baut ihn wie jede Baustelle.
+   */
+  buildRadio(s) {
+    const g = this.game;
+    const t = this.team;
+    this.saveForRadio = false;
+    if (!g.radioWin || !s.home || g.time < RADIO_FROM[this.difficulty] || s.alarm || !s.engineers.length) return;
+    if (s.own.some((b) => b.def.radio)) return;
+    const cost = BUILDINGS.radio.cost;
+    if (g.teams[t].res.money < cost.money) {
+      this.saveForRadio = true;
+      return;
+    }
+    const away = Math.atan2(-s.dir.y, -s.dir.x);
+    const p = this.findSite('radio', s.ax, s.ay, RADIO_SITE[0], RADIO_SITE[1], { angle: away, corridor: true });
+    if (p) g.issue(t, { type: 'build', building: 'radio', x: p.x, y: p.y });
+  }
+
+  /**
+   * Gegnerischer Sendemast (schon die Baustelle; ihr Baubeginn wird gemeldet, den Ort kennt die KI wie bei jeder Zielwahl): alle
+   * Kampfeinheiten greifen ihn an, nah direkt, sonst per Angriffsbewegung ohne Formation (jeder in seinem Tempo, die Zeit drängt).
+   * Liefert true, solange er steht (dann entfällt die übliche Zonenwelle).
+   */
+  attackRadio(s) {
+    const g = this.game;
+    const mast = g.buildings.find((b) => b.alive && b.def.radio && b.team !== this.team);
+    if (!mast) {
+      this.strike = null;
+      return false;
+    }
+    // Der eigene Mast siegt früher: verteidigen statt angreifen (die übliche Armeeführung und defend übernehmen)
+    const own = s.own.find((b) => b.def.radio);
+    if (own && radioEta(own) < radioEta(mast)) return false;
+    if (!this.once('radio-attack', RADIO_EVERY)) return true;
+    const army = s.combat.filter((u) => !u.house && !this.dryKind(u));
+    // Erst sammeln (am Schwerpunkt der Armee draußen, höchstens RADIO_GATHER s), dann geschlossen zuschlagen
+    if (!this.strike || this.strike.mast !== mast.id) {
+      const field = army.filter((u) => !u.def.air && dist(u.x, u.y, s.ax, s.ay) > GATHER_DIST * 2);
+      const pts = field.length ? field : army;
+      const cx = pts.reduce((a, u) => a + u.x, 0) / Math.max(1, pts.length);
+      const cy = pts.reduce((a, u) => a + u.y, 0) / Math.max(1, pts.length);
+      this.strike = { mast: mast.id, since: g.time, go: false, at: this.freeNear(cx, cy) };
+    }
+    const st = this.strike;
+    if (!st.go) {
+      const near = army.filter((u) => dist(u.x, u.y, st.at.x, st.at.y) <= RADIO_GATHER_R).length;
+      st.go = g.time - st.since >= RADIO_GATHER || near >= RADIO_GATHER_SHARE * army.length;
+      if (!st.go) {
+        const ids = army.filter((u) => dist(u.x, u.y, st.at.x, st.at.y) > RADIO_GATHER_R && !(u.order.type === 'attackMove' && dist(u.order.x, u.order.y, st.at.x, st.at.y) < 200)).map((u) => u.id);
+        if (ids.length) g.issue(this.team, { type: 'attackMove', ids, x: st.at.x, y: st.at.y });
+        return true;
+      }
+    }
+    const near = [];
+    const far = [];
+    for (const u of army) {
+      const d = dist(u.x, u.y, mast.x, mast.y);
+      if (d <= RADIO_NEAR) {
+        if (u.order.type !== 'attack' || u.order.targetId !== mast.id) near.push(u.id);
+      } else if (u.order.type !== 'attackMove' || dist(u.order.x, u.order.y, mast.x, mast.y) > RADIO_NEAR) {
+        far.push(u.id);
+      }
+    }
+    if (near.length) g.issue(this.team, { type: 'attack', ids: near, targetId: mast.id });
+    if (far.length) g.issue(this.team, { type: 'attackMove', ids: far, x: mast.x, y: mast.y });
+    return true;
   }
 
   /** Gefallenen Kommandeur ersetzen (Haupt-FOB), sobald genug Geld für ihn und eine Reserve da ist. */

@@ -88,7 +88,7 @@ export class Minimap {
 
     // Gebäude (eigene immer, fremde wenn erkundet); mindestens ca. 2,5 CSS-Pixel groß
     for (const b of g.buildings) {
-      if (!b.alive || (b.team !== team && !known(b.x, b.y))) continue;
+      if (!b.alive || (!g.alwaysVisible(team, b) && !known(b.x, b.y))) continue;
       const w = Math.max(b.w * TILE, 2.5 * px);
       const h = Math.max(b.h * TILE, 2.5 * px);
       ctx.fillStyle = g.teams[b.team].color;

@@ -589,6 +589,10 @@ export function drawTeamBuilding(ctx, cam, b, color) {
     drawBox(ctx, cam, x0, y0, x1, y1, g, color, { alpha: 0.55, noShadow: true });
     return;
   }
+  if (b.type === 'radio') {
+    drawRadioMast(ctx, cam, b, color, x0, y0, x1, y1);
+    return;
+  }
   if (spriteOverrides[b.type]?.(ctx, cam, b, color)) return;
   let top;
   if (b.type === 'depot') top = drawDepot(ctx, cam, b, color, x0, y0, x1, y1);
@@ -661,6 +665,121 @@ export function drawTeamBuilding(ctx, cam, b, color) {
 }
 
 const LABEL = { extractor: 'FÖR', mortar: 'MÖR', aa: 'FLA', drill: 'BOHR' };
+
+const MAST_H = 170; // Höhe des Sendemasts über dem Sockel (Welt-Pixel)
+const MAST_BANDS = 7; // rot-weiße Abschnitte (Flugsicherung)
+
+/** Sendemast (isometrisch): Sockel mit Teamfarbe, rot-weißer Gittermast mit Kreuzstreben, Abspannseile, blinkendes Licht oben. */
+function drawRadioMast(ctx, cam, b, color, x0, y0, x1, y1) {
+  const z = cam.zoom;
+  const base = buildingHeight(b);
+  const cx = (x0 + x1) / 2;
+  const cy = (y0 + y1) / 2;
+  const half = (x1 - x0) / 2;
+  const foot = cam.worldToScreen(cx, cy);
+  ctx.save();
+  // langer Schatten nach links unten (wie die Gebäudeschatten)
+  ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+  ctx.lineWidth = 4 * z;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(foot.x, foot.y);
+  ctx.lineTo(foot.x - (MAST_H + base) * 0.35 * z, foot.y + (MAST_H + base) * 0.175 * z);
+  ctx.stroke();
+  ctx.restore();
+  drawBox(ctx, cam, x0 + 3, y0 + 3, x1 - 3, y1 - 3, base, color, { roof: '#9a9e97' });
+  const at = (dx, dy, h, s) => planePt(cam, cx + dx * s, cy + dy * s, base + h);
+  const width = (h) => half * 0.5 + (half * 0.08 - half * 0.5) * (h / MAST_H);
+  const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+  ctx.save();
+  ctx.lineCap = 'round';
+  // Abspannseile von zwei Höhen zu vier Ankern neben dem Sockel
+  ctx.strokeStyle = 'rgba(225,228,220,0.55)';
+  ctx.lineWidth = Math.max(0.6, 0.7 * z);
+  ctx.beginPath();
+  for (const f of [0.45, 0.85]) {
+    for (const [dx, dy] of corners) {
+      const a = at(0, 0, MAST_H * f, 0);
+      const g = planePt(cam, cx + dx * half * 1.7, cy + dy * half * 1.7, 0);
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(g.x, g.y);
+    }
+  }
+  ctx.stroke();
+  // Gitter: je Abschnitt vier Beine in Band-Farbe, dazu Kreuzstreben
+  const seg = MAST_H / MAST_BANDS;
+  for (let i = 0; i < MAST_BANDS; i++) {
+    const h0 = i * seg;
+    const h1 = h0 + seg;
+    const s0 = width(h0);
+    const s1 = width(h1);
+    ctx.strokeStyle = i % 2 ? '#f1f1ec' : '#d23a32';
+    ctx.lineWidth = Math.max(1, 1.6 * z);
+    ctx.beginPath();
+    for (const [dx, dy] of corners) {
+      const p = at(dx, dy, h0, s0);
+      const q = at(dx, dy, h1, s1);
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(q.x, q.y);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(60,60,60,0.7)';
+    ctx.lineWidth = Math.max(0.5, 0.6 * z);
+    ctx.beginPath();
+    for (let k = 0; k < 4; k++) {
+      const [ax, ay] = corners[k];
+      const [bx, by] = corners[(k + 1) % 4];
+      const p = at(ax, ay, h0, s0);
+      const q = at(bx, by, h1, s1);
+      const r = at(bx, by, h0, s0);
+      const t = at(ax, ay, h1, s1);
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(q.x, q.y);
+      ctx.moveTo(r.x, r.y);
+      ctx.lineTo(t.x, t.y);
+    }
+    ctx.stroke();
+  }
+  // Antennenschüsseln in Teamfarbe und Spitze mit Licht
+  for (const [h, dx] of [[MAST_H * 0.62, 1], [MAST_H * 0.5, -1]]) {
+    const p = at(dx, 0, h, width(h) + 4);
+    ctx.fillStyle = color;
+    ctx.strokeStyle = OUTLINE;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y, 4.5 * z, 6 * z, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  const top = at(0, 0, MAST_H, 0);
+  const tip = at(0, 0, MAST_H + 18, 0);
+  ctx.strokeStyle = '#d9d9d2';
+  ctx.lineWidth = Math.max(1, 1.2 * z);
+  ctx.beginPath();
+  ctx.moveTo(top.x, top.y);
+  ctx.lineTo(tip.x, tip.y);
+  ctx.stroke();
+  const now = typeof performance !== 'undefined' ? performance.now() : 0;
+  const on = Math.floor(now / 600) % 2 === 0;
+  if (on) {
+    ctx.fillStyle = 'rgba(255,70,50,0.25)';
+    ctx.beginPath();
+    ctx.arc(tip.x, tip.y, 8 * z, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = on ? '#ff4a3a' : '#7a1f1a';
+  ctx.beginPath();
+  ctx.arc(tip.x, tip.y, 2.6 * z, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  if (b.hp < b.maxHp) {
+    // Schaden: der Sockel dunkelt ab
+    ctx.save();
+    ctx.globalAlpha = (1 - b.hp / b.maxHp) * 0.4;
+    drawBox(ctx, cam, x0 + 3, y0 + 3, x1 - 3, y1 - 3, base, '#000000', { roof: '#000000', noShadow: true });
+    ctx.restore();
+  }
+}
 
 export { hexA };
 

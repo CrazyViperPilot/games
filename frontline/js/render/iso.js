@@ -10,6 +10,7 @@ const OUTLINE = 'rgba(0,0,0,0.55)';
 export const TOWN_H = { house: 46, hall: 60, tower: 118, factory: 92, station: 54, platform: 8 };
 export const BUILD_H = {
   fob: 58,
+  radio: 14, // Sockel des Sendemasts (der Mast selbst ist höher, isobuild.drawRadioMast)
   depot: 50,
   helipad: 5,
   extractor: 36,

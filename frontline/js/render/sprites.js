@@ -6,7 +6,7 @@ import { UNITS } from '../data/units.js';
 const TILE = BALANCE.map.tile;
 const OUTLINE = 'rgba(0,0,0,0.65)';
 const GOLD = '#f2c94c';
-export const BUILD_ABBR = { fob: 'FOB', depot: 'FZ-HALLE', extractor: 'FÖR', mortar: 'MÖR', aa: 'FLA', helipad: 'HELI', drill: 'BOHR' };
+export const BUILD_ABBR = { fob: 'FOB', depot: 'FZ-HALLE', extractor: 'FÖR', mortar: 'MÖR', aa: 'FLA', helipad: 'HELI', drill: 'BOHR', radio: 'MAST' };
 export const NODE_COLOR = { bm: '#8b5a2b', mun: '#d9b600', fuel: '#3b2350' };
 export const NODE_LABEL = { bm: 'BM', mun: 'MUN', fuel: 'TS' };
 const WALL_GREY = '#8c9089';
@@ -293,6 +293,8 @@ export function drawBuilding(ctx, b, color, zoom = 1) {
     ctx.fillStyle = '#5d615b';
     ctx.fillRect(x0 + 2, y0 + h - 2 - Math.max(2, h * 0.14), w - 4, Math.max(2, h * 0.14));
     ctx.strokeRect(x0 + 1, y0 + 1, w - 2, h - 2);
+  } else if (b.type === 'radio') {
+    drawRadioTop(ctx, b, color, x0, y0, w, h, z);
   } else if (b.type === 'gate') {
     ctx.fillStyle = GATE_GREY;
     ctx.fillRect(x0 + 1, y0 + 1, w - 2, h - 2);
@@ -415,6 +417,52 @@ export function drawCrate(ctx, x, y, s = 16, zoom = 1, glow = 0) {
 }
 
 /** Mörsergranate in der Luft: Spur vom Abschuss, Kopf, Markierung am Ziel. */
+/** Sendemast von oben: Betonsockel mit Teamrand, Gittermast (Quadrate mit Kreuzstreben), Abspannseile, blinkendes rotes Licht. */
+function drawRadioTop(ctx, b, color, x0, y0, w, h, z) {
+  const cx = x0 + w / 2;
+  const cy = y0 + h / 2;
+  ctx.fillStyle = '#8d918a';
+  ctx.fillRect(x0 + 2, y0 + 2, w - 4, h - 4);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2.5 / z;
+  ctx.strokeRect(x0 + 2, y0 + 2, w - 4, h - 4);
+  // Abspannseile zu Ankern außerhalb des Sockels
+  ctx.strokeStyle = 'rgba(230,232,226,0.7)';
+  ctx.lineWidth = 1 / z;
+  ctx.beginPath();
+  for (const [dx, dy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + dx * w * 0.85, cy + dy * h * 0.85);
+  }
+  ctx.stroke();
+  ctx.fillStyle = '#5d615b';
+  for (const [dx, dy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) ctx.fillRect(cx + dx * w * 0.85 - 2 / z, cy + dy * h * 0.85 - 2 / z, 4 / z, 4 / z);
+  // Gittermast: drei Ebenen, nach oben schmaler
+  ctx.strokeStyle = '#d23a32';
+  ctx.lineWidth = 1.6 / z;
+  for (const k of [0.32, 0.22, 0.12]) {
+    const s = w * k;
+    ctx.strokeRect(cx - s, cy - s, 2 * s, 2 * s);
+  }
+  ctx.beginPath();
+  ctx.moveTo(cx - w * 0.32, cy - h * 0.32);
+  ctx.lineTo(cx + w * 0.32, cy + h * 0.32);
+  ctx.moveTo(cx + w * 0.32, cy - h * 0.32);
+  ctx.lineTo(cx - w * 0.32, cy + h * 0.32);
+  ctx.stroke();
+  // Licht an der Spitze (blinkt)
+  const t = typeof performance !== 'undefined' ? performance.now() : 0;
+  const on = Math.floor(t / 600) % 2 === 0;
+  ctx.fillStyle = on ? '#ff4a3a' : '#7a1f1a';
+  ctx.beginPath();
+  ctx.arc(cx, cy, (on ? 4 : 3) / z, 0, Math.PI * 2);
+  ctx.fill();
+  if (b.hp < b.maxHp) {
+    ctx.fillStyle = `rgba(0,0,0,${(1 - b.hp / b.maxHp) * 0.45})`;
+    ctx.fillRect(x0 + 1, y0 + 1, w - 2, h - 2);
+  }
+}
+
 /** Goldener Stern (Kommandeur) mit Mittelpunkt (x, y), Radius r (Welt-Maße). */
 export function drawStar(ctx, x, y, r, zoom = 1) {
   ctx.save();

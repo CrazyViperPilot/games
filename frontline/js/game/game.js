@@ -22,6 +22,7 @@ import { createScars, updateScars, updateScarIntel, addUnitWreck, addBuildingWre
 import { createAnimals, updateAnimals } from './animals.js';
 import { FORMATIONS, formationSlots, updateFormations } from './formation.js';
 import { hasCommander, updateCommanders, commanderFallen } from './commander.js';
+import { updateRadio, radioStarted, radioLost } from './radio.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
@@ -128,7 +129,8 @@ function lineCells(c0, r0, c1, r1) {
 
 export class Game {
   /** `map`: fertige Karte (Editor/gespeichert, siehe mapdata.js); ohne sie wird sie aus dem Seed erzeugt. */
-  constructor({ seed = 1, winPoints = BALANCE.winPoints, startMoney = BALANCE.startRes.money, map = null } = {}) {
+  /** radio: Sendemast als zweite Siegbedingung (Startmenü; ohne Angabe aus). */
+  constructor({ seed = 1, winPoints = BALANCE.winPoints, startMoney = BALANCE.startRes.money, map = null, radio = false } = {}) {
     this.seed = seed;
     this.rng = makeRng(seed);
     this.map = map ?? generateMap(seed);
@@ -153,6 +155,7 @@ export class Game {
     this.winner = null;
     this.winReason = null;
     this.winPoints = winPoints;
+    this.radioWin = !!radio;
     this.fogTimer = 0;
     this.logiTimer = 0; // Takt des Nachfüllens (logistics.js)
     this.consTimer = 0; // Takt der automatischen Bauzuweisung (construction.js)
@@ -244,6 +247,11 @@ export class Game {
     this.effects.push({ type, x, y, x2, y2, team, t: 0, life: EFFECT_LIFE[type] ?? 0.3 });
   }
 
+  /** Eigene Entity oder fertiger Sendemast (den sieht der Gegner überall, auch im Nebel). */
+  alwaysVisible(team, e) {
+    return e.team === team || (e.kind === 'building' && e.built && !!e.def.radio);
+  }
+
   isVisible(team, x, y) {
     return this.fog[team].isVisible(x, y);
   }
@@ -253,7 +261,7 @@ export class Game {
    * wenn eine eigene Einheit oder ein fertiges Gebäude des Teams näher als stealth.detectRange steht oder sie gerade geschossen haben.
    */
   sees(team, e) {
-    if (e.team === team) return true;
+    if (this.alwaysVisible(team, e)) return true;
     if (e.kind === 'house') return e.occupants.some((o) => this.sees(team, o)); // besetztes Haus: wenn ein Besatzer erkannt ist
     if (!this.fog[team].isVisible(e.x, e.y)) return false;
     if (!e.def.stealth || e.kind !== 'unit') return true;
@@ -484,6 +492,8 @@ export class Game {
     const mx = (cx + def.w / 2) * TILE;
     const my = (cy + def.h / 2) * TILE;
     const bad = (reason) => ({ ok: false, reason, cx, cy, x: mx, y: my, payer: null });
+    if (def.radio && !this.radioWin) return bad('Sendemast ist in dieser Partie ausgeschaltet');
+    if (def.unique && this.buildings.some((b) => b.alive && b.team === team && b.type === type)) return bad(`Nur ein ${def.name} je Team`);
 
     for (let r = cy; r < cy + def.h; r++) {
       for (let c = cx; c < cx + def.w; c++) {
@@ -727,6 +737,7 @@ export class Game {
     if (payer) takeStock(payer, def.cost);
     else if (carried) takeCarried(pick.list, def.cost.bm || 0);
     const b = this.spawnBuilding(cmd.building, team, p.cx, p.cy, { built: false, payerId: payer ? payer.id : null });
+    if (def.radio) radioStarted(this, b);
     for (const u of pick.list) orderBuild(u, b);
     return { ok: true, id: b.id };
   }
@@ -928,7 +939,7 @@ export class Game {
   endGame(winner, reason) {
     this.winner = winner;
     this.winReason = reason;
-    const how = reason === 'points' ? 'nach Punkten' : 'durch Eliminierung';
+    const how = reason === 'points' ? 'nach Punkten' : reason === 'radio' ? 'durch den Sendemast' : 'durch Eliminierung';
     this.message(-1, `${BALANCE.teamNames[winner]} gewinnt ${how}`);
   }
 
@@ -1000,6 +1011,7 @@ export class Game {
         this.addEffect('explosion', b.x, b.y, b.team);
         addBuildingWreck(this, b);
         this.message(b.team, `${b.def.name} zerstört`, b.x, b.y);
+        if (b.def.radio) radioLost(this, b);
       }
     }
     bs.length = k;
@@ -1025,6 +1037,7 @@ export class Game {
     updateCombat(this, dt);
     updateZone(this, dt);
     updateHot(this, dt);
+    updateRadio(this, dt);
     smoothIncome(this, dt);
 
     this.fogTimer += dt;

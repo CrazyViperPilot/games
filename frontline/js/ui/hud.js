@@ -5,6 +5,7 @@ import { UNITS } from '../data/units.js';
 import { lacksAmmo, isFoe } from '../game/entities.js';
 import { storedCrates } from '../game/crates.js';
 import { heightMult } from '../game/combat.js';
+import { radios, radioLeft } from '../game/radio.js';
 import { builderState, fobLabel, orderText } from './status.js';
 
 const RES_KEYS = ['money', 'bm', 'mun', 'fuel'];
@@ -75,6 +76,7 @@ export class Hud {
     this.timeEl = q('[data-time]');
     this.zoneEl = q('[data-zone]');
     this.hotEl = q('[data-hot]');
+    this.radioEl = q('[data-radio]');
     this.capFill = q('[data-cap]');
     this.speedBtn = q('[data-act=speed]');
     this.pauseBtn = q('[data-act=pause]');
@@ -115,6 +117,7 @@ export class Hud {
         <div class="zone" data-zone>neutral</div>
         <div class="cap" title="Punktebalken: füllt sich für das Team mit mehr Spielern in der Konfliktzone (Hot Zone zählt doppelt). Voll = 1 Punkt."><i data-cap></i></div>
         <div class="zone hotz" data-hot title="Hot Zone: kleiner Kreis in der Konfliktzone, zieht zu aktiven Bohrern. Einheiten darin bringen doppeltes Zonengeld und zählen bei der Punktewertung doppelt.">HOT</div>
+        <div class="zone radioz" data-radio hidden title="Sendemast: steht er die volle Zeit, gewinnt sein Team. Zerstören setzt die Zeit zurück."></div>
         <div class="clock">
           ${this.app.debug ? '<span class="dbg">DEBUG</span>' : ''}
           <span class="time" data-time>00:00</span>
@@ -235,6 +238,18 @@ export class Hud {
     this.hotEl.innerHTML =
       `<span class="zone-state" style="color:${hc}">${hl}</span>` +
       `<span class="zone-cnt"><b style="color:${c0}">${hz.counts[0]}</b><i>:</i><b style="color:${c1}">${hz.counts[1]}</b></span>`;
+    // Sendemast: Restzeit je fertigem Mast (beide Seiten sehen sie)
+    const masts = radios(g);
+    this.radioEl.hidden = !masts.length;
+    if (masts.length === 1) {
+      const b = masts[0];
+      this.radioEl.innerHTML = `<span class="zone-state" style="color:${BALANCE.teamColors[b.team]}">Sendemast ${BALANCE.teamNames[b.team]}</span><b class="zone-cnt">${fmtTime(radioLeft(b))}</b>`;
+    } else if (masts.length) {
+      // zwei Masten: je eine kompakte Zeile
+      this.radioEl.innerHTML = masts
+        .map((b) => `<span class="radio-row" style="color:${BALANCE.teamColors[b.team]}">Mast ${BALANCE.teamNames[b.team]} <b>${fmtTime(radioLeft(b))}</b></span>`)
+        .join('');
+    }
     this.timeEl.textContent = fmtTime(g.time);
     const st = this.app.status ? this.app.status() : { paused: false, speed: 1 };
     this.speedBtn.textContent = `${st.speed}×`;

@@ -107,6 +107,8 @@ export const BALANCE = {
   // Kommandeur (Held, einer je Team): Aura-Radius, Feuerrate darin (×), Heilung der Infanterie darin (HP/s, erst healDelay s nach dem
   // letzten Treffer); fällt er, bekommt der Gegner deathPoints Punkte
   commander: { aura: 300, fireRate: 1.1, heal: 1.5, healDelay: 6, deathPoints: 5 },
+  // Sendemast (zweite Siegbedingung): so lange halten (s) = Sieg; Warnung an beide, wenn noch warn s fehlen
+  radio: { hold: 300, warn: 60 },
   animals: {
     pairs: 4,
     deer: [3, 5],

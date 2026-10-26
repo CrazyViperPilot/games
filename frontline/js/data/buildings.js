@@ -95,6 +95,22 @@ export const BUILDINGS = {
       ammoPerShot: 0.25,
     },
   },
+  // Sendemast (nach dem Wunder aus Age of Empires II): zweite Siegbedingung, nur wenn in der Partie eingeschaltet (Game radio).
+  // Einer je Team (unique). Fertig ist er für den Gegner immer sichtbar; hält er BALANCE.radio.hold Sekunden, gewinnt sein Team.
+  radio: {
+    name: 'Sendemast',
+    armor: 'struct',
+    w: 2,
+    h: 2,
+    hp: 3000,
+    sight: 350,
+    cost: { money: 2000, bm: 600 },
+    buildTime: 120,
+    hotkey: 'G',
+    produces: [],
+    radio: true,
+    unique: true,
+  },
   drill: {
     name: 'Bohrer',
     armor: 'struct',

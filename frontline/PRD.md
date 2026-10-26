@@ -18,12 +18,12 @@ Nicht im Umfang: Netzwerk-Multiplayer, Kampagne, Speichern laufender Partien, So
 
 ## 2. Spielablauf
 
-1. Startmenü: Schwierigkeit (Leicht/Normal/Schwer), Siegpunkte (100 Standard; 25/50 für Schnellpartie), **Karte** (Zufall · Gespeichert · Neue Karte, siehe Abschnitt 9a), Start.
+1. Startmenü: Schwierigkeit (Leicht/Normal/Schwer), Siegpunkte (100 Standard; 25/50 für Schnellpartie), **Sendemast-Sieg** (An/Aus, gemerkt; Standard An, §7), **Karte** (Zufall · Gespeichert · Neue Karte, siehe Abschnitt 9a), Start.
 2. Jede Partei startet in einer Ecke der großen Karte mit der **Haupt-FOB** (unendlich Baumaterial, Munition, Treibstoff), Geld (800 oder die Kasse der letzten Runde), 1 Baufahrzeug, 1 LKW (leer), **2 Kampfpanzern, 3 Schützenpanzern, 22 Schützen und 7 Panzerabwehrsoldaten** (29 Soldaten, Startaufstellung vor der FOB). Zusammen belegen sie die 50 Plätze des Einheitenlimits (siehe §6).
 3. Nur die Haupt-FOB bildet Einheiten aus (nur gegen Geld). Man bringt Einheiten und Nachschub per LKW an die Front, gründet vordere FOBs
    (Verschanzen mit Mauern und Tore, Mörser, Flak, Nachladen und Tanken) und hält die Zone.
 4. In der Mitte liegt die sehr große **Konfliktzone** (eine Stadt). Wer dort mehr Spieler hat (Hot Zone doppelt), füllt den Punktebalken und bekommt Geld. In ihr wandert die **Hot Zone** (Abschnitt 7).
-5. **Sieg:** zuerst die Siegpunktzahl (Standard 100) erreichen – oder der Gegner hat keine FOB und kein Baufahrzeug mehr.
+5. **Sieg:** zuerst die Siegpunktzahl (Standard 100) erreichen – oder der Gegner hat keine FOB und kein Baufahrzeug mehr – oder (wenn eingeschaltet) einen **Sendemast** 5 Minuten halten (§7).
 
 ## 3. Ressourcen & Logistik
 
@@ -86,6 +86,7 @@ Nicht im Umfang: Netzwerk-Multiplayer, Kampagne, Speichern laufender Partien, So
 | Mörser | Indirektes Feuer, Reichweite 800 px (Mindestreichweite 200), Flächenschaden. **Ziel wählen** (G oder Rechtsklick auf die Karte): ein Schuss alle **20 s**, solange die FOB Munition hat; ohne Ziel schießt er automatisch auf sichtbare Gegner. Reichweitenkreis und Ziel werden bei Auswahl gezeichnet. Trifft keine Hubschrauber |
 | Flugabwehr | Schießt **Hubschrauber** ab (Reichweite 320, 35 Schaden je Schuss), fängt gegnerische Mörsergranaten ab und beschießt Bodenziele schwach. Munition aus der FOB |
 | Bohrer | Zieht die Hot Zone an (Abschnitt 7); 2×2, 150 Baumaterial, braucht beim Betrieb Treibstoff aus der FOB |
+| Sendemast (seit v4.50) | Zweite Siegbedingung (§7), nur wenn im Startmenü eingeschaltet; nur Baufahrzeug, einer je Team, 2×2 |
 
 Gebäude können abgerissen werden (Erstattung 25 % Baumaterial). **Einheitenlimit (seit v4.39):** Jedes Team hat **50 Plätze** (`BALANCE.slotCap`). Soldat, LKW, Baufahrzeug und Hubschrauber belegen je 1 Platz, Schützenpanzer 3, Kampfpanzer 5 (`slots` in `units.js`). Gezählt werden lebende Einheiten, Passagiere und Einträge der Ausbildungs-Warteschlange; ist kein Platz frei, wird die Ausbildung abgelehnt („Einheitenlimit erreicht“) und der Soldaten-Nachschub pausiert. Gefallene geben ihre Plätze wieder frei.
 
@@ -138,6 +139,7 @@ Schadensmodell: Schaden je Schuss nach Panzerklasse des Ziels (Infanterie / leic
 | Mörser | 700 | 2×2 | 200 Baumaterial, 60 Munition | 20 s |
 | Flugabwehr | 700 | 2×2 | 180 Baumaterial, 40 Munition | 18 s |
 | Bohrer | 600 | 2×2 | 150 Baumaterial | 20 s |
+| Sendemast | 3000 | 2×2 | 2000 Geld, 600 Baumaterial | 120 s |
 
 Weitere globale Zahlen (Kartengröße, Zone, Prämien, Logistikraten, Schwierigkeit) stehen in `js/data/balance.js` und sind oben im Text genannt.
 
@@ -234,6 +236,14 @@ Direktfeuer richtet sich nach Trefferzahlen (volles Ziel); Seite = Winkel zur Fa
 - **Geld:** Einheiten in der Hot Zone bringen **0,8 Geld/s** statt 0,4 (das Doppelte, nicht zusätzlich). **Besitz** nur, wenn eine Partei allein darin ist (Anzeige „HOT“); er bringt kein eigenes Geld. Punkte gibt es nicht separat; die Einheiten darin zählen doppelt für den Punktebalken.
 - Oben zeigt „HOT“ den Besitzer und die Einheitenzahl je Team, daneben der Punktebalken.
 
+### Sendemast (seit v4.50, nach dem Wunder aus Age of Empires II)
+- **Zweite Siegbedingung**, im Startmenü ein- und ausschaltbar („Sendemast-Sieg“, gemerkt, Standard An; `Game({ radio })`, ohne Angabe aus).
+- Bau wie jedes Gebäude im Bauradius einer eigenen FOB (nur Baufahrzeug, Taste **G** im Baumenü): **2000 Geld + 600 Baumaterial**, 120 s, 3000 HP. **Einer je Team** (auch als Baustelle).
+- Der Gegner erfährt den **Baubeginn** („Der Gegner baut einen Sendemast“, ohne Ort). **Fertig** ist der Mast für den Gegner **überall sichtbar** (Karte, Minimap, auch im Nebel), beide bekommen eine Meldung mit Ort.
+- Hält der fertige Mast **5 Minuten** (`BALANCE.radio.hold`), gewinnt sein Team (`winReason 'radio'`). Eine Minute vorher warnt eine Meldung beide. Wird er zerstört, verfällt die Zeit; ein neuer Mast beginnt von vorn.
+- Oben zeigt ein roter Kasten die Restzeit je fertigem Mast (beide Seiten). Iso: rot-weißer Gittermast (170 px) mit Abspannseilen, Antennen in Teamfarbe und blinkendem Licht; 2D: Sockel mit Gitter von oben.
+- `js/game/radio.js`, `BUILDINGS.radio`.
+
 ### Bohrer
 - Nach dem Bau **30 s Aufwärmen**, dann per **G** aktivierbar: **2 min aktiv**, danach **5 min Abkühlen**.
 - Aktiv verbraucht er **1 Treibstoff/s** aus der versorgenden FOB; ohne Treibstoff schaltet er ab (dann ebenfalls 5 min Pause).
@@ -254,7 +264,7 @@ Direktfeuer richtet sich nach Trefferzahlen (volles Ziel); Seite = Winkel zur Fa
 | A + Linksklick | Angriffsbewegung |
 | S | Stopp |
 | F (Einheiten gewählt) | **Formation** wechseln (seit v4.48, nach Age of Empires II): Locker → Linie → Keil → Kolonne; gilt für alle folgenden Marsch- und Angriffsbefehle (Rechtsklick/Tippen und A), ab zwei Bodeneinheiten. Reihenfolge: Kampfpanzer vorn, dann Schützenpanzer, Infanterie (Schütze, PAK), Scharfschützen, unbewaffnete Fahrzeuge (LKW, Baufahrzeug) hinten; Linie: Panzer in der Mitte, Infanterie an den Flügeln (bis 10 je Reihe); Keil: gefüllter Keil mit der Spitze am Ziel; Kolonne: einzeln, ab 9 Einheiten zu zweit. Abstand 26–44 px (nach der größten Einheit). Die Gruppe marschiert **geschlossen**: Grundtempo ist das der langsamsten Bodeneinheit, wer mehr als 16 px vor dem Nachzügler liegt, bremst (bis 10 %), wer mehr als 80 px hinter dem Mittel liegt, holt mit eigenem Tempo auf; ein festgefahrenes Mitglied (3 s ohne Fortschritt) hält niemanden auf. Am Ziel rückt jeder genau auf seinen Platz. Hubschrauber fliegen locker hinter der Formation und bremsen sie nicht. Die Zielmarke zeigt kurz die Plätze. `BALANCE.formation`, `js/game/formation.js` |
-| B | Baumenü (Baufahrzeug: alles, Soldaten: nur Mauer/Tor); darin E Mauer, R Tor, T Mörser, Z/Y Flugabwehr, X Bohrer, F FOB-Baustelle |
+| B | Baumenü (Baufahrzeug: alles, Soldaten: nur Mauer/Tor); darin E Mauer, R Tor, T Mörser, Z/Y Flugabwehr, X Bohrer, G Sendemast (wenn eingeschaltet), F FOB-Baustelle |
 | Mörser gewählt | G Ziel wählen (oder Rechtsklick auf die Karte) · C Ziel löschen |
 | Bohrer gewählt | G aktivieren |
 | Transportfahrzeuge | Infanterie wählen + **I** (Einsteigen, dann Fahrzeug antippen) oder Rechtsklick auf LKW / Baufahrzeug / Schützenpanzer / Hubschrauber = einsteigen · Fahrzeug wählen + **O** und Zielpunkt = absetzen · Transporthubschrauber: L/U/T wie LKW |
@@ -317,6 +327,7 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 - **Gruppen-Rückzug:** Steht eine Gruppe im Feuer (mindestens 4 Gegner sichtbar) und ist der Wert der Gegner mindestens 1,8-mal so hoch wie der der eigenen Einheiten dort, zieht die ganze Gruppe 1400 px Richtung Basis ab (nicht bei Angriff auf die Basis). 30 s lang gibt die KI danach keine Angriffsbefehle, damit sich die Gruppe sammelt; ein laufender Überfall wird abgebrochen. Einheiten werden im Spiel nicht geheilt, der Rückzug rettet sie also nur vor dem Tod.
 - **Zonen-FOB-Verteidigung:** Mörser und Flugabwehr der Zonen-FOB setzt die KI zur Gegnerseite hin (andere FOBs wie bisher zur Zone hin); die Zonen-FOB bekommt zwei Mörser statt einem.
 - **Formation:** Angriffswellen marschieren im **Keil** (§8): Panzer vorn, alle kommen zusammen an statt nacheinander.
+- **Sendemast:** Ab 12 min (Schwer 9 min, Leicht nie) spart die KI auf einen Sendemast (keine Kampfeinheiten, außer bei Alarm an der Haupt-FOB) und setzt ihn 220–460 px hinter die Haupt-FOB (weg von der Zone). Steht ein gegnerischer Mast (schon die Baustelle), greift sie ihn an: erst sammelt sich die Armee (höchstens 40 s oder bis 70 % im Umkreis von 600 px), dann gehen alle ohne Formation auf den Mast los, nahe Einheiten greifen ihn direkt an; die Zonenwelle entfällt so lange. Siegt ihr eigener Mast voraussichtlich früher, verteidigt sie stattdessen.
 - **Kommandeur:** zieht nie mit der Welle, sondern steht 220 px hinter dem Schwerpunkt der Armee draußen (Richtung Haupt-FOB), damit seine Aura wirkt; ohne Armee draußen wartet er am Sammelpunkt. Sind sichtbare bewaffnete Gegner näher als 450 px, weicht er zur Haupt-FOB aus. Fällt er, bildet die KI ab 90 s Spielzeit einen neuen aus, sobald danach noch 300 Geld übrig bleiben. Er holt keine Kisten und besetzt keine Häuser.
 - **Häuserkampf:** Bis zu 40 % der Infanterie in der Zone besetzen Häuser in der Nähe und halten sie (§7).
 - **Versorgungskisten:** Alle 6 s (nach den Angriffsbefehlen) schickt die KI freie Soldaten (untätig oder auf dem Weg zum Sammelpunkt, nicht in Häusern oder beim Überfall) zu Kisten aus ihrem Lagebild (§7) im Umkreis von 4500 px; Soldaten in der Zone gelten als 800 px weiter weg (sie verdienen dort Geld). Kisten mit sichtbaren Gegnern in der Nähe lässt sie liegen. Gleichzeitig holen oder tragen Leicht 1, Normal 2, Schwer 3 Soldaten. Kistenträger zählen nicht zur Armee.
@@ -361,6 +372,7 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 - **Could:** Sound, Statistik am Spielende.
 
 ## Änderungsverlauf
+- v4.50: **Sendemast** (§2, §5, §7, §10, Vorschlag nach dem Wunder aus Age of Empires II): zweite Siegbedingung, im Startmenü schaltbar. Einer je Team, fertig für den Gegner überall sichtbar, 5 min halten = Sieg; Restzeit oben in der Kopfleiste. Die KI baut ihn und greift gegnerische Masten gesammelt an. Kopfleiste auf Tablet (bis 1500 px) und Telefon (bis 1000 px) gestrafft, damit Uhr und Knöpfe nicht mehr abgeschnitten werden. Cache v62.
 - v4.49: **Kommandeur** (§6, §10, Vorschlag nach dem Strategen-Helden aus Empire Earth und dem Königsmord-Modus aus Age of Empires II): einmalige Heldeneinheit je Team ohne Platzbedarf; Aura 300 px (10 % schneller schießen, Infanterie heilt), sein Tod bringt dem Gegner 5 Punkte, Haupt-FOB bildet ihn neu aus (C). Die KI hält ihn hinter der Armee. Nebenbei: Scharfschützen (und der Kommandeur) steigen jetzt auch in LKW, Baufahrzeug und Schützenpanzer, wie es §6 für Infanterie vorsieht (vorher nur in Hubschrauber). Cache v61.
 - v4.48: **Formationen** (§8, §10, Vorschlag nach Age of Empires II): Linie, Keil und Kolonne für Marsch- und Angriffsbefehle (Taste F), Panzer vorn, Infanterie dahinter; die Gruppe marschiert geschlossen im Tempo der langsamsten Einheit und rückt am Ziel genau auf ihre Plätze. Die KI greift im Keil an. Locker bleibt der Standard. Cache v60.
 - v4.47: **Tiere** (§9, Vorschlag nach den Jagdtieren aus Age of Empires II): Rehe und Wildschweine in Rudeln auf den Wiesen außerhalb der Zone; sie grasen, ziehen weiter und fliehen vor Einheiten und Explosionen (das ganze Rudel). Rein optisch, nur in Sicht. Cache v59.

@@ -21,7 +21,7 @@ const KEYS = [
   ['A + Klick', 'Angriffsbewegung'],
   ['S', 'Stopp'],
   ['F', 'Formation wechseln: Locker, Linie, Keil, Kolonne (Panzer vorn, Gruppe marschiert geschlossen)'],
-  ['B', 'Baumenü: Baufahrzeug alles (E Mauer, R Tor, T Mörser, Z Flak, X Bohrer, F FOB-Baustelle) · Soldaten nur E Mauer, R Tor'],
+  ['B', 'Baumenü: Baufahrzeug alles (E Mauer, R Tor, T Mörser, Z Flak, X Bohrer, G Sendemast, F FOB-Baustelle) · Soldaten nur E Mauer, R Tor'],
   ['Bauen', 'Gebäude brauchen einen Bauer daneben: Baufahrzeug oder Soldaten (nur Mauer/Tor, aus getragenem Baumaterial, im Bauradius einer FOB)'],
   ['Haupt-FOB', 'Ausbildung (nur hier, nur gegen Geld, zwei Einheiten gleichzeitig): Q Schütze · W PAK · T Scharfschütze · E LKW · R Baufahrzeug · A SPz · S KPz · D Little Bird · F Transporter · G AH-64 · C Kommandeur (einmalig)'],
   ['L / U / T', 'LKW gewählt: Laden (dann FOB anklicken) · Entladen (FOB oder FOB-Baustelle) · Pendeln (Start-FOB, dann Ziel)'],
@@ -62,11 +62,28 @@ export function hideOverlay(root) {
 }
 
 const MAPSEL_KEY = 'frontline-kartenwahl';
+const RADIO_KEY = 'frontline-radio'; // Startmenü: Sendemast-Sieg an/aus
 function readMapSel() {
   try {
     return localStorage.getItem(MAPSEL_KEY) || 'random';
   } catch {
     return 'random';
+  }
+}
+/** Ein/Aus-Einstellung des Startmenüs (gemerkt). */
+function readFlag(key, dflt) {
+  try {
+    const v = localStorage.getItem(key);
+    return v === null ? dflt : v === '1';
+  } catch {
+    return dflt;
+  }
+}
+function writeFlag(key, on) {
+  try {
+    localStorage.setItem(key, on ? '1' : '0');
+  } catch {
+    /* ohne Speicher: gilt nur für diese Sitzung */
   }
 }
 function writeMapSel(v) {
@@ -77,11 +94,12 @@ function writeMapSel(v) {
   }
 }
 
-/** Startmenü: onStart({difficulty, winPoints, mapId}) beim Klick auf Start (mapId 'random' oder Karten-ID). */
+/** Startmenü: onStart({difficulty, winPoints, mapId, radio}) beim Klick auf Start (mapId 'random' oder Karten-ID, radio = Sendemast-Sieg). */
 export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.money, resetWallet = () => {} } = {}) {
   let difficulty = 'normal';
   let mapSel = readMapSel(); // 'random' | Karten-ID
   let winPoints = BALANCE.winPoints;
+  let radio = readFlag(RADIO_KEY, true);
   show(
     root,
     'start',
@@ -97,6 +115,10 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
         <div class="seg">${POINTS.map((p) => `<button type="button" data-pts="${p}">${p}</button>`).join('')}</div>
       </div>
       <div class="field">
+        <span class="flabel" title="Sendemast: bauen und ${Math.round(BALANCE.radio.hold / 60)} min halten gewinnt ebenfalls">Sendemast-Sieg</span>
+        <div class="seg"><button type="button" data-radio="1">An</button><button type="button" data-radio="0">Aus</button></div>
+      </div>
+      <div class="field">
         <span class="flabel">Karte</span>
         <div class="seg">
           <button type="button" data-mapmode="random">Zufall</button>
@@ -108,7 +130,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
       <ol class="howto">
         <li>Du startest mit 2 Kampfpanzern, 3 Schützenpanzern, 29 Soldaten (22 Schützen, 7 Panzerabwehrsoldaten), LKW, Baufahrzeug und deinem Kommandeur (goldener Stern: in seiner Nähe schießen deine Einheiten schneller und Verwundete heilen; fällt er, bekommt der Gegner 5 Punkte). Das Einheitenlimit beträgt 50 Plätze: Soldat 1, Schützenpanzer 3, Kampfpanzer 5. Die Haupt-FOB hat unendlich Baumaterial, Munition und Treibstoff und bildet alle Einheiten aus – nur Geld ist knapp.</li>
         <li>LKW (E) bringen Nachschub aus der Haupt-FOB zu den vorderen FOBs und versorgen Einheiten in ihrer Nähe.</li>
-        <li>Baufahrzeug (R): bis zu 10 FOBs (ohne überlappende Bauradien), Mörser, Flak, Bohrer. Soldaten bauen aus wenig getragenem Baumaterial Mauern und Tore.</li>
+        <li>Baufahrzeug (R): bis zu 10 FOBs (ohne überlappende Bauradien), Mörser, Flak, Bohrer und – falls oben an – einen Sendemast: steht er fertig 5 Minuten, ist die Partie gewonnen. Soldaten bauen aus wenig getragenem Baumaterial Mauern und Tore.</li>
         <li>Konfliktzone halten: jede deiner Einheiten dort bringt Geld (0,4/s, in der Hot Zone 0,8/s), alle 30 s ein Punkt. Fällt deine Haupt-FOB, ist die Runde verloren.</li>
       </ol>
       <p class="muted small center" data-wallet></p>
@@ -124,6 +146,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
   const mark = () => {
     root.querySelectorAll('[data-diff]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.diff === difficulty)));
     root.querySelectorAll('[data-pts]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.pts) === winPoints)));
+    root.querySelectorAll('[data-radio]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.radio === '1') === radio)));
   };
   const renderMapBox = () => {
     const box = root.querySelector('[data-mapbox]');
@@ -217,12 +240,16 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
     }
     if (b.dataset.diff) difficulty = b.dataset.diff;
     else if (b.dataset.pts) winPoints = Number(b.dataset.pts);
+    else if (b.dataset.radio) {
+      radio = b.dataset.radio === '1';
+      writeFlag(RADIO_KEY, radio);
+    }
     else if (b.dataset.act === 'resetWallet') {
       resetWallet();
       showWallet();
     } else if (b.dataset.act === 'start') {
       hideOverlay(root);
-      onStart({ difficulty, winPoints, mapId: mapSel });
+      onStart({ difficulty, winPoints, mapId: mapSel, radio });
       return;
     }
     mark();
@@ -268,13 +295,14 @@ export function showHelp(root) {
 }
 
 /**
- * Endbildschirm. info = { winner, team (eigenes Team), reason ('points' | 'eliminated'), stats: { time, points: [a, b], winPoints } }.
+ * Endbildschirm. info = { winner, team (eigenes Team), reason ('points' | 'eliminated' | 'radio'), stats: { time, points: [a, b], winPoints } }.
  */
 export function showEnd(root, { winner, team, reason, stats }, onRestart) {
   const won = winner === team;
   const who = BALANCE.teamNames[winner];
   let why;
   if (reason === 'points') why = `${who} hat ${stats.winPoints} Siegpunkte erreicht.`;
+  else if (reason === 'radio') why = `${who} hat den Sendemast ${Math.round(BALANCE.radio.hold / 60)} Minuten gehalten.`;
   else if (won) why = 'Die Haupt-FOB des Gegners ist zerstört.';
   else why = 'Deine Haupt-FOB ist zerstört.';
   show(
