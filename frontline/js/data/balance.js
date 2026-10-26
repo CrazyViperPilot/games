@@ -58,9 +58,10 @@ export const BALANCE = {
   difficulty: {
     // Schwierigkeit über Verhalten: ab normal Späher und Konter-Mix, ab schwer Überfälle und Gruppen-Rückzug; hart ohne Einkommensbonus.
     // weather: nutzt das Wetter (bei schlechter Sicht früher ein Späher, im Nebel greift die Welle schon mit weniger Stärke an)
-    easy: { think: 3.0, incomeMult: 0.8, attackStrength: 2500, scout: false, counter: false, raid: false, fallback: false, weather: false },
-    normal: { think: 2.0, incomeMult: 1.0, attackStrength: 2000, scout: true, counter: true, raid: false, fallback: false, weather: true },
-    hard: { think: 1.0, incomeMult: 1.0, attackStrength: 1600, scout: true, counter: true, raid: true, fallback: true, weather: true },
+    // research: Spielzeit (s), ab der die KI auf Stufe 2 bzw. 3 spart; upgrades: forscht auch Verbesserungen (aus Überschuss)
+    easy: { think: 3.0, incomeMult: 0.8, attackStrength: 2500, scout: false, counter: false, raid: false, fallback: false, weather: false, research: [240, 720], upgrades: false },
+    normal: { think: 2.0, incomeMult: 1.0, attackStrength: 2000, scout: true, counter: true, raid: false, fallback: false, weather: true, research: [150, 540], upgrades: true },
+    hard: { think: 1.0, incomeMult: 1.0, attackStrength: 1600, scout: true, counter: true, raid: true, fallback: true, weather: true, research: [90, 420], upgrades: true },
   },
   // Gelände (§7): wer höher steht, trifft härter (Direktfeuer, ab `dead` Höhenunterschied, voll ab `full`), tiefer stehend schwächer
   height: { bonus: 0.25, dead: 6, full: 36 },
@@ -124,6 +125,24 @@ export const BALANCE = {
       autumn: { clear: 3, rain: 4, fog: 3 },
       winter: { clear: 4, snow: 4, fog: 2 },
     },
+  },
+  // Forschungsstufen (nach Age of Empires II und Empire Earth, im Startmenü; ohne Angabe aus): die Haupt-FOB forscht neben der
+  // Ausbildung, eins nach dem anderen (money beim Start, time s, needs = nötige Stufe, tier = erreichte Stufe). unitTier: Stufe, ab
+  // der eine Einheit ausgebildet werden kann (fehlt = von Anfang an; die Startarmee bleibt). Schutzwesten: Infanterie nimmt × vests
+  // Schaden, Verbundpanzerung: Fahrzeuge und Hubschrauber × composite (ein Schuss, der das unverletzte Ziel sofort tötet, bleibt
+  // tödlich); Wärmebildoptik: Waffenreichweite und Sicht der Einheiten × optics.
+  research: {
+    items: {
+      tier2: { name: 'Stufe 2', money: 600, time: 60, needs: 1, tier: 2 },
+      tier3: { name: 'Stufe 3', money: 1200, time: 90, needs: 2, tier: 3 },
+      vests: { name: 'Schutzwesten', money: 400, time: 45, needs: 2 },
+      optics: { name: 'Wärmebildoptik', money: 600, time: 60, needs: 2 },
+      composite: { name: 'Verbundpanzerung', money: 800, time: 60, needs: 3 },
+    },
+    unitTier: { sniper: 2, ifv: 2, littlebird: 2, transporter: 2, tank: 3, gunship: 3 },
+    vests: 0.85,
+    composite: 0.85,
+    optics: 1.1,
   },
   animals: {
     pairs: 4,

@@ -7,6 +7,7 @@ import { storedCrates } from '../game/crates.js';
 import { heightMult } from '../game/combat.js';
 import { radios, radioLeft } from '../game/radio.js';
 import { SEASON_NAMES, WEATHER_NAMES, weatherEffect } from '../game/weather.js';
+import { RESEARCH_KEYS } from '../game/research.js';
 
 // Wettersymbole (16 × 16, Strichfarbe = currentColor)
 const WX_ICON = {
@@ -390,6 +391,7 @@ export class Hud {
     if (b.type === 'fob' && b.infinite) {
       h += '<div class="muted small lagerhead">Unendlich Baumaterial, Munition und Treibstoff · bildet alle Einheiten aus (nur gegen Geld)</div>';
       h += this.reinforceInfo(b);
+      if (g.research) h += this.researchInfo(b.team);
     } else if (b.type === 'fob') {
       h +=
         '<div class="muted small lagerhead">Lager dieser FOB (LKW füllen es aus der Haupt-FOB)</div>' +
@@ -435,6 +437,22 @@ export class Hud {
     }
     const left = Math.max(0, Math.ceil(R.interval - t.reinforceTimer)); // 0, solange kein Feld frei ist
     return `<div class="muted small">Nachschub: ${esc(UNITS[R.unit].name)} in ${left} s (${label})</div>`;
+  }
+
+  /** Haupt-FOB mit Forschung: Stufe, erforschte Verbesserungen, laufende Forschung mit Fortschritt. */
+  researchInfo(team) {
+    const tech = this.game.teams[team].tech;
+    const items = BALANCE.research.items;
+    const ups = RESEARCH_KEYS.filter((k) => !items[k].tier && tech.done.includes(k)).map((k) => items[k].name);
+    let h = `<div class="small research">Stufe ${tech.tier} von 3${ups.length ? ` · ${esc(ups.join(', '))}` : ''}</div>`;
+    const cur = tech.cur;
+    if (cur) {
+      const it = items[cur.key];
+      h += `<div class="small">Forschung ${esc(it.name)}: ${Math.min(it.time, cur.t).toFixed(0)} / ${it.time} s</div>${bar(cur.t / it.time, 'prog research')}`;
+    } else if (tech.tier < 3) {
+      h += '<div class="muted small">U = Forschung (nächste Stufe, Verbesserungen)</div>';
+    }
+    return h;
   }
 
   /** Bohrer: Phase und Restzeit. */

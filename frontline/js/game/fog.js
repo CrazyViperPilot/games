@@ -3,6 +3,7 @@
 import { BALANCE } from '../data/balance.js';
 import { RELIEF, FINE_N } from './relief.js';
 import { weatherSight } from './weather.js';
+import { opticsMul } from './research.js';
 
 const CONSTRUCTION_SIGHT = 150; // Baustellen sehen weniger
 const RAY_GAP = 44; // Abstand benachbarter Sichtstrahlen am Rand (px), kleiner als eine Nebelzelle
@@ -131,15 +132,19 @@ export class Fog {
     }
   }
 
-  /** Sichtfeld für `team` neu berechnen (aus den lebenden eigenen Entities; Regen, Nebel und Schnee verkürzen die Sichtweite). */
+  /**
+   * Sichtfeld für `team` neu berechnen (aus den lebenden eigenen Entities; Regen, Nebel und Schnee verkürzen die Sichtweite,
+   * Wärmebildoptik verlängert die der Einheiten).
+   */
   update(game, team) {
     this.visible.fill(0);
     const relief = game.relief ?? null;
     const m = weatherSight(game);
+    const mu = m * opticsMul(game, team);
     for (const u of game.units) {
       if (!u.alive || u.team !== team || !(u.def.sight > 0)) continue;
       // aus einem Haus: Sichtweite ab der Hauswand
-      this.markEntity(relief, u, u.def.sight * m + (u.house ? (game.entities.get(u.house)?.reach ?? 0) : 0));
+      this.markEntity(relief, u, u.def.sight * mu + (u.house ? (game.entities.get(u.house)?.reach ?? 0) : 0));
     }
     for (const b of game.buildings) {
       if (!b.alive || b.team !== team) continue;

@@ -6,6 +6,7 @@ import { damageHouse } from './garrison.js';
 import { addCrater } from './scars.js';
 import { auraCooldown } from './commander.js';
 import { weatherSight } from './weather.js';
+import { armorMul, opticsMul } from './research.js';
 
 const SCAN = BALANCE.scanInterval;
 const MAX_UNIT_RADIUS = 16; // größter Einheitenradius (Trefferkreis-Suche)
@@ -99,13 +100,14 @@ function warnBase(game, target) {
   game.message(target.team, 'Basis wird angegriffen', target.x, target.y);
 }
 
-/** Fügt Schaden zu, setzt lastHitTime und markiert Tote. Stadthäuser: garrison.damageHouse. */
+/** Fügt Schaden zu, setzt lastHitTime und markiert Tote. Stadthäuser: garrison.damageHouse. Einheiten: erforschte Panzerung. */
 export function hit(game, target, amount) {
   if (!target.alive || !(amount > 0)) return;
   if (target.kind === 'house') {
     damageHouse(game, target, amount);
     return;
   }
+  if (target.kind === 'unit') amount *= armorMul(game, target, amount);
   target.hp -= amount;
   target.lastHitTime = game.time;
   if (target.hp <= 0) {
@@ -168,12 +170,13 @@ function fireDirect(game, s, t, w) {
 function tryFireUnit(game, u, t) {
   const key = dmgKey(t);
   const bonus = reachBonus(game, u);
+  const reach = opticsMul(game, u.team); // Wärmebildoptik: weiter
   let pick = null;
   let pickScore = -1;
   let dry = false;
   for (const w of u.weapons) {
     const dmg = w.spec.damage[key] || 0;
-    if (!(dmg > 0) || !inRange(u, t, w.spec.range + bonus) || w.cd > 0) continue;
+    if (!(dmg > 0) || !inRange(u, t, w.spec.range * reach + bonus) || w.cd > 0) continue;
     if (w.rounds < 1) {
       dry = true;
       continue;
@@ -315,6 +318,7 @@ export function updateCombat(game, dt) {
 
   const hash = buildHash(units.filter((u) => u.alive));
   const sightMul = weatherSight(game); // Regen, Nebel und Schnee verkürzen die Zielsuche
+  const optics = [opticsMul(game, 0), opticsMul(game, 1)]; // Wärmebildoptik verlängert sie
 
   for (const u of units) {
     if (!u.alive || !u.weapons.length || u.crate) continue; // Kistenträger haben die Hände voll
@@ -328,7 +332,7 @@ export function updateCombat(game, dt) {
     // idle / attackMove: automatische Zielsuche
     if (u.scanTimer <= 0) {
       u.scanTimer = SCAN;
-      const t = findTarget(game, hash, u, u.def.sight * sightMul + reachBonus(game, u), 0, true, u.def.damage);
+      const t = findTarget(game, hash, u, u.def.sight * sightMul * optics[u.team] + reachBonus(game, u), 0, true, u.def.damage);
       u.targetId = t ? t.id : null;
     }
     if (u.targetId !== null) {

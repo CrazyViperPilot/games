@@ -65,7 +65,7 @@ const hudRoot = document.getElementById('hud');
 const overlay = document.getElementById('overlay');
 
 let session = null; // laufendes Spiel: { game, ai, camera, renderer, minimap, controller, hud, input, loop, … }
-let settings = { difficulty: 'normal', winPoints: BALANCE.winPoints, radio: true, weather: 'random' };
+let settings = { difficulty: 'normal', winPoints: BALANCE.winPoints, radio: true, weather: 'random', research: true };
 
 function nearestSpeedIndex(v) {
   let best = 0;
@@ -226,7 +226,7 @@ function startGame(opts) {
   const seed = Number.isFinite(URL_SEED) ? URL_SEED : Math.floor(Math.random() * 1e9) + 1;
   const map = opts.mapId && opts.mapId !== 'random' ? loadMap(opts.mapId) : null; // gespeicherte Karte, sonst aus dem Seed
   const weather = DEBUG && WEATHER_SETTINGS.includes(params.get('weather')) ? params.get('weather') : opts.weather ?? 'off';
-  const game = new Game({ seed, winPoints: opts.winPoints, startMoney: loadWallet(), map, radio: opts.radio !== false, weather });
+  const game = new Game({ seed, winPoints: opts.winPoints, startMoney: loadWallet(), map, radio: opts.radio !== false, weather, research: opts.research !== false });
   if (DEBUG && WEATHER_NAMES[params.get('wx')]) {
     setWeather(game, params.get('wx'), params.get('wx') === 'snow' ? 'winter' : game.weather.season); // Schnee nur im Winter
     game.weather.next = Infinity; // bleibt so (Grafik prüfen)

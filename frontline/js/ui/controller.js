@@ -9,6 +9,7 @@ import { canGarrison, canEnter } from '../game/garrison.js';
 import { canCarry } from '../game/crates.js';
 import { FORMATIONS, FORMATION_NAMES } from '../game/formation.js';
 import { hasCommander } from '../game/commander.js';
+import { researchBlock, researchEffect, unitLocked, lockReason } from '../game/research.js';
 import { unitLift, buildingHeight, TOWN_H } from '../render/iso.js';
 
 const WALL_MAX = 40; // max. Zellen je Mauerzug (Vorschau und Befehl)
@@ -26,6 +27,13 @@ const SHORT_BLD = { wall: 'Mauer', gate: 'Tor', mortar: 'Mörser', aa: 'Flak', d
 const RADIO_TIP = `. Zweite Siegbedingung: steht er fertig ${Math.round(BALANCE.radio.hold / 60)} min, gewinnst du. Der Gegner sieht ihn dann überall. Nur einer je Team.`;
 const CMD = BALANCE.commander;
 const COMMANDER_TIP = `. Einmalig, belegt keinen Platz. Aura ${CMD.aura} px: eigene Einheiten schießen ${Math.round((CMD.fireRate - 1) * 100)} % schneller, verletzte Infanterie heilt. Fällt er, bekommt der Gegner ${CMD.deathPoints} Punkte.`;
+// Forschungsmenü der Haupt-FOB: Ziel, Taste, Kurzname (Q = nächste Stufe)
+const RESEARCH_BTN = [
+  ['tier', 'Q', ''],
+  ['vests', 'W', 'Westen'],
+  ['optics', 'E', 'Optik'],
+  ['composite', 'R', 'Verbund'],
+];
 const SHORT_UNIT = { rifleman: 'Schütze', at: 'PAK', truck: 'LKW', engineer: 'Baufz.', ifv: 'SPz', tank: 'KPz', littlebird: 'Little Bird', transporter: 'Transp.-Heli', gunship: 'AH-64', sniper: 'Scharfschütze', commander: 'Kommandeur' };
 const isCarrier = (u) => u.def.cargoCap > 0; // LKW und Transporthubschrauber
 // Ladungsart: Taste, Kurzname, Bezeichnung
@@ -421,6 +429,7 @@ export class Controller {
       case 'wall':
         return; // Mauerzug läuft über beginWall/endWall
       case 'build':
+      case 'research':
         this.setMode('normal');
         break;
       default:
@@ -888,6 +897,20 @@ export class Controller {
     }
   }
 
+  /** Forschungsmenü öffnen (Haupt-FOB gewählt, Forschung eingeschaltet). */
+  startResearchMenu() {
+    if (!this.game.research) {
+      this.message('Forschung ist in dieser Partie ausgeschaltet');
+      return;
+    }
+    this.setMode('research');
+  }
+
+  /** Forschung in der Haupt-FOB beginnen; danach wieder die Ausbildung im Blick. */
+  research(fob, key) {
+    if (this.issue({ type: 'research', buildingId: fob.id, key }).ok) this.setMode('normal');
+  }
+
   cancelTrain() {
     const bs = this.selected().filter((e) => e.kind === 'building' && e.queue.length > 0);
     if (!bs.length) {
@@ -974,6 +997,8 @@ export class Controller {
         return 'Mörser: Ziel auf der Karte anklicken (Kreis zeigt Reichweite) · Esc bricht ab';
       case 'dropoff':
         return 'Absetzen: Zielpunkt anklicken · Esc bricht ab';
+      case 'research':
+        return 'Forschung: Stufe oder Verbesserung wählen (eine zugleich, Geld beim Start) · Esc zurück';
       case 'board':
         return 'Einsteigen: eigenes Transportfahrzeug (LKW, Baufahrzeug, SPz, Hubschrauber) oder ein Haus der Stadt anklicken · Esc bricht ab';
       default:
@@ -988,7 +1013,44 @@ export class Controller {
       return [entry('Abbruch', 'Esc', { tip: 'Abbrechen (Esc)', action: () => this.cancel() })];
     }
     if (m === 'build') return this.buildCard();
+    if (m === 'research') return this.researchCard();
     return this.selectionCard();
+  }
+
+  /** Forschungsmenü der Haupt-FOB: nächste Stufe (Q), Verbesserungen (W, E, R), laufende Forschung abbrechen (C). */
+  researchCard() {
+    const g = this.game;
+    const fob = this.selected().find((e) => e.kind === 'building' && e.main && e.built);
+    if (!fob || !g.research) return this.selectionCard();
+    const tech = g.teams[this.team].tech;
+    const items = BALANCE.research.items;
+    const card = [];
+    for (const [k, hotkey, short] of RESEARCH_BTN) {
+      const key = k === 'tier' ? (tech.tier < 2 ? 'tier2' : 'tier3') : k;
+      const it = items[key];
+      const reason = researchBlock(g, this.team, key) || this.moneyReason({ money: it.money });
+      const eff = researchEffect(key);
+      card.push(
+        entry(short || it.name, hotkey, {
+          cost: costText({ money: it.money }),
+          tip: `${it.name}: ${it.money} Geld, ${it.time} s${it.needs > 1 ? `, ab Stufe ${it.needs}` : ''}. ${eff[0].toUpperCase()}${eff.slice(1)}.`,
+          enabled: !reason,
+          reason,
+          active: tech.cur?.key === key || (k === 'tier' ? tech.tier >= 3 : tech.done.includes(key)),
+          action: () => this.research(fob, key),
+        }),
+      );
+    }
+    card.push(
+      entry('Abbruch', 'C', {
+        tip: 'Laufende Forschung abbrechen (C): das Geld kommt ganz zurück',
+        enabled: !!tech.cur,
+        reason: 'Keine Forschung läuft',
+        action: () => this.issue({ type: 'cancelResearch' }),
+      }),
+      entry('Zurück', 'Esc', { tip: 'Zurück zur Ausbildung (Esc)', action: () => this.cancel() }),
+    );
+    return card;
   }
 
   /** Baumenü: Baufahrzeug alles (plus F FOB-Baustelle), Infanterie nur Mauer/Tor. */
@@ -1144,6 +1206,7 @@ export class Controller {
       let reason = '';
       if (!producers.some((b) => b.built)) reason = 'Gebäude ist noch im Bau';
       else if (!ready) reason = 'Warteschlange ist voll';
+      else if (unitLocked(this.game, ready.team, u)) reason = lockReason(u);
       else if (this.game.slotsUsed(ready.team) + (def.slots ?? 1) > BALANCE.slotCap) reason = 'Einheitenlimit erreicht';
       else if (def.hero && hasCommander(this.game, ready.team)) reason = 'Nur ein Kommandeur je Team';
       else reason = this.trainReason(ready, def.cost);
@@ -1169,6 +1232,17 @@ export class Controller {
           enabled: mortars.some((b) => b.fireTarget),
           reason: 'Kein Ziel gewählt',
           action: () => this.issue({ type: 'mortarTarget', ids: mortars.map((b) => b.id) }),
+        }),
+      );
+    }
+    const main = blds.find((b) => b.main && b.built);
+    if (main && this.game.research) {
+      const tech = this.game.teams[this.team].tech;
+      card.push(
+        entry('Forschung', 'U', {
+          tip: `Forschung (U): Stufe ${tech.tier} von 3. Stufen schalten Einheiten frei, Verbesserungen stärken alle Einheiten.`,
+          active: !!tech.cur,
+          action: () => this.startResearchMenu(),
         }),
       );
     }

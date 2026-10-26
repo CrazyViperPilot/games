@@ -1,6 +1,6 @@
 // KI-Gegner (PLAN.md §5, §10.2, §11.5). Steuert nur über game.issue und liest den Zustand. Kein DOM.
 // Reihenfolge je Denkschritt: Baustellen pflegen, Verteidigung, Rückzug, Expansion (FOB-Baustellen: Zone, Relais, Flanken),
-// Produktion (nur Haupt-FOB), Verteidigungsgebäude und Mauer, Baufahrzeuge, LKW (Lieferant/Pendler/Versorger), Sammelpunkte, Armee.
+// Forschung, Produktion (nur Haupt-FOB), Verteidigungsgebäude und Mauer, Baufahrzeuge, LKW (Lieferant/Pendler/Versorger), Sammelpunkte, Armee.
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
@@ -8,6 +8,7 @@ import { makeRng } from '../core/rng.js';
 import { hasCommander } from '../game/commander.js';
 import { radioEta } from '../game/radio.js';
 import { weatherSight } from '../game/weather.js';
+import { unitLocked, researchBlock } from '../game/research.js';
 
 const MAX_PLACE = 100; // canPlace-Aufrufe je Denkschritt (Budget für die Platzsuche)
 const DEF_RANGE = BALANCE.fob.buildRadius; // Bauradius = Verteidigungsradius einer FOB
@@ -76,6 +77,8 @@ const RADIO_EVERY = 5; // s zwischen zwei Angriffsrunden auf den gegnerischen Ma
 const RADIO_GATHER = 40; // s höchstens sammelt sich die Armee vor dem Schlag gegen den Mast
 const RADIO_GATHER_R = 600; // Sammelradius; ab RADIO_GATHER_SHARE der Armee darin geht es los
 const RADIO_GATHER_SHARE = 0.7;
+const UPGRADES = ['vests', 'optics', 'composite']; // Reihenfolge der Verbesserungen (Forschung)
+const UPGRADE_RESERVE = 400; // Geld, das nach einer Verbesserung übrig bleiben soll (sie kommt nur aus Überschuss)
 const DEG = Math.PI / 180;
 const SITE_ANGLES = [0, 30, -30, 60, -60, 90, -90, 120, -120, 150, -150, 180].map((d) => d * DEG);
 const TWO_PI = Math.PI * 2;
@@ -114,6 +117,7 @@ export class AI {
     this.hadZoneFob = false; // eine Zonen-FOB (auch Baustelle) existierte im letzten Denkschritt
     this.saveForScout = false; // produce bildet keine Kampfeinheiten aus, bis der Späher bezahlt ist
     this.saveForRadio = false; // ebenso, bis der Sendemast bezahlt ist
+    this.saveForResearch = false; // ebenso, bis die nächste Stufe bezahlt ist
     this.scoutHome = false; // Späher fliegt zum Auftanken heim
     this.seenFobs = new Map(); // Gebäude-ID -> gesehene gegnerische FOB
     this.fallbackUntil = 0; // bis dahin greift army nicht an (Gruppen-Rückzug läuft)
@@ -147,6 +151,7 @@ export class AI {
     this.scout(s); // vor produce: der Späher bekommt das Geld zuerst
     this.buildRadio(s);
     this.replaceCommander(s);
+    this.research(s); // vor produce: die nächste Stufe bekommt das Geld zuerst
     this.produce(s);
     this.buildDefense(s);
     this.buildWall(s);
@@ -536,7 +541,7 @@ export class AI {
     let best = null;
     let bestKey = Infinity;
     for (const b of s.own) {
-      if (!b.built || !b.produces.includes(type) || b.queue.length >= qmax) continue;
+      if (!b.built || !b.produces.includes(type) || b.queue.length >= qmax || unitLocked(this.game, this.team, type)) continue;
       const key = b.queue.length * 100000 + (towardZone ? dist(b.x, b.y, s.zone.x, s.zone.y) : b.id);
       if (key < bestKey) {
         bestKey = key;
@@ -577,7 +582,7 @@ export class AI {
     }
 
 
-    if (this.saveForScout || this.saveForRadio) return; // Geld für den Späher bzw. den Sendemast sparen
+    if (this.saveForScout || this.saveForRadio || this.saveForResearch) return; // Geld für Späher, Sendemast bzw. Stufe sparen
 
     const mix = this.counterMix(s);
 
@@ -585,7 +590,7 @@ export class AI {
     const avail = new Set();
     for (const b of s.own) {
       if (!b.built || b.queue.length >= qmax) continue;
-      for (const u of b.produces) if (mix[u]) avail.add(u);
+      for (const u of b.produces) if (mix[u] && !unitLocked(g, t, u)) avail.add(u); // gesperrte Stufe: noch nicht
     }
     if (!avail.size) return;
     let sumW = 0;
@@ -1004,6 +1009,7 @@ export class AI {
     const bird = s.units.find((u) => u.type === 'littlebird');
     if (!bird) {
       this.saveForScout = false;
+      if (unitLocked(g, t, 'littlebird')) return; // erst ab seiner Forschungsstufe
       // schlechte Sicht (Regen, Nebel, Schnee): der Späher ist mehr wert und kommt früher
       const bad = this.cfg.weather && weatherSight(g) < WX_SCOUT_SIGHT;
       const minArmy = bad ? WX_SCOUT_ARMY : SCOUT_MIN_ARMY;
@@ -1227,6 +1233,31 @@ export class AI {
     if (near.length) g.issue(this.team, { type: 'attack', ids: near, targetId: mast.id });
     if (far.length) g.issue(this.team, { type: 'attackMove', ids: far, x: mast.x, y: mast.y });
     return true;
+  }
+
+  /**
+   * Forschung in der Haupt-FOB: ab cfg.research[0] s spart die KI auf Stufe 2, ab cfg.research[1] s auf Stufe 3 (nicht bei Alarm an
+   * der Haupt-FOB). Verbesserungen (ab Normal, cfg.upgrades) nur aus Überschuss, der Reihe nach (UPGRADES).
+   */
+  research(s) {
+    const g = this.game;
+    const t = this.team;
+    this.saveForResearch = false;
+    if (!g.research || !s.home || !s.home.built) return;
+    const tech = g.teams[t].tech;
+    if (tech.cur) return;
+    const money = g.teams[t].res.money;
+    const items = BALANCE.research.items;
+    const [t2, t3] = this.cfg.research;
+    const tier = tech.tier === 1 && g.time >= t2 ? 'tier2' : tech.tier === 2 && g.time >= t3 ? 'tier3' : null;
+    if (tier && !s.alarm) {
+      if (money < items[tier].money) this.saveForResearch = true; // produce spart, bis die Stufe bezahlbar ist
+      else g.issue(t, { type: 'research', buildingId: s.home.id, key: tier });
+      return;
+    }
+    if (!this.cfg.upgrades) return;
+    const key = UPGRADES.find((k) => !researchBlock(g, t, k));
+    if (key && money >= items[key].money + UPGRADE_RESERVE) g.issue(t, { type: 'research', buildingId: s.home.id, key });
   }
 
   /** Gefallenen Kommandeur ersetzen (Haupt-FOB), sobald genug Geld für ihn und eine Reserve da ist. */

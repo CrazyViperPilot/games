@@ -3,6 +3,7 @@ import { BALANCE } from '../data/balance.js';
 import { findPath, lineOfSight } from './pathfinding.js';
 import { inRange, resolveTarget, isFoe } from './entities.js';
 import { weatherSpeed } from './weather.js';
+import { opticsMul } from './research.js';
 
 const REPATH = 1.0; // Neuplanung bei Verfolgung (s)
 const BLOCK_REPATH = 0.5; // Neuplanung nach blockiertem Wegpunkt (s)
@@ -280,9 +281,9 @@ export function driveTo(game, u, tx, ty, reach, dt, bld = null) {
   return 'driving';
 }
 
-/** Verfolgung eines Ziels: stehen bleiben in Reichweite, sonst Weg höchstens 1×/s neu planen. */
+/** Verfolgung eines Ziels: stehen bleiben in Reichweite (Wärmebildoptik: weiter), sonst Weg höchstens 1×/s neu planen. */
 function chase(game, u, t, dt) {
-  if (u.def.range > 0 && inRange(u, t, u.def.range)) {
+  if (u.def.range > 0 && inRange(u, t, u.def.range * opticsMul(game, u.team))) {
     if (u.path.length) {
       u.path = [];
       u.pathIndex = 0;

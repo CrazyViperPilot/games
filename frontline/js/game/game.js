@@ -24,6 +24,7 @@ import { FORMATIONS, formationSlots, updateFormations } from './formation.js';
 import { hasCommander, updateCommanders, commanderFallen } from './commander.js';
 import { updateRadio, radioStarted, radioLost } from './radio.js';
 import { createWeather, updateWeather } from './weather.js';
+import { createResearch, updateResearch, cmdResearch, cmdCancelResearch, unitLocked, lockReason, opticsMul } from './research.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
@@ -132,7 +133,8 @@ export class Game {
   /** `map`: fertige Karte (Editor/gespeichert, siehe mapdata.js); ohne sie wird sie aus dem Seed erzeugt. */
   /** radio: Sendemast als zweite Siegbedingung (Startmenü; ohne Angabe aus). */
   /** weather: 'off' | 'random' | 'summer' | 'autumn' | 'winter' (Wetter und Jahreszeit, weather.js; ohne Angabe aus). */
-  constructor({ seed = 1, winPoints = BALANCE.winPoints, startMoney = BALANCE.startRes.money, map = null, radio = false, weather = 'off' } = {}) {
+  /** research: Forschungsstufen (research.js; ohne Angabe aus: alle Einheiten frei, keine Verbesserungen). */
+  constructor({ seed = 1, winPoints = BALANCE.winPoints, startMoney = BALANCE.startRes.money, map = null, radio = false, weather = 'off', research = false } = {}) {
     this.seed = seed;
     this.rng = makeRng(seed);
     this.map = map ?? generateMap(seed);
@@ -185,6 +187,7 @@ export class Game {
       }
       return team;
     });
+    createResearch(this, research); // Stufen und Verbesserungen je Team (team.tech)
     this.zone = { ...this.map.zone, owner: -1, contested: false, counts: [0, 0], weight: [0, 0], bar: { team: -1, p: 0 } };
     this.hot = createHot(this);
     this.fog = [new Fog(W, H), new Fog(W, H)];
@@ -600,6 +603,10 @@ export class Game {
         return this.cmdTrain(team, cmd);
       case 'cancelTrain':
         return this.cmdCancelTrain(team, cmd);
+      case 'research':
+        return cmdResearch(this, team, cmd);
+      case 'cancelResearch':
+        return cmdCancelResearch(this, team, cmd);
       case 'rally':
         return this.cmdRally(team, cmd);
       case 'demolish':
@@ -710,7 +717,7 @@ export class Game {
     for (const u of units) {
       // Besatzer bleiben im Haus, solange das Ziel aus den Fenstern erreichbar ist; sonst gehen sie hinaus und verfolgen es
       const h = u.house ? this.getEntity(u.house) : null;
-      if (u.house && !(h && aim && inRange(u, aim, u.def.range + h.reach))) exitHouse(this, u, t.x, t.y);
+      if (u.house && !(h && aim && inRange(u, aim, u.def.range * opticsMul(this, team) + h.reach))) exitHouse(this, u, t.x, t.y);
       u.order = { type: 'attack', x: t.x, y: t.y, targetId: t.id };
       u.targetId = t.id;
       u.path = [];
@@ -834,12 +841,13 @@ export class Game {
     return { ok: true, count: n };
   }
 
-  /** { type: 'train', buildingId, unit }: nur die Haupt-FOB; Einheiten kosten nur Geld. */
+  /** { type: 'train', buildingId, unit }: nur die Haupt-FOB; Einheiten kosten nur Geld (mit Forschung erst ab ihrer Stufe). */
   cmdTrain(team, cmd) {
     const b = this.getEntity(cmd.buildingId);
     if (!b || b.kind !== 'building' || b.team !== team) return fail('Kein eigenes Gebäude gewählt');
     if (!b.built) return fail('Gebäude ist noch im Bau');
     if (!UNITS[cmd.unit] || !b.produces.includes(cmd.unit)) return fail('Nur die Haupt-FOB bildet Einheiten aus');
+    if (unitLocked(this, team, cmd.unit)) return fail(lockReason(cmd.unit));
     if (b.queue.length >= BALANCE.queueMax) return fail('Warteschlange ist voll');
     if (this.slotsUsed(team) + (UNITS[cmd.unit].slots ?? 1) > BALANCE.slotCap) return fail('Einheitenlimit erreicht');
     if (UNITS[cmd.unit].hero && hasCommander(this, team)) return fail(ONE_COMMANDER);
@@ -1027,9 +1035,10 @@ export class Game {
       return;
     }
     this.time += dt;
-    // Reihenfolge: Wetter zuerst (Sicht und Tempo); Wirtschaft setzt team.rate zurück; Bewegung, Logistik und Bau fahren; Kampf, Zone,
+    // Reihenfolge: Wetter zuerst (Sicht und Tempo), dann Forschung; Wirtschaft setzt team.rate zurück; Bewegung, Logistik und Bau fahren; Kampf, Zone,
     // Einkommen zuletzt
     updateWeather(this, dt);
+    updateResearch(this, dt);
     updateEconomy(this, dt);
     updateGarrison(this, dt);
     updateFormations(this);

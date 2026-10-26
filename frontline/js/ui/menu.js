@@ -27,6 +27,7 @@ const KEYS = [
   ['B', 'Baumenü: Baufahrzeug alles (E Mauer, R Tor, T Mörser, Z Flak, X Bohrer, G Sendemast, F FOB-Baustelle) · Soldaten nur E Mauer, R Tor'],
   ['Bauen', 'Gebäude brauchen einen Bauer daneben: Baufahrzeug oder Soldaten (nur Mauer/Tor, aus getragenem Baumaterial, im Bauradius einer FOB)'],
   ['Haupt-FOB', 'Ausbildung (nur hier, nur gegen Geld, zwei Einheiten gleichzeitig): Q Schütze · W PAK · T Scharfschütze · E LKW · R Baufahrzeug · A SPz · S KPz · D Little Bird · F Transporter · G AH-64 · C Kommandeur (einmalig)'],
+  ['U', 'Haupt-FOB gewählt, falls im Startmenü an: Forschung (eine zugleich, neben der Ausbildung) · Q nächste Stufe (Stufe 2: Scharfschütze, SPz, Little Bird, Transporter · Stufe 3: KPz, AH-64) · W Schutzwesten (Infanterie −15 % Schaden) · E Wärmebildoptik (Reichweite und Sicht +10 %) · R Verbundpanzerung (Fahrzeuge und Hubschrauber −15 % Schaden) · C Abbruch'],
   ['L / U / T', 'LKW gewählt: Laden (dann FOB anklicken) · Entladen (FOB oder FOB-Baustelle) · Pendeln (Start-FOB, dann Ziel)'],
   ['Q / W / E / R', 'LKW gewählt: Ladungsart Gemischt · Baumaterial · Munition · Treibstoff'],
   ['Entf', 'Gebäude abreißen (25 % des Baumaterials zurück)'],
@@ -67,6 +68,7 @@ export function hideOverlay(root) {
 const MAPSEL_KEY = 'frontline-kartenwahl';
 const RADIO_KEY = 'frontline-radio'; // Startmenü: Sendemast-Sieg an/aus
 const WEATHER_KEY = 'frontline-wetter'; // Startmenü: Wetter aus, Zufall oder feste Jahreszeit
+const RESEARCH_KEY = 'frontline-forschung'; // Startmenü: Forschungsstufen an/aus
 function readMapSel() {
   try {
     return localStorage.getItem(MAPSEL_KEY) || 'random';
@@ -115,8 +117,8 @@ function writeMapSel(v) {
 }
 
 /**
- * Startmenü: onStart({difficulty, winPoints, mapId, radio, weather}) beim Klick auf Start (mapId 'random' oder Karten-ID, radio =
- * Sendemast-Sieg, weather = 'off' | 'random' | Jahreszeit).
+ * Startmenü: onStart({difficulty, winPoints, mapId, radio, weather, research}) beim Klick auf Start (mapId 'random' oder Karten-ID,
+ * radio = Sendemast-Sieg, weather = 'off' | 'random' | Jahreszeit, research = Forschungsstufen).
  */
 export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.money, resetWallet = () => {} } = {}) {
   let difficulty = 'normal';
@@ -124,6 +126,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
   let winPoints = BALANCE.winPoints;
   let radio = readFlag(RADIO_KEY, true);
   let weather = readChoice(WEATHER_KEY, WEATHER_SETTINGS, 'random');
+  let research = readFlag(RESEARCH_KEY, true);
   show(
     root,
     'start',
@@ -147,6 +150,10 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
         <div class="seg">${WEATHER_SETTINGS.map((k) => `<button type="button" data-weather="${k}">${WEATHER_LABELS[k]}</button>`).join('')}</div>
       </div>
       <div class="field">
+        <span class="flabel" title="Forschung in der Haupt-FOB: Stufe 2 schaltet Schützenpanzer und Hubschrauber frei, Stufe 3 Kampfpanzer und Kampfhubschrauber; dazu Verbesserungen für Panzerung und Reichweite">Forschung</span>
+        <div class="seg"><button type="button" data-research="1">An</button><button type="button" data-research="0">Aus</button></div>
+      </div>
+      <div class="field">
         <span class="flabel">Karte</span>
         <div class="seg">
           <button type="button" data-mapmode="random">Zufall</button>
@@ -156,7 +163,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
         <div class="mapbox" data-mapbox></div>
       </div>
       <ol class="howto">
-        <li>Du startest mit 2 Kampfpanzern, 3 Schützenpanzern, 29 Soldaten (22 Schützen, 7 Panzerabwehrsoldaten), LKW, Baufahrzeug und deinem Kommandeur (goldener Stern: in seiner Nähe schießen deine Einheiten schneller und Verwundete heilen; fällt er, bekommt der Gegner 5 Punkte). Das Einheitenlimit beträgt 50 Plätze: Soldat 1, Schützenpanzer 3, Kampfpanzer 5. Die Haupt-FOB hat unendlich Baumaterial, Munition und Treibstoff und bildet alle Einheiten aus – nur Geld ist knapp.</li>
+        <li>Du startest mit 2 Kampfpanzern, 3 Schützenpanzern, 29 Soldaten (22 Schützen, 7 Panzerabwehrsoldaten), LKW, Baufahrzeug und deinem Kommandeur (goldener Stern: in seiner Nähe schießen deine Einheiten schneller und Verwundete heilen; fällt er, bekommt der Gegner 5 Punkte). Das Einheitenlimit beträgt 50 Plätze: Soldat 1, Schützenpanzer 3, Kampfpanzer 5. Die Haupt-FOB hat unendlich Baumaterial, Munition und Treibstoff und bildet alle Einheiten aus – nur Geld ist knapp. Ist oben Forschung an, gibt es Schützenpanzer und Hubschrauber erst ab Stufe 2, Kampfpanzer und Kampfhubschrauber ab Stufe 3 (die Startarmee bleibt).</li>
         <li>LKW (E) bringen Nachschub aus der Haupt-FOB zu den vorderen FOBs und versorgen Einheiten in ihrer Nähe.</li>
         <li>Baufahrzeug (R): bis zu 10 FOBs (ohne überlappende Bauradien), Mörser, Flak, Bohrer und – falls oben an – einen Sendemast: steht er fertig 5 Minuten, ist die Partie gewonnen. Soldaten bauen aus wenig getragenem Baumaterial Mauern und Tore.</li>
         <li>Konfliktzone halten: jede deiner Einheiten dort bringt Geld (0,4/s, in der Hot Zone 0,8/s), alle 30 s ein Punkt. Fällt deine Haupt-FOB, ist die Runde verloren.</li>
@@ -176,6 +183,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
     root.querySelectorAll('[data-pts]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.pts) === winPoints)));
     root.querySelectorAll('[data-radio]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.radio === '1') === radio)));
     root.querySelectorAll('[data-weather]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.weather === weather)));
+    root.querySelectorAll('[data-research]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.research === '1') === research)));
   };
   const renderMapBox = () => {
     const box = root.querySelector('[data-mapbox]');
@@ -275,13 +283,16 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
     } else if (b.dataset.weather) {
       weather = b.dataset.weather;
       writeChoice(WEATHER_KEY, weather);
+    } else if (b.dataset.research) {
+      research = b.dataset.research === '1';
+      writeFlag(RESEARCH_KEY, research);
     }
     else if (b.dataset.act === 'resetWallet') {
       resetWallet();
       showWallet();
     } else if (b.dataset.act === 'start') {
       hideOverlay(root);
-      onStart({ difficulty, winPoints, mapId: mapSel, radio, weather });
+      onStart({ difficulty, winPoints, mapId: mapSel, radio, weather, research });
       return;
     }
     mark();
