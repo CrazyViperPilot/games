@@ -1,6 +1,7 @@
 # Deployt die Spielesammlung nach GitHub Pages:
 # Startseite unter /, jedes Spiel in seinem Ordner: /gate-squad/, /scroll-shooter/, /go/, /sudoku/, /frontline/, /mario-craft/.
 # Entwicklungsdateien (Tests, package.json, Pläne) werden nicht veröffentlicht.
+# cat-queens/ ist TypeScript + Vite und wird erst mit fertiger Oberfläche gebaut und veröffentlicht.
 name: Deploy games to GitHub Pages
 
 on:
@@ -36,7 +37,7 @@ jobs:
         uses: actions/configure-pages@v5
       - name: Prepare site
         run: |
-          rsync -a --exclude '.git' --exclude '.github' --exclude '.claude' --exclude '.agent' --exclude '_site' \
+          rsync -a --exclude '.git' --exclude '.github' --exclude '.claude' --exclude '.agent' --exclude '_site' --exclude 'cat-queens/' \
             --exclude 'test/' --exclude 'package.json' --exclude 'package-lock.json' --exclude 'node_modules/' ./ _site/
           touch _site/.nojekyll
       - name: Upload artifact
