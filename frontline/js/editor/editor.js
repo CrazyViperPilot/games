@@ -10,7 +10,7 @@ import { Renderer } from '../render/renderer.js';
 import { setIsoGround, TOWN_H } from '../render/iso.js';
 import { ISO_K } from '../render/camera.js';
 import { Game } from '../game/game.js';
-import { createEmptyMap, normalizeMap, checkMap, accessRoutes, describeMap, loadMap, saveMap, MAX_CRATES } from '../game/mapdata.js';
+import { createEmptyMap, normalizeMap, checkMap, accessRoutes, describeMap, loadMap, saveMap, MAX_CRATES, MAX_FIELDS, FIELD_CROPS } from '../game/mapdata.js';
 import { drawCrate } from '../render/sprites.js';
 import { Relief, RELIEF, COARSE_N, reliefOf, setRelief } from '../game/relief.js';
 import { reliefTiles, updateReliefTiles, drawReliefTiles } from '../render/reliefimg.js';
@@ -41,6 +41,7 @@ const TOOLS = [
   ['road', 'Straße', 'Wege', '▬', 'Von Start- zu Endpunkt ziehen'],
   ['dirt', 'Feldweg', 'Wege', '┅', 'Von Start- zu Endpunkt ziehen'],
   ['park', 'Park', 'Natur', '◌', 'Tippen setzt eine Grünfläche (nur Dekoration)'],
+  ['field', 'Feld', 'Natur', '▤', 'Tippen setzt einen Acker; rechts Frucht oder Weide wählen, Größe und Drehung ändern (nur Boden, blockiert nichts)'],
   ['tree', 'Baum', 'Natur', '♣', 'Tippen setzt einen Baum, Ziehen malt eine Baumreihe (Bäume blockieren)'],
   ['forest', 'Wald', 'Natur', '♠', 'Tippen setzt einen Wald (blockiert)'],
   ['rock', 'Fels', 'Natur', '●', 'Tippen setzt einen Felsen (blockiert)'],
@@ -99,6 +100,7 @@ const st = {
   touches: new Map(),
   pinch: null,
   carVertical: false,
+  fieldCrop: 'wheat', // Frucht für das nächste neue Feld (wheat, green, soil, rape oder pasture)
   brush: { size: 2, power: 1 }, // Indizes in BRUSH_SIZES und BRUSH_POWER
   reliefImg: null, // { relief, canvas }: Geländebild der 2D-Ansicht
 };
@@ -222,6 +224,7 @@ function listOf(k) {
     case 'road': return m.town.roads;
     case 'rail': return m.town.rails;
     case 'park': return m.town.parks;
+    case 'field': return m.town.fields;
     case 'car': return m.town.cars;
     case 'tree': return m.trees;
     case 'townTree': return m.town.trees;
@@ -293,6 +296,14 @@ function pickAt(wx, wy, sx = null, sy = null) {
   })();
   if (road) return road;
   if (pk) return pk;
+  for (let i = m.town.fields.length - 1; i >= 0; i--) {
+    const f = m.town.fields[i];
+    const c = Math.cos(f.angle || 0);
+    const sn = Math.sin(f.angle || 0);
+    const lx = (wx - f.x) * c + (wy - f.y) * sn;
+    const ly = -(wx - f.x) * sn + (wy - f.y) * c;
+    if (Math.abs(lx) <= f.w / 2 + tol * 0.4 && Math.abs(ly) <= f.h / 2 + tol * 0.4) return { k: 'field', o: f };
+  }
   if (Math.hypot(m.zone.x - wx, m.zone.y - wy) <= 90 + tol) return { k: 'zone', o: m.zone };
   return null;
 }
@@ -325,6 +336,19 @@ function place(tool, x, y) {
       const o = { x: px, y: py, r: 150 };
       m.town.parks.push(o);
       return { k: 'park', o };
+    }
+    case 'field': {
+      if (m.town.fields.length >= MAX_FIELDS) {
+        say(`Höchstens ${MAX_FIELDS} Felder je Karte`, true);
+        return null;
+      }
+      const o = { x: px, y: py, w: 300, h: 220, kind: 'field', crop: st.fieldCrop };
+      if (o.crop === 'pasture') {
+        o.kind = 'pasture';
+        delete o.crop;
+      }
+      m.town.fields.push(o);
+      return { k: 'field', o };
     }
     case 'tree': {
       const o = { x: Math.round(x), y: Math.round(y), r: 12 + Math.floor(Math.random() * 9) };
@@ -713,7 +737,7 @@ function drawSelection(sel, px) {
   ctx.lineWidth = 2 * px;
   ctx.setLineDash([6 * px, 4 * px]);
   const pad = 3 * px;
-  if (sel.k === 'building') {
+  if (sel.k === 'building' || sel.k === 'field') {
     ctx.save();
     ctx.translate(o.x, o.y);
     ctx.rotate(o.angle || 0);
@@ -1071,7 +1095,10 @@ const SEL_NAMES = {
   spawn: 'Startpunkt',
   zone: 'Konfliktzone',
   crate: 'Versorgungskiste',
+  field: 'Feld',
 };
+const FIELD_NAMES = { wheat: 'Weizenfeld', green: 'Junge Saat', soil: 'Acker (gepflügt)', rape: 'Rapsfeld', pasture: 'Weide' };
+const FIELD_ORDER = [...FIELD_CROPS, 'pasture']; // „Frucht“ schaltet der Reihe nach weiter
 const KIND_NAMES = { house: 'Haus', factory: 'Fabrik', hall: 'Halle', tower: 'Wachturm', train: 'Zugteil', station: 'Bahnhof', platform: 'Bahnsteig' };
 
 function showInspector() {
@@ -1098,6 +1125,7 @@ function showInspector() {
   if (s.k === 'building') title = KIND_NAMES[s.o.kind] || title;
   if (s.k === 'obstacle') title = Math.round(s.o.r) % 2 === 0 ? 'Wald' : 'Fels';
   if (s.k === 'spawn') title = `Start ${BALANCE.teamNames[s.i]}`;
+  if (s.k === 'field') title = FIELD_NAMES[s.o.kind === 'pasture' ? 'pasture' : s.o.crop] || title;
   const rows = [];
   if (s.k === 'building') {
     rows.push('<div class="row"><button data-i="w-">Breite −</button><button data-i="w+">Breite +</button></div>');
@@ -1108,6 +1136,11 @@ function showInspector() {
         ? '<div class="row"><button data-i="rot-">↺ 15°</button><button data-i="rot+">↻ 15°</button></div>'
         : '<div class="row"><button data-i="turn">Drehen</button>' + (s.o.kind !== 'station' ? '<button data-i="kind">Art</button>' : '') + '</div>',
     );
+  } else if (s.k === 'field') {
+    rows.push('<div class="row"><button data-i="w-">Breite −</button><button data-i="w+">Breite +</button></div>');
+    rows.push('<div class="row"><button data-i="h-">Höhe −</button><button data-i="h+">Höhe +</button></div>');
+    rows.push('<div class="row"><button data-i="rot-">↺ 15°</button><button data-i="rot+">↻ 15°</button><button data-i="crop">Frucht</button></div>');
+    rows.push('<div class="muted small">Nur Boden: Einheiten fahren darüber, Felder blockieren nichts.</div>');
   } else if (s.k === 'road') {
     rows.push('<div class="row"><button data-i="rw-">Schmaler</button><button data-i="rw+">Breiter</button></div>');
     rows.push('<div class="row"><button data-i="dirt">' + (s.o.dirt ? 'Zur Straße' : 'Zum Feldweg') + '</button></div>');
@@ -1161,6 +1194,17 @@ function inspectorAction(a) {
     const order = ['house', 'factory', 'hall'];
     o.kind = order[(order.indexOf(o.kind) + 1) % order.length];
   } else if (a === 'color') o.color = CAR_COLORS[(CAR_COLORS.indexOf(o.color) + 1) % CAR_COLORS.length];
+  else if (a === 'crop') {
+    const next = FIELD_ORDER[(FIELD_ORDER.indexOf(o.kind === 'pasture' ? 'pasture' : o.crop) + 1) % FIELD_ORDER.length];
+    if (next === 'pasture') {
+      o.kind = 'pasture';
+      delete o.crop;
+    } else {
+      o.kind = 'field';
+      o.crop = next;
+    }
+    st.fieldCrop = next; // das nächste neue Feld bekommt dieselbe Frucht
+  }
   else if (a === 'rot+' || a === 'rot-') {
     let ang = (o.angle || 0) + (a === 'rot+' ? 1 : -1) * (Math.PI / 12);
     if (ang > Math.PI) ang -= Math.PI * 2;
@@ -1219,7 +1263,7 @@ $('[data-tools]').addEventListener('click', (e) => {
 function updateInfo() {
   const d = describeMap(st.map);
   $('[data-msg]').classList.remove('bad');
-  $('[data-info]').textContent = `${d.buildings} Gebäude · ${d.roads} Straßen · ${d.trees} Bäume · ${d.obstacles} Hindernisse · ${st.map.crates.length} Kisten`;
+  $('[data-info]').textContent = `${d.buildings} Gebäude · ${d.roads} Straßen · ${d.trees} Bäume · ${d.obstacles} Hindernisse · ${st.map.town.fields.length} Felder · ${st.map.crates.length} Kisten`;
 }
 
 function setMap(map, { keepId = false } = {}) {

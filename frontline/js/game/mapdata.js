@@ -13,13 +13,15 @@ export const BUILDING_KINDS = ['house', 'factory', 'hall', 'tower', 'train', 'st
 const TURNABLE = ['train', 'platform']; // dürfen beliebig gedreht sein (`angle`, Bogenmaß)
 const SPAWN_CLEAR = 180; // freier Platz um einen Startpunkt (Haupt-FOB und Startunits)
 export const MAX_CRATES = 24; // Versorgungskisten je Karte
+export const FIELD_CROPS = ['wheat', 'green', 'soil', 'rape']; // Ackerarten: Weizen, junge Saat, gepflügt, Raps
+export const MAX_FIELDS = 300; // Felder und Weiden je Karte
 
 /** Leere Karte: nur Startpunkte in den Ecken und die Konfliktzone in der Mitte. */
 export function createEmptyMap(name = 'Neue Karte') {
   return normalizeMap({
     name,
     obstacles: [],
-    town: { roads: [], buildings: [], parks: [], cars: [], trees: [], rails: [] },
+    town: { roads: [], buildings: [], parks: [], cars: [], trees: [], rails: [], fields: [] },
     trees: [],
     spawns: [
       { x: 700, y: H - 700 },
@@ -79,6 +81,15 @@ export function normalizeMap(src) {
       cars: arr(town.cars).map((c) => ({ ...pt(c), vertical: !!c.vertical, color: String(c.color || '#b8b8b0').slice(0, 9) })),
       trees: arr(town.trees).map((t) => circ(t, 6, 40)),
       rails,
+      // Äcker und Weiden (nur Boden, blockieren nichts); ältere Karten haben keine
+      fields: arr(town.fields).slice(0, MAX_FIELDS).map((f) => ({
+        ...pt(f),
+        w: clamp(num(f.w, 300), 60, 900),
+        h: clamp(num(f.h, 220), 60, 900),
+        ...(Number.isFinite(f.angle) && Math.abs(f.angle) > 1e-3 ? { angle: clamp(f.angle, -Math.PI, Math.PI) } : {}),
+        kind: f.kind === 'pasture' ? 'pasture' : 'field',
+        ...(f.kind === 'pasture' ? {} : { crop: FIELD_CROPS.includes(f.crop) ? f.crop : 'wheat' }),
+      })),
     },
     trees: arr(src.trees).map((t) => circ(t, 6, 40)),
     spawns,

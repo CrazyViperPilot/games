@@ -28,7 +28,7 @@ const reaches = (path, x, y) => path.length > 0 && path[path.length - 1].x === x
 /**
  * Erzeugt eine Karte. Scheitert die Platzierung oder ist die Karte nicht zusammenhängend,
  * wird mit seed + 1, + 2, … neu versucht (max. 20×).
- * @returns {{ width, height, tile, obstacles: {x,y,r}[], town: {roads, buildings, parks, cars, trees}, trees: {x,y,r}[] (Bäume außerhalb der Stadt; wie die Stadtbäume blockierend), spawns: {x,y}[], zone: {x,y,r}, crates: {x,y}[] (Versorgungskisten), relief: string (Höhengelände, relief.js) }}
+ * @returns {{ width, height, tile, obstacles: {x,y,r}[], town: {roads, buildings, parks, cars, trees, fields}, trees: {x,y,r}[] (Bäume außerhalb der Stadt; wie die Stadtbäume blockierend), spawns: {x,y}[], zone: {x,y,r}, crates: {x,y}[] (Versorgungskisten), relief: string (Höhengelände, relief.js) }}
  */
 export function generateMap(seed) {
   for (let k = 0; k < MAX_ATTEMPTS; k++) {
@@ -70,6 +70,8 @@ function tryBuild(seed) {
   if (!isConnected(grid)) return null;
   // 3. Versorgungskisten zuletzt: die Zufallszahlen davor (und damit alle bisherigen Karten) bleiben gleich
   const crates = placeCrates(rng, grid);
+  // 4. Äcker, Weiden und Feldwege mit eigenem Zufall (nur Boden): auch die Kisten bleiben je Seed, wo sie waren
+  placeFarms(seed, town, outposts.buildings, obstacles, trees, relief);
 
   const map = {
     width: W,
@@ -454,4 +456,230 @@ function placeCrates(rng, grid) {
     }
   }
   return crates;
+}
+
+const FARM_CHANCE = 0.75; // so viele Einzelhäuser außerhalb der Zone werden Gehöfte mit Feldern
+const FARM_TRIES = 8; // Anordnungen je Gehöft (die mit der meisten Feldfläche gewinnt)
+const FIELD_BLOCKS = 8; // freie Flure (Paare): zwei Feldreihen beiderseits eines Feldwegs, ohne Haus
+const FIELD_GAP = 24; // Feldrain zwischen zwei Feldern
+const FIELD_YARD = 54; // Abstand Haus–Feldreihe (darin läuft der Feldweg entlang)
+const TRACK_W = 26; // Feldweg
+const TRACK_REACH = 1800; // so weit führt ein Feldweg höchstens zur nächsten Straße oder zum Nachbargehöft
+const CROP_ROLL = [['wheat', 0.35], ['green', 0.6], ['soil', 0.8], ['rape', 1]]; // Weizen, junge Saat, gepflügt, Raps
+
+/** Punkt im (gedrehten) Rechteck {x, y, w, h, angle}, Rand um pad erweitert. */
+function inBox(b, px, py, pad = 0) {
+  const a = b.angle || 0;
+  const c = Math.cos(a);
+  const sn = Math.sin(a);
+  const lx = (px - b.x) * c + (py - b.y) * sn;
+  const ly = -(px - b.x) * sn + (py - b.y) * c;
+  return Math.abs(lx) <= b.w / 2 + pad && Math.abs(ly) <= b.h / 2 + pad;
+}
+
+/** Abstand eines Punkts zur Strecke, mit Fußpunkt. */
+function segDist(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const l2 = dx * dx + dy * dy || 1;
+  const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / l2));
+  return { d: Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy)), x: x1 + t * dx, y: y1 + t * dy };
+}
+
+/** Stützpunkte über die Fläche eines Felds (Raster alle ~40 px, Ränder eingeschlossen). */
+function fieldPoints(f) {
+  const pts = [];
+  const nx = Math.max(1, Math.ceil(f.w / 40));
+  const ny = Math.max(1, Math.ceil(f.h / 40));
+  const c = Math.cos(f.angle || 0);
+  const sn = Math.sin(f.angle || 0);
+  for (let i = 0; i <= nx; i++) {
+    for (let j = 0; j <= ny; j++) {
+      const lx = (i / nx - 0.5) * f.w;
+      const ly = (j / ny - 0.5) * f.h;
+      pts.push([f.x + lx * c - ly * sn, f.y + lx * sn + ly * c]);
+    }
+  }
+  return pts;
+}
+
+const boxR = (b) => Math.hypot(b.w, b.h) / 2;
+
+/**
+ * Äcker und Weiden, punktsymmetrisch: um die Einzelhäuser außerhalb der Zone (Gehöfte) je eine Reihe von 1–3 Feldern auf einer Seite
+ * des Hauses mit einem Feldweg zwischen Haus und Feldern; dazu freie Flure (zwei Feldreihen beiderseits eines Feldwegs). Feldwege
+ * führen weiter zur nächsten Straße, zu einem anderen Feldweg oder zum Nachbargehöft. Nur Boden: Felder und Feldwege blockieren
+ * nichts, Bäume darauf fallen weg. Eigener Zufall, damit der Rest der Karte je Seed gleich bleibt.
+ * Schreibt town.fields und hängt die Feldwege an town.roads (dirt) an.
+ */
+function placeFarms(seed, town, outpostBuildings, obstacles, trees, relief) {
+  const rng = makeRng((Math.imul(seed, 2654435761) ^ 0x5eed) >>> 0);
+  const fields = [];
+  const tracks = [];
+  const roads = town.roads;
+  const buildings = town.buildings;
+  const dry = (x, y) => !relief || groundOk(relief, x, y);
+  // Feld frei? Erst grob nach Abstand vorsortieren, dann jeden Stützpunkt (und sein Spiegelbild) prüfen
+  const fieldOk = (f) => {
+    const R = boxR(f);
+    const sides = [[f.x, f.y], [W - f.x, H - f.y]];
+    const near = (list, r) => list.filter((o) => sides.some(([x, y]) => dist(x, y, o.x, o.y) < R + r(o)));
+    const obs = near(obstacles, (o) => o.r + 20);
+    const bld = near(buildings, (b) => boxR(b) + 25);
+    const fld = near(fields, (o) => boxR(o) + FIELD_GAP);
+    const rds = roads.filter((r) => sides.some(([x, y]) => segDist(x, y, r.x1, r.y1, r.x2, r.y2).d < R + r.w));
+    return fieldPoints(f).every(([x, y]) =>
+      [[x, y], [W - x, H - y]].every(
+        ([px, py]) =>
+          px > 150 && py > 150 && px < W - 150 && py < H - 150 &&
+          !inRail(py, 30) &&
+          dist(px, py, CX, CY) > ZONE_R + 120 &&
+          SPAWNS.every((sp) => dist(px, py, sp.x, sp.y) > 650) &&
+          obs.every((o) => dist(px, py, o.x, o.y) > o.r + 15) &&
+          bld.every((b) => !inBox(b, px, py, 20)) &&
+          fld.every((o) => !inBox(o, px, py, FIELD_GAP / 2)) &&
+          rds.every((r) => segDist(px, py, r.x1, r.y1, r.x2, r.y2).d > r.w / 2 + 12) &&
+          dry(px, py),
+      ),
+    );
+  };
+  // Feldweg von A nach B: frei von Wald, Wasser, fremden Gebäuden und Feldern (Haus am Anfang/Ende und ihr Spiegelbild zählen nicht)
+  const mine = (b, o) => !!o && ((b.x === o.x && b.y === o.y) || (b.x === W - o.x && b.y === H - o.y));
+  const trackOk = (x1, y1, x2, y2, ownA = null, ownB = null) => {
+    const n = Math.max(2, Math.ceil(Math.hypot(x2 - x1, y2 - y1) / 30));
+    for (let i = 0; i <= n; i++) {
+      const x = x1 + ((x2 - x1) * i) / n;
+      const y = y1 + ((y2 - y1) * i) / n;
+      for (const [px, py] of [[x, y], [W - x, H - y]]) {
+        if (px < 60 || py < 60 || px > W - 60 || py > H - 60 || dist(px, py, CX, CY) < ZONE_R - 60) return false;
+        if (obstacles.some((o) => dist(px, py, o.x, o.y) < o.r + 8)) return false;
+        if (buildings.some((b) => !mine(b, ownA) && !mine(b, ownB) && inBox(b, px, py, 6))) return false;
+        if (fields.some((f) => inBox(f, px, py, -4))) return false;
+        if (!dry(px, py)) return false;
+      }
+    }
+    return true;
+  };
+  const addTrack = (x1, y1, x2, y2) => {
+    const r = { x1: Math.round(x1), y1: Math.round(y1), x2: Math.round(x2), y2: Math.round(y2), w: TRACK_W, dirt: true };
+    const m = { x1: W - r.x1, y1: H - r.y1, x2: W - r.x2, y2: H - r.y2, w: TRACK_W, dirt: true };
+    tracks.push(r, m);
+    return [r, m];
+  };
+  // Blickrahmen: u zeigt von der Mitte zur Feldreihe, v läuft die Reihe entlang; Seite 0–3 = rechts, unten, links, oben (gedreht um angle)
+  const frame = (angle, side) => {
+    const c = Math.cos(angle);
+    const sn = Math.sin(angle);
+    const alongX = side % 2 === 0;
+    const sg = side < 2 ? 1 : -1;
+    const u = alongX ? [c * sg, sn * sg] : [-sn * sg, c * sg];
+    return { angle, alongX, u, v: [-u[1], u[0]] };
+  };
+  const randAngle = () => (rng.next() < 0.4 ? 0 : Math.round(rng.range(-0.35, 0.35) * 100) / 100);
+  const randWidths = (lo, hi) => {
+    const out = [];
+    for (let k = rng.int(lo, hi); k > 0; k--) out.push(Math.round(rng.range(170, 320)));
+    return out;
+  };
+  // Feldreihe um (ax, ay): Felder der Tiefe `depth` nebeneinander entlang v, ihre Mitte bei u = uc; nur die freien kommen mit
+  const row = (ax, ay, fr, uc, depth, widths, shift) => {
+    const total = widths.reduce((a, b) => a + b, 0) + FIELD_GAP * (widths.length - 1);
+    let v = -total / 2 + shift;
+    const out = [];
+    for (const wv of widths) {
+      const vc = v + wv / 2;
+      v += wv + FIELD_GAP;
+      const roll = rng.next();
+      const cr = rng.next();
+      const f = {
+        x: Math.round(ax + fr.u[0] * uc + fr.v[0] * vc),
+        y: Math.round(ay + fr.u[1] * uc + fr.v[1] * vc),
+        w: fr.alongX ? depth : wv,
+        h: fr.alongX ? wv : depth,
+        ...(fr.angle ? { angle: fr.angle } : {}),
+        kind: roll < 0.3 ? 'pasture' : 'field',
+      };
+      if (f.kind === 'field') f.crop = CROP_ROLL.find(([, p]) => cr <= p)[0];
+      if (fieldOk(f)) out.push({ f, v0: vc - wv / 2, v1: vc + wv / 2 });
+    }
+    return out;
+  };
+  const area = (list) => list.reduce((a, c) => a + c.f.w * c.f.h, 0);
+  const commit = (list) => {
+    for (const { f } of list) fields.push(f, { ...f, x: W - f.x, y: H - f.y });
+  };
+  // Weg entlang v bei u = ut über die Spanne [v0, v1] um (ax, ay)
+  const lane = (ax, ay, fr, ut, v0, v1) => [ax + fr.u[0] * ut + fr.v[0] * v0, ay + fr.u[1] * ut + fr.v[1] * v0, ax + fr.u[0] * ut + fr.v[0] * v1, ay + fr.u[1] * ut + fr.v[1] * v1];
+
+  // 1. Gehöfte: Feldreihe neben dem Haus, Feldweg dazwischen
+  const farms = [];
+  for (let i = 0; i < outpostBuildings.length; i += 2) {
+    const h = outpostBuildings[i];
+    if (h.kind !== 'house' || rng.next() >= FARM_CHANCE) continue;
+    let best = null;
+    for (let t = 0; t < FARM_TRIES; t++) {
+      const fr = frame(randAngle(), rng.int(0, 3));
+      const halfU = (Math.abs(fr.u[0]) * h.w + Math.abs(fr.u[1]) * h.h) / 2;
+      const depth = Math.round(rng.range(170, 300));
+      const got = row(h.x, h.y, fr, halfU + FIELD_YARD + depth / 2, depth, randWidths(1, 3), rng.range(-60, 60));
+      if (got.length && (!best || area(got) > area(best.got))) best = { fr, halfU, got };
+    }
+    if (!best) continue;
+    commit(best.got);
+    const v0 = Math.min(0, ...best.got.map((c) => c.v0)) - 10;
+    const v1 = Math.max(0, ...best.got.map((c) => c.v1)) + 10;
+    const ln = lane(h.x, h.y, best.fr, best.halfU + FIELD_YARD / 2, v0, v1);
+    const own = trackOk(...ln, h) ? addTrack(...ln) : [];
+    farms.push({ x: h.x, y: h.y, b: h, ends: [[h.x, h.y]], own });
+  }
+  // 2. Freie Flure: zwei Feldreihen beiderseits eines Feldwegs
+  for (let i = 0; i < FIELD_BLOCKS; i++) {
+    for (let t = 0; t < 40; t++) {
+      const x = rng.range(400, W - 400);
+      const y = rng.range(400, H - 400);
+      if (dist(x, y, CX, CY) < ZONE_R + 400) continue;
+      const angle = randAngle();
+      const fr = frame(angle, 0);
+      const back = frame(angle, 2);
+      const depth = Math.round(rng.range(180, 300));
+      const uc = TRACK_W / 2 + FIELD_GAP / 2 + depth / 2;
+      const widths = randWidths(2, 3);
+      const got = [...row(x, y, fr, uc, depth, widths, 0), ...row(x, y, back, uc, depth, widths, 0).map((c) => ({ ...c, v0: -c.v1, v1: -c.v0 }))];
+      if (got.length < 3) continue;
+      commit(got);
+      const ln = lane(x, y, fr, 0, Math.min(...got.map((c) => c.v0)) - 10, Math.max(...got.map((c) => c.v1)) + 10);
+      const own = trackOk(...ln) ? addTrack(...ln) : [];
+      farms.push({ x, y, b: null, ends: [[ln[0], ln[1]], [ln[2], ln[3]]], own });
+      break;
+    }
+  }
+  // 3. Anbindung: vom Haus bzw. Wegende zur nächsten Straße oder einem schon gebauten Feldweg, sonst zum nächsten Gehöft
+  for (const fm of farms) {
+    const cands = [];
+    for (const [sx, sy] of fm.ends) {
+      for (const r of [...roads, ...tracks]) {
+        if (fm.own.includes(r)) continue; // der eigene Weg an der Feldreihe bindet nicht an
+        const q = segDist(sx, sy, r.x1, r.y1, r.x2, r.y2);
+        if (q.d > 40 && q.d < TRACK_REACH) cands.push({ d: q.d, sx, sy, x: q.x, y: q.y, to: null });
+      }
+      for (const o of farms) {
+        const d = dist(sx, sy, o.x, o.y);
+        if (o !== fm && o.b && d < TRACK_REACH) cands.push({ d: d * 1.15, sx, sy, x: o.x, y: o.y, to: o.b });
+      }
+    }
+    cands.sort((a, b) => a.d - b.d);
+    for (const q of cands.slice(0, 8)) {
+      if (!trackOk(q.sx, q.sy, q.x, q.y, fm.b, q.to)) continue;
+      addTrack(q.sx, q.sy, q.x, q.y);
+      break;
+    }
+
+  }
+  // Bäume auf Feldern und Feldwegen fallen weg (paarweise: Felder und Wege sind punktsymmetrisch)
+  for (let i = trees.length - 1; i >= 0; i--) {
+    const t = trees[i];
+    if (fields.some((f) => inBox(f, t.x, t.y, t.r)) || tracks.some((r) => segDist(t.x, t.y, r.x1, r.y1, r.x2, r.y2).d < r.w / 2 + t.r)) trees.splice(i, 1);
+  }
+  town.fields = fields;
+  roads.push(...tracks);
 }

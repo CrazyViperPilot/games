@@ -130,6 +130,7 @@ export function buildTerrain(map, mode = '2d') {
 
 /** Straßen, Bahn, Stadt, Bäume und Hindernisse einer Karte auf ein Canvas (Maßstab S). Auch der Karteneditor nutzt das. */
 export function drawMapObjects(ctx, map, S, iso, rng) {
+  drawFields(ctx, map, S);
   drawRoads(ctx, map, S);
   drawRail(ctx, map, S);
   drawTown(ctx, map, S, iso);
@@ -183,6 +184,106 @@ export function drawMapObjects(ctx, map, S, iso, rng) {
 }
 
 const TRAIN_COLOR = { loco: '#b3423a', container: '#3f8a5e', tank: '#7c8190' };
+// Äcker je Frucht: Grund, Furchen, Feldrand (gepflügt zusätzlich helle Kämme)
+const CROP_LOOK = {
+  wheat: { base: '#b5a055', row: '#9a8641', edge: '#8a7a3c' },
+  green: { base: '#7b9542', row: '#657f37', edge: '#5a7032' },
+  soil: { base: '#6c5338', row: '#54402b', edge: '#4c3a27', ridge: '#7f6343' },
+  rape: { base: '#cdbd3f', row: '#b3a333', edge: '#978b2e' },
+};
+const PASTURE = { base: '#66804a', patch: '#718c50', fence: '#7d6142', bale: '#c9b26a' };
+
+/**
+ * Äcker und Weiden (town.fields): Äcker mit Furchen in Längsrichtung und dunklerem Rand, Weiden mit helleren Flecken, Zaun mit
+ * Pfosten und ein paar Heuballen. Nur Boden; die Zufallsdetails hängen an der Lage des Felds (kein gemeinsamer Zufall).
+ */
+function drawFields(ctx, map, S) {
+  for (const f of map.town?.fields ?? []) {
+    const rng = makeRng(((Math.round(f.x) * 73856093) ^ (Math.round(f.y) * 19349663)) >>> 0);
+    const w = f.w * S;
+    const h = f.h * S;
+    ctx.save();
+    ctx.translate(f.x * S, f.y * S);
+    if (f.angle) ctx.rotate(f.angle);
+    if (f.kind === 'pasture') {
+      ctx.fillStyle = PASTURE.base;
+      ctx.fillRect(-w / 2, -h / 2, w, h);
+      ctx.fillStyle = PASTURE.patch;
+      for (let i = 0; i < 7; i++) {
+        const r = (18 + rng.next() * 40) * S;
+        ctx.globalAlpha = 0.35 + rng.next() * 0.3;
+        ctx.beginPath();
+        ctx.ellipse((rng.next() - 0.5) * (w - 2 * r), (rng.next() - 0.5) * (h - 2 * r), r, r * (0.5 + rng.next() * 0.4), rng.next() * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      for (let i = rng.int(1, 3); i > 0; i--) {
+        const bx = (rng.next() - 0.5) * (w - 40 * S);
+        const by = (rng.next() - 0.5) * (h - 40 * S);
+        disc(ctx, bx + 2 * S, by + 2.5 * S, 8 * S, 'rgba(30,30,10,0.35)');
+        disc(ctx, bx, by, 8 * S, PASTURE.bale);
+      }
+      // Zaun mit Pfosten
+      ctx.strokeStyle = PASTURE.fence;
+      ctx.lineWidth = Math.max(0.8, 2.5 * S);
+      ctx.strokeRect(-w / 2, -h / 2, w, h);
+      ctx.fillStyle = PASTURE.fence;
+      const post = Math.max(1, 5 * S);
+      const along = (x0, y0, x1, y1) => {
+        const n = Math.max(1, Math.round(Math.hypot(x1 - x0, y1 - y0) / (40 * S)));
+        for (let k = 0; k <= n; k++) ctx.fillRect(x0 + ((x1 - x0) * k) / n - post / 2, y0 + ((y1 - y0) * k) / n - post / 2, post, post);
+      };
+      along(-w / 2, -h / 2, w / 2, -h / 2);
+      along(-w / 2, h / 2, w / 2, h / 2);
+      along(-w / 2, -h / 2, -w / 2, h / 2);
+      along(w / 2, -h / 2, w / 2, h / 2);
+    } else {
+      const L = CROP_LOOK[f.crop] ?? CROP_LOOK.wheat;
+      ctx.fillStyle = L.base;
+      ctx.fillRect(-w / 2, -h / 2, w, h);
+      // leichte Farbunterschiede im Bestand
+      for (let i = 0; i < 3; i++) {
+        const r = (40 + rng.next() * 60) * S;
+        ctx.globalAlpha = 0.1 + rng.next() * 0.08;
+        ctx.fillStyle = rng.next() < 0.5 ? L.row : L.edge;
+        ctx.beginPath();
+        ctx.ellipse((rng.next() - 0.5) * w * 0.6, (rng.next() - 0.5) * h * 0.6, r, r * 0.6, rng.next() * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      // Furchen in Längsrichtung, am Rand das Vorgewende
+      const long = w >= h;
+      const span = long ? h : w;
+      const len = long ? w : h;
+      const step = 12 * S;
+      const head = Math.min(18 * S, len * 0.1);
+      const rows = (color, off) => {
+        ctx.strokeStyle = color;
+        ctx.beginPath();
+        for (let d = -span / 2 + step * off; d < span / 2; d += step) {
+          if (long) {
+            ctx.moveTo(-len / 2 + head, d);
+            ctx.lineTo(len / 2 - head, d);
+          } else {
+            ctx.moveTo(d, -len / 2 + head);
+            ctx.lineTo(d, len / 2 - head);
+          }
+        }
+        ctx.stroke();
+      };
+      ctx.lineWidth = Math.max(0.6, 4 * S);
+      rows(L.row, 0.5);
+      if (L.ridge) {
+        ctx.lineWidth = Math.max(0.4, 2.5 * S);
+        rows(L.ridge, 1);
+      }
+      ctx.strokeStyle = L.edge;
+      ctx.lineWidth = Math.max(0.8, 5 * S);
+      ctx.strokeRect(-w / 2, -h / 2, w, h);
+    }
+    ctx.restore();
+  }
+}
 
 function disc(ctx, x, y, r, fill) {
   ctx.fillStyle = fill;
