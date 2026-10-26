@@ -130,7 +130,7 @@ function autoAssign(game) {
     if (u.alive && u.order.type === 'build') assigned.set(u.order.targetId, (assigned.get(u.order.targetId) || 0) + 1);
   }
   for (const u of game.units) {
-    if (!u.alive || u.order.type !== 'idle' || u.targetId !== null || !u.def.builder) continue;
+    if (!u.alive || u.order.type !== 'idle' || u.targetId !== null || !u.def.builder || u.house) continue;
     let best = null;
     let bestD = C.autoHelpRange;
     for (const s of sites) {
@@ -164,7 +164,7 @@ function autoAssign(game) {
 function countBuilders(game, b) {
   let n = 0;
   for (const u of game.units) {
-    if (!u.alive || !canBuild(u.def, b.type)) continue;
+    if (!u.alive || u.house || !canBuild(u.def, b.type)) continue;
     const o = u.order.type;
     if (o === 'build' ? u.order.targetId !== b.id : o !== 'idle') continue;
     if (footDist(u.x, u.y, b) > C.helperRange) continue;

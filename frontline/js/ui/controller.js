@@ -5,7 +5,8 @@ import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { canBuild } from '../game/construction.js';
 import { cargoSum, canSeat } from '../game/logistics.js';
-import { unitLift, buildingHeight } from '../render/iso.js';
+import { canGarrison, canEnter } from '../game/garrison.js';
+import { unitLift, buildingHeight, TOWN_H } from '../render/iso.js';
 
 const WALL_MAX = 40; // max. Zellen je Mauerzug (Vorschau und Befehl)
 const DOUBLE_MS = 350; // Doppelklick auf einen Typ = alle dieses Typs im Bild
@@ -177,7 +178,7 @@ export class Controller {
     const tol = PICK_PX / this.camera.zoom;
     let best = null;
     let bestD = Infinity;
-    for (const e of this.game.query(wx, wy, tol, (e) => e.kind === 'unit' && pred(e))) {
+    for (const e of this.game.query(wx, wy, tol, (e) => e.kind === 'unit' && !e.house && pred(e))) {
       const d = Math.hypot(e.x - wx, e.y - wy);
       if (d < bestD) {
         best = e;
@@ -195,7 +196,7 @@ export class Controller {
     let best = null;
     let bestD = Infinity;
     for (const u of this.game.units) {
-      if (!u.alive || !pred(u)) continue;
+      if (!u.alive || u.house || !pred(u)) continue; // Besatzer wählt man über ihr Haus
       const p = cam.worldToScreen(u.x, u.y);
       const d = Math.hypot(p.x - sp.x, p.y - unitLift(u) * cam.zoom - sp.y);
       if (d <= PICK_PX + u.def.radius * cam.zoom * 0.9 && d < bestD) {
@@ -223,6 +224,30 @@ export class Controller {
     return null;
   }
 
+  /** Stadthaus (nicht eingestürzt) unter dem Weltpunkt oder null. Isometrisch zählt auch ein Klick aufs Dach. */
+  pickHouse(wx, wy, pred = () => true) {
+    const houses = this.game.houses || [];
+    const inside = (h, x, y) => Math.abs(x - h.x) <= h.pw / 2 && Math.abs(y - h.y) <= h.ph / 2;
+    for (const h of houses) if (h.alive && pred(h) && inside(h, wx, wy)) return h;
+    const cam = this.camera;
+    if (cam.iso) {
+      const sp = cam.worldToScreen(wx, wy);
+      for (const h of houses) {
+        if (!h.alive || !pred(h)) continue;
+        const roof = cam.screenToWorld(sp.x, sp.y + (TOWN_H[h.type] || 40) * cam.zoom);
+        if (inside(h, roof.x, roof.y)) return h;
+      }
+    }
+    return null;
+  }
+
+  /** Eigene Besatzer des Hauses wählen (Klick aufs eigene besetzte Haus). */
+  selectHouse(h, add) {
+    const sel = this.view.selection;
+    if (!add) sel.clear();
+    for (const u of h.occupants) if (u.alive && u.team === this.team) sel.add(u.id);
+  }
+
   /** Gewählte eigene Einheiten (ohne Gebäude). */
   selectedUnits() {
     return this.selected().filter((e) => e.kind === 'unit');
@@ -230,10 +255,17 @@ export class Controller {
 
   // ---- Auswahl ------------------------------------------------------------------
 
-  /** Klick auf eigene Entity wählen; ohne Treffer (und ohne add) Auswahl leeren. */
+  /** Klick auf eigene Entity wählen (eigenes besetztes Haus: seine Besatzer); ohne Treffer (und ohne add) Auswahl leeren. */
   selectAt(wx, wy, add) {
     const hit = this.pick(wx, wy, (e) => e.team === this.team);
     const sel = this.view.selection;
+    if (!hit) {
+      const h = this.pickHouse(wx, wy, (x) => x.team === this.team);
+      if (h) {
+        this.selectHouse(h, add);
+        return;
+      }
+    }
     if (!add) sel.clear();
     if (!hit) return;
     if (add && sel.has(hit.id)) sel.delete(hit.id);
@@ -369,6 +401,12 @@ export class Controller {
     const hit = this.pick(wx, wy, (e) => e.team === this.team);
     const last = this.lastClick;
     this.lastClick = { t: now, x: wx, y: wy };
+    // Eigenes besetztes Haus: Besatzer wählen, außer gewählte Soldaten können noch hinein (dann besetzen sie es mit)
+    const ownHouse = hit ? null : this.pickHouse(wx, wy, (h) => h.team === this.team);
+    if (ownHouse && !this.selectedUnits().some((u) => canGarrison(u) && u.house !== ownHouse.id)) {
+      this.selectHouse(ownHouse, shift);
+      return;
+    }
     // Standardaktion mit gewählten Einheiten: Tippen auf Boden = Gehen, auf sichtbaren Gegner = Angriff (ohne Angriff-Knopf)
     if (!shift && !hit && this.selectedUnits().length) {
       this.rightClick(wx, wy);
@@ -429,6 +467,21 @@ export class Controller {
       const done = this.orderOnOwnBuilding(own, units);
       rest = units.filter((u) => !done.has(u.id));
       if (!rest.length) return;
+    }
+    // Stadthaus: vom Gegner besetzt und sichtbar = angreifen; leer oder eigen = Soldaten besetzen es, die übrigen gehen hin
+    const house = this.pickHouse(wx, wy);
+    if (house && house.team >= 0 && house.team !== this.team) {
+      if (this.game.sees(this.team, house)) {
+        this.issue({ type: 'attack', ids: rest.map((u) => u.id), targetId: house.id });
+        return;
+      }
+    } else if (house) {
+      const inf = rest.filter((u) => canGarrison(u) && u.house !== house.id);
+      if (inf.length && this.issue({ type: 'garrison', ids: inf.map((u) => u.id), houseId: house.id }).ok) {
+        this.moveMarker(house.x, house.y);
+        rest = rest.filter((u) => !inf.includes(u));
+        if (!rest.length) return;
+      }
     }
     const ids = rest.map((u) => u.id);
     const target = this.pick(wx, wy, (e) => e.team !== this.team && this.game.sees(this.team, e));
@@ -588,11 +641,29 @@ export class Controller {
     }
   }
 
-  /** Einsteigen: gewählte Soldaten gehen zum angetippten eigenen Transportfahrzeug (Touch-Weg, sonst Rechtsklick). */
+  /** Einsteigen: gewählte Soldaten gehen zum angetippten eigenen Transportfahrzeug oder in ein Stadthaus (Touch-Weg, sonst Rechtsklick). */
   confirmBoard(wx, wy) {
     const veh = this.pick(wx, wy, (e) => e.kind === 'unit' && e.team === this.team && e.def.seats > 0);
     if (!veh) {
-      this.message('Kein Transportfahrzeug angetippt');
+      const house = this.pickHouse(wx, wy);
+      if (!house) {
+        this.message('Kein Transportfahrzeug oder Gebäude angetippt');
+        return;
+      }
+      if (!canEnter(house, this.team)) {
+        this.message('Gebäude ist vom Gegner besetzt');
+        return;
+      }
+      const inf = this.selectedUnits().filter(canGarrison);
+      if (!inf.length) {
+        this.message('Nur Infanterie besetzt Gebäude');
+        this.setMode('normal');
+        return;
+      }
+      if (this.issue({ type: 'garrison', ids: inf.map((u) => u.id), houseId: house.id }).ok) {
+        this.moveMarker(house.x, house.y);
+        this.setMode('normal');
+      }
       return;
     }
     const riders = this.selectedUnits().filter((u) => u !== veh && canSeat(veh, u));
@@ -689,7 +760,9 @@ export class Controller {
   /** Vorschau aktualisieren: Hover-Ziel, Platzierung, Mauerzug. Wird bei jeder Mausbewegung gerufen. */
   updatePointer(wx, wy) {
     this.pointer = { x: wx, y: wy };
-    const hover = this.pick(wx, wy, (e) => e.team === this.team || this.game.sees(this.team, e));
+    const hover =
+      this.pick(wx, wy, (e) => e.team === this.team || this.game.sees(this.team, e)) ||
+      this.pickHouse(wx, wy, (h) => h.team >= 0 && this.game.sees(this.team, h));
     this.view.hoverId = hover ? hover.id : 0;
     switch (this.view.mode) {
       case 'place':
@@ -851,7 +924,7 @@ export class Controller {
       case 'dropoff':
         return 'Absetzen: Zielpunkt anklicken · Esc bricht ab';
       case 'board':
-        return 'Einsteigen: eigenes Transportfahrzeug (LKW, Baufahrzeug, SPz, Hubschrauber) anklicken · Esc bricht ab';
+        return 'Einsteigen: eigenes Transportfahrzeug (LKW, Baufahrzeug, SPz, Hubschrauber) oder ein Haus der Stadt anklicken · Esc bricht ab';
       default:
         return '';
     }
@@ -937,7 +1010,7 @@ export class Controller {
     if (riders.length) {
       card.push(
         entry('Einsteigen', 'I', {
-          tip: 'Einsteigen (I): danach LKW, Baufahrzeug, Schützenpanzer oder Transporthubschrauber anklicken (oder Rechtsklick auf das Fahrzeug)',
+          tip: 'Einsteigen (I): danach LKW, Baufahrzeug, Schützenpanzer, Transporthubschrauber oder ein Haus der Stadt anklicken (oder Rechtsklick darauf)',
           action: () => this.setMode('board'),
         }),
       );
@@ -968,8 +1041,16 @@ export class Controller {
         );
       }
     }
+    const inside = units.filter((u) => u.house);
     const helis = units.filter((u) => u.def.seats > 0);
-    if (helis.length) {
+    if (inside.length) {
+      card.push(
+        entry('Raus', 'O', {
+          tip: 'Gebäude verlassen (O). Jeder Marschbefehl führt ebenfalls hinaus.',
+          action: () => this.issue({ type: 'ungarrison', ids: inside.map((u) => u.id) }),
+        }),
+      );
+    } else if (helis.length) {
       card.push(
         entry('Absetzen', 'O', {
           tip: 'Passagiere absetzen (O): Zielpunkt anklicken. Einsteigen: Infanterie wählen, Einsteigen (I) oder Rechtsklick auf das Fahrzeug.',

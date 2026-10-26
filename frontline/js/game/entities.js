@@ -41,6 +41,7 @@ export function createUnit(id, type, team, x, y) {
     cargo: { bm: def.bmCap ?? 0, mun: 0, fuel: 0 }, // Soldaten starten mit vollem Baumaterial (bmCap)
     preset: 'mix', // LKW-Ladungsart: 'mix' | 'bm' | 'mun' | 'fuel'
     passengers: [], // Hubschrauber: eingestiegene Einheiten (alive = false, solange sie an Bord sind)
+    house: 0, // ID des besetzten Stadthauses (garrison.js; Häuser haben negative IDs), 0 = draußen
   };
   // `ammo` = Munitionswert (Lagereinheiten) der vorhandenen Schüsse; Zuweisen füllt alle Waffen im gleichen Verhältnis
   Object.defineProperty(u, 'ammo', {
@@ -151,6 +152,15 @@ export function createShell(id, team, sx, sy, tx, ty, def) {
     splash: def.splash,
     alive: true,
   };
+}
+
+/** Gegner von `team`? Leere Stadthäuser (team −1) sind niemandes Gegner. */
+export const isFoe = (team, e) => !!e && e.team >= 0 && e.team !== team;
+
+/** Lebendes Ziel hinter einer ID: wer in einem Haus sitzt, wird über das Haus getroffen. */
+export function resolveTarget(game, id) {
+  const t = game.getEntity(id);
+  return t && t.house ? game.getEntity(t.house) : t;
 }
 
 /** Radius einer Entity für Reichweiten- und Trennungsprüfungen. */

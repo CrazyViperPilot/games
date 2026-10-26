@@ -24,8 +24,9 @@ import {
   drawRock,
   unitLift,
   buildingHeight,
+  TOWN_H,
 } from './iso.js';
-import { drawTownBuilding, drawTeamBuilding, drawCar, drawBench } from './isobuild.js';
+import { drawTownBuilding, drawTeamBuilding, drawCar, drawBench, drawRubble } from './isobuild.js';
 import { parkDeco } from './terrain.js';
 import { drawTreeSprite, drawUnitSprite, setTeamBuildings } from './isosprites.js';
 import { reliefOf } from '../game/relief.js';
@@ -88,6 +89,7 @@ export class Renderer {
     this.fogBytes = null; // Nebel je Zelle (0 frei … 255 schwarz) für den WebGL-Nebel
     this.deco = null; // Bäume und Felsen der Hindernisse (isometrisch)
     this.fogLayer = makeFogLayer(game.fog[team]);
+    this.rubble = new Map(); // Trümmer je eingestürztem Haus (2D), einmal erzeugt
     this.dpr = 1;
     this.cssW = 0;
     this.cssH = 0;
@@ -149,6 +151,7 @@ export class Renderer {
     ctx.imageSmoothingEnabled = true;
 
     this.drawTerrain(ctx, R);
+    this.drawRuins(ctx, R, known);
     this.drawZone(ctx, z);
     this.drawHot(ctx, z, now);
 
@@ -163,11 +166,8 @@ export class Renderer {
       if (!b.built && b.team === team) this.drawSiteMarks(ctx, b, z);
     }
 
-    // Auswahl und Hover (unter den Einheiten)
-    for (const id of sel) {
-      const e = g.getEntity(id);
-      if (e && shown(e)) this.drawSelectRing(ctx, e, '#f2f5f2', z, false);
-    }
+    // Auswahl und Hover (unter den Einheiten); Besatzer eines Hauses: Rahmen ums Haus
+    for (const e of this.ringed(sel)) if (shown(e)) this.drawSelectRing(ctx, e, '#f2f5f2', z, false);
     if (hover && !sel.has(hover.id) && shown(hover)) this.drawSelectRing(ctx, hover, 'rgba(255,255,255,0.5)', z, true);
 
     // Sammelpunkte gewählter eigener Gebäude
@@ -179,7 +179,7 @@ export class Renderer {
     for (const air of [false, true]) {
       // Hubschrauber zuletzt: sie fliegen über allem
       for (const u of g.units) {
-        if (!u.alive || !!u.def.air !== air || !shown(u) || !inRect(u.x, u.y, 30)) continue;
+        if (!u.alive || u.house || !!u.def.air !== air || !shown(u) || !inRect(u.x, u.y, 30)) continue;
         let aim = null;
         if (u.targetId && u.def.range > 0) {
           const t = g.getEntity(u.targetId);
@@ -210,7 +210,7 @@ export class Renderer {
 
     // Lebensbalken: bei Auswahl, Hover oder Schaden
     for (const u of g.units) {
-      if (!u.alive || !shown(u) || !inRect(u.x, u.y, 30)) continue;
+      if (!u.alive || u.house || !shown(u) || !inRect(u.x, u.y, 30)) continue;
       if (!(sel.has(u.id) || hover === u || u.hp < u.maxHp)) continue;
       const bw = 24;
       this.drawHp(ctx, u.x - bw / 2, u.y - u.def.radius - HP_OFFSET / z, bw, u.hp / u.maxHp, z);
@@ -224,14 +224,19 @@ export class Renderer {
 
     // Vorrat und Warnzeichen (nur eigene Einheiten: Vorrat des Gegners ist unbekannt)
     for (const u of g.units) {
-      if (!u.alive || u.team !== team || !inRect(u.x, u.y, 30)) continue;
+      if (!u.alive || u.house || u.team !== team || !inRect(u.x, u.y, 30)) continue;
       this.drawSupply(ctx, u, sel.has(u.id) || hover === u, z);
     }
 
     if (v.placement) this.drawPlacement(ctx, v.placement, z);
 
-    // Bildschirmkoordinaten: Auswahlrahmen, Hinweistext zur Platzierung
+    // Bildschirmkoordinaten: Besatzung der Häuser, Auswahlrahmen, Hinweistext zur Platzierung
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    for (const h of g.garrisoned ?? []) {
+      if (!inRect(h.x, h.y, 200) || !(h.team === team || reveal || g.sees(team, h))) continue;
+      const p = cam.worldToScreen(h.x, h.y - h.ph / 2);
+      this.drawGarrison(ctx, p.x, p.y - 12, h);
+    }
     if (v.dragBox) this.drawDragBox(ctx, v.dragBox);
     if (v.placement && !v.placement.ok && v.placement.reason && Number.isFinite(v.placement.x)) {
       this.drawNote(ctx, cam.worldToScreen(v.placement.x, v.placement.y), v.placement.reason);
@@ -390,9 +395,8 @@ export class Renderer {
     this.drawSelectedRadii(ctx, z, v);
     this.drawRoutes(ctx, sel, z);
     setIsoGround(ctx, cam, dpr);
-    for (const id of sel) {
-      const e = g.getEntity(id);
-      if (!e || !shown(e)) continue;
+    for (const e of this.ringed(sel)) {
+      if (!shown(e)) continue;
       if (relief) this.groundAt(ctx, e.x, e.y);
       this.drawSelectRing(ctx, e, '#f2f5f2', z, false);
     }
@@ -427,7 +431,7 @@ export class Renderer {
     }
     const air = [];
     for (const u of g.units) {
-      if (!u.alive || !shown(u) || !inRect(u.x, u.y, PAD)) continue;
+      if (!u.alive || u.house || !shown(u) || !inRect(u.x, u.y, PAD)) continue;
       if (u.def.air) air.push(u);
       else items.push({ k: cam.depth(u.x, u.y), t: 5, o: u });
     }
@@ -464,7 +468,11 @@ export class Renderer {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       // Jedes Objekt steht eben auf seiner Geländehöhe (Gebäude auf der tiefsten Ecke, damit nichts schwebt)
       if (relief) cam.pin(this.baseHeight(it));
-      if (it.t === 0) drawTownBuilding(ctx, cam, it.o);
+      if (it.t === 0) {
+        const hs = g.houseBySrc?.get(it.o);
+        if (hs && hs.ruined && known(hs.x, hs.y)) drawRubble(ctx, cam, it.o);
+        else drawTownBuilding(ctx, cam, it.o);
+      }
       else if (it.t === 1) {
         if (!drawTreeSprite(ctx, cam, it.o)) drawTree(ctx, cam, it.o);
       }
@@ -526,7 +534,7 @@ export class Renderer {
       setUprightAt(ctx, cam, dpr, p.x, p.y - lift * z, wx, wy);
     };
     for (const u of g.units) {
-      if (!u.alive || !shown(u) || !inRect(u.x, u.y, PAD)) continue;
+      if (!u.alive || u.house || !shown(u) || !inRect(u.x, u.y, PAD)) continue;
       if (!(sel.has(u.id) || hover === u || u.hp < u.maxHp)) continue;
       upright(u.x, u.y, unitLift(u));
       this.drawHp(ctx, u.x - 12, u.y - u.def.radius - HP_OFFSET / z, 24, u.hp / u.maxHp, z);
@@ -541,9 +549,17 @@ export class Renderer {
       this.drawHp(ctx, b.x - bw / 2, b.cy * TILE - 8 / z, bw, b.hp / b.maxHp, z);
     }
     for (const u of g.units) {
-      if (!u.alive || u.team !== team || !inRect(u.x, u.y, PAD)) continue;
+      if (!u.alive || u.house || u.team !== team || !inRect(u.x, u.y, PAD)) continue;
       upright(u.x, u.y, unitLift(u));
       this.drawSupply(ctx, u, sel.has(u.id) || hover === u, z);
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    for (const h of g.garrisoned ?? []) {
+      if (!inRect(h.x, h.y, PAD) || !(h.team === team || reveal || g.sees(team, h))) continue;
+      if (relief) cam.pin(this.baseHeight({ t: 0, o: h.src }));
+      const p = cam.worldToScreen(h.x, h.y);
+      cam.unpin();
+      this.drawGarrison(ctx, p.x, p.y - ((TOWN_H[h.type] || 40) + 20) * z, h);
     }
 
     if (v.placement) {
@@ -727,6 +743,78 @@ export class Renderer {
     ctx.restore();
   }
 
+  /** Entities für Auswahlrahmen: Besatzer eines Hauses werden zum Haus (je Haus einmal). */
+  ringed(sel) {
+    const g = this.game;
+    const out = new Set();
+    for (const id of sel) {
+      const e = g.getEntity(id);
+      if (e) out.add(e.house ? (g.getEntity(e.house) ?? e) : e);
+    }
+    return out;
+  }
+
+  /** 2D: Ruinen eingestürzter Stadthäuser über dem Bodenbild (das die Häuser fest enthält): Schutt und Brocken. */
+  drawRuins(ctx, R, known) {
+    for (const h of this.game.houses ?? []) {
+      if (!h.ruined || !known(h.x, h.y)) continue;
+      const x0 = h.x - h.pw / 2;
+      const y0 = h.y - h.ph / 2;
+      if (x0 > R.x1 || y0 > R.y1 || x0 + h.pw < R.x0 || y0 + h.ph < R.y0) continue;
+      let bits = this.rubble.get(h.id);
+      if (!bits) {
+        const rng = makeRng(((h.x * 73856093) ^ (h.y * 19349663)) >>> 0);
+        const cols = ['#8d877c', '#79736a', '#9a9387', '#5f5a53'];
+        bits = [];
+        const n = Math.max(8, Math.min(40, Math.round((h.pw * h.ph) / 400)));
+        for (let i = 0; i < n; i++) {
+          const s = 4 + rng.next() * 11;
+          bits.push({ x: x0 + 3 + rng.next() * (h.pw - 6 - s), y: y0 + 3 + rng.next() * (h.ph - 6 - s), w: s, h: s * (0.5 + rng.next()), c: cols[i % cols.length] });
+        }
+        this.rubble.set(h.id, bits);
+      }
+      ctx.fillStyle = '#6f6a62';
+      ctx.fillRect(x0, y0, h.pw, h.ph);
+      for (const b of bits) {
+        ctx.fillStyle = b.c;
+        ctx.fillRect(b.x, b.y, b.w, b.h);
+      }
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x0, y0, h.pw, h.ph);
+    }
+  }
+
+  /** Besatzung eines Hauses (Bildschirmkoordinaten, Transformation auf DPR): Schild in Teamfarbe „n/Plätze“, darunter der Zustand. */
+  drawGarrison(ctx, x, y, h) {
+    const text = `${h.occupants.length}/${h.def.cap}`;
+    ctx.save();
+    ctx.font = '700 11px system-ui, sans-serif';
+    const w = ctx.measureText(text).width + 22;
+    const bh = 16;
+    const x0 = x - w / 2;
+    const y0 = y - bh / 2;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x0, y0, w, bh, 4);
+    else ctx.rect(x0, y0, w, bh);
+    ctx.fillStyle = this.game.teams[h.team]?.color ?? '#888';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    // kleines Soldaten-Zeichen: Helm und Schultern
+    ctx.fillStyle = '#f4f6f2';
+    ctx.beginPath();
+    ctx.arc(x0 + 8, y0 + 6.5, 3, Math.PI, 0);
+    ctx.fill();
+    ctx.fillRect(x0 + 4.5, y0 + 8.5, 7, 4);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, x0 + 15, y + 0.5);
+    if (h.hp < h.maxHp) drawBar(ctx, x0, y0 + bh + 2, w, 3, h.hp / h.maxHp, hpColor(h.hp / h.maxHp));
+    ctx.restore();
+  }
+
   drawSelectRing(ctx, e, color, z, dashed) {
     ctx.save();
     ctx.strokeStyle = color;
@@ -736,6 +824,8 @@ export class Renderer {
       ctx.beginPath();
       ctx.arc(e.x, e.y, e.def.radius + 4, 0, Math.PI * 2);
       ctx.stroke();
+    } else if (e.kind === 'house') {
+      ctx.strokeRect(e.x - e.pw / 2 - 3, e.y - e.ph / 2 - 3, e.pw + 6, e.ph + 6);
     } else {
       const half = (Math.max(e.w, e.h) * TILE) / 2 + 3;
       ctx.strokeRect(e.x - half, e.y - half, half * 2, half * 2);

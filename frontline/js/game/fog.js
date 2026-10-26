@@ -15,9 +15,9 @@ export function sightAt(relief, x, y, sight) {
   return sight * (1 + Math.min(SH.max, Math.max(0, (h - SH.base) / SH.per)));
 }
 
-/** Augenhöhe einer Entity über dem Boden. */
+/** Augenhöhe einer Entity über dem Boden (Besatzer eines Stadthauses schauen aus dem Fenster wie ein Gebäude). */
 function eyeOf(e) {
-  if (e.kind === 'building') return SH.eye.bld;
+  if (e.kind === 'building' || e.house) return SH.eye.bld;
   return e.def.armor === 'inf' ? SH.eye.inf : SH.eye.veh;
 }
 
@@ -116,7 +116,7 @@ export class Fog {
       return;
     }
     const r = sightAt(relief, e.x, e.y, sight);
-    const key = `${Math.round(e.x / 8)},${Math.round(e.y / 8)},${Math.round(r)}`;
+    const key = `${Math.round(e.x / 8)},${Math.round(e.y / 8)},${Math.round(r)},${e.house ? 1 : 0}`;
     let cells = e.fogKey === key && e.fogRelief === relief.version ? e.fogCells : null;
     if (!cells) {
       cells = this.losCells(relief, e.x, e.y, eyeOf(e), r);
@@ -135,7 +135,9 @@ export class Fog {
     this.visible.fill(0);
     const relief = game.relief ?? null;
     for (const u of game.units) {
-      if (u.alive && u.team === team && u.def.sight > 0) this.markEntity(relief, u, u.def.sight);
+      if (!u.alive || u.team !== team || !(u.def.sight > 0)) continue;
+      // aus einem Haus: Sichtweite ab der Hauswand
+      this.markEntity(relief, u, u.def.sight + (u.house ? (game.entities.get(u.house)?.reach ?? 0) : 0));
     }
     for (const b of game.buildings) {
       if (!b.alive || b.team !== team) continue;

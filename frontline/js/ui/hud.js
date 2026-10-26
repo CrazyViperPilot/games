@@ -265,6 +265,7 @@ export class Hud {
     let h =
       `<div class="title">${esc(u.def.name)}</div>${bar(f, 'hp', hpColor(f))}` +
       `<div class="muted small">${Math.ceil(u.hp)} / ${u.maxHp} HP · ${esc(orderText(this.game, u))}</div>`;
+    if (u.house) h += this.houseInfo(u);
     if (this.game.relief && !u.def.air) h += this.heightInfo(u);
     if (u.weapons.length) {
       for (const w of u.weapons) h += gauge(w.spec.name, Math.floor(w.rounds), w.spec.rounds, COLOR.mun);
@@ -293,10 +294,22 @@ export class Hud {
     return h;
   }
 
+  /** Besatzer eines Stadthauses: Haus, Plätze, Zustand. */
+  houseInfo(u) {
+    const h = this.game.getEntity(u.house);
+    if (!h) return '';
+    const f = h.hp / h.maxHp;
+    return (
+      `<div class="muted small">Im Gebäude: ${esc(h.def.name)} · ${h.occupants.length} / ${h.def.cap} Plätze · Zustand ${Math.ceil(f * 100)} %</div>` +
+      bar(f, 'hp', hpColor(f)) +
+      '<div class="muted small">Geschützt, schießt ab der Hauswand · O = aussteigen</div>'
+    );
+  }
+
   /** Standhöhe; zeigt der Zeiger auf einen sichtbaren Gegner, auch den Höhenvorteil gegen ihn. */
   heightInfo(u) {
     const g = this.game;
-    let line = `Standhöhe ${Math.round(g.groundHeight(u))}`;
+    let line = `Standhöhe ${Math.round(g.groundHeight(u) + (u.house ? BALANCE.garrison.floor : 0))}`;
     const t = g.getEntity(this.controller.view.hoverId);
     if (t && t.team !== u.team && u.weapons.length && g.sees(u.team, t)) {
       const m = heightMult(g, u, t);
@@ -404,8 +417,10 @@ export class Hud {
     const noAmmo = units.filter((u) => lacksAmmo(u)).length;
     const noFuel = units.filter((u) => u.def.fuelMax && u.fuel <= 0).length;
     const warn = [noAmmo ? `${noAmmo} ohne Munition` : '', noFuel ? `${noFuel} ohne Treibstoff` : ''].filter(Boolean);
+    const inside = units.filter((u) => u.house).length;
     return (
       `<div class="title">${title}</div><div class="chips">${chips}</div>` +
+      (inside ? `<div class="muted small">${inside} im Gebäude · O = aussteigen</div>` : '') +
       (warn.length ? `<div class="warn small">${esc(warn.join(' · '))}</div>` : '')
     );
   }

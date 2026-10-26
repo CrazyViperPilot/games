@@ -50,6 +50,9 @@ const SUPPLY_BEHIND = 150; // Versorger steht so weit hinter dem Schwerpunkt der
 const SUPPLY_MIN = 0.25; // Versorger lädt nach, wenn die Ladung unter diesem Anteil liegt
 const SURPLUS_MIN = 120; // Pendler fährt nur, wenn die Quelle so viel Überschuss hat
 const ROUTE_HOLD = 20; // s, früheste Neuplanung einer Pendler-Route
+const GARRISON_SHARE = 0.4; // Anteil der Infanterie in der Zone, der Stadthäuser besetzt (Häuserkampf)
+const GARRISON_RANGE = 500; // ein Soldat geht nur in ein Haus in diesem Umkreis
+const GARRISON_EVERY = 8; // s zwischen zwei Besetzungsrunden
 const DEG = Math.PI / 180;
 const SITE_ANGLES = [0, 30, -30, 60, -60, 90, -90, 120, -120, 150, -150, 180].map((d) => d * DEG);
 const TWO_PI = Math.PI * 2;
@@ -124,6 +127,7 @@ export class AI {
     this.manageEngineers(s);
     this.manageTrucks(s);
     this.rally(s);
+    this.garrisonZone(s);
     this.army(s);
   }
 
@@ -310,7 +314,7 @@ export class AI {
       const cx = near.reduce((a, e) => a + e.x, 0) / near.length;
       const cy = near.reduce((a, e) => a + e.y, 0) / near.length;
       const ids = s.combat
-        .filter((u) => dist(u.x, u.y, cx, cy) <= THREAT_RANGE)
+        .filter((u) => !u.house && dist(u.x, u.y, cx, cy) <= THREAT_RANGE) // Besatzer halten ihr Haus
         .filter((u) => !(u.order.type === 'attackMove' && dist(u.order.x, u.order.y, cx, cy) < 120))
         .filter((u) => u.order.type !== 'attack')
         .map((u) => u.id);
@@ -1034,6 +1038,47 @@ export class AI {
     return go.slice(0, go.length - raiders.length);
   }
 
+  /**
+   * Häuserkampf: Ein Teil der freien Infanterie in der Zone (GARRISON_SHARE) besetzt Stadthäuser in der Nähe. Dort ist sie geschützt,
+   * steht höher und schießt ab der Hauswand; nur schwere Waffen vertreiben sie. Je Haus höchstens so viele, wie Plätze frei sind.
+   */
+  garrisonZone(s) {
+    const g = this.game;
+    if (!g.houses || !g.houses.length || !this.once('garrison', GARRISON_EVERY)) return;
+    const z = s.zone;
+    const t = this.team;
+    const inZone = (e) => dist(e.x, e.y, z.x, z.y) <= z.r;
+    const inf = s.units.filter((u) => u.def.armor === 'inf' && u.def.range > 0 && inZone(u));
+    const pending = new Map(); // Haus-ID → Soldaten auf dem Weg hinein
+    let housed = 0;
+    for (const u of inf) {
+      if (u.house) housed++;
+      else if (u.order.type === 'garrison') {
+        housed++;
+        pending.set(u.order.targetId, (pending.get(u.order.targetId) || 0) + 1);
+      }
+    }
+    let want = Math.floor(inf.length * GARRISON_SHARE) - housed;
+    if (want <= 0) return;
+    const houses = g.houses.filter((h) => h.alive && (h.team < 0 || h.team === t) && inZone(h));
+    const raiding = this.raid ? this.raid.ids : null;
+    for (const u of inf) {
+      if (want <= 0) break;
+      if (u.house || u.order.type !== 'idle' || this.dryKind(u) || (raiding && raiding.has(u.id))) continue;
+      let best = null;
+      let bd = GARRISON_RANGE;
+      for (const h of houses) {
+        const d = dist(h.x, h.y, u.x, u.y);
+        if (d >= bd || h.occupants.length + (pending.get(h.id) || 0) >= h.def.cap) continue;
+        best = h;
+        bd = d;
+      }
+      if (!best || !g.issue(t, { type: 'garrison', ids: [u.id], houseId: best.id }).ok) continue;
+      pending.set(best.id, (pending.get(best.id) || 0) + 1);
+      want--;
+    }
+  }
+
   army(s) {
     const g = this.game;
     const t = this.team;
@@ -1093,18 +1138,18 @@ export class AI {
       // Gegner in der Zone, eigene Einheit ohne Feindkontakt: auf die Gegner zu, sonst stehen beide Seiten
       // außer Sichtweite und das Gefecht kommt nie zustande.
       const lone = idle
-        .filter((u) => inZone(u) && !inside.some((e) => dist(e.x, e.y, u.x, u.y) < 300))
+        .filter((u) => inZone(u) && !u.house && !inside.some((e) => dist(e.x, e.y, u.x, u.y) < 300))
         .map((u) => u.id);
       if (lone.length) g.issue(t, { type: 'attackMove', ids: lone, x: tx, y: ty });
       return;
     }
 
-    // Zone ist gegnerfrei: ein Teil der Besatzung überfällt eine gemerkte gegnerische FOB abseits der Zone.
-    const garrison = idle.filter(inZone);
+    // Zone ist gegnerfrei: ein Teil der Besatzung überfällt eine gemerkte gegnerische FOB abseits der Zone (wer in einem Haus sitzt, bleibt).
+    const garrison = idle.filter((u) => inZone(u) && !u.house);
     const left = this.startRaid(s, garrison);
     if (left.length < garrison.length) return;
 
-    const clumped = idle.filter((u) => dist(u.x, u.y, z.x, z.y) < 200);
+    const clumped = idle.filter((u) => !u.house && dist(u.x, u.y, z.x, z.y) < 200);
     if (clumped.length >= 2) {
       const groups = 4;
       const base = this.rng.next() * TWO_PI;

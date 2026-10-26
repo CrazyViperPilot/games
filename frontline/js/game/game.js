@@ -7,15 +7,16 @@ import { generateMap } from './map.js';
 import { blockers } from './mapdata.js';
 import { Grid } from './grid.js';
 import { reliefOf } from './relief.js';
-import { createUnit, createBuilding } from './entities.js';
+import { createUnit, createBuilding, isFoe, inRange } from './entities.js';
 import { Fog } from './fog.js';
 import { updateEconomy, smoothIncome } from './economy.js';
-import { updateMovement, nearestPassable, planPath, setIdle, separate } from './movement.js';
+import { updateMovement, nearestPassable, planPath, setIdle, separate, exitHouse } from './movement.js';
 import { updateCombat } from './combat.js';
 import { updateZone } from './zone.js';
 import { createHot, updateHot, cmdDrill } from './hotzone.js';
 import { updateLogistics, cmdLoad, cmdUnload, cmdRoute, cmdSetPreset, cmdBoard, cmdDropoff, cargoSum } from './logistics.js';
 import { updateConstruction, canBuild, cmdRepair, orderBuild, orderBuildSeq } from './construction.js';
+import { createHouses, updateGarrison, cmdGarrison, cmdUngarrison, dropOccupant } from './garrison.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
@@ -184,6 +185,7 @@ export class Game {
         this.spawnUnit(type, t, p.x, p.y);
       });
     }
+    createHouses(this); // Stadthäuser zum Besetzen (Häuserkampf)
     this.updateFog();
   }
 
@@ -241,6 +243,7 @@ export class Game {
    */
   sees(team, e) {
     if (e.team === team) return true;
+    if (e.kind === 'house') return e.occupants.some((o) => this.sees(team, o)); // besetztes Haus: wenn ein Besatzer erkannt ist
     if (!this.fog[team].isVisible(e.x, e.y)) return false;
     if (!e.def.stealth || e.kind !== 'unit') return true;
     if (this.time < (e.revealedUntil || 0)) return true;
@@ -552,6 +555,10 @@ export class Game {
         return this.cmdMortarTarget(team, cmd);
       case 'board':
         return cmdBoard(this, team, cmd);
+      case 'garrison':
+        return cmdGarrison(this, team, cmd);
+      case 'ungarrison':
+        return cmdUngarrison(this, team, cmd);
       case 'dropoff':
         return cmdDropoff(this, team, cmd);
       case 'drill':
@@ -649,10 +656,14 @@ export class Game {
 
   cmdAttack(team, cmd) {
     const t = this.getEntity(cmd.targetId);
-    if (!t || t.team === team) return fail('Ziel ungültig');
+    if (!isFoe(team, t)) return fail('Ziel ungültig');
     const units = this.ownUnits(team, cmd.ids).filter((u) => u.def.range > 0);
     if (!units.length) return fail('Keine bewaffnete Einheit gewählt');
+    const aim = t.house ? this.getEntity(t.house) : t;
     for (const u of units) {
+      // Besatzer bleiben im Haus, solange das Ziel aus den Fenstern erreichbar ist; sonst gehen sie hinaus und verfolgen es
+      const h = u.house ? this.getEntity(u.house) : null;
+      if (u.house && !(h && aim && inRange(u, aim, u.def.range + h.reach))) exitHouse(this, u, t.x, t.y);
       u.order = { type: 'attack', x: t.x, y: t.y, targetId: t.id };
       u.targetId = t.id;
       u.path = [];
@@ -927,7 +938,10 @@ export class Game {
     for (const u of units) {
       if (u.hp <= 0) u.alive = false;
       if (u.alive) units[k++] = u;
-      else this.entities.delete(u.id);
+      else {
+        this.entities.delete(u.id);
+        if (u.house) dropOccupant(this, u);
+      }
     }
     units.length = k;
 
@@ -958,6 +972,7 @@ export class Game {
     this.time += dt;
     // Reihenfolge: Wirtschaft setzt team.rate zurück; Bewegung, Logistik und Bau fahren; Kampf, Zone, Einkommen zuletzt
     updateEconomy(this, dt);
+    updateGarrison(this, dt);
     updateMovement(this, dt);
     updateLogistics(this, dt);
     updateConstruction(this, dt);

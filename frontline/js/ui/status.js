@@ -10,7 +10,7 @@ import { footDist } from '../game/movement.js';
 export function builderState(game, b) {
   let state = 'none';
   for (const u of game.units) {
-    if (!u.alive || !canBuild(u.def, b.type)) continue;
+    if (!u.alive || u.house || !canBuild(u.def, b.type)) continue;
     if (u.order.type === 'build' && u.order.targetId === b.id) {
       if (footDist(u.x, u.y, b) <= BALANCE.construction.helperRange) return 'near';
       state = 'assigned';
@@ -36,13 +36,18 @@ export function orderText(game, u) {
   const o = u.order;
   switch (o.type) {
     case 'idle':
+      if (u.house) return 'Im Gebäude';
       return u.def.builder ? 'Bereit (hilft bei Baustellen)' : 'Bereit';
     case 'move':
       return 'Bewegung';
     case 'attackMove':
       return 'Angriffsbewegung';
     case 'attack':
-      return 'Angriff';
+      return u.house ? 'Angriff aus dem Gebäude' : 'Angriff';
+    case 'garrison': {
+      const h = game.getEntity(o.targetId);
+      return h ? `Unterwegs ins Gebäude (${h.def.name})` : 'Bereit';
+    }
     case 'build': {
       const s = game.getEntity(o.targetId);
       return s ? `Baut ${s.type === 'fob' ? fobLabel(game, s) : s.def.name}` : 'Baustelle fertig';

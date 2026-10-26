@@ -1,13 +1,15 @@
 // Kampf: Zielsuche, Direktfeuer, Mörser und Granaten, Flugabwehr, Schaden (PLAN.md §5, §11.2). Kein DOM.
 import { BALANCE } from '../data/balance.js';
-import { createShell, inRange, radiusOf } from './entities.js';
+import { createShell, inRange, radiusOf, isFoe, resolveTarget } from './entities.js';
 import { buildHash, nearby } from './movement.js';
+import { damageHouse } from './garrison.js';
 
 const SCAN = BALANCE.scanInterval;
 const MAX_UNIT_RADIUS = 16; // größter Einheitenradius (Trefferkreis-Suche)
 const BASE_WARN_INTERVAL = 20; // s zwischen zwei Meldungen „Basis wird angegriffen“
 // Aufträge, bei denen nicht automatisch geschossen wird (Marsch, Bau, Reparatur, Logistik)
 const NO_FIRE = new Set(['move', 'build', 'repair', 'load', 'unload', 'route']);
+const GAR = BALANCE.garrison;
 
 /** Waffenwerte eines Gebäudes; null, wenn unbewaffnet. (Einheiten haben mehrere Waffen: u.weapons.) */
 export function weaponOf(e) {
@@ -15,6 +17,12 @@ export function weaponOf(e) {
 }
 
 const dmgKey = (e) => (e.kind === 'building' ? 'struct' : e.def.armor);
+
+/** Reichweite aus einem Stadthaus zählt ab der Hauswand (die Besatzer schießen aus den Fenstern). */
+const reachBonus = (game, u) => (u.house ? (game.entities.get(u.house)?.reach ?? 0) : 0);
+
+/** Schadensfaktor gegen Stadthäuser: schwere Waffen (Kanone, RPG, Granaten, Mörser) mehr, Handwaffen weniger. */
+export const houseMult = (damage) => ((damage.struct || 0) >= GAR.heavy ? GAR.heavyMult : GAR.lightMult);
 
 /** Seite, auf der der Schütze das Ziel trifft: 'front' (±45° zur Fahrtrichtung), 'rear' (±45° hinten), sonst 'side'. */
 export function sectorOf(s, t) {
@@ -29,6 +37,7 @@ export function sectorOf(s, t) {
  * mult (z. B. Höhenvorteil): Schaden × mult, bei Trefferzahlen gerundet n / mult Treffer (mindestens 1).
  */
 export function shotDamage(spec, s, t, mult = 1) {
+  if (t.kind === 'house') return (spec.damage.struct || 0) * mult * houseMult(spec.damage);
   const table = spec.hits;
   const entry = table && t.kind === 'unit' ? (table[t.type] ?? table[t.def.armor]) : undefined;
   if (entry === undefined) return (spec.damage[dmgKey(t)] || 0) * mult;
@@ -37,10 +46,10 @@ export function shotDamage(spec, s, t, mult = 1) {
   return (t.def.hp / k) * 1.001;
 }
 
-/** Schusshöhe: Gelände unter dem Schützen bzw. Ziel; Hubschrauber zählen nicht (null). */
+/** Schusshöhe: Gelände unter dem Schützen bzw. Ziel, Besatzer eines Hauses ein Stockwerk höher; Hubschrauber zählen nicht (null). */
 function standHeight(game, e) {
   if (e.kind === 'unit' && e.def.air) return null;
-  return game.groundHeight(e);
+  return game.groundHeight(e) + (e.house ? GAR.floor : 0);
 }
 
 /**
@@ -87,9 +96,13 @@ function warnBase(game, target) {
   game.message(target.team, 'Basis wird angegriffen', target.x, target.y);
 }
 
-/** Fügt Schaden zu, setzt lastHitTime und markiert Tote. */
+/** Fügt Schaden zu, setzt lastHitTime und markiert Tote. Stadthäuser: garrison.damageHouse. */
 export function hit(game, target, amount) {
   if (!target.alive || !(amount > 0)) return;
+  if (target.kind === 'house') {
+    damageHouse(game, target, amount);
+    return;
+  }
   target.hp -= amount;
   target.lastHitTime = game.time;
   if (target.hp <= 0) {
@@ -100,8 +113,8 @@ export function hit(game, target, amount) {
 }
 
 /**
- * Zielsuche für einen Schützen: zuerst Einheiten (nächste sichtbare), sonst Gebäude (ohne Mauern/Tore).
- * Idle-Einheiten suchen nur innerhalb der Leine um ihren Ankerpunkt.
+ * Zielsuche für einen Schützen: zuerst Einheiten (nächste sichtbare, Besatzer zählen nicht), dann vom Gegner besetzte Häuser,
+ * sonst Gebäude (ohne Mauern/Tore). Idle-Einheiten suchen nur innerhalb der Leine um ihren Ankerpunkt.
  */
 function findTarget(game, hash, s, radius, minRange, allowBuildings, dmg) {
   const team = s.team;
@@ -109,7 +122,7 @@ function findTarget(game, hash, s, radius, minRange, allowBuildings, dmg) {
   let best = null;
   let bestD = Infinity;
   const consider = (e) => {
-    if (!e.alive || e.team === team) return;
+    if (!e.alive || !isFoe(team, e) || e.house) return;
     if (!(dmg[dmgKey(e)] > 0)) return; // z. B. Mörser und Panzer können keine Hubschrauber treffen
     if (leashed && Math.hypot(e.x - s.anchorX, e.y - s.anchorY) > Math.max(BALANCE.leash, radius) + radiusOf(e)) return;
     const d = Math.hypot(e.x - s.x, e.y - s.y);
@@ -121,6 +134,8 @@ function findTarget(game, hash, s, radius, minRange, allowBuildings, dmg) {
     }
   };
   for (const e of nearby(hash, s.x, s.y, radius + MAX_UNIT_RADIUS)) consider(e);
+  if (best) return best;
+  for (const h of game.garrisoned) consider(h);
   if (best || !allowBuildings) return best;
   for (const b of game.buildings) {
     if (b.def.blocksAll || b.def.gate) continue;
@@ -149,12 +164,13 @@ function fireDirect(game, s, t, w) {
  */
 function tryFireUnit(game, u, t) {
   const key = dmgKey(t);
+  const bonus = reachBonus(game, u);
   let pick = null;
   let pickScore = -1;
   let dry = false;
   for (const w of u.weapons) {
     const dmg = w.spec.damage[key] || 0;
-    if (!(dmg > 0) || !inRange(u, t, w.spec.range) || w.cd > 0) continue;
+    if (!(dmg > 0) || !inRange(u, t, w.spec.range + bonus) || w.cd > 0) continue;
     if (w.rounds < 1) {
       dry = true;
       continue;
@@ -242,14 +258,19 @@ function interceptShells(game) {
   }
 }
 
-/** Einschlag: Flächenschaden mit linearem Abfall über `splash` an alle gegnerischen Entities. */
+/** Einschlag: Flächenschaden mit linearem Abfall über `splash` an alle gegnerischen Entities (Besatzer schützt ihr Haus). */
 function impact(game, p) {
   p.alive = false;
   game.addEffect('explosion', p.tx, p.ty, p.team);
   const R = p.splash || 1;
+  for (const h of game.garrisoned) {
+    if (!h.alive || !isFoe(p.team, h)) continue;
+    const d = Math.hypot(Math.max(0, Math.abs(h.x - p.tx) - h.pw / 2), Math.max(0, Math.abs(h.y - p.ty) - h.ph / 2));
+    if (d < R) hit(game, h, (p.damage.struct || 0) * houseMult(p.damage) * (1 - d / R));
+  }
   for (const list of [game.units, game.buildings]) {
     for (const e of list) {
-      if (!e.alive || e.team === p.team) continue;
+      if (!e.alive || e.team === p.team || e.house) continue;
       const d = Math.max(0, Math.hypot(e.x - p.tx, e.y - p.ty) - radiusOf(e));
       if (d >= R) continue;
       const dmg = (p.damage[dmgKey(e)] || 0) * (1 - d / R);
@@ -295,19 +316,19 @@ export function updateCombat(game, dt) {
     const o = u.order.type;
     if (NO_FIRE.has(o)) continue;
     if (o === 'attack') {
-      const t = game.getEntity(u.order.targetId);
-      if (t && t.team !== u.team) tryFireUnit(game, u, t);
+      const t = resolveTarget(game, u.order.targetId);
+      if (isFoe(u.team, t)) tryFireUnit(game, u, t);
       continue;
     }
     // idle / attackMove: automatische Zielsuche
     if (u.scanTimer <= 0) {
       u.scanTimer = SCAN;
-      const t = findTarget(game, hash, u, u.def.sight, 0, true, u.def.damage);
+      const t = findTarget(game, hash, u, u.def.sight + reachBonus(game, u), 0, true, u.def.damage);
       u.targetId = t ? t.id : null;
     }
     if (u.targetId !== null) {
-      const t = game.getEntity(u.targetId);
-      if (t) tryFireUnit(game, u, t);
+      const t = resolveTarget(game, u.targetId);
+      if (isFoe(u.team, t)) tryFireUnit(game, u, t);
     }
   }
 
@@ -325,8 +346,8 @@ export function updateCombat(game, dt) {
       b.targetId = t ? t.id : null;
     }
     if (b.targetId !== null) {
-      const t = game.getEntity(b.targetId);
-      if (t) tryFire(game, b, t, w);
+      const t = resolveTarget(game, b.targetId);
+      if (isFoe(b.team, t)) tryFire(game, b, t, w);
     }
   }
 

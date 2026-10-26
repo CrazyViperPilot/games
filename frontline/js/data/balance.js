@@ -68,6 +68,25 @@ export const BALANCE = {
   sightHeight: { base: 40, per: 350, max: 0.4, eye: { inf: 16, veh: 20, bld: 30 }, target: 12, near: 72 },
   // Tempo am Hang: Faktor = 1 − Steigung × up (bergab: 1 + Gefälle × down), begrenzt auf min … max; Fahrzeuge spüren es stärker
   slope: { upVeh: 1.5, upInf: 0.8, downVeh: 0.6, downInf: 0.3, min: 0.55, max: 1.2, pathCost: 1.2 },
+  // Häuserkampf (§7): Infanterie besetzt Stadthäuser (cap Plätze, hp hält das Haus aus), schießt von dort mit Reichweite ab Hauswand
+  // und steht `floor` px höher (Höhenvorteil). Schwere Waffen (Schaden gegen Gebäude ab `heavy`: Kanone, RPG, Granaten, Mörser)
+  // treffen Häuser × heavyMult, Handwaffen nur × lightMult. Stürzt ein Haus ein, fallen die Besatzer mit ejectDamage (Anteil der
+  // vollen HP) Schaden heraus. minSize: kleinere Gebäude (Mauern) sind keine Häuser; enterReach: Abstand zur Wand beim Betreten.
+  garrison: {
+    kinds: {
+      house: { cap: 4, hp: 700, name: 'Wohnhaus' },
+      hall: { cap: 8, hp: 1200, name: 'Halle' },
+      factory: { cap: 10, hp: 1800, name: 'Fabrik' },
+      station: { cap: 8, hp: 1200, name: 'Bahnhof' },
+    },
+    minSize: 40,
+    floor: 24,
+    ejectDamage: 0.35,
+    enterReach: 56,
+    heavy: 25,
+    heavyMult: 1.5,
+    lightMult: 0.5,
+  },
   // Tarnung (Scharfschütze): Gegner sehen die Einheit nur nahe an eigenen Einheiten/Gebäuden oder kurz nach einem Schuss
   stealth: { detectRange: 160, revealTime: 4 },
   resNames: { money: 'Geld', bm: 'Baumaterial', mun: 'Munition', fuel: 'Treibstoff' },

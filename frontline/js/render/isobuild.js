@@ -663,3 +663,44 @@ export function drawTeamBuilding(ctx, cam, b, color) {
 const LABEL = { extractor: 'FÖR', mortar: 'MÖR', aa: 'FLA', drill: 'BOHR' };
 
 export { hexA };
+
+/**
+ * Ruine eines eingestürzten Stadthauses (Häuserkampf): Schuttfläche, ein Mauerrest in der Farbe des Hauses und Trümmerbrocken,
+ * nach Tiefe sortiert. Zufall fest aus der Lage, damit die Ruine bei jedem Bild gleich aussieht.
+ */
+export function drawRubble(ctx, cam, b) {
+  const hw = b.w / 2;
+  const hh = b.h / 2;
+  const x0 = b.x - hw;
+  const y0 = b.y - hh;
+  const seed0 = hash(b.x, b.y);
+  let seed = seed0 || 1;
+  const rnd = () => (seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 4294967296;
+  let wall;
+  if (b.kind === 'house') wall = HOUSE_WALLS[seed0 % HOUSE_WALLS.length];
+  else if (b.kind === 'hall') wall = HALL_WALLS[seed0 % HALL_WALLS.length];
+  else if (b.kind === 'station') wall = '#cdbb98';
+  else wall = FACT_WALLS[seed0 % FACT_WALLS.length];
+  drawBox(ctx, cam, x0 + 2, y0 + 2, x0 + b.w - 2, y0 + b.h - 2, 4, '#6f6a62', { roof: '#857f75', noShadow: true });
+  const H = TOWN_H[b.kind] || 40;
+  const pieces = [];
+  // Mauerrest: eine Ecke steht noch (zwei kurze Wandstücke)
+  const ex = rnd() < 0.5 ? x0 : x0 + b.w;
+  const ey = rnd() < 0.5 ? y0 : y0 + b.h;
+  const sx = ex === x0 ? 1 : -1;
+  const sy = ey === y0 ? 1 : -1;
+  const lx = b.w * (0.3 + rnd() * 0.25);
+  const ly = b.h * (0.3 + rnd() * 0.25);
+  pieces.push({ x0: Math.min(ex, ex + sx * lx), y0: Math.min(ey, ey + sy * 8), x1: Math.max(ex, ex + sx * lx), y1: Math.max(ey, ey + sy * 8), h: H * 0.5, c: wall });
+  pieces.push({ x0: Math.min(ex, ex + sx * 8), y0: Math.min(ey, ey + sy * ly), x1: Math.max(ex, ex + sx * 8), y1: Math.max(ey, ey + sy * ly), h: H * 0.35, c: shade(wall, 0.15) });
+  const n = Math.max(6, Math.min(26, Math.round((b.w * b.h) / 700)));
+  const grays = ['#8d877c', '#79736a', '#9a9387', '#6b655d', wall];
+  for (let i = 0; i < n; i++) {
+    const s = 5 + rnd() * 10;
+    const px = x0 + 6 + rnd() * (b.w - 12 - s);
+    const py = y0 + 6 + rnd() * (b.h - 12 - s);
+    pieces.push({ x0: px, y0: py, x1: px + s, y1: py + s * (0.6 + rnd() * 0.8), h: 3 + rnd() * 12, c: grays[i % grays.length] });
+  }
+  pieces.sort((a, c) => cam.depth((a.x0 + a.x1) / 2, (a.y0 + a.y1) / 2) - cam.depth((c.x0 + c.x1) / 2, (c.y0 + c.y1) / 2));
+  for (const p of pieces) drawBox(ctx, cam, p.x0, p.y0, p.x1, p.y1, p.h, p.c, { noShadow: p.h < 10 });
+}

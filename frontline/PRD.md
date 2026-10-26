@@ -160,6 +160,8 @@ Schaden je Schuss nach Panzerklasse des Ziels (Inf = Infanterie, Leicht, Schwer,
 
 Das Spiel wählt je Ziel automatisch die Waffe mit dem besten Schaden bzw. die „bevorzugte“ Waffe für die Panzerklasse des Ziels; Waffen ohne Munition schweigen.
 
+Gegen besetzte **Stadthäuser** (Häuserkampf, §7) gilt die Spalte Geb, mit Faktor: Waffen mit mindestens 25 Gebäudeschaden (Hauptkanone, RPG, Granatwerfer, Raketen, Mörser) × 1,5, alle anderen (Gewehre, MGs, Bordkanone) × 0,5.
+
 ### Schaden: Treffer bis zum Abschuss
 Direktfeuer richtet sich nach Trefferzahlen (volles Ziel); Seite = Winkel zur Fahrtrichtung des Ziels (vorn ±45°, hinten ±45°, sonst seitlich). Nicht genannte Paarungen nutzen die Schadenstabelle der Panzerklasse (u. a. Hubschrauber, Gebäude, MG gegen Fahrzeuge, Gewehr gegen Fahrzeuge).
 
@@ -204,6 +206,15 @@ Direktfeuer richtet sich nach Trefferzahlen (volles Ziel); Seite = Winkel zur Fa
 - **Darstellung:** Iso mit WebGL: echtes Höhennetz (Feinraster), Licht von rechts oben wie die Gebäudeschatten, Felsblöcke an steilen Hängen und auf Gipfeln, Geröll am Fuß, Sandufer, Wasser mit Tiefe, Wellen und hellem Saum, Erdschnitt am Kartenrand; Einheiten, Gebäude (auf ihrer tiefsten Ecke), Kreise und Linien stehen auf dem Gelände. 2D und Minimap: Schummerung (Licht aus Nordwest), Fels, Ufer und Seen aufgemalt. Ohne WebGL bleibt Iso flach mit aufgemaltem Gelände.
 - **Kartenformat:** `relief` = Höhenraster als Base64-Text (1 Byte je Punkt, Höhe = Wert × 2 − 128, also −128 … 382). Fehlt es oder ist es kaputt, ist die Karte flach.
 
+### Häuserkampf (seit v4.43, nach Company of Heroes / Age of Empires II)
+
+- **Häuser:** Jedes nicht gedrehte Stadtgebäude der Arten Wohnhaus, Halle, Fabrik und Bahnhof (ab 40 × 40 px, also keine Mauern) kann von Infanterie besetzt werden: Wohnhaus **4** Plätze / 700 HP, Halle **8** / 1200, Fabrik **10** / 1800, Bahnhof **8** / 1200 (`BALANCE.garrison`). Türme, Züge, Bahnsteige und Fabrikmauern nicht. Ein Haus gehört dem Team seiner Besatzer; leer gehört es niemandem und kann nicht angegriffen werden. Ein vom Gegner besetztes Haus kann man nicht betreten.
+- **Besetzen:** Soldaten (Schütze, PAK, Scharfschütze) gehen bis an die Wand (56 px) und verschwinden im Haus; die nächsten so viele, wie Plätze frei sind, die übrigen stellen sich daneben. Fahrzeuge können nicht hinein.
+- **Drinnen:** Die Besatzer bewegen sich nicht, schießen aber weiter: Reichweite und Sicht zählen ab der Hauswand (halbe mittlere Seitenlänge mehr), sie stehen **24 höher** (Höhenvorteil, §7) und schauen mit Gebäude-Augenhöhe. Treffer, Granaten und Mörser treffen **das Haus** statt der Besatzer (nur gegnerisch besetzte Häuser nehmen Schaden). Sie zählen für Zone, Hot Zone, Punkte und Einheitenlimit und werden in Reichweite einer FOB oder eines LKW nachmunitioniert. Ein getarnter Scharfschütze verrät sein Haus erst, wenn er selbst erkannt wird.
+- **Vertreiben:** Handwaffen machen gegen Häuser nur halben Schaden, schwere Waffen das 1,5-Fache (§6). Fällt das Haus auf 0, **stürzt es ein**: Die Besatzer fallen mit 35 % ihrer vollen HP Schaden heraus (wer weniger hat, stirbt), es bleibt eine Ruine, die den Weg weiter versperrt und nicht mehr besetzt werden kann. Meldung an beide Seiten.
+- **Verlassen:** Taste **O** („Raus“) oder jeder Marsch-, Bau- oder Einsteigebefehl; die Soldaten treten auf der Seite zum Ziel aus dem Haus. Ein Angriffsbefehl auf ein Ziel in Reichweite der Fenster lässt sie drin, sonst gehen sie hinaus und verfolgen es.
+- **KI:** Alle 8 s schickt sie bis zu 40 % ihrer Infanterie in der Zone in freie Häuser im Umkreis von 500 px; Besatzer halten ihr Haus (keine Verteilbefehle, keine Überfälle, keine Verteidigungszüge), nur Rückzug bei Mangel und Gruppen-Rückzug holen sie heraus.
+
 ### Hot Zone
 - Kleiner Kreis (Radius 300 px) **innerhalb** der Konfliktzone, orange; auch auf der Minimap. Er wandert langsam (13,3 px/s) zu einem
   Zufallspunkt (neues Ziel alle 25–45 s); nur auf dem Weg zu einem aktiven Bohrer ist er mit 40 px/s schneller.
@@ -233,6 +244,7 @@ Direktfeuer richtet sich nach Trefferzahlen (volles Ziel); Seite = Winkel zur Fa
 | Mörser gewählt | G Ziel wählen (oder Rechtsklick auf die Karte) · C Ziel löschen |
 | Bohrer gewählt | G aktivieren |
 | Transportfahrzeuge | Infanterie wählen + **I** (Einsteigen, dann Fahrzeug antippen) oder Rechtsklick auf LKW / Baufahrzeug / Schützenpanzer / Hubschrauber = einsteigen · Fahrzeug wählen + **O** und Zielpunkt = absetzen · Transporthubschrauber: L/U/T wie LKW |
+| Häuserkampf | Infanterie wählen + Rechtsklick/Tippen auf ein Haus der Stadt (oder **I**, dann Haus antippen) = besetzen · Klick auf eigenes besetztes Haus = Besatzung wählen · **O** = Raus · Rechtsklick auf gegnerisch besetztes Haus = angreifen |
 | Haupt-FOB gewählt | Ausbildung: Q Schütze · W PAK · T Scharfschütze · E LKW · R Baufahrzeug · A SPz · S KPz · D Little Bird · F Transporter · G AH-64 |
 | LKW gewählt | L Laden · U Entladen · T Pendeln (Start-FOB, dann Ziel-FOB) · Ladung Q Gemischt / W Baumaterial / E Munition / R Treibstoff |
 | Entf | Gebäude abreißen |
@@ -257,6 +269,7 @@ Direktfeuer richtet sich nach Trefferzahlen (volles Ziel); Seite = Winkel zur Fa
   Route gewählter LKW als gestrichelte Linie, Bauradius gewählter FOBs als gestrichelter Kreis.
 - Meldungen (z. B. „Einheit bereit“, „Basis wird angegriffen“, „Einheiten ohne Munition“, „Route unterbrochen“).
 - Nebel des Krieges: Unerkundet schwarz, erkundet abgedunkelt, gegnerische Einheiten nur in Sicht. Mit Gelände verdecken Kämme die Sicht (§7).
+- Häuserkampf (§7): besetzte Häuser tragen ein Schild in Teamfarbe mit Besatzung/Plätzen und darunter den Zustand (eigene immer, gegnerische in Sicht); gewählte Besatzer zeigen einen Rahmen ums Haus; eingestürzte Häuser sind Schutthaufen (Iso mit Mauerrest und Brocken). Die Auswahl zeigt Haus, Plätze und Zustand.
 - Platzierungsvorschau grün/rot mit Bauradien aller eigenen FOBs.
 - **Isometrische Ansicht** (Taste V, drehbar in 90°-Schritten mit `,` `.`): Boden schräg, Gebäude, Bäume und Fahrzeuge mit Höhe, Tiefensortierung, Hubschrauber schweben mit Schatten. Stadtgebäude (Häuser aus Kenney „City Kit Commercial“, Hallen und Fabriken aus „City Kit Industrial“; 3D-Modelle, vorgerendert isometrisch, Daten `js/render/isodata.js`), Bäume sowie LKW und Baufahrzeug (Team Blau/Rot, 8 Blickrichtungen) sind Bilder aus freien Kenney-Paketen (CC0, `assets/iso/`, Lizenztexte `assets/LICENSES/`, `js/render/isosprites.js`; `?sprites=0` schaltet auf die gezeichnete Variante). Spielgebäude und Panzer sind gezeichnet und mit Details versehen: Stadthäuser mit zwei Stockwerken, Fenstern, Tür, Balkon und Satteldach; Hallen mit Rolltoren und Fensterband; Fabriken mit großen Fenstern, Toren, Schornstein; FOB als **Zentrale** (Sockelbau mit Fensterband, Eingang mit Vordach, Leitstellenturm, Radar, Antennen, Flagge); Fahrzeughalle als **Panzerwerkstatt** (Tore mit Panzer, Teamband, Dachkran); Landeplatz mit H, Ring, Randfeuer, Windsack. Unter Zoom 0,5 entfallen Fenster und Türen (Leistung). Die Zeichnung ist pro Gebäudeart durch Sprites ersetzbar (`spriteOverrides` in `js/render/isobuild.js`).
 - **Grafik (Iso):** Kampfpanzer (Leopard-2-Anmutung), Schützenpanzer (Puma-Anmutung), Little Bird und AH-64 erscheinen in der isometrischen Ansicht als gerenderte 3D-Modelle in 8 Richtungen und Teamfarbe. Panzer, Schützenpanzer und Little Bird sind eigene Entwürfe nach Fotos (Quelle und Ablauf: `tools/render-models`); der AH-64 ist „Attack Chopper“ von Geibu3D (CC BY 4.0, Namensnennung in `assets/LICENSES`). Der **Wachturm** (`buildings/tower-r0…r3.png`, je Drehung der Ansicht ein Bild) ist ein eigener Entwurf nach einem Bild. Der Transporthubschrauber bleibt gemalt.
@@ -285,6 +298,7 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 - **Flankenangriff:** Die KI merkt sich gesehene gegnerische FOBs (Standort bleibt bekannt, bis er eingesehen und leer ist oder die FOB zerstört wird). Ist die Zone gegnerfrei und stehen dort mindestens 12 freie Einheiten, zweigen 30 % davon ab und greifen die gemerkte FOB abseits der Zone an, die der Zone am nächsten liegt. Ist das Ziel zerstört, rücken die Überlebenden wieder in die Armee ein.
 - **Gruppen-Rückzug:** Steht eine Gruppe im Feuer (mindestens 4 Gegner sichtbar) und ist der Wert der Gegner mindestens 1,8-mal so hoch wie der der eigenen Einheiten dort, zieht die ganze Gruppe 1400 px Richtung Basis ab (nicht bei Angriff auf die Basis). 30 s lang gibt die KI danach keine Angriffsbefehle, damit sich die Gruppe sammelt; ein laufender Überfall wird abgebrochen. Einheiten werden im Spiel nicht geheilt, der Rückzug rettet sie also nur vor dem Tod.
 - **Zonen-FOB-Verteidigung:** Mörser und Flugabwehr der Zonen-FOB setzt die KI zur Gegnerseite hin (andere FOBs wie bisher zur Zone hin); die Zonen-FOB bekommt zwei Mörser statt einem.
+- **Häuserkampf:** Bis zu 40 % der Infanterie in der Zone besetzen Häuser in der Nähe und halten sie (§7).
 - **Schwierigkeit über Verhalten:** *Leicht*: langsame Denkschritte (3 s), hohe Angriffsschwelle, kein Späher, kein Konter-Mix, keine Überfälle, kein Rückzug, Einkommen ×0,8. *Normal*: 2 s, Späher und Konter-Mix. *Schwer*: 1 s, niedrigere Angriffsschwelle, dazu Überfälle und Gruppen-Rückzug; **kein Einkommensbonus mehr** (vorher ×1,25).
 
 ### KI-Konstanten (Quelle: `js/ai/ai.js`, `js/data/balance.js`; hier zum Nachschlagen für Erweiterungen)
@@ -308,6 +322,7 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 | Baustellen | Abriss ohne Material / Sperre fehlgeschlagener Orte | 200 s / 240 s |
 | Mauer | Abstand von der Haupt-FOB / halbe Länge | 4 / 3 Zellen (Tor in der Mitte) |
 | Rückzug (Vorrat) | Einheiten unter diesem Vorratsanteil ziehen sich zurück | 20 % |
+| Häuserkampf | Anteil der Infanterie in der Zone / Umkreis / Takt (`GARRISON_SHARE`, `GARRISON_RANGE`, `GARRISON_EVERY`) | 40 % / 500 px / 8 s |
 
 ## 11. Qualitätsanforderungen
 
@@ -325,6 +340,7 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 
 ## Änderungsverlauf
 
+- v4.43: **Häuserkampf** (§7, Vorschlag nach Company of Heroes / Age of Empires II): Infanterie besetzt Wohnhäuser, Hallen, Fabriken und Bahnhöfe, ist dort geschützt, steht höher und schießt ab der Hauswand; schwere Waffen bringen das Haus zum Einsturz (Besatzung verletzt, Ruine bleibt). Rechtsklick/Tippen oder I zum Besetzen, O zum Verlassen, Schild mit Besatzung über dem Haus, KI besetzt Häuser in der Zone. Gespeicherte Karten behalten die Fabrikmauern (vorher wurden sie beim Laden zu Häusern). Cache v55.
 - v4.42: **Weitsicht von oben, Kämme verdecken die Sicht** (§7): Sichtweite wächst mit der Höhe (bis +40 %), Sichtstrahlen über das Höhenraster lassen Täler hinter Kämmen im Nebel. `?debug=1&fog=1` behält den Nebel im Debug. Cache v54.
 - v4.41: **Höhenvorteil und Tempo am Hang** (Vorschläge aus Age of Empires II und Empire Earth, §7): bis ±25 % Schaden im Direktfeuer je nach Höhenunterschied, Fahrzeuge bergauf langsamer und bergab schneller (Infanterie schwächer), Wegsuche mit Hangkosten (Talwege), KI bevorzugt Kuppen. Cache v53.
 - v4.40: **Hügel, Berge und Seen.** Höhengelände (§7): Zufallskarte mit Bergrücken, Hügeln und Seen, mindestens 3 getrennte Zugänge zur Zone, Zone sanft und frei; Steilhänge, Gipfel und Seen sind unpassierbar. Iso-Ansicht mit WebGL-Gelände (Felsblöcke, Wasser, Licht, Erdschnitt am Rand), 2D/Minimap mit Schummerung. Karteneditor: Heben, Senken, Glätten, Ebnen, „Alles eben“, Zugänge in „Prüfen“. Kartenformat `relief`. Wegfolgen: nahe einer Wegecke bei freier Sicht gleich zum nächsten Wegpunkt (vorher stauten sich Gruppen an derselben Ecke). Cache v52.

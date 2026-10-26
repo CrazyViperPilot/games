@@ -1,7 +1,7 @@
 // Bewegung: Wegfolgen, Verfolgung, Fahrhelfer für LKW/Bauer und Trennung (PLAN.md §5, §11). Kein DOM.
 import { BALANCE } from '../data/balance.js';
 import { findPath, lineOfSight } from './pathfinding.js';
-import { inRange } from './entities.js';
+import { inRange, resolveTarget, isFoe } from './entities.js';
 
 const REPATH = 1.0; // Neuplanung bei Verfolgung (s)
 const BLOCK_REPATH = 0.5; // Neuplanung nach blockiertem Wegpunkt (s)
@@ -11,13 +11,41 @@ const CORNER = 48; // nahe einer Wegecke: bei freier Sicht gleich zum nächsten 
 export const HASH_CELL = 128; // räumliches Hash-Gitter
 const TILE = BALANCE.map.tile;
 
-/** Aufträge, die logistics.js und construction.js selbst fahren (updateMovement lässt sie aus). */
-export const OWN_DRIVERS = new Set(['load', 'unload', 'route', 'build', 'repair', 'board', 'dropoff']);
+/** Aufträge, die logistics.js, construction.js und garrison.js selbst fahren (updateMovement lässt sie aus). */
+export const OWN_DRIVERS = new Set(['load', 'unload', 'route', 'build', 'repair', 'board', 'dropoff', 'garrison']);
 
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 
-/** Plant den Weg einer Einheit zu (x, y) neu. */
+/**
+ * Einheit verlässt ihr Stadthaus (garrison.js) und steht danach draußen an der Wand, auf der Seite zu (tx, ty)
+ * (ohne Ziel ringsum verteilt). Das Haus gehört niemandem mehr, wenn der Letzte geht.
+ */
+export function exitHouse(game, u, tx = null, ty = null) {
+  const h = game.entities.get(u.house);
+  u.house = 0;
+  u.fogKey = null;
+  if (!h) return;
+  const i = h.occupants.indexOf(u);
+  if (i >= 0) h.occupants.splice(i, 1);
+  if (!h.occupants.length) h.team = -1;
+  const spread = ((u.id % 5) - 2) * 0.3;
+  const a = (tx === null ? u.id * 2.39996 : Math.atan2(ty - h.y, tx - h.x)) + spread;
+  const c = Math.cos(a);
+  const s = Math.sin(a);
+  // Abstand von der Mitte bis zur Wand in Richtung a, dann ein Stück davor
+  const wall = Math.min(Math.abs(c) > 1e-6 ? h.pw / 2 / Math.abs(c) : Infinity, Math.abs(s) > 1e-6 ? h.ph / 2 / Math.abs(s) : Infinity);
+  const ox = h.x + c * (wall + 14);
+  const oy = h.y + s * (wall + 14);
+  const p = nearestPassable(game.grid, ox, oy, u.team) || { x: ox, y: oy };
+  u.x = p.x;
+  u.y = p.y;
+  u.anchorX = p.x;
+  u.anchorY = p.y;
+}
+
+/** Plant den Weg einer Einheit zu (x, y) neu (wer in einem Haus sitzt, geht dafür hinaus). */
 export function planPath(game, u, x, y) {
+  if (u.house) exitHouse(game, u, x, y);
   u.goalX = x;
   u.goalY = y;
   if (u.def.air) {
@@ -268,8 +296,8 @@ function chase(game, u, t, dt) {
 function stepUnit(game, u, dt) {
   const o = u.order;
   if (o.type === 'attack') {
-    const t = game.getEntity(o.targetId);
-    if (!t || t.team === u.team) {
+    const t = resolveTarget(game, o.targetId);
+    if (!isFoe(u.team, t)) {
       setIdle(u);
       return;
     }
@@ -279,9 +307,9 @@ function stepUnit(game, u, dt) {
 
   // Automatisch gewähltes Ziel (idle / attackMove)
   if (u.targetId !== null) {
-    const t = game.getEntity(u.targetId);
+    const t = resolveTarget(game, u.targetId);
     const leashed = o.type === 'idle' && t && dist(t.x, t.y, u.anchorX, u.anchorY) > BALANCE.leash;
-    if (t && t.team !== u.team && !leashed) {
+    if (isFoe(u.team, t) && !leashed) {
       chase(game, u, t, dt);
       return;
     }
@@ -321,7 +349,7 @@ function resolvePair(grid, a, b) {
 /** Trennung aller lebenden Einheiten (nach allen Bewegungsschritten eines Ticks aufrufen). */
 export function separate(game) {
   const grid = game.grid;
-  const list = game.units.filter((u) => u.alive && !u.def.air); // Hubschrauber schweben über allem
+  const list = game.units.filter((u) => u.alive && !u.def.air && !u.house); // Hubschrauber schweben über allem, Besatzer sitzen im Haus
 
   // Einheiten in unpassierbaren Zellen (z. B. durch neue Gebäude) zur nächsten freien Zelle schieben
   for (const u of list) {
@@ -352,7 +380,7 @@ export function updateMovement(game, dt) {
     if (!u.alive) continue;
     u.repathTimer = Math.max(0, u.repathTimer - dt);
     u.speedMul = (u.def.fuelPerSec || 0) > 0 && u.fuel <= 0 ? BALANCE.fuelSlowMul : 1;
-    if (OWN_DRIVERS.has(u.order.type)) continue;
+    if (u.house || OWN_DRIVERS.has(u.order.type)) continue; // Besatzer eines Hauses bewegen sich nicht
     stepUnit(game, u, dt);
   }
 }
