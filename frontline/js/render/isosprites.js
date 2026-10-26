@@ -159,23 +159,55 @@ function drawInfantry(ctx, cam, u, p, type, aim) {
 export function drawUnitSprite(ctx, cam, u, p, aim = null, lift = 0) {
   const inf = INFANTRY_NAME[u.type];
   if (inf && u.team < 2) return drawInfantry(ctx, cam, u, p, inf, aim);
-  const model = UNIT_MODEL[u.type];
-  const imgs = model && VEHICLES[model][u.team];
+  return drawModel(ctx, cam, u.type, u.team, u.angle, u.def.radius, p, lift);
+}
+
+/** Fahrzeugmodell in der Blickrichtung `angle`; look(img) kann das Bild ersetzen (Wrack). false = Modell fehlt oder lädt noch. */
+function drawModel(ctx, cam, type, team, angle, radius, p, lift, look = null) {
+  const model = UNIT_MODEL[type];
+  const imgs = model && VEHICLES[model][team];
   if (!imgs) return false;
   const [a, b, c, d] = cam.isoMatrix(1);
-  const cx = Math.cos(u.angle || 0);
-  const cy = Math.sin(u.angle || 0);
+  const cx = Math.cos(angle || 0);
+  const cy = Math.sin(angle || 0);
   const sector = (Math.round(Math.atan2(b * cx + d * cy, a * cx + c * cy) / (Math.PI / 4)) + 8) % 8;
   const img = imgs[sector];
   if (!ready(img)) return false;
+  const src = look ? look(img) : img;
+  if (!src) return false;
   const z = cam.zoom;
   const view = MODEL_VIEW[model];
   if (view) {
-    const k = (u.def.radius * view.span * z) / img.naturalWidth;
-    ctx.drawImage(img, p.x - view.ax * k, p.y - lift * z - view.ay * k, img.naturalWidth * k, img.naturalHeight * k);
+    const k = (radius * view.span * z) / img.naturalWidth;
+    ctx.drawImage(src, p.x - view.ax * k, p.y - lift * z - view.ay * k, img.naturalWidth * k, img.naturalHeight * k);
     return true;
   }
-  const s = (u.def.radius * 3.6 * z) / 33;
-  ctx.drawImage(img, p.x - (img.naturalWidth * s) / 2, p.y - img.naturalHeight * s + 4 * s, img.naturalWidth * s, img.naturalHeight * s);
+  const s = (radius * 3.6 * z) / 33;
+  ctx.drawImage(src, p.x - (img.naturalWidth * s) / 2, p.y - img.naturalHeight * s + 4 * s, img.naturalWidth * s, img.naturalHeight * s);
   return true;
+}
+
+const CHARRED = new Map(); // Modellbild → verkohlte Kopie (Wracks), einmal je Bild erzeugt
+
+function charred(img) {
+  let c = CHARRED.get(img);
+  if (c !== undefined) return c;
+  c = null;
+  if (typeof document !== 'undefined') {
+    c = document.createElement('canvas');
+    c.width = img.naturalWidth;
+    c.height = img.naturalHeight;
+    const x = c.getContext('2d');
+    x.drawImage(img, 0, 0);
+    x.globalCompositeOperation = 'source-atop'; // nur das Modell einfärben, nicht den Hintergrund
+    x.fillStyle = 'rgba(30,26,22,0.8)';
+    x.fillRect(0, 0, c.width, c.height);
+  }
+  CHARRED.set(img, c);
+  return c;
+}
+
+/** Wrack als verkohltes Fahrzeugmodell am Boden (auch abgeschossene Hubschrauber). false = kein Modell, der Renderer zeichnet Kästen. */
+export function drawWreckSprite(ctx, cam, w, p) {
+  return drawModel(ctx, cam, w.type, 0, w.angle, w.r, p, 0, charred);
 }

@@ -492,3 +492,171 @@ export function drawEffect(ctx, e, zoom = 1) {
   }
   ctx.restore();
 }
+
+// ---- Sichtbarer Schaden ---------------------------------------------------------------
+const WRECK = '#2b2825'; // ausgebrannter Rumpf
+const WRECK_DARK = '#191715';
+const WRECK_LIGHT = '#4a443d';
+
+/** Kleiner Zufallsgenerator je Narbe (gleiche Form in jedem Bild). */
+export function scarRng(seed) {
+  let s = (Math.imul(seed | 0, 2654435761) >>> 0) || 1;
+  return () => (s = (Math.imul(s, 1103515245) + 12345) >>> 0) / 4294967296;
+}
+
+/** Krater bzw. Brandfleck am Boden (Weltkoordinaten): dunkle Mulde, heller Auswurfrand, verstreute Brocken. a = Deckkraft. */
+export function drawCrater(ctx, c, a = 1) {
+  const rnd = scarRng(c.id);
+  const r = c.r;
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.fillStyle = 'rgba(28,24,19,0.42)';
+  ctx.beginPath();
+  ctx.ellipse(c.x, c.y, r, r * (0.85 + rnd() * 0.15), rnd() * Math.PI, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(14,12,10,0.55)';
+  ctx.beginPath();
+  ctx.ellipse(c.x + (rnd() - 0.5) * r * 0.2, c.y + (rnd() - 0.5) * r * 0.2, r * 0.5, r * 0.42, rnd() * Math.PI, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(150,130,98,0.28)';
+  ctx.lineWidth = r * 0.14;
+  ctx.beginPath();
+  ctx.arc(c.x, c.y, r * 0.72, rnd() * 6, rnd() * 6 + 4.2);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(40,34,28,0.6)';
+  for (let i = 0; i < 6; i++) {
+    const ang = rnd() * Math.PI * 2;
+    const d = r * (1 + rnd() * 0.5);
+    const s = 0.8 + rnd() * r * 0.08;
+    ctx.fillRect(c.x + Math.cos(ang) * d - s / 2, c.y + Math.sin(ang) * d - s / 2, s, s);
+  }
+  ctx.restore();
+}
+
+/** Fahrzeugwrack von oben (Weltkoordinaten): ausgebrannter Rumpf, verdrehter Turm bzw. abgeknickter Heckausleger. */
+export function drawWreck(ctx, w, zoom = 1, a = 1) {
+  const rnd = scarRng(w.id);
+  const z = zoom || 1;
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.translate(w.x, w.y);
+  ctx.rotate(w.angle);
+  ctx.strokeStyle = OUTLINE;
+  ctx.lineWidth = 1 / z;
+  if (w.air) {
+    const len = w.type === 'transporter' ? 24 : w.type === 'gunship' ? 20 : 15;
+    const wid = w.type === 'transporter' ? 7 : 6;
+    ctx.fillStyle = WRECK_DARK;
+    ctx.save();
+    ctx.rotate(0.5 + rnd() * 0.6); // Heckausleger abgeknickt
+    ctx.fillRect(-len * 0.95, -1.2, len * 0.55, 2.4);
+    ctx.restore();
+    ctx.fillStyle = WRECK;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, len * 0.5, wid, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = WRECK_LIGHT;
+    ctx.lineWidth = 1.4 / z;
+    ctx.beginPath();
+    const r0 = rnd() * Math.PI;
+    for (let k = 0; k < 2; k++) {
+      const ang = r0 + k * 1.9;
+      const l = len * (0.45 + rnd() * 0.35);
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(ang) * l, Math.sin(ang) * l);
+    }
+    ctx.stroke();
+  } else {
+    const tracked = w.type === 'tank' || w.type === 'ifv' || w.type === 'engineer';
+    const hl = w.type === 'tank' ? 14 : w.type === 'ifv' ? 12 : 9;
+    const hw = w.type === 'tank' ? 9 : w.type === 'ifv' ? 7 : 6;
+    if (tracked) {
+      ctx.fillStyle = WRECK_DARK;
+      ctx.fillRect(-hl, -hw - 3, hl * 2, 3);
+      ctx.fillRect(-hl, hw, hl * 2 * (0.55 + rnd() * 0.3), 3); // eine Kette gerissen
+    }
+    ctx.fillStyle = WRECK;
+    ctx.fillRect(-hl + 1, -hw, hl * 2 - 2, hw * 2);
+    ctx.strokeRect(-hl + 1, -hw, hl * 2 - 2, hw * 2);
+    ctx.fillStyle = WRECK_LIGHT;
+    ctx.fillRect(-hl * 0.5, -hw * 0.5, hl * 0.6, hw * 0.4); // Rostfleck
+    if (w.type === 'tank' || w.type === 'ifv') {
+      ctx.rotate(rnd() * Math.PI * 2); // Turm verdreht
+      ctx.fillStyle = WRECK_DARK;
+      ctx.fillRect(0, -1.3, w.type === 'tank' ? 16 : 10, 2.6);
+      ctx.fillStyle = WRECK;
+      ctx.beginPath();
+      ctx.arc(0, 0, w.type === 'tank' ? 6.5 : 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+/** Gebäudetrümmer von oben (Weltkoordinaten): verkohlte Fläche mit Schuttbrocken; Mauern nur ein Schutthaufen. */
+export function drawWreckRubble(ctx, w, a = 1) {
+  const rnd = scarRng(w.id);
+  const x0 = w.x - w.w / 2;
+  const y0 = w.y - w.h / 2;
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.fillStyle = w.small ? '#77736b' : '#3a3632';
+  ctx.fillRect(x0 + 2, y0 + 2, w.w - 4, w.h - 4);
+  const n = Math.max(5, Math.min(24, Math.round((w.w * w.h) / 500)));
+  const cols = w.small ? ['#8d877c', '#6b655d', '#9a9387'] : ['#5a554e', '#47423c', '#6d675e', '#2a2724', '#7a5a3a'];
+  for (let i = 0; i < n; i++) {
+    const s = 3 + rnd() * Math.min(12, w.w * 0.25);
+    ctx.fillStyle = cols[i % cols.length];
+    ctx.fillRect(x0 + 3 + rnd() * (w.w - 6 - s), y0 + 3 + rnd() * (w.h - 6 - s), s, s * (0.5 + rnd()));
+  }
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x0 + 2, y0 + 2, w.w - 4, w.h - 4);
+  ctx.restore();
+}
+
+/**
+ * Rauchsäule ohne Bilder: Schwaden steigen vom Fußpunkt (x, y) nach oben, treiben mit dem Wind nach rechts, werden größer und
+ * blasser. s = Grundgröße (px der aktuellen Transformation), k = Stärke 0–1, t = Zeit in s, seed = je Quelle (versetzt die Phase).
+ */
+export function drawSmoke(ctx, x, y, s, k, t, seed) {
+  const n = 4 + Math.round(4 * k);
+  const off = (Math.abs(seed) % 997) / 997;
+  ctx.save();
+  for (let i = 0; i < n; i++) {
+    const ph = (t * 0.3 + i / n + off) % 1;
+    const r = s * (0.55 + 1.5 * ph);
+    const px = x + s * (2 * ph + 0.4 * Math.sin(ph * 6 + off * 40));
+    const py = y - s * 5.5 * ph;
+    ctx.globalAlpha = (0.3 + 0.4 * k) * (1 - ph) * Math.min(1, ph * 8);
+    ctx.fillStyle = ph < 0.3 ? '#34322f' : ph < 0.6 ? '#5f5c58' : '#8f8c87';
+    ctx.beginPath();
+    ctx.arc(px, py, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/** Flackerndes Feuer am Fußpunkt (x, y): drei Flammenzungen, außen orange, innen gelb. s = Größe, t = Zeit in s. */
+export function drawFire(ctx, x, y, s, t, seed) {
+  const off = (Math.abs(seed) % 101) * 0.7;
+  ctx.save();
+  for (let i = 0; i < 3; i++) {
+    const f = 0.72 + 0.28 * Math.sin(t * (10 + i * 3.3) + off + i * 2.1);
+    const r = s * (0.55 - Math.abs(i - 1) * 0.17) * f;
+    const fx = x + (i - 1) * s * 0.42;
+    ctx.globalAlpha = 0.8;
+    ctx.fillStyle = '#e8641e';
+    ctx.beginPath();
+    ctx.ellipse(fx, y - r * 0.9, r * 0.62, r * 1.25, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = '#ffd36a';
+    ctx.beginPath();
+    ctx.ellipse(fx, y - r * 0.6, r * 0.3, r * 0.65, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}

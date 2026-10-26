@@ -3,6 +3,7 @@ import { BALANCE } from '../data/balance.js';
 import { createShell, inRange, radiusOf, isFoe, resolveTarget } from './entities.js';
 import { buildHash, nearby } from './movement.js';
 import { damageHouse } from './garrison.js';
+import { addCrater } from './scars.js';
 
 const SCAN = BALANCE.scanInterval;
 const MAX_UNIT_RADIUS = 16; // größter Einheitenradius (Trefferkreis-Suche)
@@ -262,6 +263,7 @@ function interceptShells(game) {
 function impact(game, p) {
   p.alive = false;
   game.addEffect('explosion', p.tx, p.ty, p.team);
+  addCrater(game, p.tx, p.ty);
   const R = p.splash || 1;
   for (const h of game.garrisoned) {
     if (!h.alive || !isFoe(p.team, h)) continue;

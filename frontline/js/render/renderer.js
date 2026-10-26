@@ -14,6 +14,11 @@ import {
   fitText,
   hpColor,
   hexA,
+  drawCrater,
+  drawWreck,
+  drawWreckRubble,
+  drawSmoke,
+  drawFire,
 } from './sprites.js';
 import { builderState } from '../ui/status.js';
 import { makeRng } from '../core/rng.js';
@@ -27,9 +32,10 @@ import {
   buildingHeight,
   TOWN_H,
 } from './iso.js';
-import { drawTownBuilding, drawTeamBuilding, drawCar, drawBench, drawRubble, drawCrate } from './isobuild.js';
+import { drawTownBuilding, drawTeamBuilding, drawCar, drawBench, drawRubble, drawCrate, drawWreckBox } from './isobuild.js';
 import { parkDeco } from './terrain.js';
-import { drawTreeSprite, drawUnitSprite, setTeamBuildings } from './isosprites.js';
+import { drawTreeSprite, drawUnitSprite, drawWreckSprite, setTeamBuildings } from './isosprites.js';
+import { scarAlpha } from '../game/scars.js';
 import { reliefOf } from '../game/relief.js';
 import { getGround, LIGHT_ELEV } from './ground.js';
 
@@ -47,6 +53,12 @@ const BAR_W = 24; // Balkenbreite über Einheiten (Welt-px)
 const HP_OFFSET = 14; // Abstand Lebensbalken-Oberkante zum Einheitenrand (Bildschirm-px); darunter Vorrat
 const FOG_EXPLORED_ALPHA = 150; // erkundet: abgedunkelt, nicht schwarz
 const MARKER_LIFE = 0.8; // s, Lebensdauer des Wegziel-Markers
+const SC = BALANCE.scars;
+const SMOKE_AT = 0.6; // Gebäude und Häuser rauchen unter diesem Lebensanteil, Fahrzeuge unter VEHICLE_SMOKE
+const VEHICLE_SMOKE = 0.5;
+const FIRE_AT = 0.3; // darunter brennt es (Fahrzeuge: halber Wert)
+const WRECK_SMOKE = 60; // s: so lange raucht ein Wrack, die ersten WRECK_FIRE s brennt es
+const WRECK_FIRE = 20;
 
 /** Off-screen-Canvas in Nebelzellen-Größe (75 × 75) mit ImageData. */
 export function makeFogLayer(fog) {
@@ -153,6 +165,7 @@ export class Renderer {
 
     this.drawTerrain(ctx, R);
     this.drawRuins(ctx, R, known);
+    this.drawScars(ctx, inRect, z);
     this.drawZone(ctx, z);
     this.drawHot(ctx, z, now);
 
@@ -207,6 +220,11 @@ export class Renderer {
       if (!inRect(e.x, e.y, 120) && !inRect(e.x2 ?? e.x, e.y2 ?? e.y, 120)) continue;
       if (e.team !== -1 && e.team !== team && !seen(e.x, e.y) && !seen(e.x2 ?? e.x, e.y2 ?? e.y)) continue;
       drawEffect(ctx, e, z);
+    }
+    const t = now / 1000;
+    for (const q of this.smokeSources(seen, shown, inRect, 120)) {
+      if (q.fire) drawFire(ctx, q.x, q.y, q.s * 0.7, t, q.seed);
+      drawSmoke(ctx, q.x, q.y, q.s, q.k, t, q.seed);
     }
 
     if (!reveal) {
@@ -393,6 +411,12 @@ export class Renderer {
         ctx.drawImage(this.terrainIso, x0 * S, y0 * S, (x1 - x0) * S, (y1 - y0) * S, x0, y0, x1 - x0, y1 - y0);
       }
     }
+    for (const c of g.craters ?? []) {
+      if (!this.scarShown(c) || !inRect(c.x, c.y, c.r + 10)) continue;
+      if (relief) this.groundAt(ctx, c.x, c.y);
+      else setIsoGround(ctx, cam, dpr);
+      drawCrater(ctx, c, scarAlpha(c, g.time, SC.craterLife, SC.craterFade));
+    }
     setIsoGround(ctx, cam, dpr);
     this.drawZone(ctx, z);
     this.drawHot(ctx, z, now);
@@ -436,6 +460,9 @@ export class Renderer {
       items.push({ k: cam.depth(b.x, b.y), t: 4, o: b });
     }
     for (const m of this.crateMarks(seen, known)) if (inRect(m.x, m.y, 40)) items.push({ k: cam.depth(m.x, m.y), t: 8, o: m });
+    for (const w of g.wrecks ?? []) {
+      if (this.scarShown(w) && inRect(w.x, w.y, PAD)) items.push({ k: cam.depth(w.x, w.y), t: w.kind === 'building' ? 10 : 9, o: w });
+    }
     const glow = 0.6 + 0.4 * Math.sin(now / 350);
     const air = [];
     for (const u of g.units) {
@@ -488,6 +515,13 @@ export class Renderer {
       else if (it.t === 6) drawCar(ctx, cam, it.o);
       else if (it.t === 7) drawBench(ctx, cam, it.o);
       else if (it.t === 8) drawCrate(ctx, cam, it.o.x, it.o.y, it.o.ground ? 16 : 13, 0, it.o.ground ? glow : 0);
+      else if (it.t === 9 || it.t === 10) {
+        const w = it.o;
+        ctx.globalAlpha = scarAlpha(w, g.time, SC.wreckLife, SC.wreckFade);
+        if (it.t === 10) drawRubble(ctx, cam, { x: w.x, y: w.y, w: w.w, h: w.h, kind: w.small ? 'wall' : 'wreck', hgt: w.small ? 18 : 36 }, !w.small);
+        else if (!drawWreckSprite(ctx, cam, w, cam.worldToScreen(w.x, w.y))) drawWreckBox(ctx, cam, w);
+        ctx.globalAlpha = 1;
+      }
       else if (it.t === 4) {
         const b = it.o;
         drawTeamBuilding(ctx, cam, b, g.teams[b.team].color);
@@ -527,6 +561,14 @@ export class Renderer {
         cam.unpin();
       }
       drawEffect(ctx, e, z);
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const t = now / 1000;
+    for (const q of this.smokeSources(seen, shown, inRect, PAD)) {
+      const p = cam.worldToScreen(q.x, q.y);
+      const y = p.y - q.lift * z;
+      if (q.fire) drawFire(ctx, p.x, y, q.s * 0.7 * z, t, q.seed);
+      drawSmoke(ctx, p.x, y, q.s * z, q.k, t, q.seed);
     }
     if (relief && v.moveMarker) this.groundAt(ctx, v.moveMarker.x, v.moveMarker.y);
     this.drawMoveMarker(ctx, v.moveMarker, now, z);
@@ -604,6 +646,58 @@ export class Renderer {
     return out;
   }
 
+  /** Wrack oder Krater, den das Team schon gesehen hat (Debug: alle). */
+  scarShown(s) {
+    return this.revealAll || ((s.seen >> this.team) & 1) === 1;
+  }
+
+  /** Draufsicht: Krater und Brandflecken, darauf Trümmer und Fahrzeugwracks (unter Gebäuden und Einheiten). */
+  drawScars(ctx, inRect, z) {
+    const g = this.game;
+    for (const c of g.craters ?? []) {
+      if (this.scarShown(c) && inRect(c.x, c.y, c.r + 10)) drawCrater(ctx, c, scarAlpha(c, g.time, SC.craterLife, SC.craterFade));
+    }
+    for (const w of g.wrecks ?? []) {
+      if (!this.scarShown(w) || !inRect(w.x, w.y, 60)) continue;
+      const a = scarAlpha(w, g.time, SC.wreckLife, SC.wreckFade);
+      if (w.kind === 'building') drawWreckRubble(ctx, w, a);
+      else drawWreck(ctx, w, z, a);
+    }
+  }
+
+  /**
+   * Rauch und Feuer in Sicht: beschädigte Teamgebäude und Häuser (unter SMOKE_AT), Fahrzeuge (unter VEHICLE_SMOKE) und frische
+   * Wracks. Größen in Welt-px, lift = Höhe der Quelle über dem Boden (isometrisch). → [{ x, y, lift, s, k, fire, seed }]
+   */
+  smokeSources(seen, shown, inRect, pad) {
+    const g = this.game;
+    const out = [];
+    for (const b of g.buildings) {
+      if (!b.alive || !b.built || b.def.blocksAll || b.def.gate || !inRect(b.x, b.y, pad)) continue;
+      const f = b.hp / b.maxHp;
+      if (f >= SMOKE_AT || !(b.team === this.team || seen(b.x, b.y))) continue;
+      const off = ((b.id * 37) % 21) / 20 - 0.5; // nicht genau in der Mitte
+      out.push({ x: b.x + off * b.w * TILE * 0.5, y: b.y - off * b.h * TILE * 0.3, lift: buildingHeight(b) * 0.5, s: 6 + 2.5 * Math.max(b.w, b.h), k: (SMOKE_AT - f) / SMOKE_AT, fire: f < FIRE_AT, seed: b.id * 13 });
+    }
+    for (const h of g.houses ?? []) {
+      if (!h.alive || h.ruined || h.hp >= h.maxHp * SMOKE_AT || !inRect(h.x, h.y, pad) || !(h.team === this.team || seen(h.x, h.y))) continue;
+      const f = h.hp / h.maxHp;
+      out.push({ x: h.x, y: h.y, lift: (TOWN_H[h.type] || 40) * 0.85, s: 8 + Math.max(h.pw, h.ph) / 14, k: (SMOKE_AT - f) / SMOKE_AT, fire: f < FIRE_AT, seed: -h.id * 7 });
+    }
+    for (const u of g.units) {
+      if (!u.alive || u.house || u.def.armor === 'inf' || u.hp >= u.maxHp * VEHICLE_SMOKE || !inRect(u.x, u.y, pad) || !shown(u)) continue;
+      const f = u.hp / u.maxHp;
+      out.push({ x: u.x, y: u.y, lift: unitLift(u) + 6, s: 4 + u.def.radius * 0.3, k: (VEHICLE_SMOKE - f) / VEHICLE_SMOKE, fire: f < FIRE_AT / 2, seed: u.id * 17 });
+    }
+    for (const w of g.wrecks ?? []) {
+      const age = g.time - w.t0;
+      if (age >= WRECK_SMOKE || w.small || !inRect(w.x, w.y, pad) || !seen(w.x, w.y)) continue;
+      const big = w.kind === 'building';
+      out.push({ x: w.x, y: w.y, lift: big ? 12 : 6, s: big ? 8 + Math.max(w.w, w.h) / 14 : 6, k: 1 - age / WRECK_SMOKE, fire: age < WRECK_FIRE, seed: w.id * 29 });
+    }
+    return out;
+  }
+
   /** Geländehöhe, auf der ein Objekt der Tiefenliste steht: Gebäude auf ihrer tiefsten Ecke, sonst am Fußpunkt. */
   baseHeight(it) {
     const relief = this.camera.relief;
@@ -617,6 +711,11 @@ export class Renderer {
       y0 = o.cy * TILE;
       x1 = x0 + o.w * TILE;
       y1 = y0 + o.h * TILE;
+    } else if (it.t === 10) {
+      x0 = o.x - o.w / 2;
+      x1 = o.x + o.w / 2;
+      y0 = o.y - o.h / 2;
+      y1 = o.y + o.h / 2;
     } else if (it.t === 0) {
       const r = Math.max(o.w, o.h) / 2;
       x0 = o.x - (o.angle ? r : o.w / 2);

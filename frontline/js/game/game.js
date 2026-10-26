@@ -18,6 +18,7 @@ import { updateLogistics, cmdLoad, cmdUnload, cmdRoute, cmdSetPreset, cmdBoard, 
 import { updateConstruction, canBuild, cmdRepair, orderBuild, orderBuildSeq } from './construction.js';
 import { createHouses, updateGarrison, cmdGarrison, cmdUngarrison, dropOccupant } from './garrison.js';
 import { createCrates, updateCrates, updateCrateIntel, cmdPickup, cmdDeliver, cmdDropCrate } from './crates.js';
+import { createScars, updateScars, updateScarIntel, addUnitWreck, addBuildingWreck, clearWrecksUnder } from './scars.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
@@ -141,6 +142,7 @@ export class Game {
     this.buildings = [];
     this.projectiles = [];
     this.effects = [];
+    createScars(this); // Wracks und Krater (sichtbarer Schaden)
     this.events = [];
     this.winner = null;
     this.winReason = null;
@@ -267,6 +269,7 @@ export class Game {
   updateFog() {
     for (let t = 0; t < this.teams.length; t++) this.fog[t].update(this, t);
     updateCrateIntel(this);
+    updateScarIntel(this);
   }
 
   /** Lebende Entities, deren Mittelpunkt im Kreis liegt (Gebäude: plus halbe Größe). */
@@ -449,6 +452,7 @@ export class Game {
     this.grid.occupy(b);
     this.entities.set(id, b);
     this.buildings.push(b);
+    clearWrecksUnder(this, b);
     return b;
   }
 
@@ -951,6 +955,7 @@ export class Game {
       else {
         this.entities.delete(u.id);
         if (u.house) dropOccupant(this, u);
+        if (u.hp <= 0) addUnitWreck(this, u); // eingestiegene Passagiere (alive = false, hp > 0) hinterlassen nichts
       }
     }
     units.length = k;
@@ -967,6 +972,7 @@ export class Game {
       this.entities.delete(b.id);
       if (!b.demolished) {
         this.addEffect('explosion', b.x, b.y, b.team);
+        addBuildingWreck(this, b);
         this.message(b.team, `${b.def.name} zerstört`, b.x, b.y);
       }
     }
@@ -1001,6 +1007,7 @@ export class Game {
 
     this.ageEffects(dt);
     this.cleanup();
+    updateScars(this);
     if (this.winner === null) this.checkElimination();
   }
 }

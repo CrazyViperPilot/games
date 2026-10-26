@@ -706,7 +706,7 @@ export function drawCrate(ctx, cam, x, y, s = 16, base = 0, glow = 0) {
   ctx.restore();
 }
 
-export function drawRubble(ctx, cam, b) {
+export function drawRubble(ctx, cam, b, burnt = false) {
   const hw = b.w / 2;
   const hh = b.h / 2;
   const x0 = b.x - hw;
@@ -719,8 +719,9 @@ export function drawRubble(ctx, cam, b) {
   else if (b.kind === 'hall') wall = HALL_WALLS[seed0 % HALL_WALLS.length];
   else if (b.kind === 'station') wall = '#cdbb98';
   else wall = FACT_WALLS[seed0 % FACT_WALLS.length];
-  drawBox(ctx, cam, x0 + 2, y0 + 2, x0 + b.w - 2, y0 + b.h - 2, 4, '#6f6a62', { roof: '#857f75', noShadow: true });
-  const H = TOWN_H[b.kind] || 40;
+  if (burnt) wall = '#4d4842'; // ausgebranntes Teamgebäude: verkohlt
+  drawBox(ctx, cam, x0 + 2, y0 + 2, x0 + b.w - 2, y0 + b.h - 2, 4, burnt ? '#3a3632' : '#6f6a62', { roof: burnt ? '#45403a' : '#857f75', noShadow: true });
+  const H = b.hgt ?? (TOWN_H[b.kind] || 40);
   const pieces = [];
   // Mauerrest: eine Ecke steht noch (zwei kurze Wandstücke)
   const ex = rnd() < 0.5 ? x0 : x0 + b.w;
@@ -732,7 +733,7 @@ export function drawRubble(ctx, cam, b) {
   pieces.push({ x0: Math.min(ex, ex + sx * lx), y0: Math.min(ey, ey + sy * 8), x1: Math.max(ex, ex + sx * lx), y1: Math.max(ey, ey + sy * 8), h: H * 0.5, c: wall });
   pieces.push({ x0: Math.min(ex, ex + sx * 8), y0: Math.min(ey, ey + sy * ly), x1: Math.max(ex, ex + sx * 8), y1: Math.max(ey, ey + sy * ly), h: H * 0.35, c: shade(wall, 0.15) });
   const n = Math.max(6, Math.min(26, Math.round((b.w * b.h) / 700)));
-  const grays = ['#8d877c', '#79736a', '#9a9387', '#6b655d', wall];
+  const grays = burnt ? ['#5a554e', '#47423c', '#6d675e', '#2a2724', '#7a5a3a'] : ['#8d877c', '#79736a', '#9a9387', '#6b655d', wall];
   for (let i = 0; i < n; i++) {
     const s = 5 + rnd() * 10;
     const px = x0 + 6 + rnd() * (b.w - 12 - s);
@@ -741,4 +742,17 @@ export function drawRubble(ctx, cam, b) {
   }
   pieces.sort((a, c) => cam.depth((a.x0 + a.x1) / 2, (a.y0 + a.y1) / 2) - cam.depth((c.x0 + c.x1) / 2, (c.y0 + c.y1) / 2));
   for (const p of pieces) drawBox(ctx, cam, p.x0, p.y0, p.x1, p.y1, p.h, p.c, { noShadow: p.h < 10 });
+}
+
+/** Fahrzeugwrack isometrisch ohne Modellbild: flache, verkohlte Wanne; Panzer und Schützenpanzer mit verdrehtem Turm. */
+export function drawWreckBox(ctx, cam, w) {
+  const seed = hash(w.x, w.y) || 1;
+  const big = w.type === 'tank';
+  const len = w.air ? w.r * 2.4 : big ? 28 : w.type === 'ifv' ? 24 : 18;
+  const wid = w.air ? w.r * 0.9 : big ? 18 : w.type === 'ifv' ? 14 : 12;
+  drawRotBox(ctx, cam, w.x, w.y, len, wid, w.angle, w.air ? 6 : 8, '#2b2825', { roof: '#3a3530' });
+  if (w.type === 'tank' || w.type === 'ifv') {
+    const ta = w.angle + ((seed % 628) / 100);
+    drawRotBox(ctx, cam, w.x, w.y, big ? 14 : 11, big ? 12 : 9, ta, 5, '#2b2825', { base: 8, roof: '#36312c', noShadow: true });
+  }
 }
