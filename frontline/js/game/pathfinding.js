@@ -2,6 +2,7 @@
 // Die Arbeitsspeicher (Typed Arrays, Binärheap) werden pro Grid-Größe wiederverwendet.
 
 const SQRT2 = Math.SQRT2;
+const H_WEIGHT = 1.05; // Gewicht der Heuristik bei Hangkosten
 const DIAG_EXTRA = SQRT2 - 1;
 // Index 0-3: orthogonal, 4-7: diagonal
 const DX = [1, -1, 0, 0, 1, 1, -1, -1];
@@ -115,6 +116,10 @@ export function findPath(grid, sx, sy, tx, ty, team, maxNodes = 20000) {
 
   const w = getWorkspace(cols * rows);
   const stamp = w.stamp;
+  const cost = grid.cost; // Hänge kosten mehr (Zehntel je Zelle)
+  // Mit Hangkosten leicht gewichtete Heuristik: kaum längere Wege, aber viel weniger untersuchte Zellen (sonst reicht maxNodes nicht)
+  const hw = cost ? H_WEIGHT : 1;
+  if (cost) maxNodes *= 2; // variable Kosten: die Suche untersucht mehr Zellen
   const { g, parent, seen, closed } = w;
 
   // Die Startzelle gilt immer als passierbar
@@ -161,13 +166,13 @@ export function findPath(grid, sx, sy, tx, ty, team, maxNodes = 20000) {
 
       const ni = nr * cols + nc;
       if (closed[ni] === stamp) continue;
-      const ng = g[i] + (k < 4 ? 1 : SQRT2);
+      const ng = g[i] + (k < 4 ? 1 : SQRT2) * (cost ? 1 + cost[ni] / 10 : 1);
       if (seen[ni] === stamp && g[ni] <= ng) continue;
 
       seen[ni] = stamp;
       g[ni] = ng;
       parent[ni] = i;
-      heapPush(w, ni, ng + heuristic(nc, nr, tc, tr));
+      heapPush(w, ni, ng + hw * heuristic(nc, nr, tc, tr));
     }
   }
 
@@ -185,23 +190,43 @@ export function findPath(grid, sx, sy, tx, ty, team, maxNodes = 20000) {
   }
   if (found) pts[pts.length - 1] = { x: tx, y: ty };
 
-  // String-Pulling: vom aktuellen Anker so weit wie möglich per Sichtlinie springen
+  // String-Pulling: vom aktuellen Anker so weit wie möglich per Sichtlinie springen. Mit Hangkosten nur, wenn die Abkürzung nicht
+  // teurer ist als der gefundene Weg bis dorthin (sonst zöge sie den Talweg wieder über den Hügel).
   const out = [];
   let ax = sx;
   let ay = sy;
+  let ag = 0; // Wegkosten bis zum Anker
+  const gAt = (k) => g[cells[cells.length - 1 - k]];
   let i = 0;
   while (i < pts.length) {
     let last = i;
     for (let k = i; k < pts.length; k++) {
-      if (lineOfSight(grid, ax, ay, pts[k].x, pts[k].y, team)) last = k;
-      else break;
+      if (!lineOfSight(grid, ax, ay, pts[k].x, pts[k].y, team)) break;
+      if (cost && k > i && lineCost(grid, ax, ay, pts[k].x, pts[k].y) > (gAt(k) - ag) * 1.02 + 0.3) break;
+      last = k;
     }
     out.push(pts[last]);
     ax = pts[last].x;
     ay = pts[last].y;
+    ag = gAt(last);
     i = last + 1;
   }
   return out;
+}
+
+/** Kosten einer geraden Strecke in Zellen (wie g der Suche: Länge in Zellen × (1 + Hangkosten)), Zellen in halben Schritten abgetastet. */
+function lineCost(grid, x0, y0, x1, y1) {
+  const len = Math.hypot(x1 - x0, y1 - y0);
+  const n = Math.max(1, Math.ceil(len / (grid.tile / 2)));
+  const cost = grid.cost;
+  let sum = 0;
+  for (let k = 0; k < n; k++) {
+    const f = (k + 0.5) / n;
+    const c = Math.floor((x0 + (x1 - x0) * f) / grid.tile);
+    const r = Math.floor((y0 + (y1 - y0) * f) / grid.tile);
+    sum += 1 + (grid.inBounds(c, r) ? cost[r * grid.cols + c] : 0) / 10;
+  }
+  return (sum * len) / n / grid.tile;
 }
 
 /**
@@ -209,6 +234,7 @@ export function findPath(grid, sx, sy, tx, ty, team, maxNodes = 20000) {
  * (Startzelle ausgenommen). Bei genau durch eine Ecke laufender Linie müssen beide Orthogonalen frei sein.
  */
 export function lineOfSight(grid, x0, y0, x1, y1, team) {
+  const ok = (c, r) => grid.passable(c, r, team);
   const tile = grid.tile;
   let c = Math.floor(x0 / tile);
   let r = Math.floor(y0 / tile);
@@ -233,7 +259,7 @@ export function lineOfSight(grid, x0, y0, x1, y1, team) {
   while ((c !== ec || r !== er) && guard-- > 0) {
     if (Math.abs(tMaxX - tMaxY) < 1e-9) {
       // Linie geht genau durch eine Ecke
-      if (!grid.passable(c + sC, r, team) || !grid.passable(c, r + sR, team)) return false;
+      if (!ok(c + sC, r) || !ok(c, r + sR)) return false;
       c += sC;
       r += sR;
       tMaxX += tDeltaX;
@@ -245,7 +271,7 @@ export function lineOfSight(grid, x0, y0, x1, y1, team) {
       r += sR;
       tMaxY += tDeltaY;
     }
-    if (!grid.passable(c, r, team)) return false;
+    if (!ok(c, r)) return false;
   }
   return true;
 }

@@ -263,11 +263,33 @@ export class AI {
     return { x, y };
   }
 
+  /** Höchster begehbarer Punkt auf einem Kreis (Radius r) um (x, y) oder die Mitte selbst: Höhenvorteil im Gefecht. */
+  highGround(x, y, r) {
+    const g = this.game;
+    if (!g.relief) return { x, y };
+    let best = { x, y };
+    let bestH = -Infinity;
+    for (let k = 0; k <= 8; k++) {
+      const a = (k / 8) * TWO_PI;
+      const d = k === 8 ? 0 : r;
+      const px = x + Math.cos(a) * d;
+      const py = y + Math.sin(a) * d;
+      if (!g.grid.passable(g.grid.toCell(px), g.grid.toCell(py), this.team)) continue;
+      const h = g.relief.heightAt(px, py) + (k === 8 ? 4 : 0); // bei Gleichstand die Mitte
+      if (h > bestH) {
+        bestH = h;
+        best = { x: px, y: py };
+      }
+    }
+    return best;
+  }
+
   /** Sammelpunkt: an der Zonen-FOB (Richtung Basis), sonst Richtung Zone vor der Haupt-FOB. */
   gatherPoint(s) {
     if (s.zoneFob && s.zoneFob.built) {
       const v = unitVec(s.ax - s.zoneFob.x, s.ay - s.zoneFob.y);
-      return this.freeNear(s.zoneFob.x + v.x * ZONE_GATHER_DIST, s.zoneFob.y + v.y * ZONE_GATHER_DIST);
+      const p = this.highGround(s.zoneFob.x + v.x * ZONE_GATHER_DIST, s.zoneFob.y + v.y * ZONE_GATHER_DIST, 120);
+      return this.freeNear(p.x, p.y);
     }
     return this.freeNear(s.ax + s.dir.x * GATHER_DIST, s.ay + s.dir.y * GATHER_DIST);
   }
@@ -1090,7 +1112,8 @@ export class AI {
         const ids = clumped.filter((_, k) => k % groups === i).map((u) => u.id);
         if (!ids.length) continue;
         const a = base + (i * TWO_PI) / groups;
-        g.issue(t, { type: 'attackMove', ids, x: z.x + Math.cos(a) * 400, y: z.y + Math.sin(a) * 400 });
+        const p = this.highGround(z.x + Math.cos(a) * 400, z.y + Math.sin(a) * 400, 220); // Kuppen bevorzugt
+        g.issue(t, { type: 'attackMove', ids, x: p.x, y: p.y });
       }
     }
   }

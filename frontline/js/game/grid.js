@@ -1,4 +1,5 @@
 // Zellenraster für Terrain, Gebäude und Tore. Kein DOM.
+import { BALANCE } from '../data/balance.js';
 
 export class Grid {
   constructor(cols, rows, tile) {
@@ -9,6 +10,7 @@ export class Grid {
     this.terrain = new Uint8Array(n); // 1 = Hindernis
     this.struct = new Int32Array(n); // Gebäude-ID oder 0
     this.gateTeam = new Int8Array(n).fill(-1); // Team des Tors oder -1
+    this.cost = null; // Zusatzkosten je Zelle in Zehnteln (Hänge, rasterizeRelief); null = überall 0
   }
 
   idx(c, r) {
@@ -81,11 +83,20 @@ export class Grid {
     }
   }
 
-  /** Gelände (relief.js): zu steile Hänge und Seen sind Hindernisse. relief = null (flache Karte) ändert nichts. */
+  /**
+   * Gelände (relief.js): zu steile Hänge und Seen sind Hindernisse; Hänge kosten die Wegsuche mehr (Talwege werden bevorzugt,
+   * am Hang sind Einheiten langsamer). relief = null (flache Karte) ändert nichts.
+   */
   rasterizeRelief(relief) {
     if (!relief) return;
+    const k = BALANCE.slope.pathCost * 10;
+    this.cost = new Uint8Array(this.cols * this.rows);
     for (let r = 0; r < this.rows; r++) {
-      for (let c = 0; c < this.cols; c++) if (relief.cellBlocked(c, r)) this.terrain[this.idx(c, r)] = 1;
+      for (let c = 0; c < this.cols; c++) {
+        const i = this.idx(c, r);
+        if (relief.cellBlocked(c, r)) this.terrain[i] = 1;
+        else this.cost[i] = Math.min(255, Math.round(relief.cellSlope(c, r) * k));
+      }
     }
   }
 

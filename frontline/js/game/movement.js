@@ -147,10 +147,30 @@ function followAir(u, dt) {
   return true;
 }
 
+/**
+ * Tempofaktor am Hang für eine Fahrt in Richtung (dx, dy): bergauf langsamer, bergab etwas schneller; Fahrzeuge spüren es
+ * stärker als Infanterie. 1 auf flachen Karten und für Hubschrauber.
+ */
+export function slopeFactor(relief, u, dx, dy) {
+  if (!relief || u.def.air) return 1;
+  const d = Math.hypot(dx, dy);
+  if (d < 1e-6) return 1;
+  const g = relief.gradAt(u.x, u.y);
+  const grade = (g.x * dx + g.y * dy) / d; // > 0 bergauf
+  const S = BALANCE.slope;
+  const inf = u.def.armor === 'inf';
+  const f = grade >= 0 ? 1 - grade * (inf ? S.upInf : S.upVeh) : 1 - grade * (inf ? S.downInf : S.downVeh);
+  return Math.min(S.max, Math.max(S.min, f));
+}
+
 function followPath(game, u, dt) {
   if (u.def.air) return followAir(u, dt);
   const grid = game.grid;
   let budget = u.def.speed * u.speedMul * dt;
+  if (game.relief && u.pathIndex < u.path.length) {
+    const wp = u.path[u.pathIndex];
+    budget *= slopeFactor(game.relief, u, wp.x - u.x, wp.y - u.y);
+  }
   while (budget > 1e-9 && u.pathIndex < u.path.length) {
     const wp = u.path[u.pathIndex];
     if (!grid.passable(grid.toCell(wp.x), grid.toCell(wp.y), u.team)) return false;

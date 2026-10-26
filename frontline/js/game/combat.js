@@ -26,13 +26,36 @@ export function sectorOf(s, t) {
 /**
  * Schaden eines Direkttreffers. Hat die Waffe für das Ziel (Typ, sonst Panzerklasse) eine Trefferzahl (`hits`),
  * töten genau so viele Treffer das volle Ziel; sonst gilt die Schadenstabelle der Panzerklasse.
+ * mult (z. B. Höhenvorteil): Schaden × mult, bei Trefferzahlen gerundet n / mult Treffer (mindestens 1).
  */
-export function shotDamage(spec, s, t) {
+export function shotDamage(spec, s, t, mult = 1) {
   const table = spec.hits;
   const entry = table && t.kind === 'unit' ? (table[t.type] ?? table[t.def.armor]) : undefined;
-  if (entry === undefined) return spec.damage[dmgKey(t)] || 0;
+  if (entry === undefined) return (spec.damage[dmgKey(t)] || 0) * mult;
   const n = typeof entry === 'number' ? entry : entry[sectorOf(s, t)];
-  return (t.def.hp / n) * 1.001;
+  const k = mult === 1 ? n : Math.max(1, Math.round(n / mult));
+  return (t.def.hp / k) * 1.001;
+}
+
+/** Schusshöhe: Gelände unter dem Schützen bzw. Ziel; Hubschrauber zählen nicht (null). */
+function standHeight(game, e) {
+  if (e.kind === 'unit' && e.def.air) return null;
+  return game.groundHeight(e);
+}
+
+/**
+ * Höhenvorteil im Direktfeuer (Age of Empires II): steht der Schütze höher, bis +bonus Schaden, steht er tiefer, bis −bonus.
+ * Unter `dead` Höhenunterschied kein Effekt, voll ab `full`. 1 auf flachen Karten und mit Hubschraubern.
+ */
+export function heightMult(game, s, t) {
+  if (!game.relief) return 1;
+  const hs = standHeight(game, s);
+  const ht = standHeight(game, t);
+  if (hs === null || ht === null) return 1;
+  const H = BALANCE.height;
+  const dh = hs - ht;
+  const f = Math.min(1, Math.max(0, (Math.abs(dh) - H.dead) / (H.full - H.dead)));
+  return 1 + Math.sign(dh) * f * H.bonus;
 }
 
 /**
@@ -107,7 +130,7 @@ function findTarget(game, hash, s, radius, minRange, allowBuildings, dmg) {
 }
 
 function fireDirect(game, s, t, w) {
-  const dmg = shotDamage(w, s, t);
+  const dmg = shotDamage(w, s, t, heightMult(game, s, t));
   if ((w.damage.light || 0) >= 60) {
     // Panzerabwehr / Kampfpanzer: Geschoss plus kleine Explosion
     game.addEffect('shell', s.x, s.y, s.team, t.x, t.y);
@@ -156,7 +179,7 @@ function tryFireUnit(game, u, t) {
     game.addEffect('tracer', u.x, u.y, u.team, t.x, t.y);
   }
   if (u.def.stealth) u.revealedUntil = game.time + BALANCE.stealth.revealTime; // ein Schuss verrät die Stellung
-  hit(game, t, shotDamage(pick.spec, u, t));
+  hit(game, t, shotDamage(pick.spec, u, t, heightMult(game, u, t)));
 }
 
 function fireShell(game, s, tx, ty, w) {

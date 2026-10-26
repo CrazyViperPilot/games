@@ -3,6 +3,7 @@
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { lacksAmmo } from '../game/entities.js';
+import { heightMult } from '../game/combat.js';
 import { builderState, fobLabel, orderText } from './status.js';
 
 const RES_KEYS = ['money', 'bm', 'mun', 'fuel'];
@@ -264,6 +265,7 @@ export class Hud {
     let h =
       `<div class="title">${esc(u.def.name)}</div>${bar(f, 'hp', hpColor(f))}` +
       `<div class="muted small">${Math.ceil(u.hp)} / ${u.maxHp} HP · ${esc(orderText(this.game, u))}</div>`;
+    if (this.game.relief && !u.def.air) h += this.heightInfo(u);
     if (u.weapons.length) {
       for (const w of u.weapons) h += gauge(w.spec.name, Math.floor(w.rounds), w.spec.rounds, COLOR.mun);
       h += `<div class="muted small">Nachladen in der FOB: ${Math.ceil(u.def.ammoMax - u.ammo)} Munition fehlen</div>`;
@@ -289,6 +291,19 @@ export class Hud {
         ` · Ladungsart: ${PRESET_NAME[u.preset] || u.preset}</div>`;
     }
     return h;
+  }
+
+  /** Standhöhe; zeigt der Zeiger auf einen sichtbaren Gegner, auch den Höhenvorteil gegen ihn. */
+  heightInfo(u) {
+    const g = this.game;
+    let line = `Standhöhe ${Math.round(g.groundHeight(u))}`;
+    const t = g.getEntity(this.controller.view.hoverId);
+    if (t && t.team !== u.team && u.weapons.length && g.sees(u.team, t)) {
+      const m = heightMult(g, u, t);
+      const p = Math.round(Math.abs(m - 1) * 100);
+      if (p >= 1) line += m > 1 ? ` · Ziel tiefer: +${p} % Schaden` : ` · Ziel höher: −${p} % Schaden`;
+    }
+    return `<div class="muted small">${esc(line)}</div>`;
   }
 
   /** Gebäude: FOB (Lager, Baustelle), Baustelle (Fortschritt, Status), Förderanlage, Ausbildung. */

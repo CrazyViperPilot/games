@@ -129,7 +129,8 @@ export class Game {
     this.grid.rasterizeObstacles(this.map.obstacles);
     this.grid.rasterizeRects(blockers(this.map.town?.buildings ?? []));
     this.grid.rasterizeTrees([...(this.map.town?.trees ?? []), ...(this.map.trees ?? [])]);
-    this.grid.rasterizeRelief(reliefOf(this.map)); // steile Hänge und Seen
+    this.relief = reliefOf(this.map); // Höhengelände oder null (flache Karte)
+    this.grid.rasterizeRelief(this.relief); // steile Hänge und Seen, Hangkosten der Wegsuche
 
     this.time = 0;
     this.nextId = 1;
@@ -247,6 +248,11 @@ export class Game {
     for (const u of this.units) if (u.alive && u.team === team && (u.x - e.x) ** 2 + (u.y - e.y) ** 2 <= r2) return true;
     for (const b of this.buildings) if (b.alive && b.built && b.team === team && (b.x - e.x) ** 2 + (b.y - e.y) ** 2 <= r2) return true;
     return false;
+  }
+
+  /** Geländehöhe unter einer Entity (Wasseroberfläche bei Seen); 0 auf flachen Karten. */
+  groundHeight(e) {
+    return this.relief ? this.relief.displayAt(e.x, e.y) : 0;
   }
 
   isExplored(team, x, y) {
