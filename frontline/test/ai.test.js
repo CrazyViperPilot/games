@@ -16,6 +16,7 @@ function playAiVsAi(seed, minutes) {
   const game = new Game({ seed });
   const ais = [new AI(game, 0, 'normal'), new AI(game, 1, 'normal')];
   const seen = [new Set(), new Set()]; // alle je gesehenen Einheiten-IDs je Team
+  const types = [new Set(), new Set()]; // alle je gesehenen Einheitentypen je Team
   let zoneHeld = false;
   let maxFobs = [0, 0];
   const steps = Math.round((minutes * 60) / DT);
@@ -24,7 +25,10 @@ function playAiVsAi(seed, minutes) {
     ais[1].update(DT);
     game.update(DT);
     if (i % 20 === 0) {
-      for (const u of game.units) seen[u.team].add(u.id);
+      for (const u of game.units) {
+        seen[u.team].add(u.id);
+        types[u.team].add(u.type);
+      }
       if (game.zone.owner >= 0) zoneHeld = true;
       for (let t = 0; t < 2; t++) maxFobs[t] = Math.max(maxFobs[t], mine(game, t, 'fob').length);
     }
@@ -34,6 +38,7 @@ function playAiVsAi(seed, minutes) {
     time: game.time,
     winner: game.winner,
     produced: seen.map((s) => s.size - START_UNITS),
+    types,
     zoneHeld,
     maxFobs,
   };
@@ -101,9 +106,10 @@ test('KI ersetzt ein verlorenes Baufahrzeug', () => {
 });
 
 test('KI: bildet ab 3 min mit Armee einen Späher (Little Bird) aus', () => {
+  // Späher fliegen an den gegnerischen Zonenrand und fallen dort oft; gezählt wird, ob einer ausgebildet wurde
   const r = playAiVsAi(2, 8);
-  const scouts = [0, 1].map((t) => r.game.units.filter((u) => u.alive && u.team === t && u.type === 'littlebird').length);
-  assert.ok(scouts[0] + scouts[1] >= 1, `Späher: ${scouts}`);
+  const scouts = [0, 1].map((t) => r.types[t].has('littlebird'));
+  assert.ok(scouts[0] || scouts[1], `Späher: ${scouts}`);
 });
 
 test('KI-Mischung: gegen Gepanzerte mehr PAK/Panzer, gegen Infanterie mehr Schützen; ohne Sicht Grundmischung', () => {

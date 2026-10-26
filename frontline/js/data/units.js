@@ -69,6 +69,28 @@ export const UNITS = {
     canRide: true,
     hotkey: 'T',
   },
+  // Kommandeur (Held, nach Empire Earth): einer je Team, belegt keinen Platz. Aura (BALANCE.commander): eigene Einheiten in der Nähe
+  // schießen schneller, verletzte Infanterie heilt. Fällt er, bekommt der Gegner Punkte; die Haupt-FOB bildet einen neuen aus.
+  commander: {
+    name: 'Kommandeur',
+    armor: 'inf',
+    hero: true,
+    slots: 0,
+    hp: 300,
+    speed: 42,
+    radius: 7,
+    sight: 340,
+    // Maschinenpistole: 3 Magazine à 30 Schuss
+    weapons: [
+      { id: 'smg', name: 'Maschinenpistole', range: 180, cooldown: 0.6, rounds: 90, munCost: 1 / 30, hits: { inf: 6 }, damage: { inf: 10, light: 2, heavy: 1, struct: 2, air: 2 } },
+    ],
+    cost: { money: 400 },
+    buildTime: 20,
+    producedAt: 'fob',
+    fuelPerSec: 0,
+    canRide: true,
+    hotkey: 'C',
+  },
   truck: {
     name: 'LKW',
     armor: 'light',

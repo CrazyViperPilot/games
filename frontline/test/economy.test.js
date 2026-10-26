@@ -87,11 +87,12 @@ test('Zonengeld: kein Deckel – 40 Einheiten in der Zone bringen 16 Geld/s', ()
   assert.equal(g.zone.counts[0], 40);
 });
 
-test('Start: 36 Einheiten je Team (LKW, Baufahrzeug, 2 MBT, 3 SPz, 22 Schützen, 7 Panzerabwehrsoldaten) = 50 Plätze', () => {
-  assert.equal(BALANCE.startUnits.length, 36);
+test('Start: 37 Einheiten je Team (LKW, Baufahrzeug, 2 MBT, 3 SPz, 22 Schützen, 7 Panzerabwehrsoldaten, Kommandeur) = 50 Plätze', () => {
+  assert.equal(BALANCE.startUnits.length, 37);
   const g = mk({ seed: 7 });
   for (let t = 0; t < 2; t++) {
-    assert.equal(unitsOf(g, t).length, 36);
+    assert.equal(unitsOf(g, t).length, 37);
+    assert.equal(unitsOf(g, t, 'commander').length, 1, 'Kommandeur belegt keinen Platz');
     assert.equal(unitsOf(g, t, 'truck').length, 1);
     assert.equal(unitsOf(g, t, 'engineer').length, 1);
     assert.equal(unitsOf(g, t, 'tank').length, 2);
@@ -172,7 +173,7 @@ test('KI: setzt die Startarmee sofort ein, die Reserve bleibt an der Haupt-FOB',
   const g = mk({ seed: 7 });
   const ai = new AI(g, 1, 'normal');
   ai.update(DT); // erster Denkschritt sofort
-  const combat = unitsOf(g, 1).filter((u) => u.def.range > 0);
+  const combat = unitsOf(g, 1).filter((u) => u.def.range > 0 && !u.def.hero); // der Kommandeur bleibt hinter der Armee
   const moving = combat.filter((u) => u.order.type === 'attackMove');
   assert.equal(combat.length, 34);
   assert.ok(moving.length >= 0.75 * combat.length, `${moving.length} von ${combat.length} rücken aus`);

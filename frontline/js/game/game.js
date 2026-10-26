@@ -21,6 +21,7 @@ import { createCrates, updateCrates, updateCrateIntel, cmdPickup, cmdDeliver, cm
 import { createScars, updateScars, updateScarIntel, addUnitWreck, addBuildingWreck, clearWrecksUnder } from './scars.js';
 import { createAnimals, updateAnimals } from './animals.js';
 import { FORMATIONS, formationSlots, updateFormations } from './formation.js';
+import { hasCommander, updateCommanders, commanderFallen } from './commander.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
@@ -97,6 +98,7 @@ function takeCarried(list, bm) {
   }
 }
 const NO_CARRIED = 'Zu wenig getragenes Baumaterial (Soldaten laden es in einer FOB)';
+const ONE_COMMANDER = 'Nur ein Kommandeur je Team';
 
 /** Zellen einer Geraden zwischen zwei Zellen (Bresenham, inklusive Endpunkte). */
 function lineCells(c0, r0, c1, r1) {
@@ -825,7 +827,8 @@ export class Game {
     if (!b.built) return fail('Gebäude ist noch im Bau');
     if (!UNITS[cmd.unit] || !b.produces.includes(cmd.unit)) return fail('Nur die Haupt-FOB bildet Einheiten aus');
     if (b.queue.length >= BALANCE.queueMax) return fail('Warteschlange ist voll');
-    if (this.slotsUsed(team) + (UNITS[cmd.unit].slots || 1) > BALANCE.slotCap) return fail('Einheitenlimit erreicht');
+    if (this.slotsUsed(team) + (UNITS[cmd.unit].slots ?? 1) > BALANCE.slotCap) return fail('Einheitenlimit erreicht');
+    if (UNITS[cmd.unit].hero && hasCommander(this, team)) return fail(ONE_COMMANDER);
     const cost = UNITS[cmd.unit].cost;
     if (!this.canAfford(team, cost)) return fail(this.missingMoney());
     this.pay(team, cost);
@@ -836,7 +839,7 @@ export class Game {
 
   /** Belegte Plätze eines Teams: lebende Einheiten, Passagiere und Warteschlangen, je nach `slots` der Sorte. */
   slotsUsed(team) {
-    const s = (def) => def.slots || 1;
+    const s = (def) => def.slots ?? 1;
     let n = 0;
     for (const u of this.units) {
       if (!u.alive || u.team !== team) continue;
@@ -860,17 +863,18 @@ export class Game {
     return n;
   }
 
-  /** Lebende Infanterie eines Teams (inkl. Passagiere in Fahrzeugen) plus Infanterie in Ausbildungs-Warteschlangen. */
+  /** Lebende Infanterie eines Teams (inkl. Passagiere in Fahrzeugen) plus Infanterie in Ausbildungs-Warteschlangen; ohne Kommandeur. */
   soldierCount(team) {
+    const soldier = (def) => def.armor === 'inf' && !def.hero;
     let n = 0;
     for (const u of this.units) {
       if (!u.alive || u.team !== team) continue;
-      if (u.def.armor === 'inf') n += 1;
-      for (const p of u.passengers) if (p.def.armor === 'inf') n += 1;
+      if (soldier(u.def)) n += 1;
+      for (const p of u.passengers) if (soldier(p.def)) n += 1;
     }
     for (const b of this.buildings) {
       if (!b.alive || b.team !== team) continue;
-      for (const e of b.queue) if (UNITS[e.unit].armor === 'inf') n += 1;
+      for (const e of b.queue) if (soldier(UNITS[e.unit])) n += 1;
     }
     return n;
   }
@@ -973,7 +977,11 @@ export class Game {
       else {
         this.entities.delete(u.id);
         if (u.house) dropOccupant(this, u);
-        if (u.hp <= 0) addUnitWreck(this, u); // eingestiegene Passagiere (alive = false, hp > 0) hinterlassen nichts
+        if (u.hp <= 0) {
+          addUnitWreck(this, u); // eingestiegene Passagiere (alive = false, hp > 0) hinterlassen nichts
+          // gefallener Kommandeur, auch als Passagier eines zerstörten Fahrzeugs
+          for (const h of [u, ...u.passengers]) if (h.def.hero) commanderFallen(this, h);
+        }
       }
     }
     units.length = k;
@@ -1013,6 +1021,7 @@ export class Game {
     updateLogistics(this, dt);
     updateConstruction(this, dt);
     separate(this);
+    updateCommanders(this, dt);
     updateCombat(this, dt);
     updateZone(this, dt);
     updateHot(this, dt);

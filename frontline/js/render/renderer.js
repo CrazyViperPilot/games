@@ -21,6 +21,7 @@ import {
   drawFire,
   drawAnimalTop,
   drawAnimalSide,
+  drawStar,
 } from './sprites.js';
 import { builderState } from '../ui/status.js';
 import { makeRng } from '../core/rng.js';
@@ -53,6 +54,9 @@ const AMMO_COLOR = '#7f93ad'; // Munitionsbalken (grau-blau)
 const FUEL_COLOR = '#9b7bc4'; // Treibstoffbalken (violett)
 const BAR_W = 24; // Balkenbreite über Einheiten (Welt-px)
 const HP_OFFSET = 14; // Abstand Lebensbalken-Oberkante zum Einheitenrand (Bildschirm-px); darunter Vorrat
+const STAR_UP = 8; // Stern des Kommandeurs: so weit über dem Lebensbalken (Bildschirm-px)
+const STAR_R = 8; // Radius des Sterns (Bildschirm-px)
+const ISO_STAR_UP = 0; // Iso: zusätzlich angehoben (Welt-px), über dem Kopf der Figur
 const FOG_EXPLORED_ALPHA = 150; // erkundet: abgedunkelt, nicht schwarz
 const MARKER_LIFE = 0.8; // s, Lebensdauer des Wegziel-Markers
 const SLOT_LIFE = 1.6; // s, so lange zeigen Punkte die Formationsplätze
@@ -242,6 +246,9 @@ export class Renderer {
       if (!(sel.has(u.id) || hover === u || u.hp < u.maxHp)) continue;
       const bw = 24;
       this.drawHp(ctx, u.x - bw / 2, u.y - u.def.radius - HP_OFFSET / z, bw, u.hp / u.maxHp, z);
+    }
+    for (const u of g.units) {
+      if (u.alive && u.def.hero && !u.house && shown(u) && inRect(u.x, u.y, 30)) drawStar(ctx, u.x, u.y - u.def.radius - (HP_OFFSET + STAR_UP) / z, STAR_R / z, z);
     }
     for (const b of g.buildings) {
       if (!b.alive || b.team !== team || !inRect(b.x, b.y, 40)) continue;
@@ -606,6 +613,11 @@ export class Renderer {
       upright(u.x, u.y, unitLift(u));
       this.drawHp(ctx, u.x - 12, u.y - u.def.radius - HP_OFFSET / z, 24, u.hp / u.maxHp, z);
     }
+    for (const u of g.units) {
+      if (!u.alive || !u.def.hero || u.house || !shown(u) || !inRect(u.x, u.y, PAD)) continue;
+      upright(u.x, u.y, unitLift(u) + ISO_STAR_UP);
+      drawStar(ctx, u.x, u.y - u.def.radius - (HP_OFFSET + STAR_UP) / z, STAR_R / z, z);
+    }
     for (const b of g.buildings) {
       if (!b.alive || b.team !== team || !inRect(b.x, b.y, PAD)) continue;
       if (!(sel.has(b.id) || hover === b || b.hp < b.maxHp)) continue;
@@ -834,6 +846,15 @@ export class Renderer {
       const b = g.getEntity(id);
       if (b && b.kind === 'building' && b.def.weapon && b.def.weapon.shell && b.team === this.team) {
         this.drawMortarRange(ctx, b, z);
+        continue;
+      }
+      if (b && b.kind === 'unit' && b.def.hero && !b.house) {
+        // Kommandeur: Umkreis seiner Aura
+        this.groundArc(ctx, b.x, b.y, BALANCE.commander.aura);
+        ctx.fillStyle = 'rgba(242,201,76,0.06)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(242,201,76,0.8)';
+        ctx.stroke();
         continue;
       }
       if (!b || b.kind !== 'building' || b.type !== 'fob') continue;

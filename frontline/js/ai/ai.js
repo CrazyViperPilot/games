@@ -5,6 +5,7 @@ import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { makeRng } from '../core/rng.js';
+import { hasCommander } from '../game/commander.js';
 
 const MAX_PLACE = 100; // canPlace-Aufrufe je Denkschritt (Budget für die Platzsuche)
 const DEF_RANGE = BALANCE.fob.buildRadius; // Bauradius = Verteidigungsradius einer FOB
@@ -56,6 +57,11 @@ const GARRISON_EVERY = 8; // s zwischen zwei Besetzungsrunden
 const CRATE_EVERY = 6; // s zwischen zwei Runden der Kistensuche
 const CRATE_RANGE = 4500; // ein Soldat holt nur Kisten in diesem Umkreis
 const CRATE_PICKERS = { easy: 1, normal: 2, hard: 3 }; // so viele Soldaten holen oder tragen gleichzeitig Kisten
+const CMD_BEHIND = 220; // Kommandeur steht so weit hinter dem Schwerpunkt der Armee (seine Aura reicht 300 px)
+const CMD_DANGER = 450; // sichtbare Gegner so nah: der Kommandeur weicht zur Haupt-FOB aus
+const CMD_MOVE = 200; // neuer Marschbefehl erst, wenn der Wunschplatz so weit vom alten Ziel liegt
+const CMD_RESERVE = 300; // Geld, das nach der Ausbildung eines neuen Kommandeurs übrig bleiben soll
+const CMD_FROM = 90; // s Spielzeit, ab der ein gefallener Kommandeur ersetzt wird
 const DEG = Math.PI / 180;
 const SITE_ANGLES = [0, 30, -30, 60, -60, 90, -90, 120, -120, 150, -150, 180].map((d) => d * DEG);
 const TWO_PI = Math.PI * 2;
@@ -124,6 +130,7 @@ export class AI {
     this.fallBack(s);
     this.expand(s); // FOB-Baustellen setzen (Material liefert der Lieferant)
     this.scout(s); // vor produce: der Späher bekommt das Geld zuerst
+    this.replaceCommander(s);
     this.produce(s);
     this.buildDefense(s);
     this.buildWall(s);
@@ -132,6 +139,7 @@ export class AI {
     this.rally(s);
     this.garrisonZone(s);
     this.army(s);
+    this.guardCommander(s);
     this.collectCrates(s); // nach der Welle: Kisten holen nur, die zurückbleiben (Reserve, Nachschub)
   }
 
@@ -153,7 +161,7 @@ export class AI {
     const enemies = g.units.filter((u) => u.alive && u.team !== t && g.sees(t, u));
     this.corridor = home ? { x: home.x, y: home.y, dx: dir.x, dy: dir.y } : null;
 
-    const combat = units.filter((u) => u.def.range > 0 && !u.crate); // Kistenträger kämpfen nicht
+    const combat = units.filter((u) => u.def.range > 0 && !u.crate && !u.def.hero); // Kistenträger kämpfen nicht, der Kommandeur bleibt hinten
     const queuedCombat = own.reduce((n, b) => n + b.queue.filter((e) => UNITS[e.unit ?? e].range > 0).length, 0);
     const zoneFob = fobs.find((f) => dist(f.x, f.y, zone.x, zone.y) <= ZONE_FOB_R + 16) ?? null;
     const alarm =
@@ -179,6 +187,7 @@ export class AI {
       units,
       combat,
       combatN: combat.length + queuedCombat,
+      commander: units.find((u) => u.def.hero) ?? null,
       trucks: units.filter((u) => u.type === 'truck').sort((a, b) => a.id - b.id),
       engineers: units.filter((u) => u.type === 'engineer').sort((a, b) => a.id - b.id),
       needMat,
@@ -1052,7 +1061,7 @@ export class AI {
     const z = s.zone;
     const t = this.team;
     const inZone = (e) => dist(e.x, e.y, z.x, z.y) <= z.r;
-    const inf = s.units.filter((u) => u.def.armor === 'inf' && u.def.range > 0 && inZone(u));
+    const inf = s.units.filter((u) => u.def.armor === 'inf' && u.def.range > 0 && !u.def.hero && inZone(u));
     const pending = new Map(); // Haus-ID → Soldaten auf dem Weg hinein
     let housed = 0;
     for (const u of inf) {
@@ -1106,6 +1115,7 @@ export class AI {
     const pool = s.units.filter(
       (u) =>
         u.def.armor === 'inf' &&
+        !u.def.hero &&
         !u.crate &&
         !u.house &&
         (u.order.type === 'idle' || u.order.type === 'move') &&
@@ -1128,6 +1138,43 @@ export class AI {
       pool.splice(pool.indexOf(best), 1);
       free--;
     }
+  }
+
+  /** Gefallenen Kommandeur ersetzen (Haupt-FOB), sobald genug Geld für ihn und eine Reserve da ist. */
+  replaceCommander(s) {
+    const g = this.game;
+    if (!s.home || !s.home.built || g.time < CMD_FROM || hasCommander(g, this.team)) return;
+    if (g.teams[this.team].res.money < UNITS.commander.cost.money + CMD_RESERVE) return;
+    if (s.home.queue.length >= BALANCE.queueMax) return;
+    g.issue(this.team, { type: 'train', buildingId: s.home.id, unit: 'commander' });
+  }
+
+  /**
+   * Kommandeur hinter der Armee: CMD_BEHIND px hinter dem Schwerpunkt der Kampfeinheiten draußen (Richtung Haupt-FOB), damit seine
+   * Aura wirkt, er selbst aber nicht in der ersten Reihe steht. Sichtbare Gegner nahe: zurück zur Haupt-FOB. Ohne Armee draußen
+   * wartet er am Sammelpunkt.
+   */
+  guardCommander(s) {
+    const c = s.commander;
+    if (!c || c.house || !s.home) return;
+    const g = this.game;
+    let goal;
+    if (s.enemies.some((e) => !e.def.air && e.def.range > 0 && dist(e.x, e.y, c.x, c.y) < CMD_DANGER)) {
+      goal = this.freeNear(s.ax + s.dir.x * 120, s.ay + s.dir.y * 120);
+    } else {
+      const field = s.combat.filter((u) => !u.def.air && !u.house && dist(u.x, u.y, s.ax, s.ay) > GATHER_DIST * 2);
+      if (field.length >= 3) {
+        const cx = field.reduce((a, u) => a + u.x, 0) / field.length;
+        const cy = field.reduce((a, u) => a + u.y, 0) / field.length;
+        const v = unitVec(s.ax - cx, s.ay - cy);
+        goal = this.freeNear(cx + v.x * CMD_BEHIND, cy + v.y * CMD_BEHIND);
+      } else {
+        goal = this.gatherPoint(s);
+      }
+    }
+    if (dist(c.x, c.y, goal.x, goal.y) < CMD_MOVE / 2) return;
+    if (c.order.type === 'move' && dist(c.order.x, c.order.y, goal.x, goal.y) < CMD_MOVE) return;
+    g.issue(this.team, { type: 'move', ids: [c.id], x: goal.x, y: goal.y });
   }
 
   army(s) {

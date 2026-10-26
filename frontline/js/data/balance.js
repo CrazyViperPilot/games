@@ -10,8 +10,9 @@ export const BALANCE = {
   startRes: { money: 800 }, // Startgeld; die Haupt-FOB hat unendlich Baumaterial, Munition und Treibstoff
   // Einheitenlimit in Plätzen je Team: Soldat/LKW/Baufahrzeug/Hubschrauber 1, Schützenpanzer 3, Kampfpanzer 5 (`slots` in units.js)
   slotCap: 50,
-  // Start: 2 Kampfpanzer (10 Plätze), 3 Schützenpanzer (9), LKW und Baufahrzeug (2), 29 Soldaten (22 Schützen, 7 Panzerabwehr) = 50 Plätze
-  startUnits: ['truck', 'engineer', 'tank', 'tank', 'ifv', 'ifv', 'ifv', ...Array(22).fill('rifleman'), ...Array(7).fill('at')],
+  // Start: 2 Kampfpanzer (10 Plätze), 3 Schützenpanzer (9), LKW und Baufahrzeug (2), 29 Soldaten (22 Schützen, 7 Panzerabwehr) = 50 Plätze;
+  // dazu der Kommandeur (0 Plätze, hinten an der Haupt-FOB)
+  startUnits: ['truck', 'engineer', 'tank', 'tank', 'ifv', 'ifv', 'ifv', ...Array(22).fill('rifleman'), ...Array(7).fill('at'), 'commander'],
   // Geld je Sekunde und lebende eigene Einheit in der Konfliktzone (auch umkämpft, ohne Deckel)
   zone: { r: 3300, unitIncome: 0.4 },
   // Hot Zone: kleiner Kreis in der Konfliktzone, wandert zufällig oder zu aktiven Bohrern.
@@ -103,6 +104,9 @@ export const BALANCE = {
   // lineMax breit, Kolonne ab columnSingle Einheiten zweireihig. Geschlossen fahren: wer mehr als lead px (Restweg) vor dem Median
   // liegt, bremst (je brake px weiter voraus stärker, bis slowest × Grundtempo); wer mehr als lag px zurückliegt, fährt eigenes Tempo.
   formation: { gap: 12, spacingMin: 26, spacingMax: 44, lineMax: 10, columnSingle: 8, lead: 16, brake: 80, slowest: 0.1, lag: 80, stuck: 3, stuckDist: 8 },
+  // Kommandeur (Held, einer je Team): Aura-Radius, Feuerrate darin (×), Heilung der Infanterie darin (HP/s, erst healDelay s nach dem
+  // letzten Treffer); fällt er, bekommt der Gegner deathPoints Punkte
+  commander: { aura: 300, fireRate: 1.1, heal: 1.5, healDelay: 6, deathPoints: 5 },
   animals: {
     pairs: 4,
     deer: [3, 5],

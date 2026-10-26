@@ -4,6 +4,7 @@ import { createShell, inRange, radiusOf, isFoe, resolveTarget } from './entities
 import { buildHash, nearby } from './movement.js';
 import { damageHouse } from './garrison.js';
 import { addCrater } from './scars.js';
+import { auraCooldown } from './commander.js';
 
 const SCAN = BALANCE.scanInterval;
 const MAX_UNIT_RADIUS = 16; // größter Einheitenradius (Trefferkreis-Suche)
@@ -187,7 +188,7 @@ function tryFireUnit(game, u, t) {
     return;
   }
   pick.rounds -= 1;
-  pick.cd = pick.spec.cooldown;
+  pick.cd = auraCooldown(u, pick.spec.cooldown); // Kommandeur in der Nähe: schneller
   game.teams[u.team].used.mun += pick.spec.munCost;
   if ((pick.spec.damage.light || 0) >= 60) {
     game.addEffect('shell', u.x, u.y, u.team, t.x, t.y);

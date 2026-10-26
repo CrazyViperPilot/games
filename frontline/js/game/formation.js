@@ -10,12 +10,12 @@ const F = BALANCE.formation;
 
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 
-/** Rang in der Formation: 0 Kampfpanzer, 1 bewaffnete leichte Fahrzeuge, 2 Infanterie, 3 Scharfschützen, 4 unbewaffnete Fahrzeuge. */
+/** Rang in der Formation: 0 Kampfpanzer, 1 bewaffnete leichte Fahrzeuge, 2 Infanterie, 3 Scharfschützen und Kommandeur, 4 unbewaffnete Fahrzeuge. */
 export function formationRank(u) {
   const d = u.def;
   if (d.armor === 'heavy') return 0;
   if (d.armor === 'light') return d.range > 0 ? 1 : 4;
-  return d.stealth ? 3 : 2;
+  return d.stealth || d.hero ? 3 : 2;
 }
 
 /** Plätze (seitlich, nach hinten) in Abständen s für n Einheiten; Reihe 0 liegt am Ziel. */

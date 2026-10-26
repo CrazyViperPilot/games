@@ -5,6 +5,7 @@ import { UNITS } from '../data/units.js';
 
 const TILE = BALANCE.map.tile;
 const OUTLINE = 'rgba(0,0,0,0.65)';
+const GOLD = '#f2c94c';
 export const BUILD_ABBR = { fob: 'FOB', depot: 'FZ-HALLE', extractor: 'FÖR', mortar: 'MÖR', aa: 'FLA', helipad: 'HELI', drill: 'BOHR' };
 export const NODE_COLOR = { bm: '#8b5a2b', mun: '#d9b600', fuel: '#3b2350' };
 export const NODE_LABEL = { bm: 'BM', mun: 'MUN', fuel: 'TS' };
@@ -80,7 +81,25 @@ export function drawUnit(ctx, u, color, zoom = 1, aim = null, now = 0, iso = fal
   ctx.strokeStyle = OUTLINE;
   ctx.lineWidth = 1 / z;
 
-  if (u.type === 'rifleman' || u.type === 'at') {
+  if (u.type === 'commander') {
+    // Kommandeur: kurze Waffe, Körper mit goldenem Rand (Abzeichen), der Stern darüber kommt vom Renderer
+    ctx.save();
+    ctx.rotate(turret);
+    ctx.fillStyle = '#2b2f2b';
+    ctx.fillRect(0, -1, 7, 2);
+    ctx.restore();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(0, 0, 5.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = GOLD;
+    ctx.lineWidth = 1.6 / z;
+    ctx.stroke();
+    ctx.fillStyle = light;
+    ctx.beginPath();
+    ctx.arc(-1.2, -1.2, 1.8, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (u.type === 'rifleman' || u.type === 'at') {
     const at = u.type === 'at';
     ctx.save();
     ctx.rotate(turret);
@@ -396,6 +415,24 @@ export function drawCrate(ctx, x, y, s = 16, zoom = 1, glow = 0) {
 }
 
 /** Mörsergranate in der Luft: Spur vom Abschuss, Kopf, Markierung am Ziel. */
+/** Goldener Stern (Kommandeur) mit Mittelpunkt (x, y), Radius r (Welt-Maße). */
+export function drawStar(ctx, x, y, r, zoom = 1) {
+  ctx.save();
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5;
+    const k = i % 2 ? r * 0.45 : r;
+    ctx.lineTo(x + Math.cos(a) * k, y + Math.sin(a) * k);
+  }
+  ctx.closePath();
+  ctx.fillStyle = GOLD;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(60,40,0,0.85)';
+  ctx.lineWidth = 1 / zoom;
+  ctx.stroke();
+  ctx.restore();
+}
+
 export function drawShell(ctx, s, zoom = 1) {
   const z = zoom || 1;
   const head = Math.max(3, 3.5 / z);

@@ -139,7 +139,7 @@ export function drawTreeSprite(ctx, cam, t) {
   return true;
 }
 
-const INFANTRY_NAME = { rifleman: 'rifleman', at: 'at', sniper: 'sniper' };
+const INFANTRY_NAME = { rifleman: 'rifleman', at: 'at', sniper: 'sniper', commander: 'rifleman' }; // Kommandeur: Schützen-Bild, Stern vom Renderer
 /** Bildschirmrichtung einer Weltrichtung als Sektor 0–7 (0 = rechts, im Uhrzeigersinn). */
 function headingSector(cam, angle) {
   const [a, b, c, d] = cam.isoMatrix(1);

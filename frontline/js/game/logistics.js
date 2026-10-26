@@ -187,7 +187,7 @@ function stepTruck(game, u, dt) {
 
 /** Darf `rider` in `vehicle` einsteigen? Hubschrauber nehmen Infanterie und Baufahrzeuge, Bodenfahrzeuge nur Infanterie. */
 export function canSeat(vehicle, rider) {
-  return rider.def.canRide && !rider.crate && (vehicle.def.air || rider.def.builder === 'fort');
+  return rider.def.canRide && !rider.crate && (vehicle.def.air || rider.def.armor === 'inf');
 }
 
 /** { type: 'board', ids, heliId }: Infanterie/Baufahrzeuge gehen zu einem eigenen Hubschrauber und steigen ein. */

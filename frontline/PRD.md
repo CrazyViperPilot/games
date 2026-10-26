@@ -103,6 +103,7 @@ Gebäude können abgerissen werden (Erstattung 25 % Baumaterial). **Einheitenlim
 | Little Bird | Haupt-FOB | Unbewaffnet, schnell, **5 Passagiere** (Infanterie, Baufahrzeug) |
 | Transporthubschrauber | Haupt-FOB | Unbewaffnet, **9 Passagiere** und **400 Ressourcen** (laden/entladen/pendeln wie ein LKW) |
 | AH-64 (Kampfhubschrauber) | Haupt-FOB | Bordkanone und 10 Raketen (Tabelle oben), 650 HP, 70 Treibstoff; Nachtanken/-laden in einer FOB |
+| Kommandeur (Held, seit v4.49) | Haupt-FOB | **Einmalig je Team**, belegt **keinen Platz**, jedes Team startet mit ihm (hinten an der Haupt-FOB). Maschinenpistole (schwach). **Aura 300 px:** eigene Einheiten darin schießen **10 % schneller** (Abklingzeit ÷ 1,1), verletzte Infanterie darin heilt **1,5 HP/s**, sobald sie 6 s nicht getroffen wurde (Fahrzeuge nicht). **Fällt er, bekommt der Gegner 5 Punkte** (kann die Partie entscheiden; auch als Passagier eines zerstörten Fahrzeugs). Danach bildet die Haupt-FOB einen neuen aus (C, 400 Geld, 20 s); ein zweiter, auch in der Warteschlange, wird abgelehnt. Goldener Stern über der Figur (für beide Seiten sichtbar, soweit in Sicht), gewählt zeigt er den Aura-Kreis. Zählt nicht als Soldat für den Nachschub. `BALANCE.commander`, `js/game/commander.js` |
 
 **Scharfschütze und Tarnung:** Der Scharfschütze ist getarnt: Gegner sehen ihn nur, wenn eine ihrer Einheiten oder ein fertiges Gebäude näher als **160 px** an ihm steht, oder **4 s lang nach jedem seiner Schüsse**. Unentdeckt wird er nicht angegriffen und ist weder auf der Karte noch auf der Minimap zu sehen (eigene Einheiten sehen ihn immer). Er sieht selbst 440 px weit, sein Gewehr reicht 480 px, und Einheiten ohne Befehl schießen bis zu dieser Reichweite (nicht nur bis zur Leine von 300 px). Ein Schuss verbraucht 4 Munition; mit seiner Reichweite und der Tarnung ist er gegen Infanterie stark, gegen Fahrzeuge, Gebäude und Hubschrauber nutzlos. Die KI baut ihn nicht, sieht ihn aber nach denselben Tarnregeln. Er zählt zu den Soldaten für den Nachschub (Abschnitt 3).
 
@@ -127,6 +128,7 @@ Schadensmodell: Schaden je Schuss nach Panzerklasse des Ziels (Infanterie / leic
 | Little Bird | 220 | 170 | 380 | – | 350 | 15 s | 60 / 0,5 |
 | Transporthubschrauber | 500 | 130 | 320 | – | 600 | 20 s | 90 / 0,7 |
 | AH-64 | 650 | 150 | 400 | 340 | 900 | 28 s | 70 / 0,8 |
+| Kommandeur | 300 | 42 | 340 | 180 | 400 | 20 s | – |
 
 | Gebäude | HP | Größe (Zellen) | Kosten | Bauzeit |
 |---|---|---|---|---|
@@ -148,6 +150,7 @@ Schaden je Schuss nach Panzerklasse des Ziels (Inf = Infanterie, Leicht, Schwer,
 | Schütze: Gewehr | 200 | 1,0 | 12 | 3 | 1 | 4 | 3 | – |
 | PAK: RPG | 240 | 3,0 | 10 | 90 | 120 | 60 | 40 | – |
 | Scharfschütze: Gewehr | 480 | 8,0 | 200 (ein Treffer tötet Soldaten) | 6 | 1 | 2 | 2 | – (10 Schuss à 4 Munition) |
+| Kommandeur: Maschinenpistole | 180 | 0,6 | 10 (6 Treffer gegen Soldaten) | 2 | 1 | 2 | 2 | – (90 Schuss) |
 | SPz: Granatwerfer | 240 | 2,0 | 30 | 40 | 10 | 25 | – | Leicht, Schwer, Geb |
 | SPz: MG | 220 | 0,25 | 9 | 3 | 1 | 3 | 6 | – |
 | KPz: Hauptkanone | 300 | 6,0 | 45 | 120 | 150 | 120 | – | Leicht, Schwer, Geb |
@@ -257,7 +260,7 @@ Direktfeuer richtet sich nach Trefferzahlen (volles Ziel); Seite = Winkel zur Fa
 | Transportfahrzeuge | Infanterie wählen + **I** (Einsteigen, dann Fahrzeug antippen) oder Rechtsklick auf LKW / Baufahrzeug / Schützenpanzer / Hubschrauber = einsteigen · Fahrzeug wählen + **O** und Zielpunkt = absetzen · Transporthubschrauber: L/U/T wie LKW |
 | Versorgungskisten | Infanterie wählen + Rechtsklick/Tippen auf eine Kiste = holen (der nächste trägt, die übrigen begleiten) · Träger + Rechtsklick auf eigene FOB = dorthin bringen · **K** = Kiste ablegen |
 | Häuserkampf | Infanterie wählen + Rechtsklick/Tippen auf ein Haus der Stadt (oder **I**, dann Haus antippen) = besetzen · Klick auf eigenes besetztes Haus = Besatzung wählen · **O** = Raus · Rechtsklick auf gegnerisch besetztes Haus = angreifen |
-| Haupt-FOB gewählt | Ausbildung: Q Schütze · W PAK · T Scharfschütze · E LKW · R Baufahrzeug · A SPz · S KPz · D Little Bird · F Transporter · G AH-64 |
+| Haupt-FOB gewählt | Ausbildung: Q Schütze · W PAK · T Scharfschütze · E LKW · R Baufahrzeug · A SPz · S KPz · D Little Bird · F Transporter · G AH-64 · C Kommandeur (einmalig) |
 | LKW gewählt | L Laden · U Entladen · T Pendeln (Start-FOB, dann Ziel-FOB) · Ladung Q Gemischt / W Baumaterial / E Munition / R Treibstoff |
 | Entf | Gebäude abreißen |
 | Esc | Abbrechen / Auswahl aufheben |
@@ -314,6 +317,7 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 - **Gruppen-Rückzug:** Steht eine Gruppe im Feuer (mindestens 4 Gegner sichtbar) und ist der Wert der Gegner mindestens 1,8-mal so hoch wie der der eigenen Einheiten dort, zieht die ganze Gruppe 1400 px Richtung Basis ab (nicht bei Angriff auf die Basis). 30 s lang gibt die KI danach keine Angriffsbefehle, damit sich die Gruppe sammelt; ein laufender Überfall wird abgebrochen. Einheiten werden im Spiel nicht geheilt, der Rückzug rettet sie also nur vor dem Tod.
 - **Zonen-FOB-Verteidigung:** Mörser und Flugabwehr der Zonen-FOB setzt die KI zur Gegnerseite hin (andere FOBs wie bisher zur Zone hin); die Zonen-FOB bekommt zwei Mörser statt einem.
 - **Formation:** Angriffswellen marschieren im **Keil** (§8): Panzer vorn, alle kommen zusammen an statt nacheinander.
+- **Kommandeur:** zieht nie mit der Welle, sondern steht 220 px hinter dem Schwerpunkt der Armee draußen (Richtung Haupt-FOB), damit seine Aura wirkt; ohne Armee draußen wartet er am Sammelpunkt. Sind sichtbare bewaffnete Gegner näher als 450 px, weicht er zur Haupt-FOB aus. Fällt er, bildet die KI ab 90 s Spielzeit einen neuen aus, sobald danach noch 300 Geld übrig bleiben. Er holt keine Kisten und besetzt keine Häuser.
 - **Häuserkampf:** Bis zu 40 % der Infanterie in der Zone besetzen Häuser in der Nähe und halten sie (§7).
 - **Versorgungskisten:** Alle 6 s (nach den Angriffsbefehlen) schickt die KI freie Soldaten (untätig oder auf dem Weg zum Sammelpunkt, nicht in Häusern oder beim Überfall) zu Kisten aus ihrem Lagebild (§7) im Umkreis von 4500 px; Soldaten in der Zone gelten als 800 px weiter weg (sie verdienen dort Geld). Kisten mit sichtbaren Gegnern in der Nähe lässt sie liegen. Gleichzeitig holen oder tragen Leicht 1, Normal 2, Schwer 3 Soldaten. Kistenträger zählen nicht zur Armee.
 - **Schwierigkeit über Verhalten:** *Leicht*: langsame Denkschritte (3 s), hohe Angriffsschwelle, kein Späher, kein Konter-Mix, keine Überfälle, kein Rückzug, Einkommen ×0,8. *Normal*: 2 s, Späher und Konter-Mix. *Schwer*: 1 s, niedrigere Angriffsschwelle, dazu Überfälle und Gruppen-Rückzug; **kein Einkommensbonus mehr** (vorher ×1,25).
@@ -357,6 +361,7 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 - **Could:** Sound, Statistik am Spielende.
 
 ## Änderungsverlauf
+- v4.49: **Kommandeur** (§6, §10, Vorschlag nach dem Strategen-Helden aus Empire Earth und dem Königsmord-Modus aus Age of Empires II): einmalige Heldeneinheit je Team ohne Platzbedarf; Aura 300 px (10 % schneller schießen, Infanterie heilt), sein Tod bringt dem Gegner 5 Punkte, Haupt-FOB bildet ihn neu aus (C). Die KI hält ihn hinter der Armee. Nebenbei: Scharfschützen (und der Kommandeur) steigen jetzt auch in LKW, Baufahrzeug und Schützenpanzer, wie es §6 für Infanterie vorsieht (vorher nur in Hubschrauber). Cache v61.
 - v4.48: **Formationen** (§8, §10, Vorschlag nach Age of Empires II): Linie, Keil und Kolonne für Marsch- und Angriffsbefehle (Taste F), Panzer vorn, Infanterie dahinter; die Gruppe marschiert geschlossen im Tempo der langsamsten Einheit und rückt am Ziel genau auf ihre Plätze. Die KI greift im Keil an. Locker bleibt der Standard. Cache v60.
 - v4.47: **Tiere** (§9, Vorschlag nach den Jagdtieren aus Age of Empires II): Rehe und Wildschweine in Rudeln auf den Wiesen außerhalb der Zone; sie grasen, ziehen weiter und fliehen vor Einheiten und Explosionen (das ganze Rudel). Rein optisch, nur in Sicht. Cache v59.
 - v4.46: **Felder, Weiden, Feldwege** (§7, Vorschlag nach den Farmen aus Age of Empires II): Gehöfte mit Äckern (Weizen, junge Saat, gepflügt, Raps) und Weiden um die Einzelhäuser, freie Flure, Feldwege zur nächsten Straße; nur Boden. Kartenformat `town.fields`, Editor-Werkzeug „Feld“. Cache v58.
