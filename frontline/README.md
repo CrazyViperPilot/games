@@ -51,6 +51,7 @@ Spezifikation: [PRD.md](PRD.md) · Architektur: [PLAN.md](PLAN.md)
 - `?seed=N`: feste Karte (gleicher Seed = gleiche Partie).
 - `?speed=N`: Startgeschwindigkeit.
 - `?gl=0`: Gelände der Iso-Ansicht ohne WebGL (flach, nur aufgemalt).
+- `?debug=1&fog=1`: Debug, aber mit Nebel (Sicht im Gelände prüfen).
 
 Beispiel: `http://localhost:8765/frontline/?debug=1&seed=123&speed=3`
 

@@ -15,6 +15,7 @@ import { showStartMenu, showPause, showHelp, showEnd, hideOverlay } from './ui/m
 
 const params = new URLSearchParams(location.search);
 const DEBUG = params.get('debug') === '1';
+const REVEAL = DEBUG && params.get('fog') !== '1'; // Debug deckt die Karte auf; `fog=1` behält den Nebel (Sicht prüfen)
 // Ansicht: ?iso=1 / ?iso=0 oder zuletzt gewählt (V bzw. Schaltfläche); Standard 2D
 function loadIso() {
   if (params.has('iso')) return params.get('iso') === '1';
@@ -234,7 +235,7 @@ function startGame(opts) {
 
   const home = controller.homeBase();
   if (home) camera.centerOn(home.x, home.y);
-  if (DEBUG) {
+  if (REVEAL) {
     renderer.revealAll = true;
     minimap.revealAll = true;
   }
@@ -251,7 +252,7 @@ function startGame(opts) {
     update(dt) {
       ai.update(dt);
       game.update(dt);
-      if (DEBUG) game.fog[HUMAN].revealAll(); // Simulation setzt den Nebel alle 0,25 s neu
+      if (REVEAL) game.fog[HUMAN].revealAll(); // Simulation setzt den Nebel alle 0,25 s neu
     },
     render: () => frame(s),
   });

@@ -6,6 +6,7 @@ import { Relief, COARSE_N, setRelief } from '../js/game/relief.js';
 import { createEmptyMap } from '../js/game/mapdata.js';
 import { heightMult, shotDamage } from '../js/game/combat.js';
 import { slopeFactor, planPath } from '../js/game/movement.js';
+import { sightAt } from '../js/game/fog.js';
 import { UNITS } from '../js/data/units.js';
 import { BALANCE } from '../js/data/balance.js';
 
@@ -90,4 +91,34 @@ test('Wegsuche: der Weg weicht der steilen Hügelflanke aus, wenn der Umweg kurz
     py = p.y;
   }
   assert.ok(maxH < 150, `höchster Punkt am Weg ${maxH.toFixed(0)}`);
+});
+
+test('Sicht im Gelände: von oben weiter, ein Kamm verdeckt das Tal dahinter', () => {
+  // Kamm (Höhe 140, begehbar) in Nord-Süd-Richtung bei x = 4500, Beobachter westlich am Hang, Ziel östlich hinter dem Kamm
+  const map = createEmptyMap('Kamm');
+  const r = new Relief();
+  for (let j = 0; j < COARSE_N; j++) {
+    for (let i = 0; i < COARSE_N; i++) r.coarse[j * COARSE_N + i] = 20 + 140 * Math.exp(-(((i * RES - 4500) / 320) ** 2));
+  }
+  r.refine();
+  setRelief(map, r);
+  const g = new Game({ map });
+  for (const u of g.units) u.alive = false;
+  for (const b of g.buildings) if (b.team === 0) b.alive = false;
+  const scout = g.spawnUnit('rifleman', 0, 4150, 5000);
+  const foe = g.spawnUnit('rifleman', 1, 4750, 5000); // 600 px entfernt, hinter dem Kamm
+  scout.def = { ...scout.def, sight: 650 };
+  g.updateFog();
+  assert.equal(g.sees(0, foe), false, 'hinter dem Kamm verborgen');
+  assert.equal(g.isVisible(0, 4150, 4500), true, 'diesseits frei');
+  scout.x = 4500; // auf den Kamm
+  g.updateFog();
+  assert.equal(g.sees(0, foe), true, 'vom Kamm aus sichtbar');
+  // Weitsicht: oben weiter als unten
+  const flat = new Game({ map: createEmptyMap() });
+  assert.equal(sightAt(null, 0, 0, 300), 300);
+  assert.ok(sightAt(g.relief, 4500, 5000, 300) > 300 * 1.3, 'auf dem Kamm');
+  assert.ok(g.relief.cellSlope(Math.floor(4500 / 32), Math.floor(5000 / 32)) < 0.42);
+  assert.equal(sightAt(g.relief, 3000, 5000, 300), 300, 'im Tal');
+  assert.ok(flat);
 });
