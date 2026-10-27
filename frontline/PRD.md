@@ -23,7 +23,7 @@ Nicht im Umfang: Netzwerk-Multiplayer, Kampagne, Speichern laufender Partien, So
 3. Nur die Haupt-FOB bildet Einheiten aus (nur gegen Geld; mit Forschung Schützenpanzer, Scharfschützen und Hubschrauber erst ab Stufe 2, Kampfpanzer und AH-64 ab Stufe 3, §7). Man bringt Einheiten und Nachschub per LKW an die Front, gründet vordere FOBs
    (Verschanzen mit Mauern und Tore, Mörser, Flak, Nachladen und Tanken) und hält die Zone.
 4. In der Mitte liegt die sehr große **Konfliktzone** (eine Stadt). Wer dort mehr Spieler hat (Hot Zone doppelt), füllt den Punktebalken und bekommt Geld. In ihr wandert die **Hot Zone** (Abschnitt 7).
-5. **Sieg:** zuerst die Siegpunktzahl (Standard 100) erreichen – oder der Gegner hat keine FOB und kein Baufahrzeug mehr – oder (wenn eingeschaltet) einen **Sendemast** 5 Minuten halten (§7).
+5. **Sieg:** zuerst die Siegpunktzahl (Standard 100) erreichen – oder der Gegner hat keine FOB und kein Baufahrzeug mehr – oder (wenn eingeschaltet) einen **Sendemast** 30 Minuten halten (§7).
 
 ## 3. Ressourcen & Logistik
 
@@ -242,7 +242,7 @@ Direktfeuer richtet sich nach Trefferzahlen (volles Ziel); Seite = Winkel zur Fa
 - **Zweite Siegbedingung**, im Startmenü ein- und ausschaltbar („Sendemast-Sieg“, gemerkt, Standard An; `Game({ radio })`, ohne Angabe aus).
 - Bau wie jedes Gebäude im Bauradius einer eigenen FOB (nur Baufahrzeug, Taste **G** im Baumenü): **2000 Geld + 600 Baumaterial**, 120 s, 3000 HP. **Einer je Team** (auch als Baustelle).
 - Der Gegner erfährt den **Baubeginn** („Der Gegner baut einen Sendemast“, ohne Ort). **Fertig** ist der Mast für den Gegner **überall sichtbar** (Karte, Minimap, auch im Nebel), beide bekommen eine Meldung mit Ort.
-- Hält der fertige Mast **5 Minuten** (`BALANCE.radio.hold`), gewinnt sein Team (`winReason 'radio'`). Eine Minute vorher warnt eine Meldung beide. Wird er zerstört, verfällt die Zeit; ein neuer Mast beginnt von vorn.
+- Hält der fertige Mast **30 Minuten** (`BALANCE.radio.hold`), gewinnt sein Team (`winReason 'radio'`). Eine Minute vorher warnt eine Meldung beide. Wird er zerstört, verfällt die Zeit; ein neuer Mast beginnt von vorn.
 - Oben zeigt ein roter Kasten die Restzeit je fertigem Mast (beide Seiten). Iso: rot-weißer Gittermast (170 px) mit Abspannseilen, Antennen in Teamfarbe und blinkendem Licht; 2D: Sockel mit Gitter von oben.
 - `js/game/radio.js`, `BUILDINGS.radio`.
 

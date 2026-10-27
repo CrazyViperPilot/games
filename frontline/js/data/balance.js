@@ -110,7 +110,7 @@ export const BALANCE = {
   // letzten Treffer); fällt er, bekommt der Gegner deathPoints Punkte
   commander: { aura: 300, fireRate: 1.1, heal: 1.5, healDelay: 6, deathPoints: 5 },
   // Sendemast (zweite Siegbedingung): so lange halten (s) = Sieg; Warnung an beide, wenn noch warn s fehlen
-  radio: { hold: 300, warn: 60 },
+  radio: { hold: 1800, warn: 60 },
   // Wetter und Jahreszeiten (nach Empire Earth II, im Startmenü; ohne Angabe aus): Sichtweite × sight je Wetter; Bodenfahrzeuge
   // × vehicle bei Schneefall, × winter auf Winterboden. Ein Wetter hält phase s (Zufall je Art), Übergänge blenden über fade s.
   // Häufigkeit (Gewichte) des nächsten Wetters je Jahreszeit: odds (nie dasselbe Wetter zweimal hintereinander).
