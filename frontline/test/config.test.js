@@ -5,6 +5,7 @@ import { BALANCE, QUICK } from '../js/data/balance.js';
 import { UNITS } from '../js/data/units.js';
 import { BUILDINGS } from '../js/data/buildings.js';
 import { MIX } from '../js/data/ai.js';
+import { MAPGEN } from '../js/data/mapgen.js';
 import { WEATHER_SETTINGS } from '../js/game/weather.js';
 
 const RES = Object.keys(BALANCE.resNames);
@@ -20,6 +21,7 @@ test('keine NaN- oder undefined-Werte in BALANCE und QUICK', () => {
   };
   walk(BALANCE, 'BALANCE');
   walk(QUICK, 'QUICK');
+  walk(MAPGEN, 'MAPGEN');
 });
 
 test('BALANCE liest die Schnelleinstellungen', () => {
@@ -39,6 +41,7 @@ test('Einheiten: Werte, Kosten, Waffen', () => {
     for (const f of ['hp', 'speed', 'sight', 'buildTime', 'radius']) assert.ok(positive(u[f]), `UNITS.${k}.${f} = ${u[f]}`);
     for (const [r, v] of Object.entries(u.cost)) assert.ok(RES.includes(r) && v >= 0, `UNITS.${k}.cost.${r}`);
     assert.ok(u.slots === undefined || u.slots >= 0, `UNITS.${k}.slots`);
+    assert.ok(typeof u.short === 'string' && u.short, `UNITS.${k}.short fehlt (Kurzname)`);
     for (const w of u.weapons ?? []) {
       for (const f of ['range', 'cooldown', 'rounds']) assert.ok(positive(w[f]), `UNITS.${k} Waffe ${w.id}.${f} = ${w[f]}`);
       for (const [c, v] of Object.entries(w.damage)) assert.ok(['inf', 'light', 'heavy', 'struct', 'air'].includes(c) && v >= 0, `UNITS.${k} Waffe ${w.id}.damage.${c}`);

@@ -12,7 +12,7 @@ die genannten Dateien.
 
 1. Die Simulation (`js/data`, `js/core/rng.js`, `js/game`, `js/ai`) kennt kein DOM und kein `window`. Sie läuft in Node-Tests.
 2. Spieler und KI ändern das Spiel **nur** über `game.issue(team, cmd)`. Renderer, HUD und Minimap lesen nur.
-3. Spielwerte gehören nach `js/data/` (`balance.js` mit den Schnelleinstellungen `QUICK` ganz oben, `units.js`, `buildings.js`, `ai.js`),
+3. Spielwerte gehören nach `js/data/` (`balance.js` mit den Schnelleinstellungen `QUICK` ganz oben, `units.js`, `buildings.js`, `ai.js`, `mapgen.js`),
    mit deutschem Kommentar, was sie bewirken. Keine neuen Balance-Zahlen als Konstanten in `js/game` oder `js/ai`.
 4. Zufall in der Simulation nur über `game.rng` bzw. `makeRng(seed)` (`js/core/rng.js`), nie `Math.random()`. Gleicher Seed = gleiche Partie.
    Zufallskarten ohne Fluss müssen je Seed unverändert bleiben (gespeicherte Seeds, Tests).
@@ -80,7 +80,8 @@ Darunter listet ein Inhaltsverzeichnis alle weiteren Abschnitte.
 | Höhenvorteil, Tempo am Hang, Weitsicht von oben | balance.js | `BALANCE.height`, `BALANCE.slope`, `BALANCE.sightHeight` |
 | Wetter, Häuserkampf, Kisten, Kommandeur, Formationen, Fluss, Tiere, Wracks, Tarnung, Flugabwehr | balance.js | `weather`, `garrison`, `crates`, `commander`, `formation`, `river`, `animals`, `scars`, `stealth`, `airFire` |
 | Kartengröße | balance.js | `BALANCE.map` (Vorsicht: ändert alle Karten und Tests) |
-| Aufbau der Zufallskarte (Hügel, Seen, Häuser, Felder, Kisten-Abstände) | js/game/map.js, js/game/landscape.js | Konstanten am Dateianfang (ändert alle Zufallskarten) |
+| Aufbau der Zufallskarte (Hügel, Seen, Fluss, Stadt, Häuser, Felder, Kisten-Abstände) | js/data/mapgen.js | `MAPGEN.<abschnitt>` (ändert alle Zufallskarten) |
+| Kurznamen in der Befehlskarte | units.js, buildings.js | `short` |
 | Standards im Startmenü (Schwierigkeit, Schalter) | balance.js | `BALANCE.menuDefaults` |
 | Teamnamen und -farben | balance.js | `BALANCE.teamNames`, `BALANCE.teamColors` |
 
@@ -112,7 +113,7 @@ Wo jedes Feature liegt. „KI“ = Konstanten-Präfix in `js/data/ai.js`, Logik 
 | Sendemast | §7 „Sendemast“ | `radio`, `BUILDINGS.radio` | `radio.js` | `RADIO_*`, `difficulty.radioFrom` | `sprites.js`, `isobuild.js`, `hud.js` | `radio.test.js` |
 | Wetter und Jahreszeiten | §7 „Wetter“ | `weather` | `weather.js` | `WX_*` | `weatherfx.js`, `season.js` | `weather.test.js` |
 | Forschungsstufen | §7 „Forschungsstufen“ | `research` | `research.js` | `UPGRADES`, `UPGRADE_RESERVE` | `controller.js`, `hud.js` | `research.test.js` |
-| Zufallskarte, Stadt, Gehöfte, Felder | §7, §9a | `map`, `zone.r` | `map.js`, `landscape.js` | – | `terrain.js`, `iso.js`, `isobuild.js`, `isosprites.js` | `map.test.js`, `fields.test.js` |
+| Zufallskarte, Stadt, Gehöfte, Felder | §7, §9a | `map`, `zone.r`, `MAPGEN` | `map.js`, `landscape.js` | – | `terrain.js`, `iso.js`, `isobuild.js`, `isosprites.js` | `map.test.js`, `fields.test.js` |
 | Wracks und Krater (nur Optik) | §9 | `scars` | `scars.js` | – | `sprites.js` (`drawWreck`, `drawCrater`) | `scars.test.js` |
 | Tiere (nur Optik) | §9 | `animals` | `animals.js` | – | `sprites.js` (`drawAnimal*`) | `animals.test.js` |
 | KI allgemein | §10 | `difficulty` | – | `js/ai/ai.js` | – | `ai.test.js` |
@@ -129,10 +130,10 @@ Wo jedes Feature liegt. „KI“ = Konstanten-Präfix in `js/data/ai.js`, Logik 
 3. `CACHE_VERSION` in `sw.js` erhöhen, `npm run test:quick`, dann `npm test`. Schlägt ein Test fehl, der genau diesen Wert prüft: Test an die neue Regel anpassen, nicht umgekehrt.
 
 ### Neue Einheit
-1. `js/data/units.js`: ähnliche Einheit kopieren, neuen Schlüssel vergeben; `name`, Werte, `weapons`, `cost`, `buildTime`, `slots`, `hotkey` anpassen (Taste darf in der Haupt-FOB noch nicht belegt sein).
+1. `js/data/units.js`: ähnliche Einheit kopieren, neuen Schlüssel vergeben; `name`, `short`, Werte, `weapons`, `cost`, `buildTime`, `slots`, `hotkey` anpassen (Taste darf in der Haupt-FOB noch nicht belegt sein).
 2. `js/data/buildings.js`: Schlüssel in `fob.produces` eintragen.
 3. `js/data/balance.js`: Stufe in `research.unitTier` (fehlt = sofort verfügbar).
-4. `js/ui/controller.js`: Kurzname in `SHORT_UNIT`.
+4. (entfällt: der Kurzname steht als `short` in units.js)
 5. Aussehen: 2D in `js/render/sprites.js` (`drawUnit`); Iso optional in `js/render/isosprites.js` (`UNIT_MODEL` / `INFANTRY_NAME`, sonst gemalt).
 6. KI: Soll sie die Einheit bauen? Dann `MIX` in `js/data/ai.js` und die Ausbildung in `js/ai/ai.js` ergänzen, sonst im PRD §10 vermerken, dass sie es nicht tut.
 7. Test in `test/` (Ausbildung über `game.issue(team, { type: 'train', … })`), Hilfe in `js/ui/menu.js`, `npm run docs` (Tabellen), PRD §6 (Rolle) und Änderungsverlauf, `CACHE_VERSION`.
@@ -141,7 +142,7 @@ Wo jedes Feature liegt. „KI“ = Konstanten-Präfix in `js/data/ai.js`, Logik 
 1. `js/data/buildings.js`: Eintrag mit `name`, `w`, `h` (Zellen), `hp`, `sight`, `cost`, `buildTime`, `hotkey`; optional `weapon`, `aa`.
    Mit `hotkey` erscheint es automatisch im Baumenü des Baufahrzeugs.
 2. Sonderregeln beim Setzen in `game.js` (`canPlace`), Wirkung im passenden Modul oder in einem neuen Modul (Rezept „Neues Spielsystem“).
-3. `js/ui/controller.js`: Kurzname in `SHORT_BLD`. Aussehen: `js/render/sprites.js` (`drawBuilding`) und `js/render/isobuild.js`.
+3. Kurzname als `short` im Eintrag. Aussehen: `js/render/sprites.js` (`drawBuilding`) und `js/render/isobuild.js`.
 4. KI optional in `js/ai/ai.js`; Test, Hilfe, PRD §5 und Änderungsverlauf, `CACHE_VERSION`.
 
 ### Neuer Befehl

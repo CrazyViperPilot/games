@@ -8,12 +8,12 @@ const A = BALANCE.animals;
 const W = BALANCE.map.width;
 const H = BALANCE.map.height;
 const KINDS = ['deer', 'boar', 'deer', 'deer']; // Art je Rudelpaar (reihum)
-const ZONE_GAP = 250; // Abstand der Weiden zur Zonenkante
-const SPAWN_GAP = 1400; // Abstand der Rudel zu den Startpunkten
-const GROUP_GAP = 1100; // Abstand der Rudel untereinander
-const WANDER = 110; // so weit grast ein Tier um die Rudelmitte
-const MIGRATE = [16, 34]; // s, nach so langer Zeit zieht das Rudel weiter
-const MIGRATE_DIST = [220, 480];
+const ZONE_GAP = BALANCE.animals.zoneGap; // Abstand der Weiden zur Zonenkante
+const SPAWN_GAP = BALANCE.animals.spawnGap; // Abstand der Rudel zu den Startpunkten
+const GROUP_GAP = BALANCE.animals.groupGap; // Abstand der Rudel untereinander
+const WANDER = BALANCE.animals.wander; // so weit grast ein Tier um die Rudelmitte
+const MIGRATE = BALANCE.animals.migrate; // s, nach so langer Zeit zieht das Rudel weiter
+const MIGRATE_DIST = BALANCE.animals.migrateDist;
 
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 

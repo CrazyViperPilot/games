@@ -1,4 +1,4 @@
-// Alle globalen Spielzahlen. Einheiten: units.js, Gebäude: buildings.js, KI: ai.js (alle in js/data/). Wegweiser: CLAUDE.md.
+// Alle globalen Spielzahlen. Einheiten: units.js, Gebäude: buildings.js, KI: ai.js, Kartengenerator: mapgen.js (alle in js/data/). Wegweiser: CLAUDE.md.
 //
 // Inhalt (Suche nach dem Schlüssel):
 //   QUICK            Schnelleinstellungen: die Werte, die man am häufigsten ändert (gleich hier oben)
@@ -6,7 +6,7 @@
 //   Geld             startRes, walletMax, bounty, zone, hot, crates
 //   Einheiten        slotCap, startUnits, reinforce, queueMax, trainSlots, fuelSlowMul, leash, scanInterval
 //   FOB und Bauen    fob, construction, demolishRefund
-//   Logistik         logistics, shortageWarn
+//   Logistik         logistics, shortageWarn, baseAttackWarn
 //   KI-Schwierigkeit difficulty (weitere KI-Werte: ai.js)
 //   Kampf, Gelände   height, slope, airFire, sightHeight, fogInterval, stealth, garrison, commander, formation
 //   Wetter, Technik  weather, research, river
@@ -54,11 +54,13 @@ export const BALANCE = {
   zone: { r: 3300, unitIncome: QUICK.moneyPerUnitZone },
   // Hot Zone: kleiner Kreis in der Konfliktzone, wandert zufällig oder zu aktiven Bohrern.
   // Einheiten darin bringen statt unitIncome das Doppelte (unitIncome = 2 × zone.unitIncome, nicht zusätzlich).
-  hot: { r: 300, speed: 40, wanderSpeed: 40 / 3, unitIncome: QUICK.moneyPerUnitHot, wanderMin: 25, wanderMax: 45 },
+  // drillMinFuel = Mindestvorrat der FOB, um einen Bohrer zu starten
+  hot: { r: 300, speed: 40, wanderSpeed: 40 / 3, unitIncome: QUICK.moneyPerUnitHot, wanderMin: 25, wanderMax: 45, drillMinFuel: 10 },
   // Bauradien eigener FOBs dürfen sich nicht überlappen (minDistOwn = 2 × buildRadius); höchstens 10 FOBs mit der Haupt-FOB
   fob: { buildRadius: 450, minDistOwn: 900, minDistEnemy: 700, max: QUICK.maxFobs },
   queueMax: QUICK.queueMax,
   trainSlots: QUICK.trainSlots, // Ausbildungsplätze der Haupt-FOB: so viele Einträge der Warteschlange werden gleichzeitig ausgebildet
+  baseAttackWarn: 20, // s zwischen zwei Meldungen „Basis wird angegriffen“
   shortageWarn: 20, // s zwischen zwei Meldungen je Sorte und Team
   fuelSlowMul: 0.25, // Tempo von Fahrzeugen ohne Treibstoff
   // Soldaten-Nachschub (§12): kostenloser Schütze an der Haupt-FOB alle `interval` s, solange weniger als `soldierMin` Infanterie lebt
@@ -79,6 +81,8 @@ export const BALANCE = {
     resupplyInterval: 0.5, // Takt des Nachfüllens (s)
     truckSupplyRange: 180, // Nachfüllen/Mauerbau aus LKW-Ladung
     noFobWarn: 30, // s zwischen zwei Meldungen „Förderanlage ohne FOB“
+    boardReach: 45, // Infanterie steigt ein, wenn sie so nah am Hubschrauber ist
+    dropRing: 26, // Absetzen: Abstand der Passagiere um den Hubschrauber
   },
   // Bau und Reparatur (§11.8)
   construction: {
@@ -91,6 +95,8 @@ export const BALANCE = {
     fobMaterial: QUICK.fobMaterial, // Baumaterial im Lager einer FOB-Baustelle, bevor gebaut wird
     repairRate: 0.02, // Anteil maxHp je s und Baufahrzeug
     repairCostShare: 0.5, // Baumaterial-Kosten = cost.bm × geheilt/maxHp × 0.5
+    siteHpGrow: 0.9, // Baustellen-HP wächst um 90 % über die Bauzeit (Start 10 %)
+    siteSight: 150, // Baustellen sehen weniger
   },
   difficulty: {
     // Schwierigkeit über Verhalten: ab normal Späher und Konter-Mix, ab schwer Überfälle und Gruppen-Rückzug; hart ohne Einkommensbonus.
@@ -138,7 +144,8 @@ export const BALANCE = {
   // Versorgungskisten (§3, nach den Reliquien aus Age of Empires II): liegen abseits der Zone (pairs Paare, punktsymmetrisch).
   // Ein Soldat hebt eine auf (pickReach), trägt sie mit carrySpeed-Tempo und ohne zu schießen zur nächsten eigenen fertigen FOB
   // (deliverReach zur Wand); jede eingelagerte Kiste bringt dem Team `income` Geld/s. Fällt der Träger oder die FOB, liegt sie wieder am Boden.
-  crates: { pairs: 3, income: QUICK.moneyPerCrate, carrySpeed: 0.75, pickReach: 40, deliverReach: 100 },
+  // stuckHold = s, die ein Träger ohne Weg zur FOB wartet, bis er es neu versucht; stallTime = s ohne Fortkommen (Gedränge an der FOB): dann gilt die Kiste als abgeliefert, …; stallReach = … wenn der Träger so nah an der FOB-Wand steht
+  crates: { pairs: 3, income: QUICK.moneyPerCrate, carrySpeed: 0.75, pickReach: 40, deliverReach: 100, stuckHold: 5, stallTime: 3, stallReach: 320 },
   // Sichtbarer Schaden (rein optisch): Wracks zerstörter Fahrzeuge und Gebäude (wreckLife s, die letzten wreckFade s blassen sie aus,
   // höchstens wreckMax), Krater von Mörsereinschlägen (Radius craterR) und Brandflecken unter Wracks (craterLife s, höchstens craterMax).
   scars: { wreckLife: 240, wreckFade: 30, wreckMax: 80, craterLife: 180, craterFade: 30, craterMax: 150, craterR: 22 },
@@ -202,6 +209,12 @@ export const BALANCE = {
     scare: { inf: 180, vehicle: 320, air: 280, boom: 380 },
     flee: [350, 520],
     think: 0.25,
+    wander: 110, // so weit grast ein Tier um die Rudelmitte
+    migrate: [16, 34], // s, nach so langer Zeit zieht das Rudel weiter
+    migrateDist: [220, 480], // px, so weit zieht das Rudel dann
+    zoneGap: 250, // Abstand der Weiden zur Zonenkante
+    spawnGap: 1400, // Abstand der Rudel zu den Startpunkten
+    groupGap: 1100, // Abstand der Rudel untereinander
   },
   // Standards im Startmenü (das Menü merkt sich die letzte Wahl je Gerät). new Game() ohne Angabe schaltet alles aus (Tests).
   menuDefaults: { difficulty: 'normal', radio: true, weather: 'random', research: true, river: true },

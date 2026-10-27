@@ -7,9 +7,9 @@ import { driveTo, setIdle, footDist } from './movement.js';
 const C = BALANCE.crates;
 const TILE = BALANCE.map.tile;
 const CRATE_BASE = 100000; // Kisten-IDs −(CRATE_BASE + i), weit weg von den Häusern (−1, −2, …)
-const STUCK_HOLD = 5; // s, die ein Träger ohne Weg zur FOB wartet, bis er es neu versucht
-const STALL_TIME = 3; // s ohne Fortkommen (Gedränge an der FOB): dann gilt die Kiste als abgeliefert, …
-const STALL_REACH = 320; // … wenn der Träger so nah an der FOB-Wand steht
+const STUCK_HOLD = BALANCE.crates.stuckHold; // s, die ein Träger ohne Weg zur FOB wartet, bis er es neu versucht
+const STALL_TIME = BALANCE.crates.stallTime; // s ohne Fortkommen (Gedränge an der FOB): dann gilt die Kiste als abgeliefert, …
+const STALL_REACH = BALANCE.crates.stallReach; // … wenn der Träger so nah an der FOB-Wand steht
 
 const fail = (reason) => ({ ok: false, reason });
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);

@@ -4,7 +4,7 @@ import { BUILDINGS } from '../data/buildings.js';
 import { driveTo, footDist, setIdle } from './movement.js';
 
 const C = BALANCE.construction;
-const BUILD_HP_SHARE = 0.9; // Baustellen-HP wächst um 90 % über die Bauzeit (Start 10 %)
+const BUILD_HP_SHARE = BALANCE.construction.siteHpGrow; // Baustellen-HP wächst um 90 % über die Bauzeit (Start 10 %)
 const WARN = BALANCE.shortageWarn;
 
 const fail = (reason) => ({ ok: false, reason });

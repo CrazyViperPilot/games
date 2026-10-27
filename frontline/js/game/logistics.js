@@ -7,8 +7,8 @@ const L = BALANCE.logistics;
 const CARGO = ['bm', 'mun', 'fuel'];
 export const PRESETS = ['mix', 'bm', 'mun', 'fuel'];
 const TRUCK_ORDERS = new Set(['load', 'unload', 'route']);
-const BOARD_REACH = 45; // Infanterie steigt ein, wenn sie so nah am Hubschrauber ist
-const DROP_RING = 26; // Absetzen: Abstand der Passagiere um den Hubschrauber
+const BOARD_REACH = BALANCE.logistics.boardReach; // Infanterie steigt ein, wenn sie so nah am Hubschrauber ist
+const DROP_RING = BALANCE.logistics.dropRing; // Absetzen: Abstand der Passagiere um den Hubschrauber
 const EPS = 1e-9;
 
 const fail = (reason) => ({ ok: false, reason });

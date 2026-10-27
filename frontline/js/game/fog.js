@@ -5,7 +5,7 @@ import { RELIEF, FINE_N } from './relief.js';
 import { weatherSight } from './weather.js';
 import { opticsMul } from './research.js';
 
-const CONSTRUCTION_SIGHT = 150; // Baustellen sehen weniger
+const CONSTRUCTION_SIGHT = BALANCE.construction.siteSight; // Baustellen sehen weniger
 const RAY_GAP = 44; // Abstand benachbarter Sichtstrahlen am Rand (px), kleiner als eine Nebelzelle
 const RAY_STEP = 24; // Schrittweite entlang eines Strahls (px)
 const SH = BALANCE.sightHeight;

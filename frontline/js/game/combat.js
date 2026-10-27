@@ -11,7 +11,7 @@ import { damageBridge, deckDist } from './river.js';
 
 const SCAN = BALANCE.scanInterval;
 const MAX_UNIT_RADIUS = 16; // größter Einheitenradius (Trefferkreis-Suche)
-const BASE_WARN_INTERVAL = 20; // s zwischen zwei Meldungen „Basis wird angegriffen“
+const BASE_WARN_INTERVAL = BALANCE.baseAttackWarn; // s zwischen zwei Meldungen „Basis wird angegriffen“
 // Aufträge, bei denen nicht automatisch geschossen wird (Marsch, Bau, Reparatur, Logistik)
 const NO_FIRE = new Set(['move', 'build', 'repair', 'load', 'unload', 'route', 'pickup', 'deliver']);
 const GAR = BALANCE.garrison;

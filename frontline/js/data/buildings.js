@@ -28,6 +28,7 @@ export const BUILDINGS = {
   },
   wall: {
     name: 'Mauer',
+    short: 'Mauer', // Kurzname in der Befehlskarte
     armor: 'struct',
     w: 1,
     h: 1,
@@ -41,6 +42,7 @@ export const BUILDINGS = {
   },
   gate: {
     name: 'Tor',
+    short: 'Tor', // Kurzname in der Befehlskarte
     armor: 'struct',
     w: 1,
     h: 1,
@@ -54,6 +56,7 @@ export const BUILDINGS = {
   },
   mortar: {
     name: 'Mörser',
+    short: 'Mörser', // Kurzname in der Befehlskarte
     armor: 'struct',
     w: 2,
     h: 2,
@@ -75,6 +78,7 @@ export const BUILDINGS = {
   },
   aa: {
     name: 'Flugabwehr',
+    short: 'Flak', // Kurzname in der Befehlskarte
     armor: 'struct',
     w: 2,
     h: 2,
@@ -99,6 +103,7 @@ export const BUILDINGS = {
   // Einer je Team (unique). Fertig ist er für den Gegner immer sichtbar; hält er BALANCE.radio.hold Sekunden, gewinnt sein Team.
   radio: {
     name: 'Sendemast',
+    short: 'Sendemast', // Kurzname in der Befehlskarte
     armor: 'struct',
     w: 2,
     h: 2,
@@ -113,6 +118,7 @@ export const BUILDINGS = {
   },
   drill: {
     name: 'Bohrer',
+    short: 'Bohrer', // Kurzname in der Befehlskarte
     armor: 'struct',
     w: 2,
     h: 2,

@@ -4,7 +4,7 @@ import { BALANCE } from '../data/balance.js';
 import { makeRng } from '../core/rng.js';
 
 const H = BALANCE.hot;
-const MIN_FUEL = 10; // Mindestvorrat der FOB, um einen Bohrer zu starten
+const MIN_FUEL = BALANCE.hot.drillMinFuel; // Mindestvorrat der FOB, um einen Bohrer zu starten
 
 const fail = (reason) => ({ ok: false, reason });
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);

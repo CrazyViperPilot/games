@@ -11,6 +11,7 @@ const SIDES = (front, side, rear) => ({ front, side, rear });
 export const UNITS = {
   rifleman: {
     name: 'Schütze',
+    short: 'Schütze', // Kurzname in der Befehlskarte
     armor: 'inf',
     hp: 100,
     speed: 45,
@@ -32,6 +33,7 @@ export const UNITS = {
   },
   at: {
     name: 'Panzerabwehrsoldat',
+    short: 'PAK', // Kurzname in der Befehlskarte
     armor: 'inf',
     hp: 90,
     speed: 40,
@@ -52,6 +54,7 @@ export const UNITS = {
   },
   sniper: {
     name: 'Scharfschütze',
+    short: 'Scharfschütze', // Kurzname in der Befehlskarte
     armor: 'inf',
     hp: 70,
     speed: 38,
@@ -73,6 +76,7 @@ export const UNITS = {
   // schießen schneller, verletzte Infanterie heilt. Fällt er, bekommt der Gegner Punkte; die Haupt-FOB bildet einen neuen aus.
   commander: {
     name: 'Kommandeur',
+    short: 'Kommandeur', // Kurzname in der Befehlskarte
     armor: 'inf',
     hero: true,
     slots: 0,
@@ -93,6 +97,7 @@ export const UNITS = {
   },
   truck: {
     name: 'LKW',
+    short: 'LKW', // Kurzname in der Befehlskarte
     armor: 'light',
     hp: 250,
     speed: 110,
@@ -113,6 +118,7 @@ export const UNITS = {
   },
   engineer: {
     name: 'Baufahrzeug',
+    short: 'Baufz.', // Kurzname in der Befehlskarte
     armor: 'light',
     hp: 400,
     speed: 70,
@@ -134,6 +140,7 @@ export const UNITS = {
   },
   ifv: {
     name: 'Schützenpanzer',
+    short: 'SPz', // Kurzname in der Befehlskarte
     slots: 3,
     armor: 'light',
     hp: 450,
@@ -155,6 +162,7 @@ export const UNITS = {
   },
   tank: {
     name: 'Kampfpanzer',
+    short: 'KPz', // Kurzname in der Befehlskarte
     slots: 5,
     armor: 'heavy',
     hp: 1100,
@@ -177,6 +185,7 @@ export const UNITS = {
   // seats: Passagiere (Hubschrauber: Infanterie/Baufahrzeug mit canRide; LKW 2, Baufahrzeug 1, Schützenpanzer 6: nur Infanterie), cargoCap: Ressourcenladung wie ein LKW.
   littlebird: {
     name: 'Little Bird',
+    short: 'Little Bird', // Kurzname in der Befehlskarte
     armor: 'air',
     air: true,
     hp: 220,
@@ -197,6 +206,7 @@ export const UNITS = {
   },
   transporter: {
     name: 'Transporthubschrauber',
+    short: 'Transp.-Heli', // Kurzname in der Befehlskarte
     armor: 'air',
     air: true,
     hp: 500,
@@ -218,6 +228,7 @@ export const UNITS = {
   },
   gunship: {
     name: 'Kampfhubschrauber',
+    short: 'AH-64', // Kurzname in der Befehlskarte
     armor: 'air',
     air: true,
     hp: 650,
@@ -240,6 +251,7 @@ export const UNITS = {
   // (Tempo-Faktor speedRef/(speedRef + Zielgeschwindigkeit), siehe BALANCE.airFire). Schießt nur auf Luftziele.
   flak: {
     name: 'Flakpanzer',
+    short: 'Flak', // Kurzname in der Befehlskarte
     slots: 2,
     armor: 'light',
     hp: 300,
@@ -260,6 +272,7 @@ export const UNITS = {
   // darum kein Tempo-Abzug (nur die Entfernung). Schießt nur auf Luftziele.
   sam: {
     name: 'SAM-Startrampe',
+    short: 'SAM', // Kurzname in der Befehlskarte
     slots: 2,
     armor: 'light',
     hp: 350,

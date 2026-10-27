@@ -24,7 +24,6 @@ const CARGO_KEYS = ['bm', 'mun', 'fuel']; // Lagersorten (FOB-Lager, LKW-Ladung)
 const SHORT = { money: 'G', bm: 'BM', mun: 'MUN', fuel: 'TS' };
 const HOTKEY_ALIAS = { Y: 'Z' }; // Flugabwehr auch mit Y
 // Kurznamen für die Befehlskarte (der volle Name steht im Tooltip)
-const SHORT_BLD = { wall: 'Mauer', gate: 'Tor', mortar: 'Mörser', aa: 'Flak', drill: 'Bohrer', radio: 'Sendemast' };
 const RADIO_TIP = `. Zweite Siegbedingung: steht er fertig ${Math.round(BALANCE.radio.hold / 60)} min, gewinnst du. Der Gegner sieht ihn dann überall. Nur einer je Team.`;
 const CMD = BALANCE.commander;
 const COMMANDER_TIP = `. Einmalig, belegt keinen Platz. Aura ${CMD.aura} px: eigene Einheiten schießen ${Math.round((CMD.fireRate - 1) * 100)} % schneller, verletzte Infanterie heilt. Fällt er, bekommt der Gegner ${CMD.deathPoints} Punkte.`;
@@ -35,7 +34,6 @@ const RESEARCH_BTN = [
   ['optics', 'E', 'Optik'],
   ['composite', 'R', 'Verbund'],
 ];
-const SHORT_UNIT = { rifleman: 'Schütze', at: 'PAK', truck: 'LKW', engineer: 'Baufz.', ifv: 'SPz', tank: 'KPz', flak: 'Flak', sam: 'SAM', littlebird: 'Little Bird', transporter: 'Transp.-Heli', gunship: 'AH-64', sniper: 'Scharfschütze', commander: 'Kommandeur' };
 const isCarrier = (u) => u.def.cargoCap > 0; // LKW und Transporthubschrauber
 // Ladungsart: Taste, Kurzname, Bezeichnung
 const PRESET_BTN = [
@@ -1100,7 +1098,7 @@ export class Controller {
         if (def.radio && !this.game.radioWin) continue; // Sendemast nur, wenn in der Partie eingeschaltet
         const reason = this.buildReason(key);
         card.push(
-          entry(SHORT_BLD[key] || def.name, def.hotkey, {
+          entry(def.short || def.name, def.hotkey, {
             cost: costText(def.cost),
             tip: `${def.name}: ${longCost(def.cost)}${def.slots > 1 ? `, ${def.slots} Plätze` : ''}${def.radio ? RADIO_TIP : ''}`,
             enabled: !reason,
@@ -1247,7 +1245,7 @@ export class Controller {
       else if (def.hero && hasCommander(this.game, ready.team)) reason = 'Nur ein Kommandeur je Team';
       else reason = this.trainReason(ready, def.cost);
       card.push(
-        entry(SHORT_UNIT[u] || def.name, def.hotkey, {
+        entry(def.short || def.name, def.hotkey, {
           cost: costText(def.cost),
           tip: `${def.name}: ${longCost(def.cost)}${def.hero ? COMMANDER_TIP : ''}`,
           enabled: !reason,

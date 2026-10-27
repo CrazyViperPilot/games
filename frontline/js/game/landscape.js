@@ -2,6 +2,7 @@
 // einem Fluss vor jeder Startecke mit Brücken und Furten. Punktsymmetrisch wie die übrige Karte. Dazu die Prüfung, ob mehrere
 // getrennte Wege in die Konfliktzone führen. Kein DOM.
 import { BALANCE } from '../data/balance.js';
+import { MAPGEN } from '../data/mapgen.js';
 import { makeRng } from '../core/rng.js';
 import { Relief, RELIEF, COARSE_N } from './relief.js';
 import { findPath } from './pathfinding.js';
@@ -10,30 +11,20 @@ const W = BALANCE.map.width;
 const H = BALANCE.map.height;
 const TWO_PI = Math.PI * 2;
 
-const HILLS = 7; // Hügelpaare außerhalb der Stadt (passierbar)
-const ZONE_HILLS = 2; // sanfte Hügelpaare in der Stadt
-const RIDGES = 4; // Bergrücken-Paare (steile Flanken = Fels, unpassierbar)
-const LAKES = 2; // Seepaare
-const SPAWN_FLAT = 650; // ebene Fläche um die Startpunkte, danach weicher Übergang bis SPAWN_BLEND
-const SPAWN_BLEND = 1050;
-const BASE_LEVEL = 36; // mittlere Höhe des Grundes über dem Wasserspiegel-Bezug 0
+const HILLS = MAPGEN.terrain.hills;
+const ZONE_HILLS = MAPGEN.terrain.zoneHills;
+const RIDGES = MAPGEN.terrain.ridges;
+const LAKES = MAPGEN.terrain.lakes;
+const SPAWN_FLAT = MAPGEN.terrain.spawnFlat;
+const SPAWN_BLEND = MAPGEN.terrain.spawnBlend;
+const BASE_LEVEL = MAPGEN.terrain.baseLevel;
 const DRY_LEVEL = RELIEF.water + 22; // Mindesthöhe an Wegen, in der Stadt und an den Startpunkten
 // Fluss (v4.53): Bogen um jede Startecke zwischen Startgelände und Konfliktzone, vom einen Kartenrand zum anderen. Wasser halfW px
 // beiderseits der Mitte, Uferhang bank px, Mitte depth unter dem Spiegel. Brücken und Furten an festen Winkeln des Bogens (Grad von
 // der Seitenkante aus; die mittlere Brücke trägt den Feldweg zur Stadt), je ±shift Grad auf das niedrigste Gelände verschoben.
 const RIVER = {
-  halfW: 92,
-  bank: 330,
-  depth: 40,
-  r: [2280, 2520], // Abstand der Flussmitte von der Kartenecke
-  bridges: [16, 45, 74],
-  fords: [30.5, 59.5],
-  shift: 4,
-  ramp: 0.16, // Steigung der Zufahrten an Brücken und Furten (befahrbar)
+  ...MAPGEN.river,
   fordBed: RELIEF.water - 1.5, // Furt: so tief steht das Wasser (seicht, man sieht die Strömung über den Steinen)
-  fordR: 150, // Radius der Furt (Kartenformat `fords`)
-  deckOver: 62, // Brücke reicht so weit über die Wasserkante hinaus auf festen Grund
-  maxH: 165, // höchstes Gelände unter dem Flusslauf (sonst neuer Versuch: kein Fluss durch einen Bergrücken)
 };
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));

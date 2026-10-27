@@ -1,5 +1,6 @@
 // Kartenerzeugung (docs/verlauf.md §5, game/map.js). Punktsymmetrisch, deterministisch je Seed. Kein DOM.
 import { BALANCE } from '../data/balance.js';
+import { MAPGEN } from '../data/mapgen.js';
 import { makeRng } from '../core/rng.js';
 import { Grid } from './grid.js';
 import { findPath } from './pathfinding.js';
@@ -17,10 +18,10 @@ const SPAWNS = [
   { x: 700, y: 8324 },
   { x: 8324, y: 700 },
 ];
-const MAX_ATTEMPTS = 20;
-const OBSTACLE_PAIRS = 32;
-const MIN_ROUTES = 3; // so viele getrennte Wege führen mindestens von jedem Start in die Konfliktzone
-const ZONE_SLOPE = 0.25; // in der Stadt ist kein Hang steiler (alle Wege gut befahrbar)
+const MAX_ATTEMPTS = MAPGEN.general.attempts;
+const OBSTACLE_PAIRS = MAPGEN.scatter.obstaclePairs;
+const MIN_ROUTES = MAPGEN.general.minRoutes;
+const ZONE_SLOPE = MAPGEN.general.zoneSlope;
 const TWO_PI = Math.PI * 2;
 
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
@@ -96,7 +97,7 @@ function tryBuild(seed, river = false) {
   return map;
 }
 
-const CROSS_REGION = 1500; // so viele Zellen erreicht man von jedem Ufer einer Querung mindestens (sonst liegt sie in einer Tasche)
+const CROSS_REGION = MAPGEN.general.crossRegion;
 
 /** Zellen, die von (x, y) aus erreichbar sind, höchstens cap (Breitensuche); within: nur in diesem Kreis {x, y, r}. */
 function regionSize(grid, x, y, cap, within = null, goal = null) {
@@ -220,23 +221,23 @@ function isConnected(grid) {
 
 // ---- Osteuropäische Stadt in der Konfliktzone (punktsymmetrisch um die Zonenmitte) ----
 // Bahnlinie: gerade quer über die Karte durch die Zonenmitte (y = CY), Schienen sind begehbar, der stehende Zug in der Mitte nicht.
-const RAIL_HALF = 40; // halbe Breite des Bahnkorridors, Gebäude, Bäume und Felsen bleiben davon frei
+const RAIL_HALF = MAPGEN.town.railHalf;
 const TRAIN = [
   { part: 'tank', dx: -100 },
   { part: 'container', dx: 0 },
   { part: 'loco', dx: 100 },
 ];
 const inRail = (y, pad = 0) => Math.abs(y - CY) < RAIL_HALF + pad;
-const BLOCK = 400; // Häuserblock (Straßenraster)
-const ROAD_W = 64;
-const AVENUE_W = 92; // die zwei Straßen am Zentrumsplatz
+const BLOCK = MAPGEN.town.block;
+const ROAD_W = MAPGEN.town.roadW;
+const AVENUE_W = MAPGEN.town.avenueW;
 const CAR_COLORS = ['#b8b8b0', '#8a2f2f', '#2f4f7a', '#d0c060', '#3b3b3b', '#d8d8d8', '#4f7a4f'];
 
 /**
  * Straßenraster, Häuser, Hallen, Fabriken, Parks, geparkte Autos und Bäume.
  * Gebäude (Rechtecke {x,y,w,h,kind}) sind unpassierbar, alles andere ist Dekoration.
  */
-const TOWER_SIZE = 80; // Grundfläche eines Wachturms
+const TOWER_SIZE = MAPGEN.town.towerSize;
 // oben (Mitte) und links (knapp über der Bahnlinie); unten und rechts entstehen als Spiegelbild
 const TOWER_AT = [
   { x: CX, y: CY - 0.86 * ZONE_R },
@@ -374,12 +375,12 @@ function buildTown(rng) {
   return town;
 }
 
-const OUTPOST_HOUSES = 22; // Einzelhäuser außerhalb der Zone (Paare)
-const OUTPOST_HALLS = 6; // freistehende Hallen (Paare)
-const OUTPOST_FACTORIES = 7; // Fabrikgelände mit Mauer (Paare)
-const WALL_T = 16; // Mauerstärke
-const WALL_MARGIN = 80; // Abstand der Mauer zur Fabrik (Platz zum Umfahren)
-const WALL_GAP = 130; // Lücke in der Mauer (zwei gegenüberliegende Seiten)
+const OUTPOST_HOUSES = MAPGEN.outposts.houses;
+const OUTPOST_HALLS = MAPGEN.outposts.halls;
+const OUTPOST_FACTORIES = MAPGEN.outposts.factories;
+const WALL_T = MAPGEN.outposts.wallT;
+const WALL_MARGIN = MAPGEN.outposts.wallMargin;
+const WALL_GAP = MAPGEN.outposts.wallGap;
 
 /**
  * Vereinzelte Häuser, Hallen und Fabrikgelände außerhalb der Konfliktzone (punktsymmetrisch). Ein Fabrikgelände hat eine Mauer
@@ -455,7 +456,7 @@ function buildOutposts(rng, obstacles, relief = null, clearings = []) {
   return { buildings, areas };
 }
 
-const SCATTER_PAIRS = 350;
+const SCATTER_PAIRS = MAPGEN.scatter.scatterPairs;
 
 /** Einzelne Bäume und kleine Gruppen überall außerhalb der Stadt (punktsymmetrisch); sie blockieren wie Gebäude. */
 function scatterTrees(rng, obstacles, keepOut = [], relief = null) {
@@ -485,10 +486,10 @@ function scatterTrees(rng, obstacles, keepOut = [], relief = null) {
   return trees;
 }
 
-const CRATE_CLEAR = 40; // so weit ringsum ist der Boden um eine Kiste frei und erreichbar
-const CRATE_ZONE = 350; // Abstand zur Zonenkante
-const CRATE_SPAWN = 1300; // Abstand zu den Startpunkten
-const CRATE_GAP = 900; // Abstand der Kisten untereinander
+const CRATE_CLEAR = MAPGEN.crates.clear;
+const CRATE_ZONE = MAPGEN.crates.zoneGap;
+const CRATE_SPAWN = MAPGEN.crates.spawnGap;
+const CRATE_GAP = MAPGEN.crates.gap;
 
 /** Zellen, die Start 0 zu Fuß erreicht (Breitensuche über die Nachbarzellen). */
 function reachable(grid, from) {
@@ -548,14 +549,14 @@ function placeCrates(rng, grid) {
   return crates;
 }
 
-const FARM_CHANCE = 0.75; // so viele Einzelhäuser außerhalb der Zone werden Gehöfte mit Feldern
-const FARM_TRIES = 8; // Anordnungen je Gehöft (die mit der meisten Feldfläche gewinnt)
-const FIELD_BLOCKS = 8; // freie Flure (Paare): zwei Feldreihen beiderseits eines Feldwegs, ohne Haus
-const FIELD_GAP = 24; // Feldrain zwischen zwei Feldern
-const FIELD_YARD = 54; // Abstand Haus–Feldreihe (darin läuft der Feldweg entlang)
-const TRACK_W = 26; // Feldweg
-const TRACK_REACH = 1800; // so weit führt ein Feldweg höchstens zur nächsten Straße oder zum Nachbargehöft
-const CROP_ROLL = [['wheat', 0.35], ['green', 0.6], ['soil', 0.8], ['rape', 1]]; // Weizen, junge Saat, gepflügt, Raps
+const FARM_CHANCE = MAPGEN.farms.chance;
+const FARM_TRIES = MAPGEN.farms.tries;
+const FIELD_BLOCKS = MAPGEN.farms.fieldBlocks;
+const FIELD_GAP = MAPGEN.farms.fieldGap;
+const FIELD_YARD = MAPGEN.farms.fieldYard;
+const TRACK_W = MAPGEN.farms.trackW;
+const TRACK_REACH = MAPGEN.farms.trackReach;
+const CROP_ROLL = MAPGEN.farms.cropRoll;
 
 /** Punkt im (gedrehten) Rechteck {x, y, w, h, angle}, Rand um pad erweitert. */
 function inBox(b, px, py, pad = 0) {
