@@ -38,7 +38,7 @@ test('Start: je Team genau ein Kommandeur nahe der Haupt-FOB; er belegt keinen P
     assert.equal(cs[0].type, 'commander');
     const f = mainOf(g, t);
     assert.ok(Math.hypot(cs[0].x - f.x, cs[0].y - f.y) < 600);
-    assert.equal(g.slotsUsed(t), BALANCE.slotCap);
+    assert.equal(g.slotsUsed(t), 50, 'Startarmee belegt 50 Plätze');
     assert.equal(g.soldierCount(t), 29);
     assert.ok(hasCommander(g, t));
   }

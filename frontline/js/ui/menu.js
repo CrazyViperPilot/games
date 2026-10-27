@@ -27,8 +27,8 @@ const KEYS = [
   ['Wetter', 'Falls im Startmenü an: Regen und Schnee −20 % Sicht, Nebel −35 % · Schneefall bremst Fahrzeuge um 20 %, Winterboden um 10 % · das Wetter wechselt alle paar Minuten (Anzeige oben, antippen erklärt es) · bei schlechter Sicht lohnt ein Späher'],
   ['B', 'Baumenü: Baufahrzeug alles (E Mauer, R Tor, T Mörser, Z Flak, X Bohrer, G Sendemast, F FOB-Baustelle) · Soldaten nur E Mauer, R Tor'],
   ['Bauen', 'Gebäude brauchen einen Bauer daneben: Baufahrzeug oder Soldaten (nur Mauer/Tor, aus getragenem Baumaterial, im Bauradius einer FOB)'],
-  ['Haupt-FOB', 'Ausbildung (nur hier, nur gegen Geld, zwei Einheiten gleichzeitig): Q Schütze · W PAK · T Scharfschütze · E LKW · R Baufahrzeug · A SPz · S KPz · D Little Bird · F Transporter · G AH-64 · C Kommandeur (einmalig)'],
-  ['U', 'Haupt-FOB gewählt, falls im Startmenü an: Forschung (eine zugleich, neben der Ausbildung) · Q nächste Stufe (Stufe 2: Scharfschütze, SPz, Little Bird, Transporter · Stufe 3: KPz, AH-64) · W Schutzwesten (Infanterie −15 % Schaden) · E Wärmebildoptik (Reichweite und Sicht +10 %) · R Verbundpanzerung (Fahrzeuge und Hubschrauber −15 % Schaden) · C Abbruch'],
+  ['Haupt-FOB', 'Ausbildung (nur hier, nur gegen Geld, zwei Einheiten gleichzeitig): Q Schütze · W PAK · T Scharfschütze · E LKW · R Baufahrzeug · A SPz · S KPz · D Little Bird · F Transporter · G AH-64 · J Flakpanzer · N SAM-Startrampe · C Kommandeur (einmalig)'],
+  ['U', 'Haupt-FOB gewählt, falls im Startmenü an: Forschung (eine zugleich, neben der Ausbildung) · Q nächste Stufe (Stufe 2: Scharfschütze, SPz, Little Bird, Transporter, Flakpanzer · Stufe 3: KPz, AH-64, SAM-Startrampe) · W Schutzwesten (Infanterie −15 % Schaden) · E Wärmebildoptik (Reichweite und Sicht +10 %) · R Verbundpanzerung (Fahrzeuge und Hubschrauber −15 % Schaden) · C Abbruch'],
   ['L / U / T', 'LKW gewählt: Laden (dann FOB anklicken) · Entladen (FOB oder FOB-Baustelle) · Pendeln (Start-FOB, dann Ziel)'],
   ['Q / W / E / R', 'LKW gewählt: Ladungsart Gemischt · Baumaterial · Munition · Treibstoff'],
   ['Entf', 'Gebäude abreißen (25 % des Baumaterials zurück)'],
@@ -153,7 +153,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
         <div class="seg">${WEATHER_SETTINGS.map((k) => `<button type="button" data-weather="${k}">${WEATHER_LABELS[k]}</button>`).join('')}</div>
       </div>
       <div class="field">
-        <span class="flabel" title="Forschung in der Haupt-FOB: Stufe 2 schaltet Schützenpanzer und Hubschrauber frei, Stufe 3 Kampfpanzer und Kampfhubschrauber; dazu Verbesserungen für Panzerung und Reichweite">Forschung</span>
+        <span class="flabel" title="Forschung in der Haupt-FOB: Stufe 2 schaltet Schützenpanzer, Hubschrauber und Flakpanzer frei, Stufe 3 Kampfpanzer, Kampfhubschrauber und SAM-Startrampe; dazu Verbesserungen für Panzerung und Reichweite">Forschung</span>
         <div class="seg"><button type="button" data-research="1">An</button><button type="button" data-research="0">Aus</button></div>
       </div>
       <div class="field">
@@ -170,7 +170,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
         <div class="mapbox" data-mapbox></div>
       </div>
       <ol class="howto">
-        <li>Du startest mit 2 Kampfpanzern, 3 Schützenpanzern, 29 Soldaten (22 Schützen, 7 Panzerabwehrsoldaten), LKW, Baufahrzeug und deinem Kommandeur (goldener Stern: in seiner Nähe schießen deine Einheiten schneller und Verwundete heilen; fällt er, bekommt der Gegner 5 Punkte). Das Einheitenlimit beträgt 50 Plätze: Soldat 1, Schützenpanzer 3, Kampfpanzer 5. Die Haupt-FOB hat unendlich Baumaterial, Munition und Treibstoff und bildet alle Einheiten aus – nur Geld ist knapp. Ist oben Forschung an, gibt es Schützenpanzer und Hubschrauber erst ab Stufe 2, Kampfpanzer und Kampfhubschrauber ab Stufe 3 (die Startarmee bleibt).</li>
+        <li>Du startest mit 2 Kampfpanzern, 3 Schützenpanzern, 29 Soldaten (22 Schützen, 7 Panzerabwehrsoldaten), LKW, Baufahrzeug und deinem Kommandeur (goldener Stern: in seiner Nähe schießen deine Einheiten schneller und Verwundete heilen; fällt er, bekommt der Gegner 5 Punkte). Das Einheitenlimit beträgt 300 Plätze: Soldat 1, Schützenpanzer 3, Kampfpanzer 5, Flakpanzer und SAM-Startrampe 2. Die Haupt-FOB hat unendlich Baumaterial, Munition und Treibstoff und bildet alle Einheiten aus – nur Geld ist knapp. Ist oben Forschung an, gibt es Schützenpanzer, Hubschrauber und Flakpanzer erst ab Stufe 2, Kampfpanzer, Kampfhubschrauber und SAM-Startrampe ab Stufe 3 (die Startarmee bleibt).</li>
         <li>LKW (E) bringen Nachschub aus der Haupt-FOB zu den vorderen FOBs und versorgen Einheiten in ihrer Nähe.</li>
         <li>Baufahrzeug (R): bis zu 10 FOBs (ohne überlappende Bauradien), Mörser, Flak, Bohrer und – falls oben an – einen Sendemast: steht er fertig 30 Minuten, ist die Partie gewonnen. Soldaten bauen aus wenig getragenem Baumaterial Mauern und Tore.</li>
         <li>Ist oben Fluss an, liegt vor jeder Startecke ein Fluss: über drei Brücken oder langsam durch zwei Furten. Brücken lassen sich sprengen (A, dann Brücke anklicken) und von Baufahrzeugen wieder aufbauen.</li>

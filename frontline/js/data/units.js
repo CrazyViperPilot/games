@@ -236,6 +236,46 @@ export const UNITS = {
     fuelMax: 70,
     hotkey: 'G',
   },
+  // Flugabwehrpanzer (Flak): Schnellfeuer-Flak gegen Hubschrauber, Munition je Schuss 20. hitChance × speedRef: schnelle Ziele trifft sie selten
+  // (Tempo-Faktor speedRef/(speedRef + Zielgeschwindigkeit), siehe BALANCE.airFire). Schießt nur auf Luftziele.
+  flak: {
+    name: 'Flakpanzer',
+    slots: 2,
+    armor: 'light',
+    hp: 300,
+    speed: 70,
+    radius: 11,
+    sight: 380,
+    weapons: [
+      { id: 'flak', name: 'Flak', range: 330, cooldown: 0.8, rounds: 30, munCost: 20, hitChance: 0.85, speedRef: 120, damage: { air: 40 } },
+    ],
+    cost: { money: 220 },
+    buildTime: 10,
+    producedAt: 'fob',
+    fuelPerSec: 0.4,
+    fuelMax: 40,
+    hotkey: 'J',
+  },
+  // Flugabwehrrakete (SAM): Wärmesuchende Raketen, 250 Munition je Rakete, 10 s Nachladezeit. Die Rakete folgt der Wärme des Ziels,
+  // darum kein Tempo-Abzug (nur die Entfernung). Schießt nur auf Luftziele.
+  sam: {
+    name: 'SAM-Startrampe',
+    slots: 2,
+    armor: 'light',
+    hp: 350,
+    speed: 65,
+    radius: 11,
+    sight: 440,
+    weapons: [
+      { id: 'sam', name: 'Wärmesuchrakete', range: 420, cooldown: 10, rounds: 4, munCost: 250, hitChance: 0.9, damage: { air: 350 } },
+    ],
+    cost: { money: 300 },
+    buildTime: 12,
+    producedAt: 'fob',
+    fuelPerSec: 0.4,
+    fuelMax: 40,
+    hotkey: 'N',
+  },
 };
 
 // Abgeleitete Gesamtwerte aus den Waffen: größte Reichweite, bester Schaden je Klasse, Munitionswert des vollen Vorrats.

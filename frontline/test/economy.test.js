@@ -99,7 +99,7 @@ test('Start: 37 Einheiten je Team (LKW, Baufahrzeug, 2 MBT, 3 SPz, 22 Schützen,
     assert.equal(unitsOf(g, t, 'ifv').length, 3);
     assert.equal(unitsOf(g, t, 'rifleman').length, 22);
     assert.equal(unitsOf(g, t, 'at').length, 7);
-    assert.equal(g.slotsUsed(t), BALANCE.slotCap);
+    assert.equal(g.slotsUsed(t), 50, 'Startarmee belegt 50 Plätze');
     assert.equal(g.teams[t].res.money, BALANCE.startRes.money, 'Startgeld unverändert');
   }
 });
@@ -234,16 +234,22 @@ test('soldierCount: zählt Passagiere in Fahrzeugen und Infanterie in der Wartes
 }));
 
 test('Einheitenlimit: 50 Plätze, MBT belegt 5, SPz 3; Ausbildung wird abgelehnt, Tod gibt Plätze frei', () => {
-  const g = mk({ seed: 7 });
-  const f = fobOf(g, 0);
-  assert.equal(UNITS.tank.slots, 5);
-  assert.equal(UNITS.ifv.slots, 3);
-  g.teams[0].res.money = 5000;
-  let r = g.issue(0, { type: 'train', buildingId: f.id, unit: 'tank' });
-  assert.equal(r.ok, false);
-  assert.match(r.reason || r.error || JSON.stringify(r), /limit/i);
-  unitsOf(g, 0, 'tank')[0].alive = false; // 5 Plätze frei
-  assert.equal(g.issue(0, { type: 'train', buildingId: f.id, unit: 'tank' }).ok, true);
-  assert.equal(g.slotsUsed(0), 50);
-  assert.equal(g.issue(0, { type: 'train', buildingId: f.id, unit: 'rifleman' }).ok, false);
+  const cap = BALANCE.slotCap;
+  BALANCE.slotCap = 50; // der Test prüft ein volles Limit: Startarmee füllt 50 Plätze
+  try {
+    const g = mk({ seed: 7 });
+    const f = fobOf(g, 0);
+    assert.equal(UNITS.tank.slots, 5);
+    assert.equal(UNITS.ifv.slots, 3);
+    g.teams[0].res.money = 5000;
+    let r = g.issue(0, { type: 'train', buildingId: f.id, unit: 'tank' });
+    assert.equal(r.ok, false);
+    assert.match(r.reason || r.error || JSON.stringify(r), /limit/i);
+    unitsOf(g, 0, 'tank')[0].alive = false; // 5 Plätze frei
+    assert.equal(g.issue(0, { type: 'train', buildingId: f.id, unit: 'tank' }).ok, true);
+    assert.equal(g.slotsUsed(0), 50);
+    assert.equal(g.issue(0, { type: 'train', buildingId: f.id, unit: 'rifleman' }).ok, false);
+  } finally {
+    BALANCE.slotCap = cap;
+  }
 });

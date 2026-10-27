@@ -1,6 +1,6 @@
 // Forschungsstufen (v4.52, nach Age of Empires II und Empire Earth): Die Haupt-FOB forscht neben der Ausbildung, eins nach dem
-// anderen (Geld beim Start, Abbruch erstattet voll). Stufe 2 schaltet Scharfschützen, Schützenpanzer und Hubschrauber frei, Stufe 3
-// Kampfpanzer und Kampfhubschrauber; dazu drei Verbesserungen: Schutzwesten (Infanterie), Verbundpanzerung (Fahrzeuge und
+// anderen (Geld beim Start, Abbruch erstattet voll). Stufe 2 schaltet Scharfschützen, Schützenpanzer, Hubschrauber und Flakpanzer frei,
+// Stufe 3 Kampfpanzer, Kampfhubschrauber und SAM-Startrampe; dazu drei Verbesserungen: Schutzwesten (Infanterie), Verbundpanzerung (Fahrzeuge und
 // Hubschrauber) und Wärmebildoptik (Reichweite und Sicht der Einheiten). Aus (Standard): alles frei, keine Verbesserungen.
 // Zustand je Team: team.tech = { tier, done: [Schlüssel], cur: { key, t } | null }.
 import { BALANCE } from '../data/balance.js';

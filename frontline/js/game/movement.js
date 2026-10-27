@@ -402,6 +402,10 @@ export function updateMovement(game, dt) {
     u.speedMul *= weatherSpeed(game, u); // Schnee und Winterboden (weather.js)
     if (grid.ford && !u.def.air && grid.isFord(grid.toCell(u.x), grid.toCell(u.y))) u.speedMul *= BALANCE.river.ford; // durchs seichte Wasser
     if (u.order.form && u.formMul) u.speedMul *= u.formMul; // Formation fährt geschlossen (formation.js)
+    // Tempo aus der Verschiebung seit dem letzten Schritt (auch Logistikflüge, die außerhalb von stepUnit fliegen)
+    if (dt > 0) u.speedNow = Math.hypot(u.x - u.prevX, u.y - u.prevY) / dt;
+    u.prevX = u.x;
+    u.prevY = u.y;
     if (u.house || OWN_DRIVERS.has(u.order.type)) continue; // Besatzer eines Hauses bewegen sich nicht
     stepUnit(game, u, dt);
   }

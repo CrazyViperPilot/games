@@ -35,7 +35,7 @@ const RESEARCH_BTN = [
   ['optics', 'E', 'Optik'],
   ['composite', 'R', 'Verbund'],
 ];
-const SHORT_UNIT = { rifleman: 'Schütze', at: 'PAK', truck: 'LKW', engineer: 'Baufz.', ifv: 'SPz', tank: 'KPz', littlebird: 'Little Bird', transporter: 'Transp.-Heli', gunship: 'AH-64', sniper: 'Scharfschütze', commander: 'Kommandeur' };
+const SHORT_UNIT = { rifleman: 'Schütze', at: 'PAK', truck: 'LKW', engineer: 'Baufz.', ifv: 'SPz', tank: 'KPz', flak: 'Flak', sam: 'SAM', littlebird: 'Little Bird', transporter: 'Transp.-Heli', gunship: 'AH-64', sniper: 'Scharfschütze', commander: 'Kommandeur' };
 const isCarrier = (u) => u.def.cargoCap > 0; // LKW und Transporthubschrauber
 // Ladungsart: Taste, Kurzname, Bezeichnung
 const PRESET_BTN = [

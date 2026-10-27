@@ -73,7 +73,7 @@ test('Forschung: Geld beim Start, eine zugleich, Stufe 2 nach 60 s mit Meldung a
   assert.equal(t0.tech.tier, 2);
   assert.equal(t0.tech.cur, null);
   const msgs = g.drainEvents().filter((e) => e.type === 'message');
-  assert.ok(msgs.some((m) => m.team === 0 && m.text === 'Stufe 2 erreicht: Scharfschütze, Schützenpanzer, Little Bird und Transporthubschrauber freigeschaltet'));
+  assert.ok(msgs.some((m) => m.team === 0 && m.text === 'Stufe 2 erreicht: Scharfschütze, Schützenpanzer, Little Bird, Transporthubschrauber und Flakpanzer freigeschaltet'));
   assert.ok(msgs.some((m) => m.team === 1 && m.text === 'Der Gegner hat Stufe 2 erreicht'));
   assert.ok(train(g, 'ifv').ok);
   assert.equal(train(g, 'tank').reason, 'Benötigt Stufe 3');

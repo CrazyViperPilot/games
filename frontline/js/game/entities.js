@@ -35,6 +35,9 @@ export function createUnit(id, type, team, x, y) {
     repathTimer: 0,
     needPath: false,
     speedMul: 1, // 0.25 bei Fahrzeugen ohne Treibstoff (movement.js)
+    speedNow: 0, // tatsächliches Tempo (px/s) aus der Verschiebung seit dem letzten Schritt (movement.js); bestimmt die Trefferchance der Flak
+    prevX: x, // Position am Anfang des letzten Bewegungsschritts
+    prevY: y,
     // Waffen mit eigenem Schussvorrat (rounds) und Abklingzeit (cd); `ammo` ist der Munitionswert aller Schüsse zusammen
     weapons: (def.weapons ?? []).map((spec) => ({ spec, rounds: spec.rounds, cd: 0 })),
     fuel: def.fuelMax ?? 0,

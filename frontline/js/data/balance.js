@@ -8,8 +8,8 @@ export const BALANCE = {
   walletMax: 5000, // Obergrenze der Kasse, die von Runde zu Runde bleibt
   pointInterval: 30,
   startRes: { money: 800 }, // Startgeld; die Haupt-FOB hat unendlich Baumaterial, Munition und Treibstoff
-  // Einheitenlimit in Plätzen je Team: Soldat/LKW/Baufahrzeug/Hubschrauber 1, Schützenpanzer 3, Kampfpanzer 5 (`slots` in units.js)
-  slotCap: 50,
+  // Einheitenlimit in Plätzen je Team: Soldat/LKW/Baufahrzeug/Hubschrauber 1, Schützenpanzer 3, Kampfpanzer 5, Flak und SAM 2 (`slots` in units.js)
+  slotCap: 300,
   // Start: 2 Kampfpanzer (10 Plätze), 3 Schützenpanzer (9), LKW und Baufahrzeug (2), 29 Soldaten (22 Schützen, 7 Panzerabwehr) = 50 Plätze;
   // dazu der Kommandeur (0 Plätze, hinten an der Haupt-FOB)
   startUnits: ['truck', 'engineer', 'tank', 'tank', 'ifv', 'ifv', 'ifv', ...Array(22).fill('rifleman'), ...Array(7).fill('at'), 'commander'],
@@ -65,6 +65,10 @@ export const BALANCE = {
   },
   // Gelände (§7): wer höher steht, trifft härter (Direktfeuer, ab `dead` Höhenunterschied, voll ab `full`), tiefer stehend schwächer
   height: { bonus: 0.25, dead: 6, full: 36 },
+  // Flugabwehr gegen Luftziele (Flak, SAM in units.js): Trefferchance je Schuss = hitChance der Waffe × Tempo-Faktor × Entfernungs-Faktor.
+  // Tempo-Faktor (nur Waffen mit speedRef): speedRef / (speedRef + Zielgeschwindigkeit in px/s), so treffen schnelle Ziele selten.
+  // Entfernungs-Faktor: 1 am Waffenrand verliert `falloff` (Anteil), direkt davor 1.
+  airFire: { falloff: 0.3 },
   // Sicht im Gelände: Weitsicht von oben (+ (Höhe − base) / per, höchstens max), Kämme verdecken, was dahinter liegt.
   // eye = Augenhöhe über dem Boden (Infanterie, Fahrzeuge, Gebäude), target = Höhe, ab der ein Ziel hinter einer Kuppe auftaucht,
   // near = Gelände näher als das verdeckt nichts (man tritt an die Hangkante und schaut hinab)
@@ -139,7 +143,7 @@ export const BALANCE = {
       optics: { name: 'Wärmebildoptik', money: 600, time: 60, needs: 2 },
       composite: { name: 'Verbundpanzerung', money: 800, time: 60, needs: 3 },
     },
-    unitTier: { sniper: 2, ifv: 2, littlebird: 2, transporter: 2, tank: 3, gunship: 3 },
+    unitTier: { sniper: 2, ifv: 2, littlebird: 2, transporter: 2, flak: 2, tank: 3, gunship: 3, sam: 3 },
     vests: 0.85,
     composite: 0.85,
     optics: 1.1,

@@ -417,9 +417,11 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .sel .lagerhead { margin-top: 6px; }
 .bar.store { height: 7px; margin: 0; }
 
-/* schmale Bildschirme (iPad, Telefon quer): Kopfleiste kompakter, damit nichts überläuft */
+/* schmale Bildschirme (iPad, Telefon quer): Kopfleiste kompakter, damit nichts überläuft; die Kopfleiste ist hier höher,
+   damit die Einkommenszeile (Geld/s) im schwarzen Balken bleibt */
 @media (max-width: 1500px) {
-  .top { gap: 10px; padding: 0 8px; }
+  .top { height: 68px; gap: 10px; padding: 0 8px; }
+  .msgs { top: 76px; }
   .res-row { gap: 8px; }
   .res .lbl, .res .rate { display: none; }
   .pts { width: 150px; }
@@ -428,11 +430,13 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .radioz { min-width: 84px; }
   .cap { width: 90px; }
   .zone-inc { display: block; max-width: 190px; margin: 0 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+  .zone-cnt { font-size: 14px; }
 }
 
 /* Telefon quer (z. B. Pixel 8a, 914 px): Kopfleiste noch knapper, Einkommenszeile und Punktebalken entfallen (die Punkte zeigen den Fortschritt) */
 @media (max-width: 1000px) {
-  .top { gap: 6px; padding: 0 6px; }
+  .top { height: 44px; gap: 6px; padding: 0 6px; }
+  .msgs { top: 54px; }
   .res-row { gap: 7px; }
   .pts { width: 118px; }
   .pt { grid-template-columns: 28px 1fr 42px; gap: 3px; font-size: 10px; }

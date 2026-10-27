@@ -117,6 +117,36 @@ export function drawUnit(ctx, u, color, zoom = 1, aim = null, now = 0, iso = fal
     ctx.beginPath();
     ctx.arc(-1, -1, 1.5, 0, Math.PI * 2);
     ctx.fill();
+  } else if (u.type === 'flak' || u.type === 'sam') {
+    // Flakpanzer: Wanne mit Ketten, zwei Rohre auf dem Turm. SAM: Wanne mit Startrampe, vier Raketenspitzen auf dem Turm
+    ctx.rotate(hull);
+    ctx.fillStyle = '#23272a';
+    ctx.fillRect(-10, -8, 20, 2.5);
+    ctx.fillRect(-10, 5.5, 20, 2.5);
+    ctx.fillStyle = dark;
+    ctx.fillRect(-9, -6, 18, 12);
+    ctx.strokeRect(-9, -6, 18, 12);
+    ctx.rotate(turret);
+    ctx.fillStyle = u.type === 'flak' ? '#2b2f2b' : '#e9ece6';
+    if (u.type === 'flak') {
+      ctx.fillRect(0, -3, 14, 1.5);
+      ctx.strokeRect(0, -3, 14, 1.5);
+      ctx.fillRect(0, 1.5, 14, 1.5);
+      ctx.strokeRect(0, 1.5, 14, 1.5);
+    } else {
+      ctx.fillRect(-3, -5, 10, 10);
+      ctx.strokeRect(-3, -5, 10, 10);
+      for (const y of [-3, 0, 3]) {
+        ctx.beginPath();
+        ctx.arc(8, y, 1.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(0, 0, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
   } else if (u.def && u.def.air) {
     drawHeli(ctx, u, color, dark, light, hull, turret, now, z, iso);
   } else if (u.type === 'truck') {

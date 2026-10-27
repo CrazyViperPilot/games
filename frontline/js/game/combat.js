@@ -168,6 +168,16 @@ function fireDirect(game, s, t, w) {
 }
 
 /**
+ * Trefferchance eines Flugabwehrschusses (BALANCE.airFire): Grundwert der Waffe, bei speedRef mal speedRef / (speedRef + Tempo des
+ * Ziels), dazu weiter Abstand mit weniger Chance. Waffen ohne hitChance treffen immer (kein Wurf).
+ */
+export function unitHitChance(s, t, w) {
+  let p = w.hitChance;
+  if (w.speedRef) p *= w.speedRef / (w.speedRef + (t.speedNow || 0));
+  return p * (1 - BALANCE.airFire.falloff * Math.min(1, Math.hypot(t.x - s.x, t.y - s.y) / w.range));
+}
+
+/**
  * Einheit schießt auf t. Waffenwahl unter den schussbereiten Waffen in Reichweite, die dem Ziel schaden:
  * zuerst eine Waffe, die für die Panzerklasse des Ziels vorgesehen ist (targets), sonst die mit dem
  * besten Schaden je Munition. Ohne einen vollen Schuss: Mangelmeldung, keine Abklingzeit.
@@ -206,6 +216,8 @@ function tryFireUnit(game, u, t) {
     game.addEffect('tracer', u.x, u.y, u.team, t.x, t.y);
   }
   if (u.def.stealth) u.revealedUntil = game.time + BALANCE.stealth.revealTime; // ein Schuss verrät die Stellung
+  // Flak und SAM: Treffer nur mit Wurf (Trefferchance, siehe unitHitChance); daneben geht der Schuss, der Schaden bleibt aus
+  if (pick.spec.hitChance !== undefined && !(game.rng.next() < unitHitChance(u, t, pick.spec))) return;
   hit(game, t, shotDamage(pick.spec, u, t, heightMult(game, u, t)));
 }
 
