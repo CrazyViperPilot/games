@@ -325,6 +325,7 @@ if (DEBUG) {
     get game() { return game; },
     save,
     input,
+    startLevel,
   };
 }
 

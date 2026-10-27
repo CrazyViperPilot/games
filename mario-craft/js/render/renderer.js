@@ -451,11 +451,16 @@ export class Renderer {
       ctx.drawImage(this.sprites.atlas, s.sx, s.sy, s.w, s.h, x, y, s.w, s.h);
     }
 
-    // (5) Riss beim Graben.
+    // (5) Risse beim Graben und vom Kopfstoß.
     const dig = game.dig;
     if (dig && dig.active) {
       const s = this.sprites.get('crack', dig.stage, false);
       ctx.drawImage(this.sprites.atlas, s.sx, s.sy, s.w, s.h, dig.c * T + ox, dig.r * T + oy, s.w, s.h);
+    }
+    const hd = game.headDig;
+    if (hd && hd.active && !(dig && dig.active && dig.c === hd.c && dig.r === hd.r)) {
+      const s = this.sprites.get('crack', hd.stage, false);
+      ctx.drawImage(this.sprites.atlas, s.sx, s.sy, s.w, s.h, hd.c * T + ox, hd.r * T + oy, s.w, s.h);
     }
 
     // (7) Fallender Sand, TNT, Gegenstände, Gems, Truhen (Kacheln), Bett, Portal, Kristalle.
@@ -547,9 +552,9 @@ export class Renderer {
             this._put(q.size === 'l' ? 'boss_slime_l' : 'boss_slime_m', (game.time * 4) | 0, q.face < 0, q.x + q.w / 2, q.y + q.h);
           }
         } else {
+          // Riesenschleim ohne Teile (nur noch kleine Schleime übrig): nichts zeichnen.
           let name = null, frame = (game.time * 4) | 0;
-          if (b.kind === 'slimeking') name = 'boss_slime_l';
-          else if (b.kind === 'dreikopf') name = 'boss_dreikopf';
+          if (b.kind === 'dreikopf') name = 'boss_dreikopf';
           else if (b.kind === 'drache') {
             name = b.state === 'perch' ? 'boss_drache_perch' : 'boss_drache';
             frame = (game.time * 6) | 0;

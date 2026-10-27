@@ -1,9 +1,10 @@
 // Ablauf eines Levels (PLAN §2, §6, §13; PRD §2–§7). Kein DOM. update(dt, input) = ein fester Schritt.
 // Lesbar für Renderer/HUD: map, light, player, mobs[], boss, projectiles[], pickups[], falling[], particles[], tnt[],
-// dig, crystals[], camX, camY, shake, time, emeralds, lives, diamonds[3], pick, score, state: 'play'|'dying'|'won'|'over'.
+// dig, headDig, crystals[], camX, camY, shake, time, emeralds, lives, diamonds[3], pick, score, state: 'play'|'dying'|'won'|'over'.
 // Geänderte Kacheln: game.dirty[0..dirtyCount) enthält r*cols+c; nach dem Zeichnen clearDirty() aufrufen.
 // game.light wird nach einem Schritt mit lightDirty neu berechnet (danach lightDirty = false); der Renderer liest game.light je Bild.
 // Kristalle: { x, y, w, h, alive } mit linker oberer Ecke in px (wie alle anderen Rechtecke).
+// Boss-Arena: Tore (`:`) schließen beim Kampfbeginn; Tod oder Verlassen der Arena öffnet sie wieder (restartBossFight).
 import { PHYS } from '../data/physics.js';
 import { TILE_BY_ID, TILE_IDS } from '../data/tiles.js';
 import { parseLevel } from './level.js';
@@ -14,7 +15,7 @@ import * as Explode from './explode.js';
 import * as Projectiles from './projectiles.js';
 import * as Items from './items.js';
 import * as Mobs from './mobs.js';
-import { createBoss } from './bosses.js';
+import { createBoss, restartBoss } from './bosses.js';
 
 const T = PHYS.tile;
 const E = 1e-6;
@@ -97,11 +98,19 @@ export class Game {
     // Gegner aus den Spawns; Spawn '@' (type 'boss') erzeugt den Boss des Levels (map.boss, z. B. 'slimeking').
     this.mobs = [];
     this.boss = null;
+    this.bossSpawn = null;
     for (let i = 0; i < map.spawns.length; i++) {
       const sp = map.spawns[i];
-      if (sp.type === 'boss') this.boss = createBoss(map.boss, sp.x, sp.y);
-      else this.mobs.push(Mobs.createMob(sp.type, sp.x, sp.y));
+      if (sp.type === 'boss') {
+        this.boss = createBoss(map.boss, sp.x, sp.y);
+        this.bossSpawn = sp;
+      } else {
+        this.mobs.push(Mobs.createMob(sp.type, sp.x, sp.y));
+      }
     }
+    // Arena-Türen (`:`): Spalte der Türen und Seite der Arena (dort, wo der Boss steht).
+    this.doorC = map.doors.length > 0 ? map.doors[0].c : -1;
+    this.arenaRight = this.bossSpawn ? this.bossSpawn.x > (this.doorC + 0.5) * T : true;
 
     this.crystals = map.crystals.map((cr) => ({
       x: cr.x - CRYSTAL_W / 2, y: cr.y - CRYSTAL_H, w: CRYSTAL_W, h: CRYSTAL_H, alive: true,
@@ -125,6 +134,7 @@ export class Game {
     this.falling = makePool(FALLING_POOL, newFalling);
     this.tnt = makePool(TNT_POOL, newTnt);
     this.dig = { active: false, c: 0, r: 0, progress: 0, stage: 0, failCd: 0, soundCd: 0 };
+    this.headDig = { active: false, c: 0, r: 0, progress: 0, stage: 0, keep: 0, cd: 0 };   // Kopfstoß-Risse (dig.js)
 
     this.dirty = new Int32Array(256);
     this.dirtyCount = 0;
@@ -222,6 +232,8 @@ export class Game {
 
     this.boss?.update?.(this, dt, prevFeet);
     if (this.state !== 'play') return;
+    // Arena verlassen (z. B. unter der Wand durchgegraben): Kampf unterbrochen, Tore offen – nie ausgesperrt.
+    if (this.boss?.active && this.outsideArena()) this.restartBossFight();
 
     Projectiles.updateProjectiles(this, dt);
     Explode.updateTnt(this, dt);
@@ -255,11 +267,14 @@ export class Game {
     }
     const at = this.respawnAt;
     this.player = createPlayer(at.x, at.y, 'plain');
+    if (this.boss && this.boss.state !== 'idle') this.restartBossFight();
     this.player.invuln = RESPAWN_INVULN;
     this.hearts = PHYS.maxHearts;
     this.dig.active = false;
     this.dig.progress = 0;
     this.dig.stage = 0;
+    this.headDig.active = false;
+    this.headDig.progress = 0;
     this.snapCamera();
     this.state = 'play';
     this.emit('hudChange');
@@ -456,15 +471,55 @@ export class Game {
     return false;
   }
 
-  // ---------- Boss (Platzhalter bis A11–A13) ----------
+  // ---------- Boss ----------
 
-  // Bosskampf beginnt: Arena-Türen (`:`) werden zu Barrieren.
+  // Steht die Figur ganz hinter der Türspalte, auf der Seite des Bosses? Ohne Türen: immer.
+  // Erst dann startet der Kampf, damit die Figur beim Schließen nie in der Tür steht.
+  inArena() {
+    if (this.doorC < 0) return true;
+    const p = this.player;
+    return this.arenaRight ? p.x >= (this.doorC + 1) * T : p.x + p.w <= this.doorC * T;
+  }
+
+  // Ganz vor der Türspalte (außerhalb der Arena)? Ohne Türen: nie.
+  outsideArena() {
+    if (this.doorC < 0) return false;
+    const p = this.player;
+    return this.arenaRight ? p.x + p.w <= this.doorC * T : p.x >= (this.doorC + 1) * T;
+  }
+
+  // Bosskampf beginnt: Arena-Türen (`:`) werden zu Barrieren (Gitter).
   lockArena() {
     for (const d of this.map.doors) {
       this.map.set(d.c, d.r, BARRIER_ID);
       this.markDirty(d.c, d.r);
     }
     this.lightDirty = true;
+  }
+
+  // Türen wieder offen (Barrieren → Luft).
+  openArena() {
+    for (const d of this.map.doors) {
+      if (this.map.get(d.c, d.r) !== BARRIER_ID) continue;
+      this.map.set(d.c, d.r, AIR_ID);
+      this.markDirty(d.c, d.r);
+    }
+    this.lightDirty = true;
+  }
+
+  // Kampf unterbrochen (Tod oder Arena verlassen): Boss wartet wieder an seinem Start, der angerichtete Schaden
+  // bleibt (restartBoss), feindliche Geschosse verschwinden, Tore öffnen sich. Betritt die Figur die Arena wieder,
+  // geht der Kampf weiter (Tore zu).
+  restartBossFight() {
+    const sp = this.bossSpawn;
+    if (!sp || !this.boss || this.bossDefeated) return;
+    this.boss = restartBoss(this.boss, sp.x, sp.y);
+    for (let i = 0; i < this.projectiles.length; i++) {
+      const o = this.projectiles[i];
+      if (o.active && o.owner === 'enemy') o.active = false;
+    }
+    this.openArena();
+    this.emit('bossPause');
   }
 
   // Sieg: Arena-Barrieren verschwinden, das Portal wird aktiv.

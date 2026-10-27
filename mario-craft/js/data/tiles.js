@@ -51,7 +51,7 @@ export const TILES = {
 };
 
 // Laufzeit-Kacheln ohne Zeichen (entstehen im Spiel, stehen nicht im Level-Text).
-const BARRIER = tile(null, 40, 'barrier', { solid: true, art: null });
+const BARRIER = tile(null, 40, 'barrier', { solid: true });   // Arena-Gitter, nicht abbaubar
 const CHESTOPEN = tile(null, 41, 'chestopen', { solid: true, hard: 0.5 });
 
 // Lookup id → Eintrag. Lücken sind mit dem air-Eintrag gefüllt, damit TILE_BY_ID[x] für x < 64 nie undefined ist.

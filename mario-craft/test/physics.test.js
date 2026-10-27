@@ -38,7 +38,7 @@ test('Kachel-IDs und Lookup', () => {
   assert.equal(TILES.M.id, 16);
   assert.equal(TILES.S.art, 'blk_stone');
   assert.equal(TILE_BY_ID[40].kind, 'barrier');
-  assert.equal(TILE_BY_ID[40].art, null);
+  assert.equal(TILE_BY_ID[40].art, 'blk_barrier');
   assert.equal(TILE_BY_ID[40].ch, null);
   assert.equal(TILE_BY_ID[41].kind, 'chestopen');
   assert.equal(TILE_BY_ID[41].ch, null);

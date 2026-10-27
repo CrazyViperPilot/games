@@ -10,6 +10,9 @@ const AIR_ID = TILE_IDS.air;
 const FAIL_INTERVAL = 0.5;      // s zwischen zwei digFail-Ereignissen
 const SOUND_INTERVAL = 0.25;    // s zwischen zwei dig-Ereignissen beim Graben
 const TNT_FUSE = 2.0;
+const HEAD_HIT = 0.5;           // s Graben, die ein Kopfstoß wert ist (Erde: 1 Stoß, Stein mit Holzhacke: 2)
+const HEAD_KEEP = 3;            // s, die Risse vom Kopfstoß stehen bleiben (dann fängt der Block wieder bei 0 an)
+const HEAD_COOLDOWN = 0.2;      // s zwischen zwei Kopfstößen (Leiter/Schwimmen drücken sonst jeden Schritt)
 
 // Ergebnis der Zielsuche (wiederverwendet, keine Allokation).
 const TGT = { c: 0, r: 0 };
@@ -76,6 +79,30 @@ function digState(game) {
   return d;
 }
 
+// Zustand des Kopfstoß-Grabens: eigener Block mit eigenen Rissen, unabhängig vom Graben-Knopf.
+function headState(game) {
+  let h = game.headDig;
+  if (!h) {
+    h = { active: false, c: 0, r: 0, progress: 0, stage: 0, keep: 0, cd: 0 };
+    game.headDig = h;
+  }
+  return h;
+}
+
+// Risse vom Kopfstoß verblassen nach HEAD_KEEP s oder wenn der Block weg ist.
+function updateHead(game, dt) {
+  const h = game.headDig;
+  if (!h) return;
+  if (h.cd > 0) h.cd = Math.max(0, h.cd - dt);
+  if (!h.active) return;
+  h.keep -= dt;
+  if (h.keep <= 0 || !isTarget(game.map.get(h.c, h.r))) {
+    h.active = false;
+    h.progress = 0;
+    h.stage = 0;
+  }
+}
+
 function resetDig(d, p) {
   d.active = false;
   d.progress = 0;
@@ -113,6 +140,7 @@ function hitMobsWithPick(game, d, p, dir) {
 export function updateDig(game, dt, input) {
   const p = game.player;
   const d = digState(game);
+  updateHead(game, dt);
   if (d.failCd > 0) d.failCd = Math.max(0, d.failCd - dt);
   if (d.soundCd > 0) d.soundCd = Math.max(0, d.soundCd - dt);
 
@@ -223,14 +251,43 @@ export function breakTile(game, c, r, cause) {
   return true;
 }
 
-// Kopfstoß: weiche Kacheln brechen, Truhen öffnen sich. Gibt zurück, ob etwas passiert ist.
+// Kopfstoß (nach oben graben): Truhen öffnen sich. Sonst zählt jeder Stoß wie HEAD_HIT s Graben mit der
+// aktuellen Hacke; der Block bekommt Risse und bricht, sobald die Abbauzeit erreicht ist (weiche Blöcke sofort).
+// Mindest-Hacke gilt wie beim Graben; TNT zündet nur mit dem Graben-Knopf, Grundgestein und Gitter nie.
+// Gibt zurück, ob etwas passiert ist.
 export function headBreak(game, c, r) {
-  const tile = TILE_BY_ID[game.map.get(c, r)];
+  const map = game.map;
+  const id = map.get(c, r);
+  const tile = TILE_BY_ID[id];
   if (tile.kind === 'chest') {
     game.openChest(c, r);
     game.markDirty(c, r);
     return true;
   }
-  if (tile.soft) return breakTile(game, c, r, 'head');
-  return false;
+  if (!isTarget(id) || tile.drop === 'tnt') return false;
+  const h = headState(game);
+  if (h.cd > 0) return false;
+  h.cd = HEAD_COOLDOWN;
+  const pick = game.pick || 0;
+  if (pick < tile.minPick) {
+    game.emit('digFail');
+    return false;
+  }
+  if (!(h.active && h.c === c && h.r === r)) {
+    h.c = c;
+    h.r = r;
+    h.progress = 0;
+  }
+  h.progress += HEAD_HIT / (tile.hard * PICKS[pick].mult);
+  if (h.progress >= 1 - E) {
+    h.active = false;
+    h.progress = 0;
+    h.stage = 0;
+    return breakTile(game, c, r, 'head');
+  }
+  h.active = true;
+  h.keep = HEAD_KEEP;
+  h.stage = Math.min(3, Math.floor(h.progress * 4));
+  game.emit('dig');
+  return true;
 }

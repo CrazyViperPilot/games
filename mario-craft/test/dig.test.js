@@ -299,14 +299,95 @@ test('kein startFalling, wenn darüber kein Sand liegt', () => {
   assert.deepEqual(g.falling, []);
 });
 
-test('headBreak bricht Erde, nicht Stein', () => {
+// Kopfstoß nach Abklingzeit (0,2 s) wiederholen: Zeit über updateDig laufen lassen.
+function bumpAgain(g) {
+  run(g, IDLE, 0.25);
+}
+
+test('Kopfstoß bricht Erde sofort', () => {
   const g = makeGame(0);
   set(g, 5, 7, 'dirt');
   assert.equal(headBreak(g, 5, 7), true);
   assert.equal(g.map.get(5, 7), AIR);
+  assert.ok(g.events.some((e) => e.name === 'break'));
+});
 
+test('Kopfstoß gräbt Stein: Holzhacke 2 Stöße (erst Risse), Eisenhacke 1 Stoß', () => {
+  const g = makeGame(0);
   set(g, 5, 7, 'stone');
+  assert.equal(headBreak(g, 5, 7), true);
+  assert.equal(g.map.get(5, 7), TILE_IDS.stone, 'erster Stoß: nur Risse');
+  assert.equal(g.headDig.active, true);
+  assert.equal(g.headDig.c, 5);
+  assert.equal(g.headDig.r, 7);
+  assert.ok(g.headDig.stage >= 1 && g.headDig.stage <= 3, `Stufe ${g.headDig.stage}`);
+  assert.ok(g.events.some((e) => e.name === 'dig'));
+  bumpAgain(g);
+  assert.equal(headBreak(g, 5, 7), true);
+  assert.equal(g.map.get(5, 7), AIR, 'zweiter Stoß bricht');
+  assert.equal(g.headDig.active, false);
+
+  const iron = makeGame(2);
+  set(iron, 5, 7, 'stone');
+  assert.equal(headBreak(iron, 5, 7), true);
+  assert.equal(iron.map.get(5, 7), AIR);
+});
+
+test('Kopfstoß: Erz gibt Smaragde, Diamanterz einen Diamanten', () => {
+  const g = makeGame(2);
+  set(g, 5, 7, 'coal');
+  for (let i = 0; i < 3 && g.map.get(5, 7) !== AIR; i++) { headBreak(g, 5, 7); bumpAgain(g); }
+  assert.equal(g.map.get(5, 7), AIR);
+  assert.equal(g.emeralds, 1);
+  set(g, 6, 7, 'diamondore');
+  for (let i = 0; i < 3 && g.map.get(6, 7) !== AIR; i++) { headBreak(g, 6, 7); bumpAgain(g); }
+  assert.equal(g.map.get(6, 7), AIR);
+  assert.equal(g.diamonds.length, 1);
+});
+
+test('Kopfstoß: zu schwache Hacke, Grundgestein, TNT und Gitter bleiben', () => {
+  const g = makeGame(0);
+  set(g, 5, 7, 'obsidian');
   assert.equal(headBreak(g, 5, 7), false);
+  assert.ok(g.events.some((e) => e.name === 'digFail'));
+  bumpAgain(g);
+  set(g, 5, 7, 'bedrock');
+  assert.equal(headBreak(g, 5, 7), false);
+  bumpAgain(g);
+  set(g, 5, 7, 'barrier');
+  assert.equal(headBreak(g, 5, 7), false);
+  bumpAgain(g);
+  set(g, 5, 7, 'tnt');
+  assert.equal(headBreak(g, 5, 7), false);
+  assert.equal(g.map.get(5, 7), TILE_IDS.tnt);
+  assert.deepEqual(g.tnt, []);
+  assert.equal(g.events.filter((e) => e.name === 'break').length, 0);
+});
+
+test('Kopfstoß: Abklingzeit zwischen zwei Stößen, Risse verblassen nach 3 s', () => {
+  const g = makeGame(0);
+  set(g, 5, 7, 'stone');
+  headBreak(g, 5, 7);
+  assert.equal(headBreak(g, 5, 7), false, 'gleich danach (z. B. Leiter): kein zweiter Stoß');
+  assert.equal(g.map.get(5, 7), TILE_IDS.stone);
+  run(g, IDLE, 3.1);
+  assert.equal(g.headDig.active, false, 'Risse weg');
+  headBreak(g, 5, 7);
+  assert.equal(g.map.get(5, 7), TILE_IDS.stone, 'Block fängt wieder bei 0 an');
+});
+
+test('Kopfstoß: anderer Block fängt bei 0 an', () => {
+  const g = makeGame(0);
+  set(g, 5, 7, 'stone');
+  set(g, 6, 7, 'stone');
+  headBreak(g, 5, 7);
+  bumpAgain(g);
+  headBreak(g, 6, 7);
+  assert.equal(g.map.get(6, 7), TILE_IDS.stone);
+  assert.equal(g.headDig.c, 6);
+  bumpAgain(g);
+  headBreak(g, 6, 7);
+  assert.equal(g.map.get(6, 7), AIR);
   assert.equal(g.map.get(5, 7), TILE_IDS.stone);
 });
 

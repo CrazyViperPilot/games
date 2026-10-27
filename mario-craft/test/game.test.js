@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { PHYS } from '../js/data/physics.js';
 import { TILE_IDS } from '../js/data/tiles.js';
 import { Game } from '../js/game/game.js';
+import { LEVELS } from '../js/data/levels/index.js';
 
 const T = PHYS.tile;
 const DT = 1 / 60;
@@ -257,6 +258,45 @@ test('Graben unter dem Spieler bricht Erde, Spieler fällt nach', () => {
   const p = game.player;
   assert.equal(p.onGround, true);
   assert.ok(Math.abs(p.y + p.h - 12 * T) < 0.5, `Fall auf Zeile 12: ${p.y + p.h}`);
+});
+
+// Ein Sprung: Absprung, Sprung bis zur Landung gehalten.
+function jumpOnce(game) {
+  game.update(DT, input({ jump: true, jumpPressed: true }));
+  runUntil(game, input({ jump: true }), () => game.player.onGround, 240);
+  run(game, input(), 15);   // kurz stehen (Abklingzeit des Kopfstoßes)
+}
+
+test('Nach oben graben: Kopfstoß beim Springen baut Stein über dem Kopf ab (Holzhacke: 2 Stöße je Block)', () => {
+  const { game, events } = makeGame({ cells: { '2,7': 'S', '2,6': 'S', '2,5': 'Z' } });
+  run(game, input(), 10);
+  jumpOnce(game);
+  assert.equal(game.map.get(2, 7), TILE_IDS.stone, 'erster Stoß: Risse');
+  assert.equal(game.headDig.active, true);
+  jumpOnce(game);
+  assert.equal(game.map.get(2, 7), TILE_IDS.air, 'zweiter Stoß: Block weg');
+  const brk = events.find((e) => e.name === 'break');
+  assert.equal(brk.data.cause, 'head');
+  jumpOnce(game);
+  jumpOnce(game);
+  assert.equal(game.map.get(2, 6), TILE_IDS.air, 'nächster Block darüber');
+  jumpOnce(game);
+  assert.equal(game.map.get(2, 5), TILE_IDS.bedrock, 'Grundgestein bleibt');
+});
+
+test('w2-4: Diamanterz in der Gangdecke per Kopfstoß abbaubar (Eisenhacke)', () => {
+  const def = LEVELS.find((l) => l.id === 'w2-4');
+  const game = new Game({ level: def, save: { lives: 3, pick: 2 } });
+  assert.equal(game.map.get(78, 43), TILE_IDS.diamondore);
+  const p = game.player;
+  p.x = 78 * T + 2;
+  p.y = 47 * T - p.h;
+  p.vx = 0;
+  p.vy = 0;
+  run(game, input(), 10);
+  for (let i = 0; i < 4 && game.map.get(78, 43) !== TILE_IDS.air; i++) jumpOnce(game);
+  assert.equal(game.map.get(78, 43), TILE_IDS.air);
+  assert.equal(game.diamonds.filter(Boolean).length, 1);
 });
 
 test('Bogen schießt einen Pfeil', () => {

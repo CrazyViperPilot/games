@@ -105,6 +105,7 @@ const PAL_ENDSTONE = { 1: '#fbf7d6', 2: '#efe6a6', 3: '#dcd28a', 4: '#c4b96a', 5
 const PAL_CHEST = { o: '#3d2210', 1: '#c28a4a', 2: '#a06a34', 3: '#7a4c24', 4: '#f0c64a', 5: '#a07c20' };
 const PAL_CHESTOPEN = { o: '#3d2210', 1: '#c28a4a', 2: '#a06a34', 3: '#7a4c24', i: '#2a1608', j: '#4a2e16' };
 const PAL_LADDER = { 1: '#c9955a', 2: '#a8723c', 3: '#6e4524' };
+const PAL_BARRIER = { 1: '#c3c7cf', 2: '#7d828c', 3: '#3b3e45', 4: '#eef0f3' };
 const PAL_VINE = { 1: '#6fbf4a', 2: '#3f8f2e', 3: '#2a6320' };
 const PAL_LAVA = { 1: '#a8320f', 2: '#e0531a', 3: '#ff8c1a', 4: '#ffd23f', 5: '#ffe985' };
 const PAL_WATER = { 1: '#8ec5ffcc', 2: '#3d7fe0b0', 3: '#2456b8d0', 4: '#d8f0ffe6' };
@@ -473,6 +474,27 @@ function ladderTex() {
   return tex(PAL_LADDER, [toRows(a)]);
 }
 
+// Arena-Gitter (Laufzeit-Kachel barrier): eiserne Stäbe mit zwei Querstreben, dazwischen durchsichtig
+// (die Rückwand scheint durch). Untereinander nahtlos.
+function barrierTex() {
+  const a = blank();
+  const BARS = [1, 5, 9, 13];
+  for (const x of BARS) {
+    for (let y = 0; y < T; y++) {
+      put(a, x, y, '1');
+      put(a, x + 1, y, '2');
+    }
+  }
+  for (const y of [3, 11]) {
+    for (let x = 0; x < T; x++) {
+      put(a, x, y, '2');
+      put(a, x, y + 1, '3');
+    }
+    for (const x of BARS) put(a, x, y, '4'); // Niete
+  }
+  return tex(PAL_BARRIER, [toRows(a)]);
+}
+
 function vineTex() {
   const r = mulberry32(SEED.vine);
   const a = blank();
@@ -674,6 +696,7 @@ export const BLOCK_ART = {
   blk_chestopen: chestOpenTex(),
   blk_slab: slabTex(),
   blk_ladder: ladderTex(),
+  blk_barrier: barrierTex(),
   blk_vine: vineTex(),
   blk_lava: lavaTex(),
   blk_water: waterTex(),

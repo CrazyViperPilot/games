@@ -66,7 +66,8 @@ Entfallen: `data/enemies.js`, `game/enemies.js`, Mario-Kacheln, Plattform-Objekt
 ## 3. Kacheln (`data/tiles.js`) – verbindlich
 
 Jeder Eintrag: `{ id, ch, kind, solid, oneWay, climb, water, hazard, bounce, soft, falls, light, hard, minPick, drop, art }`
-(`hard` = Abbauzeit s mit Holzhacke, `null` = nicht abbaubar; `soft` = Kopfstoß bricht; `light` 0–15 Eigenlicht;
+(`hard` = Abbauzeit s mit Holzhacke, `null` = nicht abbaubar; `soft` = weicher Block (Kopfstoß bricht ihn mit 1 Stoß, siehe
+PRD §4 – der Kopfstoß gräbt alle abbaubaren Blöcke); `light` 0–15 Eigenlicht;
 `drop` siehe Tabelle; `art` = Sprite-Name).
 
 | id | ch | kind | Eigenschaften | hard | minPick | drop |
@@ -103,7 +104,7 @@ Jeder Eintrag: `{ id, ch, kind, solid, oneWay, climb, water, hazard, bounce, sof
 | 29 | `J` | slime | solid bounce | 0.3 | 0 | |
 | 30 | `\|` | torch | light 14 | 0.1 | 0 | |
 | 31 | `,` | plant | (Deko) | 0.1 | 0 | |
-| 40 | – | barrier | solid, unsichtbar (Boss-Arena) | null | | |
+| 40 | – | barrier | solid, Arena-Gitter `blk_barrier` vor der Rückwand (Boss-Arena) | null | | |
 | 41 | – | chestopen | solid | 0.5 | 0 | |
 
 `PICKS = [{ name: 'wood', mult: 1.0 }, { name: 'stone', mult: 0.7 }, { name: 'iron', mult: 0.5 }, { name: 'diamond', mult: 0.35 }]`.
@@ -193,14 +194,14 @@ buildChunks(map, sprites) -> { chunks: Canvas[][] (256×256), redrawCell(c, r), 
 
 **Ereignisse** (`onEvent(name, data)`; Namen = Audio-Funktionen): `jump, emerald, diamond, stomp, dig, digFail, break,
 chest, powerup, hurt, arrow, explode, fuse, splash, oneup, checkpoint, portal, die, gameOver, bossHit` + `levelDone`
-(`{ time, emeralds, diamonds, score }`), `lifeLost`, `hudChange`.
+(`{ time, emeralds, diamonds, score }`), `lifeLost`, `hudChange`, `bossStart`, `bossPause` (Kampf unterbrochen, ohne Ton).
 
 ## 7. Sprites (Vertrag zwischen game/* und render/art/*)
 
 Jedes `*_ART` ist `{ name: { pal: {char:'#rrggbb[aa]'}, frames: [grid,...], flip?: false } }` wie bisher in `sprites.js`
 (Zeichenraster, `.` transparent; Raster dürfen per Code erzeugt werden). Pflicht-Namen:
 
-- **Blöcke** (16×16): `blk_<kind>` für jedes `kind` aus §3 außer air/barrier; `blk_lava`, `blk_water`, `blk_torch` je 4 Frames
+- **Blöcke** (16×16): `blk_<kind>` für jedes `kind` aus §3 außer air (barrier = Eisengitter, durchsichtig); `blk_lava`, `blk_water`, `blk_torch` je 4 Frames
   (Animation), `blk_portal` gibt es nicht (Portal ist ein Gegenstand). Rückwände `wall_dirt`, `wall_stone`, `wall_nether`,
   `wall_end` (dunkel, 16×16). Risse `crack` 4 Frames (transparent bis auf dunkle Risslinien).
 - **Held** (16×28, Hitbox 12×26 mittig unten): `hero_<p>_<anim>` mit p ∈ `plain|armor|bow`, anim ∈ `stand`(1) `walk`(4)
@@ -239,6 +240,10 @@ Jedes `*_ART` ist `{ name: { pal: {char:'#rrggbb[aa]'}, frames: [grid,...], flip
   fliegt Kreise; Kristall zerstören = Stampfen oder Pfeil (kleine Explosion 1,0). Danach landet er alle 6 s für 2,5 s auf dem
   Portal-Sockel in der Mitte (`perch`) → 4 Stampfer oder 12 Pfeile. Berührung im Flug verletzt.
 - Nach dem Sieg: `barrier`-Kacheln verschwinden, Portal `F` wird aktiv (vorher unsichtbar/inaktiv).
+- Kampfbeginn erst, wenn `game.inArena()` (Figur ganz hinter der Türspalte, Seite des Bosses). Tod oder
+  `game.outsideArena()` im Kampf → `game.restartBossFight()`: `restartBoss(old, x, y)` (bosses.js) legt den Boss neu im
+  Zustand `idle` an und übernimmt den Schaden (Energie bzw. Schleimteile), feindliche Geschosse weg, `openArena()`,
+  Ereignis `bossPause`.
 
 ## 10. Leistung
 
@@ -249,7 +254,9 @@ Wie v1 (kleine interne Auflösung, Atlas, vorgerenderte Chunks, keine Allokation
 
 - `physics.test.js`: Sprunghöhe/-weite wie v1 (feste Größe), Leiter hoch/runter, Wasser sinkt langsam + Schwimmzug, Schleimblock
   schleudert ≥ 7 Kacheln hoch, Plattform `=` nur von oben.
-- `dig.test.js`: Graben unten/seitlich, Abbauzeit × Hacke, minPick, Grundgestein, Erz-Drops, Sand fällt, Kopfstoß bricht soft.
+- `dig.test.js`: Graben unten/seitlich, Abbauzeit × Hacke, minPick, Grundgestein, Erz-Drops, Sand fällt, Kopfstoß gräbt nach
+  oben (0,5 s je Stoß, Risse 3 s in `game.headDig`, Abklingzeit 0,2 s, kein TNT).
+- `arena.test.js`: Tor schließt nur hinter der Figur, Tod/Verlassen öffnet es, Boss behält Schaden, echte Boss-Level.
 - `explode.test.js`: Radius, Grundgestein/Obsidian bleiben, TNT-Kette, Spieler verletzt, Zischer-Stampfen → Explosion nach 1 s.
 - `mobs.test.js`, `bosses.test.js`, `game.test.js` (Kamera vertikal, Portal → levelDone, Bett-Respawn, Smaragde 100 → Leben).
 - `levels.test.js` (Format §4) und `reach.test.js`: Breitensuche über Steh-Positionen (laufen, fallen, springen ≤ 4 hoch/≤ 5 weit,
@@ -319,4 +326,4 @@ Meilenstein 2 = A12–A13, D3–D4 → alle 12 Level, Review, Push nach main.
 - `emeralds` = Rest unter 100 (je 100 → Leben). Event `diamond` nur aus `Game.collectDiamond`. Kristalle: linke obere Ecke, 12×18.
 - Alte Level, `enemies.js`, `combat.js` gelöscht; `LEVELS = []` bis D2. `main.js`, `renderer.js`, `hud.js`, `menu.js` sind bis B7/C2 kaputt.
 
-- **Arena-Tür (Opus, nach D2):** Zeichen `:` im Level = Luft, in `map.doors` gesammelt; `game.lockArena()` (bei `bossStart`) macht sie zu Barrieren, `defeatBoss()` öffnet sie. Türen eine Spalte vor dem Arena-Eingang setzen (Spieler darf beim Auslösen nicht darin stehen). Boss-Levels brauchen sie, sonst ist das Portal vorab erreichbar.
+- **Arena-Tür (Opus, nach D2):** Zeichen `:` im Level = Luft, in `map.doors` gesammelt; `game.lockArena()` (bei `bossStart`) macht sie zu Barrieren, `defeatBoss()` öffnet sie. Türen eine Spalte vor dem Arena-Eingang setzen; der Kampf startet erst, wenn die Figur ganz hinter der Türspalte steht (`inArena`, seit 2026-10-27), Tod/Verlassen öffnet sie wieder (`restartBossFight`). Boss-Levels brauchen sie, sonst ist das Portal vorab erreichbar.

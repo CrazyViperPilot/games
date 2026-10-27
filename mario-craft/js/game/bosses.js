@@ -47,6 +47,27 @@ export function createBoss(kind, x, y) {
 
 const KINDS = { slimeking: makeSlimeKing, dreikopf: makeDreikopf, drache: makeDrache };
 
+// Kampf unterbrochen (Tod der Figur oder Arena verlassen): neuer Boss am Spawn (x, y) im Zustand 'idle', der
+// angerichtete Schaden bleibt. Riesenschleim: dieselben Teile (Größen) nebeneinander am Spawn; Schleime aus dem
+// Boss leben als Mobs weiter. Dreikopf/Drache: Energie bleibt; zerstörte Kristalle bleiben zerstört (game.crystals).
+export function restartBoss(old, x, y) {
+  const b = createBoss(old.kind, x, y);
+  if (old.kind === 'slimeking') {
+    const keep = old.parts.filter((q) => !q.gone);
+    if (keep.length !== 1 || keep[0].size !== 'l') {
+      b.parts.length = 0;
+      for (let i = 0; i < keep.length; i++) {
+        const dx = (i - (keep.length - 1) / 2) * (SLIME.m.size + 4);
+        b.parts.push(makePart(keep[i].size, x + dx, y, 0, 0));
+      }
+      syncBody(b);
+    }
+  } else {
+    b.hp = old.hp;
+  }
+  return b;
+}
+
 function newBoss(kind, x, y, w, h) {
   const b = {
     kind, x, y, w, h, vx: 0, vy: 0, face: -1, anim: '', animTime: 0,
@@ -120,6 +141,7 @@ function stepBoss(game, b, dt, prevFeet) {
   if (b.state === 'idle') {
     const flyer = b.kind === 'dreikopf' || b.kind === 'drache';
     if (flyer ? !nearFlyer(game, b) : game.player.x < b.x - ARENA_LEAD) return;
+    if (game.inArena && !game.inArena()) return;   // erst ganz hinter der Tür (Tor schließt nicht auf der Figur)
     if (b.kind === 'drache') {
       // Landeplatz: erster fester Boden unterhalb des Spawns (der Spawn darf in der Luft liegen).
       const map = game.map;

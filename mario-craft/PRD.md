@@ -33,6 +33,13 @@ Portal**. Level sind 100–250 Blöcke breit und 30–70 Blöcke hoch; die Kamer
 | 2 Tiefen | Berge, Schlucht | großer Dungeon, Lavaseen | **Dreikopf** – schwebt, schießt explodierende Schädel |
 | 3 Nether & Leere | Glutwelt (Nether-artig) | Leere mit schwebenden Inseln | **Leerendrache** – erst 4 Kristalle zerstören, dann stampfen, wenn er landet |
 
+**Boss-Arena:** Vor jeder Arena liegt ein Tor (Level-Zeichen `:`) und davor ein Bett. Steht die Figur ganz hinter dem
+Tor, beginnt der Kampf und das Tor schließt sich als sichtbares **Eisengitter** (nicht abbaubar). Nach dem Sieg geht es
+auf. **Tod im Bosskampf** (Neustart am Bett) oder Verlassen der Arena (z. B. unten durchgegraben): Das Tor geht wieder
+auf, der Boss wartet wieder an seinem Platz, **sein Schaden bleibt** (Energie, geteilte Schleimteile, zerstörte
+Kristalle). Betritt man die Arena erneut, geht der Kampf weiter. (Fehler bis 2026-10-27: Nach dem Tod blieb das Tor zu
+und war unsichtbar – ein dunkelblauer Streifen, durch den man nicht kam.)
+
 ## 3. Spielfigur
 
 - Bewegung und Sprungwerte wie v1 (variable Sprunghöhe, Renntempo, Coyote Time, Jump Buffer).
@@ -52,7 +59,12 @@ Portal**. Level sind 100–250 Blöcke breit und 30–70 Blöcke hoch; die Kamer
   Ohne Stufe vorne (Lücke) gilt normales Graben.
 - **Spitzhacke trifft Mobs:** Graben (allein = nach unten, mit ◀/▶ = zur Seite) besiegt Gegner in 1 Block Reichweite
   (Abklingzeit 0,35 s, 1 Schaden; Bosse nicht). Ein Zischer wird so ohne Explosion erledigt.
-- **Kopfstoß** bricht weiche Blöcke (Erde, Gras, Sand, Blätter, Bretter) sofort.
+- **Nach oben graben (Kopfstoß):** Springt die Figur mit dem Kopf gegen einen abbaubaren Block, gräbt sie ihn an. Jeder
+  Stoß zählt wie 0,5 s Graben mit der aktuellen Spitzhacke; der Block bekommt Risse und bricht, sobald seine Abbauzeit
+  erreicht ist (Erde, Gras, Sand, Blätter, Bretter: 1 Stoß; Stein mit Holzhacke 2, mit Eisenhacke 1; Erze 2).
+  Risse halten 3 s. Mindest-Hacke gilt wie beim Graben (sonst „klonk“), Grundgestein und Arena-Gitter nie, TNT zündet
+  nur mit dem Graben-Knopf, Truhen öffnen sich beim Anstoßen. So erreicht man Erze und Truhen in der Decke (z. B. das
+  Diamanterz im Gang von 2-4).
 - Abbauzeit = Härte × Faktor der Spitzhacke. Spitzhacken: Holz (Start) 1,0 → Stein 0,7 → Eisen 0,5 → Diamant 0,35.
   Manche Blöcke brauchen eine Mindest-Spitzhacke (Obsidian: Diamant). Grundgestein nie.
 

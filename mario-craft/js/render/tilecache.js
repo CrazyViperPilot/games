@@ -1,5 +1,5 @@
 // Tile-Cache (PLAN §6, §8): Level in 256×256-Quadrate (16×16 Zellen) vorrendern.
-// Je Zelle: (1) Rückwand, wenn die Zelle nicht fest und nicht barrier ist und r > surface[c];
+// Je Zelle: (1) Rückwand, wenn die Zelle nicht fest oder ein Arena-Gitter (barrier) ist und r > surface[c];
 // (2) die Kachel selbst (TILE_BY_ID[id].art, null = nichts).
 // Animierte Kacheln (lava, water, torch) stehen im Cache mit Frame 0; der Renderer überzeichnet sie.
 // Rückgabe.animated = Int32Array aus Tripeln [c, r, artIndex] (0 lava, 1 water, 2 torch).
@@ -69,7 +69,7 @@ export function buildChunks(map, sprites, theme = map.theme) {
     const id = map.get(c, r);
     const t = TILE_BY_ID[id];
     const surf = map.surface[c];
-    if (!t.solid && id !== BARRIER_ID && r > surf) {
+    if ((!t.solid || id === BARRIER_ID) && r > surf) {
       blit(ctx, wallName(theme, r, surf), lx, ly);
     }
     if (id === AIR_ID || !t.art) return -1;
