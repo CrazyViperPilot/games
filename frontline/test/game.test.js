@@ -72,7 +72,7 @@ test('Startzustand: fertige Haupt-FOB mit Lager, Startunits, Geld', () => {
     assert.equal(f.built, true);
     assert.equal(f.hp, f.maxHp);
     assert.equal(unitsOf(g, t).length, BALANCE.startUnits.length);
-    assert.equal(unitsOf(g, t, 'truck').length, 1);
+    assert.equal(unitsOf(g, t, 'truck').length, 3);
     assert.equal(unitsOf(g, t, 'engineer').length, 1);
     assert.equal(unitsOf(g, t, 'rifleman').length, 22);
     assert.equal(unitsOf(g, t, 'at').length, 7);

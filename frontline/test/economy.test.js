@@ -10,7 +10,7 @@ const DT = 0.05;
 const TILE = BALANCE.map.tile;
 const mk = (opts) => classic(new Game(opts));
 
-/** Test ohne Einheitenlimit (Startarmee füllt die 50 Plätze schon). */
+/** Test ohne Einheitenlimit (Startarmee füllt die 52 Plätze schon). */
 const roomy = (fn) => () => {
   const cap = BALANCE.slotCap;
   BALANCE.slotCap = 1000;
@@ -87,19 +87,19 @@ test('Zonengeld: kein Deckel – 40 Einheiten in der Zone bringen 16 Geld/s', ()
   assert.equal(g.zone.counts[0], 40);
 });
 
-test('Start: 37 Einheiten je Team (LKW, Baufahrzeug, 2 MBT, 3 SPz, 22 Schützen, 7 Panzerabwehrsoldaten, Kommandeur) = 50 Plätze', () => {
-  assert.equal(BALANCE.startUnits.length, 37);
+test('Start: 39 Einheiten je Team (3 LKW, Baufahrzeug, 2 MBT, 3 SPz, 22 Schützen, 7 Panzerabwehrsoldaten, Kommandeur) = 52 Plätze', () => {
+  assert.equal(BALANCE.startUnits.length, 39);
   const g = mk({ seed: 7 });
   for (let t = 0; t < 2; t++) {
-    assert.equal(unitsOf(g, t).length, 37);
+    assert.equal(unitsOf(g, t).length, 39);
     assert.equal(unitsOf(g, t, 'commander').length, 1, 'Kommandeur belegt keinen Platz');
-    assert.equal(unitsOf(g, t, 'truck').length, 1);
+    assert.equal(unitsOf(g, t, 'truck').length, 3);
     assert.equal(unitsOf(g, t, 'engineer').length, 1);
     assert.equal(unitsOf(g, t, 'tank').length, 2);
     assert.equal(unitsOf(g, t, 'ifv').length, 3);
     assert.equal(unitsOf(g, t, 'rifleman').length, 22);
     assert.equal(unitsOf(g, t, 'at').length, 7);
-    assert.equal(g.slotsUsed(t), 50, 'Startarmee belegt 50 Plätze');
+    assert.equal(g.slotsUsed(t), 52, 'Startarmee belegt 52 Plätze');
     assert.equal(g.teams[t].res.money, BALANCE.startRes.money, 'Startgeld unverändert');
   }
 });
@@ -233,9 +233,9 @@ test('soldierCount: zählt Passagiere in Fahrzeugen und Infanterie in der Wartes
   assert.equal(g.soldierCount(0), 31, 'Warteschlange zählt (Schütze und Panzerabwehrsoldat)');
 }));
 
-test('Einheitenlimit: 50 Plätze, MBT belegt 5, SPz 3; Ausbildung wird abgelehnt, Tod gibt Plätze frei', () => {
+test('Einheitenlimit: 52 Plätze, MBT belegt 5, SPz 3; Ausbildung wird abgelehnt, Tod gibt Plätze frei', () => {
   const cap = BALANCE.slotCap;
-  BALANCE.slotCap = 50; // der Test prüft ein volles Limit: Startarmee füllt 50 Plätze
+  BALANCE.slotCap = 52; // der Test prüft ein volles Limit: Startarmee füllt 52 Plätze
   try {
     const g = mk({ seed: 7 });
     const f = fobOf(g, 0);
@@ -247,7 +247,7 @@ test('Einheitenlimit: 50 Plätze, MBT belegt 5, SPz 3; Ausbildung wird abgelehnt
     assert.match(r.reason || r.error || JSON.stringify(r), /limit/i);
     unitsOf(g, 0, 'tank')[0].alive = false; // 5 Plätze frei
     assert.equal(g.issue(0, { type: 'train', buildingId: f.id, unit: 'tank' }).ok, true);
-    assert.equal(g.slotsUsed(0), 50);
+    assert.equal(g.slotsUsed(0), 52);
     assert.equal(g.issue(0, { type: 'train', buildingId: f.id, unit: 'rifleman' }).ok, false);
   } finally {
     BALANCE.slotCap = cap;
