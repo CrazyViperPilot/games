@@ -164,4 +164,5 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 `js/editor/editor.js` + `editor.html` – Karteneditor; speichert Karten über `js/game/mapdata.js` im `localStorage`.
 
 Sonstiges: `sw.js` Service Worker (network-first, Präfix `frontline-`), `manifest.json`, `css/`, `icons/`, `assets/` (Lizenzen in `assets/LICENSES/`),
-`tools/render-models/` (Werkzeug zum Vorrendern der Iso-Modelle), `test/` (node --test).
+`tools/render-models/` (Werkzeug zum Vorrendern der Iso-Modelle), `tools/doc-tables.mjs` (erzeugt die Wertetabellen in PRD §6, `npm run docs`),
+`test/` (node --test; `config.test.js` prüft die Config, `doctables.test.js` die PRD-Tabellen).

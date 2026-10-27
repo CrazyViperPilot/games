@@ -3,6 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "test:quick": "node --test test/config.test.js test/doctables.test.js",
+    "docs": "node tools/doc-tables.mjs"
   }
 }

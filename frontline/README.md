@@ -41,7 +41,9 @@ Beispiel: `http://localhost:8765/frontline/?debug=1&seed=123&speed=3`
 
 ```sh
 cd frontline
-npm test        # node --test, Simulation und KI ohne Browser (dauert einige Minuten)
+npm run test:quick   # Config und PRD-Tabellen prüfen (Sekunden)
+npm run docs         # Wertetabellen in PRD.md aus js/data/ erzeugen
+npm test             # alle Tests: Simulation und KI ohne Browser (dauert einige Minuten)
 ```
 
 Die Tests liegen in `test/` und laufen per `.github/workflows/test-frontline.yml`, sobald sich `frontline/` ändert.

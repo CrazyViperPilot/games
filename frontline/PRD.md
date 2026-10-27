@@ -121,29 +121,37 @@ Schadensmodell: Schaden je Schuss nach Panzerklasse des Ziels (Infanterie / leic
 
 ### Werte (Quelle: `js/data/units.js`, `js/data/buildings.js`, `js/data/balance.js`)
 
-| Einheit | HP | Tempo | Sicht | Reichweite | Preis (Geld) | Bauzeit | Treibstoff (max / je s) |
-|---|---|---|---|---|---|---|---|
-| Schütze | 100 | 45 | 260 | 200 | 60 | 5 s | – |
-| Panzerabwehrsoldat | 90 | 40 | 260 | 240 | 120 | 8 s | – |
-| Scharfschütze | 70 | 38 | 440 | 480 | 220 | 10 s | – |
-| LKW | 250 | 110 | 220 | – | 80 | 6 s | 30 / 0,2 |
-| Baufahrzeug | 400 | 70 | 260 | – | 150 | 9 s | 40 / 0,3 |
-| Schützenpanzer | 450 | 85 | 300 | 240 | 250 | 12 s | 40 / 0,4 |
-| Kampfpanzer | 1100 | 60 | 320 | 300 | 500 | 20 s | 60 / 0,6 |
-| Little Bird | 220 | 170 | 380 | – | 350 | 15 s | 60 / 0,5 |
-| Transporthubschrauber | 500 | 130 | 320 | – | 600 | 20 s | 90 / 0,7 |
-| AH-64 | 650 | 150 | 400 | 340 | 900 | 28 s | 70 / 0,8 |
-| Kommandeur | 300 | 42 | 340 | 180 | 400 | 20 s | – |
+Die Tabellen „Werte“ und „Waffen und Schaden“ erzeugt `npm run docs` aus `js/data/` (`tools/doc-tables.mjs`); zwischen den Markierungen nichts von Hand ändern. Ein Test meldet, wenn sie nicht mehr zur Config passen.
 
-| Gebäude | HP | Größe (Zellen) | Kosten | Bauzeit |
-|---|---|---|---|---|
-| FOB | 2500 | 3×3 | 400 Baumaterial (per LKW geliefert) | 30 s |
-| Mauer | 600 | 1×1 | 8 Baumaterial | 2 s |
-| Tor | 800 | 1×1 | 25 Baumaterial | 4 s |
-| Mörser | 700 | 2×2 | 200 Baumaterial, 60 Munition | 20 s |
-| Flugabwehr | 700 | 2×2 | 180 Baumaterial, 40 Munition | 18 s |
-| Bohrer | 600 | 2×2 | 150 Baumaterial | 20 s |
-| Sendemast | 3000 | 2×2 | 2000 Geld, 600 Baumaterial | 120 s |
+<!-- auto:units:start -->
+| Einheit | Taste | Stufe | Plätze | HP | Tempo | Sicht | Reichweite | Preis | Ausbildung | Treibstoff (max / je s) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Schütze | Q | 1 | 1 | 100 | 45 | 260 | 200 | 60 Geld | 5 s | – |
+| Panzerabwehrsoldat | W | 1 | 1 | 90 | 40 | 260 | 240 | 120 Geld | 8 s | – |
+| Scharfschütze | T | 2 | 1 | 70 | 38 | 440 | 480 | 220 Geld | 10 s | – |
+| Kommandeur | C | 1 | 0 | 300 | 42 | 340 | 180 | 400 Geld | 20 s | – |
+| LKW | E | 1 | 1 | 250 | 110 | 220 | – | 80 Geld | 6 s | 30 / 0,2 |
+| Baufahrzeug | R | 1 | 1 | 400 | 70 | 260 | – | 150 Geld | 9 s | 40 / 0,3 |
+| Schützenpanzer | A | 2 | 3 | 450 | 85 | 300 | 240 | 250 Geld | 12 s | 40 / 0,4 |
+| Kampfpanzer | S | 3 | 5 | 1100 | 60 | 320 | 300 | 500 Geld | 20 s | 60 / 0,6 |
+| Little Bird | D | 2 | 1 | 220 | 170 | 380 | – | 350 Geld | 15 s | 60 / 0,5 |
+| Transporthubschrauber | F | 2 | 1 | 500 | 130 | 320 | – | 600 Geld | 20 s | 90 / 0,7 |
+| Kampfhubschrauber | G | 3 | 1 | 650 | 150 | 400 | 340 | 900 Geld | 28 s | 70 / 0,8 |
+| Flakpanzer | J | 2 | 2 | 300 | 70 | 380 | 330 | 220 Geld | 10 s | 40 / 0,4 |
+| SAM-Startrampe | N | 3 | 2 | 350 | 65 | 440 | 420 | 300 Geld | 12 s | 40 / 0,4 |
+<!-- auto:units:end -->
+
+<!-- auto:buildings:start -->
+| Gebäude | Taste (Baumenü) | HP | Größe (Zellen) | Kosten | Bauzeit |
+|---|---|---|---|---|---|
+| FOB | – | 2500 | 3×3 | 400 Baumaterial | 30 s |
+| Mauer | E | 600 | 1×1 | 8 Baumaterial | 2 s |
+| Tor | R | 800 | 1×1 | 25 Baumaterial | 4 s |
+| Mörser | T | 700 | 2×2 | 200 Baumaterial, 60 Munition | 20 s |
+| Flugabwehr | Z | 700 | 2×2 | 180 Baumaterial, 40 Munition | 18 s |
+| Sendemast | G | 3000 | 2×2 | 2000 Geld, 600 Baumaterial | 120 s |
+| Bohrer | X | 600 | 2×2 | 150 Baumaterial | 20 s |
+<!-- auto:buildings:end -->
 
 Weitere globale Zahlen (Kartengröße, Zone, Prämien, Logistikraten, Schwierigkeit) stehen in `js/data/balance.js` und sind oben im Text genannt.
 
@@ -151,23 +159,25 @@ Weitere globale Zahlen (Kartengröße, Zone, Prämien, Logistikraten, Schwierigk
 
 Schaden je Schuss nach Panzerklasse des Ziels (Inf = Infanterie, Leicht, Schwer, Geb = Gebäude, Luft). Wo die Tabelle „Treffer bis zum Abschuss“ (unten) eine Paarung nennt, gilt sie statt dieser Werte. Reichweite in px, Kadenz = Sekunden zwischen Schüssen.
 
-| Waffe | Reichweite | Kadenz | Inf | Leicht | Schwer | Geb | Luft | Bevorzugt gegen |
-|---|---|---|---|---|---|---|---|---|
-| Schütze: Gewehr | 200 | 1,0 | 12 | 3 | 1 | 4 | 3 | – |
-| PAK: RPG | 240 | 3,0 | 10 | 90 | 120 | 60 | 40 | – |
-| Scharfschütze: Gewehr | 480 | 8,0 | 200 (ein Treffer tötet Soldaten) | 6 | 1 | 2 | 2 | – (10 Schuss à 4 Munition) |
-| Kommandeur: Maschinenpistole | 180 | 0,6 | 10 (6 Treffer gegen Soldaten) | 2 | 1 | 2 | 2 | – (90 Schuss) |
-| SPz: Granatwerfer | 240 | 2,0 | 30 | 40 | 10 | 25 | – | Leicht, Schwer, Geb |
-| SPz: MG | 220 | 0,25 | 9 | 3 | 1 | 3 | 6 | – |
-| KPz: Hauptkanone | 300 | 6,0 | 45 | 120 | 150 | 120 | – | Leicht, Schwer, Geb |
-| KPz: MG | 220 | 0,25 | 10 | 3 | 0 | 2 | 3 | – |
-| AH-64: Bordkanone | 340 | 0,5 | 22 | 26 | 30 | 18 | 10 | – |
-| AH-64: Raketen | 340 | 3,0 | 40 | 120 | 220 | 120 | 150 | Schwer, Geb, Luft |
-| FOB-MG | 220 | 0,6 | 12 | 4 | 1 | 4 | 2 | – (schießt immer, kostenlos) |
-| Mörser | 800 (min. 200) | 20 | 60 | 50 | 25 | 80 | – | Flächenschaden 60 px, Granate fliegt Distanz / 300 s |
-| Flugabwehr | 320 | 0,4 | 10 | 12 | 2 | 4 | 35 | fängt zudem Mörsergranaten ab (Reichweite 350, 70 % Chance) |
-| Flak (Flakpanzer, v4.54) | 330 | 0,8 | 0 | 0 | 0 | 0 | 40 | nur Luftziele; 85 % Trefferchance × Tempo- und Entfernungsfaktor (`BALANCE.airFire`), 20 Munition je Schuss |
-| SAM (SAM-Startrampe, v4.54) | 420 | 10 | 0 | 0 | 0 | 0 | 350 | nur Luftziele; wärmesuchend, 90 % Trefferchance, 250 Munition je Rakete |
+<!-- auto:weapons:start -->
+| Waffe | Reichweite | Kadenz (s) | Schuss | Munition je Schuss | Inf | Leicht | Schwer | Geb | Luft | Hinweis |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Schütze: Gewehr | 200 | 1 | 60 | 0,033 | 12 | 3 | 1 | 4 | 3 | Soldat: 4 Treffer |
+| Panzerabwehrsoldat: RPG | 240 | 3 | 5 | 10 | 10 | 90 | 120 | 60 | 40 | Soldat: 1 Treffer |
+| Scharfschütze: Scharfschützengewehr | 480 | 8 | 10 | 4 | 200 | 6 | 1 | 2 | 2 | Soldat: 1 Treffer |
+| Kommandeur: Maschinenpistole | 180 | 0,6 | 90 | 0,033 | 10 | 2 | 1 | 2 | 2 | Soldat: 6 Treffer |
+| Schützenpanzer: Granatwerfer | 240 | 2 | 60 | 10 | 30 | 40 | 10 | 25 | – | bevorzugt gegen Leicht, Schwer, Geb; Soldat: 1 Treffer |
+| Schützenpanzer: MG | 220 | 0,25 | 300 | 5 | 9 | 3 | 1 | 3 | 6 | Soldat: 2 Treffer |
+| Kampfpanzer: Hauptkanone | 300 | 6 | 30 | 20 | 45 | 120 | 150 | 120 | – | bevorzugt gegen Leicht, Schwer, Geb; Soldat: 1 Treffer |
+| Kampfpanzer: MG | 220 | 0,25 | 300 | 5 | 10 | 3 | 0 | 2 | 3 | Soldat: 2 Treffer |
+| Kampfhubschrauber: Bordkanone | 340 | 0,5 | 300 | 10 | 22 | 26 | 30 | 18 | 10 | – |
+| Kampfhubschrauber: Raketen | 340 | 3 | 10 | 100 | 40 | 120 | 220 | 120 | 150 | bevorzugt gegen Schwer, Geb, Luft |
+| Flakpanzer: Flak | 330 | 0,8 | 30 | 20 | – | – | – | – | 40 | Trefferchance 85 % × Tempo-Faktor × Entfernungs-Faktor; nur Luftziele |
+| SAM-Startrampe: Wärmesuchrakete | 420 | 10 | 4 | 250 | – | – | – | – | 350 | Trefferchance 90 % × Entfernungs-Faktor; nur Luftziele |
+| FOB (Gebäude) | 220 | 0,6 | – | – | 12 | 4 | 1 | 4 | 2 | kostenlos |
+| Mörser (Gebäude) | 800 | 20 | – | 4 | 60 | 50 | 25 | 80 | – | min. 200 px; Fläche 60 px; Granate mit Flugzeit |
+| Flugabwehr (Gebäude) | 320 | 0,4 | – | 0,25 | 10 | 12 | 2 | 4 | 35 | fängt Mörsergranaten ab (350 px, 70 %) |
+<!-- auto:weapons:end -->
 
 Das Spiel wählt je Ziel automatisch die Waffe mit dem besten Schaden bzw. die „bevorzugte“ Waffe für die Panzerklasse des Ziels; Waffen ohne Munition schweigen.
 
@@ -431,6 +441,7 @@ Ideen von Daniel, die festgehalten, aber **noch nicht umgesetzt** werden. Gebaut
 - **Sound** (2026-10-27): Geräusche und Musik (bisher nur „Could“, §1 und §12). Offen: Umfang (Waffen, Fahrzeuge, Meldungen, Wetter, Musik) und Lautstärkeregler im Menü.
 
 ## Änderungsverlauf
+- v4.57: **Absicherung der Config** (Spielverhalten unverändert): `test/config.test.js` prüft `js/data/` auf Tippfehler und Widersprüche (`npm run test:quick`, Sekunden). Die Tabellen in §6 („Werte“, „Waffen und Schaden“) erzeugt jetzt `npm run docs` aus der Config; ein Test meldet, wenn sie veralten. Dabei kamen Flakpanzer und SAM-Startrampe in die Wertetabelle, die dort fehlten.
 - v4.56: **Doku und Config für Erweiterungen** (Spielverhalten unverändert). Neu: `CLAUDE.md` (Regeln, Wegweiser „Wo ändere ich was?“, Feature-Landkarte, Rezepte) und `ARCHITEKTUR.md`; der alte Plan liegt als `docs/verlauf.md`. In `js/data/balance.js` stehen oben die **Schnelleinstellungen** (`QUICK`: Einheitenlimit, Geld pro Sekunde, Startgeld, Siegpunkte, Sendemast-Zeit …) und ein Inhaltsverzeichnis; die KI-Werte liegen in `js/data/ai.js`, die Werte je Schwierigkeit (FOB-Grenze, Sendemast ab, Kistenholer) und die Startmenü-Standards in `BALANCE`. Cache v70.
 - v4.54: **Flak, SAM und 300er Einheitenlimit.** Das Einheitenlimit steigt von 50 auf **300 Plätze** (`BALANCE.slotCap`). Neu: **Flakpanzer** (Taste J, Stufe 2, 2 Plätze, Schnellfeuer-Flak mit 20 Munition je Schuss; Trefferchance sinkt mit dem Tempo des Ziels, `BALANCE.airFire`) und **SAM-Startrampe** (Taste N, Stufe 3, 2 Plätze, wärmesuchende Raketen mit 250 Munition je Rakete und 10 s Nachladezeit). Beide schießen nur auf Hubschrauber; die KI baut sie noch nicht. Die Kopfleiste ist auf Tablets (≤ 1500 px) 68 px hoch, damit die Geld-pro-Sekunde-Zeile im schwarzen Balken bleibt. Cache v67.
 - v4.53: **Fluss mit Brücken und Furten** (§2, §7, §8, §9, §9a, §10, Vorschlag nach den Flusskarten aus Age of Empires II und den Brücken aus Company of Heroes): auf Zufallskarten liegt vor jeder Startecke ein Fluss mit 3 Brücken und 2 Furten (halbes Tempo). Brücken werden nur auf Befehl beschossen (A + Klick), stürzen ein und sperren den Übergang, bis ein Baufahrzeug sie für 200 Geld in 30 s wieder aufbaut. Die KI baut Brücken auf ihrer Seite wieder auf. Editor: Werkzeuge Fluss, Furt und Brücke. Im Startmenü schaltbar (Standard An). Cache v65.

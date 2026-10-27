@@ -23,7 +23,8 @@ die genannten Dateien.
    von Hand: mitpflegen (Suche z. B. `grep -rn "300 Plätze" js PRD.md`).
 8. Neue Ideen, die Daniel nur festhalten will: PRD §13 „Geparkte Ideen“, nicht bauen.
 9. Startmenü-Schalter (Sendemast, Wetter, Forschung, Fluss) sind im Menü standardmäßig an, in `new Game()` ohne Angabe aus. Tests verlassen sich darauf.
-10. Texte im Spiel, Kommentare und Doku auf Deutsch, Bezeichner im Code englisch. Vor dem Push `npm test` (alle grün).
+10. Texte im Spiel, Kommentare und Doku auf Deutsch, Bezeichner im Code englisch. Nach jeder Änderung in `js/data/`: `npm run docs`
+    (erzeugt die Wertetabellen in PRD §6) und `npm run test:quick`. Vor dem Push `npm test` (alle grün).
 
 ## Starten und testen
 
@@ -33,6 +34,8 @@ python3 -m http.server 8765
 # Spiel:  http://localhost:8765/frontline/          Editor: http://localhost:8765/frontline/editor.html
 
 cd frontline
+npm run test:quick                # Config-Prüfung und PRD-Tabellen, wenige Sekunden
+npm run docs                      # Wertetabellen in PRD.md §6 aus js/data/ neu erzeugen
 npm test                          # alle Tests (node --test, Node 22), dauert einige Minuten
 node --test test/radio.test.js    # nur eine Datei
 ```
@@ -41,6 +44,8 @@ node --test test/radio.test.js    # nur eine Datei
   `?gl=0` (ohne WebGL-Boden), `?sprites=0` (gemalte statt Bild-Sprites), `?debug=1&fog=1`, `?debug=1&weather=winter&wx=snow`.
 - Tests erzeugen ein `new Game({ seed, … })`, geben Befehle über `game.issue` und rufen `game.update(dt)` in einer Schleife.
   Sie ändern Werte direkt (z. B. `BALANCE.slotCap = 1000`) und setzen sie danach zurück. `test/classic.js` gibt der Haupt-FOB ein endliches Lager.
+- `test/config.test.js` findet Tippfehler in der Config (unbekannte Einheit, doppelte Taste, Startarmee über dem Limit, NaN …),
+  `test/doctables.test.js` meldet veraltete PRD-Tabellen. Beide laufen auch in `npm test`.
 - CI: `.github/workflows/test-frontline.yml` läuft bei jeder Änderung unter `frontline/`.
 
 ## Wo ändere ich was?
@@ -120,8 +125,8 @@ Wo jedes Feature liegt. „KI“ = Konstanten-Präfix in `js/data/ai.js`, Logik 
 
 ### Einen Wert ändern
 1. Schlüssel in „Wo ändere ich was?“ suchen, Wert in `js/data/` ändern.
-2. PRD und Hilfetexte (`js/ui/menu.js`) auf die alte Zahl durchsuchen und anpassen; Eintrag im PRD-Änderungsverlauf.
-3. `CACHE_VERSION` in `sw.js` erhöhen, `npm test`. Schlägt ein Test fehl, der genau diesen Wert prüft: Test an die neue Regel anpassen, nicht umgekehrt.
+2. `npm run docs` (Tabellen in PRD §6), dann PRD-Text und Hilfetexte (`js/ui/menu.js`) auf die alte Zahl durchsuchen und anpassen; Eintrag im PRD-Änderungsverlauf.
+3. `CACHE_VERSION` in `sw.js` erhöhen, `npm run test:quick`, dann `npm test`. Schlägt ein Test fehl, der genau diesen Wert prüft: Test an die neue Regel anpassen, nicht umgekehrt.
 
 ### Neue Einheit
 1. `js/data/units.js`: ähnliche Einheit kopieren, neuen Schlüssel vergeben; `name`, Werte, `weapons`, `cost`, `buildTime`, `slots`, `hotkey` anpassen (Taste darf in der Haupt-FOB noch nicht belegt sein).
@@ -130,7 +135,7 @@ Wo jedes Feature liegt. „KI“ = Konstanten-Präfix in `js/data/ai.js`, Logik 
 4. `js/ui/controller.js`: Kurzname in `SHORT_UNIT`.
 5. Aussehen: 2D in `js/render/sprites.js` (`drawUnit`); Iso optional in `js/render/isosprites.js` (`UNIT_MODEL` / `INFANTRY_NAME`, sonst gemalt).
 6. KI: Soll sie die Einheit bauen? Dann `MIX` in `js/data/ai.js` und die Ausbildung in `js/ai/ai.js` ergänzen, sonst im PRD §10 vermerken, dass sie es nicht tut.
-7. Test in `test/` (Ausbildung über `game.issue(team, { type: 'train', … })`), Hilfe in `js/ui/menu.js`, PRD §6 (Tabelle und Rolle) und Änderungsverlauf, `CACHE_VERSION`.
+7. Test in `test/` (Ausbildung über `game.issue(team, { type: 'train', … })`), Hilfe in `js/ui/menu.js`, `npm run docs` (Tabellen), PRD §6 (Rolle) und Änderungsverlauf, `CACHE_VERSION`.
 
 ### Neues Gebäude
 1. `js/data/buildings.js`: Eintrag mit `name`, `w`, `h` (Zellen), `hp`, `sight`, `cost`, `buildTime`, `hotkey`; optional `weapon`, `aa`.
