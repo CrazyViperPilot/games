@@ -423,6 +423,7 @@ Ideen von Daniel, die festgehalten, aber **noch nicht umgesetzt** werden. Gebaut
 
 - **SimCity-Bevölkerung** (2026-10-26): Frontline um SimCity-Fähigkeiten erweitern. Wer mehr Bevölkerung hat, lässt sie in Fabriken und Förderanlagen arbeiten und bekommt dadurch mehr Ressourcen. Offen: woher die Bevölkerung kommt, Arbeitsplätze je Gebäude, Wirkung auf die Ressourcen, Verhalten der KI.
 - **Dynamisches Wetter mit Schnee und Regen** (2026-10-27): baut auf dem Wetter aus v4.51 auf (§7, dort wechseln Regen, Nebel und Schnee schon je Partie und wirken auf Sicht und Tempo). Offen: wie weit das Wetter sich im Spiel spürbar verändern soll, z. B. Schnee, der liegen bleibt und wieder taut, oder Regen, der den Boden aufweicht.
+- **Häuserkampf ausbauen** (2026-10-27): Die Grundform gibt es seit v4.43 (§7 „Häuserkampf“: Infanterie besetzt Stadthäuser, schießt aus den Fenstern, Häuser stürzen unter Beschuss ein, die KI besetzt Häuser in der Zone). Offen: was darüber hinaus kommen soll, z. B. Kampf von Raum zu Raum, Sprengen oder Stürmen besetzter Häuser, Ausbau von Häusern zu Stellungen.
 - **Sound** (2026-10-27): Geräusche und Musik (bisher nur „Could“, §1 und §12). Offen: Umfang (Waffen, Fahrzeuge, Meldungen, Wetter, Musik) und Lautstärkeregler im Menü.
 
 ## Änderungsverlauf
