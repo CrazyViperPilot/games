@@ -14,7 +14,7 @@ Konfliktzone halten“. Zwei Parteien: Spieler (Blau) gegen Computer (Rot).
 | Sprache | Deutsch |
 | Spieler | 1 Mensch gegen 1 KI. Kein Multiplayer. |
 
-Nicht im Umfang: Netzwerk-Multiplayer, Kampagne, Speichern laufender Partien, Sound (optional, „Could“).
+Nicht im Umfang: Netzwerk-Multiplayer, Kampagne, Speichern laufender Partien, Sound (optional, „Could“; als Idee geparkt, §13).
 
 ## 2. Spielablauf
 
@@ -416,6 +416,14 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 - **Must:** alles in 2–9, KI aus 10, Sieg/Niederlage, Pause.
 - **Should:** Nebel des Krieges, Kontrollgruppen, Doppelklick-Auswahl, Hilfe-Overlay, PWA/offline.
 - **Could:** Sound, Statistik am Spielende.
+
+## 13. Geparkte Ideen (nicht bauen)
+
+Ideen von Daniel, die festgehalten, aber **noch nicht umgesetzt** werden. Gebaut wird erst auf sein Zeichen, dann zuerst mit einem Vorschlag zur Ausgestaltung.
+
+- **SimCity-Bevölkerung** (2026-10-26): Frontline um SimCity-Fähigkeiten erweitern. Wer mehr Bevölkerung hat, lässt sie in Fabriken und Förderanlagen arbeiten und bekommt dadurch mehr Ressourcen. Offen: woher die Bevölkerung kommt, Arbeitsplätze je Gebäude, Wirkung auf die Ressourcen, Verhalten der KI.
+- **Dynamisches Wetter mit Schnee und Regen** (2026-10-27): baut auf dem Wetter aus v4.51 auf (§7, dort wechseln Regen, Nebel und Schnee schon je Partie und wirken auf Sicht und Tempo). Offen: wie weit das Wetter sich im Spiel spürbar verändern soll, z. B. Schnee, der liegen bleibt und wieder taut, oder Regen, der den Boden aufweicht.
+- **Sound** (2026-10-27): Geräusche und Musik (bisher nur „Could“, §1 und §12). Offen: Umfang (Waffen, Fahrzeuge, Meldungen, Wetter, Musik) und Lautstärkeregler im Menü.
 
 ## Änderungsverlauf
 - v4.53: **Fluss mit Brücken und Furten** (§2, §7, §8, §9, §9a, §10, Vorschlag nach den Flusskarten aus Age of Empires II und den Brücken aus Company of Heroes): auf Zufallskarten liegt vor jeder Startecke ein Fluss mit 3 Brücken und 2 Furten (halbes Tempo). Brücken werden nur auf Befehl beschossen (A + Klick), stürzen ein und sperren den Übergang, bis ein Baufahrzeug sie für 200 Geld in 30 s wieder aufbaut. Die KI baut Brücken auf ihrer Seite wieder auf. Editor: Werkzeuge Fluss, Furt und Brücke. Im Startmenü schaltbar (Standard An). Cache v65.
