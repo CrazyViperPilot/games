@@ -12,8 +12,8 @@ die genannten Dateien.
 
 1. Die Simulation (`js/data`, `js/core/rng.js`, `js/game`, `js/ai`) kennt kein DOM und kein `window`. Sie läuft in Node-Tests.
 2. Spieler und KI ändern das Spiel **nur** über `game.issue(team, cmd)`. Renderer, HUD und Minimap lesen nur.
-3. Spielwerte gehören nach `js/data/` (`balance.js`, `units.js`, `buildings.js`), mit deutschem Kommentar, was sie bewirken.
-   Keine neuen Balance-Zahlen als Konstanten in `js/game` oder `js/ai` (die vorhandenen KI-Konstanten oben in `js/ai/ai.js` sind die Ausnahme).
+3. Spielwerte gehören nach `js/data/` (`balance.js` mit den Schnelleinstellungen `QUICK` ganz oben, `units.js`, `buildings.js`, `ai.js`),
+   mit deutschem Kommentar, was sie bewirken. Keine neuen Balance-Zahlen als Konstanten in `js/game` oder `js/ai`.
 4. Zufall in der Simulation nur über `game.rng` bzw. `makeRng(seed)` (`js/core/rng.js`), nie `Math.random()`. Gleicher Seed = gleiche Partie.
    Zufallskarten ohne Fluss müssen je Seed unverändert bleiben (gespeicherte Seeds, Tests).
 5. Imports immer mit Endung (`'./zone.js'`), nie über den Ordner `frontline/` hinaus, keine CDNs oder externen Dateien.
@@ -45,43 +45,45 @@ node --test test/radio.test.js    # nur eine Datei
 
 ## Wo ändere ich was?
 
-Alle Pfade relativ zu `frontline/`. `BALANCE` = `js/data/balance.js`, `UNITS` = `js/data/units.js`, `BUILDINGS` = `js/data/buildings.js`.
+Alle Pfade relativ zu `frontline/`. `QUICK` und `BALANCE` = `js/data/balance.js`, `UNITS` = `js/data/units.js`, `BUILDINGS` = `js/data/buildings.js`.
+**Die häufigsten Werte stehen ganz oben in `js/data/balance.js` im Block `QUICK` (Schnelleinstellungen)**; `BALANCE` liest sie von dort.
+Darunter listet ein Inhaltsverzeichnis alle weiteren Abschnitte.
 
 | Ich will … | Datei | Schlüssel |
 |---|---|---|
-| Einheitenlimit (Plätze je Team) | balance.js | `BALANCE.slotCap` |
+| Einheitenlimit (Plätze je Team) | balance.js | `QUICK.unitLimit` (im Code `BALANCE.slotCap`) |
 | Plätze, die eine Einheit belegt | units.js | `UNITS.<typ>.slots` (fehlt = 1) |
-| Geld pro Sekunde je Einheit in der Konfliktzone | balance.js | `BALANCE.zone.unitIncome` |
-| Geld pro Sekunde in der Hot Zone (statt, nicht zusätzlich) | balance.js | `BALANCE.hot.unitIncome` |
-| Geld pro Sekunde je eingelagerter Versorgungskiste | balance.js | `BALANCE.crates.income` |
+| Geld pro Sekunde je Einheit in der Konfliktzone | balance.js | `QUICK.moneyPerUnitZone` (im Code `BALANCE.zone.unitIncome`) |
+| Geld pro Sekunde in der Hot Zone (statt, nicht zusätzlich) | balance.js | `QUICK.moneyPerUnitHot` |
+| Geld pro Sekunde je eingelagerter Versorgungskiste | balance.js | `QUICK.moneyPerCrate` |
 | Prämien für Abschüsse und Bauten | balance.js | `BALANCE.bounty` |
-| Startgeld / Obergrenze der Kasse, die von Runde zu Runde bleibt | balance.js | `BALANCE.startRes.money` / `BALANCE.walletMax` |
-| Siegpunkte (Standard) / Takt der Punkte | balance.js | `BALANCE.winPoints` / `BALANCE.pointInterval` (Auswahl 25/50/100 in `js/ui/menu.js`) |
-| Haltezeit des Sendemasts bis zum Sieg | balance.js | `BALANCE.radio.hold` |
-| Startarmee | balance.js | `BALANCE.startUnits` |
-| Kostenloser Soldaten-Nachschub | balance.js | `BALANCE.reinforce` |
-| Zahl der FOBs, Bauradius, Mindestabstände | balance.js | `BALANCE.fob` |
-| Baumaterial für eine FOB-Baustelle, Bau- und Reparaturtempo | balance.js | `BALANCE.construction` |
-| Lagergröße, LKW-Ladung, Lade- und Nachfüllraten | balance.js | `BALANCE.logistics` |
-| Gleichzeitige Ausbildungen / Länge der Warteschlange | balance.js | `BALANCE.trainSlots` / `BALANCE.queueMax` |
+| Startgeld / Obergrenze der Kasse, die von Runde zu Runde bleibt | balance.js | `QUICK.startMoney` / `QUICK.walletMax` |
+| Siegpunkte (Standard) / Takt der Punkte | balance.js | `QUICK.winPoints` / `QUICK.pointEvery` (Auswahl 25/50/100 in `js/ui/menu.js`) |
+| Haltezeit des Sendemasts bis zum Sieg | balance.js | `QUICK.radioHold` |
+| Startarmee | balance.js | `QUICK.startUnits` |
+| Kostenloser Soldaten-Nachschub | balance.js | `QUICK.reinforceEvery`, weitere in `BALANCE.reinforce` |
+| Zahl der FOBs / Bauradius, Mindestabstände | balance.js | `QUICK.maxFobs` / `BALANCE.fob` |
+| Baumaterial für eine FOB-Baustelle / Bau- und Reparaturtempo | balance.js | `QUICK.fobMaterial` / `BALANCE.construction` |
+| Lagergröße, LKW-Ladung / Lade- und Nachfüllraten | balance.js | `QUICK.storeCap`, `QUICK.truckLoad` / `BALANCE.logistics` |
+| Gleichzeitige Ausbildungen / Länge der Warteschlange | balance.js | `QUICK.trainSlots` / `QUICK.queueMax` |
 | Preis, Ausbildungszeit, HP, Tempo, Sicht einer Einheit | units.js | `cost`, `buildTime`, `hp`, `speed`, `sight` |
 | Waffen einer Einheit (Reichweite, Kadenz, Schuss, Schaden) | units.js | `weapons[]`: `range`, `cooldown`, `rounds`, `munCost`, `damage`, `hits` |
 | Kosten, Bauzeit, HP, Waffe eines Gebäudes | buildings.js | `cost`, `buildTime`, `hp`, `weapon`, `aa`, `hotkey` |
 | Welche Forschungsstufe eine Einheit freischaltet / Forschungskosten | balance.js | `BALANCE.research.unitTier` / `BALANCE.research.items` |
-| Schwierigkeit der KI (Denktakt, Angriffsschwelle, Einkommen, Verhalten) | balance.js | `BALANCE.difficulty.<easy\|normal\|hard>` |
-| Weitere KI-Werte (Wellen, Späher, Expansion, Kisten …) | js/ai/ai.js | Konstanten am Dateianfang; Bedeutung: PRD §10 „KI-Konstanten“ |
+| Schwierigkeit der KI (Denktakt, Angriffsschwelle, Einkommen, Verhalten, FOB-Grenze, Sendemast ab, Kistenholer) | balance.js | `BALANCE.difficulty.<easy\|normal\|hard>` |
+| Weitere KI-Werte (Wellen, Späher, Expansion, Kisten …) | js/data/ai.js | eine Konstante je Zeile mit Kommentar; Bedeutung: PRD §10 „KI-Konstanten“ |
 | Höhenvorteil, Tempo am Hang, Weitsicht von oben | balance.js | `BALANCE.height`, `BALANCE.slope`, `BALANCE.sightHeight` |
 | Wetter, Häuserkampf, Kisten, Kommandeur, Formationen, Fluss, Tiere, Wracks, Tarnung, Flugabwehr | balance.js | `weather`, `garrison`, `crates`, `commander`, `formation`, `river`, `animals`, `scars`, `stealth`, `airFire` |
 | Kartengröße | balance.js | `BALANCE.map` (Vorsicht: ändert alle Karten und Tests) |
 | Aufbau der Zufallskarte (Hügel, Seen, Häuser, Felder, Kisten-Abstände) | js/game/map.js, js/game/landscape.js | Konstanten am Dateianfang (ändert alle Zufallskarten) |
-| Standards im Startmenü (Schwierigkeit, Schalter) | js/ui/menu.js | `showStartMenu` (`readFlag(…, true)`) |
+| Standards im Startmenü (Schwierigkeit, Schalter) | balance.js | `BALANCE.menuDefaults` |
 | Teamnamen und -farben | balance.js | `BALANCE.teamNames`, `BALANCE.teamColors` |
 
 Danach: PRD-Text und Hilfetexte in `js/ui/menu.js` auf die alte Zahl durchsuchen und anpassen (Regel 7).
 
 ## Feature-Landkarte
 
-Wo jedes Feature liegt. „KI“ = Stelle in `js/ai/ai.js` (Konstanten-Präfix), Darstellung unter `js/render/`, UI unter `js/ui/`, Tests unter `test/`.
+Wo jedes Feature liegt. „KI“ = Konstanten-Präfix in `js/data/ai.js`, Logik in `js/ai/ai.js`, Darstellung unter `js/render/`, UI unter `js/ui/`, Tests unter `test/`.
 
 | Feature | PRD | Werte | Logik (`js/game/`) | KI | Darstellung / UI | Test |
 |---|---|---|---|---|---|---|
@@ -90,7 +92,7 @@ Wo jedes Feature liegt. „KI“ = Stelle in `js/ai/ai.js` (Konstanten-Präfix),
 | Konfliktzone, Punkte, Zonengeld | §7 | `zone`, `pointInterval` | `zone.js` | `WAVE_*`, `THREAT_*` | `renderer.js`, `hud.js` | `economy.test.js`, `game.test.js` |
 | Hot Zone und Bohrer | §7 „Hot Zone“, „Bohrer“ | `hot`, `BUILDINGS.drill` | `hotzone.js` | – | `renderer.js`, `hud.js` | `game.test.js` |
 | Lager, LKW, Nachfüllen, Transport, Einsteigen | §3 | `logistics` | `logistics.js` | `SUPPLY_*`, `SURPLUS_MIN`, `ROUTE_HOLD` | `renderer.js`, `controller.js` | `logistics.test.js` |
-| Bauen, Reparieren, FOB-Baustellen | §4, §5 | `construction`, `fob` | `construction.js`, `game.js` (`canPlace`, `cmdBuild`) | `FOB_CAP`, `RELAY_STEP`, `FLANK_R`, `WALL_*` | `controller.js` (Baumenü), `sprites.js`, `isobuild.js` | `game.test.js` |
+| Bauen, Reparieren, FOB-Baustellen | §4, §5 | `construction`, `fob` | `construction.js`, `game.js` (`canPlace`, `cmdBuild`) | `difficulty.fobCap`, `RELAY_STEP`, `FLANK_R`, `WALL_*` | `controller.js` (Baumenü), `sprites.js`, `isobuild.js` | `game.test.js` |
 | Bewegung, Wegsuche, Raster | – | `slope.pathCost`, `leash` | `movement.js`, `pathfinding.js`, `grid.js` | – | – | `path.test.js` |
 | Formationen | §8 | `formation` | `formation.js` | Keil bei Angriffswellen | `controller.js` (Taste F) | `formation.test.js` |
 | Kampf, Waffen, Schaden, Treffer | §6 „Waffen“, „Treffer“ | `UNITS.*.weapons`, `BUILDINGS.*.weapon`, `height` | `combat.js`, `entities.js` | `FALLBACK_*`, `RAID_*` | `sprites.js` (Effekte) | `hits.test.js`, `game.test.js` |
@@ -100,9 +102,9 @@ Wo jedes Feature liegt. „KI“ = Stelle in `js/ai/ai.js` (Konstanten-Präfix),
 | Gelände: Höhe, Hänge, Seen | §7 „Gelände“ | `height`, `slope`, `sightHeight` | `relief.js`, `landscape.js` | – | `ground.js` (WebGL), `reliefimg.js` | `relief.test.js`, `terrain.test.js` |
 | Fluss, Brücken, Furten | §7 „Fluss“ | `river` | `river.js`, `landscape.js` | `BRIDGE_*` | `bridge.js` | `river.test.js` |
 | Häuserkampf | §7 „Häuserkampf“ | `garrison` | `garrison.js` | `GARRISON_*` | `renderer.js`, `status.js` | `garrison.test.js` |
-| Versorgungskisten | §7 „Versorgungskisten“ | `crates` | `crates.js` | `CRATE_*` | `sprites.js` (`drawCrate`), `minimap.js` | `crates.test.js` |
+| Versorgungskisten | §7 „Versorgungskisten“ | `crates` | `crates.js` | `CRATE_*`, `difficulty.cratePickers` | `sprites.js` (`drawCrate`), `minimap.js` | `crates.test.js` |
 | Kommandeur | §6 | `commander`, `UNITS.commander` | `commander.js` | `CMD_*` | `sprites.js` (`drawStar`), `renderer.js` | `commander.test.js` |
-| Sendemast | §7 „Sendemast“ | `radio`, `BUILDINGS.radio` | `radio.js` | `RADIO_*` | `sprites.js`, `isobuild.js`, `hud.js` | `radio.test.js` |
+| Sendemast | §7 „Sendemast“ | `radio`, `BUILDINGS.radio` | `radio.js` | `RADIO_*`, `difficulty.radioFrom` | `sprites.js`, `isobuild.js`, `hud.js` | `radio.test.js` |
 | Wetter und Jahreszeiten | §7 „Wetter“ | `weather` | `weather.js` | `WX_*` | `weatherfx.js`, `season.js` | `weather.test.js` |
 | Forschungsstufen | §7 „Forschungsstufen“ | `research` | `research.js` | `UPGRADES`, `UPGRADE_RESERVE` | `controller.js`, `hud.js` | `research.test.js` |
 | Zufallskarte, Stadt, Gehöfte, Felder | §7, §9a | `map`, `zone.r` | `map.js`, `landscape.js` | – | `terrain.js`, `iso.js`, `isobuild.js`, `isosprites.js` | `map.test.js`, `fields.test.js` |
@@ -127,7 +129,7 @@ Wo jedes Feature liegt. „KI“ = Stelle in `js/ai/ai.js` (Konstanten-Präfix),
 3. `js/data/balance.js`: Stufe in `research.unitTier` (fehlt = sofort verfügbar).
 4. `js/ui/controller.js`: Kurzname in `SHORT_UNIT`.
 5. Aussehen: 2D in `js/render/sprites.js` (`drawUnit`); Iso optional in `js/render/isosprites.js` (`UNIT_MODEL` / `INFANTRY_NAME`, sonst gemalt).
-6. KI: Soll sie die Einheit bauen? Dann in `js/ai/ai.js` (`MIX` und Ausbildung) ergänzen, sonst im PRD §10 vermerken, dass sie es nicht tut.
+6. KI: Soll sie die Einheit bauen? Dann `MIX` in `js/data/ai.js` und die Ausbildung in `js/ai/ai.js` ergänzen, sonst im PRD §10 vermerken, dass sie es nicht tut.
 7. Test in `test/` (Ausbildung über `game.issue(team, { type: 'train', … })`), Hilfe in `js/ui/menu.js`, PRD §6 (Tabelle und Rolle) und Änderungsverlauf, `CACHE_VERSION`.
 
 ### Neues Gebäude
@@ -144,7 +146,7 @@ Wo jedes Feature liegt. „KI“ = Stelle in `js/ai/ai.js` (Konstanten-Präfix),
 4. Test über `game.issue`, PRD §8 (Steuerung) und Änderungsverlauf.
 
 ### Neue Option im Startmenü
-1. `js/ui/menu.js` → `showStartMenu`: Zustand, Schalter im HTML, Speicherung (`readFlag`/`writeFlag` mit eigenem Schlüssel `frontline-…`), Wert in `onStart({ … })`.
+1. Standard in `BALANCE.menuDefaults`; `js/ui/menu.js` → `showStartMenu`: Zustand, Schalter im HTML, Speicherung (`readFlag`/`writeFlag` mit eigenem Schlüssel `frontline-…`), Wert in `onStart({ … })`.
 2. `js/main.js` → `startGame`: Wert an `new Game({ … })` weitergeben.
 3. `js/game/game.js` → Konstruktor-Option mit Standard **aus**, an das Feature-Modul weitergeben (Regel 9).
 
@@ -154,6 +156,6 @@ Wo jedes Feature liegt. „KI“ = Stelle in `js/ai/ai.js` (Konstanten-Präfix),
 3. Werte als eigener Abschnitt in `js/data/balance.js`, Datei in `sw.js` → `ASSETS`, Test `test/<name>.test.js`, Zeile in der Feature-Landkarte oben.
 
 ### KI-Verhalten anpassen
-1. Schwellen und Takte zuerst über `BALANCE.difficulty` oder die Konstanten oben in `js/ai/ai.js` ändern.
+1. Schwellen und Takte zuerst über `BALANCE.difficulty` oder `js/data/ai.js` ändern.
 2. Neues Verhalten als eigene Methode der Klasse `AI`, aufgerufen aus `think()` (Denkschritt); die KI ändert das Spiel nur über `game.issue`.
 3. `test/ai.test.js` (KI gegen KI über feste Seeds) laufen lassen; PRD §10 und die Tabelle „KI-Konstanten“ aktualisieren.

@@ -1,39 +1,76 @@
-// Alle globalen Spielzahlen (docs/verlauf.md §3.1, §11).
+// Alle globalen Spielzahlen. Einheiten: units.js, Gebäude: buildings.js, KI: ai.js (alle in js/data/). Wegweiser: CLAUDE.md.
+//
+// Inhalt (Suche nach dem Schlüssel):
+//   QUICK            Schnelleinstellungen: die Werte, die man am häufigsten ändert (gleich hier oben)
+//   Partie und Sieg  map, tickRate, winPoints, pointInterval, radio
+//   Geld             startRes, walletMax, bounty, zone, hot, crates
+//   Einheiten        slotCap, startUnits, reinforce, queueMax, trainSlots, fuelSlowMul, leash, scanInterval
+//   FOB und Bauen    fob, construction, demolishRefund
+//   Logistik         logistics, shortageWarn
+//   KI-Schwierigkeit difficulty (weitere KI-Werte: ai.js)
+//   Kampf, Gelände   height, slope, airFire, sightHeight, fogInterval, stealth, garrison, commander, formation
+//   Wetter, Technik  weather, research, river
+//   Nur Optik        scars, animals
+//   Startmenü        menuDefaults
+//   Texte, Farben    resNames, teamNames, teamColors
+
+// == SCHNELLEINSTELLUNGEN ==
+// Hier ändern; BALANCE unten liest diese Werte. Danach PRD und Hilfetexte (js/ui/menu.js) anpassen (CLAUDE.md, Regel 7).
+export const QUICK = {
+  unitLimit: 300, // Einheitenlimit in Plätzen je Team (Soldat, LKW, Hubschrauber 1, SPz 3, KPz 5, Flak/SAM 2: `slots` in units.js)
+  startMoney: 800, // Startgeld (die Kasse bleibt von Runde zu Runde, höchstens walletMax)
+  walletMax: 5000, // Obergrenze der Kasse, die von Runde zu Runde bleibt
+  moneyPerUnitZone: 0.4, // Geld je Sekunde und eigene Einheit in der Konfliktzone
+  moneyPerUnitHot: 0.8, // Geld je Sekunde und Einheit in der Hot Zone (statt moneyPerUnitZone, nicht zusätzlich)
+  moneyPerCrate: 1, // Geld je Sekunde und eingelagerte Versorgungskiste
+  winPoints: 100, // Siegpunkte (Standard; im Startmenü 25, 50 oder 100)
+  pointEvery: 30, // Sekunden Zonenkontrolle je Siegpunkt
+  radioHold: 1800, // Sekunden, die ein fertiger Sendemast stehen muss, bis sein Team gewinnt (30 min)
+  maxFobs: 10, // FOBs je Team, mit Haupt-FOB
+  fobMaterial: 400, // Baumaterial, das eine FOB-Baustelle im Lager braucht, bevor gebaut wird
+  storeCap: 3000, // Lager je Sorte (Baumaterial, Munition, Treibstoff) und FOB
+  truckLoad: 400, // Ladung eines LKW (Summe aller Sorten)
+  trainSlots: 2, // so viele Einheiten bildet die Haupt-FOB gleichzeitig aus
+  queueMax: 5, // Länge der Ausbildungs-Warteschlange
+  reinforceEvery: 6, // Sekunden je kostenloser Schütze, solange weniger als reinforce.soldierMin Soldaten leben
+  // Startarmee: 2 Kampfpanzer (10 Plätze), 3 Schützenpanzer (9), 3 LKW und 1 Baufahrzeug (4), 29 Soldaten (22 Schützen, 7 Panzerabwehr) = 52 Plätze;
+  // dazu der Kommandeur (0 Plätze, hinten an der Haupt-FOB)
+  startUnits: ['truck', 'truck', 'truck', 'engineer', 'tank', 'tank', 'ifv', 'ifv', 'ifv', ...Array(22).fill('rifleman'), ...Array(7).fill('at'), 'commander'],
+};
+
 export const BALANCE = {
   map: { width: 9024, height: 9024, tile: 32 },
   tickRate: 20, // Simulationsschritte/s
-  winPoints: 100,
+  winPoints: QUICK.winPoints,
   // Geld für Abschüsse und Bauten (Anteil am Geldpreis der Einheit bzw. am Baumaterialpreis des Gebäudes)
   bounty: { inf: 0.25, vehicle: 0.6, building: 0.2, built: 0.2, notify: 100 },
-  walletMax: 5000, // Obergrenze der Kasse, die von Runde zu Runde bleibt
-  pointInterval: 30,
-  startRes: { money: 800 }, // Startgeld; die Haupt-FOB hat unendlich Baumaterial, Munition und Treibstoff
+  walletMax: QUICK.walletMax, // Obergrenze der Kasse, die von Runde zu Runde bleibt
+  pointInterval: QUICK.pointEvery,
+  startRes: { money: QUICK.startMoney }, // Startgeld; die Haupt-FOB hat unendlich Baumaterial, Munition und Treibstoff
   // Einheitenlimit in Plätzen je Team: Soldat/LKW/Baufahrzeug/Hubschrauber 1, Schützenpanzer 3, Kampfpanzer 5, Flak und SAM 2 (`slots` in units.js)
-  slotCap: 300,
-  // Start: 2 Kampfpanzer (10 Plätze), 3 Schützenpanzer (9), 3 LKW und 1 Baufahrzeug (4), 29 Soldaten (22 Schützen, 7 Panzerabwehr) = 52 Plätze;
-  // dazu der Kommandeur (0 Plätze, hinten an der Haupt-FOB)
-  startUnits: ['truck', 'truck', 'truck', 'engineer', 'tank', 'tank', 'ifv', 'ifv', 'ifv', ...Array(22).fill('rifleman'), ...Array(7).fill('at'), 'commander'],
+  slotCap: QUICK.unitLimit,
+  startUnits: QUICK.startUnits,
   // Geld je Sekunde und lebende eigene Einheit in der Konfliktzone (auch umkämpft, ohne Deckel)
-  zone: { r: 3300, unitIncome: 0.4 },
+  zone: { r: 3300, unitIncome: QUICK.moneyPerUnitZone },
   // Hot Zone: kleiner Kreis in der Konfliktzone, wandert zufällig oder zu aktiven Bohrern.
   // Einheiten darin bringen statt unitIncome das Doppelte (unitIncome = 2 × zone.unitIncome, nicht zusätzlich).
-  hot: { r: 300, speed: 40, wanderSpeed: 40 / 3, unitIncome: 0.8, wanderMin: 25, wanderMax: 45 },
+  hot: { r: 300, speed: 40, wanderSpeed: 40 / 3, unitIncome: QUICK.moneyPerUnitHot, wanderMin: 25, wanderMax: 45 },
   // Bauradien eigener FOBs dürfen sich nicht überlappen (minDistOwn = 2 × buildRadius); höchstens 10 FOBs mit der Haupt-FOB
-  fob: { buildRadius: 450, minDistOwn: 900, minDistEnemy: 700, max: 10 },
-  queueMax: 5,
-  trainSlots: 2, // Ausbildungsplätze der Haupt-FOB: so viele Einträge der Warteschlange werden gleichzeitig ausgebildet
+  fob: { buildRadius: 450, minDistOwn: 900, minDistEnemy: 700, max: QUICK.maxFobs },
+  queueMax: QUICK.queueMax,
+  trainSlots: QUICK.trainSlots, // Ausbildungsplätze der Haupt-FOB: so viele Einträge der Warteschlange werden gleichzeitig ausgebildet
   shortageWarn: 20, // s zwischen zwei Meldungen je Sorte und Team
   fuelSlowMul: 0.25, // Tempo von Fahrzeugen ohne Treibstoff
   // Soldaten-Nachschub (§12): kostenloser Schütze an der Haupt-FOB alle `interval` s, solange weniger als `soldierMin` Infanterie lebt
-  reinforce: { interval: 6, soldierMin: 29, unit: 'rifleman' },
+  reinforce: { interval: QUICK.reinforceEvery, soldierMin: 29, unit: 'rifleman' },
   demolishRefund: 0.25, // Abriss fertiger Gebäude (Baustellen: voll)
   scanInterval: 0.25, // Zielsuche
   fogInterval: 0.25,
   leash: 300, // Idle-Einheiten verfolgen max. so weit vom Ankerpunkt
   // Logistik (§11.1–11.3)
   logistics: {
-    storeCap: 3000, // Obergrenze je Sorte und FOB-Lager (die Haupt-FOB wird darauf immer wieder aufgefüllt)
-    truckCapacity: 400, // Ladung eines LKW (Summe)
+    storeCap: QUICK.storeCap, // Obergrenze je Sorte und FOB-Lager (die Haupt-FOB wird darauf immer wieder aufgefüllt)
+    truckCapacity: QUICK.truckLoad, // Ladung eines LKW (Summe)
     transferRate: 100, // Laden/Entladen je s
     transferReach: 140, // LKW muss so nah an der FOB-Mitte stehen
     resupplyRate: 4, // Nachfüllen Treibstoff je s und Einheit
@@ -51,7 +88,7 @@ export const BALANCE = {
     autoHelpRange: 400, // idle Bauer hilft automatisch
     autoRepairRange: 300, // idle Baufahrzeug repariert automatisch
     assignInterval: 1, // s, Takt der automatischen Zuweisung
-    fobMaterial: 400, // Baumaterial im Lager einer FOB-Baustelle, bevor gebaut wird
+    fobMaterial: QUICK.fobMaterial, // Baumaterial im Lager einer FOB-Baustelle, bevor gebaut wird
     repairRate: 0.02, // Anteil maxHp je s und Baufahrzeug
     repairCostShare: 0.5, // Baumaterial-Kosten = cost.bm × geheilt/maxHp × 0.5
   },
@@ -59,9 +96,11 @@ export const BALANCE = {
     // Schwierigkeit über Verhalten: ab normal Späher und Konter-Mix, ab schwer Überfälle und Gruppen-Rückzug; hart ohne Einkommensbonus.
     // weather: nutzt das Wetter (bei schlechter Sicht früher ein Späher, im Nebel greift die Welle schon mit weniger Stärke an)
     // research: Spielzeit (s), ab der die KI auf Stufe 2 bzw. 3 spart; upgrades: forscht auch Verbesserungen (aus Überschuss)
-    easy: { think: 3.0, incomeMult: 0.8, attackStrength: 2500, scout: false, counter: false, raid: false, fallback: false, weather: false, research: [240, 720], upgrades: false },
-    normal: { think: 2.0, incomeMult: 1.0, attackStrength: 2000, scout: true, counter: true, raid: false, fallback: false, weather: true, research: [150, 540], upgrades: true },
-    hard: { think: 1.0, incomeMult: 1.0, attackStrength: 1600, scout: true, counter: true, raid: true, fallback: true, weather: true, research: [90, 420], upgrades: true },
+    // fobCap: FOBs mit Haupt-FOB (höchstens fob.max); radioFrom: Spielzeit (s), ab der sie einen Sendemast baut (Infinity = nie);
+    // cratePickers: so viele Soldaten holen oder tragen gleichzeitig Versorgungskisten. Weitere KI-Werte: js/data/ai.js
+    easy: { think: 3.0, incomeMult: 0.8, attackStrength: 2500, scout: false, counter: false, raid: false, fallback: false, weather: false, research: [240, 720], upgrades: false, fobCap: 3, radioFrom: Infinity, cratePickers: 1 },
+    normal: { think: 2.0, incomeMult: 1.0, attackStrength: 2000, scout: true, counter: true, raid: false, fallback: false, weather: true, research: [150, 540], upgrades: true, fobCap: 5, radioFrom: 720, cratePickers: 2 },
+    hard: { think: 1.0, incomeMult: 1.0, attackStrength: 1600, scout: true, counter: true, raid: true, fallback: true, weather: true, research: [90, 420], upgrades: true, fobCap: 7, radioFrom: 540, cratePickers: 3 },
   },
   // Gelände (§7): wer höher steht, trifft härter (Direktfeuer, ab `dead` Höhenunterschied, voll ab `full`), tiefer stehend schwächer
   height: { bonus: 0.25, dead: 6, full: 36 },
@@ -99,13 +138,10 @@ export const BALANCE = {
   // Versorgungskisten (§3, nach den Reliquien aus Age of Empires II): liegen abseits der Zone (pairs Paare, punktsymmetrisch).
   // Ein Soldat hebt eine auf (pickReach), trägt sie mit carrySpeed-Tempo und ohne zu schießen zur nächsten eigenen fertigen FOB
   // (deliverReach zur Wand); jede eingelagerte Kiste bringt dem Team `income` Geld/s. Fällt der Träger oder die FOB, liegt sie wieder am Boden.
-  crates: { pairs: 3, income: 1, carrySpeed: 0.75, pickReach: 40, deliverReach: 100 },
+  crates: { pairs: 3, income: QUICK.moneyPerCrate, carrySpeed: 0.75, pickReach: 40, deliverReach: 100 },
   // Sichtbarer Schaden (rein optisch): Wracks zerstörter Fahrzeuge und Gebäude (wreckLife s, die letzten wreckFade s blassen sie aus,
   // höchstens wreckMax), Krater von Mörsereinschlägen (Radius craterR) und Brandflecken unter Wracks (craterLife s, höchstens craterMax).
   scars: { wreckLife: 240, wreckFade: 30, wreckMax: 80, craterLife: 180, craterFade: 30, craterMax: 150, craterR: 22 },
-  // Tiere (rein optisch, nach den Jagdtieren aus Age of Empires II): `pairs` Rudelpaare (punktsymmetrisch) außerhalb der Zone, Rehe
-  // (deer Tiere je Rudel) und Wildschweine (boar). Sie grasen und ziehen langsam (walk px/s) weiter; kommt eine Einheit näher als
-  // scare (je Art: Infanterie, Fahrzeug, Hubschrauber) oder knallt es in boom px, flieht das ganze Rudel (run px/s) flee px weit.
   // Formationen (§8, nach Age of Empires II): Abstand = größter Durchmesser + gap (spacingMin … spacingMax px); Linie höchstens
   // lineMax breit, Kolonne ab columnSingle Einheiten zweireihig. Geschlossen fahren: wer mehr als lead px (Restweg) vor dem Median
   // liegt, bremst (je brake px weiter voraus stärker, bis slowest × Grundtempo); wer mehr als lag px zurückliegt, fährt eigenes Tempo.
@@ -114,7 +150,7 @@ export const BALANCE = {
   // letzten Treffer); fällt er, bekommt der Gegner deathPoints Punkte
   commander: { aura: 300, fireRate: 1.1, heal: 1.5, healDelay: 6, deathPoints: 5 },
   // Sendemast (zweite Siegbedingung): so lange halten (s) = Sieg; Warnung an beide, wenn noch warn s fehlen
-  radio: { hold: 1800, warn: 60 },
+  radio: { hold: QUICK.radioHold, warn: 60 },
   // Wetter und Jahreszeiten (nach Empire Earth II, im Startmenü; ohne Angabe aus): Sichtweite × sight je Wetter; Bodenfahrzeuge
   // × vehicle bei Schneefall, × winter auf Winterboden. Ein Wetter hält phase s (Zufall je Art), Übergänge blenden über fade s.
   // Häufigkeit (Gewichte) des nächsten Wetters je Jahreszeit: odds (nie dasselbe Wetter zweimal hintereinander).
@@ -154,6 +190,9 @@ export const BALANCE = {
   // schwere Waffen mehr, Handwaffen weniger). Zerstört sperren sie; ein Baufahrzeug baut sie für rebuildCost Geld in rebuild s wieder
   // auf (mehrere schneller, höchstens construction.maxBuilders), es arbeitet bis reach px vom Brückenkopf.
   river: { ford: 0.5, fordCost: 30, fordDepth: 12, deck: 80, bridgeHp: 2400, rebuildCost: 200, rebuild: 30, reach: 90 },
+  // Tiere (rein optisch, nach den Jagdtieren aus Age of Empires II): `pairs` Rudelpaare (punktsymmetrisch) außerhalb der Zone, Rehe
+  // (deer Tiere je Rudel) und Wildschweine (boar). Sie grasen und ziehen langsam (walk px/s) weiter; kommt eine Einheit näher als
+  // scare (je Art: Infanterie, Fahrzeug, Hubschrauber) oder knallt es in boom px, flieht das ganze Rudel (run px/s) flee px weit.
   animals: {
     pairs: 4,
     deer: [3, 5],
@@ -164,6 +203,8 @@ export const BALANCE = {
     flee: [350, 520],
     think: 0.25,
   },
+  // Standards im Startmenü (das Menü merkt sich die letzte Wahl je Gerät). new Game() ohne Angabe schaltet alles aus (Tests).
+  menuDefaults: { difficulty: 'normal', radio: true, weather: 'random', research: true, river: true },
   resNames: { money: 'Geld', bm: 'Baumaterial', mun: 'Munition', fuel: 'Treibstoff' },
   teamNames: ['Blau', 'Rot'],
   teamColors: ['#3d8bfd', '#e5484d'],

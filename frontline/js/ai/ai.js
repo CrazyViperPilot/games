@@ -9,78 +9,77 @@ import { hasCommander } from '../game/commander.js';
 import { radioEta } from '../game/radio.js';
 import { weatherSight } from '../game/weather.js';
 import { unitLocked, researchBlock } from '../game/research.js';
+import {
+  MAX_PLACE,
+  THREAT_RANGE,
+  THREAT_DANGER,
+  GATHER_DIST,
+  ZONE_GATHER_DIST,
+  RALLY_MOVE,
+  RELAY_STEP,
+  FLANK_R,
+  RESERVE,
+  SITE_TIMEOUT,
+  BAD_TIME,
+  ALARM_TIME,
+  DRY,
+  WALL_OFFSET,
+  WALL_HALF,
+  MIX,
+  THREAT_PER_UNIT,
+  WAVE_ODDS,
+  WAVE_PATIENCE,
+  WAVE_MIN,
+  SCOUT_MIN_ARMY,
+  SCOUT_FROM,
+  SCOUT_FUEL,
+  SCOUT_REFILL,
+  WX_SCOUT_SIGHT,
+  WX_SCOUT_ARMY,
+  WX_SCOUT_FROM,
+  WX_FOG_SIGHT,
+  WX_FOG_WAVE,
+  COUNTER_MIN,
+  COUNTER_WEIGHT,
+  RAID_MIN,
+  RAID_SHARE,
+  FALLBACK_ODDS,
+  FALLBACK_MIN_FOES,
+  FALLBACK_DIST,
+  FALLBACK_HOLD,
+  ENG_NEAR,
+  SUPPLY_BEHIND,
+  SUPPLY_MIN,
+  SURPLUS_MIN,
+  ROUTE_HOLD,
+  GARRISON_SHARE,
+  GARRISON_RANGE,
+  GARRISON_EVERY,
+  CRATE_EVERY,
+  CRATE_RANGE,
+  CMD_BEHIND,
+  CMD_DANGER,
+  CMD_MOVE,
+  CMD_RESERVE,
+  CMD_FROM,
+  RADIO_SITE,
+  RADIO_NEAR,
+  RADIO_EVERY,
+  RADIO_GATHER,
+  RADIO_GATHER_R,
+  RADIO_GATHER_SHARE,
+  UPGRADES,
+  UPGRADE_RESERVE,
+  BRIDGE_EVERY,
+  BRIDGE_RESERVE,
+} from '../data/ai.js'; // KI-Werte (js/data/ai.js)
 
-const MAX_PLACE = 100; // canPlace-Aufrufe je Denkschritt (Budget für die Platzsuche)
 const DEF_RANGE = BALANCE.fob.buildRadius; // Bauradius = Verteidigungsradius einer FOB
 const FOB_COST = BALANCE.construction.fobMaterial; // Baumaterial, das eine FOB-Baustelle braucht
 const ZONE_FOB_R = BALANCE.zone.r * 0.6; // Zonen-FOB: Mittelpunkt höchstens so weit von der Zonenmitte
-const THREAT_RANGE = 900; // Kampfeinheiten in dieser Nähe zur Bedrohung reagieren
-const THREAT_DANGER = 600; // Gegner in dieser Nähe machen ein FOB-Ziel unattraktiver
-const GATHER_DIST = 300; // Sammelpunkt Richtung Zone, vom Zentrum der Haupt-FOB
-const ZONE_GATHER_DIST = 150; // Sammelpunkt an der Zonen-FOB, Richtung eigener Basis
-const RALLY_MOVE = 150; // Sammelpunkt-Befehl nur neu setzen, wenn sich der Punkt so weit verschiebt
-const RELAY_STEP = 1000; // Abstand der Relais-FOBs auf dem Weg zur Zone (Bauradien dürfen sich nicht überlappen)
-const FLANK_R = 1000; // Flanken-FOBs: Abstand zur Zonen-FOB
-const RESERVE = 0.2; // Anteil der Angriffsgruppe, der als Reserve an der Haupt-FOB bleibt (ab 5 Einheiten)
-const SITE_TIMEOUT = 200; // s, eine FOB-Baustelle ohne Material wird danach abgerissen
-const BAD_TIME = 240; // s, Sperre eines fehlgeschlagenen FOB-Ziels
-const ALARM_TIME = 30; // s, Treffer an der Basis gelten als Angriff auf die Basis
-const DRY = 0.2; // Einheiten mit weniger Munition/Treibstoff (Anteil) ziehen sich zurück
-const WALL_OFFSET = 4; // Mauer im Abstand (Zellen) vom Zentrum der Haupt-FOB
-const WALL_HALF = 3; // Mauerlinie: 2 × WALL_HALF + 1 Zellen, Tor in der Mitte
-const MIX = { rifleman: 0.5, at: 0.2, ifv: 0.2, tank: 0.1 }; // Zielanteile der Kampfeinheiten
-const THREAT_PER_UNIT = 150; // mittlerer Geldwert einer Kampfeinheit (Mix) für die Schätzung einer Besatzung
-const FOB_CAP = { easy: 3, normal: 5, hard: 7 }; // FOB-Grenze je Schwierigkeit mit Haupt-FOB (Spielmaximum 10)
-const WAVE_ODDS = 1.2; // Welle greift nur an, wenn ihr Wert mindestens so viel Mal die geschätzte Zonenbesatzung beträgt
-const WAVE_PATIENCE = 600; // s ohne Welle, bis die geforderte Stärke auf WAVE_MIN fällt
-const WAVE_MIN = 0.6; // Untergrenze des Geduld-Faktors
-const SCOUT_MIN_ARMY = 10; // Kampfeinheiten, ab denen sich die KI einen Späher leistet
 const SCOUT_MONEY = UNITS.littlebird.cost.money; // Geld, ab dem ein Späher ausgebildet wird
-const SCOUT_FROM = 180; // s Spielzeit, ab der ein Späher gebaut wird
-const SCOUT_FUEL = 0.35; // Späher kehrt unter diesem Treibstoffanteil zur Haupt-FOB zurück
-const SCOUT_REFILL = 0.9; // und fliegt erst wieder aus, wenn der Tank so voll ist
-const WX_SCOUT_SIGHT = 0.9; // Sichtfaktor (Wetter), unter dem der Späher früher kommt:
-const WX_SCOUT_ARMY = 5; // schon ab so vielen Kampfeinheiten
-const WX_SCOUT_FROM = 90; // und ab dieser Spielzeit (s)
-const WX_FOG_SIGHT = 0.7; // Sichtfaktor (Nebel), bis zu dem die Welle die Deckung nutzt:
-const WX_FOG_WAVE = 0.85; // sie geht schon mit diesem Anteil der geforderten Stärke los
-const COUNTER_MIN = 8; // sichtbare gegnerische Kampfeinheiten, ab denen die Mischung angepasst wird
-const COUNTER_WEIGHT = 0.8; // Stärke der Anpassung (0 = Grundmischung)
-const RAID_MIN = 12; // Besatzung ab so vielen freien Einheiten schickt einen Überfall auf eine gegnerische FOB
-const RAID_SHARE = 0.3; // Anteil der Besatzung für den Überfall
-const FALLBACK_ODDS = 1.8; // Gruppe zieht ab, wenn die Gegner im Feuer so viel Mal ihren Wert übertreffen
-const FALLBACK_MIN_FOES = 4; // und mindestens so viele Gegner sichtbar sind
-const FALLBACK_DIST = 1400; // Rückzugsstrecke Richtung Basis
-const FALLBACK_HOLD = 30; // s, in denen nach einem Rückzug keine Angriffsbefehle kommen
 const KEYS = ['bm', 'mun', 'fuel'];
 const CAP = BALANCE.logistics.truckCapacity;
-const ENG_NEAR = 250; // Baufahrzeug näher an einer Baustelle: die automatische Zuweisung übernimmt
-const SUPPLY_BEHIND = 150; // Versorger steht so weit hinter dem Schwerpunkt der Armee
-const SUPPLY_MIN = 0.25; // Versorger lädt nach, wenn die Ladung unter diesem Anteil liegt
-const SURPLUS_MIN = 120; // Pendler fährt nur, wenn die Quelle so viel Überschuss hat
-const ROUTE_HOLD = 20; // s, früheste Neuplanung einer Pendler-Route
-const GARRISON_SHARE = 0.4; // Anteil der Infanterie in der Zone, der Stadthäuser besetzt (Häuserkampf)
-const GARRISON_RANGE = 500; // ein Soldat geht nur in ein Haus in diesem Umkreis
-const GARRISON_EVERY = 8; // s zwischen zwei Besetzungsrunden
-const CRATE_EVERY = 6; // s zwischen zwei Runden der Kistensuche
-const CRATE_RANGE = 4500; // ein Soldat holt nur Kisten in diesem Umkreis
-const CRATE_PICKERS = { easy: 1, normal: 2, hard: 3 }; // so viele Soldaten holen oder tragen gleichzeitig Kisten
-const CMD_BEHIND = 220; // Kommandeur steht so weit hinter dem Schwerpunkt der Armee (seine Aura reicht 300 px)
-const CMD_DANGER = 450; // sichtbare Gegner so nah: der Kommandeur weicht zur Haupt-FOB aus
-const CMD_MOVE = 200; // neuer Marschbefehl erst, wenn der Wunschplatz so weit vom alten Ziel liegt
-const CMD_RESERVE = 300; // Geld, das nach der Ausbildung eines neuen Kommandeurs übrig bleiben soll
-const CMD_FROM = 90; // s Spielzeit, ab der ein gefallener Kommandeur ersetzt wird
-const RADIO_FROM = { easy: Infinity, normal: 720, hard: 540 }; // s Spielzeit, ab der die KI einen Sendemast baut (Leicht nie)
-const RADIO_SITE = [220, 460]; // Abstand des Masts von der Haupt-FOB, zur Rückseite (weg von der Zone)
-const RADIO_NEAR = 500; // so nah am gegnerischen Mast greifen Einheiten ihn direkt an
-const RADIO_EVERY = 5; // s zwischen zwei Angriffsrunden auf den gegnerischen Mast
-const RADIO_GATHER = 40; // s höchstens sammelt sich die Armee vor dem Schlag gegen den Mast
-const RADIO_GATHER_R = 600; // Sammelradius; ab RADIO_GATHER_SHARE der Armee darin geht es los
-const RADIO_GATHER_SHARE = 0.7;
-const UPGRADES = ['vests', 'optics', 'composite']; // Reihenfolge der Verbesserungen (Forschung)
-const UPGRADE_RESERVE = 400; // Geld, das nach einer Verbesserung übrig bleiben soll (sie kommt nur aus Überschuss)
-const BRIDGE_EVERY = 10; // s zwischen zwei Prüfungen der eigenen Brücken
-const BRIDGE_RESERVE = 150; // Geld, das nach dem Wiederaufbau einer Brücke übrig bleiben soll
 const DEG = Math.PI / 180;
 const SITE_ANGLES = [0, 30, -30, 60, -60, 90, -90, 120, -120, 150, -150, 180].map((d) => d * DEG);
 const TWO_PI = Math.PI * 2;
@@ -227,7 +226,7 @@ export class AI {
   }
 
   fobCap() {
-    return FOB_CAP[this.difficulty];
+    return this.cfg.fobCap;
   }
 
   /** Befehls-Drosselung: true, wenn der Schlüssel seit `secs` s nicht benutzt wurde (und merkt ihn sich). */
@@ -1152,7 +1151,7 @@ export class AI {
     if (!g.crates || !g.crates.length || !s.builtFobs.length || !this.once('crates', CRATE_EVERY)) return;
     const t = this.team;
     const busy = s.units.filter((u) => u.crate || u.order.type === 'pickup');
-    let free = CRATE_PICKERS[this.difficulty] - busy.length;
+    let free = this.cfg.cratePickers - busy.length;
     if (free <= 0) return;
     const taken = new Set(busy.map((u) => u.order.targetId));
     const raiding = this.raid ? this.raid.ids : null;
@@ -1192,14 +1191,14 @@ export class AI {
   }
 
   /**
-   * Sendemast (zweite Siegbedingung): ab RADIO_FROM spart die KI darauf (nicht bei Alarm an der Haupt-FOB) und setzt ihn hinter die
+   * Sendemast (zweite Siegbedingung): ab difficulty.radioFrom spart die KI darauf (nicht bei Alarm an der Haupt-FOB) und setzt ihn hinter die
    * Haupt-FOB, weg von der Zone. Das Baufahrzeug baut ihn wie jede Baustelle.
    */
   buildRadio(s) {
     const g = this.game;
     const t = this.team;
     this.saveForRadio = false;
-    if (!g.radioWin || !s.home || g.time < RADIO_FROM[this.difficulty] || s.alarm || !s.engineers.length) return;
+    if (!g.radioWin || !s.home || g.time < this.cfg.radioFrom || s.alarm || !s.engineers.length) return;
     if (s.own.some((b) => b.def.radio)) return;
     const cost = BUILDINGS.radio.cost;
     if (g.teams[t].res.money < cost.money) {

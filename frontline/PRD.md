@@ -380,7 +380,7 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 - **Versorgungskisten:** Alle 6 s (nach den Angriffsbefehlen) schickt die KI freie Soldaten (untätig oder auf dem Weg zum Sammelpunkt, nicht in Häusern oder beim Überfall) zu Kisten aus ihrem Lagebild (§7) im Umkreis von 4500 px; Soldaten in der Zone gelten als 800 px weiter weg (sie verdienen dort Geld). Kisten mit sichtbaren Gegnern in der Nähe lässt sie liegen. Gleichzeitig holen oder tragen Leicht 1, Normal 2, Schwer 3 Soldaten. Kistenträger zählen nicht zur Armee.
 - **Schwierigkeit über Verhalten:** *Leicht*: langsame Denkschritte (3 s), hohe Angriffsschwelle, kein Späher, kein Konter-Mix, keine Überfälle, kein Rückzug, kein Wetter, Einkommen ×0,8. *Normal*: 2 s, Späher, Konter-Mix und Wetter. *Schwer*: 1 s, niedrigere Angriffsschwelle, dazu Überfälle und Gruppen-Rückzug; **kein Einkommensbonus mehr** (vorher ×1,25).
 
-### KI-Konstanten (Quelle: `js/ai/ai.js`, `js/data/balance.js`; hier zum Nachschlagen für Erweiterungen)
+### KI-Konstanten (Quelle: `js/data/ai.js`, `BALANCE.difficulty` in `js/data/balance.js`; hier zum Nachschlagen für Erweiterungen)
 
 | Bereich | Konstante | Wert |
 |---|---|---|
@@ -405,7 +405,7 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 | Mauer | Abstand von der Haupt-FOB / halbe Länge | 4 / 3 Zellen (Tor in der Mitte) |
 | Rückzug (Vorrat) | Einheiten unter diesem Vorratsanteil ziehen sich zurück | 20 % |
 | Häuserkampf | Anteil der Infanterie in der Zone / Umkreis / Takt (`GARRISON_SHARE`, `GARRISON_RANGE`, `GARRISON_EVERY`) | 40 % / 500 px / 8 s |
-| Versorgungskisten | Takt / Umkreis / Holer gleichzeitig Leicht–Normal–Schwer (`CRATE_EVERY`, `CRATE_RANGE`, `CRATE_PICKERS`) | 6 s / 4500 px / 1–2–3 |
+| Versorgungskisten | Takt / Umkreis / Holer gleichzeitig Leicht–Normal–Schwer (`CRATE_EVERY`, `CRATE_RANGE`, `difficulty.cratePickers`) | 6 s / 4500 px / 1–2–3 |
 
 ## 11. Qualitätsanforderungen
 
@@ -431,6 +431,7 @@ Ideen von Daniel, die festgehalten, aber **noch nicht umgesetzt** werden. Gebaut
 - **Sound** (2026-10-27): Geräusche und Musik (bisher nur „Could“, §1 und §12). Offen: Umfang (Waffen, Fahrzeuge, Meldungen, Wetter, Musik) und Lautstärkeregler im Menü.
 
 ## Änderungsverlauf
+- v4.56: **Doku und Config für Erweiterungen** (Spielverhalten unverändert). Neu: `CLAUDE.md` (Regeln, Wegweiser „Wo ändere ich was?“, Feature-Landkarte, Rezepte) und `ARCHITEKTUR.md`; der alte Plan liegt als `docs/verlauf.md`. In `js/data/balance.js` stehen oben die **Schnelleinstellungen** (`QUICK`: Einheitenlimit, Geld pro Sekunde, Startgeld, Siegpunkte, Sendemast-Zeit …) und ein Inhaltsverzeichnis; die KI-Werte liegen in `js/data/ai.js`, die Werte je Schwierigkeit (FOB-Grenze, Sendemast ab, Kistenholer) und die Startmenü-Standards in `BALANCE`. Cache v70.
 - v4.54: **Flak, SAM und 300er Einheitenlimit.** Das Einheitenlimit steigt von 50 auf **300 Plätze** (`BALANCE.slotCap`). Neu: **Flakpanzer** (Taste J, Stufe 2, 2 Plätze, Schnellfeuer-Flak mit 20 Munition je Schuss; Trefferchance sinkt mit dem Tempo des Ziels, `BALANCE.airFire`) und **SAM-Startrampe** (Taste N, Stufe 3, 2 Plätze, wärmesuchende Raketen mit 250 Munition je Rakete und 10 s Nachladezeit). Beide schießen nur auf Hubschrauber; die KI baut sie noch nicht. Die Kopfleiste ist auf Tablets (≤ 1500 px) 68 px hoch, damit die Geld-pro-Sekunde-Zeile im schwarzen Balken bleibt. Cache v67.
 - v4.53: **Fluss mit Brücken und Furten** (§2, §7, §8, §9, §9a, §10, Vorschlag nach den Flusskarten aus Age of Empires II und den Brücken aus Company of Heroes): auf Zufallskarten liegt vor jeder Startecke ein Fluss mit 3 Brücken und 2 Furten (halbes Tempo). Brücken werden nur auf Befehl beschossen (A + Klick), stürzen ein und sperren den Übergang, bis ein Baufahrzeug sie für 200 Geld in 30 s wieder aufbaut. Die KI baut Brücken auf ihrer Seite wieder auf. Editor: Werkzeuge Fluss, Furt und Brücke. Im Startmenü schaltbar (Standard An). Cache v65.
 - v4.52: **Forschungsstufen** (§2, §6, §7, §8, §9, §10, Vorschlag nach Age of Empires II und Empire Earth): die Haupt-FOB forscht neben der Ausbildung (Taste U). Stufe 2 schaltet Scharfschütze, Schützenpanzer und Hubschrauber frei, Stufe 3 Kampfpanzer und AH-64; dazu Schutzwesten (Infanterie −15 % Schaden), Wärmebildoptik (Reichweite und Sicht +10 %) und Verbundpanzerung (Fahrzeuge und Hubschrauber −15 % Schaden). Im Startmenü schaltbar (Standard An), die Startarmee bleibt. Die KI forscht nach Zeitplan je Schwierigkeit. Cache v64.

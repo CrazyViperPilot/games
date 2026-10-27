@@ -14,7 +14,7 @@ Spielregeln: [PRD.md](PRD.md). Zahlen stehen hier bewusst nicht, sie gehören in
   Simulation (js/game/, kein DOM)  ◄─────────────────────────────┘     Darstellung (js/render/), HUD
                          │                    ── Zustand ──────────────────►  (liest nur)
                          ▼ liest
-  Werte (js/data/: BALANCE, UNITS, BUILDINGS), gelesen von allen Schichten
+  Werte (js/data/: QUICK und BALANCE, UNITS, BUILDINGS, KI-Werte), gelesen von allen Schichten
 ```
 
 - **Simulation** (`js/data`, `js/core/rng.js`, `js/game`, `js/ai`): ohne DOM, deterministisch je Seed, läuft in Node (`npm test`).
@@ -124,7 +124,8 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 
 `js/core/` – `loop.js` feste Schrittweite und Frames, `rng.js` Zufall je Seed (mulberry32).
 
-`js/data/` – `balance.js` alle globalen Spielzahlen (BALANCE), `units.js` Einheiten und Waffen (UNITS), `buildings.js` Gebäude (BUILDINGS).
+`js/data/` – `balance.js` alle globalen Spielzahlen (oben `QUICK` = Schnelleinstellungen, darunter `BALANCE` mit Inhaltsverzeichnis),
+`units.js` Einheiten und Waffen (UNITS), `buildings.js` Gebäude (BUILDINGS), `ai.js` KI-Werte.
 
 `js/game/` (Simulation, kein DOM)
 
@@ -143,7 +144,7 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 | `map.js`, `landscape.js`, `relief.js`, `mapdata.js` | Zufallskarte (Stadt, Gehöfte, Kisten), Höhengelände, Höhenraster, Kartenformat für Editor und Speicher |
 | `scars.js`, `animals.js` | Wracks und Krater, Tiere (nur Optik, aber Teil der Simulation) |
 
-`js/ai/ai.js` – Klasse `AI`: `update(dt)` ruft im Takt `BALANCE.difficulty.<stufe>.think` die Methode `think()`; Konstanten am Dateianfang.
+`js/ai/ai.js` – Klasse `AI`: `update(dt)` ruft im Takt `BALANCE.difficulty.<stufe>.think` die Methode `think()`; Werte aus `js/data/ai.js` und `BALANCE.difficulty`.
 
 `js/render/` (Zeichnen, liest nur)
 

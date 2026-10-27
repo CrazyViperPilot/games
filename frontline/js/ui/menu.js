@@ -123,13 +123,14 @@ function writeMapSel(v) {
  * radio = Sendemast-Sieg, weather = 'off' | 'random' | Jahreszeit, research = Forschungsstufen, river = Flüsse auf Zufallskarten).
  */
 export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.money, resetWallet = () => {} } = {}) {
-  let difficulty = 'normal';
+  const D = BALANCE.menuDefaults; // Standards: js/data/balance.js
+  let difficulty = D.difficulty;
   let mapSel = readMapSel(); // 'random' | Karten-ID
   let winPoints = BALANCE.winPoints;
-  let radio = readFlag(RADIO_KEY, true);
-  let weather = readChoice(WEATHER_KEY, WEATHER_SETTINGS, 'random');
-  let research = readFlag(RESEARCH_KEY, true);
-  let river = readFlag(RIVER_KEY, true);
+  let radio = readFlag(RADIO_KEY, D.radio);
+  let weather = readChoice(WEATHER_KEY, WEATHER_SETTINGS, D.weather);
+  let research = readFlag(RESEARCH_KEY, D.research);
+  let river = readFlag(RIVER_KEY, D.river);
   show(
     root,
     'start',
