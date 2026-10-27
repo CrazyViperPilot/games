@@ -1,4 +1,4 @@
-// Geländebild der Karte in 1/4 Maßstab (PLAN §5 render/terrain.js). Einmal pro Karte erzeugt, zwischengespeichert.
+// Geländebild der Karte in 1/4 Maßstab (docs/verlauf.md §5 render/terrain.js). Einmal pro Karte erzeugt, zwischengespeichert.
 import { makeRng } from '../core/rng.js';
 import { reliefOf } from '../game/relief.js';
 import { reliefLayers } from './reliefimg.js';

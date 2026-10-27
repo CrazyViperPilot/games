@@ -1,4 +1,4 @@
-// KI-Gegner (PLAN.md §5, §10.2, §11.5). Steuert nur über game.issue und liest den Zustand. Kein DOM.
+// KI-Gegner (docs/verlauf.md §5, §10.2, §11.5). Steuert nur über game.issue und liest den Zustand. Kein DOM.
 // Reihenfolge je Denkschritt: Baustellen pflegen, Verteidigung, Rückzug, Expansion (FOB-Baustellen: Zone, Relais, Flanken),
 // Forschung, Produktion (nur Haupt-FOB), Verteidigungsgebäude und Mauer, Brücken, Baufahrzeuge, LKW (Lieferant/Pendler/Versorger), Sammelpunkte, Armee.
 import { BALANCE } from '../data/balance.js';

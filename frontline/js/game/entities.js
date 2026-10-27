@@ -1,4 +1,4 @@
-// Fabriken für Einheiten, Gebäude und Granaten (PLAN.md §4, §5, §11). Reine Funktionen, kein Zugriff auf Game.
+// Fabriken für Einheiten, Gebäude und Granaten (docs/verlauf.md §4, §5, §11). Reine Funktionen, kein Zugriff auf Game.
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';

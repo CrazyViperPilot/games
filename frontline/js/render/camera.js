@@ -1,4 +1,4 @@
-// Kamera: Weltausschnitt, Zoom und Umrechnung Welt <-> Bildschirm (PLAN §5 render/camera.js). Kein DOM.
+// Kamera: Weltausschnitt, Zoom und Umrechnung Welt <-> Bildschirm (docs/verlauf.md §5 render/camera.js). Kein DOM.
 
 const ZOOM_MIN = 0.35;
 const ZOOM_MAX = 1.6;

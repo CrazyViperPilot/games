@@ -1,4 +1,4 @@
-// Haupt-Renderer (PLAN §5 render/renderer.js). Zeichnet Terrain, Zone, Vorkommen, Gebäude, Einheiten,
+// Haupt-Renderer (docs/verlauf.md §5 render/renderer.js). Zeichnet Terrain, Zone, Vorkommen, Gebäude, Einheiten,
 // Granaten, Effekte, Nebel und Overlays. Liest game.projectiles/effects bei jedem Aufruf frisch. Kein Zugriff auf den Controller.
 import { BALANCE } from '../data/balance.js';
 import { BUILDINGS } from '../data/buildings.js';

@@ -1,4 +1,4 @@
-// Haupt-Schleife (PLAN §5 core/loop.js): feste Schrittweite für update(), render() pro Frame. DOM: requestAnimationFrame.
+// Haupt-Schleife (docs/verlauf.md §5 core/loop.js): feste Schrittweite für update(), render() pro Frame. DOM: requestAnimationFrame.
 
 const MAX_STEPS = 10; // max. Simulationsschritte pro Frame
 

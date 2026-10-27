@@ -1,4 +1,4 @@
-// Bau und Reparatur: Bauer fahren, Baufortschritt, automatische Zuweisung (PLAN.md §11.8). Kein DOM.
+// Bau und Reparatur: Bauer fahren, Baufortschritt, automatische Zuweisung (docs/verlauf.md §11.8). Kein DOM.
 import { BALANCE } from '../data/balance.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { driveTo, footDist, setIdle } from './movement.js';

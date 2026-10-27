@@ -1,4 +1,4 @@
-// Spieler-Steuerung (PLAN §5 ui/controller.js, §11.3–11.8): Auswahl, Modi, Befehle und Befehlskarte. Kein DOM.
+// Spieler-Steuerung (docs/verlauf.md §5 ui/controller.js, §11.3–11.8): Auswahl, Modi, Befehle und Befehlskarte. Kein DOM.
 // Hält den Ansichtszustand `view`, den renderer.render(view) liest. Befehle laufen nur über game.issue.
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';

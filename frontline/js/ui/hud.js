@@ -1,4 +1,4 @@
-// DOM-HUD (PLAN §5 ui/hud.js, §11.4): Ressourcen, Punkte, Zone, Zeit, Auswahl, Befehlskarte und Meldungen.
+// DOM-HUD (docs/verlauf.md §5 ui/hud.js, §11.4): Ressourcen, Punkte, Zone, Zeit, Auswahl, Befehlskarte und Meldungen.
 // Schreibt das DOM höchstens 5× pro Sekunde und nur, wenn sich der HTML-Text geändert hat.
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';

@@ -1,4 +1,4 @@
-// Prozedurale Zeichnung von oben (PLAN §5 render/sprites.js). Alle Funktionen zeichnen in Weltkoordinaten;
+// Prozedurale Zeichnung von oben (docs/verlauf.md §5 render/sprites.js). Alle Funktionen zeichnen in Weltkoordinaten;
 // der Renderer setzt die Kamera-Transformation. `zoom` dient nur dazu, Linien und Schrift bildschirmstabil zu halten.
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';

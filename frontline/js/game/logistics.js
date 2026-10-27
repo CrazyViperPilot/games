@@ -1,4 +1,4 @@
-// Logistik: LKW laden, entladen, pendeln und das Nachfüllen der Einheiten (PLAN.md §11.2, §11.3). Kein DOM.
+// Logistik: LKW laden, entladen, pendeln und das Nachfüllen der Einheiten (docs/verlauf.md §11.2, §11.3). Kein DOM.
 import { BALANCE } from '../data/balance.js';
 import { driveTo, setIdle, nearestPassable } from './movement.js';
 import { addAmmo } from './entities.js';

@@ -117,7 +117,7 @@ Panzerklasse „Luft“: Flugabwehr (stark), Panzerabwehrsoldat (40), Raketen de
 Granatwerfer und Mörser nicht. Passagiere steigen per Rechtsklick auf den Hubschrauber ein und werden mit **O** am Zielpunkt abgesetzt;
 stirbt der Hubschrauber, sind die Passagiere verloren.
 
-Schadensmodell: Schaden je Schuss nach Panzerklasse des Ziels (Infanterie / leicht / schwer / Gebäude) – Werte in `PLAN.md`. Höhenvorteil siehe §7 „Gelände“.
+Schadensmodell: Schaden je Schuss nach Panzerklasse des Ziels (Infanterie / leicht / schwer / Gebäude) – Werte in §6 „Waffen und Schaden“. Höhenvorteil siehe §7 „Gelände“.
 
 ### Werte (Quelle: `js/data/units.js`, `js/data/buildings.js`, `js/data/balance.js`)
 

@@ -1,4 +1,8 @@
-# Frontline – Architektur & Umsetzungsplan
+# Frontline – ursprünglicher Umsetzungsplan (historisch)
+
+> **Historisch, nicht mehr maßgeblich.** Dieser Plan beschreibt den Aufbau von v1 bis v4.23 (Arbeitspakete, Reviews). Zahlen und
+> Schnittstellen hier sind teils veraltet. Aktuell gelten [../ARCHITEKTUR.md](../ARCHITEKTUR.md), [../CLAUDE.md](../CLAUDE.md) und [../PRD.md](../PRD.md).
+> Code-Kommentare wie `(docs/verlauf.md §11.2)` verweisen auf die Abschnitte dieser Datei.
 
 Anforderungen: `PRD.md`. Vanilla JS (ES-Module, `import … from './x.js'` immer mit Endung), Canvas 2D, kein Build,
 keine externen Dateien/CDNs/Fonts. Desktop-Chrome, Maus + Tastatur. Alle Texte deutsch.

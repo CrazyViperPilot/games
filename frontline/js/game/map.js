@@ -1,4 +1,4 @@
-// Kartenerzeugung (PLAN.md §5, game/map.js). Punktsymmetrisch, deterministisch je Seed. Kein DOM.
+// Kartenerzeugung (docs/verlauf.md §5, game/map.js). Punktsymmetrisch, deterministisch je Seed. Kein DOM.
 import { BALANCE } from '../data/balance.js';
 import { makeRng } from '../core/rng.js';
 import { Grid } from './grid.js';

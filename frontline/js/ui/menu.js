@@ -1,4 +1,4 @@
-// Overlay-Menüs (PLAN §5 ui/menu.js): Start, Pause, Hilfe, Ende. Reines DOM, keine Spiellogik.
+// Overlay-Menüs (docs/verlauf.md §5 ui/menu.js): Start, Pause, Hilfe, Ende. Reines DOM, keine Spiellogik.
 // Jedes Menü setzt root.dataset.kind ('start' | 'pause' | 'help' | 'end'), damit die Tastatur weiß, was offen ist.
 import { BALANCE } from '../data/balance.js';
 import { listMaps, deleteMap, saveMap, normalizeMap, describeMap } from '../game/mapdata.js';

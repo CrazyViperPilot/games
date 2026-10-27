@@ -1,4 +1,4 @@
-// Konfliktzone: Kontrolle, Geld, Punkte und Siegprüfung (PLAN.md §5, game/zone.js). Kein DOM.
+// Konfliktzone: Kontrolle, Geld, Punkte und Siegprüfung (docs/verlauf.md §5, game/zone.js). Kein DOM.
 import { BALANCE } from '../data/balance.js';
 
 const Z = BALANCE.zone;

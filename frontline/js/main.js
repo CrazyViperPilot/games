@@ -1,4 +1,4 @@
-// Bootstrap (PLAN §5 main.js): Startmenü, Spiel erzeugen, Schleife, URL-Parameter, Service Worker.
+// Bootstrap (docs/verlauf.md §5 main.js): Startmenü, Spiel erzeugen, Schleife, URL-Parameter, Service Worker.
 // URL: ?seed=N (feste Karte) · ?river=0|1 (Fluss) · ?speed=N (Startgeschwindigkeit) · ?debug=1 (Karte aufgedeckt, M = +1000, bis 10×).
 // Debug: ?weather=summer|autumn|winter (Jahreszeit) · ?wx=clear|rain|fog|snow (Wetter sofort, ohne Wechsel).
 import { BALANCE } from './data/balance.js';

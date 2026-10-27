@@ -1,4 +1,4 @@
-// Bewegung: Wegfolgen, Verfolgung, Fahrhelfer für LKW/Bauer und Trennung (PLAN.md §5, §11). Kein DOM.
+// Bewegung: Wegfolgen, Verfolgung, Fahrhelfer für LKW/Bauer und Trennung (docs/verlauf.md §5, §11). Kein DOM.
 import { BALANCE } from '../data/balance.js';
 import { findPath, lineOfSight } from './pathfinding.js';
 import { inRange, resolveTarget, isFoe, canAttack } from './entities.js';

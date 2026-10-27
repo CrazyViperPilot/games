@@ -1,4 +1,4 @@
-// Eingabe (PLAN §5 ui/input.js): Maus und Tastatur → Controller und Kamera. Hält keinen Spielzustand.
+// Eingabe (docs/verlauf.md §5 ui/input.js): Maus und Tastatur → Controller und Kamera. Hält keinen Spielzustand.
 // `app` (optional) liefert Aktionen aus main.js: overlayOpen, closeOverlay, togglePause, toggleHelp, changeSpeed, debugMoney.
 const DRAG_PX = 6; // ab dieser Strecke ist ein Druck ein Ziehen: Maus links = Rahmenauswahl, Maus rechts und Finger = Karte verschieben
 const EDGE_PX = 10; // Randscrollen: Abstand zum Fensterrand

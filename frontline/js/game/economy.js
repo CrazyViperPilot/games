@@ -1,4 +1,4 @@
-// Wirtschaft: Produktion in der Haupt-FOB und Geldrate (PLAN.md §5, §11.1). Geld kommt nur aus Zone und Hot Zone. Kein DOM.
+// Wirtschaft: Produktion in der Haupt-FOB und Geldrate (docs/verlauf.md §5, §11.1). Geld kommt nur aus Zone und Hot Zone. Kein DOM.
 // Baufortschritt: construction.js. Nachfüllen und LKW: logistics.js.
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';

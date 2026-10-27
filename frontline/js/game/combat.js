@@ -1,4 +1,4 @@
-// Kampf: Zielsuche, Direktfeuer, Mörser und Granaten, Flugabwehr, Schaden (PLAN.md §5, §11.2). Kein DOM.
+// Kampf: Zielsuche, Direktfeuer, Mörser und Granaten, Flugabwehr, Schaden (docs/verlauf.md §5, §11.2). Kein DOM.
 import { BALANCE } from '../data/balance.js';
 import { createShell, inRange, radiusOf, isFoe, canAttack, resolveTarget } from './entities.js';
 import { buildHash, nearby } from './movement.js';

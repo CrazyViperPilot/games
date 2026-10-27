@@ -1,4 +1,4 @@
-// Einheitenwerte (PLAN.md §3.2, §11.2, §11.8).
+// Einheitenwerte (docs/verlauf.md §3.2, §11.2, §11.8).
 // weapons: Waffen mit rounds (Schuss im Vorrat), munCost (Munition aus dem FOB-Lager je Schuss beim Nachladen), cooldown, damage nach Panzerklasse,
 // optional targets (Klassen, gegen die diese Waffe bevorzugt wird). Daraus entstehen range, damage (bester Wert je Klasse) und ammoMax.
 // cost: fehlende Schlüssel = 0. Alle Einheiten entstehen in der Haupt-FOB; hotkey: Taste im Ausbildungsmenü.

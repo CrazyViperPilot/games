@@ -1,4 +1,4 @@
-// Gebäudewerte (PLAN.md §3.3). w, h in Zellen. Alle Gebäude haben Rüstung 'struct'.
+// Gebäudewerte (docs/verlauf.md §3.3). w, h in Zellen. Alle Gebäude haben Rüstung 'struct'.
 // Optional: weapon {range, minRange, cooldown, damage, splash, shell, ammoPerShot}, aa {range, cooldown, chance, ammoPerShot},
 // buildable (false = nur per LKW), blocksAll (Mauer), gate (Tor).
 // hotkey: Taste im Baumenü, null = keine.

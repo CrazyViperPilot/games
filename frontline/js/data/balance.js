@@ -1,4 +1,4 @@
-// Alle globalen Spielzahlen (PLAN.md §3.1, §11).
+// Alle globalen Spielzahlen (docs/verlauf.md §3.1, §11).
 export const BALANCE = {
   map: { width: 9024, height: 9024, tile: 32 },
   tickRate: 20, // Simulationsschritte/s
