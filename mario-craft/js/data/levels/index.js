@@ -97,6 +97,39 @@ import w3_30 from './w3-30.js';
 import w3_31 from './w3-31.js';
 import w3_32 from './w3-32.js';
 import w3_33 from './w3-33.js';
+import w4_1 from './w4-1.js';
+import w4_2 from './w4-2.js';
+import w4_3 from './w4-3.js';
+import w4_4 from './w4-4.js';
+import w4_5 from './w4-5.js';
+import w4_6 from './w4-6.js';
+import w4_7 from './w4-7.js';
+import w4_8 from './w4-8.js';
+import w4_9 from './w4-9.js';
+import w4_10 from './w4-10.js';
+import w4_11 from './w4-11.js';
+import w4_12 from './w4-12.js';
+import w4_13 from './w4-13.js';
+import w4_14 from './w4-14.js';
+import w4_15 from './w4-15.js';
+import w4_16 from './w4-16.js';
+import w4_17 from './w4-17.js';
+import w4_18 from './w4-18.js';
+import w4_19 from './w4-19.js';
+import w4_20 from './w4-20.js';
+import w4_21 from './w4-21.js';
+import w4_22 from './w4-22.js';
+import w4_23 from './w4-23.js';
+import w4_24 from './w4-24.js';
+import w4_25 from './w4-25.js';
+import w4_26 from './w4-26.js';
+import w4_27 from './w4-27.js';
+import w4_28 from './w4-28.js';
+import w4_29 from './w4-29.js';
+import w4_30 from './w4-30.js';
+import w4_31 from './w4-31.js';
+import w4_32 from './w4-32.js';
+import w4_33 from './w4-33.js';
 
 export const LEVELS = [
   w1_1,
@@ -198,4 +231,37 @@ export const LEVELS = [
   w3_31,
   w3_32,
   w3_33,
+  w4_1,
+  w4_2,
+  w4_3,
+  w4_4,
+  w4_5,
+  w4_6,
+  w4_7,
+  w4_8,
+  w4_9,
+  w4_10,
+  w4_11,
+  w4_12,
+  w4_13,
+  w4_14,
+  w4_15,
+  w4_16,
+  w4_17,
+  w4_18,
+  w4_19,
+  w4_20,
+  w4_21,
+  w4_22,
+  w4_23,
+  w4_24,
+  w4_25,
+  w4_26,
+  w4_27,
+  w4_28,
+  w4_29,
+  w4_30,
+  w4_31,
+  w4_32,
+  w4_33,
 ];

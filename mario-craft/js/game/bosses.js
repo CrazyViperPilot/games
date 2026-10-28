@@ -45,7 +45,7 @@ export function createBoss(kind, x, y) {
   return KINDS[kind](x, y);
 }
 
-const KINDS = { slimeking: makeSlimeKing, dreikopf: makeDreikopf, drache: makeDrache };
+const KINDS = { slimeking: makeSlimeKing, dreikopf: makeDreikopf, drache: makeDrache, schildkroete: makeSchildkroete };
 
 // Kampf unterbrochen (Tod der Figur oder Arena verlassen): neuer Boss am Spawn (x, y) im Zustand 'idle', der
 // angerichtete Schaden bleibt. Riesenschleim: dieselben Teile (Größen) nebeneinander am Spawn; Schleime aus dem
@@ -164,6 +164,10 @@ function stepBoss(game, b, dt, prevFeet) {
     stepDrache(game, b, dt, prevFeet);
     return;
   }
+  if (b.kind === 'schildkroete') {
+    stepSchildkroete(game, b, dt, prevFeet);
+    return;
+  }
 
   const parts = b.parts;
   for (let i = 0; i < parts.length; i++) movePart(game, parts[i], dt);
@@ -179,7 +183,11 @@ function hitBoss(game, b, how) {
     return;
   }
   if (b.kind === 'drache') {
-    if (how === 'arrow') hitDrache(game, b, DRA.arrowDmg);   // Explosionen wirken nicht
+    if (how === 'arrow') hitDrache(game, b, DRA.arrowDmg);
+    return;
+  }
+  if (b.kind === 'schildkroete') {
+    if (how === 'arrow') hitSchildkroete(game, b, TUR.arrowDmg);
     return;
   }
   if (b.state !== 'fight') return;
@@ -628,4 +636,113 @@ function hitDrache(game, b, dmg) {
   game.addScore(HIT_SCORE);
   game.emit('bossHit', { hp: b.hp });
   if (b.hp <= 0) defeatFlyer(game, b, DRA.defeatRadius);
+}
+
+
+// ---------- Riesenschildkröte ----------
+
+const TUR = BOSSES.schildkroete;
+
+function makeSchildkroete(x, y) {
+  const w = TUR.w, h = TUR.h;
+  const b = newBoss('schildkroete', x - w / 2, y - h, w, h);
+  b.anim = 'boss_schildkroete';
+  b.hp = TUR.hp;
+  b.maxHp = TUR.hp;
+  b.phase = 1;
+  b.shellTimer = 0;
+  b.shellDir = -1;
+  b.onGround = true;
+  return b;
+}
+
+function enterShell(b, dir = -1) {
+  b.state = 'shell';
+  b.anim = 'boss_schildkroete_shell';
+  b.shellTimer = TUR.shellTime;
+  b.shellDir = dir !== 0 ? dir : -1;
+  b.face = b.shellDir;
+}
+
+function exitShell(b) {
+  b.state = 'fight';
+  b.anim = 'boss_schildkroete';
+  b.shellTimer = 0;
+  b.vx = 0;
+}
+
+function stepSchildkroete(game, b, dt, prevFeet) {
+  const p = game.player;
+  b.animTime += dt;
+  b.invuln = Math.max(0, b.invuln - dt);
+
+  if (b.hp <= b.maxHp * 0.5) b.phase = 2;
+
+  // Schwerkraft
+  b.vy = Math.min(PHYS.maxFall, b.vy + PHYS.gravity * dt);
+
+  if (b.state === 'fight') {
+    b.face = (p.x + p.w / 2 < b.x + b.w / 2) ? -1 : 1;
+    b.vx = b.face * TUR.speed;
+  } else if (b.state === 'shell') {
+    b.shellTimer -= dt;
+    const speed = b.phase === 2 ? TUR.shellSpeedEnraged : TUR.shellSpeed;
+    b.vx = b.shellDir * speed;
+    if (b.shellTimer <= 0) {
+      exitShell(b);
+    }
+  }
+
+  const col = moveAndCollide(b, game.map, dt);
+  b.onGround = col.onGround;
+
+  if (b.state === 'shell' && col.hitWall) {
+    b.shellDir = -b.shellDir;
+    b.face = b.shellDir;
+    game.emit('bossHit', { wall: true });
+  }
+
+  touchSchildkroete(game, b, prevFeet);
+}
+
+function touchSchildkroete(game, b, prevFeet) {
+  const p = game.player;
+  if (!overlapsPlayer(b, p)) return;
+
+  const stompOver = p.vy > 0 && prevFeet <= b.y + b.h * 0.5;
+
+  if (b.state === 'fight') {
+    if (stompOver || p.star > 0) {
+      hitSchildkroete(game, b, TUR.stompDmg);
+      p.vy = -(game.jumpHeld ? PHYS.stompBounceHold : PHYS.stompBounce);
+      const dir = (p.x + p.w / 2 < b.x + b.w / 2) ? 1 : -1;
+      enterShell(b, dir);
+      return;
+    }
+  } else if (b.state === 'shell') {
+    if (stompOver || p.star > 0) {
+      p.vy = -(game.jumpHeld ? PHYS.stompBounceHold : PHYS.stompBounce);
+      b.shellDir = -b.shellDir;
+      b.face = b.shellDir;
+      game.emit('bossHit', { deflected: true });
+      return;
+    }
+  }
+
+  if (p.star > 0) return;
+  if (p.invuln <= 0) game.hurtPlayer('boss');
+}
+
+function hitSchildkroete(game, b, dmg) {
+  if (b.invuln > 0 || b.state === 'defeated') return;
+  b.hp = Math.max(0, b.hp - dmg);
+  b.invuln = TUR.invulnTime;
+  game.addScore(HIT_SCORE);
+  game.emit('bossHit', { hp: b.hp });
+  if (b.hp <= 0) {
+    defeatFlyer(game, b, TUR.defeatRadius);
+  } else if (b.state === 'fight') {
+    const dir = (game.player.x + game.player.w / 2 < b.x + b.w / 2) ? 1 : -1;
+    enterShell(b, dir);
+  }
 }

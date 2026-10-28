@@ -31,7 +31,7 @@ const PAL_BTN = {
 const PAL_FONT = { w: '#ffffff', k: '#000000aa' };
 
 // Welten (Parallax/Himmel je Theme; Kacheln kommen aus art/blocks.js).
-export const THEMES = ['overworld', 'depths', 'nether', 'end'];
+export const THEMES = ['overworld', 'depths', 'nether', 'end', 'paradise'];
 
 // ---------- Schrift (3×5 Glyphen, im Atlas als 4×6 mit Schatten) ----------
 const GLYPHS = {

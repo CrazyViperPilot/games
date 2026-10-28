@@ -147,7 +147,7 @@ test('Riesenschleim: Neustart behält die Teile, kleine Schleime leben weiter', 
 });
 
 test('restartBoss: Dreikopf und Drache behalten die Energie, unbeschädigt bleibt alles wie neu', () => {
-  for (const kind of ['dreikopf', 'drache']) {
+  for (const kind of ['dreikopf', 'drache', 'schildkroete']) {
     const old = createBoss(kind, 400, 192);
     old.hp = 3;
     old.state = 'fight';
@@ -163,7 +163,7 @@ test('restartBoss: Dreikopf und Drache behalten die Energie, unbeschädigt bleib
 });
 
 // Echte Boss-Level: im Kampf sterben, am Bett neu starten, zurück in die Arena laufen.
-for (const id of ['w1-33', 'w2-33', 'w3-33']) {
+for (const id of ['w1-33', 'w2-33', 'w3-33', 'w4-33']) {
   test(`${id}: nach dem Tod im Bosskampf kommt man wieder in die Arena`, () => {
     const def = LEVELS.find((l) => l.id === id);
     const game = new Game({ level: def, save: { lives: 5 } });

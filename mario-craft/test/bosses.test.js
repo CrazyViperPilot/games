@@ -1020,3 +1020,84 @@ test('Leerendrache: Bot besiegt die Arena in unter 120 s Simulationszeit', () =>
   assert.ok(steps * STEP < 120, `Zeit ${secs} s`);
   assert.equal(count('crystal'), 4);
 });
+
+
+// ---------- Riesenschildkröte (Tests) ----------
+
+test('Riesenschildkröte: createBoss liefert die Felder für den Renderer', () => {
+  const b = createBoss('schildkroete', 100, 200);
+  assert.equal(b.kind, 'schildkroete');
+  assert.equal(b.state, 'idle');
+  assert.equal(b.active, false);
+  assert.equal(b.w, 52);
+  assert.equal(b.h, 32);
+  assert.equal(b.x, 100 - 26);
+  assert.equal(b.y, 200 - 32);
+  assert.equal(b.hp, 12);
+  assert.equal(b.anim, 'boss_schildkroete');
+  assert.equal(typeof b.update, 'function');
+  assert.equal(typeof b.damage, 'function');
+});
+
+test('Riesenschildkröte: Parser-Spawn @ erzeugt den Boss', () => {
+  const { game } = makeGame({ lives: 5 }, 'schildkroete');
+  assert.ok(game.boss);
+  assert.equal(game.boss.kind, 'schildkroete');
+});
+
+test('Riesenschildkröte: wird erst aktiv, wenn der Spieler in der Arena steht', () => {
+  const { game, count } = makeGame({ lives: 5 }, 'schildkroete');
+  const b = game.boss;
+  run(game, 60);
+  assert.equal(b.state, 'idle');
+  assert.equal(b.active, false);
+
+  game.player.x = b.x - 20 * T + 1;
+  game.update(DT, input());
+  assert.equal(b.state, 'fight');
+  assert.equal(b.active, true);
+  assert.equal(count('bossStart'), 1);
+});
+
+test('Riesenschildkröte: Stampfer macht 3 Schaden, Prall und versetzt in Panzermodus', () => {
+  const { game, count } = makeGame({ lives: 5 }, 'schildkroete');
+  activate(game);
+  const b = game.boss;
+  assert.equal(b.hp, 12);
+
+  // Spieler springt von oben auf die Schildkröte
+  const p = game.player;
+  p.x = b.x + b.w / 2 - p.w / 2;
+  p.y = b.y - p.h - 1;
+  p.vy = 200;
+  game.update(DT, input());
+
+  assert.equal(b.hp, 9, '12 - 3 = 9 hp');
+  assert.ok(p.vy < 0, 'Spieler prallt nach oben ab');
+  assert.equal(b.state, 'shell', 'zieht sich in den Panzer zurück');
+  assert.equal(b.anim, 'boss_schildkroete_shell');
+  assert.ok(count('bossHit') >= 1);
+});
+
+test('Riesenschildkröte: Pfeil macht 1 Schaden', () => {
+  const { game } = makeGame({ lives: 5 }, 'schildkroete');
+  activate(game);
+  const b = game.boss;
+  assert.equal(b.hp, 12);
+  b.damage(game, 'arrow');
+  assert.equal(b.hp, 11);
+  assert.equal(b.state, 'shell', 'geht bei Treffer in den Panzer');
+});
+
+test('Riesenschildkröte: Sieg bei 0 HP', () => {
+  const { game, count } = makeGame({ lives: 5 }, 'schildkroete');
+  activate(game);
+  const b = game.boss;
+  b.hp = 1;
+  b.invuln = 0;
+  b.damage(game, 'arrow');
+  assert.equal(b.hp, 0);
+  assert.equal(b.state, 'defeated');
+  assert.equal(b.active, false);
+  assert.equal(game.bossDefeated, true);
+});

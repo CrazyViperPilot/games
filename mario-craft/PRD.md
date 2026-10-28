@@ -21,7 +21,7 @@ Nicht in v2: Blöcke setzen (Bauen), Inventar, Loren, Musik, Mehrspieler.
 
 ## 2. Spielablauf
 
-Startbildschirm → Levelauswahl (3 Welten × 33 Level = 99 Level) → Level → Levelende. Wie v1 (Pause, Speichern, Game Over setzt die
+Startbildschirm → Levelauswahl (4 Welten × 33 Level = 132 Level) → Level → Levelende. Wie v1 (Pause, Speichern, Game Over setzt die
 Welt auf Level 1 zurück, Leben wieder 3).
 
 Jedes Level folgt grob dem Weg **Oberfläche → Abstieg (graben, Schluchten) → Höhle/Dungeon → (Boss) → Aufstieg →
@@ -32,6 +32,7 @@ Portal**. Level sind 100–250 Blöcke breit und 30–70 Blöcke hoch; die Kamer
 | 1 Oberwelt | Wiese, Wald | Höhlen, erster Dungeon | **Riesenschleim** – teilt sich bei Stampfern (groß → 2 mittel → je 2 klein) |
 | 2 Tiefen | Berge, Schlucht | großer Dungeon, Lavaseen | **Dreikopf** – schwebt, schießt explodierende Schädel |
 | 3 Nether & Leere | Glutwelt (Nether-artig) | Leere mit schwebenden Inseln | **Leerendrache** – erst 4 Kristalle zerstören, dann stampfen, wenn er landet |
+| 4 Paradies | Strand, Palmen, Sand | Grotten, Wasserbecken, Unterwasser | **Riesenschildkröte** – weicht bei Treffern in ihren Panzer zurück, prallt an Wänden ab |
 
 **Boss-Arena:** Vor jeder Arena liegt ein Tor (Level-Zeichen `:`) und davor ein Bett. Steht die Figur ganz hinter dem
 Tor, beginnt der Kampf und das Tor schließt sich als sichtbares **Eisengitter** (nicht abbaubar). Nach dem Sieg geht es
@@ -93,6 +94,7 @@ und war unsichtbar – ein dunkelblauer Streifen, durch den man nicht kam.)
 | **Silberfischchen** | klein, flink, aus getarntem Stein | stampfen, Pfeil |
 | **Glutgeist** (Welt 3) | schwebt, schießt alle 3 s drei Feuerkugeln | nur Pfeil (Stampfen verbrennt) |
 | **Leerenläufer** (Welt 3) | harmlos; berührt man ihn, teleportiert er neben dich und greift an | 2 Stampfer, Pfeil |
+| **Riesenschildkröte** (Welt 4 Boss) | läuft am Boden; bei Treffer zieht sie sich in ihren Panzer zurück, rast und prallt ab; Stampfer auf Panzer prallen ab | 4 Stampfer / 12 Pfeile (Stampfen = 3 Schaden) |
 
 **Herzen:** Jedes Leben hat **10 Herzen** (zweite HUD-Zeile unter Smaragden/Leben, rot = voll). Schaden: Zombie/Mob-Berührung
 und Sand 1 Herz, Feuer 2, Explosion und Boss 3. Rüstung/Bogen senken jeden Schaden um 1 (mindestens 1) und bleiben
@@ -150,5 +152,5 @@ zurückgesetzt, außer Sprache und Ton.
 
 1. 60 fps auf beiden Geräten (Prüfung: Chromium, CPU ×4, Ø ≤ 16,7 ms, auch beim Graben und bei Explosionen).
 2. Graben, Klettern, Schwimmen, Schleimblock, Zischer-Explosion mit Blockzerstörung funktionieren per Touch.
-3. Alle 99 Level schaffbar (Prüf-Suche durch alle Level inkl. Graben; Test-Bot schafft bestehende Referenz-Level).
+3. Alle 132 Level schaffbar (Prüf-Suche durch alle Level inkl. Graben; Test-Bot schafft bestehende Referenz-Level).
 4. DE/PL vollständig, Offline-Modus, Fortschritt bleibt erhalten.

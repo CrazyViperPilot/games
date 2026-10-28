@@ -186,11 +186,62 @@ function crystalFrame(f) {
   });
 }
 
+
+// ---------- Riesenschildkröte (52×32) ----------
+const PAL_TURTLE = {
+  k: '#0f2411', g: '#1f5424', G: '#2e7a35', h: '#4aa653',
+  y: '#d4a233', s: '#3ea853', e: '#0a170c', w: '#ffffff', p: '#143818',
+};
+
+function turtleFrame(walk) {
+  const g = grid(52, 32, (x, y) => {
+    // Kopf vorn rechts (cols 38..48, rows 10..22)
+    if (inEll(x, y, 43, 16, 7, 5)) {
+      if (inRect(x, y, 44, 13, 46, 15)) return x === 45 && y === 14 ? 'w' : 'e'; // Auge
+      return 's';
+    }
+    // Beine unten (vorn und hinten)
+    const legOff = walk ? 2 : -2;
+    if (inRect(x, y, 14 + legOff, 23, 20 + legOff, 30) || inRect(x, y, 32 - legOff, 23, 38 - legOff, 30)) {
+      return 's';
+    }
+    // Bauch / Gelber Rand (rows 22..24)
+    if (inEll(x, y, 26, 22, 19, 4)) return 'y';
+    // Panzer (Kuppel rows 4..22, cols 8..44)
+    if (inEll(x, y, 26, 15, 18, 11)) {
+      // Panzer-Schuppen (Muster)
+      if (inEll(x, y, 26, 11, 6, 4) || inEll(x, y, 16, 15, 4, 4) || inEll(x, y, 35, 15, 4, 4)) return 'p';
+      if (inEll(x, y, 26, 7, 12, 4)) return 'h'; // Glanz oben
+      return inEll(x, y, 26, 15, 14, 8) ? 'G' : 'g';
+    }
+    return null;
+  });
+  return outline(g, 'k');
+}
+
+function turtleShellFrame(spin) {
+  const g = grid(52, 32, (x, y) => {
+    // Bauch / Gelber Rand
+    if (inEll(x, y, 26, 23, 20, 5)) return 'y';
+    // Geschlossener Panzer
+    if (inEll(x, y, 26, 16, 21, 12)) {
+      const off = spin ? 3 : -3;
+      if (inEll(x, y, 26 + off, 12, 6, 4) || inEll(x, y, 15 + off, 16, 5, 4) || inEll(x, y, 36 + off, 16, 5, 4)) return 'p';
+      if (inEll(x, y, 26, 8, 14, 4)) return 'h';
+      return inEll(x, y, 26, 16, 16, 9) ? 'G' : 'g';
+    }
+    return null;
+  });
+  return outline(g, 'k');
+}
+
 export const BOSS_ART = {
   boss_slime_l: { pal: PAL_SLIME, frames: [slimeFrame(48, false), slimeFrame(48, true)] },
   boss_slime_m: { pal: PAL_SLIME, frames: [slimeFrame(32, false), slimeFrame(32, true)] },
   boss_dreikopf: { pal: PAL_BONE, frames: [dreikopfFrame(0), dreikopfFrame(1)] },
   boss_drache: { pal: PAL_DRAGON, frames: [dragonFrame(0), dragonFrame(1)] },
   boss_drache_perch: { pal: PAL_DRAGON, frames: [dragonPerchFrame()] },
+  boss_schildkroete: { pal: PAL_TURTLE, frames: [turtleFrame(false), turtleFrame(true)] },
+  boss_schildkroete_shell: { pal: PAL_TURTLE, frames: [turtleShellFrame(false), turtleShellFrame(true)] },
   crystal: { pal: PAL_CRYSTAL, frames: [crystalFrame(0), crystalFrame(1)] },
 };

@@ -6,8 +6,8 @@ import { TILE_BY_ID } from '../js/data/tiles.js';
 
 // Format der Level (PLAN §4). Erreichbarkeit steht in test/reach.test.js.
 const CHEST_KINDS = ['armor', 'bow', 'apple', 'cake', 'pick_stone', 'pick_iron', 'pick_diamond', 'emeralds'];
-const BOSSES = ['slimeking', 'dreikopf', 'drache'];
-const THEMES = ['overworld', 'depths', 'nether', 'end'];
+const BOSSES = ['slimeking', 'dreikopf', 'drache', 'schildkroete'];
+const THEMES = ['overworld', 'depths', 'nether', 'end', 'paradise'];
 const ID_RE = /^w([1-9])-([1-9]\d*)$/;
 
 const countChar = (rows, ch) => rows.reduce((n, row) => n + row.split(ch).length - 1, 0);

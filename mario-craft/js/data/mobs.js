@@ -53,6 +53,12 @@ export const BOSSES = {
     fireEvery: 3, fireEveryEnraged: 2, fireSpeed: 100,
     perchTime: 6, flyTime: 4, defeatRadius: 2,
   },
+  // Riesenschildkröte (Paradies, Strand/Küste). Arena 32×12.
+  schildkroete: {
+    w: 52, h: 32, arena: { w: 32, h: 12 }, hp: 12, stompDmg: 3, arrowDmg: 1, invulnTime: 1.0,
+    speed: 35, shellSpeed: 140, shellSpeedEnraged: 180, shellTime: 3.0,
+    defeatRadius: 2,
+  },
 };
 
 // Monster-Spawner (Kachel M): erzeugt alle `every` s einen Gegner, wenn der Spieler ≤ `range` Kacheln entfernt ist.
