@@ -34,6 +34,7 @@
                 <button id="btnScoreDone" class="gold-btn" hidden>Fertig</button>
                 <button id="btnUndo" class="gold-btn">Zug zurück</button>
                 <button id="btnResign" class="gold-btn">Aufgeben</button>
+                <button id="btnExplain" class="gold-btn">Erklären</button>
             </div>
 
             <div class="secondary-controls">
@@ -42,17 +43,25 @@
 
             <div class="settings">
                 <div class="setting">
-                    <span class="setting-label">Gegner</span>
+                    <span class="setting-label" id="labelOpponent">Gegner</span>
                     <div class="segmented">
-                        <button class="diff-btn active" data-level="easy">Leicht</button>
-                        <button class="diff-btn" data-level="medium">Mittel</button>
+                        <button class="diff-btn active" data-level="easy" id="btnEasy">Leicht</button>
+                        <button class="diff-btn" data-level="medium" id="btnMedium">Mittel</button>
                     </div>
                 </div>
                 <div class="setting">
-                    <span class="setting-label">Brett</span>
+                    <span class="setting-label" id="labelBoard">Brett</span>
                     <div class="segmented">
                         <button class="diff-btn active" data-size="9">9 × 9</button>
                         <button class="diff-btn" data-size="13">13 × 13</button>
+                    </div>
+                </div>
+                <div class="setting">
+                    <span class="setting-label" id="labelLang">Sprache</span>
+                    <div class="segmented">
+                        <button class="diff-btn active" data-lang="de">DE</button>
+                        <button class="diff-btn" data-lang="en">EN</button>
+                        <button class="diff-btn" data-lang="pl">PL</button>
                     </div>
                 </div>
             </div>
@@ -71,6 +80,7 @@
         </div>
     </div>
 
+    <script src="lang.js"></script>
     <script src="go.js"></script>
     <script src="ai.js"></script>
     <script src="app.js"></script>

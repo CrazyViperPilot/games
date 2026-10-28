@@ -1,10 +1,11 @@
 // Bei jeder Änderung an einer Datei aus ASSETS die Version in CACHE_NAME erhöhen, sonst bekommen installierte Kopien sie nicht.
 const CACHE_PREFIX = 'go-game-';
-const CACHE_NAME = CACHE_PREFIX + 'v2';
+const CACHE_NAME = CACHE_PREFIX + 'v3';
 const ASSETS = [
   './',
   './index.html',
   './style.css',
+  './lang.js',
   './go.js',
   './ai.js',
   './app.js',

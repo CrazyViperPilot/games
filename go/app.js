@@ -10,13 +10,14 @@ const STAR_POINTS = {
     13: [[3, 3], [9, 3], [6, 6], [3, 9], [9, 9]]
 };
 
-const el = {
+const el = typeof document !== 'undefined' ? {
     board: document.getElementById('board'),
     status: document.getElementById('status'),
     captures: document.getElementById('captures'),
     btnPass: document.getElementById('btnPass'),
     btnUndo: document.getElementById('btnUndo'),
     btnResign: document.getElementById('btnResign'),
+    btnExplain: document.getElementById('btnExplain'),
     btnScoreDone: document.getElementById('btnScoreDone'),
     btnNewGame: document.getElementById('btnNewGame'),
     confirmModal: document.getElementById('confirmModal'),
@@ -24,11 +25,18 @@ const el = {
     confirmYes: document.getElementById('confirmYes'),
     confirmNo: document.getElementById('confirmNo'),
     confirmOverlay: document.querySelector('.confirm-overlay')
-};
+} : {};
 
 let game = null;
 let history = [];       // states before each human move, for undo
+let prevGame = null;    // state before the last move (human or AI), for Erklaeren
 let level = 'easy';
+let currentLang = 'de';
+
+function getTexts() {
+    const dict = typeof I18N !== 'undefined' ? I18N : (typeof require !== 'undefined' ? require('./lang.js').I18N : null);
+    return (dict && dict[currentLang]) ? dict[currentLang] : (dict ? dict.de : {});
+}
 let aiThinking = false;
 let notice = '';        // one-off message, e.g. an illegal move
 let layout = null;      // board geometry in CSS pixels
@@ -40,7 +48,8 @@ let pendingConfirm = null;
 
 function saveState() {
     try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ game, history, level }));
+        try { localStorage.setItem('goLang', currentLang); } catch {} 
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ game, history, level, prevGame, lang: currentLang }));
     } catch {
         // Storage can be unavailable (private mode); the game still works.
     }
@@ -55,6 +64,8 @@ function loadState() {
         game = state.game;
         history = state.history || [];
         level = state.level || 'easy';
+        prevGame = state.prevGame || null;
+        currentLang = state.lang || localStorage.getItem('goLang') || 'de';
         return true;
     } catch {
         return false;
@@ -68,6 +79,7 @@ function loadState() {
 function startGame(size) {
     game = goCreate(size);
     history = [];
+    prevGame = null;
     notice = '';
     commit();
 }
@@ -85,6 +97,7 @@ function aiTurn() {
     // Wait a frame so "denkt nach" is painted before the search blocks the thread.
     requestAnimationFrame(() => setTimeout(() => {
         const idx = goAiChoose(game, level);
+        prevGame = game;
         game = idx < 0 ? goPass(game) : goPlay(game, idx);
         aiThinking = false;
         commit();
@@ -107,11 +120,12 @@ function onBoardTap(event) {
 
     const next = goPlay(game, idx);
     if (!next) {
-        notice = 'Dieser Zug ist nicht erlaubt (Selbstmord oder Ko).';
+        notice = getTexts().illegalMove;
         render();
         return;
     }
-    history.push(game);
+    history.push({ game, prevGame });
+    prevGame = game;
     if (history.length > MAX_HISTORY) history.shift();
     game = next;
     notice = '';
@@ -120,7 +134,8 @@ function onBoardTap(event) {
 
 function onPass() {
     if (aiThinking || game.phase !== 'play' || game.toMove !== GO_BLACK) return;
-    history.push(game);
+    history.push({ game, prevGame });
+    prevGame = game;
     game = goPass(game);
     notice = '';
     commit();
@@ -129,7 +144,14 @@ function onPass() {
 // Takes back your last move together with the computer's reply.
 function onUndo() {
     if (aiThinking || game.phase !== 'play' || history.length === 0) return;
-    game = history.pop();
+    const entry = history.pop();
+    if (entry && entry.board) {
+        game = entry;
+        prevGame = null;
+    } else if (entry) {
+        game = entry.game;
+        prevGame = entry.prevGame;
+    }
     notice = '';
     commit();
 }
@@ -137,7 +159,95 @@ function onUndo() {
 function askBeforeReset(action) {
     const hasStones = game.board.some(c => c !== GO_EMPTY);
     if (game.phase === 'over' || !hasStones) action();
-    else showConfirm('Die aktuelle Partie geht verloren. Fortfahren?', action);
+    else showConfirm(getTexts().confirmReset, action);
+}
+
+// Formats a board index as a human-readable coordinate (e.g. 'D5').
+function posLabel(idx, size) {
+    const col = idx % size;
+    const row = Math.floor(idx / size);
+    // Standard Go labelling: letters skip 'I', rows count from bottom.
+    const letter = String.fromCharCode(65 + col + (col >= 8 ? 1 : 0));
+    return letter + (size - row);
+}
+
+// Generates an explanation of the last move in the active language.
+function generateExplanation(cur = game, prev = prevGame, lang = currentLang) {
+    const dict = typeof I18N !== 'undefined' ? I18N : (typeof require !== 'undefined' ? require('./lang.js').I18N : null);
+    const t = (dict && dict[lang]) ? dict[lang] : (dict ? dict.de : {});
+
+    if (!prev || !cur) return t.explainNoMove || 'Noch kein Zug gespielt. Schwarz beginnt.';
+
+    const player = prev.toMove;
+    const isHuman = player === GO_BLACK;
+    const subject = isHuman ? t.subjectHuman : t.subjectAi;
+    const verbPlay = isHuman ? t.verbPlayHuman : t.verbPlayAi;
+    const verbCap = isHuman ? t.verbCapHuman : t.verbCapAi;
+    const size = cur.size;
+
+    // Pass
+    if (cur.lastMove < 0) {
+        return isHuman ? t.explainPassHuman : t.explainPassAi;
+    }
+
+    const idx = cur.lastMove;
+    const pos = posLabel(idx, size);
+    const captured = cur.captures[player] - prev.captures[player];
+
+    // Check whether the played spot was fully surrounded by opponent stones.
+    const opp = 3 - player;
+    const neighbors = goNeighbors(size, idx);
+    const allNeighborsWereOpponent = neighbors.every(n => prev.board[n] === opp);
+
+    let text = '';
+    if (captured > 0) {
+        const stoneWord = t.stoneWord(captured);
+        if (allNeighborsWereOpponent) {
+            text = t.explainApparentSuicide(subject, verbPlay, pos, verbCap, captured, stoneWord);
+        } else {
+            text = t.explainCapture(subject, verbPlay, pos, verbCap, captured, stoneWord);
+        }
+    } else {
+        // No captures - explain liberties
+        const group = goGroup(cur.board, size, idx);
+        const libs = group.liberties.size;
+        const libWord = t.libertyWord(libs);
+
+        if (group.stones.length > 1) {
+            text = t.explainMoveGroup(subject, verbPlay, pos, libs, libWord);
+        } else {
+            text = t.explainMoveSingle(subject, verbPlay, pos, libs, libWord);
+        }
+    }
+
+    // Mention ko if set
+    if (cur.ko >= 0) {
+        text += t.explainKo(posLabel(cur.ko, size));
+    }
+
+    return text;
+}
+
+function onExplain() {
+    if (aiThinking) return;
+    const expl = generateExplanation();
+    notice = notice === expl ? '' : expl;
+    render();
+}
+
+function setLanguage(lang) {
+    if (!['de', 'en', 'pl'].includes(lang)) lang = 'de';
+    currentLang = lang;
+    if (typeof document !== 'undefined') {
+        document.documentElement.lang = lang;
+    }
+    if (notice && prevGame) {
+        notice = generateExplanation(game, prevGame, currentLang);
+    } else if (notice) {
+        notice = '';
+    }
+    saveState();
+    render();
 }
 
 // =============================================================
@@ -262,39 +372,65 @@ function drawDeadMark(ctx, x, y, d) {
 // Text and controls
 // =============================================================
 
-function formatPoints(value) {
-    return value.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+function formatPoints(value, lang = currentLang) {
+    const locale = lang === 'en' ? 'en-US' : lang === 'pl' ? 'pl-PL' : 'de-DE';
+    return value.toLocaleString(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }
 
 function resultText() {
+    const t = getTexts();
     const r = game.result;
-    const winner = r.winner === GO_BLACK ? 'Du (Schwarz)' : 'Der Computer (Weiß)';
+    const winner = r.winner === GO_BLACK ? t.winnerBlack : t.winnerWhite;
     if (r.resigned) {
-        return r.winner === GO_BLACK
-            ? `${winner} gewinnt. Der Computer hat aufgegeben.`
-            : `${winner} gewinnt. Du hast aufgegeben.`;
+        return r.winner === GO_BLACK ? t.resignedBlack : t.resignedWhite;
     }
-    const margin = formatPoints(Math.abs(r.black - r.white));
-    return `${winner} gewinnt mit ${margin} Punkten (Schwarz ${r.black}, Weiß ${formatPoints(r.white)}).`;
+    const margin = formatPoints(Math.abs(r.black - r.white), currentLang);
+    const black = formatPoints(r.black, currentLang);
+    const white = formatPoints(r.white, currentLang);
+    return t.scoreResult(winner, margin, black, white);
 }
 
 function statusText() {
+    const t = getTexts();
     if (notice) return notice;
     if (game.phase === 'over') return resultText();
     if (game.phase === 'score') {
         const s = goScore(game);
-        return `Tote Steine antippen. Stand: Schwarz ${s.black}, Weiß ${formatPoints(s.white)} (inkl. ${formatPoints(GO_KOMI)} Komi).`;
+        const black = formatPoints(s.black, currentLang);
+        const white = formatPoints(s.white, currentLang);
+        const komi = formatPoints(GO_KOMI, currentLang);
+        return t.scoringHelp(black, white, komi);
     }
-    if (aiThinking) return 'Der Computer denkt nach …';
-    return game.toMove === GO_BLACK ? 'Du bist am Zug (Schwarz).' : 'Der Computer ist am Zug.';
+    if (aiThinking) return t.aiThinking;
+    return game.toMove === GO_BLACK ? t.turnBlack : t.turnWhite;
+}
+
+function updateLocalizedUI() {
+    const t = getTexts();
+    if (el.btnPass) el.btnPass.textContent = t.btnPass;
+    if (el.btnScoreDone) el.btnScoreDone.textContent = t.btnScoreDone;
+    if (el.btnUndo) el.btnUndo.textContent = t.btnUndo;
+    if (el.btnResign) el.btnResign.textContent = t.btnResign;
+    if (el.btnExplain) el.btnExplain.textContent = t.btnExplain;
+    if (el.btnNewGame) el.btnNewGame.textContent = t.btnNewGame;
+    if (el.labelOpponent) el.labelOpponent.textContent = t.labelOpponent;
+    if (el.labelBoard) el.labelBoard.textContent = t.labelBoard;
+    if (el.labelLang) el.labelLang.textContent = t.labelLang;
+    if (el.btnEasy) el.btnEasy.textContent = t.diffEasy;
+    if (el.btnMedium) el.btnMedium.textContent = t.diffMedium;
+    if (el.confirmYes) el.confirmYes.textContent = t.confirmYes;
+    if (el.confirmNo) el.confirmNo.textContent = t.confirmNo;
 }
 
 function render() {
     layoutBoard();
     drawBoard();
 
+    updateLocalizedUI();
+
+    const t = getTexts();
     el.status.textContent = statusText();
-    el.captures.textContent = `Gefangen: du ${game.captures[GO_BLACK]} · Computer ${game.captures[GO_WHITE]}`;
+    el.captures.textContent = t.captures(game.captures[GO_BLACK], game.captures[GO_WHITE]);
 
     const playing = game.phase === 'play';
     el.btnPass.hidden = !playing;
@@ -304,12 +440,17 @@ function render() {
     el.btnPass.disabled = aiThinking || game.toMove !== GO_BLACK;
     el.btnUndo.disabled = aiThinking || history.length === 0;
     el.btnResign.disabled = aiThinking;
+    el.btnExplain.hidden = !playing;
+    el.btnExplain.disabled = aiThinking || !prevGame;
 
     document.querySelectorAll('[data-level]').forEach(b => {
         b.classList.toggle('active', b.dataset.level === level);
     });
     document.querySelectorAll('[data-size]').forEach(b => {
         b.classList.toggle('active', Number(b.dataset.size) === game.size);
+    });
+    document.querySelectorAll('[data-lang]').forEach(b => {
+        b.classList.toggle('active', b.dataset.lang === currentLang);
     });
 }
 
@@ -338,13 +479,14 @@ function init() {
     el.board.addEventListener('click', onBoardTap);
     el.btnPass.addEventListener('click', onPass);
     el.btnUndo.addEventListener('click', onUndo);
+    el.btnExplain.addEventListener('click', onExplain);
     el.btnScoreDone.addEventListener('click', () => {
         game = goFinish(game);
         commit();
     });
     el.btnResign.addEventListener('click', () => {
         if (aiThinking) return;
-        showConfirm('Partie aufgeben?', () => {
+        showConfirm(getTexts().confirmResign, () => {
             game = goResign(game, GO_BLACK);
             commit();
         });
@@ -366,6 +508,13 @@ function init() {
             render();
         });
     });
+    document.querySelectorAll('[data-lang]').forEach(b => {
+        b.addEventListener('click', () => {
+            const lang = b.dataset.lang;
+            if (lang === currentLang) return;
+            setLanguage(lang);
+        });
+    });
 
     el.confirmYes.addEventListener('click', () => {
         const action = pendingConfirm;
@@ -381,4 +530,9 @@ function init() {
     if (game.phase === 'play' && game.toMove === GO_WHITE) aiTurn();
 }
 
-init();
+if (typeof window !== 'undefined') {
+    init();
+}
+if (typeof module !== 'undefined') {
+    module.exports = { posLabel, generateExplanation, setLanguage, getTexts, formatPoints };
+}
