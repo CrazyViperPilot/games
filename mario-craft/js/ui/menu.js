@@ -8,7 +8,7 @@ import { audio } from '../core/audio.js';
 // Welten, deren Level spielbar sind. Welt 2 und 3 zeigen bis Meilenstein 2 „bald verfügbar“.
 const OPEN_WORLDS = 3;
 const WORLDS = [1, 2, 3];
-const LEVELS_PER_WORLD = 4;
+const LEVELS_PER_WORLD = 33;
 const PICK_KEYS = ['pickWood', 'pickStone', 'pickIron', 'pickDiamond'];
 const BTN_SIZES = ['small', 'normal', 'large'];
 const BTN_SIZE_KEYS = { small: 'btnSmall', normal: 'btnNormal', large: 'btnLarge' };

@@ -8,7 +8,7 @@ import { TILE_BY_ID } from '../js/data/tiles.js';
 const CHEST_KINDS = ['armor', 'bow', 'apple', 'cake', 'pick_stone', 'pick_iron', 'pick_diamond', 'emeralds'];
 const BOSSES = ['slimeking', 'dreikopf', 'drache'];
 const THEMES = ['overworld', 'depths', 'nether', 'end'];
-const ID_RE = /^w([1-9])-([1-9])$/;
+const ID_RE = /^w([1-9])-([1-9]\d*)$/;
 
 const countChar = (rows, ch) => rows.reduce((n, row) => n + row.split(ch).length - 1, 0);
 // Grundgestein oder Barriere: fest und nicht abbaubar.
@@ -18,9 +18,9 @@ if (LEVELS.length === 0) {
   test('LEVELS ist leer: kein Level zu prüfen (Format-Prüfung greift ab D2)', () => {});
 }
 
-test('Level-IDs w<Welt>-<Nr>: 4 Level je Welt, Reihenfolge wie in LEVELS', () => {
+test('Level-IDs w<Welt>-<Nr>: 33 Level je Welt, Reihenfolge wie in LEVELS', () => {
   LEVELS.forEach((def, i) => {
-    const world = Math.floor(i / 4) + 1, nr = (i % 4) + 1;
+    const world = Math.floor(i / 33) + 1, nr = (i % 33) + 1;
     assert.equal(def.id, `w${world}-${nr}`);
     assert.equal(def.world, world);
   });
@@ -67,7 +67,7 @@ for (const def of LEVELS) {
 
     if (def.boss !== undefined) {
       assert.ok(BOSSES.includes(def.boss), `Boss "${def.boss}" unbekannt`);
-      assert.match(id, /-4$/, 'Boss nur in w*-4');
+      assert.match(id, /-33$/, 'Boss nur in w*-33');
     }
     assert.equal(countChar(def.rows, '@'), def.boss ? 1 : 0, 'Boss-Start @ passt nicht zu boss');
   });

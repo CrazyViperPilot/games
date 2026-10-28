@@ -1,5 +1,5 @@
-// Generator für Level w1-4 „Riesenschleim“ (Boss-Level, Welt 1). Schreibt ../w1-4.js.
-// Aufruf: node js/data/levels/gen/w1-4.mjs
+// Generator für Level w1-33 „Riesenschleim“ (Boss-Level, Welt 1). Schreibt ../w1-33.js.
+// Aufruf: node js/data/levels/gen/w1-33.mjs
 import { writeFileSync } from 'node:fs';
 import { addFood } from './food.mjs';
 import { dirname, join } from 'node:path';
@@ -113,9 +113,9 @@ addFood(g, W, H);
 
 const rows = g.map((line) => line.join(''));
 const chestLines = Object.entries(chests).map(([k, v]) => `    '${k}': '${v}',`).join('\n');
-const out = `// Level w1-4 „Riesenschleim“ (Boss-Level). Erzeugt von js/data/levels/gen/w1-4.mjs – nicht von Hand ändern.
+const out = `// Level w1-33 „Riesenschleim“ (Boss-Level). Erzeugt von js/data/levels/gen/w1-33.mjs – nicht von Hand ändern.
 export default {
-  id: 'w1-4',
+  id: 'w1-33',
   world: 1,
   theme: 'overworld',
   rows: [
@@ -130,5 +130,5 @@ ${chestLines}
 `;
 
 const here = dirname(fileURLToPath(import.meta.url));
-writeFileSync(join(here, '..', 'w1-4.js'), out);
-console.log(`w1-4.js geschrieben: ${W} x ${H}`);
+writeFileSync(join(here, '..', 'w1-33.js'), out);
+console.log(`w1-33.js geschrieben: ${W} x ${H}`);

@@ -295,7 +295,7 @@ Wie v1 (kleine interne Auflösung, Atlas, vorgerenderte Chunks, keine Allokation
 | D4 | Welt 3 (4 Level) | `data/levels/w3-*.js` |
 
 Meilenstein 1 = A1–A11, B1–B7, C1–C2, D1–D2 → Welt 1 spielbar (Welten 2/3 in der Levelauswahl „bald“), Push nach main.
-Meilenstein 2 = A12–A13, D3–D4 → alle 12 Level, Review, Push nach main.
+Meilenstein 2 = A12–A13, D3–D4 → alle 99 Level (3 Welten à 33 Level), Review, Push nach main.
 
 ## 13. Notizen aus den Aufgaben
 

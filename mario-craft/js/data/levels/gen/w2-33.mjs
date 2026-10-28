@@ -1,5 +1,5 @@
-// Generator für Level w2-4 „Dreikopf-Kerker“ (Boss-Level, Welt 2, depths, 140 × 50).
-// Aufruf: node js/data/levels/gen/w2-4.mjs  → schreibt js/data/levels/w2-4.js.
+// Generator für Level w2-33 „Dreikopf-Kerker“ (Boss-Level, Welt 2, depths, 140 × 50).
+// Aufruf: node js/data/levels/gen/w2-33.mjs  → schreibt js/data/levels/w2-33.js.
 // Weg: kurze Oberfläche (links) → Schacht → vier Dungeon-Gänge, jeweils nach rechts, durch Leitern
 // verbunden (Band 1 bis 4, Zeilen 19–21, 27–29, 35–37, 44–46) → Arena unten rechts (Spalten 100–137).
 // Bett und Truhen liegen vor der Arena. Die Arena-Tür `:` (Spalte 99) wird beim Bosskampf zur Barriere.
@@ -143,9 +143,9 @@ ensureHeadroom(g, W, H);
 
 const rows = g.map((line) => line.join(''));
 const chestLines = Object.entries(chests).map(([k, v]) => `  '${k}': '${v}',`).join('\n');
-const out = `// Level w2-4 „Dreikopf-Kerker“ (Boss-Level, Welt 2). Erzeugt von js/data/levels/gen/w2-4.mjs – nicht von Hand ändern.
+const out = `// Level w2-33 „Dreikopf-Kerker“ (Boss-Level, Welt 2). Erzeugt von js/data/levels/gen/w2-33.mjs – nicht von Hand ändern.
 export default {
-  id: 'w2-4',
+  id: 'w2-33',
   world: 2,
   theme: 'depths',
   rows: [
@@ -160,6 +160,6 @@ ${chestLines}
 `;
 
 const here = dirname(fileURLToPath(import.meta.url));
-const target = join(here, '..', 'w2-4.js');
+const target = join(here, '..', 'w2-33.js');
 writeFileSync(target, out);
 console.log(`geschrieben: ${target} (${W} x ${H})`);

@@ -15,10 +15,10 @@ test('i18n: de und pl haben dieselben Schlüssel', () => {
   assert.deepEqual(pl, de);
 });
 
-test('i18n: Level-Namen für alle 12 Level vorhanden', () => {
+test('i18n: Level-Namen für alle 99 Level vorhanden', () => {
   for (const lang of LANGS) {
     for (let w = 1; w <= 3; w++) {
-      for (let l = 1; l <= 4; l++) {
+      for (let l = 1; l <= 33; l++) {
         assert.ok(STRINGS[lang][`lv_w${w}_${l}`], `${lang}.lv_w${w}_${l} fehlt`);
       }
     }

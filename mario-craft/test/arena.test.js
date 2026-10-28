@@ -163,7 +163,7 @@ test('restartBoss: Dreikopf und Drache behalten die Energie, unbeschädigt bleib
 });
 
 // Echte Boss-Level: im Kampf sterben, am Bett neu starten, zurück in die Arena laufen.
-for (const id of ['w1-4', 'w2-4', 'w3-4']) {
+for (const id of ['w1-33', 'w2-33', 'w3-33']) {
   test(`${id}: nach dem Tod im Bosskampf kommt man wieder in die Arena`, () => {
     const def = LEVELS.find((l) => l.id === id);
     const game = new Game({ level: def, save: { lives: 5 } });

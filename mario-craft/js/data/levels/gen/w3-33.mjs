@@ -1,5 +1,5 @@
-// Generator für Level w3-4 „Leerendrache“ (Boss-Level, Welt 3, Theme end). Schreibt ../w3-4.js.
-// Aufruf: node js/data/levels/gen/w3-4.mjs
+// Generator für Level w3-33 „Leerendrache“ (Boss-Level, Welt 3, Theme end). Schreibt ../w3-33.js.
+// Aufruf: node js/data/levels/gen/w3-33.mjs
 // Aufbau: Endstein-Inseln (Zugang, Zischer, Leerenläufer) → Eingangstür → Arena (40 × 20).
 // Arena: Eingang links (Rampe aufs Obsidian-Deck), vier Säulen mit Kristallen auf dem Deck,
 // Landeplatz (flacher Boden) in der Mitte, Portal rechts am Boden.
@@ -126,9 +126,9 @@ addFood(g, W, H);
 
 const rows = g.map((line) => line.join(''));
 const chestLines = Object.entries(chests).map(([k, v]) => `    '${k}': '${v}',`).join('\n');
-const out = `// Level w3-4 „Leerendrache“ (Boss-Level). Erzeugt von js/data/levels/gen/w3-4.mjs – nicht von Hand ändern.
+const out = `// Level w3-33 „Leerendrache“ (Boss-Level). Erzeugt von js/data/levels/gen/w3-33.mjs – nicht von Hand ändern.
 export default {
-  id: 'w3-4',
+  id: 'w3-33',
   world: 3,
   theme: 'end',
   rows: [
@@ -143,5 +143,5 @@ ${chestLines}
 `;
 
 const here = dirname(fileURLToPath(import.meta.url));
-writeFileSync(join(here, '..', 'w3-4.js'), out);
-console.log(`w3-4.js geschrieben: ${W} x ${H}`);
+writeFileSync(join(here, '..', 'w3-33.js'), out);
+console.log(`w3-33.js geschrieben: ${W} x ${H}`);

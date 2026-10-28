@@ -284,8 +284,8 @@ test('Nach oben graben: Kopfstoß beim Springen baut Stein über dem Kopf ab (Ho
   assert.equal(game.map.get(2, 5), TILE_IDS.bedrock, 'Grundgestein bleibt');
 });
 
-test('w2-4: Diamanterz in der Gangdecke per Kopfstoß abbaubar (Eisenhacke)', () => {
-  const def = LEVELS.find((l) => l.id === 'w2-4');
+test('w2-33: Diamanterz in der Gangdecke per Kopfstoß abbaubar (Eisenhacke)', () => {
+  const def = LEVELS.find((l) => l.id === 'w2-33');
   const game = new Game({ level: def, save: { lives: 3, pick: 2 } });
   assert.equal(game.map.get(78, 43), TILE_IDS.diamondore);
   const p = game.player;

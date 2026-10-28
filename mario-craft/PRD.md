@@ -21,13 +21,13 @@ Nicht in v2: Blöcke setzen (Bauen), Inventar, Loren, Musik, Mehrspieler.
 
 ## 2. Spielablauf
 
-Startbildschirm → Levelauswahl (3 Welten × 4 Level) → Level → Levelende. Wie v1 (Pause, Speichern, Game Over setzt die
+Startbildschirm → Levelauswahl (3 Welten × 33 Level = 99 Level) → Level → Levelende. Wie v1 (Pause, Speichern, Game Over setzt die
 Welt auf Level 1 zurück, Leben wieder 3).
 
 Jedes Level folgt grob dem Weg **Oberfläche → Abstieg (graben, Schluchten) → Höhle/Dungeon → (Boss) → Aufstieg →
 Portal**. Level sind 100–250 Blöcke breit und 30–70 Blöcke hoch; die Kamera folgt in beide Richtungen.
 
-| Welt | Oben | Unten | Boss (Level 4) |
+| Welt | Oben | Unten | Boss (Level 33) |
 |---|---|---|---|
 | 1 Oberwelt | Wiese, Wald | Höhlen, erster Dungeon | **Riesenschleim** – teilt sich bei Stampfern (groß → 2 mittel → je 2 klein) |
 | 2 Tiefen | Berge, Schlucht | großer Dungeon, Lavaseen | **Dreikopf** – schwebt, schießt explodierende Schädel |
@@ -64,7 +64,7 @@ und war unsichtbar – ein dunkelblauer Streifen, durch den man nicht kam.)
   erreicht ist (Erde, Gras, Sand, Blätter, Bretter: 1 Stoß; Stein mit Holzhacke 2, mit Eisenhacke 1; Erze 2).
   Risse halten 3 s. Mindest-Hacke gilt wie beim Graben (sonst „klonk“), Grundgestein und Arena-Gitter nie, TNT zündet
   nur mit dem Graben-Knopf, Truhen öffnen sich beim Anstoßen. So erreicht man Erze und Truhen in der Decke (z. B. das
-  Diamanterz im Gang von 2-4).
+  Diamanterz im Gang von 2-33).
 - Abbauzeit = Härte × Faktor der Spitzhacke. Spitzhacken: Holz (Start) 1,0 → Stein 0,7 → Eisen 0,5 → Diamant 0,35.
   Manche Blöcke brauchen eine Mindest-Spitzhacke (Obsidian: Diamant). Grundgestein nie.
 
@@ -150,5 +150,5 @@ zurückgesetzt, außer Sprache und Ton.
 
 1. 60 fps auf beiden Geräten (Prüfung: Chromium, CPU ×4, Ø ≤ 16,7 ms, auch beim Graben und bei Explosionen).
 2. Graben, Klettern, Schwimmen, Schleimblock, Zischer-Explosion mit Blockzerstörung funktionieren per Touch.
-3. Alle 12 Level schaffbar (Prüf-Suche durch die Level inkl. Graben; Test-Bot schafft Welt 1 komplett).
+3. Alle 99 Level schaffbar (Prüf-Suche durch alle Level inkl. Graben; Test-Bot schafft bestehende Referenz-Level).
 4. DE/PL vollständig, Offline-Modus, Fortschritt bleibt erhalten.
