@@ -120,7 +120,7 @@ function viewLevels(save) {
     <header class="head"><button class="btn small" data-act="back">← ${t('back')}</button><h2>${t('levels')}</h2></header>
     <p class="hint">${t('pickLabel')}: ${t(PICK_KEYS[pick])} · ${gearText(save.power)}</p>`;
   for (const w of WORLDS) {
-    html += `<div class="world"><div class="wname">${w} · ${t('w' + w)}</div><div class="tiles">`;
+    html += `<div class="world"><div class="wname">${t('w' + w)}</div><div class="tiles">`;
     for (let l = 1; l <= LEVELS_PER_WORLD; l++) {
       const id = `w${w}-${l}`;
       const label = `${w}-${l}`;

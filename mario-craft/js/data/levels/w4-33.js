@@ -1,8 +1,8 @@
-// Level w4-33 „Schildkröten-Bucht“ (Boss-Level, Welt 4). Automatisch generiert.
+// Level w4-33 „Golem-Zitadelle“ (Boss-Level, Welt 4). Automatisch generiert.
 export default {
   "id": "w4-33",
   "world": 4,
-  "theme": "paradise",
+  "theme": "sky",
   "rows": [
     "Z...........................................................Z..............................................................................Z",
     "Z...........................................................Z..............................................................................Z",
@@ -13,17 +13,17 @@ export default {
     "Z...........................................................Z..............................................................................Z",
     "Z...........................................................Z..............................................................................Z",
     "Z...........................................................Z..............................................................................Z",
-    "Z..........Y...........a.Y..................................Z..............................................................................Z",
-    "Z.......YY*YYYY.......YYYYYYY...............................Z..............................................................................Z",
-    "Z......Y...T...Y.....Y...T...Y..............................Z..............................................................................Z",
-    "Z..........T.............T..................................Z..............................................................................Z",
-    "Z.........T.............T...................................Z..............................................................................Z",
-    "Z...P.o.o.T.............T......................q............Z..............................................................................Z",
-    "ZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH.AAAAAAAAAAAAAAAAAAAAAAAZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAZ",
-    "ZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH.AAAAAAAAAAAAAAAAAAAAAAAZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAZ",
+    "Z...........................................................Z..............................................................................Z",
+    "Z.........*.............=...................................Z..............................................................................Z",
+    "Z.........B.............B...................................Z..............................................................................Z",
+    "Z.........B.............B...................................Z..............................................................................Z",
+    "Z.........B.............B...................................Z..............................................................................Z",
+    "Z...P.o.o.B............aB......................q............Z..............................................................................Z",
+    "ZBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBH.BBBBBBBBBBBBBBBBBBBBBBBZBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBZ",
+    "ZBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBH.BBBBBBBBBBBBBBBBBBBBBBBZBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBZ",
     "ZSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSH.SSSSSSSSSSSSSSSSSSSSSSSZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ",
     "ZSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSH.SSSSSSSSSSSSSSSSSSSSSSSZ.............................................................................ZZ",
-    "ZSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSH.SSSSSSSSSSSSSSSSSSSSSSSZ.............................................................................ZZ",
+    "ZSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSH.SSSSSSSSSSSSSSSSSSSSSSSZ.................U...........................................................ZZ",
     "ZSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSH.SSSSSSSSSSSSSSSSSSSSSSSZ.............................................................................ZZ",
     "ZSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSH.SSSSSSSSSSSSSSSSSSSSSSSZ.............................................................................ZZ",
     "ZSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSH.SSSSSSSSSSSSSSSSSSSSSSSZ.............................................................................ZZ",
@@ -33,7 +33,7 @@ export default {
     "ZSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS......*..................:.|.................*.......................................................|.ZZ",
     "ZSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS.......................|.:.............................................................................ZZ",
     "ZSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS.............?...?...K...:....o...ao...................@..q.......................a................F...ZZ",
-    "ZSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAZ",
+    "ZSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBZ",
     "ZSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSZ",
     "ZSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSZ",
     "ZSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSZ",
@@ -54,5 +54,5 @@ export default {
     "48,28": "bow"
   },
   "pick": 2,
-  "boss": "schildkroete"
+  "boss": "eisengolem"
 };

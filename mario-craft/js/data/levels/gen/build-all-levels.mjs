@@ -348,13 +348,13 @@ export function buildDepthsLevel(nr) {
   return b.validate();
 }
 
-export function buildNetherLevel(nr) {
+export function buildNetherLevel(nr, world = 5) {
   const seed = 3000 + nr * 61;
   const rng = makeRng(seed);
-  const id = `w3-${nr}`;
+  const id = `w${world}-${nr}`;
   const W = 140 + (nr % 5) * 8;
   const H = 46 + (nr % 3) * 4;
-  const b = new LevelBuilder(id, 3, 'nether', W, H, 2);
+  const b = new LevelBuilder(id, world, 'nether', W, H, 2);
 
   const baseGround = 14;
   b.addBorders(false);
@@ -421,13 +421,13 @@ export function buildNetherLevel(nr) {
   return b.validate();
 }
 
-export function buildEndLevel(nr) {
+export function buildEndLevel(nr, world = 5) {
   const seed = 4000 + nr * 67;
   const rng = makeRng(seed);
-  const id = `w3-${nr}`;
+  const id = `w${world}-${nr}`;
   const W = 150 + (nr % 5) * 8;
   const H = 48 + (nr % 3) * 4;
-  const b = new LevelBuilder(id, 3, 'end', W, H, 2);
+  const b = new LevelBuilder(id, world, 'end', W, H, 2);
 
   b.addBorders(true);
 
@@ -496,13 +496,13 @@ export function buildEndLevel(nr) {
   return b.validate();
 }
 
-export function buildParadiseLevel(nr) {
+export function buildParadiseLevel(nr, world = 3) {
   const seed = 5000 + nr * 73;
   const rng = makeRng(seed);
-  const id = `w4-${nr}`;
+  const id = `w${world}-${nr}`;
   const W = 135 + (nr % 6) * 6;
   const H = 42 + (nr % 4) * 3;
-  const b = new LevelBuilder(id, 4, 'paradise', W, H, 2);
+  const b = new LevelBuilder(id, world, 'paradise', W, H, 2);
 
   const baseGround = 14 + (nr % 3);
   b.addBorders(false);
@@ -597,10 +597,10 @@ export function buildParadiseLevel(nr) {
   return b.validate();
 }
 
-export function buildParadiseBossLevel() {
-  const id = 'w4-33';
+export function buildParadiseBossLevel(world = 3) {
+  const id = `w${world}-33`;
   const W = 140, H = 44;
-  const b = new LevelBuilder(id, 4, 'paradise', W, H, 2, 'schildkroete');
+  const b = new LevelBuilder(id, world, 'paradise', W, H, 2, 'schildkroete');
 
   b.addBorders(false);
 
@@ -659,13 +659,13 @@ export function buildParadiseBossLevel() {
   return b.validate();
 }
 
-export function buildSkyLevel(nr) {
+export function buildSkyLevel(nr, world = 4) {
   const seed = 6000 + nr * 79;
   const rng = makeRng(seed);
-  const id = `w5-${nr}`;
+  const id = `w${world}-${nr}`;
   const W = 135 + (nr % 6) * 6;
   const H = 44 + (nr % 4) * 3;
-  const b = new LevelBuilder(id, 5, 'sky', W, H, 2);
+  const b = new LevelBuilder(id, world, 'sky', W, H, 2);
 
   const baseGround = 15 + (nr % 3);
   b.addBorders(false);
@@ -741,10 +741,10 @@ export function buildSkyLevel(nr) {
   return b.validate();
 }
 
-export function buildSkyBossLevel() {
-  const id = 'w5-33';
+export function buildSkyBossLevel(world = 4) {
+  const id = `w${world}-33`;
   const W = 140, H = 44;
-  const b = new LevelBuilder(id, 5, 'sky', W, H, 2, 'eisengolem');
+  const b = new LevelBuilder(id, world, 'sky', W, H, 2, 'eisengolem');
 
   b.addBorders(false);
 
@@ -807,25 +807,26 @@ export function buildSkyBossLevel() {
 }
 
 // -------------------------------------------------------------
-// AUSFÜHRUNG & GENERIERUNG ALLER 132 LEVEL
+// AUSFÜHRUNG & GENERIERUNG ALLER 165 LEVEL
 // -------------------------------------------------------------
 
 export function generateAllLevels() {
-  console.log('--- Mario Craft 132-Level Generator Start ---');
+  console.log('--- Mario Craft 165-Level Generator Start ---');
 
-  // 1. Bestehende Boss-Level (ehemals w1-4, w2-4, w3-4) auf w1-33, w2-33, w3-33 migrieren
-  for (const w of [1, 2, 3]) {
-    const oldPath = join(LEVELS_DIR, `w${w}-4.js`);
-    if (fs.existsSync(oldPath)) {
-      const oldContent = readFileSync(oldPath, 'utf8');
-      if (oldContent.includes('slimeking') || oldContent.includes('dreikopf') || oldContent.includes('drache')) {
-        const newContent = oldContent
-          .replace(new RegExp(`id:\s*'w${w}-4'`, 'g'), `id: 'w${w}-33'`)
-          .replace(new RegExp(`Level w${w}-4`, 'g'), `Level w${w}-33`);
-
-        const newPath = join(LEVELS_DIR, `w${w}-33.js`);
-        writeFileSync(newPath, newContent, 'utf8');
-        console.log(`Migrated boss level w${w}-4 -> w${w}-33`);
+  // 1. Nether-Level w3-1, w3-2, w3-3, w3-33 nach Welt 5 (w5-1, w5-2, w5-3, w5-33) migrieren (vor Überschreiben von w3)
+  for (const nr of [1, 2, 3, 33]) {
+    const p3 = join(LEVELS_DIR, `w3-${nr}.js`);
+    const p5 = join(LEVELS_DIR, `w5-${nr}.js`);
+    if (fs.existsSync(p3)) {
+      const c = readFileSync(p3, 'utf8');
+      if (c.includes("'nether'") || c.includes("'end'") || c.includes("'drache'")) {
+        const migrated = c
+          .replace(new RegExp(`id:\\s*'w3-${nr}'`, 'g'), `id: 'w5-${nr}'`)
+          .replace(new RegExp(`world:\\s*3`, 'g'), `world: 5`)
+          .replace(new RegExp(`Level w3-${nr}`, 'g'), `Level w5-${nr}`)
+          .replace(new RegExp(`Welt 3`, 'g'), `Welt 5`);
+        writeFileSync(p5, migrated, 'utf8');
+        console.log(`Migrated Nether/End w3-${nr} -> w5-${nr}`);
       }
     }
   }
@@ -852,68 +853,68 @@ export default ${JSON.stringify(def, null, 2)};
   }
   console.log('World 2 (Tiefen) w2-4..w2-32 generated!');
 
-  // 4. Welt 3: w3-4 bis w3-32 generieren
-  for (let nr = 4; nr <= 18; nr++) {
-    const def = buildNetherLevel(nr);
+  // 4. Welt 3: w3-1 bis w3-32 (Paradies) generieren
+  for (let nr = 1; nr <= 32; nr++) {
+    const def = buildParadiseLevel(nr, 3);
     const filePath = join(LEVELS_DIR, `w3-${nr}.js`);
-    const content = `// Level w3-${nr} (Welt 3, nether). Automatisch generiert.
+    const content = `// Level w3-${nr} (Welt 3, paradies). Automatisch generiert.
+export default ${JSON.stringify(def, null, 2)};
+`;
+    writeFileSync(filePath, content, 'utf8');
+  }
+  console.log('World 3 (Paradies) w3-1..w3-32 generated!');
+
+  // 5. Welt 3 Boss: w3-33 (Riesenschildkröte) generieren
+  {
+    const def = buildParadiseBossLevel(3);
+    const filePath = join(LEVELS_DIR, 'w3-33.js');
+    const content = `// Level w3-33 „Schildkröten-Bucht“ (Boss-Level, Welt 3). Automatisch generiert.
+export default ${JSON.stringify(def, null, 2)};
+`;
+    writeFileSync(filePath, content, 'utf8');
+    console.log('World 3 Boss (Riesenschildkröte) w3-33 generated!');
+  }
+
+  // 6. Welt 4: w4-1 bis w4-32 (Himmelsfestung) generieren
+  for (let nr = 1; nr <= 32; nr++) {
+    const def = buildSkyLevel(nr, 4);
+    const filePath = join(LEVELS_DIR, `w4-${nr}.js`);
+    const content = `// Level w4-${nr} (Welt 4, sky). Automatisch generiert.
+export default ${JSON.stringify(def, null, 2)};
+`;
+    writeFileSync(filePath, content, 'utf8');
+  }
+  console.log('World 4 (Himmelsfestung) w4-1..w4-32 generated!');
+
+  // 7. Welt 4 Boss: w4-33 (Eisengolem) generieren
+  {
+    const def = buildSkyBossLevel(4);
+    const filePath = join(LEVELS_DIR, 'w4-33.js');
+    const content = `// Level w4-33 „Golem-Zitadelle“ (Boss-Level, Welt 4). Automatisch generiert.
+export default ${JSON.stringify(def, null, 2)};
+`;
+    writeFileSync(filePath, content, 'utf8');
+    console.log('World 4 Boss (Eisengolem) w4-33 generated!');
+  }
+
+  // 8. Welt 5: w5-4 bis w5-18 (Nether) und w5-19 bis w5-32 (End) generieren
+  for (let nr = 4; nr <= 18; nr++) {
+    const def = buildNetherLevel(nr, 5);
+    const filePath = join(LEVELS_DIR, `w5-${nr}.js`);
+    const content = `// Level w5-${nr} (Welt 5, nether). Automatisch generiert.
 export default ${JSON.stringify(def, null, 2)};
 `;
     writeFileSync(filePath, content, 'utf8');
   }
   for (let nr = 19; nr <= 32; nr++) {
-    const def = buildEndLevel(nr);
-    const filePath = join(LEVELS_DIR, `w3-${nr}.js`);
-    const content = `// Level w3-${nr} (Welt 3, end). Automatisch generiert.
-export default ${JSON.stringify(def, null, 2)};
-`;
-    writeFileSync(filePath, content, 'utf8');
-  }
-  console.log('World 3 (Nether & Leere) w3-4..w3-32 generated!');
-
-  // 5. Welt 4: w4-1 bis w4-32 generieren
-  for (let nr = 1; nr <= 32; nr++) {
-    const def = buildParadiseLevel(nr);
-    const filePath = join(LEVELS_DIR, `w4-${nr}.js`);
-    const content = `// Level w4-${nr} (Welt 4, paradies). Automatisch generiert.
-export default ${JSON.stringify(def, null, 2)};
-`;
-    writeFileSync(filePath, content, 'utf8');
-  }
-  console.log('World 4 (Paradies) w4-1..w4-32 generated!');
-
-  // 6. Welt 4 Boss: w4-33 generieren
-  {
-    const def = buildParadiseBossLevel();
-    const filePath = join(LEVELS_DIR, 'w4-33.js');
-    const content = `// Level w4-33 „Schildkröten-Bucht“ (Boss-Level, Welt 4). Automatisch generiert.
-export default ${JSON.stringify(def, null, 2)};
-`;
-    writeFileSync(filePath, content, 'utf8');
-    console.log('World 4 Boss (Riesenschildkröte) w4-33 generated!');
-  }
-
-  // 7. Welt 5: w5-1 bis w5-32 generieren
-  for (let nr = 1; nr <= 32; nr++) {
-    const def = buildSkyLevel(nr);
+    const def = buildEndLevel(nr, 5);
     const filePath = join(LEVELS_DIR, `w5-${nr}.js`);
-    const content = `// Level w5-${nr} (Welt 5, sky). Automatisch generiert.
+    const content = `// Level w5-${nr} (Welt 5, end). Automatisch generiert.
 export default ${JSON.stringify(def, null, 2)};
 `;
     writeFileSync(filePath, content, 'utf8');
   }
-  console.log('World 5 (Himmelsfestung) w5-1..w5-32 generated!');
-
-  // 8. Welt 5 Boss: w5-33 generieren
-  {
-    const def = buildSkyBossLevel();
-    const filePath = join(LEVELS_DIR, 'w5-33.js');
-    const content = `// Level w5-33 „Golem-Zitadelle“ (Boss-Level, Welt 5). Automatisch generiert.
-export default ${JSON.stringify(def, null, 2)};
-`;
-    writeFileSync(filePath, content, 'utf8');
-    console.log('World 5 Boss (Eisengolem) w5-33 generated!');
-  }
+  console.log('World 5 (Nether & Leere) w5-4..w5-32 generated!');
 
   // 9. Index-Datei js/data/levels/index.js schreiben
   let indexImports = '';
