@@ -16,7 +16,7 @@ Live: https://crazyviperpilot.github.io/games/
 | **CrazyViperMahjong** | [`crazyviper-mahjong/`](crazyviper-mahjong/) | Mahjong Solitaire mit 36 Kampfjet-Typen statt Schriftzeichen, 4 Layouts. [PRD](crazyviper-mahjong/PRD.md) | `CACHE_NAME` in `crazyviper-mahjong/sw.js` |
 | **Catsweeper** | [`catsweeper/`](catsweeper/) | Minesweeper mit Katzen und Fisch-Markierung, 3 Stufen. [PRD](catsweeper/PRD.md) | `CACHE_NAME` in `catsweeper/sw.js` |
 | **Katzen-Queens** | [`cat-queens/`](cat-queens/) | Logikrätsel (Queens / Star Battle) mit Katzen: Tagesrätsel, 3 Stufen, Hinweise. TypeScript + Vite, wird in `pages.yml` gebaut. [PRD](cat-queens/PRD.md) | Hash aller Dateien, automatisch in `cat-queens/dist/sw.js` |
-| **Mario Craft** | [`mario-craft/`](mario-craft/) | Jump'n Run im Pixel-Stil: 4 Welten mit Bossen, Deutsch und Polnisch. [README](mario-craft/README.md) | `CACHE_VERSION` in `mario-craft/sw.js` |
+| **Mario Craft** | [`mario-craft/`](mario-craft/) | Jump'n Run im Pixel-Stil: 5 Welten mit Bossen, Deutsch und Polnisch. [README](mario-craft/README.md) | `CACHE_VERSION` in `mario-craft/sw.js` |
 
 ## Aufbau: jedes Spiel ist eigenständig
 

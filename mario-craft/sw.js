@@ -1,6 +1,6 @@
 // Mario Craft Service Worker: network-first (immer die neueste Version), Cache nur als Offline-Fallback.
 // Bei Änderungen an Dateien CACHE_VERSION erhöhen, damit Clients die neue Version laden.
-const CACHE_VERSION = 'mariocraft-v11';
+const CACHE_VERSION = 'mariocraft-v12';
 const CACHE_PREFIX = 'mariocraft-';
 const CACHE_NAME = CACHE_VERSION;
 
@@ -151,6 +151,39 @@ const ASSETS = [
   './js/data/levels/w4-31.js',
   './js/data/levels/w4-32.js',
   './js/data/levels/w4-33.js',
+  './js/data/levels/w5-1.js',
+  './js/data/levels/w5-2.js',
+  './js/data/levels/w5-3.js',
+  './js/data/levels/w5-4.js',
+  './js/data/levels/w5-5.js',
+  './js/data/levels/w5-6.js',
+  './js/data/levels/w5-7.js',
+  './js/data/levels/w5-8.js',
+  './js/data/levels/w5-9.js',
+  './js/data/levels/w5-10.js',
+  './js/data/levels/w5-11.js',
+  './js/data/levels/w5-12.js',
+  './js/data/levels/w5-13.js',
+  './js/data/levels/w5-14.js',
+  './js/data/levels/w5-15.js',
+  './js/data/levels/w5-16.js',
+  './js/data/levels/w5-17.js',
+  './js/data/levels/w5-18.js',
+  './js/data/levels/w5-19.js',
+  './js/data/levels/w5-20.js',
+  './js/data/levels/w5-21.js',
+  './js/data/levels/w5-22.js',
+  './js/data/levels/w5-23.js',
+  './js/data/levels/w5-24.js',
+  './js/data/levels/w5-25.js',
+  './js/data/levels/w5-26.js',
+  './js/data/levels/w5-27.js',
+  './js/data/levels/w5-28.js',
+  './js/data/levels/w5-29.js',
+  './js/data/levels/w5-30.js',
+  './js/data/levels/w5-31.js',
+  './js/data/levels/w5-32.js',
+  './js/data/levels/w5-33.js',
   './js/data/mobs.js',
   './js/data/physics.js',
   './js/data/strings.js',

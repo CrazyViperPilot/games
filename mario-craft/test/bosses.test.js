@@ -1101,3 +1101,79 @@ test('Riesenschildkröte: Sieg bei 0 HP', () => {
   assert.equal(b.active, false);
   assert.equal(game.bossDefeated, true);
 });
+
+// ---------- Eisengolem (Tests) ----------
+
+test('Eisengolem: createBoss liefert die Felder für den Renderer', () => {
+  const b = createBoss('eisengolem', 100, 200);
+  assert.equal(b.kind, 'eisengolem');
+  assert.equal(b.state, 'idle');
+  assert.equal(b.active, false);
+  assert.equal(b.w, 36);
+  assert.equal(b.h, 46);
+  assert.equal(b.x, 100 - 18);
+  assert.equal(b.y, 200 - 46);
+  assert.equal(b.hp, 12);
+  assert.equal(b.anim, 'boss_eisengolem');
+  assert.equal(typeof b.update, 'function');
+  assert.equal(typeof b.damage, 'function');
+});
+
+test('Eisengolem: Parser-Spawn @ erzeugt den Boss', () => {
+  const { game } = makeGame({ lives: 5 }, 'eisengolem');
+  assert.ok(game.boss);
+  assert.equal(game.boss.kind, 'eisengolem');
+});
+
+test('Eisengolem: wird erst aktiv, wenn der Spieler in der Arena steht', () => {
+  const { game, count } = makeGame({ lives: 5 }, 'eisengolem');
+  const b = game.boss;
+  run(game, 60);
+  assert.equal(b.state, 'idle');
+  assert.equal(b.active, false);
+
+  game.player.x = b.x - 20 * T + 1;
+  game.update(DT, input());
+  assert.equal(b.state, 'fight');
+  assert.equal(b.active, true);
+  assert.equal(count('bossStart'), 1);
+});
+
+test('Eisengolem: Stampfer macht 3 Schaden und Prall', () => {
+  const { game, count } = makeGame({ lives: 5 }, 'eisengolem');
+  activate(game);
+  const b = game.boss;
+  assert.equal(b.hp, 12);
+
+  const p = game.player;
+  p.x = b.x + b.w / 2 - p.w / 2;
+  p.y = b.y - p.h - 1;
+  p.vy = 200;
+  game.update(DT, input());
+
+  assert.equal(b.hp, 9, '12 - 3 = 9 hp');
+  assert.ok(p.vy < 0, 'Spieler prallt nach oben ab');
+  assert.ok(count('bossHit') >= 1);
+});
+
+test('Eisengolem: Pfeil macht 1 Schaden', () => {
+  const { game } = makeGame({ lives: 5 }, 'eisengolem');
+  activate(game);
+  const b = game.boss;
+  assert.equal(b.hp, 12);
+  b.damage(game, 'arrow');
+  assert.equal(b.hp, 11);
+});
+
+test('Eisengolem: Sieg bei 0 HP', () => {
+  const { game } = makeGame({ lives: 5 }, 'eisengolem');
+  activate(game);
+  const b = game.boss;
+  b.hp = 1;
+  b.invuln = 0;
+  b.damage(game, 'arrow');
+  assert.equal(b.hp, 0);
+  assert.equal(b.state, 'defeated');
+  assert.equal(b.active, false);
+  assert.equal(game.bossDefeated, true);
+});

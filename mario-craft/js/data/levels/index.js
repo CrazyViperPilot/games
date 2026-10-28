@@ -130,6 +130,39 @@ import w4_30 from './w4-30.js';
 import w4_31 from './w4-31.js';
 import w4_32 from './w4-32.js';
 import w4_33 from './w4-33.js';
+import w5_1 from './w5-1.js';
+import w5_2 from './w5-2.js';
+import w5_3 from './w5-3.js';
+import w5_4 from './w5-4.js';
+import w5_5 from './w5-5.js';
+import w5_6 from './w5-6.js';
+import w5_7 from './w5-7.js';
+import w5_8 from './w5-8.js';
+import w5_9 from './w5-9.js';
+import w5_10 from './w5-10.js';
+import w5_11 from './w5-11.js';
+import w5_12 from './w5-12.js';
+import w5_13 from './w5-13.js';
+import w5_14 from './w5-14.js';
+import w5_15 from './w5-15.js';
+import w5_16 from './w5-16.js';
+import w5_17 from './w5-17.js';
+import w5_18 from './w5-18.js';
+import w5_19 from './w5-19.js';
+import w5_20 from './w5-20.js';
+import w5_21 from './w5-21.js';
+import w5_22 from './w5-22.js';
+import w5_23 from './w5-23.js';
+import w5_24 from './w5-24.js';
+import w5_25 from './w5-25.js';
+import w5_26 from './w5-26.js';
+import w5_27 from './w5-27.js';
+import w5_28 from './w5-28.js';
+import w5_29 from './w5-29.js';
+import w5_30 from './w5-30.js';
+import w5_31 from './w5-31.js';
+import w5_32 from './w5-32.js';
+import w5_33 from './w5-33.js';
 
 export const LEVELS = [
   w1_1,
@@ -264,4 +297,37 @@ export const LEVELS = [
   w4_31,
   w4_32,
   w4_33,
+  w5_1,
+  w5_2,
+  w5_3,
+  w5_4,
+  w5_5,
+  w5_6,
+  w5_7,
+  w5_8,
+  w5_9,
+  w5_10,
+  w5_11,
+  w5_12,
+  w5_13,
+  w5_14,
+  w5_15,
+  w5_16,
+  w5_17,
+  w5_18,
+  w5_19,
+  w5_20,
+  w5_21,
+  w5_22,
+  w5_23,
+  w5_24,
+  w5_25,
+  w5_26,
+  w5_27,
+  w5_28,
+  w5_29,
+  w5_30,
+  w5_31,
+  w5_32,
+  w5_33,
 ];

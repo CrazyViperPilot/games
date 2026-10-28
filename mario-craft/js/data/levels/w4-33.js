@@ -1,4 +1,4 @@
-// Level w4-33 „Riesenschildkröte“ (Boss-Level). Erzeugt von js/data/levels/gen/w4-33.mjs – nicht von Hand ändern.
+// Level w4-33 „Schildkröten-Bucht“ (Boss-Level, Welt 4). Automatisch generiert.
 export default {
   "id": "w4-33",
   "world": 4,

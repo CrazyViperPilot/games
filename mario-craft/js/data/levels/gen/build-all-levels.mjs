@@ -1,5 +1,5 @@
-// Generator für alle Level von Mario Craft (4 Welten x 33 Level = 132 Level).
-// Erzeugt w1-4..w1-32, w2-4..w2-32, w3-4..w3-32, w4-1..w4-33 und versetzt die bisherigen Bosse auf w1-33, w2-33, w3-33.
+// Generator für alle Level von Mario Craft (5 Welten x 33 Level = 165 Level).
+// Erzeugt w1-4..w1-32, w2-4..w2-32, w3-4..w3-32, w4-1..w4-33, w5-1..w5-33 und versetzt die bisherigen Bosse auf w1-33, w2-33, w3-33.
 // Prüft jedes Level mit parseLevel und explore auf 100% Erreichbarkeit und Unlösbarkeitsfreiheit!
 import fs, { writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -659,6 +659,153 @@ export function buildParadiseBossLevel() {
   return b.validate();
 }
 
+export function buildSkyLevel(nr) {
+  const seed = 6000 + nr * 79;
+  const rng = makeRng(seed);
+  const id = `w5-${nr}`;
+  const W = 135 + (nr % 6) * 6;
+  const H = 44 + (nr % 4) * 3;
+  const b = new LevelBuilder(id, 5, 'sky', W, H, 2);
+
+  const baseGround = 15 + (nr % 3);
+  b.addBorders(false);
+
+  for (let c = 1; c < W - 1; c++) {
+    b.put(c, baseGround, (c % 2 === 0) ? 'B' : 'C');
+    b.put(c, baseGround + 1, 'B');
+    b.fill(c, baseGround + 2, c, H - 2, 'S');
+  }
+
+  for (let c = 6; c < W - 8; c += 8 + Math.floor(rng() * 6)) {
+    b.vline(c, baseGround - 4, baseGround - 1, 'B');
+    b.vline(c + 1, baseGround - 4, baseGround - 1, 'B');
+    b.put(c, baseGround - 5, '=');
+    b.put(c + 1, baseGround - 5, '|');
+  }
+
+  b.put(4, baseGround - 1, 'P');
+  b.put(W - 5, baseGround - 1, 'F');
+  b.put(W - 6, baseGround - 1, 'o');
+  b.put(W - 7, baseGround - 1, 'o');
+
+  const chamber1Floor = baseGround + 10;
+  const chamber2Floor = baseGround + 20;
+
+  const shaft1C = Math.floor(W * 0.18);
+  b.fill(shaft1C, baseGround, shaft1C + 1, chamber1Floor, '.');
+  b.vline(shaft1C, baseGround, chamber1Floor, 'H');
+
+  const c1End = Math.floor(W * 0.5);
+  b.fill(shaft1C, chamber1Floor - 4, c1End, chamber1Floor, '.');
+  b.hline(shaft1C, c1End, chamber1Floor + 1, 'B');
+
+  b.put(shaft1C + 6, chamber1Floor, 'J');
+  b.put(shaft1C + 10, chamber1Floor - 3, 'U');
+
+  const bedC = c1End - 4;
+  b.put(bedC, chamber1Floor, 'K');
+  b.addChest(bedC - 3, chamber1Floor, (nr % 2 === 0) ? 'armor' : 'bow');
+
+  b.put(shaft1C + 4, chamber1Floor, 's');
+  b.put(c1End - 8, chamber1Floor, 'z');
+  b.put(shaft1C + 2, chamber1Floor - 2, '|');
+  b.put(bedC + 2, chamber1Floor - 2, '|');
+
+  const shaft2C = c1End;
+  b.fill(shaft2C - 1, chamber1Floor + 1, shaft2C, chamber2Floor, '.');
+  b.vline(shaft2C, chamber1Floor + 1, chamber2Floor, 'H');
+
+  const c2End = Math.floor(W * 0.78);
+  b.fill(shaft2C - 2, chamber2Floor - 4, c2End, chamber2Floor, '.');
+  b.hline(shaft2C - 2, c2End, chamber2Floor + 1, 'R');
+
+  b.vline(shaft2C + 10, chamber2Floor - 4, chamber2Floor, 'B');
+  b.put(shaft2C + 11, chamber2Floor - 2, '=');
+  b.addChest(shaft2C + 14, chamber2Floor, (nr % 3 === 0) ? 'pick_diamond' : 'apple');
+  b.put(c2End - 4, chamber2Floor, 'J');
+
+  b.put(shaft2C + 6, chamber2Floor, 'e');
+  b.put(shaft2C + 18, chamber2Floor, 'c');
+
+  const shaft3C = c2End;
+  b.fill(shaft3C, baseGround, shaft3C + 1, chamber2Floor, '.');
+  b.vline(shaft3C, baseGround, chamber2Floor, 'H');
+
+  b.addDiamond(10, baseGround - 4, false);
+  b.addDiamond(shaft1C + 5, chamber1Floor - 2, false);
+  b.addDiamond(c2End - 2, chamber2Floor - 2, false);
+
+  b.put(shaft1C + 2, chamber1Floor - 3, '2');
+  b.put(shaft2C + 3, chamber2Floor - 3, '3');
+
+  return b.validate();
+}
+
+export function buildSkyBossLevel() {
+  const id = 'w5-33';
+  const W = 140, H = 44;
+  const b = new LevelBuilder(id, 5, 'sky', W, H, 2, 'eisengolem');
+
+  b.addBorders(false);
+
+  const baseGround = 15;
+
+  for (let c = 1; c < W - 1; c++) {
+    b.put(c, baseGround, 'B');
+    b.put(c, baseGround + 1, 'B');
+    b.fill(c, baseGround + 2, c, H - 2, 'S');
+  }
+
+  b.vline(10, baseGround - 4, baseGround - 1, 'B');
+  b.put(10, baseGround - 5, '=');
+  b.vline(24, baseGround - 4, baseGround - 1, 'B');
+  b.put(24, baseGround - 5, '=');
+
+  b.put(4, baseGround - 1, 'P');
+  b.put(6, baseGround - 1, 'o');
+  b.put(8, baseGround - 1, 'o');
+
+  const shaftC = 35;
+  const arenaFloor = 28;
+  b.fill(shaftC, baseGround, shaftC + 1, arenaFloor, '.');
+  b.vline(shaftC, baseGround, arenaFloor, 'H');
+
+  const doorC = 60;
+  b.fill(shaftC, arenaFloor - 3, doorC, arenaFloor, '.');
+  b.hline(shaftC, doorC, arenaFloor + 1, 'B');
+
+  b.put(doorC - 4, arenaFloor, 'K');
+  b.addChest(doorC - 8, arenaFloor, 'armor');
+  b.addChest(doorC - 12, arenaFloor, 'bow');
+  b.put(doorC - 2, arenaFloor - 1, '|');
+
+  b.fill(doorC, 0, doorC, arenaFloor - 3, 'Z');
+  b.fill(doorC, arenaFloor - 2, doorC, arenaFloor, ':');
+
+  b.fill(doorC + 1, arenaFloor - 10, W - 2, arenaFloor, '.');
+  b.hline(doorC + 1, W - 2, arenaFloor + 1, 'B');
+  b.fill(doorC + 1, arenaFloor + 2, W - 2, H - 2, 'S');
+
+  b.hline(doorC, W - 2, arenaFloor - 11, 'Z');
+  b.vline(W - 2, arenaFloor - 11, arenaFloor, 'Z');
+
+  const bossC = doorC + 30;
+  b.put(bossC, arenaFloor, '@');
+  b.put(W - 6, arenaFloor, 'F');
+  b.put(doorC + 5, arenaFloor, 'o');
+  b.put(doorC + 10, arenaFloor, 'o');
+
+  b.put(doorC + 2, arenaFloor - 2, '|');
+  b.put(W - 4, arenaFloor - 2, '|');
+  b.put(doorC + 18, arenaFloor - 9, 'U');
+
+  b.addDiamond(10, baseGround - 5, false);
+  b.addDiamond(shaftC + 6, arenaFloor - 2, false);
+  b.addDiamond(doorC + 20, arenaFloor - 2, false);
+
+  return b.validate();
+}
+
 // -------------------------------------------------------------
 // AUSFÜHRUNG & GENERIERUNG ALLER 132 LEVEL
 // -------------------------------------------------------------
@@ -746,11 +893,33 @@ export default ${JSON.stringify(def, null, 2)};
     console.log('World 4 Boss (Riesenschildkröte) w4-33 generated!');
   }
 
-  // 7. Index-Datei js/data/levels/index.js schreiben
+  // 7. Welt 5: w5-1 bis w5-32 generieren
+  for (let nr = 1; nr <= 32; nr++) {
+    const def = buildSkyLevel(nr);
+    const filePath = join(LEVELS_DIR, `w5-${nr}.js`);
+    const content = `// Level w5-${nr} (Welt 5, sky). Automatisch generiert.
+export default ${JSON.stringify(def, null, 2)};
+`;
+    writeFileSync(filePath, content, 'utf8');
+  }
+  console.log('World 5 (Himmelsfestung) w5-1..w5-32 generated!');
+
+  // 8. Welt 5 Boss: w5-33 generieren
+  {
+    const def = buildSkyBossLevel();
+    const filePath = join(LEVELS_DIR, 'w5-33.js');
+    const content = `// Level w5-33 „Golem-Zitadelle“ (Boss-Level, Welt 5). Automatisch generiert.
+export default ${JSON.stringify(def, null, 2)};
+`;
+    writeFileSync(filePath, content, 'utf8');
+    console.log('World 5 Boss (Eisengolem) w5-33 generated!');
+  }
+
+  // 9. Index-Datei js/data/levels/index.js schreiben
   let indexImports = '';
   let indexArray = 'export const LEVELS = [\n';
 
-  for (let w = 1; w <= 4; w++) {
+  for (let w = 1; w <= 5; w++) {
     for (let nr = 1; nr <= 33; nr++) {
       const varName = `w${w}_${nr}`;
       indexImports += `import ${varName} from './w${w}-${nr}.js';\n`;
@@ -761,9 +930,9 @@ export default ${JSON.stringify(def, null, 2)};
 
   const indexPath = join(LEVELS_DIR, 'index.js');
   writeFileSync(indexPath, indexImports + '\n' + indexArray, 'utf8');
-  console.log('Updated js/data/levels/index.js with all 132 levels!');
+  console.log('Updated js/data/levels/index.js with all 165 levels!');
 
-  console.log('--- ALL 132 LEVELS CREATED AND VALIDATED SUCCESSFULLY ---');
+  console.log('--- ALL 165 LEVELS CREATED AND VALIDATED SUCCESSFULLY ---');
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

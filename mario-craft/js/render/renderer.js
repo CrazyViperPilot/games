@@ -58,6 +58,8 @@ const SKY = {
   depths: [[0, '#161b28'], [1, '#353d52']],
   nether: [[0, '#140404'], [0.55, '#4a0e0a'], [1, '#b8400f']],
   end: [[0, '#05020b'], [1, '#1d0c33']],
+  paradise: [[0, '#1171ba'], [0.5, '#4eb3e9'], [1, '#c5f0fc']],
+  sky: [[0, '#1d2671'], [0.45, '#5c3d75'], [0.8, '#c33764'], [1, '#f8b195']],
 };
 
 function clamp255(v) { return v < 0 ? 0 : v > 255 ? 255 : Math.round(v); }
@@ -180,6 +182,17 @@ const LAYERS = {
   end: [
     { fn: (g, h) => stars(g, h, 40, '#6a5a92', false, 11, 0.8), f: PARA_FAR },
     { fn: (g, h) => stars(g, h, 14, '#f0e6ff', true, 23, 0.7), f: PARA_NEAR },
+  ],
+  paradise: [
+    { fn: (g, h) => clouds(g, h, [[40, 0.45, 6], [200, 0.52, 7]]), f: 0.12, wind: 3.0 },
+    { fn: (g, h) => { silhouette(g, h, 0.58, h * 0.08, '#48bfe3', 0.5); haze(g, h); }, f: 0.25 },
+    { fn: (g, h) => silhouette(g, h, 0.65, h * 0.06, '#06d6a0', 0.0), f: PARA_NEAR },
+  ],
+  sky: [
+    { fn: (g, h) => clouds(g, h, [[20, 0.35, 7], [160, 0.42, 8]]), f: 0.1, wind: 4.0 },
+    { fn: (g, h) => clouds(g, h, [[90, 0.48, 5], [230, 0.45, 6]]), f: 0.2, wind: 8.0 },
+    { fn: (g, h) => stars(g, h, 25, '#ffeaa7', false, 17, 0.6), f: PARA_FAR },
+    { fn: (g, h) => silhouette(g, h, 0.7, h * 0.09, '#6c5ce7', 0.3), f: PARA_NEAR },
   ],
 };
 
@@ -558,6 +571,9 @@ export class Renderer {
           else if (b.kind === 'drache') {
             name = b.state === 'perch' ? 'boss_drache_perch' : 'boss_drache';
             frame = (game.time * 6) | 0;
+          } else if (b.anim) {
+            name = b.anim;
+            frame = (game.time * 4) | 0;
           }
           if (name) this._put(name, frame, b.face < 0, b.x + b.w / 2, b.y + b.h);
         }

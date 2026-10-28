@@ -45,7 +45,7 @@ export function createBoss(kind, x, y) {
   return KINDS[kind](x, y);
 }
 
-const KINDS = { slimeking: makeSlimeKing, dreikopf: makeDreikopf, drache: makeDrache, schildkroete: makeSchildkroete };
+const KINDS = { slimeking: makeSlimeKing, dreikopf: makeDreikopf, drache: makeDrache, schildkroete: makeSchildkroete, eisengolem: makeEisengolem };
 
 // Kampf unterbrochen (Tod der Figur oder Arena verlassen): neuer Boss am Spawn (x, y) im Zustand 'idle', der
 // angerichtete Schaden bleibt. Riesenschleim: dieselben Teile (Größen) nebeneinander am Spawn; Schleime aus dem
@@ -168,6 +168,10 @@ function stepBoss(game, b, dt, prevFeet) {
     stepSchildkroete(game, b, dt, prevFeet);
     return;
   }
+  if (b.kind === 'eisengolem') {
+    stepEisengolem(game, b, dt, prevFeet);
+    return;
+  }
 
   const parts = b.parts;
   for (let i = 0; i < parts.length; i++) movePart(game, parts[i], dt);
@@ -188,6 +192,10 @@ function hitBoss(game, b, how) {
   }
   if (b.kind === 'schildkroete') {
     if (how === 'arrow') hitSchildkroete(game, b, TUR.arrowDmg);
+    return;
+  }
+  if (b.kind === 'eisengolem') {
+    if (how === 'arrow') hitEisengolem(game, b, GOL.arrowDmg);
     return;
   }
   if (b.state !== 'fight') return;
@@ -744,5 +752,88 @@ function hitSchildkroete(game, b, dmg) {
   } else if (b.state === 'fight') {
     const dir = (game.player.x + game.player.w / 2 < b.x + b.w / 2) ? 1 : -1;
     enterShell(b, dir);
+  }
+}
+
+// ---------- Eisengolem ----------
+
+const GOL = BOSSES.eisengolem;
+
+function makeEisengolem(x, y) {
+  const w = GOL.w, h = GOL.h;
+  const b = newBoss('eisengolem', x - w / 2, y - h, w, h);
+  b.anim = 'boss_eisengolem';
+  b.hp = GOL.hp;
+  b.maxHp = GOL.hp;
+  b.phase = 1;
+  b.slamTimer = 0;
+  b.slammed = true;
+  b.onGround = true;
+  return b;
+}
+
+function stepEisengolem(game, b, dt, prevFeet) {
+  const p = game.player;
+  b.animTime += dt;
+  b.invuln = Math.max(0, b.invuln - dt);
+
+  if (b.hp <= b.maxHp * 0.5) b.phase = 2;
+
+  // Schwerkraft
+  const prevVy = b.vy;
+  b.vy = Math.min(PHYS.maxFall, b.vy + PHYS.gravity * dt);
+
+  b.face = (p.x + p.w / 2 < b.x + b.w / 2) ? -1 : 1;
+  const speed = b.phase === 2 ? GOL.enragedSpeed : GOL.speed;
+  b.vx = b.face * speed;
+
+  // Slam / Sprung-Angriff
+  b.slamTimer = (b.slamTimer || 0) + dt;
+  if (b.slamTimer >= GOL.slamEvery && b.onGround) {
+    b.slamTimer = 0;
+    b.vy = GOL.slamJumpVy;
+    b.slammed = false;
+  }
+
+  const col = moveAndCollide(b, game.map, dt);
+  b.onGround = col.onGround;
+
+  // Landung nach Sprung löst Schockwelle aus
+  if (b.onGround && prevVy > 0 && !b.slammed) {
+    b.slammed = true;
+    game.emit('bossHit', { slam: true });
+    const dist = Math.abs((p.x + p.w / 2) - (b.x + b.w / 2));
+    if (p.onGround && dist < 120 && p.invuln <= 0 && p.star <= 0) {
+      game.hurtPlayer('boss');
+    }
+  }
+
+  touchEisengolem(game, b, prevFeet);
+}
+
+function touchEisengolem(game, b, prevFeet) {
+  const p = game.player;
+  if (!overlapsPlayer(b, p)) return;
+
+  const stompOver = p.vy > 0 && prevFeet <= b.y + b.h * 0.5;
+
+  if (stompOver || p.star > 0) {
+    hitEisengolem(game, b, GOL.stompDmg);
+    p.vy = -(game.jumpHeld ? PHYS.stompBounceHold : PHYS.stompBounce);
+    return;
+  }
+
+  if (p.star > 0) return;
+  if (p.invuln <= 0) game.hurtPlayer('boss');
+}
+
+function hitEisengolem(game, b, dmg) {
+  if (b.invuln > 0 || b.state === 'defeated') return;
+  b.hp = Math.max(0, b.hp - dmg);
+  b.invuln = GOL.invulnTime;
+  game.addScore(HIT_SCORE);
+  game.emit('bossHit', { hp: b.hp });
+  if (b.hp <= 0) {
+    defeatFlyer(game, b, GOL.defeatRadius);
   }
 }

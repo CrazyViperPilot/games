@@ -8,9 +8,9 @@ Spezifikation: [PRD.md](PRD.md) · Architektur: [PLAN.md](PLAN.md)
 
 ## Spielprinzip
 
-- **4 Welten zu je 33 Leveln (132 Level insgesamt):** Oberwelt, Tiefen, Nether & Leere, Paradies (Strand, Sand, Unterwasser). Jedes Level führt von der Oberfläche in die Tiefe
-  (Höhlen, Dungeons, Grotten) und wieder hinauf zum Portal. Level 33 jeder Welt hat einen Boss
-  (Riesenschleim, Dreikopf, Leerendrache, Riesenschildkröte).
+- **5 Welten zu je 33 Leveln (165 Level insgesamt):** Oberwelt, Tiefen, Nether & Leere, Paradies (Strand, Sand, Unterwasser), Himmelsfestung (Zitadelle, Türme, Wolken). Jedes Level führt von der Oberfläche in die Tiefe
+  (Höhlen, Dungeons, Grotten, Katakomben) und wieder hinauf zum Portal. Level 33 jeder Welt hat einen Boss
+  (Riesenschleim, Dreikopf, Leerendrache, Riesenschildkröte, Eisengolem).
 - **Graben:** Knopf neben Springen. Bessere Spitzhacken (Stein, Eisen, Diamant) liegen in Truhen und bleiben gespeichert.
 - **Gegner:** Zischer (explodiert, zerstört Blöcke), Zombie, Skelett, Spinne, Schleim, Silberfischchen, Glutgeist,
   Leerenläufer; Monster-Spawner, TNT, Lava.

@@ -59,6 +59,12 @@ export const BOSSES = {
     speed: 35, shellSpeed: 140, shellSpeedEnraged: 180, shellTime: 3.0,
     defeatRadius: 2,
   },
+  // Eisengolem (Himmelsfestung). Arena 32×12.
+  eisengolem: {
+    w: 36, h: 46, arena: { w: 32, h: 12 }, hp: 12, stompDmg: 3, arrowDmg: 1, invulnTime: 1.0,
+    speed: 35, enragedSpeed: 55, slamEvery: 3.5, slamJumpVy: -260,
+    defeatRadius: 2,
+  },
 };
 
 // Monster-Spawner (Kachel M): erzeugt alle `every` s einen Gegner, wenn der Spieler ≤ `range` Kacheln entfernt ist.

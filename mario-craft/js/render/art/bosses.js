@@ -235,6 +235,48 @@ function turtleShellFrame(spin) {
   return outline(g, 'k');
 }
 
+// ---------- Eisengolem (40×48) ----------
+const PAL_GOLEM = {
+  k: '#1a1a20', b: '#dcd8cf', B: '#aba79e', d: '#747068',
+  v: '#4b7d42', r: '#d32f2f', w: '#ffffff', n: '#ba9a76',
+};
+
+function golemFrame(walk) {
+  const g = grid(40, 48, (x, y) => {
+    // Kopf cols 14..25, rows 4..13
+    if (inRect(x, y, 14, 4, 25, 13)) {
+      if (y === 8 && (x === 17 || x === 22)) return 'r';
+      if (inRect(x, y, 19, 8, 20, 12)) return 'n';
+      if (y >= 12) return 'B';
+      return 'b';
+    }
+    // Rumpf/Brust cols 11..28, rows 14..29
+    if (inRect(x, y, 11, 14, 28, 29)) {
+      if (x < 13 || x > 26 || y > 27) return 'B';
+      if (inRect(x, y, 13, 17, 16, 22)) return 'v';
+      return 'b';
+    }
+    // Arme
+    const armOff = walk ? 2 : -2;
+    if (inRect(x, y, 5, 15 - armOff, 10, 35 - armOff)) {
+      if (y > 32 - armOff) return 'd';
+      return 'B';
+    }
+    if (inRect(x, y, 29, 15 + armOff, 34, 35 + armOff)) {
+      if (y > 32 + armOff) return 'd';
+      return 'B';
+    }
+    // Beine cols 13..18 und 21..26, rows 30..45
+    const legOff = walk ? 2 : -2;
+    if (inRect(x, y, 13, 30 + legOff, 18, 45 + legOff) || inRect(x, y, 21, 30 - legOff, 26, 45 - legOff)) {
+      if (y > 42) return 'd';
+      return 'b';
+    }
+    return null;
+  });
+  return outline(g, 'k');
+}
+
 export const BOSS_ART = {
   boss_slime_l: { pal: PAL_SLIME, frames: [slimeFrame(48, false), slimeFrame(48, true)] },
   boss_slime_m: { pal: PAL_SLIME, frames: [slimeFrame(32, false), slimeFrame(32, true)] },
@@ -243,5 +285,6 @@ export const BOSS_ART = {
   boss_drache_perch: { pal: PAL_DRAGON, frames: [dragonPerchFrame()] },
   boss_schildkroete: { pal: PAL_TURTLE, frames: [turtleFrame(false), turtleFrame(true)] },
   boss_schildkroete_shell: { pal: PAL_TURTLE, frames: [turtleShellFrame(false), turtleShellFrame(true)] },
+  boss_eisengolem: { pal: PAL_GOLEM, frames: [golemFrame(false), golemFrame(true)] },
   crystal: { pal: PAL_CRYSTAL, frames: [crystalFrame(0), crystalFrame(1)] },
 };
