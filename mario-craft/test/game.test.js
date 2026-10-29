@@ -360,3 +360,39 @@ test('Essen im Level (a/q) liegt bereit, heilt Herzen und bleibt bei vollen Herz
   run(g2, input(), 5);
   assert.equal(g2.pickups.filter((i) => i.active).length, 1);
 });
+
+// Treppen-Knopf (↗): wie Springen + Graben + Richtung, auch ohne gehaltene Richtung, bis nach oben.
+function shaftLevel() {
+  // 20 Spalten, 16 Zeilen: Erde ab Zeile 6 (Oberfläche), 1 breiter Schacht in Spalte 5 bis aufs Grundgestein.
+  const cells = {};
+  for (let r = 6; r < 15; r++) for (let c = 0; c < 20; c++) cells[`${c},${r}`] = r < 10 ? '#' : 'S';
+  for (let r = 6; r < 15; r++) cells[`5,${r}`] = '.';
+  return makeLevel({ cols: 20, rows: 16, cells, start: [5, 14], goal: [18, 5] });
+}
+
+test('Treppen-Knopf: aus einem Schacht auf Grundgestein schräg nach oben zur Oberfläche graben', () => {
+  const g = new Game({ level: shaftLevel(), onEvent: () => {} });
+  g.pick = 0;
+  const p = g.player;
+  run(g, input(), 30);
+  assert.ok(p.onGround, 'steht im Schacht');
+  const startY = p.y;
+  for (let i = 0; i < 60 * 40 && p.y > 5 * T; i++) g.update(DT, input({ stair: true }));
+  assert.ok(p.y < startY - 6 * T, `Figur ist aufgestiegen (y=${p.y})`);
+});
+
+test('Treppen-Knopf: Grundgestein auf der Blickseite → es wird zur anderen Seite hochgegraben', () => {
+  const lvl = shaftLevel();
+  const rows = lvl.rows.map((s) => s.split(''));
+  for (let r = 6; r < 15; r++) { rows[r][5] = r < 10 ? '#' : 'S'; rows[r][12] = '.'; rows[r][13] = 'Z'; }   // Schacht in Spalte 12, rechts Grundgestein
+  rows[14][5] = '.'; rows[14][12] = 'P';
+  const g = new Game({ level: { ...lvl, rows: rows.map((a) => a.join('')) }, onEvent: () => {} });
+  g.pick = 0;
+  const p = g.player;
+  run(g, input(), 30);
+  assert.equal(p.face, 1, 'schaut zunächst nach rechts');
+  const startY = p.y;
+  for (let i = 0; i < 60 * 40 && p.y > 5 * T; i++) g.update(DT, input({ stair: true }));
+  assert.ok(p.y < startY - 6 * T, `Figur ist aufgestiegen (y=${p.y})`);
+  assert.ok(p.x < 12 * T, 'ist nach links ausgewichen');
+});

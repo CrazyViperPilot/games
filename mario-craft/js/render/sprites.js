@@ -67,7 +67,7 @@ const UI_ART = {
 };
 
 // Bedien-Knöpfe: Kreis mit Symbol, Frame 0 = normal, 1 = gedrückt. Radien wie PLAN §7.
-const BTN_R = { left: 24, right: 24, jump: 30, fire: 20, dig: 24 };
+const BTN_R = { left: 24, right: 24, jump: 30, fire: 20, dig: 24, stair: 24 };
 function buttonFrames(id, down) {
   const r = BTN_R[id];
   const size = 2 * r + 1;
@@ -90,6 +90,11 @@ function buttonFrames(id, down) {
       const hx = dx - 6, hy = dy + 6, dh = Math.hypot(hx, hy);
       const head = dh >= 3.8 && dh <= 5.8 && hx - hy >= 0;
       sym = handle || head;
+    }
+    if (id === 'stair') {
+      // Treppe: drei aufsteigende, gefüllte Stufen (je 6 px breit, 5 px höher), unten links nach oben rechts.
+      const k = Math.floor((dx + 9) / 6);
+      sym = dx >= -9 && dx <= 8 && dy <= 9 && dy >= 4 - 5 * k;
     }
     return sym ? 'x' : 'o';
   });

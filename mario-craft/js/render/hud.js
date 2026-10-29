@@ -12,7 +12,7 @@ const PAUSE_Y = 4;
 const PICK_NAMES = ['it_pick_stone', 'it_pick_stone', 'it_pick_iron', 'it_pick_diamond'];
 const BOSS_BAR_W = 80, BOSS_BAR_H = 4;
 const BOSS_PARTS_FULL = 4;      // Slimeking: ab 4 Teilen volle Anzeige
-const BTN_NAME = { left: 'btn_left', right: 'btn_right', jump: 'btn_jump', fire: 'btn_fire', dig: 'btn_dig' };
+const BTN_NAME = { left: 'btn_left', right: 'btn_right', jump: 'btn_jump', fire: 'btn_fire', dig: 'btn_dig', stair: 'btn_stair' };
 
 export function bindHud(sprites) {
   S = sprites;

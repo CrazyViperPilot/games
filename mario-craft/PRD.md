@@ -66,7 +66,8 @@ und war unsichtbar – ein dunkelblauer Streifen, durch den man nicht kam.)
 
 - Knopf **Graben** (Spitzhacke) rechts. Allein = Block unter den Füßen; mit ◀/▶ = Block daneben (bei 2 hohen
   Blöcken erst unten, dann oben). Halten: Risse (4 Stufen), dann bricht der Block.
-- **Treppe (schräg nach oben graben):** Springen halten + Graben + ◀/▶ an einer Wand. Die Stufe (Block vor den Füßen)
+- **Treppen-Knopf ↗ (Daumen-freundlich, immer einen Weg nach oben):** eigener Knopf rechts über dem Graben-Knopf (Tastatur: E/Shift). Gedrückt halten wirkt wie Springen + Graben + Richtung: Richtung = gehaltenes ◀/▶, sonst Blickrichtung. Ist dort Grundgestein/Gitter im Weg, geht es automatisch zur anderen Seite. So kommt man auch aus dem tiefsten Schacht auf Grundgestein Stufe für Stufe wieder nach oben (Hacke wie beim Graben; Gestein braucht je nach Hacke etwas länger).
+- **Treppe per Kombi (schräg nach oben graben):** Springen halten + Graben + ◀/▶ an einer Wand. Die Stufe (Block vor den Füßen)
   bleibt stehen; abgebaut werden vorne die Kopfzeile, vorne eine Zeile darüber und der Block über dem eigenen Kopf.
   Ist alles frei, hüpft die Figur automatisch auf die Stufe; mit gehaltenen Tasten geht es Stufe für Stufe weiter hoch.
   Ohne Stufe vorne (Lücke) gilt normales Graben.
@@ -153,8 +154,9 @@ hoch (Generator-Schritt `gen/headroom.mjs`), damit man über Pfeile springen kan
 | links | ◀ ▶ | laufen |
 | rechts | Springen (groß) | auch Klettern hoch / Schwimmen |
 | rechts | **Graben** (Spitzhacke) links neben Springen | auch Klettern runter |
+| rechts | **Treppe ↗** über Graben | schräg nach oben graben, siehe §4 |
 | rechts | Bogen (klein, über Springen) | nur mit Bogen sichtbar |
-| Tastatur | ←→/AD, Leertaste/W/↑, **↓/S = Graben**, X = Bogen, Esc | |
+| Tastatur | ←→/AD, Leertaste/W/↑, **↓/S = Graben**, E/Shift = Treppe, X = Bogen, Esc | |
 
 ## 9. Speicherstand
 

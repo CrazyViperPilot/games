@@ -9,7 +9,7 @@ import { PHYS } from '../data/physics.js';
 import { TILE_BY_ID, TILE_IDS } from '../data/tiles.js';
 import { parseLevel } from './level.js';
 import { createPlayer, setPower, updatePlayer } from './player.js';
-import { updateDig, headBreak } from './dig.js';
+import { updateDig, headBreak, stairDir } from './dig.js';
 import { computeLight } from './light.js';
 import * as Explode from './explode.js';
 import * as Projectiles from './projectiles.js';
@@ -214,8 +214,25 @@ export class Game {
     }
   }
 
+  // Treppen-Knopf (↗): wirkt wie Springen + Graben + Richtung (PRD §4), die Richtung wählt stairDir.
+  _stairInput(input) {
+    const s = this._stairIn || (this._stairIn = { left: false, right: false, jump: false, dig: false, fire: false });
+    const dir = stairDir(this, input);
+    s.left = dir < 0;
+    s.right = dir > 0;
+    s.jump = true;
+    s.dig = true;
+    s.fire = input.fire;
+    s.jumpPressed = false;
+    s.digPressed = !!input.digPressed;
+    s.firePressed = input.firePressed;
+    s.pausePressed = false;
+    return s;
+  }
+
   _stepPlay(dt, input) {
     const p = this.player;
+    if (input.stair) input = this._stairInput(input);
     this.time += dt;
 
     const prevFeet = p.y + p.h;

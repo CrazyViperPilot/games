@@ -11,7 +11,7 @@ Spezifikation: [PRD.md](PRD.md) · Architektur: [PLAN.md](PLAN.md)
 - **5 Welten zu je 33 Leveln (165 Level insgesamt):** Oberwelt, Tiefen, Nether & Leere, Paradies (Strand, Sand, Unterwasser), Himmelsfestung (Zitadelle, Türme, Wolken). Jedes Level führt von der Oberfläche in die Tiefe
   (Höhlen, Dungeons, Grotten, Katakomben) und wieder hinauf zum Portal. Level 33 jeder Welt hat einen Boss
   (Riesenschleim, Dreikopf, Leerendrache, Riesenschildkröte, Eisengolem).
-- **Graben:** Knopf neben Springen. Bessere Spitzhacken (Stein, Eisen, Diamant) liegen in Truhen und bleiben gespeichert.
+- **Graben:** Knopf neben Springen. **Treppe ↗** (Knopf über Graben): gräbt schräg nach oben und steigt Stufe für Stufe hoch, auch aus dem tiefsten Schacht auf Grundgestein. Bessere Spitzhacken (Stein, Eisen, Diamant) liegen in Truhen und bleiben gespeichert.
 - **Gegner:** Zischer (explodiert, zerstört Blöcke), Zombie, Skelett, Spinne, Schleim, Silberfischchen, Glutgeist,
   Leerenläufer; Monster-Spawner, TNT, Lava.
 - **Gegenstände:** Rüstung, Bogen, goldener Apfel (unverwundbar), Kuchen (1-Up), Smaragde (100 = 1 Leben), 3 Diamanten pro Level.
@@ -22,9 +22,9 @@ Spezifikation: [PRD.md](PRD.md) · Architektur: [PLAN.md](PLAN.md)
 | Gerät | Aktion |
 |---|---|
 | Touch, links ◀ ▶ | laufen (der Daumen darf zwischen ◀ und ▶ rutschen) |
-| Touch, rechts | springen (groß), Graben links daneben, Bogen darüber (nur mit Bogen) |
+| Touch, rechts | springen (groß), Graben links daneben, Treppe ↗ über Graben, Bogen über Springen (nur mit Bogen) |
 | Pause-Knopf oben rechts | Pause-Menü |
-| Tastatur | ←/→ oder A/D laufen, Leertaste/↑/W springen, ↓/S graben, X oder J Bogen, Esc Pause |
+| Tastatur | ←/→ oder A/D laufen, Leertaste/↑/W springen, ↓/S graben, E/Shift Treppe hoch, X oder J Bogen, Esc Pause |
 
 ## Lokal starten
 

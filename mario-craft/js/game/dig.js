@@ -51,7 +51,8 @@ function findUnder(map, p) {
 
 // Treppe: Springen + Graben + Richtung. Die Kachel vor den Füßen bleibt als Stufe stehen; abgebaut werden
 // vorne Kopfzeile, vorne eine Zeile darüber und über dem eigenen Kopf. Rückgabe: 'target' (TGT gesetzt),
-// 'ready' (alles frei, Stufe da → hochhüpfen) oder 'none' (keine Stufe / Grundgestein im Weg).
+// 'ready' (alles frei, Stufe da → hochhüpfen), 'blocked' (Stufe da, aber Grundgestein/Gitter im Weg) oder
+// 'none' (keine Stufe vorne, z. B. Lücke).
 function findStair(map, p, dir) {
   const c = Math.floor((p.x + p.w / 2) / T);
   const c1 = c + dir;
@@ -65,9 +66,21 @@ function findStair(map, p, dir) {
       TGT.r = cells[i][1];
       return 'target';
     }
-    if (TILE_BY_ID[id].solid) return 'none';
+    if (TILE_BY_ID[id].solid) return 'blocked';
   }
   return 'ready';
+}
+
+// Treppen-Knopf (↗) ohne gehaltene Richtung: gewählte Richtung = Blickrichtung; ist dort Grundgestein im Weg,
+// wird die andere Seite versucht, damit man am Boden nie festsitzt. Mit ◀/▶ gilt diese Richtung.
+export function stairDir(game, input) {
+  const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+  if (dir !== 0) return dir;
+  const p = game.player;
+  const face = p.face || 1;
+  if (!p.onGround || findStair(game.map, p, face) !== 'blocked') return face;
+  const other = findStair(game.map, p, -face);
+  return other === 'target' || other === 'ready' ? -face : face;
 }
 
 function digState(game) {
