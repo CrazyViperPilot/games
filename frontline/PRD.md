@@ -342,6 +342,12 @@ Direktfeuer richtet sich nach Trefferzahlen (volles Ziel); Seite = Winkel zur Fa
   Spielzeit, Geschwindigkeit.
 - Unten links Minimap, Mitte Auswahlinfo (FOB: Lager; LKW: Ladung und Ladungsart; Einheiten: Munition/Treibstoff),
   rechts Befehlskarte mit Kosten und Tastenkürzeln (nicht bezahlbare Buttons ausgegraut mit Grund).
+- **Telefon quer** (Bildschirmhöhe ≤ 520 px, z. B. Pixel 8a mit 915 × 412 CSS-px; seit v4.60): kompakte Oberfläche, damit das Spielfeld sichtbar bleibt.
+  Kopfleiste 36 px (statt 44–68 px, Wertungszeile der Zone entfällt), unten nur ≈ 110 px statt 190 px: Minimap 100 px, Auswahl (scrollbar, 108 px hoch),
+  Befehlskarte mit 6 Spalten à 50 × 48 px (Touch-Ziele; Tastenkürzel ausgeblendet). Der Knopf „▾“ neben der Minimap klappt Auswahl und Befehle ein (nur die Minimap
+  bleibt, Zustand wird gemerkt, `localStorage` `frontline-hud-fold`). Die Kamera zentriert Ziele (Spielstart, Minimap-Klick, Meldung antippen, Taste für Basis) in der
+  vom HUD nicht verdeckten Mitte (`camera.insetTop/insetBottom`). Tooltips der Befehlstasten gibt es nur mit Maus (Hover), nicht auf Touch.
+  Tablet (Lenovo Tab M11) und Desktop behalten das bisherige Layout.
 - Auf der Karte: Munitions-/Treibstoffbalken bei gewählten Einheiten, Warnzeichen bei Einheiten ohne Munition,
   Route gewählter LKW als gestrichelte Linie, Bauradius gewählter FOBs als gestrichelter Kreis.
 - Meldungen (z. B. „Einheit bereit“, „Basis wird angegriffen“, „Einheiten ohne Munition“, „Route unterbrochen“).
@@ -453,6 +459,7 @@ Alle Geräusche werden im Browser mit WebAudio **selbst erzeugt** (Rauschen und 
 - **Raumklang:** Stereo-Position und Lautstärke nach der Lage auf dem Bildschirm; außerhalb des Bilds leiser, weit weg stumm; Gegner im Nebel bleiben stumm (wie in der Grafik). Gleiche Geräusche werden gedrosselt und die Zahl gleichzeitiger Geräusche begrenzt (große Schlachten bleiben schlank, Explosionen haben Vorrang); ein Kompressor verhindert Übersteuern. Pause, Tabwechsel und Spielende halten die Dauergeräusche an.
 
 ## Änderungsverlauf
+- v4.60: **Telefon-Layout quer** (§9): bei Bildschirmhöhe ≤ 520 px kompakte Kopfleiste und Bodenleiste (≈ 110 statt 190 px), Auswahl/Befehle einklappbar (Knopf „▾“), Kamera zentriert Ziele im unverdeckten Bereich, keine hängenden Tooltips auf Touch; Spielregeln unverändert. Cache v73.
 - v4.59: **Ton** (§14): selbst erzeugte Geräusche für Waffen, Einschläge, Fahrzeuge, Hubschrauber, Wetter und Meldungen, Schalter im HUD (Taste F2) und im Startmenü; Spielregeln unverändert. Cache v72.
 - v4.58: **Config vollständig gebündelt** (Spielverhalten und Zufallskarten je Seed unverändert): Kurznamen der Befehlskarte als `short` in `units.js` und `buildings.js`; verstreute Spielwerte (Bauplatz-Sicht, Baustellen-HP, Bohrer-Mindesttreibstoff, Einsteigen und Absetzen, Kistenträger, Meldetakt „Basis wird angegriffen“, Tiere) in `BALANCE`; die Werte des Kartengenerators (Hügel, Seen, Fluss, Stadt, Gehöfte, Kisten-Abstände) in `js/data/mapgen.js`. Cache v71.
 - v4.57: **Absicherung der Config** (Spielverhalten unverändert): `test/config.test.js` prüft `js/data/` auf Tippfehler und Widersprüche (`npm run test:quick`, Sekunden). Die Tabellen in §6 („Werte“, „Waffen und Schaden“) erzeugt jetzt `npm run docs` aus der Config; ein Test meldet, wenn sie veralten. Dabei kamen Flakpanzer und SAM-Startrampe in die Wertetabelle, die dort fehlten.

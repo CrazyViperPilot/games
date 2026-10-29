@@ -306,6 +306,8 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   z-index: 5;
 }
 .cbtn:hover::after { display: block; }
+/* Touch hat kein Hover: der Tooltip bliebe nach dem Antippen stehen und verdeckte das Spielfeld */
+@media (hover: none) { .cbtn:hover::after { display: none; } }
 
 /* ---- Overlay-Menüs ---------------------------------------------------------- */
 .overlay {
@@ -467,3 +469,49 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .menu .btn-sm, .menu .filebtn { height: 30px; display: inline-flex; align-items: center; padding: 0 12px; cursor: pointer; }
 .filebtn { border: 1px solid var(--line-2); border-radius: 6px; background: var(--panel-2); color: var(--text); font-size: 12px; }
 .bad { color: var(--bad); }
+
+/* ---- Telefon quer (z. B. Pixel 8a, 915 × 412): wenig Höhe, das Spielfeld soll sichtbar bleiben ---------------------------------
+   Kopfleiste 36 px, unten eine kompakte Zeile (Übersicht, Auswahl, Befehle ≈ 110 px) statt 190 px. Der Knopf „▾“ klappt Auswahl
+   und Befehle ein (die Übersichtskarte bleibt); der Zustand wird gemerkt. Befehlstasten 48–50 px (Touch-Mindestgröße ≈ 44 px). */
+.fold { display: none; }
+@media (max-height: 520px) {
+  .hud { font-size: 12px; }
+  .top { height: 36px; }
+  .msgs { top: 42px; max-width: 320px; }
+  .msg { font-size: 12px; padding: 3px 8px; }
+  .btn-sm { height: 28px; }
+  .zone-state { font-size: 10px; }
+  .zone-cnt { font-size: 13px; }
+  .zone-cnt:nth-of-type(2) { display: none; } /* Wertungszeile entfällt (steht im Tooltip der Zone) */
+  .bottom { height: auto; justify-content: flex-start; align-items: flex-end; gap: 6px; padding: 4px 6px calc(4px + env(safe-area-inset-bottom)); background: linear-gradient(#0000, #0c0f0ca0 60%); }
+  .mm { width: 100px; height: 100px; }
+  .mm canvas { width: 98px; height: 98px; }
+  .sel { flex: 0 1 300px; margin-left: auto; min-width: 150px; height: 108px; box-sizing: border-box; padding: 5px 8px; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; background: #1d231dd9; }
+  .sel .title { font-size: 13px; margin-bottom: 3px; }
+  .sel .hint { font-size: 11px; margin-bottom: 3px; }
+  .sel .small, .sel .gauge .gl, .sel .srow { font-size: 10.5px; }
+  .bar { height: 5px; margin: 3px 0; }
+  .cmd { grid-template-columns: repeat(6, 50px); grid-auto-rows: 48px; gap: 3px; padding: 4px; background: #1d231dd9; }
+  .cbtn { width: 50px; height: 48px; padding: 3px 1px 2px; }
+  .cbtn .cl { font-size: 8.2px; }
+  .cbtn .cc { font-size: 8.5px; }
+  .cbtn .ck { display: none; } /* Tastenkürzel brauchen auf dem Telefon keinen Platz */
+  .fold {
+    display: block;
+    flex: none;
+    align-self: flex-end;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border-radius: 8px;
+    border: 1px solid var(--line-2);
+    background: #1d231dd9;
+    color: var(--text);
+    font-size: 15px;
+    pointer-events: auto;
+    cursor: pointer;
+  }
+  .hud.folded .sel, .hud.folded .cmd { display: none; }
+  .hud.folded .fold { transform: scaleY(-1); }
+  .hud.folded .bottom { background: none; }
+}

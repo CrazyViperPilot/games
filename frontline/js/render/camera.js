@@ -29,6 +29,8 @@ export class Camera {
     this.rot = 0; // isometrisch: Drehung 0–3 (je 90°)
     this.viewW = 800;
     this.viewH = 600;
+    this.insetTop = 0; // vom HUD verdeckte Höhe oben/unten (CSS-Pixel); centerOn legt Ziele in die freie Mitte dazwischen
+    this.insetBottom = 0;
     // Höhengelände (game/relief.js), nur isometrisch wirksam: Punkte am Boden erscheinen um ihre Geländehöhe angehoben.
     // Der Renderer setzt es nur, wenn er das Gelände auch in 3D zeichnet (sonst bleibt der Boden flach und relief null).
     this.relief = null;
@@ -164,6 +166,8 @@ export class Camera {
     this.x = x;
     this.y = y;
     this.clamp();
+    const dy = (this.insetTop - this.insetBottom) / 2;
+    if (dy) this.pan(0, dy); // Ziel in die Mitte des unverdeckten Bereichs (pan: Inhalt folgt dem Versatz)
   }
 
   /** Mitte so begrenzen, dass der Ausschnitt möglichst in der Karte bleibt (zu groß: zentriert). Isometrisch: Mitte in der Karte. */

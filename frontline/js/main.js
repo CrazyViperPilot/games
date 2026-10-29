@@ -263,6 +263,13 @@ function startGame(opts) {
   sound.attach(game, camera, HUMAN);
   const minimap = new Minimap(hud.minimapCanvas, game, camera, HUMAN);
 
+  const applyInsets = () => {
+    const ins = hud.insets();
+    camera.insetTop = ins.top;
+    camera.insetBottom = ins.bottom;
+  };
+  app.onLayout = applyInsets; // HUD klappt ein/aus
+  applyInsets();
   const home = controller.homeBase();
   if (home) camera.centerOn(home.x, home.y);
   if (REVEAL) {
@@ -273,6 +280,7 @@ function startGame(opts) {
   const onResize = () => {
     renderer.resize();
     minimap.resize();
+    applyInsets();
   };
   window.addEventListener('resize', onResize);
 

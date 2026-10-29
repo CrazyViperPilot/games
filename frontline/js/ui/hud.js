@@ -105,6 +105,10 @@ export class Hud {
       num: q(`[data-pn="${t}"]`),
     }));
 
+    // Telefon quer: Auswahl und Befehle lassen sich einklappen (nur dort sichtbar, siehe css/style.css); der Zustand wird gemerkt
+    try { this.folded = localStorage.getItem('frontline-hud-fold') === '1'; } catch { this.folded = false; }
+    root.classList.toggle('folded', this.folded);
+
     this.onClick = (e) => this.click(e);
     root.addEventListener('click', this.onClick);
   }
@@ -148,9 +152,27 @@ export class Hud {
       <div class="msgs" data-msgs></div>
       <div class="bottom">
         <div class="panel mm"><canvas aria-label="Übersicht"></canvas></div>
+        <button type="button" class="fold" data-act="fold" title="Auswahl und Befehle ein-/ausklappen" aria-label="Auswahl und Befehle ein-/ausklappen">▾</button>
         <div class="panel sel" data-sel></div>
         <div class="panel cmd" data-cmd></div>
       </div>`;
+  }
+
+  setFolded(on) {
+    this.folded = on;
+    this.root.classList.toggle('folded', on);
+    try { localStorage.setItem('frontline-hud-fold', on ? '1' : '0'); } catch { /* ohne Speicher: gilt nur für diese Sitzung */ }
+    this.app.onLayout?.();
+  }
+
+  /** Von der HUD verdeckte Höhe oben und unten (CSS-Pixel), damit die Kamera Ziele in die freie Mitte legt. */
+  insets() {
+    const shown = (el) => (el && el.offsetParent !== null ? el.getBoundingClientRect() : null);
+    const top = shown(this.root.querySelector('.top'));
+    const foldBtn = shown(this.root.querySelector('.fold'));
+    // eingeklappt deckt nur die Übersichtskarte eine Ecke ab: kein Versatz nötig
+    const panels = foldBtn && this.folded ? [] : [this.cmdEl, this.selEl, this.root.querySelector('.mm')].map(shown).filter(Boolean);
+    return { top: top ? top.bottom : 0, bottom: panels.length ? window.innerHeight - Math.min(...panels.map((b) => b.top)) : 0 };
   }
 
   click(e) {
@@ -163,6 +185,7 @@ export class Hud {
       else if (act.dataset.act === 'view') this.app.toggleView?.();
       else if (act.dataset.act === 'rotl') this.app.rotateView?.(-1);
       else if (act.dataset.act === 'rotr') this.app.rotateView?.(1);
+      else if (act.dataset.act === 'fold') this.setFolded(!this.folded);
       else if (act.dataset.act === 'weather') this.controller.message(this.weatherText());
       return;
     }
