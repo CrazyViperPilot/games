@@ -1,4 +1,4 @@
-// Level w4-33 „Golem-Zitadelle“ (Boss-Level, Welt 4). Automatisch generiert.
+// Level w4-33 (Welt 4, Boss „Golem-Zitadelle“). Automatisch generiert (gen/build-all-levels.mjs).
 export default {
   "id": "w4-33",
   "world": 4,

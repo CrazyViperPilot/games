@@ -7,7 +7,7 @@ const SIGHT = 10;
 const MIN_CLEAR = 4;
 const TARGET = 5;
 const SOLID = new Set('GAS#CBWTY12345NREUMX?!ZJ'.split(''));
-const KEEP = new Set('ZX?!M'.split(''));          // nie ausschneiden
+const KEEP = new Set('ZX?!M4'.split(''));          // nie ausschneiden
 
 const isSolid = (ch) => ch === undefined || SOLID.has(ch);
 const isFloor = (ch) => isSolid(ch) || ch === '=';   // Slabs tragen, sind aber von unten durchlässig

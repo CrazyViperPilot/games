@@ -1,4 +1,4 @@
-// Level w3-33 „Schildkröten-Bucht“ (Boss-Level, Welt 3). Automatisch generiert.
+// Level w3-33 (Welt 3, Boss „Schildkröten-Bucht“). Automatisch generiert (gen/build-all-levels.mjs).
 export default {
   "id": "w3-33",
   "world": 3,

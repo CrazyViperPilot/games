@@ -5,7 +5,7 @@ import { t, setLang, LANGS } from '../js/core/i18n.js';
 
 // Erlaubt: Buchstaben (inkl. Sonderzeichen der jeweiligen Sprache, siehe unten), Ziffern, Leerzeichen,
 // Satzzeichen, Anführungszeichen, Pfeile und Symbole der Oberfläche, Platzhalter-Klammern.
-const COMMON = /^[\p{L}\p{N}\s.,!?:;'"„“”‚‘’\-–&/·()◀▶←→↑↓◆◇★☆●{}+%]*$/u;
+const COMMON = /^[\p{L}\p{N}\s.,!?:;'"„“”‚‘’\-–&/·()◀▶←→↑↓◆◇★☆●{}+%#]*$/u;
 const EXTRA = { de: 'äöüßÄÖÜ', pl: 'ąćęłńóśźżĄĆĘŁŃÓŚŹŻ' };
 const FORBIDDEN = /Münz|Pilz|Stern|Feuerblume|Monet|Gwiazd|Grzyb|Kwiat/;
 
@@ -67,11 +67,11 @@ test('i18n: Sprachen und Platzhalter', () => {
   assert.deepEqual(LANGS, ['de', 'pl']);
   setLang('pl');
   assert.equal(t('start'), 'Graj');
-  assert.equal(t('gameOverText', { world: t('w3') }), 'Wracasz na poziom 1 świata „Nether i Pustka” z 3 życiami.');
+  assert.equal(t('gameOverText', { world: t('w3') }), 'Wracasz na poziom 1 świata „Świat #3 - Raj” z 3 życiami.');
   assert.equal(t('diamondsOf', { n: 2 }), '2 z 3');
   setLang('de');
   assert.equal(t('start'), 'Spielen');
-  assert.equal(t('gameOverText', { world: t('w1') }), 'Zurück zu Level 1 von Oberwelt, mit 3 Leben.');
+  assert.equal(t('gameOverText', { world: t('w1') }), 'Zurück zu Level 1 von Welt #1 - Oberwelt, mit 3 Leben.');
   assert.equal(t('diamondsOf', { n: 2 }), '2 von 3');
   setLang('xx');
   assert.equal(t('start'), 'Spielen', 'unbekannte Sprache fällt auf Deutsch zurück');

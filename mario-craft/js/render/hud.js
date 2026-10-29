@@ -40,7 +40,7 @@ export function drawText(ctx, text, x, y) {
   let cx = x;
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
-    if (ch !== ' ') blit(ctx, `font_${ch === ':' ? 'colon' : ch}`, 0, cx, y);
+    if (ch !== ' ') blit(ctx, `font_${ch === ':' ? 'colon' : ch === '-' ? 'dash' : ch}`, 0, cx, y);
     cx += ADV;
   }
   return cx - x;
@@ -113,6 +113,9 @@ export function drawHud(ctx, game, w, h) {
   drawNum(ctx, pick, 1, x + 13, y + 2);
   // Herzen (zweite Zeile): volle rot, verlorene dunkel
   for (let i = 0; i < PHYS_HEARTS; i++) drawHeart(ctx, 4 + i * 9, y + 14, i < game.hearts);
+  // Aktuelles Level oben in der Mitte (z. B. "1-5" = Welt 1, Level 5)
+  const lvl = String(game.levelId || '').replace(/^w/, '');
+  if (lvl) drawText(ctx, lvl, ((w - lvl.length * ADV) / 2) | 0, y + 2);
   // Pause
   blit(ctx, 'pause', 0, w - PAUSE_X_OFF, PAUSE_Y);
   // Boss-Energie

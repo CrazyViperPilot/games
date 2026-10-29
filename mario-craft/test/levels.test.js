@@ -32,7 +32,7 @@ for (const def of LEVELS) {
   test(`${id}: parseLevel, Maße, Start/Portal/Bett, Rand`, () => {
     assert.match(id, ID_RE);
     const map = parseLevel(def);
-    assert.ok(map.cols >= 100 && map.cols <= 250, `Spalten ${map.cols} außerhalb 100–250`);
+    assert.ok(map.cols >= 100 && map.cols <= 320, `Spalten ${map.cols} außerhalb 100–320`);
     assert.ok(map.rows >= 30 && map.rows <= 70, `Zeilen ${map.rows} außerhalb 30–70`);
     assert.ok(THEMES.includes(def.theme), `Theme "${def.theme}" unbekannt`);
     assert.equal(countChar(def.rows, 'P'), 1, 'genau ein Start P');
@@ -72,3 +72,20 @@ for (const def of LEVELS) {
     assert.equal(countChar(def.rows, '@'), def.boss ? 1 : 0, 'Boss-Start @ passt nicht zu boss');
   });
 }
+
+test('Level: keine zwei Level sind gleich', () => {
+  const seen = new Map();
+  for (const def of LEVELS) {
+    const key = def.rows.join('\n');
+    assert.ok(!seen.has(key), `${def.id} ist identisch mit ${seen.get(key)}`);
+    seen.set(key, def.id);
+  }
+});
+
+test('Level: ab Level 4 mindestens 200 Spalten breit (Bodenlevel)', () => {
+  for (const def of LEVELS) {
+    const nr = Number(def.id.split('-')[1]);
+    if (nr < 4 || nr > 32 || def.world === 5 && nr >= 19) continue;
+    assert.ok(def.rows[0].length >= 200, `${def.id}: nur ${def.rows[0].length} Spalten`);
+  }
+});

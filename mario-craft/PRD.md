@@ -25,7 +25,18 @@ Startbildschirm → Levelauswahl (5 Welten × 33 Level = 165 Level) → Level �
 Welt auf Level 1 zurück, Leben wieder 3).
 
 Jedes Level folgt grob dem Weg **Oberfläche → Abstieg (graben, Schluchten) → Höhle/Dungeon → (Boss) → Aufstieg →
-Portal**. Level sind 100–250 Blöcke breit und 30–70 Blöcke hoch; die Kamera folgt in beide Richtungen.
+Portal**. Level sind 100–320 Blöcke breit und 30–70 Blöcke hoch; die Kamera folgt in beide Richtungen.
+
+**Levelaufbau (ab Level 4, Generator `gen/compose.mjs`):** Level 4–32 jeder Welt sind 200–300 Blöcke breit und aus zufällig
+gewählten **Abschnitten** zusammengesetzt (Lücken, Trittstein-Säulen, Brücken mit Löchern, Treppen, Mauern, Gegnerfelder,
+Täler, Türme mit Leiter, schwebende Plattformen, Gegnernester, Engstellen). Jedes Level hat eigenen Seed und eigene
+Abschnittsfolge, keine zwei Level sind gleich (Test). Schwierigkeit wächst mit der Levelnummer (breitere Lücken, mehr
+Gegner, mehr Höhlenkammern: 2 bis Level 9, 3 bis 21, danach 4). **Pflichtroute:** Mitte der Oberfläche ist ein Lavasee, man
+muss über den Schacht (Leiter) in die Höhlenkammern, durch sie hindurch und über die Leiter am Ende wieder hinauf; Bett
+(Checkpoint) liegt in einer Kammer. Welt 5 Level 19–32 sind Inseln der Leere (13–21 Inseln mit Gegnern, Säulen, Trittsteinen).
+Der Generator spielt jedes Nicht-Boss-Level mit dem Test-Bot durch; unlösbare Würfe werden verworfen und neu gewürfelt.
+
+**Level-Anzeige:** Oben in der Mitte steht im Spiel die Levelnummer (z. B. `1-5` = Welt 1, Level 5).
 
 | Welt | Oben | Unten | Boss (Level 33) |
 |---|---|---|---|

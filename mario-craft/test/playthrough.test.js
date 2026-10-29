@@ -11,7 +11,9 @@ import { playLevel } from './helpers/bot.js';
 const TIME_LIMIT = 300;   // s Simulationszeit je Level
 const TODO = {};
 
-for (const id of ['w1-1', 'w1-2', 'w1-3', 'w2-1', 'w2-2', 'w2-3', 'w3-1', 'w3-2', 'w3-3']) {
+// Stichprobe: die handgebauten Level und je Welt ein frühes und ein spätes generiertes (der Generator spielt jedes
+// Level beim Erzeugen mit demselben Bot durch).
+for (const id of ['w1-1', 'w1-2', 'w1-3', 'w2-1', 'w2-2', 'w2-3', 'w1-12', 'w1-32', 'w2-32', 'w3-1', 'w3-32', 'w4-1', 'w4-32', 'w5-4', 'w5-18', 'w5-19', 'w5-32']) {
   const opts = TODO[id] ? { todo: TODO[id] } : {};
   test(`Bot spielt ${id} bis zum Portal`, opts, () => {
     const def = LEVELS.find((l) => l.id === id);

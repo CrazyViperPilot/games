@@ -72,6 +72,7 @@ export class Game {
     const s = save || {};
     const map = parseLevel(level);
     this.map = map;
+    this.levelId = level && level.id;
     this.onEvent = onEvent || null;
     this.viewW = viewW;
     this.viewH = viewH;
