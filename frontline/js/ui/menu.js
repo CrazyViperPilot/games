@@ -3,6 +3,7 @@
 import { BALANCE } from '../data/balance.js';
 import { listMaps, deleteMap, saveMap, normalizeMap, describeMap } from '../game/mapdata.js';
 import { WEATHER_SETTINGS } from '../game/weather.js';
+import { SOUND_KEY } from '../audio/sound.js';
 
 const DIFFS = [
   ['easy', 'Leicht'],
@@ -43,6 +44,7 @@ const KEYS = [
   ['V', 'Ansicht umschalten: 2D von oben / isometrisch'],
   [', / .', 'Isometrische Ansicht um 90° nach links / rechts drehen (auch Knöpfe ⟲ ⟳ oben)'],
   ['P', 'Pause'],
+  ['F2', 'Ton an/aus (auch der Lautsprecher-Knopf oben)'],
   ['Minimap', 'Linksklick = Kamera, Rechtsklick = Bewegen'],
 ];
 
@@ -131,6 +133,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
   let weather = readChoice(WEATHER_KEY, WEATHER_SETTINGS, D.weather);
   let research = readFlag(RESEARCH_KEY, D.research);
   let river = readFlag(RIVER_KEY, D.river);
+  let sound = readFlag(SOUND_KEY, true); // Ton: gleicher Speicher wie der Schalter im Spiel (audio/sound.js)
   show(
     root,
     'start',
@@ -160,6 +163,10 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
       <div class="field">
         <span class="flabel" title="Zufallskarten: je ein Fluss vor jeder Startecke mit drei zerstörbaren Brücken und zwei Furten">Fluss</span>
         <div class="seg"><button type="button" data-river="1">An</button><button type="button" data-river="0">Aus</button></div>
+      </div>
+      <div class="field">
+        <span class="flabel" title="Schüsse, Explosionen, Fahrzeuge, Wetter und Meldungen; selbst erzeugt, ohne Dateien. Im Spiel: Taste F2 oder der Lautsprecher-Knopf oben">Ton</span>
+        <div class="seg"><button type="button" data-sound="1">An</button><button type="button" data-sound="0">Aus</button></div>
       </div>
       <div class="field">
         <span class="flabel">Karte</span>
@@ -194,6 +201,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
     root.querySelectorAll('[data-weather]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.weather === weather)));
     root.querySelectorAll('[data-research]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.research === '1') === research)));
     root.querySelectorAll('[data-river]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.river === '1') === river)));
+    root.querySelectorAll('[data-sound]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.sound === '1') === sound)));
   };
   const renderMapBox = () => {
     const box = root.querySelector('[data-mapbox]');
@@ -299,6 +307,9 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
     } else if (b.dataset.river) {
       river = b.dataset.river === '1';
       writeFlag(RIVER_KEY, river);
+    } else if (b.dataset.sound) {
+      sound = b.dataset.sound === '1';
+      writeFlag(SOUND_KEY, sound);
     }
     else if (b.dataset.act === 'resetWallet') {
       resetWallet();

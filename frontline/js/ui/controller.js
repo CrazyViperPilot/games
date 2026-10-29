@@ -19,6 +19,8 @@ const GROUP_DOUBLE_MS = 500; // Gruppentaste zweimal = Kamera hin
 const PICK_PX = 16; // Trefferradius in Bildschirm-Pixeln
 const TARGET_MODES = ['board', 'place', 'wall', 'attackMove', 'fobTarget', 'loadFob', 'unloadFob', 'routeFrom', 'routeTo', 'mortarTarget', 'dropoff'];
 const BUILD_MENU = Object.keys(BUILDINGS).filter((k) => BUILDINGS[k].hotkey && BUILDINGS[k].buildable !== false);
+// Befehle, die der Ton quittiert (Marsch, Angriff, Bau …); Ausbildung und Forschung melden sich über ihre Meldungen
+const ORDER_SOUND = new Set(['move', 'attackMove', 'attack', 'garrison', 'ungarrison', 'board', 'pickup', 'deliver', 'load', 'unload', 'route', 'build', 'repair', 'buildFob', 'buildWall', 'mortarTarget', 'dropoff', 'repairBridge']);
 const RES_KEYS = ['money', 'bm', 'mun', 'fuel'];
 const CARGO_KEYS = ['bm', 'mun', 'fuel']; // Lagersorten (FOB-Lager, LKW-Ladung)
 const SHORT = { money: 'G', bm: 'BM', mun: 'MUN', fuel: 'TS' };
@@ -134,6 +136,7 @@ export class Controller {
   issue(cmd) {
     const r = this.game.issue(this.team, cmd);
     if (!r.ok) this.message(r.reason);
+    else if (ORDER_SOUND.has(cmd.type)) this.onOrder?.(cmd);
     return r;
   }
 

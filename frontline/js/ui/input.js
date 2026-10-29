@@ -380,6 +380,10 @@ export class Input {
       case 'P':
         app.togglePause?.();
         return;
+      case 'F2':
+        e.preventDefault();
+        app.toggleSound?.();
+        return;
       case 'F1':
       case '?':
         e.preventDefault();

@@ -120,6 +120,7 @@ Wo jedes Feature liegt. „KI“ = Konstanten-Präfix in `js/data/ai.js`, Logik 
 | Karteneditor, gespeicherte Karten | §9a | – | `mapdata.js` | – | `js/editor/editor.js`, `editor.html`, `css/editor.css` | `mapdata.test.js` |
 | Steuerung, Befehlskarte, HUD, Menüs, Hilfe | §8, §9 | – | – | – | `controller.js`, `input.js`, `hud.js`, `menu.js`, `status.js` | – |
 | Kamera, Iso-Ansicht, Minimap | §9 | – | – | – | `camera.js`, `iso.js`, `renderer.js`, `minimap.js` | – |
+| Ton (Waffen, Einschläge, Wetter, Meldungen; synthetisiert, Schalter) | §14 | – | – (liest `game.effects`, Hinweis `snd` aus `addEffect`) | – | `js/audio/sound.js`, `main.js`, `hud.js` (Knopf), `menu.js` | `sound.test.js` |
 | Offline, Installation | §11 | – | – | – | `sw.js`, `manifest.json`, `icons/` | – |
 
 ## Rezepte

@@ -93,6 +93,7 @@ export class Hud {
     this.capFill = q('[data-cap]');
     this.speedBtn = q('[data-act=speed]');
     this.pauseBtn = q('[data-act=pause]');
+    this.soundBtn = q('[data-act=sound]');
     this.viewBtn = q('[data-act=view]');
     this.res = {};
     for (const k of RES_KEYS) {
@@ -140,6 +141,7 @@ export class Hud {
           <button type="button" class="btn-sm" data-act="rotl" title="Isometrische Ansicht nach links drehen (,)">⟲</button>
           <button type="button" class="btn-sm" data-act="view" title="Ansicht umschalten: 2D / isometrisch (V)">2D</button>
           <button type="button" class="btn-sm" data-act="rotr" title="Isometrische Ansicht nach rechts drehen (.)">⟳</button>
+          <button type="button" class="btn-sm" data-act="sound" title="Ton an/aus (F2)" aria-label="Ton an/aus">🔊</button>
           <button type="button" class="btn-sm" data-act="help" title="Hilfe (F1)">Hilfe</button>
         </div>
       </header>
@@ -157,6 +159,7 @@ export class Hud {
       if (act.dataset.act === 'speed') this.app.cycleSpeed?.();
       else if (act.dataset.act === 'pause') this.app.togglePause?.();
       else if (act.dataset.act === 'help') this.app.toggleHelp?.();
+      else if (act.dataset.act === 'sound') this.app.toggleSound?.();
       else if (act.dataset.act === 'view') this.app.toggleView?.();
       else if (act.dataset.act === 'rotl') this.app.rotateView?.(-1);
       else if (act.dataset.act === 'rotr') this.app.rotateView?.(1);
@@ -270,6 +273,7 @@ export class Hud {
     const st = this.app.status ? this.app.status() : { paused: false, speed: 1 };
     this.speedBtn.textContent = `${st.speed}×`;
     this.pauseBtn.textContent = st.paused ? 'Weiter' : 'Pause';
+    this.soundBtn.textContent = st.sound === false ? '🔇' : '🔊';
     this.viewBtn.textContent = this.controller.camera.iso ? 'Iso' : '2D';
   }
 

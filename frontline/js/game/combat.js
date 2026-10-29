@@ -158,10 +158,10 @@ function fireDirect(game, s, t, w) {
   const dmg = shotDamage(w, s, t, heightMult(game, s, t));
   if ((w.damage.light || 0) >= 60) {
     // Panzerabwehr / Kampfpanzer: Geschoss plus kleine Explosion
-    game.addEffect('shell', s.x, s.y, s.team, t.x, t.y);
-    game.addEffect('explosion', t.x, t.y, s.team);
+    game.addEffect('shell', s.x, s.y, s.team, t.x, t.y, 'cannon');
+    game.addEffect('explosion', t.x, t.y, s.team, t.x, t.y, 'hit');
   } else {
-    game.addEffect('tracer', s.x, s.y, s.team, t.x, t.y);
+    game.addEffect('tracer', s.x, s.y, s.team, t.x, t.y, 'base');
   }
   s.cooldown = w.cooldown;
   hit(game, t, dmg);
@@ -210,10 +210,10 @@ function tryFireUnit(game, u, t) {
   pick.cd = auraCooldown(u, pick.spec.cooldown); // Kommandeur in der Nähe: schneller
   game.teams[u.team].used.mun += pick.spec.munCost;
   if ((pick.spec.damage.light || 0) >= 60) {
-    game.addEffect('shell', u.x, u.y, u.team, t.x, t.y);
-    game.addEffect('explosion', t.x, t.y, u.team);
+    game.addEffect('shell', u.x, u.y, u.team, t.x, t.y, pick.spec.id);
+    game.addEffect('explosion', t.x, t.y, u.team, t.x, t.y, 'hit');
   } else {
-    game.addEffect('tracer', u.x, u.y, u.team, t.x, t.y);
+    game.addEffect('tracer', u.x, u.y, u.team, t.x, t.y, pick.spec.id);
   }
   if (u.def.stealth) u.revealedUntil = game.time + BALANCE.stealth.revealTime; // ein Schuss verrät die Stellung
   // Flak und SAM: Treffer nur mit Wurf (Trefferchance, siehe unitHitChance); daneben geht der Schuss, der Schaden bleibt aus
@@ -223,7 +223,7 @@ function tryFireUnit(game, u, t) {
 
 function fireShell(game, s, tx, ty, w) {
   game.projectiles.push(createShell(game.newId(), s.team, s.x, s.y, tx, ty, w));
-  game.addEffect('muzzle', s.x, s.y, s.team);
+  game.addEffect('muzzle', s.x, s.y, s.team, s.x, s.y, 'mortar');
   s.cooldown = w.cooldown;
 }
 

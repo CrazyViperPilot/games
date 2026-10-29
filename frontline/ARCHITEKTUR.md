@@ -161,6 +161,8 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 `js/ui/` – `controller.js` Auswahl, Modi, Befehlskarte (kein DOM, ruft `game.issue`), `input.js` Maus/Tastatur/Touch,
 `hud.js` DOM-Anzeige, `menu.js` Start-, Pause-, Hilfe- und Endbildschirm, `status.js` lesende Texthilfen.
 
+`js/audio/sound.js` – Ton (PRD §14): synthetisiert per WebAudio, liest `game.effects` (Hinweis `snd`), Meldungen und Wetter; `main.js` hält ein `Sound` für alle Partien.
+
 `js/editor/editor.js` + `editor.html` – Karteneditor; speichert Karten über `js/game/mapdata.js` im `localStorage`.
 
 Sonstiges: `sw.js` Service Worker (network-first, Präfix `frontline-`), `manifest.json`, `css/`, `icons/`, `assets/` (Lizenzen in `assets/LICENSES/`),

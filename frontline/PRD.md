@@ -14,11 +14,11 @@ Konfliktzone halten“. Zwei Parteien: Spieler (Blau) gegen Computer (Rot).
 | Sprache | Deutsch |
 | Spieler | 1 Mensch gegen 1 KI. Kein Multiplayer. |
 
-Nicht im Umfang: Netzwerk-Multiplayer, Kampagne, Speichern laufender Partien, Sound (optional, „Could“; als Idee geparkt, §13).
+Nicht im Umfang: Netzwerk-Multiplayer, Kampagne, Speichern laufender Partien, Musik (als Idee geparkt, §13). Ton (Geräusche) gibt es seit v4.59, §14.
 
 ## 2. Spielablauf
 
-1. Startmenü: Schwierigkeit (Leicht/Normal/Schwer), Siegpunkte (100 Standard; 25/50 für Schnellpartie), **Sendemast-Sieg** (An/Aus, gemerkt; Standard An, §7), **Wetter** (Aus · Zufall · Sommer · Herbst · Winter, gemerkt; Standard Zufall, §7), **Forschung** (An/Aus, gemerkt; Standard An, §7), **Fluss** (An/Aus, gemerkt; Standard An, nur Zufallskarten, §7), **Karte** (Zufall · Gespeichert · Neue Karte, siehe Abschnitt 9a), Start.
+1. Startmenü: Schwierigkeit (Leicht/Normal/Schwer), Siegpunkte (100 Standard; 25/50 für Schnellpartie), **Sendemast-Sieg** (An/Aus, gemerkt; Standard An, §7), **Wetter** (Aus · Zufall · Sommer · Herbst · Winter, gemerkt; Standard Zufall, §7), **Forschung** (An/Aus, gemerkt; Standard An, §7), **Fluss** (An/Aus, gemerkt; Standard An, nur Zufallskarten, §7), **Ton** (An/Aus, gemerkt; Standard An, §14), **Karte** (Zufall · Gespeichert · Neue Karte, siehe Abschnitt 9a), Start.
 2. Jede Partei startet in einer Ecke der großen Karte mit der **Haupt-FOB** (unendlich Baumaterial, Munition, Treibstoff), Geld (800 oder die Kasse der letzten Runde), 1 Baufahrzeug, **3 LKW** (leer), **2 Kampfpanzern, 3 Schützenpanzern, 22 Schützen und 7 Panzerabwehrsoldaten** (29 Soldaten, Startaufstellung vor der FOB). Zusammen belegen sie 52 der 300 Plätze des Einheitenlimits (siehe §6).
 3. Nur die Haupt-FOB bildet Einheiten aus (nur gegen Geld; mit Forschung Schützenpanzer, Scharfschützen und Hubschrauber erst ab Stufe 2, Kampfpanzer und AH-64 ab Stufe 3, §7). Man bringt Einheiten und Nachschub per LKW an die Front, gründet vordere FOBs
    (Verschanzen mit Mauern und Tore, Mörser, Flak, Nachladen und Tanken) und hält die Zone.
@@ -332,6 +332,7 @@ Direktfeuer richtet sich nach Trefferzahlen (volles Ziel); Seite = Winkel zur Fa
 | `,` / `.` / Knöpfe ⟲ ⟳ | Isometrische Ansicht in 90°-Schritten nach links / rechts drehen (in 2D ohne Wirkung) |
 | Leertaste / H | Kamera auf Auswahl / Haupt-FOB |
 | P | Pause; `+` / `-` Spielgeschwindigkeit 1×–3× |
+| F2 / Lautsprecher-Knopf oben | Ton an/aus (wird gemerkt, §14) |
 | F1 / ? | Hilfe |
 | Minimap | Linksklick = Kamera, Rechtsklick = Bewegen |
 
@@ -429,19 +430,30 @@ Verhalten: Baufahrzeug setzt Baustellen, Schützen bauen Mauern aus getragenem B
 
 - **Must:** alles in 2–9, KI aus 10, Sieg/Niederlage, Pause.
 - **Should:** Nebel des Krieges, Kontrollgruppen, Doppelklick-Auswahl, Hilfe-Overlay, PWA/offline.
-- **Could:** Sound, Statistik am Spielende.
+- **Could:** Statistik am Spielende. (Sound ist seit v4.59 gebaut, §14.)
 
 ## 13. Geparkte Ideen (nicht bauen)
 
 Ideen von Daniel, die festgehalten, aber **noch nicht umgesetzt** werden. Gebaut wird erst auf sein Zeichen, dann zuerst mit einem Vorschlag zur Ausgestaltung.
 
 - **SimCity-Bevölkerung** (2026-10-26): Frontline um SimCity-Fähigkeiten erweitern. Wer mehr Bevölkerung hat, lässt sie in Fabriken und Förderanlagen arbeiten und bekommt dadurch mehr Ressourcen. Offen: woher die Bevölkerung kommt, Arbeitsplätze je Gebäude, Wirkung auf die Ressourcen, Verhalten der KI.
-- **Dynamisches Wetter mit Schnee und Regen** (2026-10-27): baut auf dem Wetter aus v4.51 auf (§7, dort wechseln Regen, Nebel und Schnee schon je Partie und wirken auf Sicht und Tempo). Offen: wie weit das Wetter sich im Spiel spürbar verändern soll, z. B. Schnee, der liegen bleibt und wieder taut, oder Regen, der den Boden aufweicht.
 - **Häuserkampf ausbauen** (2026-10-27): Die Grundform gibt es seit v4.43 (§7 „Häuserkampf“: Infanterie besetzt Stadthäuser, schießt aus den Fenstern, Häuser stürzen unter Beschuss ein, die KI besetzt Häuser in der Zone). Offen: was darüber hinaus kommen soll, z. B. Kampf von Raum zu Raum, Sprengen oder Stürmen besetzter Häuser, Ausbau von Häusern zu Stellungen.
-- **Sound** (2026-10-27): Geräusche und Musik (bisher nur „Could“, §1 und §12). Offen: Umfang (Waffen, Fahrzeuge, Meldungen, Wetter, Musik) und Lautstärkeregler im Menü.
 - **LLM für dynamische Gegner und Dialoge** (2026-10-27): Ein Sprachmodell soll im Spiel aktiv mitwirken, z. B. KI-Gegner, die auf die Lage reagieren, und Dialoge von Kommandeur und Meldungen. Offen: welches Modell und wo es läuft (Gerät oder Server, Offline-Tauglichkeit der PWA), Kosten und Datenschutz, wie die Antworten die Regeln nicht brechen, und ob die heutige KI als Rückfall bleibt.
+- **Musik** (2026-10-29): Hintergrundmusik zum Ton aus §14 (bisher nur Geräusche). Offen: Stil (Marsch, Ambient, dynamisch je Lage), Lautstärkeregler statt nur An/Aus.
+
+## 14. Ton (seit v4.59)
+
+Alle Geräusche werden im Browser mit WebAudio **selbst erzeugt** (Rauschen und Schwingungen, `js/audio/sound.js`): keine Audiodateien, keine fremden Lizenzen, sofort offline da. Der Ton liest nur (`game.effects`, Meldungen, Wetter) und ändert nichts am Spiel; die Simulation hängt Effekten nur einen Hinweis `snd` an (Waffen-ID, Rüstungsklasse eines Gefallenen oder `building`).
+
+- **Schalter:** Lautsprecher-Knopf oben (🔊/🔇), Taste **F2** und im Startmenü „Ton“ An/Aus; gemerkt unter `frontline-ton`, Standard An. Aus = der AudioContext schläft, kein Rechenaufwand. Der Browser erlaubt Ton erst nach der ersten Berührung oder Taste, das ist das Startmenü.
+- **Waffen:** eigener Klang je Waffe (Gewehr, MP, MG, Scharfschützengewehr, Kanone, Granatwerfer, RPG, Raketen, Flak, SAM, Basis-MG, Mörser), Tonhöhe leicht zufällig, damit Salven nicht nach Maschine klingen.
+- **Einschläge und Gefallene:** kleine, mittlere und große Explosion (Treffer einer Panzerabwehrwaffe, Fahrzeug, Einschlag/Gebäude), Soldaten leise, abgeschossene Hubschrauber mit Absturzpfeifen, abgefangene Granate als Zing.
+- **Dauergeräusche:** Regen, Wind (Schnee, Nebel, Winter), Hubschrauber-Rotor und Dieselbrummen fahrender Fahrzeuge im Bild; dazu im Regen gelegentlich Donner. Pegel blenden weich über.
+- **Meldungen:** Ausbildung fertig (zwei Töne), Bau fertig, Alarm bei „Basis wird angegriffen“, Münze bei Prämien, leiser Hinweiston für übrige Meldungen; Klick auf HUD-Knöpfe, Bestätigung von Marsch-, Angriffs- und Baubefehlen; Fanfare bei Sieg, Trauermarsch bei Niederlage.
+- **Raumklang:** Stereo-Position und Lautstärke nach der Lage auf dem Bildschirm; außerhalb des Bilds leiser, weit weg stumm; Gegner im Nebel bleiben stumm (wie in der Grafik). Gleiche Geräusche werden gedrosselt und die Zahl gleichzeitiger Geräusche begrenzt (große Schlachten bleiben schlank, Explosionen haben Vorrang); ein Kompressor verhindert Übersteuern. Pause, Tabwechsel und Spielende halten die Dauergeräusche an.
 
 ## Änderungsverlauf
+- v4.59: **Ton** (§14): selbst erzeugte Geräusche für Waffen, Einschläge, Fahrzeuge, Hubschrauber, Wetter und Meldungen, Schalter im HUD (Taste F2) und im Startmenü; Spielregeln unverändert. Cache v72.
 - v4.58: **Config vollständig gebündelt** (Spielverhalten und Zufallskarten je Seed unverändert): Kurznamen der Befehlskarte als `short` in `units.js` und `buildings.js`; verstreute Spielwerte (Bauplatz-Sicht, Baustellen-HP, Bohrer-Mindesttreibstoff, Einsteigen und Absetzen, Kistenträger, Meldetakt „Basis wird angegriffen“, Tiere) in `BALANCE`; die Werte des Kartengenerators (Hügel, Seen, Fluss, Stadt, Gehöfte, Kisten-Abstände) in `js/data/mapgen.js`. Cache v71.
 - v4.57: **Absicherung der Config** (Spielverhalten unverändert): `test/config.test.js` prüft `js/data/` auf Tippfehler und Widersprüche (`npm run test:quick`, Sekunden). Die Tabellen in §6 („Werte“, „Waffen und Schaden“) erzeugt jetzt `npm run docs` aus der Config; ein Test meldet, wenn sie veralten. Dabei kamen Flakpanzer und SAM-Startrampe in die Wertetabelle, die dort fehlten.
 - v4.56: **Doku und Config für Erweiterungen** (Spielverhalten unverändert). Neu: `CLAUDE.md` (Regeln, Wegweiser „Wo ändere ich was?“, Feature-Landkarte, Rezepte) und `ARCHITEKTUR.md`; der alte Plan liegt als `docs/verlauf.md`. In `js/data/balance.js` stehen oben die **Schnelleinstellungen** (`QUICK`: Einheitenlimit, Geld pro Sekunde, Startgeld, Siegpunkte, Sendemast-Zeit …) und ein Inhaltsverzeichnis; die KI-Werte liegen in `js/data/ai.js`, die Werte je Schwierigkeit (FOB-Grenze, Sendemast ab, Kistenholer) und die Startmenü-Standards in `BALANCE`. Cache v70.

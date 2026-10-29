@@ -31,7 +31,7 @@ const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
 const H = BALANCE.map.height;
 const STOCK_KEYS = ['bm', 'mun', 'fuel']; // Lagersorten (team.res.* sind Summen über FOB-Lager)
-const EFFECT_LIFE = { tracer: 0.12, shell: 0.3, explosion: 0.5, intercept: 0.4, muzzle: 0.1 };
+const EFFECT_LIFE = { tracer: 0.12, shell: 0.3, explosion: 0.5, intercept: 0.4, muzzle: 0.1, death: 0.1 };
 const SHORTAGE_TEXT = {
   mun: 'Einheiten ohne Munition',
   fuel: 'Fahrzeuge ohne Treibstoff',
@@ -252,8 +252,9 @@ export class Game {
     return ev;
   }
 
-  addEffect(type, x, y, team = -1, x2 = x, y2 = y) {
-    this.effects.push({ type, x, y, x2, y2, team, t: 0, life: EFFECT_LIFE[type] ?? 0.3 });
+  /** `snd`: Hinweis für den Ton (ui/Sound): Waffen-ID, Rüstungsklasse eines Gefallenen oder 'building'; die Simulation wertet ihn nicht aus. */
+  addEffect(type, x, y, team = -1, x2 = x, y2 = y, snd = null) {
+    this.effects.push({ type, x, y, x2, y2, team, snd, t: 0, life: EFFECT_LIFE[type] ?? 0.3 });
   }
 
   /** Eigene Entity oder fertiger Sendemast (den sieht der Gegner überall, auch im Nebel). */
@@ -1009,6 +1010,7 @@ export class Game {
         this.entities.delete(u.id);
         if (u.house) dropOccupant(this, u);
         if (u.hp <= 0) {
+          this.addEffect('death', u.x, u.y, u.team, u.x, u.y, u.def.armor);
           addUnitWreck(this, u); // eingestiegene Passagiere (alive = false, hp > 0) hinterlassen nichts
           // gefallener Kommandeur, auch als Passagier eines zerstörten Fahrzeugs
           for (const h of [u, ...u.passengers]) if (h.def.hero) commanderFallen(this, h);
@@ -1028,7 +1030,7 @@ export class Game {
       this.grid.release(b);
       this.entities.delete(b.id);
       if (!b.demolished) {
-        this.addEffect('explosion', b.x, b.y, b.team);
+        this.addEffect('explosion', b.x, b.y, b.team, b.x, b.y, 'building');
         addBuildingWreck(this, b);
         this.message(b.team, `${b.def.name} zerstört`, b.x, b.y);
         if (b.def.radio) radioLost(this, b);

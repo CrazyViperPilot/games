@@ -6,6 +6,7 @@ import { Game } from './game/game.js';
 import { loadMap } from './game/mapdata.js';
 import { AI } from './ai/ai.js';
 import { createLoop } from './core/loop.js';
+import { Sound } from './audio/sound.js';
 import { Camera } from './render/camera.js';
 import { Renderer } from './render/renderer.js';
 import { Minimap } from './render/minimap.js';
@@ -64,6 +65,16 @@ const canvas = document.getElementById('view');
 const hudRoot = document.getElementById('hud');
 const overlay = document.getElementById('overlay');
 
+const sound = new Sound(); // Ton (PRD §14): ein Sound-Objekt für alle Partien, der AudioContext entsteht erst bei der ersten Geste
+for (const ev of ['pointerdown', 'keydown']) window.addEventListener(ev, () => sound.unlock(), { capture: true });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) sound.ctx?.suspend?.().catch?.(() => {});
+  else if (sound.on) sound.ctx?.resume?.().catch?.(() => {});
+});
+hudRoot.addEventListener('click', (e) => {
+  if (e.target.closest('button')) sound.click();
+});
+
 let session = null; // laufendes Spiel: { game, ai, camera, renderer, minimap, controller, hud, input, loop, … }
 let settings = { difficulty: 'normal', winPoints: BALANCE.winPoints, radio: true, weather: 'random', research: true, river: true };
 
@@ -88,6 +99,7 @@ function stopSession() {
   const s = session;
   if (!s) return;
   session = null;
+  sound.detach();
   s.loop.stop();
   s.input.destroy();
   window.removeEventListener('resize', s.onResize);
@@ -105,7 +117,7 @@ const app = {
   debug: DEBUG,
   status() {
     const s = session;
-    return s ? { paused: s.loop.paused, speed: s.loop.speed } : { paused: false, speed: 1 };
+    return s ? { paused: s.loop.paused, speed: s.loop.speed, sound: sound.on } : { paused: false, speed: 1, sound: sound.on };
   },
   overlayOpen: () => !overlay.hidden,
   closeOverlay() {
@@ -171,6 +183,11 @@ const app = {
     s.loop.speed = SPEEDS[(nearestSpeedIndex(s.loop.speed) + 1) % SPEEDS.length];
     s.hud.pushMessage(`Tempo ${s.loop.speed}×`);
   },
+  toggleSound() {
+    const on = sound.toggle();
+    session?.hud.pushMessage(on ? 'Ton an (F2)' : 'Ton aus (F2)');
+    session?.hud.refresh();
+  },
   debugMoney() {
     const s = session;
     if (!DEBUG || !s) return;
@@ -195,7 +212,9 @@ function frame(s) {
     if (ev.type !== 'message' || (ev.team !== HUMAN && ev.team !== -1)) continue;
     s.controller.noteEvent(ev);
     s.hud.pushMessage(ev.text, Number.isFinite(ev.x) ? { x: ev.x, y: ev.y } : null);
+    sound.message(ev);
   }
+  sound.update(dt, s.loop.paused);
 
   s.renderer.render(s.controller.view);
   s.minimap.render();
@@ -205,6 +224,7 @@ function frame(s) {
   if (g.winner !== null && !s.ended) {
     s.ended = true;
     saveWallet(g.teams[HUMAN].res.money);
+    sound.end(g.winner === HUMAN);
     showEnd(
       overlay,
       {
@@ -239,6 +259,8 @@ function startGame(opts) {
   const controller = new Controller(game, HUMAN, camera);
   const hud = new Hud(hudRoot, game, HUMAN, controller, app);
   controller.onMessage = (text) => hud.pushMessage(text);
+  controller.onOrder = () => sound.order();
+  sound.attach(game, camera, HUMAN);
   const minimap = new Minimap(hud.minimapCanvas, game, camera, HUMAN);
 
   const home = controller.homeBase();
@@ -266,6 +288,7 @@ function startGame(opts) {
   });
   s.loop.speed = startSpeed();
   session = s;
+  if (DEBUG) window.frontlineSound = sound;
   if (DEBUG) window.frontline = s; // Konsole/Tests: Zugriff auf Spielzustand
   s.loop.start();
 }
