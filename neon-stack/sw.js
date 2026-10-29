@@ -1,7 +1,7 @@
 // Neon Stack Service Worker: network-first, Cache nur als Offline-Fallback.
 // Bei Änderungen an Dateien CACHE_NAME hochzählen. Löscht nur Caches mit eigenem Präfix.
 const CACHE_PREFIX = 'neonstack-';
-const CACHE_NAME = CACHE_PREFIX + 'v1';
+const CACHE_NAME = CACHE_PREFIX + 'v2';
 const ASSETS = ['./', './index.html', './style.css', './logic.js', './audio.js', './fx.js', './game.js', './manifest.json',
   './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png'];
 

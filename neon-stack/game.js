@@ -880,8 +880,7 @@
   $('#p-music').addEventListener('click', () => toggle('music'));
   pauseBtn.addEventListener('click', () => { A.resume(); A.sfx('click'); pauseGame(); });
   $('#btn-continue').addEventListener('click', () => { A.sfx('click'); resumeGame(); });
-  $('#btn-restart').addEventListener('click', () => { A.sfx('click'); startGame(mode); });
-  $('#btn-tomenu').addEventListener('click', () => { A.sfx('click'); toMenu(); });
+  $('#btn-restart').addEventListener('click', () => { A.sfx('click'); toMenu(); });
   $('#btn-again').addEventListener('click', () => { A.sfx('click'); startGame(mode); });
   $('#btn-over-menu').addEventListener('click', () => { A.sfx('click'); toMenu(); });
 

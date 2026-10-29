@@ -14,7 +14,7 @@
 <body>
   <canvas id="stage" aria-label="Spielfeld"></canvas>
   <div id="crt" aria-hidden="true"></div>
-  <button id="btn-pause" aria-label="Pause" hidden>❚❚</button>
+  <button id="btn-pause" aria-label="Pause" hidden><i></i></button>
 
   <div id="pad" hidden>
     <div class="cluster left">
@@ -57,8 +57,7 @@
     <div class="card small">
       <h2>PAUSE</h2>
       <button id="btn-continue" class="big"><b>WEITER</b></button>
-      <button id="btn-restart" class="big"><b>NEU STARTEN</b></button>
-      <button id="btn-tomenu" class="big"><b>MENÜ</b></button>
+      <button id="btn-restart" class="big"><b>NEUES SPIEL</b><small>Zurück zur Auswahl Klassik / Neon-Modus</small></button>
       <div class="toggles">
         <button id="p-sound" class="tog" aria-pressed="true">TON <em>AN</em></button>
         <button id="p-music" class="tog" aria-pressed="true">MUSIK <em>AN</em></button>
@@ -71,8 +70,8 @@
       <h2 class="glitch" data-t="FLATLINED">FLATLINED</h2>
       <p class="final"><span id="o-score">0</span><small id="o-info"></small></p>
       <p id="o-best" class="newbest" hidden>NEUER BESTWERT</p>
-      <button id="btn-again" class="big"><b>NOCH MAL</b></button>
-      <button id="btn-over-menu" class="big"><b>MENÜ</b></button>
+      <button id="btn-again" class="big"><b>NOCH MAL</b><small>Gleicher Modus</small></button>
+      <button id="btn-over-menu" class="big"><b>NEUES SPIEL</b><small>Klassik oder Neon-Modus wählen</small></button>
     </div>
   </div>
 
