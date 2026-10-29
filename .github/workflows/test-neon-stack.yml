@@ -1,0 +1,23 @@
+# Tests für Neon Stack – läuft nur, wenn sich etwas in neon-stack/ ändert.
+name: Test Neon Stack
+
+on:
+  push:
+    branches: ["main"]
+    paths: ["neon-stack/**", ".github/workflows/test-neon-stack.yml"]
+  pull_request:
+    paths: ["neon-stack/**", ".github/workflows/test-neon-stack.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node neon-stack/test/logic.test.js

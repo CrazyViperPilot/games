@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#07070b">
+  <meta name="description" content="Neon Stack: Tetris im Cyberpunk-Look mit optionalem Neon-Modus. Offline spielbar.">
+  <title>Neon Stack</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="stage" aria-label="Spielfeld"></canvas>
+  <div id="crt" aria-hidden="true"></div>
+  <button id="btn-pause" aria-label="Pause" hidden>❚❚</button>
+
+  <div id="pad" hidden>
+    <div class="cluster left">
+      <button class="pad-btn" data-act="left" aria-label="Links"><i class="ic ic-left"></i></button>
+      <button class="pad-btn" data-act="down" aria-label="Runter"><i class="ic ic-down"></i></button>
+      <button class="pad-btn" data-act="right" aria-label="Rechts"><i class="ic ic-right"></i></button>
+    </div>
+    <div class="cluster right">
+      <button class="pad-btn rot" data-act="ccw" aria-label="Links herum drehen"><i class="ic ic-ccw"></i></button>
+      <button class="pad-btn rot" data-act="cw" aria-label="Rechts herum drehen"><i class="ic ic-cw"></i></button>
+    </div>
+  </div>
+
+  <div id="menu" class="overlay">
+    <div class="card">
+      <div class="logo" aria-label="Neon Stack">
+        <span class="glitch" data-t="NEON">NEON</span><span class="glitch y" data-t="STACK">STACK</span>
+      </div>
+      <p class="tag">// BLOCK PROTOCOL — NIGHT SHIFT</p>
+      <button id="btn-resume" class="big resume" hidden><b>WEITERSPIELEN</b><small id="resume-info"></small></button>
+      <button id="btn-classic" class="big"><b>KLASSIK</b><small>Reines Tetris im Cyber-Look · Bestwert <span id="best-classic">0</span></small></button>
+      <button id="btn-neon" class="big neon"><b>NEON-MODUS</b><small>Optional: Regen, Glitch, Partikel, Synthwave · Bestwert <span id="best-neon">0</span></small></button>
+      <div class="toggles">
+        <button id="t-sound" class="tog" aria-pressed="true">TON <em>AN</em></button>
+        <button id="t-music" class="tog" aria-pressed="true">MUSIK <em>AN</em></button>
+        <button id="t-vib" class="tog" aria-pressed="true">VIBRATION <em>AN</em></button>
+      </div>
+      <details class="help">
+        <summary>STEUERUNG &amp; REGELN</summary>
+        <p><b>Unten links:</b> ◀ ▼ ▶ — Teil nach links, schnell runter (gedrückt halten), nach rechts.<br>
+        <b>Unten rechts:</b> ↺ links herum, ↻ rechts herum drehen.<br>
+        <b>Wischen nach unten</b> aufs Spielfeld = Sofort-Drop. <b>Tippen auf HOLD</b> (oder nach oben wischen) = Teil zurücklegen.</p>
+        <p>Zeilen füllen, um sie zu löschen. 4 Zeilen auf einmal = TETRIS. T-Spins, Combos und Back-to-Back geben Bonuspunkte. Alle 10 Zeilen steigt das Level. Tastatur: Pfeile, Y/Z und X drehen, Leertaste, C = Hold, P = Pause.</p>
+      </details>
+      <p class="ver">Spielstand &amp; Bestwerte liegen nur auf diesem Gerät.</p>
+    </div>
+  </div>
+
+  <div id="pause" class="overlay" hidden>
+    <div class="card small">
+      <h2>PAUSE</h2>
+      <button id="btn-continue" class="big"><b>WEITER</b></button>
+      <button id="btn-restart" class="big"><b>NEU STARTEN</b></button>
+      <button id="btn-tomenu" class="big"><b>MENÜ</b></button>
+      <div class="toggles">
+        <button id="p-sound" class="tog" aria-pressed="true">TON <em>AN</em></button>
+        <button id="p-music" class="tog" aria-pressed="true">MUSIK <em>AN</em></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="over" class="overlay" hidden>
+    <div class="card small">
+      <h2 class="glitch" data-t="FLATLINED">FLATLINED</h2>
+      <p class="final"><span id="o-score">0</span><small id="o-info"></small></p>
+      <p id="o-best" class="newbest" hidden>NEUER BESTWERT</p>
+      <button id="btn-again" class="big"><b>NOCH MAL</b></button>
+      <button id="btn-over-menu" class="big"><b>MENÜ</b></button>
+    </div>
+  </div>
+
+  <script src="logic.js"></script>
+  <script src="audio.js"></script>
+  <script src="fx.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
