@@ -37,9 +37,9 @@ import {
 } from './iso.js';
 import { drawTownBuilding, drawTeamBuilding, drawCar, drawBench, drawRubble, drawCrate, drawWreckBox } from './isobuild.js';
 import { parkDeco } from './terrain.js';
-import { drawTreeSprite, drawUnitSprite, drawWreckSprite, setTeamBuildings } from './isosprites.js';
+import { drawTreeSprite, drawRockSprite, drawBushSprite, drawUnitSprite, drawWreckSprite, setTeamBuildings } from './isosprites.js';
 import { scarAlpha } from '../game/scars.js';
-import { reliefOf } from '../game/relief.js';
+import { reliefOf, RELIEF } from '../game/relief.js';
 import { getGround, LIGHT_ELEV } from './ground.js';
 import { seasonal, setRoofSnow } from './season.js';
 import { drawWeather } from './weatherfx.js';
@@ -382,6 +382,7 @@ export class Renderer {
   buildDeco() {
     const trees = [];
     const rocks = [];
+    const bushes = [];
     for (const o of this.game.map.obstacles) {
       if (Math.round(o.r) % 2 === 0) {
         const rng = makeRng((o.x * 31 + o.y * 17 + o.r) >>> 0);
@@ -391,9 +392,24 @@ export class Renderer {
           const d = Math.sqrt(rng.next()) * o.r * 0.85;
           trees.push({ x: o.x + Math.cos(a) * d, y: o.y + Math.sin(a) * d, r: 12 + rng.next() * 8 });
         }
+        // Büsche am Waldrand (nur Optik, blockieren nicht)
+        const edge = Math.max(2, Math.round(o.r / 16));
+        for (let i = 0; i < edge; i++) {
+          const a = rng.next() * Math.PI * 2;
+          const d = o.r * (0.95 + rng.next() * 0.2);
+          bushes.push({ x: o.x + Math.cos(a) * d, y: o.y + Math.sin(a) * d, r: 8 + rng.next() * 4 });
+        }
       } else rocks.push(o);
     }
-    return { trees, rocks };
+    // Einzelne Büsche neben verstreuten Bäumen (fest nach Lage des Baums)
+    for (const t of this.game.map.trees ?? []) {
+      const h = (Math.imul(Math.round(t.x), 73856093) ^ Math.imul(Math.round(t.y), 19349663)) >>> 0;
+      if (h % 100 >= 30) continue;
+      const a = ((h >>> 7) % 628) / 100;
+      bushes.push({ x: t.x + Math.cos(a) * t.r * 1.5, y: t.y + Math.sin(a) * t.r * 1.5, r: 8 + ((h >>> 12) % 40) / 10 });
+    }
+    const relief = reliefOf(this.game.map);
+    return { trees, rocks, bushes: relief ? bushes.filter((b) => relief.heightAt(b.x, b.y) > RELIEF.water + 4 && relief.heightAt(b.x, b.y) < RELIEF.peak) : bushes };
   }
 
   /**
@@ -486,6 +502,7 @@ export class Renderer {
       for (const b of d.benches) items.push({ k: cam.depth(b.x, b.y), t: 7, o: b });
     }
     for (const o of this.deco.rocks) if (inRect(o.x, o.y, PAD)) items.push({ k: cam.depth(o.x, o.y), t: 2, o });
+    for (const b of this.deco.bushes) if (inRect(b.x, b.y, 40)) items.push({ k: cam.depth(b.x, b.y), t: 13, o: b });
     for (const b of g.buildings) {
       if (!b.alive || (!g.alwaysVisible(team, b) && !known(b.x, b.y)) || !inRect(b.x, b.y, PAD)) continue;
       items.push({ k: cam.depth(b.x, b.y), t: 4, o: b });
@@ -549,7 +566,8 @@ export class Renderer {
       else if (it.t === 1) {
         if (!drawTreeSprite(ctx, cam, it.o, this.season)) drawTree(ctx, cam, it.o, this.season);
       }
-      else if (it.t === 2) drawRock(ctx, cam, it.o);
+      else if (it.t === 2) { if (!drawRockSprite(ctx, cam, it.o, this.season)) drawRock(ctx, cam, it.o); }
+      else if (it.t === 13) drawBushSprite(ctx, cam, it.o, this.season);
       else if (it.t === 6) drawCar(ctx, cam, it.o);
       else if (it.t === 7) drawBench(ctx, cam, it.o);
       else if (it.t === 8) drawCrate(ctx, cam, it.o.x, it.o.y, it.o.ground ? 16 : 13, 0, it.o.ground ? glow : 0);

@@ -19,3 +19,6 @@ Scharfschütze (units/sniper-*): eigenes blockiges Modell im Stil der Kenney-Sol
 ## Bäume (eigene Grafik)
 `trees/tree-a..d.png` (128×160, drei Laubbäume und eine Fichte) für die Standardansicht (Drehung 0), gemalt von `tools/gen-trees.mjs` (kein Fremdmaterial).
 `trees/tree.png` ist der Block-Baum für die gedrehten Ansichten.
+
+## Felsen und Büsche (eigene Grafik)
+`rocks/rock-a..d.png` (128×104, Bodenpunkt 64/92) und `bushes/bush-a..c.png` (72×56, Bodenpunkt 36/50), gemalt von `tools/gen-rocks.mjs` (kein Fremdmaterial). Büsche sind reine Optik (js/render/renderer.js `buildDeco`).

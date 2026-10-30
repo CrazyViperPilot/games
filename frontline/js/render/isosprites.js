@@ -41,6 +41,11 @@ const TREE = load('trees/tree.png'); // Ersatz, solange die gemalten Bäume lade
 // Gemalte Bäume (tools/gen-trees.mjs), drei Laubbäume und eine Fichte, je Baum fest nach Position
 const TREES_NATURAL = ['a', 'b', 'c', 'd'].map((n) => load(`trees/tree-${n}.png`));
 const TREE_FOOT = 6; // Bildzeilen unter dem Stammfuß im Natur-Bild
+// Gemalte Felsen und Büsche (tools/gen-rocks.mjs): Bodenpunkt im Bild und Bildbreite
+const ROCKS = ['a', 'b', 'c', 'd'].map((n) => load(`rocks/rock-${n}.png`));
+const BUSHES = ['a', 'b', 'c'].map((n) => load(`bushes/bush-${n}.png`));
+const ROCK_VIEW = { ax: 64, ay: 92, w: 128, h: 104 };
+const BUSH_VIEW = { ax: 36, ay: 50, w: 72 };
 
 // Fahrzeuge: je Modell und Team (0 = Blau, 1 = Rot) acht Bilder nach Bildschirmrichtung
 const SECTORS = ['e', 'se', 's', 'sw', 'w', 'nw', 'n', 'ne']; // 0° = rechts, im Uhrzeigersinn
@@ -160,6 +165,41 @@ function drawNaturalTree(ctx, cam, t, season, img) {
   ctx.ellipse(p.x + r * 0.15, p.y + r * 0.1, r * 1.0, r * 0.45, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.drawImage(sea, p.x - (img.naturalWidth * s) / 2, p.y - (img.naturalHeight - TREE_FOOT) * s, img.naturalWidth * s, img.naturalHeight * s);
+  return true;
+}
+
+/** Fels (Hindernis mit ungeradem Radius): ein gemaltes Bild nach Radius skaliert, große Felsen mit zwei kleineren Begleitern. false = Bild fehlt. */
+export function drawRockSprite(ctx, cam, o, season = 'summer') {
+  const h = hash(o.x, o.y);
+  const img = ROCKS[h % ROCKS.length];
+  if (!ready(img)) return false;
+  const z = cam.zoom;
+  const draw = (x, y, r, k) => {
+    const src = ROCKS[k % ROCKS.length];
+    if (!ready(src)) return;
+    const im = seasonal(src, season, 'ground', 2, 0);
+    const p = cam.worldToScreen(x, y);
+    const s = (r * 2.6 * z) / ROCK_VIEW.w;
+    ctx.drawImage(im, p.x - ROCK_VIEW.ax * s, p.y - ROCK_VIEW.ay * s, ROCK_VIEW.w * s, ROCK_VIEW.h * s);
+  };
+  if (o.r >= 50) {
+    const a = ((h >>> 3) % 628) / 100;
+    draw(o.x + Math.cos(a) * o.r * 0.55, o.y + Math.sin(a) * o.r * 0.55 + o.r * 0.1, o.r * 0.5, h + 1);
+    draw(o.x + Math.cos(a + 2.4) * o.r * 0.5, o.y + Math.sin(a + 2.4) * o.r * 0.5 + o.r * 0.1, o.r * 0.42, h + 2);
+  }
+  draw(o.x, o.y, o.r, h);
+  return true;
+}
+
+/** Busch (reine Optik, blockiert nicht): Fuß am Weltpunkt, Größe nach Radius, Laubfarbe je Jahreszeit wie beim Baum. false = Bild fehlt. */
+export function drawBushSprite(ctx, cam, b, season = 'summer') {
+  const h = hash(b.x, b.y * 3 + 2);
+  const img = BUSHES[h % BUSHES.length];
+  if (!ready(img)) return false;
+  const sea = seasonal(img, season, 'tree', 2, season === 'autumn' ? h % 3 : 0);
+  const p = cam.worldToScreen(b.x, b.y);
+  const s = (b.r * 3.4 * cam.zoom) / BUSH_VIEW.w;
+  ctx.drawImage(sea, p.x - BUSH_VIEW.ax * s, p.y - BUSH_VIEW.ay * s, img.naturalWidth * s, img.naturalHeight * s);
   return true;
 }
 
