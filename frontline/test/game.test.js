@@ -390,6 +390,8 @@ test('Schütze baut Mauer, Schütze kann keine Halle bauen', () => {
   const g = mk({ seed: 7 });
   const f = fobOf(g, 0);
   const rifle = unitsOf(g, 0, 'rifleman')[0];
+  rifle.x = f.x + 80; // Startaufstellung steht weiter weg: der Schütze soll hier neben der FOB stehen
+  rifle.y = f.y + 80;
   const spot = findSpot(g, 0, 'mortar', f.x, f.y);
   const bad = g.issue(0, { type: 'build', ids: [rifle.id], building: 'mortar', x: spot.x, y: spot.y });
   assert.equal(bad.ok, false);
@@ -506,6 +508,8 @@ test('Reparatur ohne FOB-Lager in Reichweite findet nicht statt', () => {
   const wall = g.spawnBuilding('wall', 0, cellOf(f.x) + 20, cellOf(f.y), { built: true });
   wall.hp = 100;
   const eng = unitsOf(g, 0, 'engineer')[0];
+  eng.x = wall.x - 60; // neben die Mauer stellen (die Startaufstellung steht weiter weg)
+  eng.y = wall.y;
   assert.equal(g.issue(0, { type: 'repair', ids: [eng.id], targetId: wall.id }).ok, true);
   run(g, 10);
   assert.equal(wall.hp, 100);
@@ -568,6 +572,7 @@ test('Erstattung: Abriss fertiger Gebäude 25 % Baumaterial, Baustelle voll, an 
 /** Mörser (Team 0) bei (600, 3800), Feind-Schütze bei (1000, 3800), eigene Sicht durch Fahrzeughalle. */
 function mortarScene(withAA) {
   const g = mk({ seed: 7 });
+  for (const u of unitsOf(g, 0)) u.alive = false; // Startaufstellung räumen
   g.spawnBuilding('mortar', 0, cellOf(600) - 1, cellOf(7924) - 1);
   g.spawnBuilding('mortar', 0, cellOf(1000) - 1, cellOf(8074) - 1);
   const enemy = g.spawnUnit('rifleman', 1, 1000, 7924);
@@ -622,6 +627,7 @@ test('Flugabwehr fängt Mörsergranaten ab', () => {
 test('Verbrauch: ein Schuss zieht einen Schuss aus dem Einheitenvorrat, nicht aus dem Lager', () => {
   const g = mk({ seed: 7 });
   const sp = g.map.spawns[0];
+  for (const u of unitsOf(g, 0)) u.alive = false; // Startaufstellung räumen
   const rifle = g.spawnUnit('rifleman', 0, sp.x + 300, sp.y - 300);
   const enemy = g.spawnUnit('rifleman', 1, rifle.x + 120, rifle.y);
   const stock0 = g.teams[0].res.mun;

@@ -50,6 +50,22 @@ export const BALANCE = {
   // Einheitenlimit in Plätzen je Team: Soldat/LKW/Baufahrzeug/Hubschrauber 1, Schützenpanzer 3, Kampfpanzer 5, Flak und SAM 2 (`slots` in units.js)
   slotCap: QUICK.unitLimit,
   startUnits: QUICK.startUnits,
+  // Startaufstellung nach Truppengattung getrennt um die Haupt-FOB. angle = Grad von der Richtung zur Kartenmitte (0 = vorn,
+  // 90 = links, 180 = hinten), dist = Abstand des Ankerpunkts zur FOB-Mitte (px), gap = Lücke zwischen den Einheiten (px).
+  // Eine Gattung füllt von ihrem Ankerpunkt aus die nächsten freien Plätze; Typen ohne Gruppe nehmen `fallback`.
+  startLayout: {
+    maxDist: 700, // weiter als so viele px von der FOB-Mitte wird nichts aufgestellt
+    groups: [
+      { types: ['tank', 'ifv'], angle: 0, dist: 330, gap: 26 }, // Panzer vorn
+      { types: ['rifleman', 'sniper'], angle: 60, dist: 300, gap: 14 }, // Schützen links
+      { types: ['at'], angle: -60, dist: 300, gap: 14 }, // Panzerabwehr rechts
+      { types: ['truck', 'engineer'], angle: 180, dist: 330, gap: 24 }, // Versorgung hinten
+      { types: ['flak', 'sam'], angle: -130, dist: 330, gap: 26 }, // Luftabwehr hinten rechts
+      { types: ['littlebird', 'transporter', 'gunship'], angle: 130, dist: 380, gap: 40 }, // Hubschrauber hinten links
+      { types: ['commander'], angle: 180, dist: 130, gap: 10 }, // Kommandeur dicht hinter der FOB
+    ],
+    fallback: { angle: 0, dist: 200, gap: 14 },
+  },
   // Geld je Sekunde und lebende eigene Einheit in der Konfliktzone (auch umkämpft, ohne Deckel)
   zone: { r: 3300, unitIncome: QUICK.moneyPerUnitZone },
   // Hot Zone: kleiner Kreis in der Konfliktzone, wandert zufällig oder zu aktiven Bohrern.

@@ -40,12 +40,12 @@ const WALL_TYPES = new Set(['wall', 'gate']);
 
 const zeroRes = () => ({ money: 0, bm: 0, mun: 0, fuel: 0 });
 
-const START_GAP = 4; // Abstand zwischen Einheiten beim Start (px, über die Radien hinaus)
 const START_STEP = 12; // Rastergröße der Startplätze (px)
 
 /**
- * Startaufstellung um die Haupt-FOB: je Einheit der erste freie passierbare Platz im Raster, vorn (zur Kartenmitte)
- * zuerst, nie überlappend. Liefert die Mittelpunkte in der Reihenfolge von `types`.
+ * Startaufstellung um die Haupt-FOB nach Truppengattung getrennt (BALANCE.startLayout): jede Gattung hat einen Ankerpunkt
+ * (Winkel zur Kartenmitte, Abstand zur FOB) und füllt von dort aus die nächsten freien passierbaren Plätze im Raster,
+ * nie überlappend. Beide Teams nutzen dieselbe Anordnung relativ zur Kartenmitte. Liefert die Mittelpunkte in der Reihenfolge von `types`.
  */
 function startFormation(grid, team, cx, cy, types) {
   let fx = W / 2 - cx;
@@ -53,28 +53,37 @@ function startFormation(grid, team, cx, cy, types) {
   const fl = Math.hypot(fx, fy) || 1;
   fx /= fl;
   fy /= fl;
-  // Kandidaten in Ringen 60–600 px um die FOB (FOB-Mitte liegt im Gebäude und ist nicht passierbar)
+  const layout = BALANCE.startLayout;
+  const R = layout.maxDist;
+  // Kandidaten in Ringen 60–R px um die FOB (FOB-Mitte liegt im Gebäude und ist nicht passierbar)
   const cands = [];
-  for (let dy = -600; dy <= 600; dy += START_STEP) {
-    for (let dx = -600; dx <= 600; dx += START_STEP) {
+  for (let dy = -R; dy <= R; dy += START_STEP) {
+    for (let dx = -R; dx <= R; dx += START_STEP) {
       const r = Math.hypot(dx, dy);
-      if (r < 60 || r > 600) continue;
+      if (r < 60 || r > R) continue;
       const x = cx + dx;
       const y = cy + dy;
       if (!grid.passable(grid.toCell(x), grid.toCell(y), team)) continue;
-      // vorn näher, seitlich und hinten weiter weg
-      cands.push({ x, y, score: r + 150 * (1 - (dx * fx + dy * fy) / r) });
+      cands.push({ x, y });
     }
   }
-  cands.sort((a, b) => a.score - b.score || a.x - b.x || a.y - b.y);
   const placed = [];
   for (const type of types) {
+    const g = layout.groups.find((o) => o.types.includes(type)) || layout.fallback;
     const rad = UNITS[type].radius;
-    const spot = cands.find((c) =>
-      placed.every((p) => Math.hypot(c.x - p.x, c.y - p.y) >= rad + p.rad + START_GAP),
-    );
-    if (spot) placed.push({ x: spot.x, y: spot.y, rad });
-    else placed.push(null);
+    const a = (g.angle * Math.PI) / 180;
+    const ax = cx + g.dist * (fx * Math.cos(a) - fy * Math.sin(a));
+    const ay = cy + g.dist * (fx * Math.sin(a) + fy * Math.cos(a));
+    let best = null;
+    let bestD = Infinity;
+    for (const c of cands) {
+      const d = Math.hypot(c.x - ax, c.y - ay);
+      if (d >= bestD) continue;
+      if (placed.some((p) => Math.hypot(c.x - p.x, c.y - p.y) < rad + p.rad + Math.max(g.gap, p.gap))) continue;
+      best = c;
+      bestD = d;
+    }
+    placed.push(best ? { x: best.x, y: best.y, rad, gap: g.gap } : null);
   }
   return placed.map((p) => (p ? { x: p.x, y: p.y } : null));
 }
