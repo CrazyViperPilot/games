@@ -110,7 +110,7 @@ function plinth(ctx, w, color, floorAt = 0) {
   if (floorAt) lines(ctx, [[wallPoint(w, 0, floorAt), wallPoint(w, 1, floorAt)]], 'rgba(0,0,0,0.28)');
 }
 
-/** Satteldach über dem Quader (First entlang der langen Seite); keine Rückseiten. */
+/** Satteldach über dem Quader (First entlang der langen Seite); abgewandte Giebel entfallen, beide Dachhälften werden gezeichnet. */
 function gableRoof(ctx, cam, x0, y0, x1, y1, H, rh, roofCol, wallCol) {
   const z = cam.zoom;
   roofCol = snowy(roofCol); // Winter: Schnee auf dem Dach (season.js)
@@ -140,11 +140,14 @@ function gableRoof(ctx, cam, x0, y0, x1, y1, H, rh, roofCol, wallCol) {
   ctx.lineJoin = 'round';
   ctx.lineWidth = 1;
   ctx.strokeStyle = OUTLINE;
-  for (const [pts, nx, ny, slope] of pieces) {
-    const n = cam.worldToScreen(xm + nx * 10, ym + ny * 10);
-    const sx = n.x - o.x;
-    const sy = n.y - o.y;
-    if (sy < -0.01) continue; // zeigt vom Betrachter weg
+  // Wegzeigende Dachhälfte zuerst (sie ist von oben sichtbar, der Quaderdeckel darf nicht durchscheinen), dann die zugewandten Teile.
+  const facing = pieces.map((pc) => {
+    const n = cam.worldToScreen(xm + pc[1] * 10, ym + pc[2] * 10);
+    return [pc, n.x - o.x, n.y - o.y];
+  });
+  facing.sort((a, b) => a[2] - b[2]);
+  for (const [[pts, , , slope], sx, sy] of facing) {
+    if (sy < -0.01 && !slope) continue; // abgewandter Giebel ist verdeckt, abgewandte Schräge nicht
     ctx.beginPath();
     ctx.moveTo(pts[0].x, pts[0].y);
     for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);

@@ -1,6 +1,6 @@
 // Frontline Service Worker: network-first (immer die neueste Version), Cache nur als Offline-Fallback.
 // Bei Änderungen an Dateien CACHE_VERSION erhöhen, damit Clients die neue Version laden.
-const CACHE_VERSION = 'frontline-v83';
+const CACHE_VERSION = 'frontline-v85';
 const CACHE_PREFIX = 'frontline-';
 const CACHE_NAME = CACHE_VERSION;
 
@@ -178,11 +178,8 @@ const ASSETS = [
   './assets/iso/buildings/ind_building-d.png',
   './assets/iso/buildings/ind_building-e.png',
   './assets/iso/buildings/ind_building-f.png',
-  './assets/iso/buildings/ind_building-g.png',
   './assets/iso/buildings/ind_building-h.png',
   './assets/iso/buildings/ind_building-i.png',
-  './assets/iso/buildings/ind_building-j.png',
-  './assets/iso/buildings/ind_building-k.png',
   './assets/iso/buildings/ind_building-l.png',
   './assets/iso/buildings/ind_building-m.png',
   './assets/iso/buildings/ind_building-n.png',
