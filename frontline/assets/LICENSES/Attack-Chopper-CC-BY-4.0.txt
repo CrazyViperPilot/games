@@ -1,8 +1,0 @@
-Attack Chopper (3D-Modell)
-
-Urheber: Cheese Animal Productions (Geibu3D), https://geibu3d.itch.io/
-Quelle: https://opengameart.org/content/attack-chopper
-Lizenz: Creative Commons Attribution 4.0 (CC BY 4.0), https://creativecommons.org/licenses/by/4.0/
-
-Änderungen: Das Modell (Attack_Helicopter.obj mit Apache_Texture_White.png) wurde mit three.js in 8 Blickrichtungen
-gerendert und in Teamfarben (Blau/Rot) eingefärbt; nur die Bilder assets/iso/vehicles/apache-*.png werden im Spiel genutzt.

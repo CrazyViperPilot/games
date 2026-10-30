@@ -281,11 +281,123 @@ const out = await page.evaluate(() => {
     S.push(cyl([-33, 0, 52], [-33, 0, 55], 3, 3, 8, METAL)); // Mast hinten
     for (const [x, z] of [[30, 43], [-33, 56]]) {
       const d = cyl([x, 0, z], [x, 0, z + 0.6], 38, 38, 20, '#c9ced0');
-      d.alpha = 0.22;
+      d.alpha = 0.14;
       S.push(d);
       for (const a of [0.4, 2.1, 3.6]) S.push(cyl([x, 0, z + 0.3], [x + Math.cos(a) * 38, Math.sin(a) * 38, z + 0.3], 0.9, 0.9, 4, '#2b2d2f')); // Blattschatten
     }
     S.push(box(-1, 1, -11.5, -6, 35, 41, T.vest));
+    return { solids: S, shadow: null };
+  }
+
+  // ---------- LKW, Baufahrzeug, Kampfhubschrauber, Little Bird ----------
+  const wheel = (S, x, y, r, w) => {
+    const s = Math.sign(y);
+    S.push(cyl([x, y, r], [x, y + s * w, r], r, r, 10, '#1b1c1e'));
+    S.push(cyl([x, y + s * w, r], [x, y + s * (w + 0.4), r], r * 0.5, r * 0.5, 8, '#8d9296'));
+  };
+  const rotor = (S, x, y, z, R, blades) => {
+    const d = cyl([x, y, z], [x, y, z + 0.6], R, R, 22, '#c9ced0');
+    d.alpha = 0.13;
+    S.push(d);
+    for (const a of blades) S.push(cyl([x, y, z + 0.3], [x + Math.cos(a) * R, y + Math.sin(a) * R, z + 0.3], 1, 0.8, 4, '#26282a'));
+  };
+  function truck(team) {
+    const T = TEAM[team];
+    const body = mix(T.base, '#6b6f66', 0.2);
+    const dark = mix(body, '#000000', 0.3);
+    const tarp = mix(T.base, '#8a8460', 0.55);
+    const S = [];
+    S.push(box(-44, 40, -15, 15, 8, 15, '#2c2e30')); // Fahrgestell
+    S.push(prismXZ([[10, 15], [10, 44], [26, 44], [36, 34], [40, 28], [40, 15]], -17, 17, body)); // Fahrerhaus
+    S.push(box(36, 40.6, -14, 14, 29, 40, '#25323d')); // Frontscheibe
+    S.push(box(10, 40.6, 17, 17.4, 30, 40, '#25323d')); // Seitenfenster
+    S.push(box(39.6, 41.6, -14, 14, 15, 22, '#202224')); // Kühlergrill
+    for (const y of [-11, 9]) S.push(box(40, 41.4, y, y + 3, 22, 26, '#f4efc8')); // Scheinwerfer
+    S.push(prismXZ([[-44, 15], [-44, 40], [6, 44], [6, 15]], -18, 18, tarp)); // Plane
+    for (const x of [-34, -20, -6]) S.push(box(x, x + 1.2, -18.2, 18.2, 15, 40, mix(tarp, '#000000', 0.25))); // Spriegel
+    S.push(box(-44.5, -43.5, -16, 16, 10, 16, dark));
+    for (const s of [-1, 1]) {
+      for (const x of [-30, -14, 28]) wheel(S, x, s * 14, 9, 7);
+      S.push(box(-34, 34, s * 15 - 0.4, s * 15 + 0.4, 17, 18, dark));
+    }
+    S.push(cyl([22, 12, 44], [22, 12, 54], 1.6, 1.6, 6, METAL)); // Auspuff
+    S.push(box(11, 14, -4, 4, 44, 46, T.vest)); // Teamfarbe auf dem Dach
+    return { solids: S, shadow: [[-46, -22], [44, -22], [44, 22], [-46, 22]] };
+  }
+  function engineer(team) {
+    const T = TEAM[team];
+    const body = mix(T.base, '#6b6f66', 0.2);
+    const dark = mix(body, '#000000', 0.3);
+    const YEL = '#c9a93a';
+    const S = [];
+    S.push(box(-36, 34, -14, 14, 8, 14, '#2c2e30'));
+    S.push(prismXZ([[2, 14], [2, 34], [14, 34], [26, 24], [34, 22], [34, 14]], -16, 16, body)); // Fahrerhaus
+    S.push(box(24, 27.5, -13, 13, 24, 33, '#25323d'));
+    S.push(box(2, 27.5, 16, 16.4, 24, 33, '#25323d'));
+    S.push(box(33.6, 35.6, -13, 13, 14, 20, '#202224'));
+    for (const y of [-11, 9]) S.push(box(34, 35.4, y, y + 3, 17, 21, '#f4efc8'));
+    S.push(box(-36, 0, -16, 16, 14, 24, YEL)); // Ladefläche mit Bordwand
+    S.push(box(-34, -2, -13.5, 13.5, 24, 24.4, mix(YEL, '#000000', 0.4)));
+    S.push(cyl([-18, 0, 24], [-18, 0, 30], 6, 6, 10, METAL)); // Drehkranz des Krans
+    S.push(cyl([-18, 0, 30], [-36, 0, 54], 2.6, 2.1, 6, YEL)); // Ausleger
+    S.push(cyl([-36, 0, 54], [-48, 0, 46], 1.8, 1.5, 6, YEL)); // Spitze
+    S.push(cyl([-48, 0, 46], [-48, 0, 34], 0.5, 0.5, 4, '#15171a')); // Seil
+    S.push(box(-50, -46, -2, 2, 30, 34, METAL)); // Haken
+    S.push(cyl([-8, 0, 24], [-8, 0, 36], 1.2, 1.2, 6, '#15171a')); // Stütze
+    for (const s of [-1, 1]) {
+      for (const x of [-24, 22]) wheel(S, x, s * 13, 8, 6.5);
+      S.push(box(-6, 8, s * 17.5 - 1.5, s * 17.5 + 1.5, 6, 10, METAL)); // Abstützung
+    }
+    S.push(cyl([14, 0, 34], [14, 0, 38], 3, 3, 8, '#e8a020')); // Rundumleuchte
+    S.push(box(4, 8, -3, 3, 34, 35, T.vest));
+    return { solids: S, shadow: [[-40, -20], [40, -20], [40, 20], [-40, 20]] };
+  }
+  function apache(team) {
+    const T = TEAM[team];
+    const body = mix(T.base, '#4c5256', 0.5);
+    const dark = mix(body, '#000000', 0.32);
+    const S = [];
+    S.push(prismXZ([[-10, 14], [-10, 28], [8, 30], [24, 25], [34, 19], [28, 13], [0, 11]], -6, 6, body)); // Rumpf
+    S.push(prismXZ([[10, 28], [16, 34], [28, 26], [24, 23]], -4.5, 4.5, '#1f3040')); // Kanzel
+    S.push(prismXZ([[-4, 28], [0, 33], [10, 31], [8, 28]], -4.5, 4.5, '#1f3040'));
+    for (const s of [-1, 1]) {
+      S.push(cyl([-22, s * 8.5, 28], [2, s * 8.5, 28], 5, 4.6, 8, dark)); // Triebwerk
+      S.push(box(-2, 11, s * 12, s * 26, 18, 20, dark)); // Stummelflügel
+      S.push(cyl([2, s * 25, 21], [16, s * 25, 21], 3.4, 3, 8, '#aeb2a8')); // Raketenbehälter
+      S.push(cyl([16, s * 25, 21], [18.5, s * 25, 21], 3, 1, 8, '#7a3a2a'));
+      S.push(cyl([6, s * 5, 10], [6, s * 5, 4], 1, 1, 4, METAL)); // Fahrwerk
+      S.push(cyl([6, s * 5, 4], [6, s * 8, 4], 2.6, 2.6, 8, '#1b1c1e'));
+    }
+    S.push(prismXZ([[-10, 22], [-10, 28], [-56, 27], [-56, 24]], -2.2, 2.2, body)); // Heckausleger
+    S.push(prismXZ([[-58, 24], [-50, 24], [-52, 42], [-58, 44]], -0.9, 0.9, dark)); // Seitenleitwerk
+    S.push(box(-60, -48, -10, 10, 25, 26.2, dark)); // Höhenleitwerk
+    S.push(cyl([34, 0, 15], [44, 0, 14], 1.2, 1.2, 5, '#1f2123')); // Bordkanone
+    S.push(cyl([-2, 0, 30], [-2, 0, 40], 1.8, 1.8, 6, METAL)); // Rotormast
+    S.push(box(-3, 1, -1.5, 1.5, 38, 42, T.vest));
+    rotor(S, -2, 0, 41, 46, [0.5, 0.5 + Math.PI / 2, 0.5 + Math.PI, 0.5 + 1.5 * Math.PI]);
+    rotor(S, -55, 3, 33, 9, [1.0, 1.0 + Math.PI / 2, 1.0 + Math.PI, 1.0 + 1.5 * Math.PI]);
+    return { solids: S, shadow: null };
+  }
+  function littlebird(team) {
+    const T = TEAM[team];
+    const body = mix(T.base, '#7a8590', 0.25);
+    const dark = mix(body, '#000000', 0.3);
+    const S = [];
+    S.push(sphere([2, 0, 24], 17, 12, 12.5, body, 10, 7)); // Rumpf
+    S.push(sphere([12, 0, 26], 9, 9.5, 9, '#243746', 8, 6)); // Glaskuppel
+    S.push(box(-14, 0, -7, 7, 24, 33, dark)); // Triebwerksverkleidung
+    S.push(cyl([-10, 0, 26], [-54, 0, 29], 3.4, 2, 8, body)); // Heckausleger
+    S.push(box(-58, -50, -0.8, 0.8, 28, 44, dark)); // Seitenleitwerk
+    S.push(box(-56, -50, -9, 9, 29, 30, dark)); // Höhenleitwerk
+    S.push(cyl([-2, 0, 32], [-2, 0, 40], 1.8, 1.8, 6, METAL)); // Rotormast
+    for (const s of [-1, 1]) {
+      S.push(cyl([-28, s * 13, 3], [26, s * 13, 3], 1.4, 1.4, 6, METAL)); // Kufen
+      for (const x of [-14, 12]) S.push(cyl([x, s * 13, 3], [x, s * 8, 15], 1, 1, 5, METAL));
+      S.push(box(-4, 12, s * 15, s * 19, 17, 23, dark)); // Außensitzbank / Waffenträger
+    }
+    S.push(box(0, 4, -1, 1, 37, 39, T.vest));
+    rotor(S, -2, 0, 41, 40, [0.3, 0.3 + (2 * Math.PI) / 5, 0.3 + (4 * Math.PI) / 5, 0.3 + (6 * Math.PI) / 5, 0.3 + (8 * Math.PI) / 5]);
+    rotor(S, -55, 2, 36, 8, [1.0, 1.0 + Math.PI / 2, 1.0 + Math.PI, 1.0 + 1.5 * Math.PI]);
     return { solids: S, shadow: null };
   }
 
@@ -361,6 +473,10 @@ const out = await page.evaluate(() => {
     const fl = flak(team);
     const sm = sam(team);
     const ch = chinook(team);
+    const tr = truck(team);
+    const en = engineer(team);
+    const ap = apache(team);
+    const lb = littlebird(team);
     const rf = { rifleman: soldier('rifleman', team), at: soldier('at', team), sniper: soldier('sniper', team) };
     SECT.forEach((sec, s) => {
       const yaw = yawOf(s);
@@ -369,6 +485,10 @@ const out = await page.evaluate(() => {
       draw(`vehicles/flak-${team}-${sec}.png`, 144, 120, 72, 86, 0.92, fl, yaw);
       draw(`vehicles/sam-${team}-${sec}.png`, 144, 120, 72, 86, 0.92, sm, yaw);
       draw(`vehicles/transporter-${team}-${sec}.png`, 144, 120, 72, 90, 0.9, ch, yaw);
+      draw(`vehicles/truck-${team}-${sec}.png`, 144, 120, 72, 86, 0.9, tr, yaw);
+      draw(`vehicles/pickup-${team}-${sec}.png`, 144, 120, 72, 86, 0.92, en, yaw);
+      draw(`vehicles/apache-${team}-${sec}.png`, 144, 120, 72, 90, 0.82, ap, yaw);
+      draw(`vehicles/littlebird-${team}-${sec}.png`, 144, 120, 72, 90, 0.9, lb, yaw);
       for (const type of ['rifleman', 'at', 'sniper']) draw(`units/${type}-${team}-${sec}.png`, 80, 112, 40, 100, 0.95, rf[type], yaw);
     });
   }

@@ -55,8 +55,8 @@ const BUSH_VIEW = { ax: 36, ay: 50, w: 72 };
 const SECTORS = ['e', 'se', 's', 'sw', 'w', 'nw', 'n', 'ne']; // 0° = rechts, im Uhrzeigersinn
 const TEAM_COLOR = ['blue', 'red'];
 const UNIT_MODEL = { truck: 'truck', engineer: 'pickup', tank: 'tank', gunship: 'apache', littlebird: 'littlebird', ifv: 'ifv', flak: 'flak', sam: 'sam', transporter: 'transporter' };
-// 3D-Modelle (T-12-Panzer, Attack Chopper), siehe assets/iso/README.md: span = Bildbreite in Einheitenradien, ax/ay = Bodenpunkt im Bild
-const MODEL_VIEW = { tank: { span: 6.5, ax: 72, ay: 82 }, apache: { span: 5, ax: 64, ay: 47 }, littlebird: { span: 5, ax: 64, ay: 55 }, ifv: { span: 5.6, ax: 72, ay: 82 }, flak: { span: 6.1, ax: 72, ay: 86 }, sam: { span: 6.1, ax: 72, ay: 86 }, transporter: { span: 7.2, ax: 72, ay: 90 } };
+// Gemalte Fahrzeugmodelle (tools/gen-troops.mjs), siehe assets/iso/README.md: span = Bildbreite in Einheitenradien, ax/ay = Bodenpunkt im Bild
+const MODEL_VIEW = { truck: { span: 7, ax: 72, ay: 86 }, pickup: { span: 6.4, ax: 72, ay: 86 }, tank: { span: 6.5, ax: 72, ay: 82 }, apache: { span: 6.2, ax: 72, ay: 90 }, littlebird: { span: 6.8, ax: 72, ay: 90 }, ifv: { span: 5.6, ax: 72, ay: 82 }, flak: { span: 6.1, ax: 72, ay: 86 }, sam: { span: 6.1, ax: 72, ay: 86 }, transporter: { span: 7.2, ax: 72, ay: 90 } };
 const VEHICLES = {};
 for (const model of new Set(Object.values(UNIT_MODEL))) {
   VEHICLES[model] = TEAM_COLOR.map((c) => SECTORS.map((s) => load(`vehicles/${model}-${c}-${s}.png`)));
