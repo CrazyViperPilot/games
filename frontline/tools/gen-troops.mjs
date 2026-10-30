@@ -131,13 +131,15 @@ const out = await page.evaluate(() => {
         const sh = 0.5 + 0.62 * Math.max(0, dot(nrm, LIGHT)) + (nrm[2] < -0.3 ? -0.15 : 0);
         const [r, g, b] = hex(s.col).map((v) => Math.max(0, Math.min(255, Math.round(v * sh))));
         const fill = `rgb(${r},${g},${b})`;
+        ctx.globalAlpha = s.alpha ?? 1;
         ctx.fillStyle = fill;
         ctx.strokeStyle = `rgb(${Math.round(r * 0.78)},${Math.round(g * 0.78)},${Math.round(b * 0.78)})`;
         ctx.beginPath();
         pts.map(proj).forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
         ctx.closePath();
         ctx.fill();
-        ctx.stroke();
+        if (s.alpha === undefined) ctx.stroke();
+        ctx.globalAlpha = 1;
       }
     }
   }
@@ -211,6 +213,82 @@ const out = await page.evaluate(() => {
     return { solids: S, shadow: [[-46, -30], [46, -30], [46, 30], [-46, 30]] };
   }
 
+
+  // ---------- Flakpanzer, Flugabwehrrakete, Transporthubschrauber ----------
+  function hullKit(team, S) {
+    const T = TEAM[team];
+    const body = mix(T.base, '#6b6f66', 0.3);
+    const dark = mix(body, '#000000', 0.3);
+    for (const s of [-1, 1]) {
+      const y0 = s > 0 ? 19 : -28;
+      const y1 = s > 0 ? 28 : -19;
+      S.push(prismXZ([[-34, 0], [34, 0], [41, 7], [34, 12], [-34, 12], [-41, 7]], y0, y1, TRACK));
+      S.push(box(-32, 36, s > 0 ? 28 : -30, s > 0 ? 30 : -28, 5, 16, dark));
+      for (const x of [-38, 38]) S.push(cyl([x, s * 28.1, 6], [x, s * 28.6, 6], 6, 6, 10, '#44484b'));
+    }
+    S.push(prismXZ([[-42, 8], [-42, 19], [22, 19], [44, 12], [44, 8]], -19, 19, body));
+    return { T, body, dark };
+  }
+  function flak(team) {
+    const S = [];
+    const { T, body, dark } = hullKit(team, S);
+    S.push(prismXY([[-24, -17], [10, -17], [20, -10], [20, 10], [10, 17], [-24, 17]], 19, 36, body)); // großer Turm
+    S.push(box(-20, 12, -13, 13, 36, 37.5, mix(body, '#ffffff', 0.12)));
+    for (const y of [-9, 9]) {
+      S.push(box(14, 24, y - 3, y + 3, 24, 32, dark)); // Rohrwiege
+      S.push(cyl([20, y, 28], [62, y, 28], 2.2, 1.9, 8, '#2b2f31')); // Doppelrohr
+    }
+    S.push(cyl([-12, 0, 37], [-12, 0, 46], 1.6, 1.6, 6, METAL)); // Radarmast
+    S.push(cyl([-12, -9, 52], [-12, 9, 52], 9, 9, 12, mix(body, '#ffffff', 0.15))); // Suchradarscheibe
+    S.push(cyl([4, 0, 38], [4, 0, 41], 4, 4, 8, METAL));
+    S.push(cyl([-30, -12, 19], [-30, -12, 44], 0.7, 0.5, 4, '#15171a'));
+    S.push(box(-30.3, -29.7, -12, -6.5, 38, 43, T.vest));
+    return { solids: S, shadow: [[-46, -30], [46, -30], [46, 30], [-46, 30]] };
+  }
+  function sam(team) {
+    const S = [];
+    const { T, body, dark } = hullKit(team, S);
+    S.push(prismXY([[-14, -14], [8, -14], [14, -8], [14, 8], [8, 14], [-14, 14]], 19, 26, body)); // Drehkranz
+    S.push(box(-18, 8, -12, 12, 26, 29, dark)); // Startgestell
+    for (const y of [-8, 8]) {
+      for (const dz of [0, 9]) {
+        S.push(cyl([-20, y, 33 + dz], [24, y, 49 + dz], 4.4, 4.4, 8, '#d9dcd4')); // Rakete im Behälter
+        S.push(cyl([24, y, 49 + dz], [31, y, 52 + dz], 4.4, 1.2, 8, '#a8432f')); // Spitze
+      }
+    }
+    S.push(box(-14, 6, -11, 11, 29, 33, dark));
+    S.push(box(2, 10, -5, 5, 22, 30, METAL)); // Radar vorn
+    S.push(cyl([-32, -12, 19], [-32, -12, 44], 0.7, 0.5, 4, '#15171a'));
+    S.push(box(-32.3, -31.7, -12, -6.5, 38, 43, T.vest));
+    return { solids: S, shadow: [[-46, -30], [46, -30], [46, 30], [-46, 30]] };
+  }
+  function chinook(team) {
+    const T = TEAM[team];
+    const body = mix(T.base, '#6b6f66', 0.25);
+    const dark = mix(body, '#000000', 0.3);
+    const S = [];
+    for (const s of [-1, 1]) {
+      S.push(cyl([-30, s * 9, 6], [30, s * 9, 6], 1.4, 1.4, 6, METAL)); // Kufen
+      for (const x of [-22, 22]) S.push(cyl([x, s * 9, 6], [x, s * 9, 15], 1, 1, 5, METAL));
+      S.push(box(-30, 30, s * 9 - 0.7, s * 9 + 0.7, 5.5, 6.5, METAL));
+    }
+    S.push(prismXZ([[-46, 16], [-46, 30], [-30, 34], [22, 34], [38, 31], [46, 24], [46, 16], [30, 14], [-30, 14]], -12, 12, body)); // Rumpf
+    S.push(prismXZ([[34, 21], [34, 30], [44, 26], [44, 21]], -11, 11, mix('#1c2830', body, 0.1))); // Cockpitscheiben
+    S.push(box(-47, -44, -10, 10, 15, 28, dark)); // Heckrampe
+    for (const x of [-30, -16, -2, 12]) S.push(box(x, x + 6, 12, 12.4, 22, 28, '#25323d')); // Fenster
+    S.push(box(-40, -26, -4, 4, 34, 52, mix(body, '#000000', 0.12))); // Heckpylon
+    S.push(cyl([30, 0, 34], [30, 0, 42], 3, 3, 8, METAL)); // Mast vorn
+    S.push(cyl([-33, 0, 52], [-33, 0, 55], 3, 3, 8, METAL)); // Mast hinten
+    for (const [x, z] of [[30, 43], [-33, 56]]) {
+      const d = cyl([x, 0, z], [x, 0, z + 0.6], 38, 38, 20, '#c9ced0');
+      d.alpha = 0.22;
+      S.push(d);
+      for (const a of [0.4, 2.1, 3.6]) S.push(cyl([x, 0, z + 0.3], [x + Math.cos(a) * 38, Math.sin(a) * 38, z + 0.3], 0.9, 0.9, 4, '#2b2d2f')); // Blattschatten
+    }
+    S.push(box(-1, 1, -11.5, -6, 35, 41, T.vest));
+    return { solids: S, shadow: null };
+  }
+
   // ---------- Soldaten ----------
   const SKIN = '#d9ae8a';
   const OLIVE = '#5b6b45';
@@ -280,11 +358,17 @@ const out = await page.evaluate(() => {
   for (const team of ['blue', 'red']) {
     const t = tank(team);
     const f = ifv(team);
+    const fl = flak(team);
+    const sm = sam(team);
+    const ch = chinook(team);
     const rf = { rifleman: soldier('rifleman', team), at: soldier('at', team), sniper: soldier('sniper', team) };
     SECT.forEach((sec, s) => {
       const yaw = yawOf(s);
       draw(`vehicles/tank-${team}-${sec}.png`, 144, 120, 72, 82, 0.86, t, yaw);
       draw(`vehicles/ifv-${team}-${sec}.png`, 144, 120, 72, 82, 0.95, f, yaw);
+      draw(`vehicles/flak-${team}-${sec}.png`, 144, 120, 72, 86, 0.92, fl, yaw);
+      draw(`vehicles/sam-${team}-${sec}.png`, 144, 120, 72, 86, 0.92, sm, yaw);
+      draw(`vehicles/transporter-${team}-${sec}.png`, 144, 120, 72, 90, 0.9, ch, yaw);
       for (const type of ['rifleman', 'at', 'sniper']) draw(`units/${type}-${team}-${sec}.png`, 80, 112, 40, 100, 0.95, rf[type], yaw);
     });
   }
