@@ -43,6 +43,7 @@ import { reliefOf, RELIEF } from '../game/relief.js';
 import { getGround, LIGHT_ELEV } from './ground.js';
 import { seasonal, setRoofSnow } from './season.js';
 import { drawWeather } from './weatherfx.js';
+import { drawMood } from './mood.js';
 import { drawBridgeTop, drawBridgeIso, drawBridgeBar, bridgeBar, fordPosts, drawFordPostTop, drawFordPostIso } from './bridge.js';
 import { bridgeUnder } from '../game/river.js';
 
@@ -106,6 +107,7 @@ export class Renderer {
     this.camera = camera;
     this.team = team;
     this.revealAll = false; // Debug: kein Nebel, alle Gegner sichtbar
+    this.mood = null; // Lichtstimmung (mood.js), main.js setzt sie nach der Wahl im Startmenü
     this.season = game.weather?.season ?? 'summer'; // Herbst- und Winterfarben (season.js)
     this.terrain = seasonal(buildTerrain(game.map), this.season);
     this.terrainIso = null; // Boden ohne Gebäude/Bäume, erst beim ersten Wechsel in die isometrische Ansicht
@@ -249,6 +251,7 @@ export class Renderer {
     // Regen, Schnee und Nebel über der Welt (Bildschirmkoordinaten), danach wieder die Welt-Transformation
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     drawWeather(ctx, g.weather, this.cssW, this.cssH, now, cam);
+    drawMood(ctx, this.mood, this.cssW, this.cssH); // Lichtstimmung (mood.js)
     ctx.setTransform(dpr * z, 0, 0, dpr * z, (cam.viewW / 2 - cam.x * z) * dpr, (cam.viewH / 2 - cam.y * z) * dpr);
 
     // Lebensbalken: bei Auswahl, Hover oder Schaden
@@ -663,6 +666,7 @@ export class Renderer {
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     drawWeather(ctx, g.weather, this.cssW, this.cssH, now, cam); // Regen, Schnee und Nebel über der Welt
+    drawMood(ctx, this.mood, this.cssW, this.cssH); // Lichtstimmung (mood.js)
 
     // Balken und Warnzeichen aufrecht über den Objekten
     const upright = (wx, wy, lift) => {

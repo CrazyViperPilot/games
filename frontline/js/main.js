@@ -1,6 +1,6 @@
 // Bootstrap (docs/verlauf.md §5 main.js): Startmenü, Spiel erzeugen, Schleife, URL-Parameter, Service Worker.
 // URL: ?seed=N (feste Karte) · ?river=0|1 (Fluss) · ?speed=N (Startgeschwindigkeit) · ?debug=1 (Karte aufgedeckt, M = +1000, bis 10×).
-// Debug: ?weather=summer|autumn|winter (Jahreszeit) · ?wx=clear|rain|fog|snow (Wetter sofort, ohne Wechsel).
+// Debug: ?mood=morning|day|evening|night (Lichtstimmung) · ?weather=summer|autumn|winter (Jahreszeit) · ?wx=clear|rain|fog|snow (Wetter sofort, ohne Wechsel).
 import { BALANCE } from './data/balance.js';
 import { Game } from './game/game.js';
 import { loadMap } from './game/mapdata.js';
@@ -14,6 +14,7 @@ import { Controller } from './ui/controller.js';
 import { Input } from './ui/input.js';
 import { Hud } from './ui/hud.js';
 import { showStartMenu, showPause, showHelp, showEnd, hideOverlay } from './ui/menu.js';
+import { pickMood, MOOD_SETTINGS } from './render/mood.js';
 import { setWeather, WEATHER_NAMES, WEATHER_SETTINGS } from './game/weather.js';
 
 const params = new URLSearchParams(location.search);
@@ -76,7 +77,7 @@ hudRoot.addEventListener('click', (e) => {
 });
 
 let session = null; // laufendes Spiel: { game, ai, camera, renderer, minimap, controller, hud, input, loop, … }
-let settings = { difficulty: 'normal', winPoints: BALANCE.winPoints, radio: true, weather: 'random', research: true, river: true };
+let settings = { difficulty: 'normal', winPoints: BALANCE.winPoints, radio: true, weather: 'random', mood: 'random', research: true, river: true };
 
 function nearestSpeedIndex(v) {
   let best = 0;
@@ -256,6 +257,8 @@ function startGame(opts) {
   const camera = new Camera(BALANCE.map.width, BALANCE.map.height);
   camera.iso = loadIso();
   const renderer = new Renderer(canvas, game, camera, HUMAN);
+  const moodSetting = DEBUG && MOOD_SETTINGS.includes(params.get('mood')) ? params.get('mood') : opts.mood ?? 'off';
+  renderer.mood = pickMood(moodSetting, seed, game.weather.season); // nur Optik, ?debug=1&mood=night
   const controller = new Controller(game, HUMAN, camera);
   const hud = new Hud(hudRoot, game, HUMAN, controller, app);
   controller.onMessage = (text) => hud.pushMessage(text);

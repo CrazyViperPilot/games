@@ -3,6 +3,7 @@
 import { BALANCE } from '../data/balance.js';
 import { listMaps, deleteMap, saveMap, normalizeMap, describeMap } from '../game/mapdata.js';
 import { WEATHER_SETTINGS } from '../game/weather.js';
+import { MOOD_SETTINGS } from '../render/mood.js';
 import { SOUND_KEY } from '../audio/sound.js';
 
 const DIFFS = [
@@ -70,6 +71,8 @@ export function hideOverlay(root) {
 
 const MAPSEL_KEY = 'frontline-kartenwahl';
 const RADIO_KEY = 'frontline-radio'; // Startmenü: Sendemast-Sieg an/aus
+const MOOD_LABELS = { off: 'Aus', random: 'Zufall', morning: 'Morgen', day: 'Tag', evening: 'Abend', night: 'Nacht' };
+const MOOD_KEY = 'frontline-licht'; // Startmenü: Lichtstimmung (nur Optik)
 const WEATHER_KEY = 'frontline-wetter'; // Startmenü: Wetter aus, Zufall oder feste Jahreszeit
 const RESEARCH_KEY = 'frontline-forschung'; // Startmenü: Forschungsstufen an/aus
 const RIVER_KEY = 'frontline-fluss'; // Startmenü: Flüsse auf Zufallskarten an/aus
@@ -131,6 +134,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
   let winPoints = BALANCE.winPoints;
   let radio = readFlag(RADIO_KEY, D.radio);
   let weather = readChoice(WEATHER_KEY, WEATHER_SETTINGS, D.weather);
+  let mood = readChoice(MOOD_KEY, MOOD_SETTINGS, 'random');
   let research = readFlag(RESEARCH_KEY, D.research);
   let river = readFlag(RIVER_KEY, D.river);
   let sound = readFlag(SOUND_KEY, true); // Ton: gleicher Speicher wie der Schalter im Spiel (audio/sound.js)
@@ -155,6 +159,10 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
       <div class="field">
         <span class="flabel" title="Jahreszeit und wechselndes Wetter: Regen, Nebel und Schnee senken die Sicht, Schnee bremst Fahrzeuge">Wetter</span>
         <div class="seg">${WEATHER_SETTINGS.map((k) => `<button type="button" data-weather="${k}">${WEATHER_LABELS[k]}</button>`).join('')}</div>
+      </div>
+      <div class="field">
+        <span class="flabel" title="Lichtstimmung über der Karte: Morgen, Tag, Abend oder Nacht (nur Optik, ändert nichts am Spiel). Zufall wählt passend zur Jahreszeit">Licht</span>
+        <div class="seg">${MOOD_SETTINGS.map((k) => `<button type="button" data-mood="${k}">${MOOD_LABELS[k]}</button>`).join('')}</div>
       </div>
       <div class="field">
         <span class="flabel" title="Forschung in der Haupt-FOB: Stufe 2 schaltet Schützenpanzer, Hubschrauber und Flakpanzer frei, Stufe 3 Kampfpanzer, Kampfhubschrauber und SAM-Startrampe; dazu Verbesserungen für Panzerung und Reichweite">Forschung</span>
@@ -199,6 +207,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
     root.querySelectorAll('[data-pts]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.pts) === winPoints)));
     root.querySelectorAll('[data-radio]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.radio === '1') === radio)));
     root.querySelectorAll('[data-weather]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.weather === weather)));
+    root.querySelectorAll('[data-mood]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mood === mood)));
     root.querySelectorAll('[data-research]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.research === '1') === research)));
     root.querySelectorAll('[data-river]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.river === '1') === river)));
     root.querySelectorAll('[data-sound]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.sound === '1') === sound)));
@@ -298,6 +307,9 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
     else if (b.dataset.radio) {
       radio = b.dataset.radio === '1';
       writeFlag(RADIO_KEY, radio);
+    } else if (b.dataset.mood) {
+      mood = b.dataset.mood;
+      writeChoice(MOOD_KEY, mood);
     } else if (b.dataset.weather) {
       weather = b.dataset.weather;
       writeChoice(WEATHER_KEY, weather);
@@ -316,7 +328,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
       showWallet();
     } else if (b.dataset.act === 'start') {
       hideOverlay(root);
-      onStart({ difficulty, winPoints, mapId: mapSel, radio, weather, research, river });
+      onStart({ difficulty, winPoints, mapId: mapSel, radio, weather, mood, research, river });
       return;
     }
     mark();
