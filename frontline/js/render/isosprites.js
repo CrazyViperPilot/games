@@ -37,7 +37,10 @@ for (const [key, [file, ax, ay]] of Object.entries(INFANTRY_SPRITES)) INF_IMG[ke
 const TEAM_NAME = ['blue', 'red'];
 const TILE_W = 32; // Weltpixel je Kachel (1 Modelleinheit der Gebäudebilder)
 const INFANTRY_UNIT = 9; // Weltpixel je Modelleinheit der Soldaten
-const TREE = load('trees/tree.png');
+const TREE = load('trees/tree.png'); // gedrehte Ansichten: blockiger Baum
+// Standardansicht (Drehung 0): gemalte Bäume (tools/gen-trees.mjs), drei Laubbäume und eine Fichte, je Baum fest nach Position
+const TREES_NATURAL = ['a', 'b', 'c', 'd'].map((n) => load(`trees/tree-${n}.png`));
+const TREE_FOOT = 6; // Bildzeilen unter dem Stammfuß im Natur-Bild
 
 // Fahrzeuge: je Modell und Team (0 = Blau, 1 = Rot) acht Bilder nach Bildschirmrichtung
 const SECTORS = ['e', 'se', 's', 'sw', 'w', 'nw', 'n', 'ne']; // 0° = rechts, im Uhrzeigersinn
@@ -127,6 +130,8 @@ if (ENABLED) {
 
 /** Baum (aufrecht, Fuß am Weltpunkt). Liefert false, wenn das Bild fehlt. */
 export function drawTreeSprite(ctx, cam, t, season = 'summer') {
+  const natural = cam.rot === 0 ? TREES_NATURAL[hash(t.x, t.y * 3 + 1) % 4] : null;
+  if (natural && ready(natural)) return drawNaturalTree(ctx, cam, t, season, natural);
   if (!ready(TREE)) return false;
   // Jahreszeit: Herbstlaub in drei Färbungen (je Baum fest), Winter mit Schnee auf der Krone (season.js)
   const img = seasonal(TREE, season, 'tree', 2, season === 'autumn' ? hash(t.x, t.y) % 3 : 0);
@@ -139,6 +144,22 @@ export function drawTreeSprite(ctx, cam, t, season = 'summer') {
   ctx.ellipse(p.x, p.y + r * 0.1, r * 0.9, r * 0.45, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.drawImage(img, p.x - (TREE.naturalWidth * s) / 2, p.y - TREE.naturalHeight * s + 3 * s, TREE.naturalWidth * s, TREE.naturalHeight * s);
+  return true;
+}
+
+/** Natürlicher Baum (nur Standardansicht): Stammfuß am Weltpunkt, Größe nach Radius, Laubfarbe je Jahreszeit wie beim Block-Baum. */
+function drawNaturalTree(ctx, cam, t, season, img) {
+  const spruce = img === TREES_NATURAL[2];
+  const sea = seasonal(img, season, 'tree', 2, season === 'autumn' ? hash(t.x, t.y) % 3 : 0);
+  const z = cam.zoom;
+  const p = cam.worldToScreen(t.x, t.y);
+  const r = t.r * z;
+  const s = (0.9 + (hash(t.x, t.y) % 30) / 100) * ((t.r * 2.9 * z) / img.naturalWidth) * (spruce ? 1.15 : 1);
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.beginPath();
+  ctx.ellipse(p.x + r * 0.15, p.y + r * 0.1, r * 1.0, r * 0.45, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.drawImage(sea, p.x - (img.naturalWidth * s) / 2, p.y - (img.naturalHeight - TREE_FOOT) * s, img.naturalWidth * s, img.naturalHeight * s);
   return true;
 }
 

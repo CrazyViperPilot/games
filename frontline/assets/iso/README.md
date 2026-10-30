@@ -15,3 +15,7 @@ Schützenpanzer (vehicles/ifv-*, nach einem Foto des Puma) und Kampfpanzer (vehi
 Wachturm (buildings/tower-r0…r3.png): eigenes Modell (`buildTower` in `tools/render-models/view.html`, `prodtw.mjs`) nach einem Bild eines Radar-/Wachturms auf Stahlgerüst; 1 Modelleinheit = 1 Kachel, je Drehung der Ansicht ein Bild (Modell gedreht, Licht fest), Maße in `TOWER_VIEW` (js/render/isosprites.js). Keine fremden Modelldaten, keine Lizenzauflagen.
 
 Scharfschütze (units/sniper-*): eigenes blockiges Modell im Stil der Kenney-Soldaten, Ghillie-Anzug aus Büscheln nach einem Foto (`buildSniper`, `shotUnit` in `tools/render-models/view.html`, `prodsn.mjs`), 8 Richtungen, Teamfarbe an Brust und Kapuze. Keine fremden Modelldaten, keine Lizenzauflagen.
+
+## Bäume (eigene Grafik)
+`trees/tree-a..d.png` (128×160, drei Laubbäume und eine Fichte) für die Standardansicht (Drehung 0), gemalt von `tools/gen-trees.mjs` (kein Fremdmaterial).
+`trees/tree.png` ist der Block-Baum für die gedrehten Ansichten.
