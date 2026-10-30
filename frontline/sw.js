@@ -200,6 +200,7 @@ const ASSETS = [
   './assets/iso/trees/tree-b.png',
   './assets/iso/trees/tree-c.png',
   './assets/iso/trees/tree-d.png',
+  './assets/iso/cars/cars.png',
   './assets/iso/rocks/rock-a.png',
   './assets/iso/rocks/rock-b.png',
   './assets/iso/rocks/rock-c.png',

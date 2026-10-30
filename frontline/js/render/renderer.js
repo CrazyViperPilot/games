@@ -37,7 +37,7 @@ import {
 } from './iso.js';
 import { drawTownBuilding, drawTeamBuilding, drawCar, drawBench, drawRubble, drawCrate, drawWreckBox } from './isobuild.js';
 import { parkDeco } from './terrain.js';
-import { drawTreeSprite, drawRockSprite, drawBushSprite, drawUnitSprite, drawWreckSprite, setTeamBuildings } from './isosprites.js';
+import { drawTreeSprite, drawRockSprite, drawBushSprite, drawCarSprite, drawUnitSprite, drawWreckSprite, setTeamBuildings } from './isosprites.js';
 import { scarAlpha } from '../game/scars.js';
 import { reliefOf, RELIEF } from '../game/relief.js';
 import { getGround, LIGHT_ELEV } from './ground.js';
@@ -584,7 +584,7 @@ export class Renderer {
       }
       else if (it.t === 2) { if (!drawRockSprite(ctx, cam, it.o, this.season)) drawRock(ctx, cam, it.o); }
       else if (it.t === 13) drawBushSprite(ctx, cam, it.o, this.season);
-      else if (it.t === 6) drawCar(ctx, cam, it.o);
+      else if (it.t === 6) { if (!drawCarSprite(ctx, cam, it.o)) drawCar(ctx, cam, it.o); }
       else if (it.t === 7) drawBench(ctx, cam, it.o);
       else if (it.t === 8) drawCrate(ctx, cam, it.o.x, it.o.y, it.o.ground ? 16 : 13, 0, it.o.ground ? glow : 0);
       else if (it.t === 12) drawFordPostIso(ctx, cam, it.o);

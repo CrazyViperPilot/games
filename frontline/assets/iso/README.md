@@ -22,3 +22,6 @@ Scharfschütze (units/sniper-*): eigenes blockiges Modell im Stil der Kenney-Sol
 
 ## Felsen und Büsche (eigene Grafik)
 `rocks/rock-a..d.png` (128×104, Bodenpunkt 64/92) und `bushes/bush-a..c.png` (72×56, Bodenpunkt 36/50), gemalt von `tools/gen-rocks.mjs` (kein Fremdmaterial). Büsche sind reine Optik (js/render/renderer.js `buildDeco`).
+
+## Zivile Autos (eigene Grafik)
+`cars/cars.png`: Blatt aus Zellen 96×80 (Wagenmitte am Boden bei 48/56, 2 Bildpunkte je Bildschirm-Pixel), Spalte = Lackfarbe (Liste `CAR_COLORS` in isosprites.js), Zeile = Form × Richtung. Gemalt von `tools/gen-cars.mjs`, kein Fremdmaterial.

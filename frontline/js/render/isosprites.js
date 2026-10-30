@@ -44,6 +44,10 @@ const TREE_FOOT = 6; // Bildzeilen unter dem Stammfuß im Natur-Bild
 // Gemalte Felsen und Büsche (tools/gen-rocks.mjs): Bodenpunkt im Bild und Bildbreite
 const ROCKS = ['a', 'b', 'c', 'd'].map((n) => load(`rocks/rock-${n}.png`));
 const BUSHES = ['a', 'b', 'c'].map((n) => load(`bushes/bush-${n}.png`));
+// Zivile Autos (tools/gen-cars.mjs): ein Blatt, Spalte = Lackfarbe, Zeile = Form (Limousine, Kombi, Transporter) × Richtung
+const CARS = load('cars/cars.png');
+const CAR_COLORS = ['#b8b8b0', '#8a2f2f', '#2f4f7a', '#d0c060', '#3b3b3b', '#d8d8d8', '#4f7a4f']; // wie CAR_COLORS in js/game/map.js
+const CAR_CELL = { w: 96, h: 80, ax: 48, ay: 56, ppu: 2 }; // Zellgröße, Wagenmitte am Boden, Bildpunkte je Bildschirm-Pixel
 const ROCK_VIEW = { ax: 64, ay: 92, w: 128, h: 104 };
 const BUSH_VIEW = { ax: 36, ay: 50, w: 72 };
 
@@ -165,6 +169,21 @@ function drawNaturalTree(ctx, cam, t, season, img) {
   ctx.ellipse(p.x + r * 0.15, p.y + r * 0.1, r * 1.0, r * 0.45, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.drawImage(sea, p.x - (img.naturalWidth * s) / 2, p.y - (img.naturalHeight - TREE_FOOT) * s, img.naturalWidth * s, img.naturalHeight * s);
+  return true;
+}
+
+/** Geparktes Auto: Form nach Lage, Richtung nach der Längsachse im Bild (rechts unten = A, links unten = B). false = Bild oder Farbe fehlt. */
+export function drawCarSprite(ctx, cam, c) {
+  const col = CAR_COLORS.indexOf(c.color);
+  if (col < 0 || !ready(CARS)) return false;
+  const [a, b, cc, d] = cam.isoMatrix(1);
+  const sx = c.vertical ? cc : a;
+  const sy = c.vertical ? d : b;
+  const dir = sx * sy > 0 ? 0 : 1;
+  const row = (hash(c.x, c.y) % 3) * 2 + dir;
+  const p = cam.worldToScreen(c.x, c.y);
+  const s = cam.zoom / CAR_CELL.ppu;
+  ctx.drawImage(CARS, col * CAR_CELL.w, row * CAR_CELL.h, CAR_CELL.w, CAR_CELL.h, p.x - CAR_CELL.ax * s, p.y - CAR_CELL.ay * s, CAR_CELL.w * s, CAR_CELL.h * s);
   return true;
 }
 
