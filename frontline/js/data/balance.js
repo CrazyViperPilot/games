@@ -8,7 +8,7 @@
 //   FOB und Bauen    fob, construction, demolishRefund
 //   Logistik         logistics, shortageWarn, baseAttackWarn
 //   KI-Schwierigkeit difficulty (weitere KI-Werte: ai.js)
-//   Kampf, Gelände   height, slope, airFire, sightHeight, fogInterval, stealth, garrison, commander, formation
+//   Kampf, Gelände   height, slope, airFire, sightHeight, fogInterval, stealth, garrison, fortress, commander, formation
 //   Wetter, Technik  weather, research, river
 //   Nur Optik        scars, animals
 //   Startmenü        menuDefaults
@@ -119,10 +119,11 @@ export const BALANCE = {
     // weather: nutzt das Wetter (bei schlechter Sicht früher ein Späher, im Nebel greift die Welle schon mit weniger Stärke an)
     // research: Spielzeit (s), ab der die KI auf Stufe 2 bzw. 3 spart; upgrades: forscht auch Verbesserungen (aus Überschuss)
     // fobCap: FOBs mit Haupt-FOB (höchstens fob.max); radioFrom: Spielzeit (s), ab der sie einen Sendemast baut (Infinity = nie);
-    // cratePickers: so viele Soldaten holen oder tragen gleichzeitig Versorgungskisten. Weitere KI-Werte: js/data/ai.js
-    easy: { think: 3.0, incomeMult: 0.8, attackStrength: 2500, scout: false, counter: false, raid: false, fallback: false, weather: false, research: [240, 720], upgrades: false, fobCap: 3, radioFrom: Infinity, cratePickers: 1 },
-    normal: { think: 2.0, incomeMult: 1.0, attackStrength: 2000, scout: true, counter: true, raid: false, fallback: false, weather: true, research: [150, 540], upgrades: true, fobCap: 5, radioFrom: 720, cratePickers: 2 },
-    hard: { think: 1.0, incomeMult: 1.0, attackStrength: 1600, scout: true, counter: true, raid: true, fallback: true, weather: true, research: [90, 420], upgrades: true, fobCap: 7, radioFrom: 540, cratePickers: 3 },
+    // cratePickers: so viele Soldaten holen oder tragen gleichzeitig Versorgungskisten;
+    // fort: baut ab Spielzeit `from` (s) bis zu `fobs` FOBs zur Festung aus (Mauerring, Tore, `towers` Türme mit Besatzung und Dachaufbau). Weitere KI-Werte: js/data/ai.js
+    easy: { think: 3.0, incomeMult: 0.8, attackStrength: 2500, scout: false, counter: false, raid: false, fallback: false, weather: false, research: [240, 720], upgrades: false, fobCap: 3, radioFrom: Infinity, cratePickers: 1, fort: { from: Infinity, fobs: 0, towers: 0 } },
+    normal: { think: 2.0, incomeMult: 1.0, attackStrength: 2000, scout: true, counter: true, raid: false, fallback: false, weather: true, research: [150, 540], upgrades: true, fobCap: 5, radioFrom: 720, cratePickers: 2, fort: { from: 600, fobs: 1, towers: 1 } },
+    hard: { think: 1.0, incomeMult: 1.0, attackStrength: 1600, scout: true, counter: true, raid: true, fallback: true, weather: true, research: [90, 420], upgrades: true, fobCap: 7, radioFrom: 540, cratePickers: 3, fort: { from: 420, fobs: 2, towers: 2 } },
   },
   // Gelände (§7): wer höher steht, trifft härter (Direktfeuer, ab `dead` Höhenunterschied, voll ab `full`), tiefer stehend schwächer
   height: { bonus: 0.25, dead: 6, full: 36 },
@@ -155,6 +156,10 @@ export const BALANCE = {
     heavyMult: 1.5,
     lightMult: 0.5,
   },
+  // Festung (§5a): Befehl 'fortify' an einer FOB baut einen Mauerring mit je einem Tor in der Mitte jeder Seite und `towers` Gefechtstürme
+  // an den Ecken, die zum Gegner zeigen. ring = Abstand der Mauer von der FOB-Mitte (Zellen); floor = Höhenvorteil der Turmbesatzung (px);
+  // ejectDamage = Schaden (Anteil der vollen HP) an der Besatzung, wenn der Turm fällt
+  fortress: { ring: 4, towers: 2, floor: 40, ejectDamage: 0.35 },
   // Tarnung (Scharfschütze): Gegner sehen die Einheit nur nahe an eigenen Einheiten/Gebäuden oder kurz nach einem Schuss
   stealth: { detectRange: 160, revealTime: 4 },
   // Versorgungskisten (§3, nach den Reliquien aus Age of Empires II): liegen abseits der Zone (pairs Paare, punktsymmetrisch).

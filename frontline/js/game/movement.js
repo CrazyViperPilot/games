@@ -31,7 +31,7 @@ export function exitHouse(game, u, tx = null, ty = null) {
   if (!h) return;
   const i = h.occupants.indexOf(u);
   if (i >= 0) h.occupants.splice(i, 1);
-  if (!h.occupants.length) h.team = -1;
+  if (!h.occupants.length && h.kind === 'house') h.team = -1;
   const spread = ((u.id % 5) - 2) * 0.3;
   const a = (tx === null ? u.id * 2.39996 : Math.atan2(ty - h.y, tx - h.x)) + spread;
   const c = Math.cos(a);

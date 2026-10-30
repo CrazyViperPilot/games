@@ -17,6 +17,7 @@ export const BUILD_H = {
   extractor: 36,
   drill: 54,
   mortar: 30,
+  tower: 74, // Gefechtsturm (Festung)
   aa: 38,
   wall: 30,
   gate: 24,

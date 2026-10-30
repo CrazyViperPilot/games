@@ -68,8 +68,13 @@ export function freeSeats(game, h, team) {
 
 /** Darf `team` dieses Haus betreten? Nicht eingestürzt und nicht vom Gegner besetzt. */
 export function canEnter(h, team) {
-  return !!h && h.kind === 'house' && h.alive && (h.team < 0 || h.team === team);
+  if (!h || !h.alive) return false;
+  if (h.kind === 'building') return h.type === 'tower' && h.built && h.team === team; // Gefechtsturm: nur eigene Besatzung
+  return h.kind === 'house' && (h.team < 0 || h.team === team);
 }
+
+/** Haus oder Gefechtsturm: alles, was Besatzer aufnimmt. */
+const isSeat = (h) => !!h && (h.kind === 'house' || (h.kind === 'building' && h.type === 'tower'));
 
 /**
  * { type: 'garrison', ids, houseId }: Infanterie geht in ein leeres oder eigenes Stadthaus. Die nächsten so viele, wie Plätze frei
@@ -77,7 +82,7 @@ export function canEnter(h, team) {
  */
 export function cmdGarrison(game, team, cmd) {
   const h = game.getEntity(cmd.houseId);
-  if (!h || h.kind !== 'house') return fail('Kein Gebäude zum Besetzen');
+  if (!isSeat(h)) return fail('Kein Gebäude zum Besetzen');
   if (!canEnter(h, team)) return fail('Gebäude ist vom Gegner besetzt');
   const list = game.ownUnits(team, cmd.ids).filter((u) => canGarrison(u) && u.house !== h.id);
   if (!list.length) {
@@ -121,13 +126,13 @@ function enter(game, u, h) {
   u.fogKey = null;
   setIdle(u);
   h.occupants.push(u);
-  h.team = u.team;
+  if (h.kind === 'house') h.team = u.team;
 }
 
 /** Auf dem Weg ins Haus: hinlaufen bis an die Wand, dann hinein (wenn Platz ist und kein Gegner zuvorkam). */
 function stepWalker(game, u, dt) {
   const h = game.getEntity(u.order.targetId);
-  if (!h || h.kind !== 'house') {
+  if (!isSeat(h)) {
     setIdle(u);
     return;
   }
@@ -191,7 +196,7 @@ export function dropOccupant(game, u) {
   if (!h) return;
   const i = h.occupants.indexOf(u);
   if (i >= 0) h.occupants.splice(i, 1);
-  if (!h.occupants.length) h.team = -1;
+  if (!h.occupants.length && h.kind === 'house') h.team = -1;
 }
 
 /**
@@ -199,17 +204,18 @@ export function dropOccupant(game, u) {
  * Einheiten auf dem Weg laufen weiter, die Liste der besetzten Häuser wird erneuert.
  */
 export function updateGarrison(game, dt) {
-  for (const h of game.houses) {
-    if (!h.occupants.length) continue;
+  const tend = (h) => {
     const gone = h.occupants.filter((u) => !u.alive || u.house !== h.id);
     for (const u of gone) if (u.house === h.id) u.house = 0;
     if (gone.length) h.occupants = h.occupants.filter((u) => !gone.includes(u));
-    if (!h.occupants.length) h.team = -1;
+    if (!h.occupants.length && h.kind === 'house') h.team = -1;
     for (const u of h.occupants.slice()) {
       const o = u.order;
       if (o.type !== 'idle' && o.type !== 'attack') exitHouse(game, u, o.x, o.y);
     }
-  }
+  };
+  for (const h of game.houses) if (h.occupants.length) tend(h);
+  for (const b of game.buildings) if (b.occupants && b.occupants.length) tend(b);
   for (const u of game.units) {
     if (u.alive && u.order.type === 'garrison') stepWalker(game, u, dt);
   }

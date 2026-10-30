@@ -72,6 +72,12 @@ import {
   UPGRADE_RESERVE,
   BRIDGE_EVERY,
   BRIDGE_RESERVE,
+  FORT_EVERY,
+  FORT_BM_MIN,
+  FORT_CREW_RANGE,
+  FORT_ROOFS,
+  FORT_WANT,
+  HELI_MIN_MONEY,
 } from '../data/ai.js'; // KI-Werte (js/data/ai.js)
 
 const DEF_RANGE = BALANCE.fob.buildRadius; // Bauradius = Verteidigungsradius einer FOB
@@ -156,6 +162,7 @@ export class AI {
     this.produce(s);
     this.buildDefense(s);
     this.buildWall(s);
+    this.fortify(s);
     this.rebuildBridges(s);
     this.manageEngineers(s);
     this.manageTrucks(s);
@@ -212,6 +219,7 @@ export class AI {
       combatN: combat.length + queuedCombat,
       commander: units.find((u) => u.def.hero) ?? null,
       trucks: units.filter((u) => u.type === 'truck').sort((a, b) => a.id - b.id),
+      helis: units.filter((u) => u.type === 'transporter').sort((a, b) => a.id - b.id),
       engineers: units.filter((u) => u.type === 'engineer').sort((a, b) => a.id - b.id),
       needMat,
       alarm,
@@ -734,6 +742,63 @@ export class AI {
     if (!r.ok) this.memo.set('wall', g.time + 110); // Linie steht bereits (oder nichts baubar): lange nicht erneut versuchen
   }
 
+  // ---- Festung ---------------------------------------------------------------------
+
+  /**
+   * Festung (BALANCE.difficulty.<stufe>.fort): ab `from` baut die KI die Haupt-FOB, danach die vorderste FOB zur Festung aus
+   * (Befehl `fortify`: Mauerring, Tore, Türme), besetzt die Türme mit freien Schützen, setzt Dachaufbauten (Mörser, SAM, Flak)
+   * und kauft einen Transporthubschrauber, der die ausgebauten FOBs mit versorgt (manageTrucks).
+   */
+  fortify(s) {
+    const g = this.game;
+    const t = this.team;
+    const cfg = this.cfg.fort;
+    if (!cfg.fobs || g.time < cfg.from || !s.home || !this.once('fort', FORT_EVERY)) return;
+    const front = s.builtFobs.filter((f) => f !== s.home).sort((a, b) => dist(a.x, a.y, s.zone.x, s.zone.y) - dist(b.x, b.y, s.zone.x, s.zone.y))[0];
+    const targets = [s.home, s.zoneFob?.built ? s.zoneFob : front].filter(Boolean).slice(0, cfg.fobs);
+    const foe = g.map.spawns[1 - t];
+    const airSeen = s.enemies.some((e) => e.def.air);
+    for (const f of targets) {
+      const towers = s.own.filter((b) => b.type === 'tower' && dist(b.x, b.y, f.x, f.y) <= DEF_RANGE);
+      if (!s.alarm && f.store.bm >= FORT_BM_MIN) {
+        g.issue(t, { type: 'fortify', buildingId: f.id, towers: cfg.towers, tx: foe.x, ty: foe.y });
+      }
+      for (const tw of towers) {
+        if (!tw.built) continue;
+        if (tw.occupants.length < tw.def.cap) this.crewTower(s, tw);
+        if (!tw.roof && !tw.roofJob && tw.occupants.length) {
+          const have = towers.map((o) => o.roof ?? o.roofJob?.kind);
+          const order = airSeen ? ['sam', ...FORT_ROOFS] : FORT_ROOFS;
+          const kind = order.find((k) => !have.includes(k)) ?? FORT_ROOFS[0];
+          g.issue(t, { type: 'roof', buildingId: tw.id, kind });
+        }
+      }
+    }
+    this.buyHeli(s);
+  }
+
+  /** Freie Schützen aus der Nähe gehen in den Turm (höchstens bis alle Plätze belegt sind). */
+  crewTower(s, tw) {
+    const free = tw.def.cap - tw.occupants.length - s.units.filter((u) => u.order.type === 'garrison' && u.order.targetId === tw.id).length;
+    if (free <= 0) return;
+    const ids = s.units
+      .filter((u) => u.type === 'rifleman' && !u.house && !u.crate && u.order.type === 'idle' && !this.dryKind(u) && dist(u.x, u.y, tw.x, tw.y) <= FORT_CREW_RANGE)
+      .sort((a, b) => dist(a.x, a.y, tw.x, tw.y) - dist(b.x, b.y, tw.x, tw.y) || a.id - b.id)
+      .slice(0, free)
+      .map((u) => u.id);
+    if (ids.length) this.game.issue(this.team, { type: 'garrison', ids, houseId: tw.id });
+  }
+
+  /** Ein Transporthubschrauber, sobald ein Turm steht: er fliegt Vorräte zwischen den FOBs, wenn der Landweg weit oder gesperrt ist. */
+  buyHeli(s) {
+    const g = this.game;
+    if (s.helis.length || this.queued(s, 'transporter') || !s.own.some((b) => b.type === 'tower' && b.built)) return;
+    const cost = UNITS.transporter.cost.money;
+    if (g.teams[this.team].res.money < cost + HELI_MIN_MONEY || unitLocked(g, this.team, 'transporter')) return;
+    const b = this.pickProducer(s, 'transporter', BALANCE.queueMax, false);
+    if (b) g.issue(this.team, { type: 'train', buildingId: b.id, unit: 'transporter' });
+  }
+
   // ---- Baufahrzeuge ----------------------------------------------------------------
 
   /** Läuft ein LKW-Auftrag, der Material zu dieser FOB-Baustelle bringt? */
@@ -834,9 +899,12 @@ export class AI {
 
   /** Soll-Lagerstand einer FOB je Sorte: die Zonen-FOB braucht am meisten (Mörser, Flak, Nachladen); die Haupt-FOB ist unendlich. */
   wantOf(s, f) {
-    if (f === s.zoneFob) return { bm: 400, mun: 300, fuel: 150 };
-    if (f === s.home) return { bm: 300, mun: 200, fuel: 200 };
-    return { bm: 300, mun: 150, fuel: 80 };
+    const w = f === s.zoneFob ? { bm: 400, mun: 300, fuel: 150 } : f === s.home ? { bm: 300, mun: 200, fuel: 200 } : { bm: 300, mun: 150, fuel: 80 };
+    if (s.own.some((b) => b.type === 'tower' && dist(b.x, b.y, f.x, f.y) <= DEF_RANGE)) {
+      w.bm += FORT_WANT.bm; // Festung: Türme und Mauern brauchen Material und Munition
+      w.mun += FORT_WANT.mun;
+    }
+    return w;
   }
 
   manageTrucks(s) {
@@ -854,6 +922,7 @@ export class AI {
     for (const tr of s.trucks) {
       if (this.roles.get(tr.id) === 'pend') this.managePendler(s, tr, taken, reserveFob);
     }
+    for (const h of s.helis) this.managePendler(s, h, taken, reserveFob); // Transporthubschrauber pendeln wie LKW (Luftweg)
   }
 
   /** Fertige FOB mit dem größten Vorrat einer Sorte. */

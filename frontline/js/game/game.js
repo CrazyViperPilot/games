@@ -16,6 +16,7 @@ import { updateZone } from './zone.js';
 import { createHot, updateHot, cmdDrill } from './hotzone.js';
 import { updateLogistics, cmdLoad, cmdUnload, cmdRoute, cmdSetPreset, cmdBoard, cmdDropoff, cargoSum } from './logistics.js';
 import { updateConstruction, canBuild, cmdRepair, orderBuild, orderBuildSeq } from './construction.js';
+import { cmdRoof, cmdFortify, updateTowers, ejectCrew } from './tower.js';
 import { createHouses, updateGarrison, cmdGarrison, cmdUngarrison, dropOccupant } from './garrison.js';
 import { createCrates, updateCrates, updateCrateIntel, cmdPickup, cmdDeliver, cmdDropCrate } from './crates.js';
 import { createScars, updateScars, updateScarIntel, addUnitWreck, addBuildingWreck, clearWrecksUnder } from './scars.js';
@@ -607,6 +608,10 @@ export class Game {
         return cmdGarrison(this, team, cmd);
       case 'ungarrison':
         return cmdUngarrison(this, team, cmd);
+      case 'roof':
+        return cmdRoof(this, team, cmd);
+      case 'fortify':
+        return cmdFortify(this, team, cmd);
       case 'pickup':
         return cmdPickup(this, team, cmd);
       case 'deliver':
@@ -1037,6 +1042,7 @@ export class Game {
         continue;
       }
       this.grid.release(b);
+      if (b.occupants?.length) ejectCrew(this, b);
       this.entities.delete(b.id);
       if (!b.demolished) {
         this.addEffect('explosion', b.x, b.y, b.team, b.x, b.y, 'building');
@@ -1061,6 +1067,7 @@ export class Game {
     updateResearch(this, dt);
     updateEconomy(this, dt);
     updateGarrison(this, dt);
+    updateTowers(this, dt);
     updateFormations(this);
     updateMovement(this, dt);
     updateCrates(this, dt);

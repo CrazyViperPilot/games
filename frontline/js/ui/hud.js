@@ -2,6 +2,7 @@
 // Schreibt das DOM höchstens 5× pro Sekunde und nur, wenn sich der HTML-Text geändert hat.
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
+import { BUILDINGS } from '../data/buildings.js';
 import { lacksAmmo, isFoe } from '../game/entities.js';
 import { storedCrates } from '../game/crates.js';
 import { heightMult } from '../game/combat.js';
@@ -434,6 +435,11 @@ export class Hud {
       const sup = g.supplierOf(b);
       if (!sup) h += `<div class="warn small">Keine FOB in Reichweite – keine Munition</div>`;
       else if (sup.store.mun < w.ammoPerShot) h += `<div class="warn small">FOB ohne Munition – feuert nicht</div>`;
+    }
+    if (b.type === 'tower' && b.built) {
+      const roof = b.roof ? BUILDINGS.tower.roofs[b.roof].name : b.roofJob ? `${BUILDINGS.tower.roofs[b.roofJob.kind].name} im Bau` : 'frei';
+      h += `<div class="muted small">Besatzung ${b.occupants.length}/${b.def.cap} · Dach: ${esc(roof)}</div>`;
+      if (b.roof && !b.occupants.length) h += '<div class="warn small">Ohne Besatzung feuert der Aufbau nicht</div>';
     }
     if (b.drill && b.built) h += this.drillInfo(b);
     if (b.queue.length) {

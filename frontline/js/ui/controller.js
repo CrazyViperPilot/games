@@ -471,7 +471,7 @@ export class Controller {
     }
     // Nur Touch: eigenes Gebäude antippen gibt LKW/Baufahrzeug den Befehl (laden, hinfahren, reparieren), da es keinen Rechtsklick gibt.
     // Mit der Maus wählt der Linksklick das Gebäude, Befehle gibt der Rechtsklick.
-    if (pointer === 'touch' && !shift && hit && hit.kind === 'building' && this.selectedUnits().some((u) => u.def.cargoCap || u.def.builder === 'all')) {
+    if (pointer === 'touch' && !shift && hit && hit.kind === 'building' && this.selectedUnits().some((u) => u.def.cargoCap || u.def.builder === 'all' || (hit.type === 'tower' && canGarrison(u)))) {
       this.rightClick(wx, wy);
       return;
     }
@@ -590,6 +590,13 @@ export class Controller {
         if (loaded.length) this.issue({ type: 'unload', ids: ids(loaded), fobId: b.id });
       }
       for (const u of trucks) done.add(u.id);
+    }
+    if (b.type === 'tower' && b.built) {
+      const inf = units.filter((u) => canGarrison(u) && u.house !== b.id && !done.has(u.id));
+      if (inf.length && this.issue({ type: 'garrison', ids: ids(inf), houseId: b.id }).ok) {
+        this.moveMarker(b.x, b.y);
+        for (const u of inf) done.add(u.id);
+      }
     }
     const others = units.filter((u) => !done.has(u.id));
     if (!b.built) {
@@ -1269,6 +1276,43 @@ export class Controller {
           enabled: mortars.some((b) => b.fireTarget),
           reason: 'Kein Ziel gewählt',
           action: () => this.issue({ type: 'mortarTarget', ids: mortars.map((b) => b.id) }),
+        }),
+      );
+    }
+    const towers = blds.filter((b) => b.type === 'tower' && b.built);
+    if (towers.length) {
+      const bare = towers.filter((b) => !b.roof && !b.roofJob);
+      for (const [kind, r] of Object.entries(BUILDINGS.tower.roofs)) {
+        card.push(
+          entry(r.short, r.hotkey, {
+            cost: costText(r.cost),
+            tip: `Dachaufbau ${r.name} (${r.hotkey}): ${longCost(r.cost)}, ${r.time} s Bauzeit. Feuert nur, solange ein Soldat im Turm sitzt; Munition kommt aus dem FOB-Lager.`,
+            enabled: bare.length > 0,
+            reason: 'Das Dach trägt schon einen Aufbau',
+            action: () => {
+              for (const b of bare) this.issue({ type: 'roof', buildingId: b.id, kind });
+            },
+          }),
+        );
+      }
+      const crew = towers.flatMap((b) => b.occupants);
+      card.push(
+        entry('Raus', 'O', {
+          tip: 'Besatzung verlässt den Turm (O). Soldaten hinein: Rechtsklick auf den Turm.',
+          enabled: crew.length > 0,
+          reason: 'Niemand im Turm',
+          action: () => this.issue({ type: 'ungarrison', ids: crew.map((u) => u.id) }),
+        }),
+      );
+    }
+    const fobs = blds.filter((b) => b.type === 'fob' && b.built);
+    if (fobs.length) {
+      card.push(
+        entry('Festung', 'H', {
+          tip: `FOB zur Festung ausbauen (H): Mauerring mit vier Toren und ${BALANCE.fortress.towers} Gefechtstürmen an den Ecken zum Gegner. Material aus dem FOB-Lager, Baufahrzeuge und Soldaten bauen selbst. Erneut drücken ergänzt, was fehlt.`,
+          action: () => {
+            for (const f of fobs) this.issue({ type: 'fortify', buildingId: f.id });
+          },
         }),
       );
     }

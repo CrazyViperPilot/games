@@ -132,6 +132,8 @@ export function createBuilding(id, type, team, cx, cy, tile) {
     drill: def.drill ? { builtAt: null, state: 'warmup', endAt: 0, readyAt: 0, activatedAt: 0, frac: 0 } : null, // Bohrer
     supplied: type !== 'fob', // FOB-Baustelle: erst nach 400 Baumaterial im eigenen Lager
     warnTime: -1e9,
+    // Gefechtsturm: Besatzung (wie ein Stadthaus), Dachaufbau (roof) und laufender Aufbau (roofJob)
+    ...(def.cap ? { occupants: [], pw: w * tile, ph: h * tile, reach: def.reach, roof: null, roofJob: null } : {}),
   };
 }
 

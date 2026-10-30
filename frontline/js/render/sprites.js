@@ -2,11 +2,12 @@
 // der Renderer setzt die Kamera-Transformation. `zoom` dient nur dazu, Linien und Schrift bildschirmstabil zu halten.
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
+import { BUILDINGS } from '../data/buildings.js';
 
 const TILE = BALANCE.map.tile;
 const OUTLINE = 'rgba(0,0,0,0.65)';
 const GOLD = '#f2c94c';
-export const BUILD_ABBR = { fob: 'FOB', depot: 'FZ-HALLE', extractor: 'FÖR', mortar: 'MÖR', aa: 'FLA', helipad: 'HELI', drill: 'BOHR', radio: 'MAST' };
+export const BUILD_ABBR = { fob: 'FOB', depot: 'FZ-HALLE', extractor: 'FÖR', mortar: 'MÖR', aa: 'FLA', tower: 'TURM', helipad: 'HELI', drill: 'BOHR', radio: 'MAST' };
 export const NODE_COLOR = { bm: '#8b5a2b', mun: '#d9b600', fuel: '#3b2350' };
 export const NODE_LABEL = { bm: 'BM', mun: 'MUN', fuel: 'TS' };
 const WALL_GREY = '#8c9089';
@@ -347,6 +348,21 @@ export function drawBuilding(ctx, b, color, zoom = 1) {
     if (b.hp < b.maxHp) {
       ctx.fillStyle = `rgba(0,0,0,${(1 - b.hp / b.maxHp) * 0.45})`;
       ctx.fillRect(x0 + 1, y0 + 1, w - 2, h - 2);
+    }
+    if (b.type === 'tower') {
+      // Gefechtsturm: Besatzung als Punkte, Dachaufbau als Kürzel
+      const cap = b.def.cap;
+      for (let i = 0; i < cap; i++) {
+        ctx.fillStyle = i < b.occupants.length ? '#f4f1d0' : 'rgba(0,0,0,0.55)';
+        ctx.beginPath();
+        ctx.arc(x0 + w / 2 + (i - (cap - 1) / 2) * 12, y0 + h - 9, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      const roof = b.roof ?? b.roofJob?.kind;
+      if (roof) {
+        ctx.fillStyle = b.roof ? '#ffd45a' : 'rgba(255,255,255,0.6)';
+        fitText(ctx, BUILDINGS.tower.roofs[roof].short, x0 + w / 2, y0 + 11, 9, z, w * 0.8);
+      }
     }
     if (b.drill) {
       // Bohrer: Phase als Balken über dem Gebäude (aktiv grün und leerlaufend, bereit gelb, sonst grau und füllend)

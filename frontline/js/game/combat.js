@@ -54,7 +54,7 @@ export function shotDamage(spec, s, t, mult = 1) {
 /** Schusshöhe: Gelände unter dem Schützen bzw. Ziel, Besatzer eines Hauses ein Stockwerk höher; Hubschrauber zählen nicht (null). */
 function standHeight(game, e) {
   if (e.kind === 'unit' && e.def.air) return null;
-  return game.groundHeight(e) + (e.house ? GAR.floor : 0);
+  return game.groundHeight(e) + (e.house ? (game.entities.get(e.house)?.kind === 'building' ? BALANCE.fortress.floor : GAR.floor) : 0);
 }
 
 /**
@@ -259,7 +259,7 @@ function fireAtGround(game, b, w) {
 /** Flugabwehr: jede bereite Flugabwehr fängt die nächste gegnerische Granate in Reichweite mit `chance` ab. */
 function interceptShells(game) {
   for (const b of game.buildings) {
-    if (!b.alive || !b.built || !b.def.aa || b.aaCooldown > 0) continue;
+    if (!b.alive || !b.built || !b.def.aa || b.aaCooldown > 0 || (b.def.roofKind && !b.occupants.length)) continue;
     let best = null;
     let bestD = Infinity;
     for (const p of game.projectiles) {
@@ -366,7 +366,7 @@ export function updateCombat(game, dt) {
   for (const b of buildings) {
     if (!b.alive || !b.built) continue;
     const w = weaponOf(b);
-    if (!w) continue;
+    if (!w || (b.def.roofKind && !b.occupants.length)) continue; // Dachaufbau feuert nur mit Besatzung
     if (w.shell && b.fireTarget) {
       fireAtGround(game, b, w); // gewähltes Ziel: kein automatisches Feuer
       continue;

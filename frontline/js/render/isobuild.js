@@ -640,6 +640,25 @@ export function drawTeamBuilding(ctx, cam, b, color) {
       ctx.moveTo(cx, cy);
       ctx.lineTo(cx + 8 * z, cy - 20 * z);
       ctx.stroke();
+    } else if (b.type === 'tower' && b.roof) {
+      // Dachaufbau: Mörserrohr, Flakrohre oder SAM-Rampe auf dem Turm
+      ctx.strokeStyle = '#23272a';
+      ctx.lineWidth = (b.roof === 'flak' ? 3 : 4) * z;
+      ctx.beginPath();
+      if (b.roof === 'flak') {
+        ctx.moveTo(cx - 5 * z, cy);
+        ctx.lineTo(cx - 9 * z, cy - 20 * z);
+        ctx.moveTo(cx + 5 * z, cy);
+        ctx.lineTo(cx + 1 * z, cy - 20 * z);
+      } else {
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + 8 * z, cy - (b.roof === 'sam' ? 24 : 20) * z);
+      }
+      ctx.stroke();
+      if (b.roof === 'sam') {
+        ctx.fillStyle = '#e9ece6';
+        ctx.fillRect(cx + 5 * z, cy - 28 * z, 6 * z, 8 * z);
+      }
     } else if (b.type === 'aa') {
       ctx.strokeStyle = '#23272a';
       ctx.lineWidth = 3 * z;
@@ -669,7 +688,7 @@ export function drawTeamBuilding(ctx, cam, b, color) {
   }
 }
 
-const LABEL = { extractor: 'FÖR', mortar: 'MÖR', aa: 'FLA', drill: 'BOHR' };
+const LABEL = { extractor: 'FÖR', mortar: 'MÖR', aa: 'FLA', drill: 'BOHR', tower: 'TURM' };
 
 const MAST_H = 170; // Höhe des Sendemasts über dem Sockel (Welt-Pixel)
 const MAST_BANDS = 7; // rot-weiße Abschnitte (Flugsicherung)
