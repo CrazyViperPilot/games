@@ -16,7 +16,7 @@ export const HASH_CELL = 128; // räumliches Hash-Gitter
 const TILE = BALANCE.map.tile;
 
 /** Aufträge, die logistics.js, construction.js, garrison.js und crates.js selbst fahren (updateMovement lässt sie aus). */
-export const OWN_DRIVERS = new Set(['load', 'unload', 'route', 'build', 'repair', 'board', 'dropoff', 'garrison', 'pickup', 'deliver', 'repairBridge']);
+export const OWN_DRIVERS = new Set(['load', 'unload', 'route', 'build', 'repair', 'board', 'dropoff', 'garrison', 'storm', 'pickup', 'deliver', 'repairBridge']);
 
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 

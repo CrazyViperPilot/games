@@ -155,6 +155,21 @@ export const BALANCE = {
     heavy: 25,
     heavyMult: 1.5,
     lightMult: 0.5,
+    // Besatzer sind nicht ganz unverwundbar: `spill` (Anteil) jedes Hausschadens trifft zusätzlich die Besatzer, gleichmäßig verteilt
+    // (Splitter, Schutt). Sandsäcke halbieren das (siehe works).
+    spill: 0.2,
+    // Stürmen: Infanterie läuft an ein gegnerisch besetztes Haus und kämpft an der Wand (Granaten, Nahkampf). Jeder Beteiligte macht
+    // `dps` Schaden je Sekunde an der anderen Seite (der Reihe nach, einer nach dem anderen); die Besatzer stecken nur `cover` (Anteil)
+    // des Schadens ein. Ist niemand mehr drin, ziehen die Stürmer ein und halten das Haus.
+    storm: { dps: 14, cover: 0.7 },
+    // Ausbau zur Stellung (Befehl 'fortifyHouse', einmal je Haus und Art, nur mit eigener Besatzung, `time` s Bauzeit, `cost` Geld):
+    // sandbags = hp × hpMult (der Zuwachs kommt sofort dazu) und spill × spillMult; mgnest = Besatzer schießen mit `fire`-facher Feuerrate;
+    // wire = Stürmer machen nur `stormMult` (Anteil) ihres Schadens.
+    works: {
+      sandbags: { name: 'Sandsäcke', cost: { money: 120 }, time: 14, hpMult: 1.5, spillMult: 0.5 },
+      mgnest: { name: 'MG-Nest', cost: { money: 200 }, time: 18, fire: 1.35 },
+      wire: { name: 'Stacheldraht', cost: { money: 80 }, time: 10, stormMult: 0.6 },
+    },
   },
   // Festung (§5a): Befehl 'fortify' an einer FOB baut einen Mauerring mit je einem Tor in der Mitte jeder Seite und `towers` Gefechtstürme
   // an den Ecken, die zum Gegner zeigen. ring = Abstand der Mauer von der FOB-Mitte (Zellen); floor = Höhenvorteil der Turmbesatzung (px);

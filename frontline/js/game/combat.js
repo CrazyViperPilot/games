@@ -2,7 +2,7 @@
 import { BALANCE } from '../data/balance.js';
 import { createShell, inRange, radiusOf, isFoe, canAttack, resolveTarget } from './entities.js';
 import { buildHash, nearby } from './movement.js';
-import { damageHouse } from './garrison.js';
+import { damageHouse, houseFire } from './garrison.js';
 import { addCrater } from './scars.js';
 import { auraCooldown } from './commander.js';
 import { weatherSight } from './weather.js';
@@ -13,7 +13,7 @@ const SCAN = BALANCE.scanInterval;
 const MAX_UNIT_RADIUS = 16; // größter Einheitenradius (Trefferkreis-Suche)
 const BASE_WARN_INTERVAL = BALANCE.baseAttackWarn; // s zwischen zwei Meldungen „Basis wird angegriffen“
 // Aufträge, bei denen nicht automatisch geschossen wird (Marsch, Bau, Reparatur, Logistik)
-const NO_FIRE = new Set(['move', 'build', 'repair', 'load', 'unload', 'route', 'pickup', 'deliver']);
+const NO_FIRE = new Set(['move', 'build', 'repair', 'load', 'unload', 'route', 'pickup', 'deliver', 'storm']);
 const GAR = BALANCE.garrison;
 
 /** Waffenwerte eines Gebäudes; null, wenn unbewaffnet. (Einheiten haben mehrere Waffen: u.weapons.) */
@@ -207,7 +207,7 @@ function tryFireUnit(game, u, t) {
     return;
   }
   pick.rounds -= 1;
-  pick.cd = auraCooldown(u, pick.spec.cooldown); // Kommandeur in der Nähe: schneller
+  pick.cd = auraCooldown(u, pick.spec.cooldown) / (u.house ? houseFire(game, u) : 1); // Kommandeur in der Nähe, MG-Nest im Haus: schneller
   game.teams[u.team].used.mun += pick.spec.munCost;
   if ((pick.spec.damage.light || 0) >= 60) {
     game.addEffect('shell', u.x, u.y, u.team, t.x, t.y, pick.spec.id);

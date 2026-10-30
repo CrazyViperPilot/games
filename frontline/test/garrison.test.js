@@ -72,7 +72,7 @@ test('Schutz: Gegner treffen das Haus statt der Besatzer; Handwaffen schwach, sc
   def.weapons[0].rounds = 0; // schießt nicht zurück
   const foe = g.spawnUnit('rifleman', 1, 3000, 2830);
   run(g, 5);
-  assert.equal(def.hp, def.maxHp, 'Besatzer unverletzt');
+  assert.ok(def.hp < def.maxHp && def.hp > def.maxHp * 0.8, 'Besatzer nur von Splittern getroffen');
   assert.ok(h.hp < h.maxHp, 'Haus beschädigt');
   assert.equal(foe.targetId, h.id, 'Ziel ist das Haus');
   const rifle = UNITS.rifleman.weapons[0];
@@ -180,4 +180,94 @@ test('KI besetzt Häuser in der Zone; Besatzung und Häuser bleiben stimmig (See
     }
   }
   assert.ok(housed[0] + housed[1] > 0, `besetzt: ${housed}`);
+});
+
+test('Splitter: ein Teil des Hausschadens trifft die Besatzer, Sandsäcke halbieren ihn', () => {
+  const g = townGame([{ x: 3000, y: 3000, w: 96, h: 76, kind: 'house' }]);
+  const h = g.houses[0];
+  const men = [0, 1].map((i) => g.spawnUnit('rifleman', 0, 2950 + i * 30, 3100));
+  g.issue(0, { type: 'garrison', ids: men.map((u) => u.id), houseId: h.id });
+  run(g, 8);
+  assert.equal(h.occupants.length, 2);
+  hit(g, h, 100);
+  const lost = men.reduce((s, u) => s + (u.maxHp - u.hp), 0);
+  assert.ok(Math.abs(lost - 100 * G.spill) < 1e-6, `${lost} HP Splitter`);
+  h.works.sandbags = true;
+  hit(g, h, 100);
+  const lost2 = men.reduce((s, u) => s + (u.maxHp - u.hp), 0) - lost;
+  assert.ok(Math.abs(lost2 - 100 * G.spill * G.works.sandbags.spillMult) < 1e-6);
+  // genug Splitter töten Besatzer, das Haus bleibt stehen
+  hit(g, h, 100);
+  for (let i = 0; i < 30 && h.occupants.length; i++) hit(g, h, 20);
+  assert.ok(h.alive ? h.occupants.every((u) => u.alive) : true);
+});
+
+test('Stürmen: Infanterie räumt ein besetztes Haus und zieht ein; Stacheldraht schwächt sie', () => {
+  const run1 = (wire) => {
+    const g = townGame([{ x: 3000, y: 3000, w: 96, h: 76, kind: 'house' }]);
+    const h = g.houses[0];
+    const def = [0, 1].map((i) => g.spawnUnit('rifleman', 1, 3000 + i * 10, 3000));
+    for (const u of def) {
+      u.order = { type: 'garrison', targetId: h.id, x: h.x, y: h.y };
+    }
+    run(g, 4);
+    assert.equal(h.team, 1);
+    if (wire) h.works.wire = true;
+    const att = [0, 1, 2, 3, 4, 5].map((i) => g.spawnUnit("rifleman", 0, 2880 + i * 25, 3200));
+    for (const u of att) u.fogKey = null;
+    // Sicht erzwingen
+    g.sees = () => true;
+    assert.equal(g.issue(0, { type: 'storm', ids: att.map((u) => u.id), houseId: h.id }).ok, true);
+    run(g, 30);
+    return { g, h, att, def };
+  };
+  const a = run1(false);
+  assert.ok(a.def.every((u) => !u.alive), 'Besatzung ausgeschaltet');
+  assert.ok(a.att.filter((u) => u.alive).length >= 1);
+  assert.equal(a.h.team, 0, 'Haus gehört den Stürmern');
+  assert.ok(a.h.occupants.length >= 1 && a.h.alive);
+  const b = run1(true);
+  const hpA = a.att.reduce((s, u) => s + Math.max(0, u.hp), 0);
+  const hpB = b.att.reduce((s, u) => s + Math.max(0, u.hp), 0);
+  assert.ok(hpB <= hpA, 'mit Stacheldraht verlieren die Stürmer mehr');
+});
+
+test('Stürmen: Fehler bei leerem oder eigenem Haus, Fahrzeugen und ohne Sicht', () => {
+  const g = townGame([{ x: 3000, y: 3000, w: 96, h: 76, kind: 'house' }]);
+  const h = g.houses[0];
+  const m = g.spawnUnit('rifleman', 0, 2900, 3200);
+  assert.equal(g.issue(0, { type: 'storm', ids: [m.id], houseId: h.id }).ok, false);
+  const t = g.spawnUnit('tank', 0, 2800, 3200);
+  const d = g.spawnUnit('rifleman', 1, 3000, 3000);
+  d.order = { type: 'garrison', targetId: h.id, x: h.x, y: h.y };
+  run(g, 4);
+  g.sees = () => true;
+  assert.equal(g.issue(0, { type: 'storm', ids: [t.id], houseId: h.id }).reason, 'Nur Infanterie stürmt Gebäude');
+  assert.equal(g.issue(1, { type: 'storm', ids: [d.id], houseId: h.id }).ok, false);
+});
+
+test('Ausbau: Sandsäcke, MG-Nest und Stacheldraht kosten Geld, brauchen Besatzung und wirken', () => {
+  const g = townGame([{ x: 3000, y: 3000, w: 96, h: 76, kind: 'house' }]);
+  const h = g.houses[0];
+  const m = g.spawnUnit('rifleman', 0, 2950, 3100);
+  assert.equal(g.issue(0, { type: 'fortifyHouse', houseId: h.id, work: 'sandbags' }).ok, false, 'leeres Haus');
+  g.issue(0, { type: 'garrison', ids: [m.id], houseId: h.id });
+  run(g, 8);
+  assert.equal(m.house, h.id);
+  g.teams[0].res.money = 1000;
+  const base = h.maxHp;
+  assert.equal(g.issue(0, { type: 'fortifyHouse', houseId: h.id, work: 'sandbags' }).ok, true);
+  assert.equal(g.teams[0].res.money, 1000 - G.works.sandbags.cost.money);
+  assert.equal(g.issue(0, { type: 'fortifyHouse', houseId: h.id, work: 'wire' }).ok, false, 'nur eine Arbeit zugleich');
+  run(g, G.works.sandbags.time + 1);
+  assert.equal(h.works.sandbags, true);
+  assert.equal(h.maxHp, base * G.works.sandbags.hpMult);
+  assert.equal(g.issue(0, { type: 'fortifyHouse', houseId: h.id, work: 'sandbags' }).ok, false, 'schon gebaut');
+  assert.equal(g.issue(0, { type: 'fortifyHouse', houseId: h.id, work: 'mgnest' }).ok, true);
+  run(g, G.works.mgnest.time + 1);
+  assert.equal(h.works.mgnest, true);
+  // Einsturz räumt alles
+  hit(g, h, 1e6);
+  assert.deepEqual(h.works, {});
+  assert.equal(h.building, null);
 });

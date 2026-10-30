@@ -17,10 +17,16 @@ const WALL_MAX = 40; // max. Zellen je Mauerzug (Vorschau und Befehl)
 const DOUBLE_MS = 350; // Doppelklick auf einen Typ = alle dieses Typs im Bild
 const GROUP_DOUBLE_MS = 500; // Gruppentaste zweimal = Kamera hin
 const PICK_PX = 16; // Trefferradius in Bildschirm-Pixeln
-const TARGET_MODES = ['board', 'place', 'wall', 'attackMove', 'fobTarget', 'loadFob', 'unloadFob', 'routeFrom', 'routeTo', 'mortarTarget', 'dropoff'];
+const TARGET_MODES = ['board', 'storm', 'place', 'wall', 'attackMove', 'fobTarget', 'loadFob', 'unloadFob', 'routeFrom', 'routeTo', 'mortarTarget', 'dropoff'];
 const BUILD_MENU = Object.keys(BUILDINGS).filter((k) => BUILDINGS[k].hotkey && BUILDINGS[k].buildable !== false);
 // Befehle, die der Ton quittiert (Marsch, Angriff, Bau …); Ausbildung und Forschung melden sich über ihre Meldungen
-const ORDER_SOUND = new Set(['move', 'attackMove', 'attack', 'garrison', 'ungarrison', 'board', 'pickup', 'deliver', 'load', 'unload', 'route', 'build', 'repair', 'buildFob', 'buildWall', 'mortarTarget', 'dropoff', 'repairBridge']);
+const FORTIFY_KEYS = [['sandbags', 'Z'], ['mgnest', 'N'], ['wire', 'W']];
+const FORTIFY_TIPS = {
+  sandbags: 'Das Haus hält 50 % mehr aus, Splitter treffen die Besatzung nur halb so stark.',
+  mgnest: 'Die Besatzer schießen schneller.',
+  wire: 'Stürmer machen nur 60 % Schaden.',
+};
+const ORDER_SOUND = new Set(['move', 'attackMove', 'attack', 'garrison', 'ungarrison', 'storm', 'fortifyHouse', 'board', 'pickup', 'deliver', 'load', 'unload', 'route', 'build', 'repair', 'buildFob', 'buildWall', 'mortarTarget', 'dropoff', 'repairBridge']);
 const RES_KEYS = ['money', 'bm', 'mun', 'fuel'];
 const CARGO_KEYS = ['bm', 'mun', 'fuel']; // Lagersorten (FOB-Lager, LKW-Ladung)
 const SHORT = { money: 'G', bm: 'BM', mun: 'MUN', fuel: 'TS' };
@@ -445,6 +451,9 @@ export class Controller {
       case 'board':
         this.confirmBoard(wx, wy);
         return;
+      case 'storm':
+        this.confirmStorm(wx, wy);
+        return;
       case 'wall':
         return; // Mauerzug läuft über beginWall/endWall
       case 'build':
@@ -738,6 +747,25 @@ export class Controller {
     }
     if (this.issue({ type: 'mortarTarget', ids, x: wx, y: wy }).ok) {
       this.moveMarker(wx, wy);
+      this.setMode('normal');
+    }
+  }
+
+  /** Stürmen: gewählte Soldaten greifen das angetippte, vom Gegner besetzte Haus an der Wand an (Nahkampf, dann einziehen). */
+  confirmStorm(wx, wy) {
+    const house = this.pickHouse(wx, wy);
+    const inf = this.selectedUnits().filter(canGarrison);
+    if (!house || house.team < 0 || house.team === this.team) {
+      this.message('Kein gegnerisch besetztes Haus angetippt');
+      return;
+    }
+    if (!inf.length) {
+      this.message('Nur Infanterie stürmt Gebäude');
+      this.setMode('normal');
+      return;
+    }
+    if (this.issue({ type: 'storm', ids: inf.map((u) => u.id), houseId: house.id }).ok) {
+      this.moveMarker(house.x, house.y);
       this.setMode('normal');
     }
   }
@@ -1043,6 +1071,8 @@ export class Controller {
         return 'Absetzen: Zielpunkt anklicken · Esc bricht ab';
       case 'research':
         return 'Forschung: Stufe oder Verbesserung wählen (eine zugleich, Geld beim Start) · Esc zurück';
+      case 'storm':
+        return 'Stürmen: gegnerisch besetztes Haus anklicken · Esc bricht ab';
       case 'board':
         return 'Einsteigen: eigenes Transportfahrzeug (LKW, Baufahrzeug, SPz, Hubschrauber) oder ein Haus der Stadt anklicken · Esc bricht ab';
       default:
@@ -1216,6 +1246,31 @@ export class Controller {
       );
     }
     const inside = units.filter((u) => u.house);
+    if (units.some(canGarrison) && inside.length < units.length) {
+      card.push(
+        entry('Stürmen', 'X', {
+          tip: 'Stürmen (X): danach ein vom Gegner besetztes Haus anklicken. Die Soldaten laufen an die Wand, kämpfen gegen die Besatzung (Besatzer sind in Deckung) und ziehen ein, wenn das Haus leer ist. Mit Überzahl und Deckung lohnt es sich, allein sind sie unter Feuer.',
+          action: () => this.setMode('storm'),
+        }),
+      );
+    }
+    const homes = [...new Set(inside.map((u) => this.game.getEntity(u.house)).filter(Boolean))];
+    if (homes.length === 1) {
+      const home = homes[0];
+      for (const [key, hotkey] of FORTIFY_KEYS) {
+        const w = BALANCE.garrison.works[key];
+        card.push(
+          entry(w.name, hotkey, {
+            cost: costText(w.cost),
+            tip: `${w.name} (${hotkey}): ${FORTIFY_TIPS[key]} Kostet ${w.cost.money} ${BALANCE.resNames.money}, ${w.time} s Bauzeit, nur mit Besatzung im Haus.`,
+            active: !!home.works[key] || home.building?.work === key,
+            enabled: !home.works[key] && !home.building,
+            reason: home.works[key] ? 'Schon gebaut' : 'Es wird schon ausgebaut',
+            action: () => this.issue({ type: 'fortifyHouse', houseId: home.id, work: key }),
+          }),
+        );
+      }
+    }
     const helis = units.filter((u) => u.def.seats > 0);
     if (inside.length) {
       card.push(

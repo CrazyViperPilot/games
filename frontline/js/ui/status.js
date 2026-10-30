@@ -49,6 +49,10 @@ export function orderText(game, u) {
       const h = game.getEntity(o.targetId);
       return h ? `Unterwegs ins Gebäude (${h.def.name})` : 'Bereit';
     }
+    case 'storm': {
+      const h = game.getEntity(o.targetId);
+      return h ? `${u.storming ? 'Stürmt' : 'Läuft zum Sturm auf'}: ${h.def.name}` : 'Bereit';
+    }
     case 'pickup':
       return 'Holt eine Versorgungskiste';
     case 'deliver':

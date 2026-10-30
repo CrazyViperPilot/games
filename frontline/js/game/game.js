@@ -17,7 +17,7 @@ import { createHot, updateHot, cmdDrill } from './hotzone.js';
 import { updateLogistics, cmdLoad, cmdUnload, cmdRoute, cmdSetPreset, cmdBoard, cmdDropoff, cargoSum } from './logistics.js';
 import { updateConstruction, canBuild, cmdRepair, orderBuild, orderBuildSeq } from './construction.js';
 import { cmdRoof, cmdFortify, updateTowers, ejectCrew } from './tower.js';
-import { createHouses, updateGarrison, cmdGarrison, cmdUngarrison, dropOccupant } from './garrison.js';
+import { createHouses, updateGarrison, cmdGarrison, cmdUngarrison, cmdStorm, cmdFortifyHouse, dropOccupant } from './garrison.js';
 import { createCrates, updateCrates, updateCrateIntel, cmdPickup, cmdDeliver, cmdDropCrate } from './crates.js';
 import { createScars, updateScars, updateScarIntel, addUnitWreck, addBuildingWreck, clearWrecksUnder } from './scars.js';
 import { createAnimals, updateAnimals } from './animals.js';
@@ -610,6 +610,10 @@ export class Game {
         return cmdUngarrison(this, team, cmd);
       case 'roof':
         return cmdRoof(this, team, cmd);
+      case 'storm':
+        return cmdStorm(this, team, cmd);
+      case 'fortifyHouse':
+        return cmdFortifyHouse(this, team, cmd);
       case 'fortify':
         return cmdFortify(this, team, cmd);
       case 'pickup':

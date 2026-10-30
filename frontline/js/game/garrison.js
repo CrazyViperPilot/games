@@ -1,5 +1,6 @@
 // Häuserkampf: Infanterie besetzt Stadthäuser (Wohnhaus, Halle, Fabrik, Bahnhof), ist dort geschützt und schießt weiter.
-// Schwere Waffen zerstören das Haus; dann fallen die Besatzer verletzt heraus und es bleibt eine Ruine (PRD §7). Kein DOM.
+// Schwere Waffen zerstören das Haus; dann fallen die Besatzer verletzt heraus und es bleibt eine Ruine (PRD §7). Ein Teil jedes
+// Hausschadens trifft die Besatzer, Infanterie kann ein besetztes Haus stürmen, und Besatzer bauen es zur Stellung aus. Kein DOM.
 import { BALANCE } from '../data/balance.js';
 import { driveTo, setIdle, exitHouse } from './movement.js';
 
@@ -45,6 +46,8 @@ export function createHouses(game) {
       alive: true,
       ruined: false,
       occupants: [],
+      works: {}, // fertige Ausbauten (Schlüssel aus BALANCE.garrison.works)
+      building: null, // laufender Ausbau { work, left } (left = Restzeit in s)
       lastHitTime: -1e9,
       src: b,
     };
@@ -117,6 +120,45 @@ export function cmdUngarrison(game, team, cmd) {
   return { ok: true, count: list.length };
 }
 
+/**
+ * { type: 'storm', ids, houseId }: Infanterie stürmt ein vom Gegner besetztes, sichtbares Haus. An der Wand kämpft sie gegen die
+ * Besatzer (updateGarrison); ist niemand mehr drin, zieht sie ein.
+ */
+export function cmdStorm(game, team, cmd) {
+  const h = game.getEntity(cmd.houseId);
+  if (!h || h.kind !== 'house' || !h.alive) return fail('Kein Gebäude zum Stürmen');
+  if (h.team < 0 || h.team === team) return fail('Gebäude ist nicht vom Gegner besetzt');
+  if (!game.sees(team, h)) return fail('Gebäude nicht in Sicht');
+  const list = game.ownUnits(team, cmd.ids).filter(canGarrison);
+  if (!list.length) return fail('Nur Infanterie stürmt Gebäude');
+  for (const u of list) {
+    u.order = { type: 'storm', x: h.x, y: h.y, targetId: h.id };
+    u.targetId = null;
+    u.path = [];
+    u.pathIndex = 0;
+    u.repathTimer = 0;
+    u.storming = 0;
+  }
+  return { ok: true, count: list.length };
+}
+
+/**
+ * { type: 'fortifyHouse', houseId, work }: Besatzer bauen das Haus zur Stellung aus (BALANCE.garrison.works). Kostet Geld, dauert `time` s
+ * und läuft nur, solange die eigene Besatzung drin ist; je Haus eine Arbeit zugleich, jede Art einmal. Stürzt das Haus ein, ist alles weg.
+ */
+export function cmdFortifyHouse(game, team, cmd) {
+  const h = game.getEntity(cmd.houseId);
+  const w = G.works[cmd.work];
+  if (!h || h.kind !== 'house' || !w) return fail('Kein Gebäude zum Ausbauen');
+  if (!h.alive || h.team !== team || !h.occupants.length) return fail('Ausbau braucht eigene Besatzung im Haus');
+  if (h.works[cmd.work]) return fail(`${w.name} ist schon gebaut`);
+  if (h.building) return fail('Das Haus wird schon ausgebaut');
+  if (!game.canAfford(team, w.cost)) return fail(game.missingMoney());
+  game.pay(team, w.cost);
+  h.building = { work: cmd.work, left: w.time };
+  return { ok: true };
+}
+
 /** Einheit betritt das Haus: steht in der Mitte, bewegt sich nicht mehr, Haus gehört ihrem Team. */
 function enter(game, u, h) {
   if (u.house) exitHouse(game, u);
@@ -157,7 +199,32 @@ function stepWalker(game, u, dt) {
 }
 
 /**
- * Schaden an einem Haus (aus combat.hit). Die Besatzer bleiben unverletzt, bis das Haus einstürzt: dann fallen sie mit
+ * Stürmer: hinlaufen bis an die Wand und dort kämpfen (updateGarrison). Ist das Haus leer geworden oder gehört es schon dem
+ * eigenen Team, geht der Stürmer hinein (wenn Platz ist); ein eingestürztes Haus beendet den Auftrag.
+ */
+function stepStormer(game, u, dt) {
+  u.storming = 0;
+  const h = game.getEntity(u.order.targetId);
+  if (!h || h.kind !== 'house' || !h.alive) {
+    setIdle(u);
+    return;
+  }
+  if (h.team < 0 || h.team === u.team) {
+    if (freeSeats(game, h, u.team) > 0) u.order = { type: 'garrison', x: h.x, y: h.y, targetId: h.id };
+    else setIdle(u);
+    return;
+  }
+  const st = driveTo(game, u, h.x, h.y, G.enterReach, dt, h);
+  if (st === 'stuck') {
+    game.message(u.team, 'Kein Weg zum Gebäude', u.x, u.y);
+    setIdle(u);
+    return;
+  }
+  if (st === 'arrived') u.storming = h.id;
+}
+
+/**
+ * Schaden an einem Haus (aus combat.hit). Die Besatzer bekommen davon nur den Splitteranteil `spill` ab; stürzt das Haus ein, fallen sie mit
  * ejectDamage heraus, und es bleibt eine Ruine (versperrt den Weg weiter, kann nicht mehr besetzt werden).
  */
 export function damageHouse(game, h, amount) {
@@ -165,10 +232,21 @@ export function damageHouse(game, h, amount) {
   h.hp -= amount;
   h.lastHitTime = game.time;
   for (const u of h.occupants) u.lastHitTime = game.time;
-  if (h.hp > 0) return;
+  if (h.hp > 0) {
+    // Splitter treffen die Besatzer (beim Einsturz zählt stattdessen ejectDamage)
+    const spill = amount * G.spill * (h.works.sandbags ? G.works.sandbags.spillMult : 1);
+    for (const u of h.occupants) wound(game, u, spill / h.occupants.length);
+    if (h.occupants.some((u) => !u.alive)) {
+      h.occupants = h.occupants.filter((u) => u.alive);
+      if (!h.occupants.length) h.team = -1;
+    }
+    return;
+  }
   h.hp = 0;
   h.alive = false;
   h.ruined = true;
+  h.works = {};
+  h.building = null;
   const team = h.team;
   const list = h.occupants.slice();
   for (const u of list) {
@@ -189,6 +267,35 @@ export function damageHouse(game, h, amount) {
   }
 }
 
+/** Schaden an einer Einheit ohne Panzerungsrechnung (Splitter, Nahkampf); Tote bringen dem Gegner die Prämie. */
+function wound(game, u, amount) {
+  if (!u.alive || !(amount > 0)) return;
+  u.hp -= amount;
+  u.lastHitTime = game.time;
+  if (u.hp <= 0) {
+    u.hp = 0;
+    u.alive = false;
+    game.bounty(u);
+  }
+}
+
+/** Schaden der Reihe nach auf die Einheiten der Liste (der Erste fällt zuerst, der Rest geht an den nächsten). */
+function woundInOrder(game, list, amount) {
+  for (const u of list) {
+    if (!(amount > 0)) return;
+    if (!u.alive) continue;
+    const d = Math.min(amount, u.hp);
+    amount -= d;
+    wound(game, u, d);
+  }
+}
+
+/** Feuerratenfaktor der Besatzer eines Hauses mit MG-Nest (1 sonst), siehe combat.tryFireUnit. */
+export function houseFire(game, u) {
+  const h = houseOf(game, u);
+  return h && h.works.mgnest ? G.works.mgnest.fire : 1;
+}
+
 /** Tote Einheit aus ihrem Haus streichen (Game.cleanup). */
 export function dropOccupant(game, u) {
   const h = houseOf(game, u);
@@ -197,6 +304,30 @@ export function dropOccupant(game, u) {
   const i = h.occupants.indexOf(u);
   if (i >= 0) h.occupants.splice(i, 1);
   if (!h.occupants.length && h.kind === 'house') h.team = -1;
+}
+
+/** Kampf an der Hauswand: beide Seiten machen sich der Reihe nach Schaden (BALANCE.garrison.storm), die Besatzer mit Deckung. */
+function fightAtWall(game, h, list, dt) {
+  const occ = h.occupants.filter((u) => u.alive);
+  if (!occ.length) return;
+  const S = G.storm;
+  const wire = h.works.wire ? G.works.wire.stormMult : 1;
+  woundInOrder(game, occ, list.length * S.dps * S.cover * wire * dt);
+  woundInOrder(game, list, occ.length * S.dps * dt);
+  for (const u of occ) u.lastHitTime = game.time;
+}
+
+/** Ausbau fertig: Wirkung eintragen (Sandsäcke: mehr HP sofort) und melden. */
+function finishWork(game, h) {
+  const key = h.building.work;
+  h.building = null;
+  h.works[key] = true;
+  if (key === 'sandbags') {
+    const extra = G.kinds[h.type].hp * (G.works.sandbags.hpMult - 1);
+    h.maxHp += extra;
+    h.hp += extra;
+  }
+  game.message(h.team, `${G.works[key].name} fertig: ${h.def.name}`, h.x, h.y);
 }
 
 /**
@@ -214,10 +345,27 @@ export function updateGarrison(game, dt) {
       if (o.type !== 'idle' && o.type !== 'attack') exitHouse(game, u, o.x, o.y);
     }
   };
-  for (const h of game.houses) if (h.occupants.length) tend(h);
-  for (const b of game.buildings) if (b.occupants && b.occupants.length) tend(b);
-  for (const u of game.units) {
-    if (u.alive && u.order.type === 'garrison') stepWalker(game, u, dt);
+  for (const h of game.houses) {
+    if (h.occupants.length) tend(h);
+    if (h.building && h.alive && h.occupants.length) {
+      h.building.left -= dt;
+      if (h.building.left <= 0) finishWork(game, h);
+    }
   }
+  for (const b of game.buildings) if (b.occupants && b.occupants.length) tend(b);
+  const stormers = new Map(); // Haus → Stürmer an seiner Wand
+  for (const u of game.units) {
+    if (!u.alive) continue;
+    if (u.order.type === 'garrison') stepWalker(game, u, dt);
+    else if (u.order.type === 'storm') {
+      stepStormer(game, u, dt);
+      if (u.storming) {
+        const h = game.getEntity(u.storming);
+        if (!stormers.has(h)) stormers.set(h, []);
+        stormers.get(h).push(u);
+      }
+    }
+  }
+  for (const [h, list] of stormers) fightAtWall(game, h, list, dt);
   game.garrisoned = game.houses.filter((h) => h.alive && h.occupants.length > 0);
 }

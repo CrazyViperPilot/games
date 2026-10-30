@@ -386,8 +386,18 @@ export class Hud {
     return (
       `<div class="muted small">Im Gebäude: ${esc(h.def.name)} · ${h.occupants.length} / ${h.def.cap} Plätze · Zustand ${Math.ceil(f * 100)} %</div>` +
       bar(f, 'hp', hpColor(f)) +
-      '<div class="muted small">Geschützt, schießt ab der Hauswand · O = aussteigen</div>'
+      '<div class="muted small">Geschützt, schießt ab der Hauswand · O = aussteigen</div>' +
+      this.worksInfo(h)
     );
+  }
+
+  /** Ausbauten eines Stadthauses (Sandsäcke, MG-Nest, Stacheldraht) und der laufende Ausbau. */
+  worksInfo(h) {
+    const W = BALANCE.garrison.works;
+    const done = Object.keys(h.works).map((k) => W[k].name);
+    let t = done.length ? `<div class="muted small">Ausgebaut: ${esc(done.join(', '))}</div>` : '';
+    if (h.building) t += `<div class="muted small">Baut ${esc(W[h.building.work].name)}: noch ${Math.ceil(h.building.left)} s</div>`;
+    return t;
   }
 
   /** Standhöhe; zeigt der Zeiger auf einen sichtbaren Gegner, auch den Höhenvorteil gegen ihn. */

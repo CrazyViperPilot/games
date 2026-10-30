@@ -1021,7 +1021,8 @@ export class Renderer {
 
   /** Besatzung eines Hauses (Bildschirmkoordinaten, Transformation auf DPR): Schild in Teamfarbe „n/Plätze“, darunter der Zustand. */
   drawGarrison(ctx, x, y, h) {
-    const text = `${h.occupants.length}/${h.def.cap}`;
+    const works = h.works ? Object.keys(h.works).length : 0;
+    const text = `${h.occupants.length}/${h.def.cap}${'+'.repeat(works)}${h.building ? '…' : ''}`; // + = fertiger Ausbau, … = im Bau
     ctx.save();
     ctx.font = '700 11px system-ui, sans-serif';
     const w = ctx.measureText(text).width + 22;
