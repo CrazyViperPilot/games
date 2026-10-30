@@ -37,8 +37,8 @@ for (const [key, [file, ax, ay]] of Object.entries(INFANTRY_SPRITES)) INF_IMG[ke
 const TEAM_NAME = ['blue', 'red'];
 const TILE_W = 32; // Weltpixel je Kachel (1 Modelleinheit der Gebäudebilder)
 const INFANTRY_UNIT = 9; // Weltpixel je Modelleinheit der Soldaten
-const TREE = load('trees/tree.png'); // gedrehte Ansichten: blockiger Baum
-// Standardansicht (Drehung 0): gemalte Bäume (tools/gen-trees.mjs), drei Laubbäume und eine Fichte, je Baum fest nach Position
+const TREE = load('trees/tree.png'); // Ersatz, solange die gemalten Bäume laden: blockiger Baum
+// Gemalte Bäume (tools/gen-trees.mjs), drei Laubbäume und eine Fichte, je Baum fest nach Position
 const TREES_NATURAL = ['a', 'b', 'c', 'd'].map((n) => load(`trees/tree-${n}.png`));
 const TREE_FOOT = 6; // Bildzeilen unter dem Stammfuß im Natur-Bild
 
@@ -130,7 +130,7 @@ if (ENABLED) {
 
 /** Baum (aufrecht, Fuß am Weltpunkt). Liefert false, wenn das Bild fehlt. */
 export function drawTreeSprite(ctx, cam, t, season = 'summer') {
-  const natural = cam.rot === 0 ? TREES_NATURAL[hash(t.x, t.y * 3 + 1) % 4] : null;
+  const natural = TREES_NATURAL[hash(t.x, t.y * 3 + 1) % 4]; // aufrechte Kronen: in allen Drehungen gleich
   if (natural && ready(natural)) return drawNaturalTree(ctx, cam, t, season, natural);
   if (!ready(TREE)) return false;
   // Jahreszeit: Herbstlaub in drei Färbungen (je Baum fest), Winter mit Schnee auf der Krone (season.js)
@@ -147,7 +147,7 @@ export function drawTreeSprite(ctx, cam, t, season = 'summer') {
   return true;
 }
 
-/** Natürlicher Baum (nur Standardansicht): Stammfuß am Weltpunkt, Größe nach Radius, Laubfarbe je Jahreszeit wie beim Block-Baum. */
+/** Natürlicher Baum (alle Ansichten): Stammfuß am Weltpunkt, Größe nach Radius, Laubfarbe je Jahreszeit wie beim Block-Baum. */
 function drawNaturalTree(ctx, cam, t, season, img) {
   const spruce = img === TREES_NATURAL[2];
   const sea = seasonal(img, season, 'tree', 2, season === 'autumn' ? hash(t.x, t.y) % 3 : 0);
