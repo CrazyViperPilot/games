@@ -56,7 +56,7 @@ const SECTORS = ['e', 'se', 's', 'sw', 'w', 'nw', 'n', 'ne']; // 0° = rechts, i
 const TEAM_COLOR = ['blue', 'red'];
 const UNIT_MODEL = { truck: 'truck', engineer: 'pickup', tank: 'tank', gunship: 'apache', littlebird: 'littlebird', ifv: 'ifv' };
 // 3D-Modelle (T-12-Panzer, Attack Chopper), siehe assets/iso/README.md: span = Bildbreite in Einheitenradien, ax/ay = Bodenpunkt im Bild
-const MODEL_VIEW = { tank: { span: 5.8, ax: 64, ay: 61 }, apache: { span: 5, ax: 64, ay: 47 }, littlebird: { span: 5, ax: 64, ay: 55 }, ifv: { span: 5, ax: 64, ay: 89 } };
+const MODEL_VIEW = { tank: { span: 6.5, ax: 72, ay: 82 }, apache: { span: 5, ax: 64, ay: 47 }, littlebird: { span: 5, ax: 64, ay: 55 }, ifv: { span: 5.6, ax: 72, ay: 82 } };
 const VEHICLES = {};
 for (const model of new Set(Object.values(UNIT_MODEL))) {
   VEHICLES[model] = TEAM_COLOR.map((c) => SECTORS.map((s) => load(`vehicles/${model}-${c}-${s}.png`)));
