@@ -409,6 +409,22 @@ export class Renderer {
       bushes.push({ x: t.x + Math.cos(a) * t.r * 1.5, y: t.y + Math.sin(a) * t.r * 1.5, r: 8 + ((h >>> 12) % 40) / 10 });
     }
     const relief = reliefOf(this.game.map);
+    if (relief) {
+      // Geröll auf steilen Hängen und Gipfeln (nur Optik, dort ist es ohnehin unpassierbar), fest nach Lage
+      for (let y = 24; y < H; y += 48) {
+        for (let x = 24; x < W; x += 48) {
+          const h = (Math.imul(x, 73856093) ^ Math.imul(y, 19349663)) >>> 0;
+          if (h % 100 >= 12) continue;
+          const px = x + ((h >>> 8) % 40) - 20;
+          const py = y + ((h >>> 16) % 40) - 20;
+          if (relief.heightAt(px, py) < RELIEF.water + 30) continue; // nicht im See oder am Uferrand
+          const gr = relief.gradAt(px, py);
+          if (Math.hypot(gr.x, gr.y) > RELIEF.rock || (relief.heightAt(px, py) > RELIEF.peak * 0.85 && relief.heightAt(px, py) <= RELIEF.peak + 60)) {
+            rocks.push({ x: px, y: py, r: 11 + ((h >>> 4) % 12) });
+          }
+        }
+      }
+    }
     return { trees, rocks, bushes: relief ? bushes.filter((b) => relief.heightAt(b.x, b.y) > RELIEF.water + 4 && relief.heightAt(b.x, b.y) < RELIEF.peak) : bushes };
   }
 
