@@ -6,7 +6,7 @@ import { damageHouse, houseFire } from './garrison.js';
 import { addCrater } from './scars.js';
 import { auraCooldown } from './commander.js';
 import { weatherSight } from './weather.js';
-import { armorMul, opticsMul } from './research.js';
+import { armorMul, opticsMul, fxMul, rangeMul, dealtMul, smokeMul } from './research.js';
 import { damageBridge, deckDist } from './river.js';
 
 const SCAN = BALANCE.scanInterval;
@@ -112,7 +112,7 @@ export function hit(game, target, amount) {
     damageBridge(game, target, amount);
     return;
   }
-  if (target.kind === 'unit') amount *= armorMul(game, target, amount);
+  if (target.kind === 'unit') amount *= armorMul(game, target, amount) * smokeMul(game, target);
   target.hp -= amount;
   target.lastHitTime = game.time;
   if (target.hp <= 0) {
@@ -185,7 +185,7 @@ export function unitHitChance(s, t, w) {
 function tryFireUnit(game, u, t) {
   const key = dmgKey(t);
   const bonus = reachBonus(game, u);
-  const reach = opticsMul(game, u.team); // Wärmebildoptik: weiter
+  const reach = rangeMul(game, u); // Wärmebildoptik, Zielfernrohre: weiter
   let pick = null;
   let pickScore = -1;
   let dry = false;
@@ -207,7 +207,7 @@ function tryFireUnit(game, u, t) {
     return;
   }
   pick.rounds -= 1;
-  pick.cd = auraCooldown(u, pick.spec.cooldown) / (u.house ? houseFire(game, u) : 1); // Kommandeur in der Nähe, MG-Nest im Haus: schneller
+  pick.cd = (auraCooldown(u, pick.spec.cooldown) * fxMul(game, u.team, 'cd')) / (u.house ? houseFire(game, u) : 1); // Kommandeur in der Nähe, MG-Nest im Haus: schneller
   game.teams[u.team].used.mun += pick.spec.munCost;
   if ((pick.spec.damage.light || 0) >= 60) {
     game.addEffect('shell', u.x, u.y, u.team, t.x, t.y, pick.spec.id);
@@ -218,7 +218,7 @@ function tryFireUnit(game, u, t) {
   if (u.def.stealth) u.revealedUntil = game.time + BALANCE.stealth.revealTime; // ein Schuss verrät die Stellung
   // Flak und SAM: Treffer nur mit Wurf (Trefferchance, siehe unitHitChance); daneben geht der Schuss, der Schaden bleibt aus
   if (pick.spec.hitChance !== undefined && !(game.rng.next() < unitHitChance(u, t, pick.spec))) return;
-  hit(game, t, shotDamage(pick.spec, u, t, heightMult(game, u, t)));
+  hit(game, t, shotDamage(pick.spec, u, t, heightMult(game, u, t)) * dealtMul(game, u, t));
 }
 
 function fireShell(game, s, tx, ty, w) {

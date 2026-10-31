@@ -176,7 +176,14 @@ test('Befehlskarte: Haupt-FOB zeigt Forschung (U), gesperrte Einheiten mit Grund
   assert.equal(c.view.mode, 'research');
   assert.deepEqual(card().map((e) => e.hotkey), ['Q', 'W', 'E', 'R', 'C', 'Esc']);
   assert.equal(btn('Q').label, 'Stufe 2');
-  assert.equal(btn('W').reason, 'Benötigt Stufe 2');
+  assert.equal(btn('W').label, 'Fahrzeuge');
+  c.handleHotkey('E'); // Ast Waffen
+  assert.equal(c.view.branch, 'wpn');
+  assert.equal(btn('Q').label, 'Schutzwesten');
+  assert.equal(btn('Q').reason, 'Benötigt Stufe 2');
+  c.cancel();
+  assert.equal(c.view.branch, null, 'Esc: zurück zur Hauptkarte');
+  assert.equal(c.view.mode, 'research');
   assert.equal(btn('C').enabled, false);
   c.handleHotkey('Q');
   assert.equal(g.teams[0].tech.cur.key, 'tier2');

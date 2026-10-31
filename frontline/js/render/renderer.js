@@ -99,6 +99,18 @@ export function updateFogLayer(layer, fog, reveal) {
   layer.ctx.putImageData(layer.image, 0, 0);
 }
 
+/** Eigene Mine: dunkle Scheibe mit rotem Punkt (der Gegner sieht sie nicht). */
+function drawMine(ctx, x, y, z) {
+  ctx.fillStyle = 'rgba(30,30,30,0.85)';
+  ctx.beginPath();
+  ctx.ellipse(x, y, 9 * z, 6 * z, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#e04030';
+  ctx.beginPath();
+  ctx.arc(x, y, 2 * z, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 export class Renderer {
   constructor(canvas, game, camera, team) {
     this.canvas = canvas;
@@ -240,6 +252,10 @@ export class Renderer {
     }
     const t = now / 1000;
     for (const q of this.smokeSources(seen, shown, inRect, 120)) {
+      if (q.mine) {
+        drawMine(ctx, q.x, q.y, 1);
+        continue;
+      }
       if (q.fire) drawFire(ctx, q.x, q.y, q.s * 0.7, t, q.seed);
       drawSmoke(ctx, q.x, q.y, q.s, q.k, t, q.seed);
     }
@@ -647,6 +663,10 @@ export class Renderer {
     for (const q of this.smokeSources(seen, shown, inRect, PAD)) {
       const p = cam.worldToScreen(q.x, q.y);
       const y = p.y - q.lift * z;
+      if (q.mine) {
+        drawMine(ctx, p.x, y, z * 0.6);
+        continue;
+      }
       if (q.fire) drawFire(ctx, p.x, y, q.s * 0.7 * z, t, q.seed);
       drawSmoke(ctx, p.x, y, q.s * z, q.k, t, q.seed);
     }
@@ -738,6 +758,17 @@ export class Renderer {
       else if (c.state === 'ground' && this.revealAll) out.push({ x: c.x, y: c.y, ground: true });
     }
     if (!this.revealAll) for (const m of g.crateSeen?.[this.team]?.values() ?? []) if (known(m.x, m.y)) out.push({ x: m.x, y: m.y, ground: true });
+    for (const s of g.smokes ?? []) {
+      if (!inRect(s.x, s.y, pad + s.r) || !(s.team === this.team || seen(s.x, s.y))) continue;
+      const k = Math.min(1, (s.until - g.time) / 3, (g.time - s.t0) / 1 + 0.2); // Auf- und Abklingen
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2 + s.t0;
+        out.push({ x: s.x + Math.cos(a) * s.r * 0.55, y: s.y + Math.sin(a) * s.r * 0.55, lift: 8, s: s.r * 0.55, k: Math.max(0.15, k) * 0.8, fire: false, seed: Math.round(s.t0 * 7) + i * 31 });
+      }
+    }
+    for (const m of g.mines ?? []) {
+      if (m.team === this.team && inRect(m.x, m.y, pad)) out.push({ x: m.x, y: m.y, lift: 0, s: 3, k: 0.5, fire: false, seed: 1, mine: true });
+    }
     return out;
   }
 

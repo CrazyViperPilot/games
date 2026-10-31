@@ -115,7 +115,7 @@ Wo jedes Feature liegt. „KI“ = Konstanten-Präfix in `js/data/ai.js`, Logik 
 | Kommandeur | §6 | `commander`, `UNITS.commander` | `commander.js` | `CMD_*` | `sprites.js` (`drawStar`), `renderer.js` | `commander.test.js` |
 | Sendemast | §7 „Sendemast“ | `radio`, `BUILDINGS.radio` | `radio.js` | `RADIO_*`, `difficulty.radioFrom` | `sprites.js`, `isobuild.js`, `hud.js` | `radio.test.js` |
 | Wetter und Jahreszeiten | §7 „Wetter“ | `weather` | `weather.js` | `WX_*` | `weatherfx.js`, `season.js` | `weather.test.js` |
-| Forschungsstufen | §7 „Forschungsstufen“ | `research` | `research.js` | `UPGRADES`, `UPGRADE_RESERVE` | `controller.js`, `hud.js` | `research.test.js` |
+| Forschungsstufen und -baum | §7 „Forschungsstufen“ | `research` | `research.js`, `abilities.js` | `UPGRADES`, `UPGRADE_RESERVE` | `controller.js`, `hud.js` | `research.test.js` |
 | Zufallskarte, Stadt, Gehöfte, Felder | §7, §9a | `map`, `zone.r`, `MAPGEN` | `map.js`, `landscape.js` | – | `terrain.js`, `iso.js`, `isobuild.js`, `isosprites.js` | `map.test.js`, `fields.test.js` |
 | Stadt (Zonen, Einwohner, Werke füllen Haupt-Lager) | §15 | `CITY` | `city.js` (`updateCity`, Befehl `city`) | `aiCity` in `ai.js` | `js/ui/citypanel.js` (Taste Y), `hud.js` (Knopf) | `city.test.js` |
 | Wracks und Krater (nur Optik) | §9 | `scars` | `scars.js` | – | `sprites.js` (`drawWreck`, `drawCrater`) | `scars.test.js` |

@@ -39,6 +39,7 @@ Die Reihenfolge ist Absicht; ein neues System kommt an die Stelle, deren Ergebni
 |---|---|---|---|
 | 1 | `updateWeather` | `weather.js` | Wetterwechsel, Sicht- und Tempofaktoren |
 | 2 | `updateResearch` | `research.js` | Forschungsfortschritt |
+| 2b | `updateAbilities` | `abilities.js` | Rauch, Minen, Feldwerkstatt |
 | 3 | `updateEconomy` | `economy.js` | `team.rate` zurücksetzen, Ausbildung, Soldaten-Nachschub |
 | 3a | `updateCity` | `city.js` | nur mit Stadt: Einwohner, Wachstum, Erträge ins Lager der Haupt-FOB, Steuern |
 | 4 | `updateGarrison`, `updateTowers` | `garrison.js`, `tower.js` | Ein- und Aussteigen in Stadthäuser und Gefechtstürme; Dachaufbauten werden fertig |
@@ -121,6 +122,7 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 | `drill` | `ids` | `hotzone.js` `cmdDrill` | Bohrer starten |
 | `train`, `cancelTrain` | `buildingId, unit` / `buildingId` | `game.js` | Ausbildung in der Haupt-FOB / letzten Eintrag abbrechen |
 | `research`, `cancelResearch` | `buildingId, key` / – | `research.js` | Forschung starten / abbrechen |
+| `smoke`, `mine` | `ids` | `abilities.js` | Nebelwand (Fahrzeuge) / Mine (Baufahrzeug) |
 | `rally` | `buildingId, x, y` | `game.js` `cmdRally` | Sammelpunkt |
 | `demolish` | `buildingId` | `game.js` `cmdDemolish` | Gebäude abreißen |
 

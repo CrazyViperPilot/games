@@ -217,13 +217,43 @@ export const BALANCE = {
   // Schaden, Verbundpanzerung: Fahrzeuge und Hubschrauber × composite (ein Schuss, der das unverletzte Ziel sofort tötet, bleibt
   // tödlich); Wärmebildoptik: Waffenreichweite und Sicht der Einheiten × optics.
   research: {
+    // branch: veh (Fahrzeuge) · wpn (Waffen) · abl (Fähigkeiten); needs = Mindeststufe; req = Voraussetzung (Schlüssel oder 'branch' =
+    // alle anderen Forschungen des Astes); fx = Wirkung, Faktoren verschiedener Forschungen multiplizieren sich (research.js fxMul):
+    // speed Bodenfahrzeug-Tempo · fuel Verbrauch · taken Schaden gegen Fahrzeuge und Hubschrauber (zusätzlich zu composite) ·
+    // dealtInf/dealtVeh/dealtAll Schaden der Schüsse · cd Abklingzeit · sniperRange · aa Flak und SAM · build Bautempo ·
+    // repair Reparaturtempo · abilityCd Abklingzeit von Rauch und Minen. regen = Selbstreparatur der Bodenfahrzeuge (Anteil von
+    // maxHp je s, wenn 6 s lang nicht getroffen); smoke / mines schalten die Einsatzknöpfe frei.
     items: {
       tier2: { name: 'Stufe 2', money: 600, time: 60, needs: 1, tier: 2 },
       tier3: { name: 'Stufe 3', money: 1200, time: 90, needs: 2, tier: 3 },
-      vests: { name: 'Schutzwesten', money: 400, time: 45, needs: 2 },
-      optics: { name: 'Wärmebildoptik', money: 600, time: 60, needs: 2 },
-      composite: { name: 'Verbundpanzerung', money: 800, time: 60, needs: 3 },
+      // Fahrzeuge
+      engine1: { name: 'Motor I', branch: 'veh', money: 500, time: 50, needs: 2, fx: { speed: 1.1 } },
+      engine2: { name: 'Motor II', branch: 'veh', money: 900, time: 70, needs: 3, req: 'engine1', fx: { speed: 1.1 } },
+      fueltank: { name: 'Zusatztank', branch: 'veh', money: 400, time: 40, needs: 2, fx: { fuel: 0.8 } },
+      composite: { name: 'Verbundpanzerung', branch: 'veh', money: 800, time: 60, needs: 3 },
+      reactive: { name: 'Reaktivpanzerung', branch: 'veh', money: 1000, time: 75, needs: 3, req: 'composite', fx: { taken: 0.9 } },
+      workshop: { name: 'Feldwerkstatt', branch: 'veh', money: 600, time: 60, needs: 2, regen: 0.01 },
+      vmaster: { name: 'Panzerwaffe', branch: 'veh', money: 2000, time: 120, needs: 3, req: 'branch', fx: { speed: 1.1, taken: 0.9 } },
+      // Waffen
+      vests: { name: 'Schutzwesten', branch: 'wpn', money: 400, time: 45, needs: 2 },
+      ap: { name: 'Panzerbrechende Munition', branch: 'wpn', money: 600, time: 60, needs: 2, fx: { dealtVeh: 1.15 } },
+      frag: { name: 'Splittergranaten', branch: 'wpn', money: 500, time: 50, needs: 2, fx: { dealtInf: 1.15 } },
+      scope: { name: 'Zielfernrohre', branch: 'wpn', money: 400, time: 45, needs: 2, fx: { sniperRange: 1.2 } },
+      rapid: { name: 'Schnellfeuer', branch: 'wpn', money: 900, time: 75, needs: 3, fx: { cd: 0.88 } },
+      missiles: { name: 'Lenkraketen', branch: 'wpn', money: 800, time: 70, needs: 3, fx: { aa: 1.25 } },
+      wmaster: { name: 'Waffenmeister', branch: 'wpn', money: 2000, time: 120, needs: 3, req: 'branch', fx: { dealtAll: 1.1 } },
+      // Fähigkeiten
+      optics: { name: 'Wärmebildoptik', branch: 'abl', money: 600, time: 60, needs: 2 },
+      fastbuild: { name: 'Schnellbau', branch: 'abl', money: 500, time: 50, needs: 2, fx: { build: 1.25 } },
+      repairkit: { name: 'Reparaturset', branch: 'abl', money: 400, time: 40, needs: 2, fx: { repair: 2 } },
+      smoke: { name: 'Nebelwerfer', branch: 'abl', money: 700, time: 60, needs: 2 },
+      mines: { name: 'Minen', branch: 'abl', money: 800, time: 70, needs: 3 },
+      amaster: { name: 'Eliteausbildung', branch: 'abl', money: 2000, time: 120, needs: 3, req: 'branch', fx: { abilityCd: 0.5, build: 1.25 } },
     },
+    branches: { veh: 'Fahrzeuge', wpn: 'Waffen', abl: 'Fähigkeiten' },
+    // Einsatzfähigkeiten (Tasten V und M): Rauch senkt den Schaden eigener Einheiten darin, Minen treffen Bodeneinheiten des Gegners
+    smoke: { r: 110, life: 14, cd: 45, taken: 0.5 },
+    mine: { trigger: 30, blast: 55, damage: 150, cd: 12, max: 8 },
     unitTier: { sniper: 2, ifv: 2, littlebird: 2, transporter: 2, flak: 2, tank: 3, gunship: 3, sam: 3 },
     vests: 0.85,
     composite: 0.85,

@@ -27,3 +27,27 @@ test('Straße: schneller, abseits mehr Verbrauch je Strecke', () => {
   assert.ok(road.dx > off.dx * 1.2, `Straße ${road.dx} vs. Gelände ${off.dx}`);
   assert.ok(off.fuel / off.dx > road.fuel / road.dx, 'Verbrauch je Strecke abseits höher');
 });
+
+import { fxMul, researchBlock } from '../js/game/research.js';
+
+test('Forschungsbaum: Motor wirkt, Meisterschaft braucht den ganzen Ast, Rauch halbiert Schaden, Mine trifft', () => {
+  const g = new Game({ map: createEmptyMap(), research: true });
+  for (const u of g.units) u.alive = false;
+  g.cleanup();
+  g.teams[0].tech.tier = 3;
+  assert.match(researchBlock(g, 0, 'engine2'), /Motor I/);
+  assert.match(researchBlock(g, 0, 'vmaster'), /Ast/);
+  g.teams[0].tech.done.push('engine1', 'engine2', 'smoke', 'mines');
+  assert.ok(Math.abs(fxMul(g, 0, 'speed') - 1.21) < 1e-9);
+  const tank = g.spawnUnit('tank', 0, 1000, 1000);
+  const eng = g.spawnUnit('engineer', 0, 1100, 1000);
+  assert.equal(g.issue(0, { type: 'smoke', ids: [tank.id] }).ok, true);
+  assert.equal(g.issue(0, { type: 'smoke', ids: [tank.id] }).ok, false, 'Ladezeit');
+  assert.equal(g.issue(0, { type: 'mine', ids: [eng.id] }).ok, true);
+  const foe = g.spawnUnit('tank', 1, 1100, 1000);
+  g.update(DT);
+  assert.ok(foe.hp < foe.maxHp, 'Mine hat getroffen');
+  const hp = tank.hp;
+  g.spawnUnit('tank', 1, 1400, 1000);
+  assert.ok(g.smokes.length === 1);
+});

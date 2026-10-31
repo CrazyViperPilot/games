@@ -2,6 +2,7 @@
 import { BALANCE } from '../data/balance.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { driveTo, footDist, setIdle } from './movement.js';
+import { fxMul } from './research.js';
 
 const C = BALANCE.construction;
 const BUILD_HP_SHARE = BALANCE.construction.siteHpGrow; // Baustellen-HP wächst um 90 % über die Bauzeit (Start 10 %)
@@ -104,7 +105,7 @@ function stepRepairer(game, u, dt) {
     return;
   }
   if (st !== 'arrived') return;
-  const heal = Math.min(b.maxHp - b.hp, b.maxHp * C.repairRate * dt);
+  const heal = Math.min(b.maxHp - b.hp, b.maxHp * C.repairRate * dt * fxMul(game, u.team, 'repair'));
   const costBm = b.def.cost.bm * (heal / b.maxHp) * C.repairCostShare;
   const payer = game.payerFor(u.team, b.x, b.y, { bm: costBm });
   if (!payer) {
@@ -191,7 +192,7 @@ function progressSite(game, b, dt) {
     b.store.bm -= C.fobMaterial;
     b.supplied = true;
   }
-  const f = (n * dt) / b.def.buildTime;
+  const f = (n * dt * fxMul(game, b.team, 'build')) / b.def.buildTime;
   b.progress += f;
   b.hp = Math.min(b.maxHp, b.hp + b.maxHp * BUILD_HP_SHARE * f);
   if (b.progress >= 1) {

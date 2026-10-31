@@ -21,12 +21,36 @@ export function researchEffect(key) {
   if (key === 'vests') return `Infanterie nimmt ${pct(R.vests)} weniger Schaden`;
   if (key === 'composite') return `Fahrzeuge und Hubschrauber nehmen ${pct(R.composite)} weniger Schaden`;
   if (key === 'optics') return `Waffenreichweite und Sicht der Einheiten +${pct(R.optics)}`;
+  const it2 = R.items[key];
+  const fx = it2?.fx;
+  if (fx) {
+    const T = {
+      speed: (m) => `Bodenfahrzeuge ${pct(m)} schneller`,
+      fuel: (m) => `Treibstoffverbrauch −${pct(m)}`,
+      taken: (m) => `Fahrzeuge und Hubschrauber nehmen ${pct(m)} weniger Schaden`,
+      dealtVeh: (m) => `+${pct(m)} Schaden gegen Fahrzeuge`,
+      dealtInf: (m) => `+${pct(m)} Schaden gegen Infanterie`,
+      dealtAll: (m) => `+${pct(m)} Schaden`,
+      cd: (m) => `Waffen feuern ${Math.round((1 / m - 1) * 100)} % schneller`,
+      sniperRange: (m) => `Scharfschützen-Reichweite +${pct(m)}`,
+      aa: (m) => `Flak und SAM +${pct(m)} Schaden`,
+      build: (m) => `Bautempo +${pct(m)}`,
+      repair: (m) => `Reparatur ${m}× so schnell`,
+      abilityCd: (m) => `Rauch und Minen laden ${pct(m)} schneller`,
+    };
+    return Object.entries(fx).map(([k, m]) => T[k](m)).join(', ');
+  }
+  if (it2?.regen) return 'Bodenfahrzeuge reparieren sich selbst, wenn sie 6 s nicht getroffen wurden';
+  if (key === 'smoke') return 'Fahrzeuge legen mit V eine Nebelwand: eigene Einheiten darin nehmen halb so viel Schaden';
+  if (key === 'mines') return 'Baufahrzeuge legen mit M Minen, die Bodeneinheiten des Gegners treffen';
   return '';
 }
 
 /** Legt game.research und team.tech an (on: Forschung eingeschaltet). */
 export function createResearch(game, on) {
   game.research = !!on;
+  game.smokes = [];
+  game.mines = [];
   for (const t of game.teams) t.tech = { tier: 1, done: [], cur: null };
 }
 
@@ -49,6 +73,10 @@ export function researchBlock(game, team, key) {
   const tech = game.teams[team].tech;
   if (tech.done.includes(key) || (it.tier && tech.tier >= it.tier)) return 'Bereits erforscht';
   if (tech.cur) return tech.cur.key === key ? 'Wird gerade erforscht' : 'Es läuft schon eine Forschung';
+  if (it.req === 'branch') {
+    const rest = RESEARCH_KEYS.filter((k) => R.items[k].branch === it.branch && k !== key && !R.items[k].tier);
+    if (rest.some((k) => !tech.done.includes(k))) return `Benötigt alle anderen Forschungen im Ast ${R.branches[it.branch]}`;
+  } else if (it.req && !tech.done.includes(it.req)) return `Benötigt ${R.items[it.req].name}`;
   if (tech.tier < it.needs) return `Benötigt Stufe ${it.needs}`;
   return '';
 }
@@ -108,8 +136,32 @@ export function armorMul(game, u, amount) {
   const done = game.teams[u.team]?.tech.done;
   if (!done?.length) return 1;
   if (u.def.armor === 'inf') return done.includes('vests') ? R.vests : 1;
-  return done.includes('composite') ? R.composite : 1;
+  return (done.includes('composite') ? R.composite : 1) * fxMul(game, u.team, 'taken');
 }
 
 /** Faktor für Waffenreichweite und Sicht der Einheiten eines Teams (Wärmebildoptik), sonst 1. */
 export const opticsMul = (game, team) => (hasTech(game, team, 'optics') ? R.optics : 1);
+
+/** Produkt der Wirkung `stat` (fx) aller erforschten Verbesserungen des Teams, sonst 1. */
+export function fxMul(game, team, stat) {
+  if (!game.research) return 1;
+  let m = 1;
+  for (const k of game.teams[team].tech.done) m *= R.items[k]?.fx?.[stat] ?? 1;
+  return m;
+}
+
+/** Waffenreichweite-Faktor einer Einheit: Wärmebildoptik, bei Scharfschützen Zielfernrohre. */
+export const rangeMul = (game, u) => opticsMul(game, u.team) * (u.type === 'sniper' ? fxMul(game, u.team, 'sniperRange') : 1);
+
+/** Faktor auf den Schaden eines Schusses von s auf t (Munition, Granaten, Lenkraketen, Waffenmeister). */
+export function dealtMul(game, s, t) {
+  if (!game.research || !game.teams[s.team].tech.done.length) return 1;
+  const m = fxMul(game, s.team, 'dealtAll') * fxMul(game, s.team, t.def.armor === 'inf' ? 'dealtInf' : 'dealtVeh');
+  return s.type === 'flak' || s.type === 'sam' ? m * fxMul(game, s.team, 'aa') : m;
+}
+
+/** Faktor Rauch: eigene Einheiten in einer Nebelwand ihres Teams nehmen weniger Schaden. */
+export function smokeMul(game, u) {
+  for (const s of game.smokes ?? []) if (s.team === u.team && Math.hypot(u.x - s.x, u.y - s.y) <= s.r) return BALANCE.research.smoke.taken;
+  return 1;
+}

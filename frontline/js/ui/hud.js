@@ -488,14 +488,14 @@ export class Hud {
   researchInfo(team) {
     const tech = this.game.teams[team].tech;
     const items = BALANCE.research.items;
-    const ups = RESEARCH_KEYS.filter((k) => !items[k].tier && tech.done.includes(k)).map((k) => items[k].name);
-    let h = `<div class="small research">Stufe ${tech.tier} von 3${ups.length ? ` · ${esc(ups.join(', '))}` : ''}</div>`;
+    const n = RESEARCH_KEYS.filter((k) => !items[k].tier && tech.done.includes(k)).length;
+    let h = `<div class="small research">Stufe ${tech.tier} von 3${n ? ` · ${n} Verbesserungen` : ''}</div>`;
     const cur = tech.cur;
     if (cur) {
       const it = items[cur.key];
       h += `<div class="small">Forschung ${esc(it.name)}: ${Math.min(it.time, cur.t).toFixed(0)} / ${it.time} s</div>${bar(cur.t / it.time, 'prog research')}`;
-    } else if (tech.tier < 3) {
-      h += '<div class="muted small">U = Forschung (nächste Stufe, Verbesserungen)</div>';
+    } else {
+      h += '<div class="muted small">U = Forschung (Stufen, Fahrzeuge, Waffen, Fähigkeiten)</div>';
     }
     return h;
   }

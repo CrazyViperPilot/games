@@ -3,7 +3,7 @@ import { BALANCE } from '../data/balance.js';
 import { findPath, lineOfSight } from './pathfinding.js';
 import { inRange, resolveTarget, isFoe, canAttack } from './entities.js';
 import { weatherSpeed } from './weather.js';
-import { opticsMul } from './research.js';
+import { rangeMul, fxMul } from './research.js';
 
 const REPATH = 1.0; // Neuplanung bei Verfolgung (s)
 const BLOCK_REPATH = 0.5; // Neuplanung nach blockiertem Wegpunkt (s)
@@ -246,7 +246,7 @@ export function drive(game, u, dt) {
   const fps = u.def.fuelPerSec || 0;
   if (fps > 0 && (u.x !== x0 || u.y !== y0)) {
     if (u.fuel > 0) {
-      const used = Math.min(u.fuel, fps * dt * (u.onRoad === false ? BALANCE.roads.offroadFuel : 1));
+      const used = Math.min(u.fuel, fps * dt * (u.onRoad === false ? BALANCE.roads.offroadFuel : 1) * fxMul(game, u.team, 'fuel'));
       u.fuel -= used;
       game.teams[u.team].used.fuel += used;
     }
@@ -283,7 +283,7 @@ export function driveTo(game, u, tx, ty, reach, dt, bld = null) {
 
 /** Verfolgung eines Ziels: stehen bleiben in Reichweite (Wärmebildoptik: weiter), sonst Weg höchstens 1×/s neu planen. */
 function chase(game, u, t, dt) {
-  if (u.def.range > 0 && inRange(u, t, u.def.range * opticsMul(game, u.team))) {
+  if (u.def.range > 0 && inRange(u, t, u.def.range * rangeMul(game, u))) {
     if (u.path.length) {
       u.path = [];
       u.pathIndex = 0;
@@ -415,6 +415,7 @@ export function updateMovement(game, dt) {
     u.speedMul *= weatherSpeed(game, u); // Schnee und Winterboden (weather.js)
     u.onRoad = groundVehicle(u) ? onRoad(game, u.x, u.y) : null; // Straße der Karte: schneller, sparsamer
     if (u.onRoad) u.speedMul *= BALANCE.roads.speedMul;
+    if (groundVehicle(u)) u.speedMul *= fxMul(game, u.team, 'speed'); // Motor I und II
     if (grid.ford && !u.def.air && grid.isFord(grid.toCell(u.x), grid.toCell(u.y))) u.speedMul *= BALANCE.river.ford; // durchs seichte Wasser
     if (u.order.form && u.formMul) u.speedMul *= u.formMul; // Formation fährt geschlossen (formation.js)
     // Tempo aus der Verschiebung seit dem letzten Schritt (auch Logistikflüge, die außerhalb von stepUnit fliegen)

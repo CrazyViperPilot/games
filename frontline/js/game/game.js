@@ -26,6 +26,7 @@ import { FORMATIONS, formationSlots, updateFormations } from './formation.js';
 import { hasCommander, updateCommanders, commanderFallen } from './commander.js';
 import { updateRadio, radioStarted, radioLost } from './radio.js';
 import { createWeather, updateWeather } from './weather.js';
+import { updateAbilities, cmdAbility } from './abilities.js';
 import { createResearch, updateResearch, cmdResearch, cmdCancelResearch, unitLocked, lockReason, opticsMul } from './research.js';
 import { createBridges, updateBridges, cmdRepairBridge, bridgeUnder } from './river.js';
 
@@ -637,6 +638,9 @@ export class Game {
         return this.cmdCancelTrain(team, cmd);
       case 'research':
         return cmdResearch(this, team, cmd);
+      case 'smoke':
+      case 'mine':
+        return cmdAbility(this, team, cmd);
       case 'cancelResearch':
         return cmdCancelResearch(this, team, cmd);
       case 'rally':
@@ -1074,6 +1078,7 @@ export class Game {
     // Einkommen zuletzt
     updateWeather(this, dt);
     updateResearch(this, dt);
+    updateAbilities(this, dt);
     updateEconomy(this, dt);
     updateCity(this, dt);
     updateGarrison(this, dt);

@@ -9,7 +9,7 @@ import { canGarrison, canEnter } from '../game/garrison.js';
 import { canCarry } from '../game/crates.js';
 import { FORMATIONS, FORMATION_NAMES } from '../game/formation.js';
 import { hasCommander } from '../game/commander.js';
-import { researchBlock, researchEffect, unitLocked, lockReason } from '../game/research.js';
+import { researchBlock, researchEffect, unitLocked, lockReason, hasTech, RESEARCH_KEYS } from '../game/research.js';
 import { deckDist } from '../game/river.js';
 import { unitLift, buildingHeight, TOWN_H } from '../render/iso.js';
 
@@ -35,13 +35,9 @@ const HOTKEY_ALIAS = { Y: 'Z' }; // Flugabwehr auch mit Y
 const RADIO_TIP = `. Zweite Siegbedingung: steht er fertig ${Math.round(BALANCE.radio.hold / 60)} min, gewinnst du. Der Gegner sieht ihn dann überall. Nur einer je Team.`;
 const CMD = BALANCE.commander;
 const COMMANDER_TIP = `. Einmalig, belegt keinen Platz. Aura ${CMD.aura} px: eigene Einheiten schießen ${Math.round((CMD.fireRate - 1) * 100)} % schneller, verletzte Infanterie heilt. Fällt er, bekommt der Gegner ${CMD.deathPoints} Punkte.`;
-// Forschungsmenü der Haupt-FOB: Ziel, Taste, Kurzname (Q = nächste Stufe)
-const RESEARCH_BTN = [
-  ['tier', 'Q', ''],
-  ['vests', 'W', 'Westen'],
-  ['optics', 'E', 'Optik'],
-  ['composite', 'R', 'Verbund'],
-];
+// Forschungsmenü der Haupt-FOB: Hauptkarte Q = nächste Stufe, W/E/R = Äste; im Ast Tasten in dieser Reihenfolge
+const BRANCH_BTN = [['veh', 'W'], ['wpn', 'E'], ['abl', 'R']];
+const ITEM_KEYS = ['Q', 'W', 'E', 'R', 'T', 'A', 'S'];
 const isCarrier = (u) => u.def.cargoCap > 0; // LKW und Transporthubschrauber
 // Ladungsart: Taste, Kurzname, Bezeichnung
 const PRESET_BTN = [
@@ -148,6 +144,7 @@ export class Controller {
 
   setMode(mode) {
     this.view.mode = mode;
+    this.view.branch = null; // Forschungsast (nur im Forschungsmenü)
     this.placeType = null;
     this.wall = null;
     this.view.placement = null;
@@ -377,6 +374,10 @@ export class Controller {
 
   /** Esc: laufenden Modus beenden, sonst Auswahl aufheben. */
   cancel() {
+    if (this.view.mode === 'research' && this.view.branch) {
+      this.view.branch = null;
+      return;
+    }
     if (this.view.mode !== 'normal') {
       this.setMode('normal');
       return;
@@ -1099,21 +1100,41 @@ export class Controller {
     const tech = g.teams[this.team].tech;
     const items = BALANCE.research.items;
     const card = [];
-    for (const [k, hotkey, short] of RESEARCH_BTN) {
-      const key = k === 'tier' ? (tech.tier < 2 ? 'tier2' : 'tier3') : k;
+    const item = (key, hotkey, short) => {
       const it = items[key];
       const reason = researchBlock(g, this.team, key) || this.moneyReason({ money: it.money });
       const eff = researchEffect(key);
       card.push(
         entry(short || it.name, hotkey, {
           cost: costText({ money: it.money }),
-          tip: `${it.name}: ${it.money} Geld, ${it.time} s${it.needs > 1 ? `, ab Stufe ${it.needs}` : ''}. ${eff[0].toUpperCase()}${eff.slice(1)}.`,
+          tip: `${it.name}: ${it.money} Geld, ${it.time} s${it.needs > 1 ? `, ab Stufe ${it.needs}` : ''}. ${eff ? eff[0].toUpperCase() + eff.slice(1) + '.' : ''}`,
           enabled: !reason,
           reason,
-          active: tech.cur?.key === key || (k === 'tier' ? tech.tier >= 3 : tech.done.includes(key)),
+          active: tech.cur?.key === key || tech.done.includes(key),
           action: () => this.research(fob, key),
         }),
       );
+    };
+    const br = this.view.branch;
+    if (!br) {
+      item(tech.tier < 2 ? 'tier2' : 'tier3', 'Q', '');
+      if (tech.tier >= 3) card[0].active = true;
+      for (const [id, hotkey] of BRANCH_BTN) {
+        const keys = RESEARCH_KEYS.filter((k) => items[k].branch === id);
+        const done = keys.filter((k) => tech.done.includes(k)).length;
+        card.push(
+          entry(BALANCE.research.branches[id], hotkey, {
+            cost: `${done}/${keys.length}`,
+            tip: `${BALANCE.research.branches[id]} (${hotkey}): ${done} von ${keys.length} erforscht`,
+            active: tech.cur && items[tech.cur.key].branch === id,
+            action: () => {
+              this.view.branch = id;
+            },
+          }),
+        );
+      }
+    } else {
+      RESEARCH_KEYS.filter((k) => items[k].branch === br).forEach((k, i) => item(k, ITEM_KEYS[i], ''));
     }
     card.push(
       entry('Abbruch', 'C', {
@@ -1201,6 +1222,31 @@ export class Controller {
         action: () => this.cycleFormation(),
       }),
     );
+    if (this.game.research) {
+      const ground = units.filter((u) => !u.def.armor || u.def.armor !== 'inf');
+      if (ground.length && hasTech(this.game, this.team, 'smoke')) {
+        const cd = Math.ceil(Math.max(0, ...ground.map((u) => u.abilityCd || 0)));
+        card.push(
+          entry('Nebel', 'N', {
+            tip: `Nebelwand (N): legt an der Stelle der gewählten Fahrzeuge Rauch (${BALANCE.research.smoke.life} s). Eigene Einheiten darin nehmen halb so viel Schaden. Ladezeit ${BALANCE.research.smoke.cd} s.`,
+            enabled: units.every((u) => !(u.abilityCd > 0)) || ground.some((u) => !(u.abilityCd > 0)),
+            reason: `Noch nicht bereit (${cd} s)`,
+            action: () => this.issue({ type: 'smoke', ids: ground.map((u) => u.id) }),
+          }),
+        );
+      }
+      const engs = units.filter((u) => u.type === 'engineer');
+      if (engs.length && hasTech(this.game, this.team, 'mines')) {
+        card.push(
+          entry('Mine', 'Z', {
+            tip: `Mine legen (Z): das Baufahrzeug legt an seiner Stelle eine Mine, unsichtbar für den Gegner. Sie trifft Bodeneinheiten des Gegners im Umkreis ${BALANCE.research.mine.blast} px mit ${BALANCE.research.mine.damage} Schaden. Höchstens ${BALANCE.research.mine.max}, Ladezeit ${BALANCE.research.mine.cd} s.`,
+            enabled: engs.some((u) => !(u.abilityCd > 0)),
+            reason: 'Noch nicht bereit',
+            action: () => this.issue({ type: 'mine', ids: engs.map((u) => u.id) }),
+          }),
+        );
+      }
+    }
     const riders = units.filter((u) => u.def.canRide);
     if (riders.length) {
       card.push(
