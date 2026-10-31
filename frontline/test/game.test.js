@@ -706,7 +706,8 @@ test('Verbrauch: fahrender Panzer verbraucht Treibstoff aus seinem Vorrat, stehe
   }
   assert.ok(moved > 0, 'Panzer ist gefahren');
   const used = UNITS.tank.fuelMax - tank.fuel;
-  assert.ok(Math.abs(used - UNITS.tank.fuelPerSec * DT * moved) < 1e-6, `Verbrauch ${used}`);
+  const base = UNITS.tank.fuelPerSec * DT * moved; // abseits der Straße × roads.offroadFuel
+  assert.ok(used >= base - 1e-6 && used <= base * BALANCE.roads.offroadFuel + 1e-6, `Verbrauch ${used}`);
   assert.ok(Math.abs(g.teams[0].used.fuel - used) < 1e-9);
 });
 

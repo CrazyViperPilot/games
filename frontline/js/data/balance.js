@@ -78,6 +78,8 @@ export const BALANCE = {
   trainSlots: QUICK.trainSlots, // Ausbildungsplätze der Haupt-FOB: so viele Einträge der Warteschlange werden gleichzeitig ausgebildet
   baseAttackWarn: 20, // s zwischen zwei Meldungen „Basis wird angegriffen“
   shortageWarn: 20, // s zwischen zwei Meldungen je Sorte und Team
+  // Straßen der Karte (Stadtraster und Feldwege): Bodenfahrzeuge fahren darauf schneller; abseits verbrauchen sie mehr Treibstoff
+  roads: { speedMul: 1.35, offroadFuel: 1.15 },
   fuelSlowMul: 0.25, // Tempo von Fahrzeugen ohne Treibstoff
   // Soldaten-Nachschub (§12): kostenloser Schütze an der Haupt-FOB alle `interval` s, solange weniger als `soldierMin` Infanterie lebt
   reinforce: { interval: QUICK.reinforceEvery, soldierMin: 29, unit: 'rifleman' },

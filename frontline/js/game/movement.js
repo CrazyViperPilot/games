@@ -246,7 +246,7 @@ export function drive(game, u, dt) {
   const fps = u.def.fuelPerSec || 0;
   if (fps > 0 && (u.x !== x0 || u.y !== y0)) {
     if (u.fuel > 0) {
-      const used = Math.min(u.fuel, fps * dt);
+      const used = Math.min(u.fuel, fps * dt * (u.onRoad === false ? BALANCE.roads.offroadFuel : 1));
       u.fuel -= used;
       game.teams[u.team].used.fuel += used;
     }
@@ -387,6 +387,19 @@ export function separate(game) {
   }
 }
 
+const groundVehicle = (u) => !u.def.air && u.def.armor !== 'inf' && (u.def.fuelPerSec || 0) > 0;
+
+/** Liegt der Punkt auf einer Straße oder einem Feldweg der Karte (game.map.town.roads, Breite w)? */
+function onRoad(game, x, y) {
+  for (const r of game.map.town?.roads ?? []) {
+    const dx = r.x2 - r.x1;
+    const dy = r.y2 - r.y1;
+    const t = Math.max(0, Math.min(1, ((x - r.x1) * dx + (y - r.y1) * dy) / (dx * dx + dy * dy || 1)));
+    if (Math.hypot(x - (r.x1 + dx * t), y - (r.y1 + dy * t)) <= (r.w ?? 40) / 2) return true;
+  }
+  return false;
+}
+
 /**
  * Bewegt die Einheiten um dt (ohne LKW- und Bauaufträge; die fahren logistics.js bzw. construction.js).
  * Setzt Repath-Timer und Tempo (25 % bei Fahrzeugen ohne Treibstoff, carrySpeed mit Kiste, Schnee und Winterboden bremsen
@@ -400,6 +413,8 @@ export function updateMovement(game, dt) {
     u.speedMul = (u.def.fuelPerSec || 0) > 0 && u.fuel <= 0 ? BALANCE.fuelSlowMul : 1;
     if (u.crate) u.speedMul *= BALANCE.crates.carrySpeed; // Kistenträger gehen langsamer
     u.speedMul *= weatherSpeed(game, u); // Schnee und Winterboden (weather.js)
+    u.onRoad = groundVehicle(u) ? onRoad(game, u.x, u.y) : null; // Straße der Karte: schneller, sparsamer
+    if (u.onRoad) u.speedMul *= BALANCE.roads.speedMul;
     if (grid.ford && !u.def.air && grid.isFord(grid.toCell(u.x), grid.toCell(u.y))) u.speedMul *= BALANCE.river.ford; // durchs seichte Wasser
     if (u.order.form && u.formMul) u.speedMul *= u.formMul; // Formation fährt geschlossen (formation.js)
     // Tempo aus der Verschiebung seit dem letzten Schritt (auch Logistikflüge, die außerhalb von stepUnit fliegen)
