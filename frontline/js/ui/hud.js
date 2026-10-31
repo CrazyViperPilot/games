@@ -130,6 +130,7 @@ export class Hud {
       )
       .join('');
     return `
+      ${g.city ? '<button type="button" class="city-fab" data-act="city" title="Stadt verwalten (Y)">🏙 Stadt</button>' : ''}
       <header class="top">
         <div class="res-row">${res}</div>
         <div class="pts">${pts}</div>

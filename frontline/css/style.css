@@ -532,3 +532,6 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .city-tools { width: 236px; display: grid; grid-template-columns: 1fr 1fr; align-content: start; }
   .ctool { min-height: 36px; padding: 3px 6px; font-size: 11px; }
 }
+/* Großer Stadt-Knopf für Touch (ohne Tastatur), nur bei eingeschalteter Stadt */
+.city-fab { position: fixed; right: 10px; top: 50px; z-index: 20; min-height: 44px; padding: 0 16px; border-radius: 10px; border: 2px solid var(--accent); background: #1d231df0; color: var(--text); font-size: 15px; font-weight: 700; cursor: pointer; pointer-events: auto; }
+.city-fab:active { background: #2e372e; }
