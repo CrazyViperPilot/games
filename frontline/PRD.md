@@ -498,6 +498,7 @@ Alle Geräusche werden im Browser mit WebAudio **selbst erzeugt** (Rauschen und 
 
 ## Änderungsverlauf
 - v4.78: **Großer Stadt-Knopf für Touch** (§15): fester Knopf „🏙 Stadt“ rechts unter der oberen Leiste, damit die Stadt ohne Tastatur zu öffnen ist. Cache v91.
+- v4.79: **Forschung per Touch** (§8, §9): Forschungsmenü, Äste, Forschungen, Zurück sowie Nebel (N) und Mine (Z) sind Knöpfe der Befehlskarte (kein Keyboard nötig); Forschungsknöpfe tragen Kurznamen (`short`) und den Preis, damit sie auf 50 px breiten Telefonknöpfen lesbar sind. Cache v92.
 - v4.77: **Forschungsbaum ausgebaut** (§7): drei Äste Fahrzeuge, Waffen, Fähigkeiten mit 21 Forschungen, Meisterschaften, Nebelwand (N) und Minen (Z). Cache v90.
 - v4.76: **Straßentempo** (§7): Bodenfahrzeuge fahren auf Straßen und Feldwegen 35 % schneller, abseits verbrauchen sie 15 % mehr Treibstoff. Cache v91.
 - v4.75: **SimCity-Stadt, Schritt 1** (§15): Startmenü-Schalter „Stadt“ (Standard aus); Zonenstadt je Team mit Straßen, Wohnen, Gewerbe und drei Werksarten; Werke füllen das nun endliche Lager der Haupt-FOB; Stadtansicht (Knopf oder Taste Y, Befehl `city`); KI baut nach Bauplan. Neu: `js/game/city.js`, `js/data/city.js`, `js/ui/citypanel.js`, `test/city.test.js`. Cache v88.

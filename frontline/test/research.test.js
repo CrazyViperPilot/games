@@ -179,7 +179,7 @@ test('Befehlskarte: Haupt-FOB zeigt Forschung (U), gesperrte Einheiten mit Grund
   assert.equal(btn('W').label, 'Fahrzeuge');
   c.handleHotkey('E'); // Ast Waffen
   assert.equal(c.view.branch, 'wpn');
-  assert.equal(btn('Q').label, 'Schutzwesten');
+  assert.equal(btn('Q').label, 'Westen');
   assert.equal(btn('Q').reason, 'Benötigt Stufe 2');
   c.cancel();
   assert.equal(c.view.branch, null, 'Esc: zurück zur Hauptkarte');

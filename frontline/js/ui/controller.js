@@ -1105,7 +1105,7 @@ export class Controller {
       const reason = researchBlock(g, this.team, key) || this.moneyReason({ money: it.money });
       const eff = researchEffect(key);
       card.push(
-        entry(short || it.name, hotkey, {
+        entry(short || it.short || it.name, hotkey, {
           cost: costText({ money: it.money }),
           tip: `${it.name}: ${it.money} Geld, ${it.time} s${it.needs > 1 ? `, ab Stufe ${it.needs}` : ''}. ${eff ? eff[0].toUpperCase() + eff.slice(1) + '.' : ''}`,
           enabled: !reason,
@@ -1123,7 +1123,7 @@ export class Controller {
         const keys = RESEARCH_KEYS.filter((k) => items[k].branch === id);
         const done = keys.filter((k) => tech.done.includes(k)).length;
         card.push(
-          entry(BALANCE.research.branches[id], hotkey, {
+          entry({ veh: 'Fahrzeuge', wpn: 'Waffen', abl: 'Fähigk.' }[id], hotkey, {
             cost: `${done}/${keys.length}`,
             tip: `${BALANCE.research.branches[id]} (${hotkey}): ${done} von ${keys.length} erforscht`,
             active: tech.cur && items[tech.cur.key].branch === id,
