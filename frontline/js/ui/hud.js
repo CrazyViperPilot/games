@@ -146,6 +146,7 @@ export class Hud {
           <button type="button" class="btn-sm" data-act="rotl" title="Isometrische Ansicht nach links drehen (,)">⟲</button>
           <button type="button" class="btn-sm" data-act="view" title="Ansicht umschalten: 2D / isometrisch (V)">2D</button>
           <button type="button" class="btn-sm" data-act="rotr" title="Isometrische Ansicht nach rechts drehen (.)">⟳</button>
+          ${g.city ? '<button type="button" class="btn-sm" data-act="city" title="Stadt verwalten (Y)">Stadt</button>' : ''}
           <button type="button" class="btn-sm" data-act="sound" title="Ton an/aus (F2)" aria-label="Ton an/aus">🔊</button>
           <button type="button" class="btn-sm" data-act="help" title="Hilfe (F1)">Hilfe</button>
         </div>
@@ -182,6 +183,7 @@ export class Hud {
       if (act.dataset.act === 'speed') this.app.cycleSpeed?.();
       else if (act.dataset.act === 'pause') this.app.togglePause?.();
       else if (act.dataset.act === 'help') this.app.toggleHelp?.();
+      else if (act.dataset.act === 'city') this.app.toggleCity?.();
       else if (act.dataset.act === 'sound') this.app.toggleSound?.();
       else if (act.dataset.act === 'view') this.app.toggleView?.();
       else if (act.dataset.act === 'rotl') this.app.rotateView?.(-1);

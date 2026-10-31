@@ -1,6 +1,8 @@
 // KI-Gegner (docs/verlauf.md §5, §10.2, §11.5). Steuert nur über game.issue und liest den Zustand. Kein DOM.
 // Reihenfolge je Denkschritt: Baustellen pflegen, Verteidigung, Rückzug, Expansion (FOB-Baustellen: Zone, Relais, Flanken),
 // Forschung, Produktion (nur Haupt-FOB), Verteidigungsgebäude und Mauer, Brücken, Baufahrzeuge, LKW (Lieferant/Pendler/Versorger), Sammelpunkte, Armee.
+import { CITY } from '../data/city.js';
+import { aiCity } from '../game/city.js';
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
@@ -146,6 +148,11 @@ export class AI {
   }
 
   think() {
+    this.cityTimer = (this.cityTimer ?? 0) + this.cfg.think;
+    if (this.game.city && this.cityTimer >= CITY.ai.interval[this.difficulty]) {
+      this.cityTimer = 0;
+      aiCity(this.game, this.team, this.difficulty); // Stadt nach festem Bauplan ausbauen (city.js)
+    }
     const s = this.snapshot();
     this.budget = MAX_PLACE;
     this.maintainSites(s);

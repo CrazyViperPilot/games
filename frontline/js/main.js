@@ -13,6 +13,7 @@ import { Minimap } from './render/minimap.js';
 import { Controller } from './ui/controller.js';
 import { Input } from './ui/input.js';
 import { Hud } from './ui/hud.js';
+import { CityPanel } from './ui/citypanel.js';
 import { showStartMenu, showPause, showHelp, showEnd, hideOverlay } from './ui/menu.js';
 import { pickMood, MOOD_SETTINGS } from './render/mood.js';
 import { setWeather, WEATHER_NAMES, WEATHER_SETTINGS } from './game/weather.js';
@@ -77,7 +78,7 @@ hudRoot.addEventListener('click', (e) => {
 });
 
 let session = null; // laufendes Spiel: { game, ai, camera, renderer, minimap, controller, hud, input, loop, … }
-let settings = { difficulty: 'normal', winPoints: BALANCE.winPoints, radio: true, weather: 'random', mood: 'random', research: true, river: true };
+let settings = { difficulty: 'normal', winPoints: BALANCE.winPoints, radio: true, weather: 'random', mood: 'random', research: true, river: true, city: false };
 
 function nearestSpeedIndex(v) {
   let best = 0;
@@ -104,6 +105,7 @@ function stopSession() {
   s.loop.stop();
   s.input.destroy();
   window.removeEventListener('resize', s.onResize);
+  s.cityPanel?.destroy();
   s.hud.destroy();
   clearCanvas();
 }
@@ -184,6 +186,12 @@ const app = {
     s.loop.speed = SPEEDS[(nearestSpeedIndex(s.loop.speed) + 1) % SPEEDS.length];
     s.hud.pushMessage(`Tempo ${s.loop.speed}×`);
   },
+  toggleCity() {
+    const s = session;
+    if (!s || s.ended || !s.cityPanel) return;
+    if (!overlay.hidden) return;
+    s.cityPanel.toggle();
+  },
   toggleSound() {
     const on = sound.toggle();
     session?.hud.pushMessage(on ? 'Ton an (F2)' : 'Ton aus (F2)');
@@ -208,6 +216,7 @@ function frame(s) {
   const dt = Math.min(0.1, (now - (s.last ?? now)) / 1000);
   s.last = now;
   s.input.update(dt);
+  s.cityPanel?.update();
 
   for (const ev of s.game.drainEvents()) {
     if (ev.type !== 'message' || (ev.team !== HUMAN && ev.team !== -1)) continue;
@@ -248,7 +257,7 @@ function startGame(opts) {
   const map = opts.mapId && opts.mapId !== 'random' ? loadMap(opts.mapId) : null; // gespeicherte Karte, sonst aus dem Seed
   const weather = DEBUG && WEATHER_SETTINGS.includes(params.get('weather')) ? params.get('weather') : opts.weather ?? 'off';
   const river = params.has('river') ? params.get('river') === '1' : opts.river !== false; // ?river=0|1 übersteuert das Startmenü
-  const game = new Game({ seed, winPoints: opts.winPoints, startMoney: loadWallet(), map, radio: opts.radio !== false, weather, research: opts.research !== false, river });
+  const game = new Game({ seed, winPoints: opts.winPoints, startMoney: loadWallet(), map, radio: opts.radio !== false, weather, research: opts.research !== false, river, city: !!opts.city });
   if (DEBUG && WEATHER_NAMES[params.get('wx')]) {
     setWeather(game, params.get('wx'), params.get('wx') === 'snow' ? 'winter' : game.weather.season); // Schnee nur im Winter
     game.weather.next = Infinity; // bleibt so (Grafik prüfen)
@@ -287,7 +296,8 @@ function startGame(opts) {
   };
   window.addEventListener('resize', onResize);
 
-  const s = { game, ai, camera, renderer, minimap, controller, hud, input, onResize, loop: null, ended: false, last: null };
+  const cityPanel = game.city ? new CityPanel(hudRoot.parentElement ?? document.body, game, HUMAN, (t) => hud.pushMessage(t)) : null;
+  const s = { game, ai, camera, renderer, minimap, controller, hud, input, cityPanel, onResize, loop: null, ended: false, last: null };
   s.loop = createLoop({
     tickRate: BALANCE.tickRate,
     update(dt) {

@@ -376,6 +376,10 @@ export class Input {
       case '.':
         app.rotateView?.(1);
         return;
+      case 'y':
+      case 'Y':
+        app.toggleCity?.();
+        return;
       case 'p':
       case 'P':
         app.togglePause?.();

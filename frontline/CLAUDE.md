@@ -22,7 +22,7 @@ die genannten Dateien.
    (neue Version `v4.xx`, Cache-Version). Die Hilfe (F1) und die Spielanleitung in `js/ui/menu.js` nennen Zahlen und Tasten
    von Hand: mitpflegen (Suche z. B. `grep -rn "300 Plätze" js PRD.md`).
 8. Neue Ideen, die Daniel nur festhalten will: PRD §13 „Geparkte Ideen“, nicht bauen.
-9. Startmenü-Schalter (Sendemast, Wetter, Forschung, Fluss) sind im Menü standardmäßig an, in `new Game()` ohne Angabe aus. Tests verlassen sich darauf.
+9. Startmenü-Schalter (Sendemast, Wetter, Forschung, Fluss, Stadt) sind im Menü standardmäßig an, in `new Game()` ohne Angabe aus. Tests verlassen sich darauf.
 10. Texte im Spiel, Kommentare und Doku auf Deutsch, Bezeichner im Code englisch. Nach jeder Änderung in `js/data/`: `npm run docs`
     (erzeugt die Wertetabellen in PRD §6) und `npm run test:quick`. Vor dem Push `npm test` (alle grün).
 
@@ -79,6 +79,7 @@ Darunter listet ein Inhaltsverzeichnis alle weiteren Abschnitte.
 | Weitere KI-Werte (Wellen, Späher, Expansion, Kisten …) | js/data/ai.js | eine Konstante je Zeile mit Kommentar; Bedeutung: PRD §10 „KI-Konstanten“ |
 | Höhenvorteil, Tempo am Hang, Weitsicht von oben | balance.js | `BALANCE.height`, `BALANCE.slope`, `BALANCE.sightHeight` |
 | Festung (Mauerring, Zahl der Türme, Höhenvorteil, Fallschaden) / Turm (Plätze, Dachaufbauten, Preise) | balance.js / buildings.js | `BALANCE.fortress` / `BUILDINGS.tower` |
+| Stadt: Größe, Startlager, Erträge, Steuern, Kosten, Wachstum, KI-Takt | js/data/city.js | `CITY` |
 | Wetter, Häuserkampf, Kisten, Kommandeur, Formationen, Fluss, Tiere, Wracks, Tarnung, Flugabwehr | balance.js | `weather`, `garrison`, `crates`, `commander`, `formation`, `river`, `animals`, `scars`, `stealth`, `airFire` |
 | Kartengröße | balance.js | `BALANCE.map` (Vorsicht: ändert alle Karten und Tests) |
 | Aufbau der Zufallskarte (Hügel, Seen, Fluss, Stadt, Häuser, Felder, Kisten-Abstände) | js/data/mapgen.js | `MAPGEN.<abschnitt>` (ändert alle Zufallskarten) |
@@ -116,6 +117,7 @@ Wo jedes Feature liegt. „KI“ = Konstanten-Präfix in `js/data/ai.js`, Logik 
 | Wetter und Jahreszeiten | §7 „Wetter“ | `weather` | `weather.js` | `WX_*` | `weatherfx.js`, `season.js` | `weather.test.js` |
 | Forschungsstufen | §7 „Forschungsstufen“ | `research` | `research.js` | `UPGRADES`, `UPGRADE_RESERVE` | `controller.js`, `hud.js` | `research.test.js` |
 | Zufallskarte, Stadt, Gehöfte, Felder | §7, §9a | `map`, `zone.r`, `MAPGEN` | `map.js`, `landscape.js` | – | `terrain.js`, `iso.js`, `isobuild.js`, `isosprites.js` | `map.test.js`, `fields.test.js` |
+| Stadt (Zonen, Einwohner, Werke füllen Haupt-Lager) | §15 | `CITY` | `city.js` (`updateCity`, Befehl `city`) | `aiCity` in `ai.js` | `js/ui/citypanel.js` (Taste Y), `hud.js` (Knopf) | `city.test.js` |
 | Wracks und Krater (nur Optik) | §9 | `scars` | `scars.js` | – | `sprites.js` (`drawWreck`, `drawCrater`) | `scars.test.js` |
 | Tiere (nur Optik) | §9 | `animals` | `animals.js` | – | `sprites.js` (`drawAnimal*`) | `animals.test.js` |
 | KI allgemein | §10 | `difficulty` | – | `js/ai/ai.js` | – | `ai.test.js` |

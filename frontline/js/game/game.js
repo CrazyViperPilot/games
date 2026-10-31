@@ -10,6 +10,7 @@ import { reliefOf } from './relief.js';
 import { createUnit, createBuilding, isFoe, canAttack, inRange } from './entities.js';
 import { Fog } from './fog.js';
 import { updateEconomy, smoothIncome } from './economy.js';
+import { createCity, updateCity, cmdCity } from './city.js';
 import { updateMovement, nearestPassable, planPath, setIdle, separate, exitHouse } from './movement.js';
 import { updateCombat } from './combat.js';
 import { updateZone } from './zone.js';
@@ -145,8 +146,9 @@ export class Game {
   /** radio: Sendemast als zweite Siegbedingung (Startmenü; ohne Angabe aus). */
   /** weather: 'off' | 'random' | 'summer' | 'autumn' | 'winter' (Wetter und Jahreszeit, weather.js; ohne Angabe aus). */
   /** research: Forschungsstufen (research.js; ohne Angabe aus: alle Einheiten frei, keine Verbesserungen). */
+  /** city: Zonenstadt hinter der Haupt-FOB (city.js; ohne Angabe aus: Haupt-FOB hat unendlich Material). */
   /** river: Zufallskarte mit Flüssen, Brücken und Furten (river.js; ohne Angabe aus). Fertige Karten bringen ihre eigenen mit. */
-  constructor({ seed = 1, winPoints = BALANCE.winPoints, startMoney = BALANCE.startRes.money, map = null, radio = false, weather = 'off', research = false, river = false } = {}) {
+  constructor({ seed = 1, winPoints = BALANCE.winPoints, startMoney = BALANCE.startRes.money, map = null, radio = false, weather = 'off', research = false, river = false, city = false } = {}) {
     this.seed = seed;
     this.rng = makeRng(seed);
     this.map = map ?? generateMap(seed, { river });
@@ -216,6 +218,7 @@ export class Game {
       });
     }
     createHouses(this); // Stadthäuser zum Besetzen (Häuserkampf)
+    createCity(this, city); // Zonenstadt je Team, Haupt-FOB mit endlichem Lager (nur wenn eingeschaltet)
     createCrates(this); // Versorgungskisten der Karte
     createAnimals(this); // Rehe und Wildschweine (nur Optik)
     createWeather(this, weather); // Jahreszeit und Wetter (eigener Zufall)
@@ -330,7 +333,7 @@ export class Game {
   stockOf(team, k) {
     let sum = 0;
     for (const b of this.buildings) {
-      if (b.alive && b.built && b.team === team && b.type === 'fob' && !b.infinite) sum += b.store[k];
+      if (b.alive && b.built && b.team === team && b.type === 'fob' && !b.infinite && !(b.main && this.city)) sum += b.store[k];
     }
     return sum;
   }
@@ -345,7 +348,7 @@ export class Game {
    * und leert die übrigen Front-Lager. Die Haupt-FOB bleibt unverändert (unendlich).
    */
   setStock(team, vals) {
-    const fobs = this.buildings.filter((b) => b.alive && b.built && b.team === team && b.type === 'fob' && !b.infinite);
+    const fobs = this.buildings.filter((b) => b.alive && b.built && b.team === team && b.type === 'fob' && !b.infinite && !(b.main && this.city));
     fobs.forEach((f, i) => {
       for (const k of STOCK_KEYS) f.store[k] = i === 0 ? vals[k] || 0 : 0;
     });
@@ -626,6 +629,8 @@ export class Game {
         return cmdDropoff(this, team, cmd);
       case 'drill':
         return cmdDrill(this, team, cmd);
+      case 'city':
+        return cmdCity(this, team, cmd);
       case 'train':
         return this.cmdTrain(team, cmd);
       case 'cancelTrain':
@@ -1070,6 +1075,7 @@ export class Game {
     updateWeather(this, dt);
     updateResearch(this, dt);
     updateEconomy(this, dt);
+    updateCity(this, dt);
     updateGarrison(this, dt);
     updateTowers(this, dt);
     updateFormations(this);

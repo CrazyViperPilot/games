@@ -35,7 +35,7 @@ const KEYS = [
   ['L / U / T', 'LKW gewählt: Laden (dann FOB anklicken) · Entladen (FOB oder FOB-Baustelle) · Pendeln (Start-FOB, dann Ziel)'],
   ['Q / W / E / R', 'LKW gewählt: Ladungsart Gemischt · Baumaterial · Munition · Treibstoff'],
   ['Entf', 'Gebäude abreißen (25 % des Baumaterials zurück)'],
-  ['Lager', 'Die Haupt-FOB hat unendlich Baumaterial, Munition und Treibstoff. Vordere FOBs haben ein eigenes Lager, das LKW füllen · Gebäude bezahlt die FOB in Reichweite · LKW versorgen Einheiten in der Nähe aus ihrer Ladung'],
+  ['Lager', 'Die Haupt-FOB hat unendlich Baumaterial (mit „Stadt“ im Startmenü: nur, was die Werke der Stadt liefern), Munition und Treibstoff. Vordere FOBs haben ein eigenes Lager, das LKW füllen · Gebäude bezahlt die FOB in Reichweite · LKW versorgen Einheiten in der Nähe aus ihrer Ladung'],
   ['Munition', 'Jeder Schuss verbraucht Munition · ohne Vorrat feuern Einheiten nicht (FOB-MG kostet nichts)'],
   ['Treibstoff', 'Fahrzeuge verbrauchen Treibstoff nur beim Fahren · ohne Vorrat nur 25 % Tempo'],
   ['Esc', 'Abbrechen · Auswahl aufheben'],
@@ -46,6 +46,7 @@ const KEYS = [
   ['V', 'Ansicht umschalten: 2D von oben / isometrisch'],
   [', / .', 'Isometrische Ansicht um 90° nach links / rechts drehen (auch Knöpfe ⟲ ⟳ oben)'],
   ['P', 'Pause'],
+  ['Y', 'Stadt öffnen/schließen (nur mit Stadt im Startmenü): Zonen malen, Werke bauen; das Spiel läuft weiter'],
   ['F2', 'Ton an/aus (auch der Lautsprecher-Knopf oben)'],
   ['Minimap', 'Linksklick = Kamera, Rechtsklick = Bewegen'],
 ];
@@ -76,6 +77,7 @@ const MOOD_LABELS = { off: 'Aus', random: 'Zufall', morning: 'Morgen', day: 'Tag
 const MOOD_KEY = 'frontline-licht'; // Startmenü: Lichtstimmung (nur Optik)
 const WEATHER_KEY = 'frontline-wetter'; // Startmenü: Wetter aus, Zufall oder feste Jahreszeit
 const RESEARCH_KEY = 'frontline-forschung'; // Startmenü: Forschungsstufen an/aus
+const CITY_KEY = 'frontline-stadt'; // Startmenü: Stadt (SimCity-Teil) an/aus
 const RIVER_KEY = 'frontline-fluss'; // Startmenü: Flüsse auf Zufallskarten an/aus
 function readMapSel() {
   try {
@@ -138,6 +140,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
   let mood = readChoice(MOOD_KEY, MOOD_SETTINGS, 'random');
   let research = readFlag(RESEARCH_KEY, D.research);
   let river = readFlag(RIVER_KEY, D.river);
+  let city = readFlag(CITY_KEY, D.city);
   let sound = readFlag(SOUND_KEY, true); // Ton: gleicher Speicher wie der Schalter im Spiel (audio/sound.js)
   show(
     root,
@@ -168,6 +171,10 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
       <div class="field">
         <span class="flabel" title="Forschung in der Haupt-FOB: Stufe 2 schaltet Schützenpanzer, Hubschrauber und Flakpanzer frei, Stufe 3 Kampfpanzer, Kampfhubschrauber und SAM-Startrampe; dazu Verbesserungen für Panzerung und Reichweite">Forschung</span>
         <div class="seg"><button type="button" data-research="1">An</button><button type="button" data-research="0">Aus</button></div>
+      </div>
+      <div class="field">
+        <span class="flabel" title="Zonenstadt hinter der Haupt-FOB: Wohnen, Gewerbe und Werke bauen; die Werke füllen das Lager der Haupt-FOB mit Baumaterial, Munition und Treibstoff (ohne Stadt hat sie unendlich davon)">Stadt</span>
+        <div class="seg"><button type="button" data-city="1">An</button><button type="button" data-city="0">Aus</button></div>
       </div>
       <div class="field">
         <span class="flabel" title="Zufallskarten: je ein Fluss vor jeder Startecke mit drei zerstörbaren Brücken und zwei Furten">Fluss</span>
@@ -210,6 +217,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
     root.querySelectorAll('[data-weather]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.weather === weather)));
     root.querySelectorAll('[data-mood]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mood === mood)));
     root.querySelectorAll('[data-research]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.research === '1') === research)));
+    root.querySelectorAll('[data-city]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.city === '1') === city)));
     root.querySelectorAll('[data-river]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.river === '1') === river)));
     root.querySelectorAll('[data-sound]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.sound === '1') === sound)));
   };
@@ -317,6 +325,9 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
     } else if (b.dataset.research) {
       research = b.dataset.research === '1';
       writeFlag(RESEARCH_KEY, research);
+    } else if (b.dataset.city) {
+      city = b.dataset.city === '1';
+      writeFlag(CITY_KEY, city);
     } else if (b.dataset.river) {
       river = b.dataset.river === '1';
       writeFlag(RIVER_KEY, river);
@@ -329,7 +340,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
       showWallet();
     } else if (b.dataset.act === 'start') {
       hideOverlay(root);
-      onStart({ difficulty, winPoints, mapId: mapSel, radio, weather, mood, research, river });
+      onStart({ difficulty, winPoints, mapId: mapSel, radio, weather, mood, research, river, city });
       return;
     }
     mark();

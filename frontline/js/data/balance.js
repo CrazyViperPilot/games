@@ -253,7 +253,7 @@ export const BALANCE = {
     groupGap: 1100, // Abstand der Rudel untereinander
   },
   // Standards im Startmenü (das Menü merkt sich die letzte Wahl je Gerät). new Game() ohne Angabe schaltet alles aus (Tests).
-  menuDefaults: { difficulty: 'normal', radio: true, weather: 'random', research: true, river: true },
+  menuDefaults: { difficulty: 'normal', radio: true, weather: 'random', research: true, river: true, city: false },
   resNames: { money: 'Geld', bm: 'Baumaterial', mun: 'Munition', fuel: 'Treibstoff' },
   teamNames: ['Blau', 'Rot'],
   teamColors: ['#3d8bfd', '#e5484d'],
