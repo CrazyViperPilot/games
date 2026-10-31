@@ -217,7 +217,7 @@ export const BALANCE = {
   // Schaden, Verbundpanzerung: Fahrzeuge und Hubschrauber × composite (ein Schuss, der das unverletzte Ziel sofort tötet, bleibt
   // tödlich); Wärmebildoptik: Waffenreichweite und Sicht der Einheiten × optics.
   research: {
-    // branch: veh (Fahrzeuge) · wpn (Waffen) · abl (Fähigkeiten); needs = Mindeststufe; req = Voraussetzung (Schlüssel oder 'branch' =
+    // short = Kurzname auf dem Knopf (Telefon: 50 px breit). branch: veh (Fahrzeuge) · wpn (Waffen) · abl (Fähigkeiten); needs = Mindeststufe; req = Voraussetzung (Schlüssel oder 'branch' =
     // alle anderen Forschungen des Astes); fx = Wirkung, Faktoren verschiedener Forschungen multiplizieren sich (research.js fxMul):
     // speed Bodenfahrzeug-Tempo · fuel Verbrauch · taken Schaden gegen Fahrzeuge und Hubschrauber (zusätzlich zu composite) ·
     // dealtInf/dealtVeh/dealtAll Schaden der Schüsse · cd Abklingzeit · sniperRange · aa Flak und SAM · build Bautempo ·
@@ -227,28 +227,28 @@ export const BALANCE = {
       tier2: { name: 'Stufe 2', money: 600, time: 60, needs: 1, tier: 2 },
       tier3: { name: 'Stufe 3', money: 1200, time: 90, needs: 2, tier: 3 },
       // Fahrzeuge
-      engine1: { name: 'Motor I', branch: 'veh', money: 500, time: 50, needs: 2, fx: { speed: 1.1 } },
-      engine2: { name: 'Motor II', branch: 'veh', money: 900, time: 70, needs: 3, req: 'engine1', fx: { speed: 1.1 } },
-      fueltank: { name: 'Zusatztank', branch: 'veh', money: 400, time: 40, needs: 2, fx: { fuel: 0.8 } },
-      composite: { name: 'Verbundpanzerung', branch: 'veh', money: 800, time: 60, needs: 3 },
-      reactive: { name: 'Reaktivpanzerung', branch: 'veh', money: 1000, time: 75, needs: 3, req: 'composite', fx: { taken: 0.9 } },
-      workshop: { name: 'Feldwerkstatt', branch: 'veh', money: 600, time: 60, needs: 2, regen: 0.01 },
-      vmaster: { name: 'Panzerwaffe', branch: 'veh', money: 2000, time: 120, needs: 3, req: 'branch', fx: { speed: 1.1, taken: 0.9 } },
+      engine1: { name: 'Motor I', short: 'Motor I', branch: 'veh', money: 500, time: 50, needs: 2, fx: { speed: 1.1 } },
+      engine2: { name: 'Motor II', short: 'Motor II', branch: 'veh', money: 900, time: 70, needs: 3, req: 'engine1', fx: { speed: 1.1 } },
+      fueltank: { name: 'Zusatztank', short: 'Tank+', branch: 'veh', money: 400, time: 40, needs: 2, fx: { fuel: 0.8 } },
+      composite: { name: 'Verbundpanzerung', short: 'Verbund', branch: 'veh', money: 800, time: 60, needs: 3 },
+      reactive: { name: 'Reaktivpanzerung', short: 'Reaktiv', branch: 'veh', money: 1000, time: 75, needs: 3, req: 'composite', fx: { taken: 0.9 } },
+      workshop: { name: 'Feldwerkstatt', short: 'Werkstatt', branch: 'veh', money: 600, time: 60, needs: 2, regen: 0.01 },
+      vmaster: { name: 'Panzerwaffe', short: 'Meister', branch: 'veh', money: 2000, time: 120, needs: 3, req: 'branch', fx: { speed: 1.1, taken: 0.9 } },
       // Waffen
-      vests: { name: 'Schutzwesten', branch: 'wpn', money: 400, time: 45, needs: 2 },
-      ap: { name: 'Panzerbrechende Munition', branch: 'wpn', money: 600, time: 60, needs: 2, fx: { dealtVeh: 1.15 } },
-      frag: { name: 'Splittergranaten', branch: 'wpn', money: 500, time: 50, needs: 2, fx: { dealtInf: 1.15 } },
-      scope: { name: 'Zielfernrohre', branch: 'wpn', money: 400, time: 45, needs: 2, fx: { sniperRange: 1.2 } },
-      rapid: { name: 'Schnellfeuer', branch: 'wpn', money: 900, time: 75, needs: 3, fx: { cd: 0.88 } },
-      missiles: { name: 'Lenkraketen', branch: 'wpn', money: 800, time: 70, needs: 3, fx: { aa: 1.25 } },
-      wmaster: { name: 'Waffenmeister', branch: 'wpn', money: 2000, time: 120, needs: 3, req: 'branch', fx: { dealtAll: 1.1 } },
+      vests: { name: 'Schutzwesten', short: 'Westen', branch: 'wpn', money: 400, time: 45, needs: 2 },
+      ap: { name: 'Panzerbrechende Munition', short: 'Pz-Munition', branch: 'wpn', money: 600, time: 60, needs: 2, fx: { dealtVeh: 1.15 } },
+      frag: { name: 'Splittergranaten', short: 'Splitter', branch: 'wpn', money: 500, time: 50, needs: 2, fx: { dealtInf: 1.15 } },
+      scope: { name: 'Zielfernrohre', short: 'Zielfernr.', branch: 'wpn', money: 400, time: 45, needs: 2, fx: { sniperRange: 1.2 } },
+      rapid: { name: 'Schnellfeuer', short: 'Schnellf.', branch: 'wpn', money: 900, time: 75, needs: 3, fx: { cd: 0.88 } },
+      missiles: { name: 'Lenkraketen', short: 'Raketen', branch: 'wpn', money: 800, time: 70, needs: 3, fx: { aa: 1.25 } },
+      wmaster: { name: 'Waffenmeister', short: 'Meister', branch: 'wpn', money: 2000, time: 120, needs: 3, req: 'branch', fx: { dealtAll: 1.1 } },
       // Fähigkeiten
-      optics: { name: 'Wärmebildoptik', branch: 'abl', money: 600, time: 60, needs: 2 },
-      fastbuild: { name: 'Schnellbau', branch: 'abl', money: 500, time: 50, needs: 2, fx: { build: 1.25 } },
-      repairkit: { name: 'Reparaturset', branch: 'abl', money: 400, time: 40, needs: 2, fx: { repair: 2 } },
-      smoke: { name: 'Nebelwerfer', branch: 'abl', money: 700, time: 60, needs: 2 },
-      mines: { name: 'Minen', branch: 'abl', money: 800, time: 70, needs: 3 },
-      amaster: { name: 'Eliteausbildung', branch: 'abl', money: 2000, time: 120, needs: 3, req: 'branch', fx: { abilityCd: 0.5, build: 1.25 } },
+      optics: { name: 'Wärmebildoptik', short: 'Optik', branch: 'abl', money: 600, time: 60, needs: 2 },
+      fastbuild: { name: 'Schnellbau', short: 'Schnellbau', branch: 'abl', money: 500, time: 50, needs: 2, fx: { build: 1.25 } },
+      repairkit: { name: 'Reparaturset', short: 'Rep.-Set', branch: 'abl', money: 400, time: 40, needs: 2, fx: { repair: 2 } },
+      smoke: { name: 'Nebelwerfer', short: 'Nebelw.', branch: 'abl', money: 700, time: 60, needs: 2 },
+      mines: { name: 'Minen', short: 'Minen', branch: 'abl', money: 800, time: 70, needs: 3 },
+      amaster: { name: 'Eliteausbildung', short: 'Meister', branch: 'abl', money: 2000, time: 120, needs: 3, req: 'branch', fx: { abilityCd: 0.5, build: 1.25 } },
     },
     branches: { veh: 'Fahrzeuge', wpn: 'Waffen', abl: 'Fähigkeiten' },
     // Einsatzfähigkeiten (Tasten V und M): Rauch senkt den Schaden eigener Einheiten darin, Minen treffen Bodeneinheiten des Gegners

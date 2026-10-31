@@ -497,6 +497,7 @@ Alle Geräusche werden im Browser mit WebAudio **selbst erzeugt** (Rauschen und 
 - **Raumklang:** Stereo-Position und Lautstärke nach der Lage auf dem Bildschirm; außerhalb des Bilds leiser, weit weg stumm; Gegner im Nebel bleiben stumm (wie in der Grafik). Gleiche Geräusche werden gedrosselt und die Zahl gleichzeitiger Geräusche begrenzt (große Schlachten bleiben schlank, Explosionen haben Vorrang); ein Kompressor verhindert Übersteuern. Pause, Tabwechsel und Spielende halten die Dauergeräusche an.
 
 ## Änderungsverlauf
+- v4.78: **Forschung per Touch** (§8, §9): Forschungsmenü, Äste, Forschungen, Zurück sowie Nebel (N) und Mine (Z) sind Knöpfe der Befehlskarte (kein Keyboard nötig); Forschungsknöpfe tragen Kurznamen (`short`) und den Preis, damit sie auf 50 px breiten Telefonknöpfen lesbar sind. Cache v91.
 - v4.77: **Forschungsbaum ausgebaut** (§7): drei Äste Fahrzeuge, Waffen, Fähigkeiten mit 21 Forschungen, Meisterschaften, Nebelwand (N) und Minen (Z). Cache v90.
 - v4.76: **Straßentempo** (§7): Bodenfahrzeuge fahren auf Straßen und Feldwegen 35 % schneller, abseits verbrauchen sie 15 % mehr Treibstoff. Cache v89.
 - v4.75: **SimCity-Stadt, Schritt 1** (§15): Startmenü-Schalter „Stadt“ (Standard aus); Zonenstadt je Team mit Straßen, Wohnen, Gewerbe und drei Werksarten; Werke füllen das nun endliche Lager der Haupt-FOB; Stadtansicht (Knopf oder Taste Y, Befehl `city`); KI baut nach Bauplan. Neu: `js/game/city.js`, `js/data/city.js`, `js/ui/citypanel.js`, `test/city.test.js`. Cache v88.
