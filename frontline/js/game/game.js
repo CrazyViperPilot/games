@@ -10,7 +10,7 @@ import { reliefOf } from './relief.js';
 import { createUnit, createBuilding, isFoe, canAttack, inRange } from './entities.js';
 import { Fog } from './fog.js';
 import { updateEconomy, smoothIncome } from './economy.js';
-import { createCity, updateCity, cmdCity } from './city.js';
+import { createCity, updateCity, cmdCity, cityNoise, freePop, crewOf } from './city.js';
 import { updateMovement, nearestPassable, planPath, setIdle, separate, exitHouse } from './movement.js';
 import { updateCombat } from './combat.js';
 import { updateZone } from './zone.js';
@@ -34,6 +34,7 @@ const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
 const H = BALANCE.map.height;
 const STOCK_KEYS = ['bm', 'mun', 'fuel']; // Lagersorten (team.res.* sind Summen über FOB-Lager)
+const NOISY = new Set(['tracer', 'shell', 'explosion', 'muzzle']); // Effekte, die Stadtbewohner in der Konfliktzone vertreiben (city.js)
 const EFFECT_LIFE = { tracer: 0.12, shell: 0.3, explosion: 0.5, intercept: 0.4, muzzle: 0.1, death: 0.1 };
 const SHORTAGE_TEXT = {
   mun: 'Einheiten ohne Munition',
@@ -269,6 +270,10 @@ export class Game {
   /** `snd`: Hinweis für den Ton (ui/Sound): Waffen-ID, Rüstungsklasse eines Gefallenen oder 'building'; die Simulation wertet ihn nicht aus. */
   addEffect(type, x, y, team = -1, x2 = x, y2 = y, snd = null) {
     this.effects.push({ type, x, y, x2, y2, team, snd, t: 0, life: EFFECT_LIFE[type] ?? 0.3 });
+    if (this.city && NOISY.has(type)) {
+      cityNoise(this, x, y); // Stadt: Bewohner der Konfliktzone fliehen vor Schüssen und Einschlägen
+      if (x2 !== x || y2 !== y) cityNoise(this, x2, y2);
+    }
   }
 
   /** Eigene Entity oder fertiger Sendemast (den sieht der Gegner überall, auch im Nebel). */
@@ -888,6 +893,7 @@ export class Game {
     if (b.queue.length >= BALANCE.queueMax) return fail('Warteschlange ist voll');
     if (this.slotsUsed(team) + (UNITS[cmd.unit].slots ?? 1) > BALANCE.slotCap) return fail('Einheitenlimit erreicht');
     if (UNITS[cmd.unit].hero && hasCommander(this, team)) return fail(ONE_COMMANDER);
+    if (this.city && freePop(this, team) < crewOf(cmd.unit)) return fail('Zu wenig freie Einwohner (Stadt: Wohnen ausbauen)');
     const cost = UNITS[cmd.unit].cost;
     if (!this.canAfford(team, cost)) return fail(this.missingMoney());
     this.pay(team, cost);

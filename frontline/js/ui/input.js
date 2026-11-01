@@ -149,6 +149,7 @@ export class Input {
         // zweiter Finger: laufende Einzelgeste verwerfen
         this.down = null;
         this.controller.setDragBox(null);
+        this.app.cityBuild?.()?.cancel();
         this.pinch = null;
         this.pinchStep();
         return;
@@ -167,6 +168,13 @@ export class Input {
     }
     if (e.button !== 0) return;
     const c = this.controller;
+    const city = this.app.cityBuild?.();
+    if (city) {
+      // Baumodus der Stadt: ein Finger oder linke Maustaste zieht ein Rechteck auf der Karte
+      this.down = { sx: p.x, sy: p.y, cx: e.clientX, cy: e.clientY, mode: 'city' };
+      city.begin(w.x, w.y);
+      return;
+    }
     this.down = { sx: p.x, sy: p.y, cx: e.clientX, cy: e.clientY, shift: e.shiftKey, dragging: false, panning: false, mode: c.view.mode };
     if (c.view.mode === 'wall') c.beginWall(w.x, w.y);
   }
@@ -201,6 +209,11 @@ export class Input {
     }
     if (this.mmDrag !== null) this.minimapGo(e);
     const d = this.down;
+    if (d && d.mode === 'city') {
+      const w = this.camera.screenToWorld(p.x, p.y);
+      this.app.cityBuild?.()?.move(w.x, w.y);
+      return;
+    }
     if (d) {
       if (!d.dragging && !d.panning && d.mode !== 'wall' && Math.hypot(p.x - d.sx, p.y - d.sy) >= DRAG_PX) {
         // Maus: Rahmenauswahl; Finger: Ziehen schiebt die Karte
@@ -248,9 +261,17 @@ export class Input {
     if (e.type === 'pointercancel') {
       this.down = null;
       this.controller.setDragBox(null);
+      this.app.cityBuild?.()?.cancel();
       return;
     }
     if (e.button !== 0 || !this.down) return;
+    if (this.down.mode === 'city') {
+      this.down = null;
+      const p = this.pos(e, this.canvas);
+      const w = this.camera.screenToWorld(p.x, p.y);
+      this.app.cityBuild?.()?.end(w.x, w.y);
+      return;
+    }
     const d = this.down;
     this.down = null;
     const c = this.controller;
@@ -360,7 +381,8 @@ export class Input {
         return;
       case 'Escape':
         e.preventDefault();
-        this.controller.cancel();
+        if (app.cityBuild?.()) app.toggleCity?.();
+        else this.controller.cancel();
         return;
       case 'h':
       case 'H':

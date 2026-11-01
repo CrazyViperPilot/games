@@ -1,5 +1,6 @@
 // Wirtschaft: Produktion in der Haupt-FOB und Geldrate (docs/verlauf.md §5, §11.1). Geld kommt nur aus Zone und Hot Zone. Kein DOM.
 // Baufortschritt: construction.js. Nachfüllen und LKW: logistics.js.
+import { crewOf } from './city.js';
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { planPath, setIdle } from './movement.js';
@@ -67,6 +68,7 @@ export function updateEconomy(game, dt) {
       b.queue.splice(i, 1);
       b.queueTimes.splice(i, 1);
       const u = game.spawnUnit(type, b.team, spot.x, spot.y);
+      if (game.city) u.crew = crewOf(type); // Stadt: die Einheit belegt Einwohner, solange sie lebt
       u.order = { type: 'move', x: b.rallyX, y: b.rallyY, targetId: null };
       planPath(game, u, b.rallyX, b.rallyY);
       if (u.path.length === 0) setIdle(u);

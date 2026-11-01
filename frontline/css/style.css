@@ -516,21 +516,26 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .hud.folded .bottom { background: none; }
 }
 
-/* Stadtansicht (SimCity-Teil, js/ui/citypanel.js) */
-.city { position: fixed; inset: 44px 10px 10px 10px; z-index: 30; display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 10px; background: #141814f2; border: 1px solid var(--line-2); }
-.city-head { display: flex; align-items: center; gap: 12px; font-size: 13px; }
-.city-head .city-stats { flex: 1; color: var(--muted); font-size: 12px; }
-.city-body { flex: 1; min-height: 0; display: flex; gap: 8px; }
-.city-map { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; }
-.city-tools { display: flex; flex-direction: column; gap: 4px; width: 128px; overflow-y: auto; }
-.ctool { display: grid; grid-template-columns: 22px 1fr; align-items: center; column-gap: 6px; text-align: left; padding: 4px 8px; min-height: 40px; border-radius: 6px; border: 2px solid var(--line-2); background: var(--panel-2); color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer; }
+/* Baumodus der Stadt direkt auf der Karte (SimCity-Teil, js/ui/citypanel.js, seit v4.82) */
+.city-bar { position: fixed; right: 10px; top: 50px; z-index: 25; display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: 10px; background: #141814e6; border: 1px solid var(--line-2); pointer-events: auto; max-height: calc(100% - 60px); overflow-y: auto; }
+.city-tools { display: flex; flex-direction: column; gap: 4px; width: 120px; }
+.ctool { display: grid; grid-template-columns: 22px 1fr; align-items: center; column-gap: 6px; text-align: left; padding: 3px 8px; min-height: 40px; border-radius: 6px; border: 2px solid var(--line-2); background: var(--panel-2); color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer; }
 .ctool i { grid-row: span 2; font-style: normal; color: var(--c); font-size: 17px; text-align: center; }
 .ctool small { color: var(--muted); font-weight: 500; font-size: 10px; }
 .ctool[aria-pressed="true"] { border-color: var(--c); background: #2e372e; }
-.city-foot { font-size: 12px; color: var(--muted); }
+.city-acts { display: flex; flex-direction: column; gap: 4px; }
+.city-acts .btn-sm { min-height: 36px; }
+.city-done { border-color: var(--accent) !important; font-weight: 700; }
+.city-strip span { display: block; }
+.city-strip { position: fixed; left: 50%; top: 104px; transform: translateX(-50%); z-index: 25; max-width: calc(100% - 300px); padding: 4px 10px; border-radius: 8px; background: #141814e6; border: 1px solid var(--line-2); color: var(--text); font-size: 12px; text-align: center; pointer-events: none; }
+body.city-mode .city-fab { display: none; }
 @media (max-height: 520px) {
-  .city-tools { width: 236px; display: grid; grid-template-columns: 1fr 1fr; align-content: start; }
-  .ctool { min-height: 36px; padding: 3px 6px; font-size: 11px; }
+  .city-bar { top: 44px; max-height: calc(100% - 52px); }
+  .city-tools { width: 196px; display: grid; grid-template-columns: 1fr 1fr; }
+  .ctool { min-height: 38px; padding: 2px 5px; font-size: 11px; }
+  .city-acts { flex-direction: row; }
+  .city-acts .btn-sm { flex: 1; }
+  .city-strip { top: 40px; font-size: 10px; max-width: calc(100% - 230px); left: 12px; transform: none; text-align: left; }
 }
 /* Großer Stadt-Knopf für Touch (ohne Tastatur), nur bei eingeschalteter Stadt */
 .city-fab { position: fixed; right: 10px; top: 50px; z-index: 20; min-height: 44px; padding: 0 16px; border-radius: 10px; border: 2px solid var(--accent); background: #1d231df0; color: var(--text); font-size: 15px; font-weight: 700; cursor: pointer; pointer-events: auto; }

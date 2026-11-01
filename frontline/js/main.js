@@ -191,7 +191,11 @@ const app = {
     if (!s || s.ended || !s.cityPanel) return;
     if (!overlay.hidden) return;
     s.cityPanel.toggle();
+    if (s.cityPanel.open) s.controller.cancel();
+    s.hud.refresh?.();
   },
+  /** Baumodus der Stadt offen? Dann die Stadtleiste (Input zieht damit Rechtecke auf der Karte). */
+  cityBuild: () => (session?.cityPanel?.open && !session.ended ? session.cityPanel : null),
   toggleSound() {
     const on = sound.toggle();
     session?.hud.pushMessage(on ? 'Ton an (F2)' : 'Ton aus (F2)');
@@ -297,6 +301,7 @@ function startGame(opts) {
   window.addEventListener('resize', onResize);
 
   const cityPanel = game.city ? new CityPanel(hudRoot.parentElement ?? document.body, game, HUMAN, (t) => hud.pushMessage(t), (x, y) => camera.centerOn(x, y)) : null;
+  renderer.cityUi = cityPanel; // Baumodus: Gebiet und gezogenes Rechteck zeichnen (nur lesen)
   const s = { game, ai, camera, renderer, minimap, controller, hud, input, cityPanel, onResize, loop: null, ended: false, last: null };
   s.loop = createLoop({
     tickRate: BALANCE.tickRate,

@@ -77,6 +77,14 @@ export class Minimap {
     ctx.lineWidth = 1.5 * px;
     ctx.stroke();
 
+    // Stadt: Gebiet blass, Gebäude kräftig in Teamfarbe (Bild je Team, neu nur wenn sich Gebiet oder Zellen ändern)
+    for (const c of g.city ?? []) {
+      const img = this.cityImage(c, g.teams[c.team].color);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, 0, 0, c.cols, c.rows, 0, 0, c.cols * c.cell, c.rows * c.cell);
+      ctx.imageSmoothingEnabled = true;
+    }
+
     // Hot Zone
     const hz = g.hot;
     ctx.beginPath();
@@ -145,5 +153,34 @@ export class Minimap {
     ctx.stroke();
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  /** Kleines Bild (eine Zelle = ein Pixel) von Gebiet und Gebäuden einer Stadt. */
+  cityImage(c, color) {
+    this.cityImgs ??= new Map();
+    let e = this.cityImgs.get(c.team);
+    const key = `${c.claimVer}/${c.ver}`;
+    if (e && e.key === key) return e.canvas;
+    if (!e) {
+      const canvas = document.createElement('canvas');
+      canvas.width = c.cols;
+      canvas.height = c.rows;
+      e = { canvas, ctx: canvas.getContext('2d'), key: '' };
+      this.cityImgs.set(c.team, e);
+    }
+    e.key = key;
+    const im = e.ctx.createImageData(c.cols, c.rows);
+    const n = parseInt(color.slice(1), 16);
+    const [R, G, B] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    for (let i = 0; i < c.claim.length; i++) {
+      const a = c.level[i] && c.kind[i] !== 1 ? 230 : c.kind[i] ? 140 : c.claim[i] ? 45 : 0;
+      if (!a) continue;
+      im.data[i * 4] = R;
+      im.data[i * 4 + 1] = G;
+      im.data[i * 4 + 2] = B;
+      im.data[i * 4 + 3] = a;
+    }
+    e.ctx.putImageData(im, 0, 0);
+    return e.canvas;
   }
 }

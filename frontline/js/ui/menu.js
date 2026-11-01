@@ -47,7 +47,7 @@ const KEYS = [
   ['V', 'Ansicht umschalten: 2D von oben / isometrisch'],
   [', / .', 'Isometrische Ansicht um 90° nach links / rechts drehen (auch Knöpfe ⟲ ⟳ oben)'],
   ['P', 'Pause'],
-  ['Y', 'Stadt öffnen/schließen (nur mit Stadt im Startmenü): Zonen malen, Werke bauen; das Spiel läuft weiter'],
+  ['Y', 'Baumodus der Stadt an/aus (nur mit Stadt im Startmenü): Werkzeug rechts wählen, auf der Karte ein Rechteck ziehen (nur im eigenen Gebiet, gestrichelte Linie); zwei Finger schieben weiter; das Spiel läuft weiter · Ausgebildete Einheiten brauchen freie Einwohner (Soldat 1, Panzer 3, Hubschrauber 2) · Bewohner in der Konfliktzone fliehen bei Beschuss'],
   ['F2', 'Ton an/aus (auch der Lautsprecher-Knopf oben)'],
   ['Minimap', 'Linksklick = Kamera, Rechtsklick = Bewegen'],
 ];
@@ -174,7 +174,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
         <div class="seg"><button type="button" data-research="1">An</button><button type="button" data-research="0">Aus</button></div>
       </div>
       <div class="field">
-        <span class="flabel" title="Zonenstadt hinter der Haupt-FOB: Wohnen, Gewerbe und Werke bauen; die Werke füllen das Lager der Haupt-FOB mit Baumaterial, Munition und Treibstoff (ohne Stadt hat sie unendlich davon)">Stadt</span>
+        <span class="flabel" title="Zonenstadt im eigenen Gebiet auf der ganzen Karte (Gebiet wächst um FOBs und Stadtgebäude): Wohnen, Gewerbe und Werke bauen; die Werke füllen das Lager der Haupt-FOB mit Baumaterial, Munition und Treibstoff (ohne Stadt hat sie unendlich davon); ausgebildete Einheiten kosten Einwohner">Stadt</span>
         <div class="seg"><button type="button" data-city="1">An</button><button type="button" data-city="0">Aus</button></div>
       </div>
       <div class="field">
