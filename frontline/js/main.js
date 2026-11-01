@@ -78,7 +78,7 @@ hudRoot.addEventListener('click', (e) => {
 });
 
 let session = null; // laufendes Spiel: { game, ai, camera, renderer, minimap, controller, hud, input, loop, … }
-let settings = { difficulty: 'normal', winPoints: BALANCE.winPoints, radio: true, weather: 'random', mood: 'random', research: true, river: true, city: false };
+let settings = { difficulty: 'normal', winPoints: BALANCE.winPoints, radio: true, weather: 'random', mood: 'random', research: true, river: true, city: true };
 
 function nearestSpeedIndex(v) {
   let best = 0;
