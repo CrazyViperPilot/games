@@ -25,15 +25,15 @@ test('mit Stadt: endliches Startlager, Front-Summe ohne Haupt-FOB', () => {
 
 test('Bauen kostet Geld, zu wenig Geld stoppt, Abriss ist kostenlos', () => {
   const g = new Game({ seed: 3, city: true, startMoney: 100 });
-  const r = paint(g, 'road', 0, 0, 9, 0); // 10 x 5 = 50
+  const r = paint(g, 'road', 0, 4, 9, 4); // 10 x 5 = 50
   assert.ok(r.ok);
   assert.equal(g.teams[0].res.money, 50);
-  const r2 = paint(g, 'bm', 0, 1, 4, 1); // 5 x 40 > 50 Geld: nur 1 Zelle
+  const r2 = paint(g, 'bm', 0, 5, 4, 5); // 5 x 40 > 50 Geld: nur 1 Zelle
   assert.equal(r2.placed, 1);
   assert.equal(r2.broke, true);
-  assert.equal(paint(g, 'erase', 0, 1, 4, 1).ok, true);
+  assert.equal(paint(g, 'erase', 0, 5, 4, 5).ok, true);
   assert.equal(g.teams[0].res.money, 10);
-  assert.equal(paint(g, 'res', 0, 1, 0, 1).ok, false); // zu wenig Geld (20 > 10)
+  assert.equal(paint(g, 'res', 0, 5, 0, 5).ok, false); // zu wenig Geld (20 > 10)
 });
 
 test('Zone ohne Straße wächst nicht, mit Straße wird sie Gebäude', () => {
@@ -79,4 +79,30 @@ test('KI baut nach Bauplan und liefert Material', () => {
   for (let t = 0; t < 20 * 240; t++) { ai.update(0.05); g.update(0.05); }
   assert.ok(g.city[1].kind.filter(Boolean).length > n0 + 10);
   assert.ok(g.city[1].stats.pop > 0);
+});
+
+test('Stadt liegt um die Haupt-FOB: gesperrte Zellen, Gebäude sperren den Weg, Abriss gibt ihn frei', () => {
+  const g = new Game({ seed: 3, city: true, startMoney: 3000 });
+  const c = g.city[0];
+  const m = g.mainFob(0);
+  assert.ok(m.x > c.x0 && m.x < c.x0 + c.cols * c.cell && m.y > c.y0 && m.y < c.y0 + c.rows * c.cell, 'FOB im Stadtgebiet');
+  const fc = Math.floor((m.x - c.x0) / c.cell);
+  const fr = Math.floor((m.y - c.y0) / c.cell);
+  assert.equal(c.blocked[fr * c.cols + fc], 1);
+  assert.equal(paint(g, 'res', fc, fr, fc, fr).ok, false, 'unter der FOB nichts bauen');
+  paint(g, 'road', 0, 4, 3, 4);
+  paint(g, 'bm', 0, 5, 0, 5);
+  const T = g.grid.tile;
+  const tx = (c.x0 + 32) / T;
+  const ty = (c.y0 + 5 * c.cell + 32) / T;
+  // eine Einheit steht auf der Zelle: sie rückt beim Bau beiseite
+  const u = g.units.find((x) => x.team === 0 && !x.def.air);
+  u.x = c.x0 + 30; u.y = c.y0 + 5 * c.cell + 30; u.path = [];
+  run(g, CITY.growTime + 1);
+  assert.equal(c.level[5 * c.cols], 1);
+  assert.equal(g.grid.passable(Math.floor(tx), Math.floor(ty), 0), false, 'Gebäude blockiert');
+  assert.ok(g.grid.passable(g.grid.toCell(u.x), g.grid.toCell(u.y), 0), 'Einheit steht frei');
+  assert.ok(g.grid.passable(Math.floor((c.x0 + 32) / T), Math.floor((c.y0 + 4 * c.cell + 32) / T), 0), 'Straße begehbar');
+  paint(g, 'erase', 0, 5, 0, 5);
+  assert.equal(g.grid.passable(Math.floor(tx), Math.floor(ty), 0), true, 'Abriss gibt frei');
 });

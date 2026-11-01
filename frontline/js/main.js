@@ -296,7 +296,7 @@ function startGame(opts) {
   };
   window.addEventListener('resize', onResize);
 
-  const cityPanel = game.city ? new CityPanel(hudRoot.parentElement ?? document.body, game, HUMAN, (t) => hud.pushMessage(t)) : null;
+  const cityPanel = game.city ? new CityPanel(hudRoot.parentElement ?? document.body, game, HUMAN, (t) => hud.pushMessage(t), (x, y) => camera.centerOn(x, y)) : null;
   const s = { game, ai, camera, renderer, minimap, controller, hud, input, cityPanel, onResize, loop: null, ended: false, last: null };
   s.loop = createLoop({
     tickRate: BALANCE.tickRate,

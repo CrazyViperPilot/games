@@ -9,7 +9,8 @@ const TOOLS = [...KINDS, 'erase'];
 const fmt = (v, d = 0) => v.toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d });
 
 export class CityPanel {
-  constructor(parent, game, team, onMessage = () => {}) {
+  constructor(parent, game, team, onMessage = () => {}, onShow = null) {
+    this.onShow = onShow; // (x, y) => Kamera auf die Stadt (main.js)
     this.game = game;
     this.team = team;
     this.onMessage = onMessage;
@@ -20,7 +21,7 @@ export class CityPanel {
     root.className = 'city';
     root.hidden = true;
     root.innerHTML = `
-      <div class="city-head"><b>Stadt</b><span class="city-stats"></span><button type="button" class="btn-sm" data-close>Schließen (Y)</button></div>
+      <div class="city-head"><b>Stadt</b><span class="city-stats"></span><button type="button" class="btn-sm" data-show>Auf Karte zeigen</button><button type="button" class="btn-sm" data-close>Schließen (Y)</button></div>
       <div class="city-body">
         <div class="city-map"><canvas></canvas></div>
         <div class="city-tools">${TOOLS.map((k) => {
@@ -38,6 +39,11 @@ export class CityPanel {
     this.footEl = root.querySelector('.city-foot');
     root.addEventListener('click', (e) => {
       if (e.target.closest('[data-close]')) this.toggle(false);
+      if (e.target.closest('[data-show]')) {
+        const c = this.game.city[this.team];
+        this.toggle(false);
+        this.onShow?.(c.x0 + (c.cols * c.cell) / 2, c.y0 + (c.rows * c.cell) / 2);
+      }
       const t = e.target.closest('[data-tool]');
       if (t) {
         this.tool = t.dataset.tool;
@@ -144,6 +150,11 @@ export class CityPanel {
         const y = r * n;
         ctx.strokeStyle = '#ffffff12';
         ctx.strokeRect(x + 0.5, y + 0.5, n - 1, n - 1);
+        if (city.blocked[i]) {
+          ctx.fillStyle = '#0a0d0a'; // gesperrt: Haupt-FOB oder Hindernis
+          ctx.fillRect(x + 1, y + 1, n - 2, n - 2);
+          continue;
+        }
         if (!k) continue;
         const lv = city.level[i];
         ctx.fillStyle = COLORS[k];
@@ -162,6 +173,21 @@ export class CityPanel {
         if (lv) ctx.fillText('•'.repeat(lv), x + n / 2, y + n * 0.5);
         else if (!linked) ctx.fillText('?', x + n / 2, y + n * 0.5); // ohne Straßenanschluss
       }
+    }
+    const fob = this.game.mainFob(this.team);
+    if (fob) {
+      // Haupt-FOB an ihrer Stelle im Raster
+      const T = this.game.grid.tile;
+      const fx = ((fob.cx * T - city.x0) / city.cell) * n;
+      const fy = ((fob.cy * T - city.y0) / city.cell) * n;
+      const fw = ((fob.w * T) / city.cell) * n;
+      ctx.fillStyle = this.game.teams[this.team].color;
+      ctx.fillRect(fx, fy, fw, fw);
+      ctx.fillStyle = '#fff';
+      ctx.font = `700 ${Math.floor(n * 0.4)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('FOB', fx + fw / 2, fy + fw / 2);
     }
     const d = this.drag;
     if (d) {

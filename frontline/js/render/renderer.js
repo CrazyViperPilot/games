@@ -46,6 +46,7 @@ import { drawWeather } from './weatherfx.js';
 import { drawMood } from './mood.js';
 import { drawBridgeTop, drawBridgeIso, drawBridgeBar, bridgeBar, fordPosts, drawFordPostTop, drawFordPostIso } from './bridge.js';
 import { bridgeUnder } from '../game/river.js';
+import { drawCityGround, drawCityTop, cityBuildings } from './citylayer.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
@@ -194,6 +195,8 @@ export class Renderer {
     for (const p of fordPosts(g.map, reliefOf(g.map))) if (inRect(p.x, p.y, 10)) drawFordPostTop(ctx, p); // Furtstangen
     this.drawRuins(ctx, R, known);
     this.drawScars(ctx, inRect, z);
+    drawCityGround(this, ctx, team, known, inRect); // Stadt: Straßen und Grundstücke
+    drawCityTop(this, ctx, team, known, inRect); // Stadt: Dächer
     this.drawZone(ctx, z);
     this.drawHot(ctx, z, now);
 
@@ -500,6 +503,8 @@ export class Renderer {
     }
     for (const b of g.bridges ?? []) if (inRect(b.x, b.y, b.len / 2 + PAD)) drawBridgeIso(ctx, cam, dpr, b); // Einheiten fahren darüber
     setIsoGround(ctx, cam, dpr);
+    drawCityGround(this, ctx, team, known, inRect); // Stadt: Straßen und Grundstücke
+    setIsoGround(ctx, cam, dpr);
     this.drawZone(ctx, z);
     this.drawHot(ctx, z, now);
     setIsoGround(ctx, cam, dpr);
@@ -526,6 +531,7 @@ export class Renderer {
     const items = [];
     const town = g.map.town;
     for (const b of town?.buildings ?? []) if (inRect(b.x, b.y, PAD)) items.push({ k: cam.depth(b.x, b.y), t: 0, o: b });
+    for (const b of cityBuildings(g, team, known, (x, y) => inRect(x, y, PAD))) items.push({ k: cam.depth(b.x, b.y), t: 0, o: b }); // Stadt
     for (const t of town?.trees ?? []) if (inRect(t.x, t.y, PAD)) items.push({ k: cam.depth(t.x, t.y), t: 1, o: t });
     for (const t of g.map.trees ?? []) if (inRect(t.x, t.y, PAD)) items.push({ k: cam.depth(t.x, t.y), t: 1, o: t });
     for (const t of this.deco.trees) if (inRect(t.x, t.y, PAD)) items.push({ k: cam.depth(t.x, t.y), t: 1, o: t });

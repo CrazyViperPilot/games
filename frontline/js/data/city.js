@@ -5,6 +5,9 @@ export const CITY = {
   // ---- Schnelleinstellungen ----
   cols: 18, // Breite des Stadtrasters (Zellen)
   rows: 10, // Höhe des Stadtrasters (Zellen)
+  cell: 64, // Kantenlänge einer Stadtzelle auf der Karte (px, Vielfaches der Kachel 32)
+  fobRow: 1.5, // Lage der Haupt-FOB im Raster: so viele Zellen vom zonenseitigen Rand entfernt (die Stadt liegt dahinter)
+  fobMargin: 64, // um die Haupt-FOB bleibt so viel Platz frei (px; dort erscheinen neue Einheiten)
   startStock: { bm: 1500, mun: 600, fuel: 600 }, // Startlager der Haupt-FOB bei eingeschalteter Stadt (sonst unendlich)
   yield: { bm: 0.1, mun: 0.06, fuel: 0.03 }, // Ertrag je Arbeiter und Sekunde in Werken für Baumaterial, Munition, Treibstoff
   taxPop: 0.03, // Geld/s je Einwohner
