@@ -686,7 +686,12 @@ export function cmdCity(game, team, cmd) {
   const poor = (CITY.costBm[cmd.kind] ?? 0) > 0 ? 'Zu wenig Baumaterial im Haupt-Lager' : 'Zu wenig Geld';
   if (!placed) return { ok: false, reason: broke ? poor : noDeposit ? 'Förderanlagen nur auf Rohstoffvorkommen' : outside ? 'Nur im eigenen Gebiet bauen' : 'Nichts zu ändern' };
   rebuildList(city);
-  return { ok: true, placed, broke };
+  // Zonen ohne Straße daneben wachsen nicht (Förderanlagen schon): melden
+  let noRoad = false;
+  if (!erase && cmd.kind !== 'road' && cmd.kind !== 'mine') {
+    for (let row = r0; row <= r1 && !noRoad; row++) for (let col = c0; col <= c1; col++) if (city.kind[idx(city, col, row)] === id && !hasRoad(city, col, row)) noRoad = true;
+  }
+  return { ok: true, placed, broke, noRoad };
 }
 
 // ---- KI: baut in Ringen um die Haupt-FOB nach außen, dazu kleine Viertel an vorderen FOBs (seit v4.82),

@@ -1,7 +1,8 @@
 // Stadt auf der Karte (PRD §15): Straßen, ausgewiesene Zonen, Gebäude, Gebietsgrenzen und im Baumodus das gezogene Rechteck.
 // Liest nur game.city (und ren.cityUi, die Stadtleiste). 2D: flach von oben; isometrisch: Boden hier, Gebäude als Stadthäuser
 // über drawTownBuilding (renderer.js).
-import { KINDS, DEPOSITS, cellRect, canZone } from '../game/city.js';
+import { KINDS, DEPOSITS, cellRect, canZone, hasRoad } from '../game/city.js';
+import { CITY } from '../data/city.js';
 import { CITY_COLORS } from '../ui/citypanel.js';
 
 const LOT = { res: '#5fa36a', com: '#5a88c4', bm: '#b07a43', mun: '#9aa4b4', fuel: '#a585cf', steel: '#7f8c99', mine: '#c9a14a', market: '#d6b84a' };
@@ -62,7 +63,7 @@ export function drawCityGround(ren, ctx, team, known, inRect) {
   ctx.save();
   if (ren.draping()) ctx.setTransform(ren.dpr, 0, 0, ren.dpr, 0, 0);
   drawDeposits(ren, ctx, known);
-  for (const { k, lv, r, ruin } of cells(g, team, known)) {
+  for (const { c, k, lv, r, ruin } of cells(g, team, known)) {
     if (!inRect(r.x, r.y, 64)) continue;
     if (ruin) {
       // Ruine: Schutt, bis die Zelle neu wächst
@@ -84,6 +85,16 @@ export function drawCityGround(ren, ctx, team, known, inRect) {
     ctx.strokeStyle = LOT[k];
     ctx.lineWidth = ren.draping() ? 1.5 : 3;
     ctx.stroke();
+    if (!lv && k !== 'mine' && c.team === team) {
+      // ausgewiesen, aber noch nicht gebaut: Fortschritt als Balken, rot ohne Straße daneben
+      const col = Math.floor(r.x0 / c.cell);
+      const row = Math.floor(r.y0 / c.cell);
+      const linked = hasRoad(c, col, row);
+      const f = linked ? Math.max(0, Math.min(1, c.timer[row * c.cols + col] / CITY.growTime)) : 1;
+      groundRect(ren, ctx, r.x0 + 8, r.y + 4, r.x0 + 8 + (r.x1 - r.x0 - 16) * f, r.y + 12);
+      ctx.fillStyle = linked ? '#e8e2a0' : '#e0553a';
+      ctx.fill();
+    }
   }
   drawTerritory(ren, ctx, team, known);
   ctx.restore();
