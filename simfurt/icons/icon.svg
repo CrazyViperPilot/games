@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b3a63"/><stop offset="1" stop-color="#f3a45a"/></linearGradient>
+    <linearGradient id="gl" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8fb7da"/><stop offset="1" stop-color="#4a7fae"/></linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#sky)"/>
+  <g>
+    <rect x="96" y="250" width="56" height="170" fill="#2c4a73"/>
+    <rect x="160" y="170" width="64" height="250" fill="url(#gl)"/>
+    <polygon points="160,170 192,128 224,170" fill="#c9d3da"/>
+    <rect x="232" y="90" width="52" height="330" fill="#e5ecee"/><rect x="256" y="40" width="4" height="52" fill="#e5ecee"/>
+    <rect x="292" y="200" width="64" height="220" fill="#3d6c96"/>
+    <rect x="364" y="270" width="52" height="150" fill="#2c4a73"/>
+  </g>
+  <g fill="#ffe9a8" opacity=".85"><rect x="172" y="200" width="8" height="10"/><rect x="196" y="230" width="8" height="10"/><rect x="244" y="130" width="8" height="10"/><rect x="262" y="180" width="8" height="10"/><rect x="304" y="240" width="8" height="10"/><rect x="330" y="280" width="8" height="10"/></g>
+  <path d="M0 420 Q128 396 256 420 T512 420 V512 H0Z" fill="#2f78bd"/>
+  <path d="M0 452 Q128 428 256 452 T512 452" stroke="#9fd0f5" stroke-width="5" fill="none" opacity=".7"/>
+</svg>
