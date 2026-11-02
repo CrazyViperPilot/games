@@ -1096,7 +1096,12 @@ export class Controller {
     }
     if (m === 'build') return this.buildCard();
     if (m === 'research') return this.researchCard();
-    return this.selectionCard();
+    const card = this.selectionCard();
+    // Abwählen auch per Touch (Tippen auf den Boden schickt gewählte Einheiten sonst los)
+    if (this.view.selection.size) {
+      card.push(entry('Abwählen', 'Esc', { tip: 'Auswahl aufheben (Esc)', action: () => this.view.selection.clear() }));
+    }
+    return card;
   }
 
   /** Forschungsmenü der Hauptstadt: nächste Stufe (Q), Verbesserungen (W, E, R), laufende Forschung abbrechen (C). */

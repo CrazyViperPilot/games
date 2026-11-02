@@ -41,13 +41,14 @@ export class CityPanel {
         return `<button type="button" class="ctool" data-tool="${k}" title="${name}${TIP[k] ? `: ${TIP[k]}` : ''}" style="--c:${CITY_COLORS[k]}"><i>${ICON[k]}</i><span>${SHORT[k]}</span><small>${price}</small></button>`;
       }).join('')}</div>
       <div class="city-trade" hidden><small>Je ${CITY.market.lot} Stück, Preise in Geld</small>${GOODS.map((g) => `<div class="trow"><b>${GOOD_NAME[g]}</b><button type="button" class="btn-sm" data-trade="${g}" data-dir="sell" title="${CITY.market.lot} ${GOOD_NAME[g]} verkaufen">Verk. +${CITY.market.sell[g]}</button><button type="button" class="btn-sm" data-trade="${g}" data-dir="buy" title="${CITY.market.lot} ${GOOD_NAME[g]} kaufen">Kauf −${CITY.market.buy[g]}</button></div>`).join('')}</div>
-      <div class="city-acts"><button type="button" class="btn-sm" data-tradeview>Handel</button><button type="button" class="btn-sm" data-show>Zur Stadt</button><button type="button" class="btn-sm city-done" data-close>Fertig (Y)</button></div>`;
+      <div class="city-acts"><button type="button" class="btn-sm city-fold" data-fold title="Menü einklappen (Stadt-Knopf klappt es wieder auf)">▴ Einklappen</button><button type="button" class="btn-sm" data-tradeview>Handel</button><button type="button" class="btn-sm" data-show>Zur Stadt</button><button type="button" class="btn-sm city-done" data-close>Fertig (Y)</button></div>`;
     parent.appendChild(strip);
     parent.appendChild(root);
     this.root = root;
     this.strip = strip;
     root.addEventListener('click', (e) => {
       if (e.target.closest('[data-close]')) this.toggle(false);
+      if (e.target.closest('[data-fold]')) this.fold(true);
       if (e.target.closest('[data-show]')) {
         const m = this.game.mainFob(this.team);
         if (m) this.onShow?.(m.x, m.y);
@@ -79,8 +80,19 @@ export class CityPanel {
     this.root.querySelectorAll('[data-tool]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tool === this.tool)));
   }
 
+  /** Menü einklappen (Baumodus bleibt, mehr Platz auf dem Bildschirm) oder wieder aufklappen. */
+  fold(on) {
+    this.folded = on;
+    this.root.hidden = on || !this.open;
+    this.strip.hidden = on || !this.open;
+    document.body.classList.toggle('city-folded', on && this.open);
+    if (!on && this.open) this.update(true);
+  }
+
   toggle(on = !this.open) {
     this.open = on;
+    this.folded = false;
+    document.body.classList.remove('city-folded');
     this.root.hidden = !on;
     this.strip.hidden = !on;
     this.drag = null;

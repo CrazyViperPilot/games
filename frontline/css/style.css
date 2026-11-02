@@ -525,7 +525,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .ctool small { color: var(--muted); font-weight: 500; font-size: 10px; }
 .ctool[aria-pressed="true"] { border-color: var(--c); background: #2e372e; }
 .city-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
-.city-acts .city-done { grid-column: span 2; }
+.city-acts .city-done, .city-acts .city-fold { grid-column: span 2; }
 .city-trade { display: flex; flex-direction: column; gap: 4px; width: 196px; }
 .city-trade .trow { display: grid; grid-template-columns: 44px 1fr 1fr; gap: 4px; align-items: center; font-size: 11px; }
 .city-trade .btn-sm { min-height: 36px; padding: 2px 4px; font-size: 11px; }
@@ -533,13 +533,13 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .city-done { border-color: var(--accent) !important; font-weight: 700; }
 .city-strip span { display: block; }
 .city-strip { position: fixed; left: 50%; top: 104px; transform: translateX(-50%); z-index: 25; max-width: calc(100% - 300px); padding: 4px 10px; border-radius: 8px; background: #141814e6; border: 1px solid var(--line-2); color: var(--text); font-size: 12px; text-align: center; pointer-events: none; }
-body.city-mode .city-fab { display: none; }
+body.city-mode:not(.city-folded) .city-fab { display: none; }
 @media (max-height: 520px) {
   .city-bar { top: 44px; max-height: calc(100% - 52px); }
   .city-tools { width: 196px; display: grid; grid-template-columns: 1fr 1fr; }
   .ctool { min-height: 38px; padding: 2px 5px; font-size: 11px; }
-  .city-acts { grid-template-columns: 1fr 1fr 1fr; }
-  .city-acts .city-done { grid-column: auto; }
+  .city-acts { grid-template-columns: 1fr 1fr; }
+  .city-acts .city-done, .city-acts .city-fold { grid-column: auto; }
   .city-strip { top: 40px; font-size: 10px; max-width: calc(100% - 230px); left: 12px; transform: none; text-align: left; }
 }
 /* Großer Stadt-Knopf für Touch (ohne Tastatur), nur bei eingeschalteter Stadt */

@@ -190,7 +190,8 @@ const app = {
     const s = session;
     if (!s || s.ended || !s.cityPanel) return;
     if (!overlay.hidden) return;
-    s.cityPanel.toggle();
+    if (s.cityPanel.open && s.cityPanel.folded) s.cityPanel.fold(false); // eingeklappt: Stadt-Knopf klappt auf
+    else s.cityPanel.toggle();
     if (s.cityPanel.open) s.controller.cancel();
     s.hud.refresh?.();
   },
