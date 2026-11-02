@@ -463,6 +463,14 @@ export function updateCity(game, dt) {
       game.message(id, `${e.def.name} in der Stadt zerstört`, e.x, e.y);
     }
 
+    // Treffer merken (KI meidet die Gegend beim Bauen und schickt Verteidiger)
+    for (const e of c.ents.values()) {
+      if (e.lastHitTime > game.time - dt * 1.5) {
+        c.hitLog = (c.hitLog ?? []).filter((h) => h.t > game.time - CITY.ai.dangerTime).slice(-19);
+        c.hitLog.push({ x: e.x, y: e.y, t: game.time });
+      }
+    }
+
     // Truppen: gefallene Soldaten fehlen der Stadt (Einwohner weg, müssen neu zuziehen)
     const drafted = draftedCount(game, id);
     if (drafted < c.drafted) c.popF = Math.max(0, c.popF - (c.drafted - drafted));
@@ -690,9 +698,13 @@ function aiRoad(col, row, ac, ar) {
   return (((row - ar) % n) + n) % n === 0 || col === ac;
 }
 
-/** Welche Zone braucht die Stadt als Nächstes? Wohnen, wenn Arbeit fehlt, sonst die Arbeitsstätte mit dem größten Rückstand. */
-function aiNeed(c, add) {
+/**
+ * Welche Zone braucht die Stadt als Nächstes? (freie Planung seit v4.85) Wohnen, wenn Wohnraum oder freie Einwohner fehlen,
+ * sonst die Arbeitsstätte mit dem größten Rückstand zum Mix; knappe Sorten (Lager, Metall, Geld) zählen CITY.ai.boost-fach.
+ */
+function aiNeed(game, c, add) {
   const t = totals(c);
+  const A = CITY.ai;
   const count = { res: 0, com: 0, bm: 0, mun: 0, fuel: 0, steel: 0, market: 0 };
   for (const k in add) count[k] += add[k];
   for (const i of c.list) {
@@ -700,18 +712,38 @@ function aiNeed(c, add) {
     if (k in count) count[k]++;
   }
   const work = count.com + count.bm + count.mun + count.fuel + count.steel + count.market;
-  if (count.res < work * 1.2 || (t.housing + t.fled < c.drafted + 20 && count.res <= work * 2)) return 'res';
+  const free = c.stats.free ?? 0;
+  if (count.res < work * 1.2 || (t.housing + t.fled < c.drafted + 20 && count.res <= work * 2) || (free < A.lowFree && count.res <= work * 2)) return 'res';
+  const main = game.mainFob(c.team);
+  const s = c.stats;
+  const low = {
+    bm: main && main.store.bm < A.lowStock && s.raw.wood + s.raw.stone > s.bm, // Rohstoff da, Werk fehlt
+    mun: main && main.store.mun < A.lowStock && c.metal > 50,
+    fuel: main && main.store.fuel < A.lowStock && s.raw.oil > s.fuel,
+    steel: c.metal < A.lowMetal && s.raw.ore > s.metal + s.mun * CITY.convert.mun,
+    com: game.teams[c.team].res.money < A.lowMoney,
+  };
   let best = 'bm';
   let lo = Infinity;
-  for (const [k, w] of Object.entries(CITY.ai.mix)) {
+  for (const [k, w] of Object.entries(A.mix)) {
     if (k === 'market' && count.market >= 1) continue; // ein Markt reicht
-    const r = count[k] / w;
+    const r = count[k] / (w * (low[k] ? A.boost : 1));
     if (r < lo) {
       lo = r;
       best = k;
     }
   }
   return best;
+}
+
+/** Liegt die Zelle nahe einem frischen Treffer auf die eigene Stadt? */
+function inDanger(c, col, row, now) {
+  const R = CITY.ai.dangerRadius;
+  for (const h of c.hitLog ?? []) {
+    if (h.t < now - CITY.ai.dangerTime) continue;
+    if (Math.abs(Math.floor(h.x / c.cell) - col) <= R && Math.abs(Math.floor(h.y / c.cell) - row) <= R) return true;
+  }
+  return false;
 }
 
 /** Freie Zellen um den Anker (Weltpunkt), nach Abstand sortiert (Ringe), bis zum Radius in Zellen. */
@@ -721,7 +753,7 @@ function aiCandidates(game, c, x, y, rad) {
   for (let row = Math.max(0, ar - rad); row <= Math.min(c.rows - 1, ar + rad); row++) {
     for (let col = Math.max(0, ac - rad); col <= Math.min(c.cols - 1, ac + rad); col++) {
       const i = idx(c, col, row);
-      if (c.kind[i] || !canZone(game, c, i)) continue;
+      if (c.kind[i] || !canZone(game, c, i) || inDanger(c, col, row, game.time)) continue;
       const d = Math.max(Math.abs(col - ac), Math.abs(row - ar)) * 100 + Math.abs(col - ac) + Math.abs(row - ar);
       out.push({ i, col, row, d, road: aiRoad(col, row, ac, ar), deposit: c.deposit[i] });
     }
@@ -762,7 +794,7 @@ export function aiCity(game, team, difficulty) {
     if (!cand.road) {
       // nur neben einer (geplanten) Straße
       if (!hasRoad(city, cand.col, cand.row)) continue;
-      kind = aiNeed(city, add);
+      kind = aiNeed(game, city, add);
     }
     if (money() < CITY.cost[kind] + reserve) return;
     const r = game.issue(team, { type: 'city', kind, c0: cand.col, r0: cand.row, c1: cand.col, r1: cand.row });
@@ -775,7 +807,20 @@ export function aiCity(game, team, difficulty) {
 /** Freie Vorkommen im eigenen Gebiet (Zellindizes). */
 function depositCells(game, c) {
   const out = [];
-  for (let i = 0; i < c.deposit.length; i++) if (c.deposit[i] && c.claim[i] && !c.kind[i] && canZone(game, c, i)) out.push(i);
+  for (let i = 0; i < c.deposit.length; i++) {
+    if (!c.deposit[i] || !c.claim[i] || c.kind[i] || !canZone(game, c, i)) continue;
+    const q = i % c.cols;
+    if (!inDanger(c, q, (i - q) / c.cols, game.time)) out.push(i);
+  }
+  // knappe Sorten zuerst (Öl bei wenig Treibstoff, Erz bei wenig Metall)
+  const main = game.mainFob(c.team);
+  const want = (i) => {
+    const d = DEPOSITS[c.deposit[i] - 1];
+    if (d === 'oil' && main && main.store.fuel < CITY.ai.lowStock) return 0;
+    if (d === 'ore' && c.metal < CITY.ai.lowMetal) return 0;
+    return 1;
+  };
+  out.sort((a, b) => want(a) - want(b) || a - b);
   return out;
 }
 
@@ -805,13 +850,15 @@ export function aiRaid(game, team, difficulty, dt) {
   const foe = game.city[1 - team];
   const main = game.mainFob(team);
   if (!foe || !main) return;
+  // Ziel nach Wert: Werke, Förderung und Markt zuerst, geteilt durch die Entfernung (freie Planung seit v4.85)
   let target = null;
-  let best = Infinity;
+  let best = -Infinity;
   for (const e of foe.ents.values()) {
     if (!e.alive || !game.isExplored(team, e.x, e.y)) continue;
-    const d = Math.hypot(e.x - main.x, e.y - main.y);
-    if (d < best) {
-      best = d;
+    const k = KINDS[foe.kind[e.cityCell] - 1];
+    const v = (CITY.ai.targetValue[k] ?? 1) / (1 + Math.hypot(e.x - main.x, e.y - main.y) / 1000);
+    if (v > best) {
+      best = v;
       target = e;
     }
   }
@@ -821,4 +868,33 @@ export function aiRaid(game, team, difficulty, dt) {
     .slice(0, CITY.ai.raidSize)
     .map((u) => u.id);
   if (ids.length) game.issue(team, { type: 'attackMove', ids, x: target.x, y: target.y });
+}
+
+/**
+ * Verteidigung (von ai.js jede Denkrunde): Wird ein eigenes Stadtgebäude beschossen, schickt die KI bis zu defendSize
+ * bewaffnete Bodeneinheiten aus der Nähe mit Angriffsmarsch dorthin; Förderanlagen und Werke zuerst.
+ */
+export function aiDefend(game, team) {
+  const c = game.city?.[team];
+  if (!c) return;
+  const A = CITY.ai;
+  if (game.time - (c.defendAt ?? -1e9) < A.defendCooldown) return;
+  let spot = null;
+  let best = -1;
+  for (const e of c.ents.values()) {
+    if (!e.alive || e.lastHitTime < game.time - 4) continue;
+    const v = A.targetValue[KINDS[c.kind[e.cityCell] - 1]] ?? 1;
+    if (v > best) {
+      best = v;
+      spot = e;
+    }
+  }
+  if (!spot) return;
+  const near = game.units
+    .filter((u) => u.alive && u.team === team && !u.def.air && u.weapons.length && !u.house && !u.crate && u.order.type !== 'attack' && Math.hypot(u.x - spot.x, u.y - spot.y) < A.defendRange)
+    .sort((a, b) => Math.hypot(a.x - spot.x, a.y - spot.y) - Math.hypot(b.x - spot.x, b.y - spot.y) || a.id - b.id)
+    .slice(0, A.defendSize);
+  if (!near.length) return;
+  c.defendAt = game.time;
+  game.issue(team, { type: 'attackMove', ids: near.map((u) => u.id), x: spot.x, y: spot.y });
 }

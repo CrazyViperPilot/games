@@ -65,5 +65,18 @@ export const CITY = {
     buyMetalBelow: 150, // kauft Metall am Markt, wenn weniger da ist und genug Geld (reserve + Preis) bleibt
     raidEvery: { easy: 0, normal: 240, hard: 150 }, // s zwischen Angriffen auf die gegnerische Stadt (0 = nie)
     raidSize: 4, // so viele Fahrzeuge greifen an
+    // Freie Planung (seit v4.85): Engpässe heben das Gewicht einer Zone im Mix
+    lowStock: 800, // BM, MUN, TS im Hauptlager darunter = knapp
+    lowMetal: 300, // Metall darunter = knapp
+    lowFree: 8, // freie Einwohner darunter = Wohnen knapp
+    lowMoney: 400, // Geld darunter = Gewerbe knapp
+    boost: 4, // so viel stärker zählt eine knappe Zone
+    dangerTime: 90, // s, so lange meidet sie Zellen nahe einem Treffer auf ihre Stadt
+    dangerRadius: 3, // Zellen um den Treffer
+    defendSize: 6, // so viele Einheiten schickt sie zu einem angegriffenen Stadtgebäude
+    defendRange: 2500, // px, nur Einheiten in diesem Abstand
+    defendCooldown: 12, // s zwischen zwei Verteidigungsbefehlen
+    // Angriffsziele: Wert je Zellenart (geteilt durch Entfernung); Werke und Förderung zuerst
+    targetValue: { steel: 3, fuel: 3, mun: 3, mine: 2.5, market: 2, bm: 2, com: 1, res: 0.5 },
   },
 };

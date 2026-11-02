@@ -2,7 +2,7 @@
 // Reihenfolge je Denkschritt: Baustellen pflegen, Verteidigung, Rückzug, Expansion (FOB-Baustellen: Zone, Relais, Flanken),
 // Forschung, Produktion (nur Haupt-FOB), Verteidigungsgebäude und Mauer, Brücken, Baufahrzeuge, LKW (Lieferant/Pendler/Versorger), Sammelpunkte, Armee.
 import { CITY } from '../data/city.js';
-import { aiCity, aiRaid } from '../game/city.js';
+import { aiCity, aiRaid, aiDefend } from '../game/city.js';
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
@@ -149,7 +149,10 @@ export class AI {
 
   think() {
     this.cityTimer = (this.cityTimer ?? 0) + this.cfg.think;
-    if (this.game.city) aiRaid(this.game, this.team, this.difficulty, this.cfg.think); // Angriffe auf die gegnerische Stadt
+    if (this.game.city) {
+      aiRaid(this.game, this.team, this.difficulty, this.cfg.think); // Angriffe auf die gegnerische Stadt (Werke zuerst)
+      aiDefend(this.game, this.team); // eigene Stadt verteidigen
+    }
     if (this.game.city && this.cityTimer >= CITY.ai.interval[this.difficulty]) {
       this.cityTimer = 0;
       aiCity(this.game, this.team, this.difficulty); // Stadt ausbauen: Ringe, Viertel, Förderung, Markt (city.js)

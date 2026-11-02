@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
 import { CITY } from '../js/data/city.js';
 import { AI } from '../js/ai/ai.js';
-import { canZone, cityNoise, freePop } from '../js/game/city.js';
+import { canZone, cityNoise, freePop, aiCity, aiDefend, aiRaid, KIND_ID } from '../js/game/city.js';
 
 const run = (g, s) => { for (let t = 0; t < s * 20; t++) g.update(0.05); };
 // Ursprung (c, r) eines w × h großen, ganz bebaubaren Rechtecks im Gebiet des Teams, nahe der Haupt-FOB
@@ -340,4 +340,60 @@ test('Startviertel: Raffinerie, Wohnen und Ölquelle stehen fertig, Treibstoff f
   m.store.fuel = 0;
   run(g, 30);
   assert.ok(g.city[0].stats.fuel > 0 && m.store.fuel > 0, `TS ${m.store.fuel}`);
+});
+
+test('Freie Planung: knapper Treibstoff mit Öl im Überfluss → KI weist Raffinerien aus', () => {
+  const g = new Game({ seed: 3, city: true, startMoney: 20000 });
+  const c = g.city[1];
+  run(g, 20);
+  const fuel0 = c.list.filter((i) => c.kind[i] === KIND_ID.fuel).length;
+  for (let n = 0; n < 30; n++) {
+    g.mainFob(1).store.fuel = 100;
+    c.stats.raw.oil = 50; // reichlich Öl, zu wenig Raffinerie
+    c.stats.free = 50; // genug freie Einwohner
+    aiCity(g, 1, 'normal');
+  }
+  const fuel1 = c.list.filter((i) => c.kind[i] === KIND_ID.fuel).length;
+  const steel = c.list.filter((i) => c.kind[i] === KIND_ID.steel).length;
+  assert.ok(fuel1 >= fuel0 + 3 && fuel1 > steel, `Raffinerien ${fuel0} → ${fuel1}, Stahlwerke ${steel}`);
+});
+
+test('Freie Planung: KI baut nicht neben frisch beschossenen Zellen', () => {
+  const g = new Game({ seed: 3, city: true, startMoney: 20000 });
+  const c = g.city[1];
+  const m = g.mainFob(1);
+  c.hitLog = [{ x: m.x, y: m.y, t: g.time }]; // Treffer an der Haupt-FOB: die ganze Umgebung meiden
+  const before = new Set(c.list);
+  aiCity(g, 1, 'normal');
+  const R = CITY.ai.dangerRadius;
+  const added = c.list.filter((i) => !before.has(i));
+  assert.ok(added.length > 0, 'baut woanders');
+  for (const i of added) {
+    const q = i % c.cols;
+    const r = (i - q) / c.cols;
+    assert.ok(Math.abs(q - Math.floor(m.x / c.cell)) > R || Math.abs(r - Math.floor(m.y / c.cell)) > R, 'nicht in der Gefahrenzone');
+  }
+});
+
+test('KI verteidigt beschossene Stadtgebäude und greift gegnerische Werke zuerst an', () => {
+  const g = new Game({ seed: 3, city: true, startMoney: 5000 });
+  run(g, 20);
+  const c = g.city[1];
+  const e = [...c.ents.values()].find((x) => c.kind[x.cityCell] === KIND_ID.fuel);
+  assert.ok(e, 'Raffinerie im Startviertel');
+  e.lastHitTime = g.time;
+  aiDefend(g, 1);
+  const sent = g.units.filter((u) => u.team === 1 && u.order.type === 'attackMove' && Math.hypot(u.order.x - e.x, u.order.y - e.y) < 300);
+  assert.ok(sent.length > 0 && sent.length <= CITY.ai.defendSize, `Verteidiger ${sent.length}`);
+  // Angriff: das Ziel ist die Raffinerie (Werk) des Spielers, nicht ein Wohnhaus
+  const own = g.city[0];
+  g.fog[1].revealAll?.();
+  for (const u of g.units) if (u.team === 1) u.order = { type: 'idle' };
+  own.raidTimer = 0;
+  c.raidTimer = 1e9;
+  aiRaid(g, 1, 'normal', 1);
+  const ref = [...own.ents.values()].find((x) => own.kind[x.cityCell] === KIND_ID.fuel);
+  const raiders = g.units.filter((u) => u.team === 1 && u.order.type === 'attackMove');
+  assert.ok(raiders.length > 0, 'Angreifer unterwegs');
+  assert.ok(raiders.every((u) => Math.hypot(u.order.x - ref.x, u.order.y - ref.y) < 200), 'Ziel ist die Raffinerie');
 });
