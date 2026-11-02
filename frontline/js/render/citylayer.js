@@ -5,9 +5,9 @@ import { KINDS, DEPOSITS, cellRect, canZone, hasRoad } from '../game/city.js';
 import { CITY } from '../data/city.js';
 import { CITY_COLORS } from '../ui/citypanel.js';
 
-const LOT = { res: '#5fa36a', com: '#5a88c4', bm: '#b07a43', mun: '#9aa4b4', fuel: '#a585cf', steel: '#7f8c99', mine: '#c9a14a', market: '#d6b84a' };
-const ROOF = { res: '#8a4b3c', com: '#9aa3ab', bm: '#6e5a48', mun: '#5f6670', fuel: '#6a5a7e', steel: '#4f5862', mine: '#7a6440', market: '#b8863b' };
-const TOWN_KIND = { res: 'house', com: 'hall', bm: 'factory', mun: 'factory', fuel: 'factory', steel: 'factory', mine: 'hall', market: 'hall' };
+const LOT = { res: '#5fa36a', com: '#5a88c4', bm: '#b07a43', mun: '#9aa4b4', fuel: '#a585cf', steel: '#7f8c99', mine: '#c9a14a', market: '#d6b84a', power: '#e0c040', uni: '#6fa8dc', dc: '#4fc3c7' };
+const ROOF = { res: '#8a4b3c', com: '#9aa3ab', bm: '#6e5a48', mun: '#5f6670', fuel: '#6a5a7e', steel: '#4f5862', mine: '#7a6440', market: '#b8863b', power: '#5a5a40', uni: '#7a3b30', dc: '#3a4a55' };
+const TOWN_KIND = { res: 'house', com: 'hall', bm: 'factory', mun: 'factory', fuel: 'factory', steel: 'factory', mine: 'hall', market: 'hall', power: 'factory', uni: 'hall', dc: 'hall' };
 // Rohstoffvorkommen: Bodenfarbe und Farbe der Tupfen (Bäume, Steine, Erzbrocken, Öllachen)
 const DEP_GROUND = { wood: 'rgba(30,70,30,0.55)', stone: 'rgba(120,120,115,0.55)', ore: 'rgba(140,70,40,0.55)', oil: 'rgba(20,20,24,0.6)' };
 const DEP_DOT = { wood: '#1f5a24', stone: '#b9b9b0', ore: '#c4612f', oil: '#0b0b0e' };

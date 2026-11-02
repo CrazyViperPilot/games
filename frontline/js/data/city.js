@@ -17,7 +17,7 @@ export const CITY = {
   taxCom: 0.15, // zusätzliches Geld/s je Arbeiter im Gewerbe
 
   // ---- Bau ----
-  cost: { road: 0, res: 20, com: 30, bm: 40, mun: 40, fuel: 40, steel: 50, mine: 30, market: 60 }, // Geld je Zelle (Abriss kostenlos, keine Erstattung)
+  cost: { road: 0, res: 20, com: 30, bm: 40, mun: 40, fuel: 40, steel: 50, mine: 30, market: 60, power: 80, uni: 150, dc: 250 }, // Geld je Zelle (Abriss kostenlos, keine Erstattung)
   costBm: { road: 10 }, // Baumaterial je Zelle aus dem Lager der Hauptstadt (seit v4.83: Straßen kosten Baumaterial statt Geld)
 
   // ---- Rohstoffe (seit v4.83, PRD §15) ----
@@ -35,6 +35,27 @@ export const CITY = {
   metalCost: { truck: 20, engineer: 20, ifv: 60, tank: 120, flak: 60, sam: 80, littlebird: 60, transporter: 80, gunship: 120 },
   // Markt: handelt in Losen; verkaufen bringt wenig, kaufen kostet viel (Geld je Los)
   market: { lot: 100, sell: { bm: 20, mun: 30, fuel: 30, metal: 40 }, buy: { bm: 80, mun: 120, fuel: 120, metal: 160 } },
+
+  // ---- Wissen (seit v4.88, Stufe 5) ----
+  // Universität: ohne sie nur Forschungsstufe 1; Uni-Stufe 1 schaltet Stufe 2 frei, uniForTier3 die Stufe 3. Jede Uni-Stufe über 1
+  // beschleunigt die Forschung um uniSpeed. Rechenzentrum: schaltet den Forschungsast „KI“ frei (BALANCE.research, branch 'ai').
+  jobsUni: [0, 8, 16, 28], // Studenten und Lehrer je Stufe (zählen als Arbeitsplätze)
+  jobsDc: [0, 6, 12, 20], // Arbeitsplätze je Stufe im Rechenzentrum
+  uniForTier3: 3,
+  uniSpeed: 0.25,
+
+  // ---- Strom und Zufriedenheit (seit v4.88, Stufe 3) ----
+  // Strom wirkt stadtweit (keine Leitungen). Angebot: base (Notstrom der Hauptstadt) + Kraftwerke (supply je Stufe × Besetzung).
+  // Bedarf je Stufe und Zellenart; reicht der Strom nicht, arbeiten Förderung, Werke und Forschung nur im Verhältnis Angebot/Bedarf.
+  power: {
+    base: 40,
+    supply: [0, 60, 120, 200],
+    use: { res: 1, com: 3, market: 3, bm: 8, mun: 8, fuel: 8, steel: 10, mine: 4, uni: 12, dc: 30, power: 0 },
+  },
+  // Zufriedenheit 0 … 1 = base + shops × Versorgung (Gewerbe-Arbeiter je Einwohner, voll ab shopPer) + safety × Sicherheit
+  // (weniger Treffer auf die Stadt in den letzten 60 s, null ab hitsBad) + power × Strom. Wirkung: Erträge und Steuern × (lo + span × Zufriedenheit),
+  // Zuzug × (0,5 + Zufriedenheit).
+  happy: { base: 0.2, shops: 0.35, shopPer: 0.1, safety: 0.25, hitsBad: 10, power: 0.2, lo: 0.7, span: 0.4 },
 
   // ---- Angriff (seit v4.83) ----
   hp: [0, 300, 500, 800], // Trefferpunkte eines Stadtgebäudes je Stufe
@@ -60,7 +81,10 @@ export const CITY = {
     roadEvery: 3, // jede so vielte Zeile (vom Anker aus) wird Straße, dazu eine Straßenspalte durch den Anker
     quarter: 3, // Radius (Zellen) der kleinen Viertel an vorderen FOBs
     quarterEvery: 3, // jeder so vielte Takt baut an einer vorderen FOB statt an der Hauptstadt
-    mix: { com: 2, bm: 3, mun: 2, fuel: 2, steel: 2, market: 0.3 }, // Verhältnis der Arbeitsstätten
+    mix: { com: 2, bm: 3, mun: 2, fuel: 2, steel: 2, market: 0.3 }, // Verhältnis der Arbeitsstätten (Kraftwerk, Uni, Rechenzentrum nach Bedarf)
+    powerMargin: 1.15, // baut ein Kraftwerk, wenn das Stromangebot unter Bedarf × powerMargin fällt
+    uniFrom: 6, // Arbeitsstätten, ab denen sie eine Universität baut
+    dcFrom: 16, // … ein Rechenzentrum (nach der Uni)
     sellAbove: 2700, // verkauft am Markt, wenn eine Sorte im Hauptlager darüber liegt
     buyMetalBelow: 150, // kauft Metall am Markt, wenn weniger da ist und genug Geld (reserve + Preis) bleibt
     raidEvery: { easy: 0, normal: 240, hard: 150 }, // s zwischen Angriffen auf die gegnerische Stadt (0 = nie)
@@ -77,6 +101,6 @@ export const CITY = {
     defendRange: 2500, // px, nur Einheiten in diesem Abstand
     defendCooldown: 12, // s zwischen zwei Verteidigungsbefehlen
     // Angriffsziele: Wert je Zellenart (geteilt durch Entfernung); Werke und Förderung zuerst
-    targetValue: { steel: 3, fuel: 3, mun: 3, mine: 2.5, market: 2, bm: 2, com: 1, res: 0.5 },
+    targetValue: { steel: 3, fuel: 3, mun: 3, power: 3, dc: 2.5, uni: 2, mine: 2.5, market: 2, bm: 2, com: 1, res: 0.5 },
   },
 };

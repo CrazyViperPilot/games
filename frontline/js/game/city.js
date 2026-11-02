@@ -7,11 +7,11 @@ import { nearestPassable } from './movement.js';
 import { makeRng } from '../core/rng.js';
 
 /** Zellenarten (Code im Raster): 0 leer. Neue Arten nur hinten anhängen (Code = Index + 1). */
-export const KINDS = ['road', 'res', 'com', 'bm', 'mun', 'fuel', 'steel', 'mine', 'market'];
+export const KINDS = ['road', 'res', 'com', 'bm', 'mun', 'fuel', 'steel', 'mine', 'market', 'power', 'uni', 'dc'];
 export const KIND_ID = Object.fromEntries(KINDS.map((k, i) => [k, i + 1]));
 export const KIND_NAME = {
   road: 'Straße', res: 'Wohnen', com: 'Gewerbe', bm: 'Baumaterial-Werk', mun: 'Munitionswerk', fuel: 'Raffinerie',
-  steel: 'Stahlwerk', mine: 'Förderanlage', market: 'Markt',
+  steel: 'Stahlwerk', mine: 'Förderanlage', market: 'Markt', power: 'Kraftwerk', uni: 'Universität', dc: 'Rechenzentrum',
 };
 const WORKS = ['bm', 'mun', 'fuel', 'steel'];
 /** Rohstoffvorkommen (Code im Raster `deposit`): 0 keins. */
@@ -21,7 +21,7 @@ export const MINE_NAME = { wood: 'Holzfäller', stone: 'Steinbruch', ore: 'Erzmi
 /** Waren am Markt. */
 export const GOODS = ['bm', 'mun', 'fuel', 'metal'];
 
-const zeroStats = () => ({ pop: 0, housing: 0, jobs: 0, jobsCom: 0, workers: 0, drafted: 0, free: 0, fled: 0, bm: 0, mun: 0, fuel: 0, metal: 0, money: 0, raw: { wood: 0, stone: 0, ore: 0, oil: 0 } });
+const zeroStats = () => ({ powerSupply: 0, powerUse: 0, powerRatio: 1, happy: 1, pop: 0, housing: 0, jobs: 0, jobsCom: 0, workers: 0, drafted: 0, free: 0, fled: 0, bm: 0, mun: 0, fuel: 0, metal: 0, money: 0, raw: { wood: 0, stone: 0, ore: 0, oil: 0 } });
 
 /**
  * Gesperrte Zellen (für beide Teams gleich): unter und um jede Hauptstadt oder auf Hindernissen (Bäume, Wasser, Häuser, Gebäude).
@@ -383,12 +383,23 @@ export function hasRoad(c, col, row) {
 
 /** Summen (Wohnplätze, Arbeitsplätze je Art) aus den gebauten Zellen; geflohene Wohnzellen zählen nicht. */
 function totals(c) {
-  const t = { housing: 0, fled: 0, jobsCom: 0, bm: 0, mun: 0, fuel: 0, steel: 0, mine: { wood: 0, stone: 0, ore: 0, oil: 0 }, market: 0 };
+  const t = { housing: 0, fled: 0, jobsCom: 0, bm: 0, mun: 0, fuel: 0, steel: 0, mine: { wood: 0, stone: 0, ore: 0, oil: 0 }, market: 0, power: 0, powerJobs: 0, uni: 0, dc: 0, jobsOther: 0, use: 0 };
   for (const i of c.list) {
     const lv = c.level[i];
     if (!lv) continue;
     const k = KINDS[c.kind[i] - 1];
-    if (k === 'res') {
+    t.use += (CITY.power.use[k] ?? 0) * lv; // Strombedarf
+    if (k === 'power') {
+      t.power += CITY.power.supply[lv];
+      t.powerJobs += CITY.jobs[lv];
+      t.jobsOther += CITY.jobs[lv];
+    } else if (k === 'uni') {
+      t.uni = Math.max(t.uni, lv);
+      t.jobsOther += CITY.jobsUni[lv];
+    } else if (k === 'dc') {
+      t.dc = Math.max(t.dc, lv);
+      t.jobsOther += CITY.jobsDc[lv];
+    } else if (k === 'res') {
       if (c.flee[i] > 0) t.fled += CITY.housing[lv];
       else t.housing += CITY.housing[lv];
     } else if (k === 'com') t.jobsCom += CITY.jobsCom[lv];
@@ -477,11 +488,11 @@ export function updateCity(game, dt) {
     c.drafted = drafted;
 
     const t = totals(c);
-    const jobs = t.jobsCom + t.bm + t.mun + t.fuel + t.steel + t.mineJobs;
+    const jobs = t.jobsCom + t.bm + t.mun + t.fuel + t.steel + t.mineJobs + t.jobsOther;
 
     // Einwohner ziehen ein oder ab, bis die Wohnplätze gefüllt sind (ohne Arbeit nur ein kleiner Anfang)
     const target = jobs > 0 ? t.housing : Math.min(t.housing, CITY.startPop);
-    if (c.popF < target) c.popF = Math.min(target, c.popF + CITY.immigration * dt);
+    if (c.popF < target) c.popF = Math.min(target, c.popF + CITY.immigration * (0.5 + (c.stats.happy ?? 1)) * dt); // zufriedene Städte ziehen schneller an
     else if (c.popF > target) c.popF = Math.max(target, c.popF - CITY.immigration * dt);
     const pop = c.popF;
     const pool = Math.max(0, pop - drafted); // Einwohner, die arbeiten können
@@ -524,16 +535,30 @@ export function updateCity(game, dt) {
     s.jobsCom = t.jobsCom;
     s.workers = jobs * fill;
     s.market = t.market;
-    for (const d of DEPOSITS) s.raw[d] = t.mine[d] * fill * CITY.extract[d];
+    // Strom (Stufe 3): Angebot aus Notstrom und Kraftwerken; Mangel bremst Förderung und Werke
+    s.powerSupply = CITY.power.base + t.power * fill;
+    s.powerUse = t.use;
+    s.powerRatio = t.use > 0 ? Math.min(1, s.powerSupply / t.use) : 1;
+    // Zufriedenheit (Stufe 3): Läden, Sicherheit, Strom
+    const H = CITY.happy;
+    const shop = pop > 0 ? Math.min(1, (t.jobsCom * fill) / (pop * H.shopPer)) : 1;
+    const hits = (c.hitLog ?? []).filter((h) => h.t > game.time - 60).length;
+    const safe = 1 - Math.min(1, hits / H.hitsBad);
+    s.happy = pop > 0 ? Math.min(1, H.base + H.shops * shop + H.safety * safe + H.power * s.powerRatio) : 1;
+    const mood = H.lo + H.span * s.happy;
+    const eff = fill * s.powerRatio * mood; // Besetzung × Strom × Zufriedenheit
+    s.uni = t.uni;
+    s.dc = t.dc;
+    for (const d of DEPOSITS) s.raw[d] = t.mine[d] * eff * CITY.extract[d];
     const Y = CITY.yield;
     const K = CITY.convert;
-    s.bm = Math.min(t.bm * fill * Y.bm, (s.raw.wood + s.raw.stone) / K.bm);
-    s.fuel = Math.min(t.fuel * fill * Y.fuel, s.raw.oil / K.fuel);
-    const metalIn = Math.min(t.steel * fill * Y.metal, s.raw.ore / K.metal);
-    s.mun = Math.min(t.mun * fill * Y.mun, (c.metal / Math.max(dt, 1e-6) + metalIn) / K.mun); // Munition braucht Metall
+    s.bm = Math.min(t.bm * eff * Y.bm, (s.raw.wood + s.raw.stone) / K.bm);
+    s.fuel = Math.min(t.fuel * eff * Y.fuel, s.raw.oil / K.fuel);
+    const metalIn = Math.min(t.steel * eff * Y.metal, s.raw.ore / K.metal);
+    s.mun = Math.min(t.mun * eff * Y.mun, (c.metal / Math.max(dt, 1e-6) + metalIn) / K.mun); // Munition braucht Metall
     s.metal = metalIn - s.mun * K.mun;
     c.metal = Math.max(0, Math.min(BALANCE.logistics.storeCap, c.metal + s.metal * dt));
-    s.money = pool * CITY.taxPop + t.jobsCom * fill * CITY.taxCom;
+    s.money = (pool * CITY.taxPop + t.jobsCom * fill * CITY.taxCom) * mood;
     c.stats = s;
 
     const main = game.mainFob(id);
@@ -543,6 +568,21 @@ export function updateCity(game, dt) {
     team.res.money += s.money * dt;
     team.rate.money += s.money;
   });
+}
+
+/** Höchste fertige Stufe einer Zellenart in der Stadt des Teams (0 = keine; ohne Stadt 0). */
+export function cityLevel(game, team, kind) {
+  const c = game.city?.[team];
+  if (!c) return 0;
+  const id = KIND_ID[kind];
+  let lv = 0;
+  for (const i of c.list) if (c.kind[i] === id && c.level[i] > lv) lv = c.level[i];
+  return lv;
+}
+
+/** Stromverhältnis der Stadt (1 = genug Strom); ohne Stadt 1. */
+export function powerRatio(game, team) {
+  return game.city?.[team]?.stats.powerRatio ?? 1;
 }
 
 /** Stadtgebäude (Ziel-Entity) eines Teams in der Zelle unter (x, y), oder null. */
@@ -710,7 +750,7 @@ function aiRoad(col, row, ac, ar) {
 function aiNeed(game, c, add) {
   const t = totals(c);
   const A = CITY.ai;
-  const count = { res: 0, com: 0, bm: 0, mun: 0, fuel: 0, steel: 0, market: 0 };
+  const count = { res: 0, com: 0, bm: 0, mun: 0, fuel: 0, steel: 0, market: 0, power: 0, uni: 0, dc: 0 };
   for (const k in add) count[k] += add[k];
   for (const i of c.list) {
     const k = KINDS[c.kind[i] - 1];
@@ -718,6 +758,11 @@ function aiNeed(game, c, add) {
   }
   const work = count.com + count.bm + count.mun + count.fuel + count.steel + count.market;
   const free = c.stats.free ?? 0;
+  // Strom, Universität, Rechenzentrum (seit v4.88) nach Bedarf
+  const st = c.stats;
+  if (st.powerSupply + (add.power ?? 0) * CITY.power.supply[1] < st.powerUse * A.powerMargin + 10 && (add.power ?? 0) < 1) return 'power';
+  if (!count.uni && work >= A.uniFrom) return 'uni';
+  if (!count.dc && count.uni && work >= A.dcFrom) return 'dc';
   if (count.res < work * 1.2 || (t.housing + t.fled < c.drafted + 20 && count.res <= work * 2) || (free < A.lowFree && count.res <= work * 2)) return 'res';
   const main = game.mainFob(c.team);
   const s = c.stats;
@@ -758,7 +803,7 @@ function aiCandidates(game, c, x, y, rad) {
   for (let row = Math.max(0, ar - rad); row <= Math.min(c.rows - 1, ar + rad); row++) {
     for (let col = Math.max(0, ac - rad); col <= Math.min(c.cols - 1, ac + rad); col++) {
       const i = idx(c, col, row);
-      if (c.kind[i] || !canZone(game, c, i) || inDanger(c, col, row, game.time)) continue;
+      if (c.kind[i] || !canZone(game, c, i) || inDanger(c, col, row, game.time) || !cellFree(game, c, col, row)) continue; // Fels, Wasser oder Gebäude: dort wüchse nie etwas
       const d = Math.max(Math.abs(col - ac), Math.abs(row - ar)) * 100 + Math.abs(col - ac) + Math.abs(row - ar);
       out.push({ i, col, row, d, road: aiRoad(col, row, ac, ar), deposit: c.deposit[i] });
     }

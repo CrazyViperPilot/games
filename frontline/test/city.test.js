@@ -394,3 +394,57 @@ test('KI verteidigt beschossene Stadtgebäude und greift gegnerische Werke zuers
   assert.ok(raiders.length > 0, 'Angreifer unterwegs');
   assert.ok(raiders.every((u) => Math.hypot(u.order.x - ref.x, u.order.y - ref.y) < 200), 'Ziel ist die Raffinerie');
 });
+
+// v4.88: Universität, Rechenzentrum, Strom, Zufriedenheit
+import { researchBlock } from '../js/game/research.js';
+const setLevel = (g, kind, lv, team = 0) => {
+  const b = spot(g, 1, 1, team);
+  raw(g, kind, b.c, b.r, b.c, b.r, team);
+  const c = g.city[team];
+  const i = b.r * c.cols + b.c;
+  c.level[i] = lv;
+  return i;
+};
+
+test('Universität: ohne sie nur Stufe 1, Stufe 3 braucht Uni-Stufe 3; KI-Ast braucht Rechenzentrum', () => {
+  const g = new Game({ seed: 3, city: true, research: true });
+  assert.equal(researchBlock(g, 0, 'tier2'), 'Benötigt eine Universität in der Stadt');
+  assert.equal(researchBlock(g, 0, 'drones'), 'Benötigt Stufe 2');
+  const u = setLevel(g, 'uni', 1);
+  assert.equal(researchBlock(g, 0, 'tier2'), '');
+  g.teams[0].tech.tier = 2;
+  assert.equal(researchBlock(g, 0, 'tier3'), `Benötigt eine Universität der Stufe ${CITY.uniForTier3}`);
+  assert.equal(researchBlock(g, 0, 'drones'), 'Benötigt ein Rechenzentrum in der Stadt');
+  g.city[0].level[u] = CITY.uniForTier3;
+  assert.equal(researchBlock(g, 0, 'tier3'), '');
+  setLevel(g, 'dc', 1);
+  assert.equal(researchBlock(g, 0, 'drones'), '');
+  // ohne Stadt: Stufen wie bisher, KI-Ast gesperrt
+  const n = new Game({ seed: 3, research: true });
+  assert.equal(researchBlock(n, 0, 'tier2'), '');
+  n.teams[0].tech.tier = 2;
+  assert.equal(researchBlock(n, 0, 'drones'), 'Nur mit Stadt (Rechenzentrum)');
+});
+
+test('Strom: zu wenig Kraftwerke bremsen die Werke, ein Kraftwerk hilft', () => {
+  const g = new Game({ seed: 3, city: true });
+  for (let k = 0; k < 6; k++) setLevel(g, 'steel', 3);
+  run(g, 2);
+  const s = g.city[0].stats;
+  assert.ok(s.powerUse > s.powerSupply, `Verbrauch ${s.powerUse} > Angebot ${s.powerSupply}`);
+  assert.ok(s.powerRatio < 1);
+  const before = s.powerRatio;
+  for (let k = 0; k < 2; k++) setLevel(g, 'power', 3);
+  run(g, 2);
+  assert.ok(g.city[0].stats.powerRatio > before);
+});
+
+test('Zufriedenheit sinkt bei Beschuss der Stadt', () => {
+  const g = new Game({ seed: 3, city: true });
+  run(g, 2);
+  const calm = g.city[0].stats.happy;
+  const m = g.mainFob(0);
+  g.city[0].hitLog = Array.from({ length: CITY.happy.hitsBad }, () => ({ x: m.x, y: m.y, t: g.time }));
+  run(g, 1);
+  assert.ok(g.city[0].stats.happy < calm - 0.1, `${g.city[0].stats.happy} < ${calm}`);
+});

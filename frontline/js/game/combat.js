@@ -6,7 +6,10 @@ import { damageHouse, houseFire } from './garrison.js';
 import { addCrater } from './scars.js';
 import { auraCooldown } from './commander.js';
 import { weatherSight } from './weather.js';
-import { armorMul, opticsMul, fxMul, rangeMul, dealtMul, smokeMul } from './research.js';
+import { armorMul, opticsMul, fxMul, rangeMul, dealtMul, smokeMul, hasTech } from './research.js';
+
+/** Forschung „Autonome Türme“: Dachaufbauten feuern ohne Besatzung. */
+const autoTurret = (game, team) => hasTech(game, team, 'autoturret');
 import { damageBridge, deckDist } from './river.js';
 import { forEnemyCity } from './city.js';
 
@@ -219,7 +222,7 @@ function tryFireUnit(game, u, t) {
   }
   if (u.def.stealth) u.revealedUntil = game.time + BALANCE.stealth.revealTime; // ein Schuss verrät die Stellung
   // Flak und SAM: Treffer nur mit Wurf (Trefferchance, siehe unitHitChance); daneben geht der Schuss, der Schaden bleibt aus
-  if (pick.spec.hitChance !== undefined && !(game.rng.next() < unitHitChance(u, t, pick.spec))) return;
+  if (pick.spec.hitChance !== undefined && !(game.rng.next() < unitHitChance(u, t, pick.spec) * fxMul(game, t.team, 'jam'))) return; // Störsender des Ziels
   hit(game, t, shotDamage(pick.spec, u, t, heightMult(game, u, t)) * dealtMul(game, u, t));
 }
 
@@ -261,7 +264,7 @@ function fireAtGround(game, b, w) {
 /** Flugabwehr: jede bereite Flugabwehr fängt die nächste gegnerische Granate in Reichweite mit `chance` ab. */
 function interceptShells(game) {
   for (const b of game.buildings) {
-    if (!b.alive || !b.built || !b.def.aa || b.aaCooldown > 0 || (b.def.roofKind && !b.occupants.length)) continue;
+    if (!b.alive || !b.built || !b.def.aa || b.aaCooldown > 0 || (b.def.roofKind && !b.occupants.length && !autoTurret(game, b.team))) continue;
     let best = null;
     let bestD = Infinity;
     for (const p of game.projectiles) {
@@ -368,7 +371,7 @@ export function updateCombat(game, dt) {
   for (const b of buildings) {
     if (!b.alive || !b.built) continue;
     const w = weaponOf(b);
-    if (!w || (b.def.roofKind && !b.occupants.length)) continue; // Dachaufbau feuert nur mit Besatzung
+    if (!w || (b.def.roofKind && !b.occupants.length && !autoTurret(game, b.team))) continue; // Dachaufbau feuert nur mit Besatzung (oder Autonome Türme)
     if (w.shell && b.fireTarget) {
       fireAtGround(game, b, w); // gewähltes Ziel: kein automatisches Feuer
       continue;

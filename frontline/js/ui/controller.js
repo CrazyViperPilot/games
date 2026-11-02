@@ -37,7 +37,7 @@ const RADIO_TIP = `. Zweite Siegbedingung: steht er fertig ${Math.round(BALANCE.
 const CMD = BALANCE.commander;
 const COMMANDER_TIP = `. Einmalig, belegt keinen Platz. Aura ${CMD.aura} px: eigene Einheiten schießen ${Math.round((CMD.fireRate - 1) * 100)} % schneller, verletzte Infanterie heilt. Fällt er, bekommt der Gegner ${CMD.deathPoints} Punkte.`;
 // Forschungsmenü der Hauptstadt: Hauptkarte Q = nächste Stufe, W/E/R = Äste; im Ast Tasten in dieser Reihenfolge
-const BRANCH_BTN = [['veh', 'W'], ['wpn', 'E'], ['abl', 'R']];
+const BRANCH_BTN = [['veh', 'W'], ['wpn', 'E'], ['abl', 'R'], ['ai', 'T']]; // KI nur mit Stadt
 const ITEM_KEYS = ['Q', 'W', 'E', 'R', 'T', 'A', 'S'];
 const isCarrier = (u) => u.def.cargoCap > 0; // LKW und Transporthubschrauber
 // Ladungsart: Taste, Kurzname, Bezeichnung
@@ -1127,10 +1127,11 @@ export class Controller {
       item(tech.tier < 2 ? 'tier2' : 'tier3', 'Q', '');
       if (tech.tier >= 3) card[0].active = true;
       for (const [id, hotkey] of BRANCH_BTN) {
+        if (id === 'ai' && !g.city) continue;
         const keys = RESEARCH_KEYS.filter((k) => items[k].branch === id);
         const done = keys.filter((k) => tech.done.includes(k)).length;
         card.push(
-          entry({ veh: 'Fahrzeuge', wpn: 'Waffen', abl: 'Fähigk.' }[id], hotkey, {
+          entry({ veh: 'Fahrzeuge', wpn: 'Waffen', abl: 'Fähigk.', ai: 'KI' }[id], hotkey, {
             cost: `${done}/${keys.length}`,
             tip: `${BALANCE.research.branches[id]} (${hotkey}): ${done} von ${keys.length} erforscht`,
             active: tech.cur && items[tech.cur.key].branch === id,

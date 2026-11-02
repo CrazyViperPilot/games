@@ -249,8 +249,13 @@ export const BALANCE = {
       smoke: { name: 'Nebelwerfer', short: 'Nebelw.', branch: 'abl', money: 700, time: 60, needs: 2 },
       mines: { name: 'Minen', short: 'Minen', branch: 'abl', money: 800, time: 70, needs: 3 },
       amaster: { name: 'Eliteausbildung', short: 'Meister', branch: 'abl', money: 2000, time: 120, needs: 3, req: 'branch', fx: { abilityCd: 0.5, build: 1.25 } },
+      // KI (seit v4.88, nur mit Stadt und Rechenzentrum: dc = braucht ein fertiges Rechenzentrum)
+      drones: { name: 'Aufklärungsdrohnen', short: 'Drohnen', branch: 'ai', dc: true, money: 700, time: 60, needs: 2, fx: { optics: 1.15 } },
+      aitarget: { name: 'KI-Zielerfassung', short: 'KI-Ziel', branch: 'ai', dc: true, money: 1100, time: 80, needs: 3, req: 'drones', fx: { dealtAll: 1.12 } },
+      autoturret: { name: 'Autonome Türme', short: 'Auto-Turm', branch: 'ai', dc: true, money: 900, time: 70, needs: 2, autoTurret: true },
+      jammer: { name: 'Störsender', short: 'Störs.', branch: 'ai', dc: true, money: 800, time: 60, needs: 2, fx: { jam: 0.75 } },
     },
-    branches: { veh: 'Fahrzeuge', wpn: 'Waffen', abl: 'Fähigkeiten' },
+    branches: { veh: 'Fahrzeuge', wpn: 'Waffen', abl: 'Fähigkeiten', ai: 'KI' },
     // Einsatzfähigkeiten (Tasten V und M): Rauch senkt den Schaden eigener Einheiten darin, Minen treffen Bodeneinheiten des Gegners
     smoke: { r: 110, life: 14, cd: 45, taken: 0.5 },
     mine: { trigger: 30, blast: 55, damage: 150, cd: 12, max: 8 },

@@ -1355,7 +1355,7 @@ export class AI {
     const items = BALANCE.research.items;
     const [t2, t3] = this.cfg.research;
     const tier = tech.tier === 1 && g.time >= t2 ? 'tier2' : tech.tier === 2 && g.time >= t3 ? 'tier3' : null;
-    if (tier && !s.alarm) {
+    if (tier && !s.alarm && !researchBlock(g, t, tier)) { // mit Stadt erst, wenn die Universität steht
       if (money < items[tier].money) this.saveForResearch = true; // produce spart, bis die Stufe bezahlbar ist
       else g.issue(t, { type: 'research', buildingId: s.home.id, key: tier });
       return;

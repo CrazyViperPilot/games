@@ -5,6 +5,8 @@
 // Zustand je Team: team.tech = { tier, done: [Schlüssel], cur: { key, t } | null }.
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
+import { CITY } from '../data/city.js';
+import { cityLevel, powerRatio } from './city.js';
 
 const R = BALANCE.research;
 export const RESEARCH_KEYS = Object.keys(R.items);
@@ -37,9 +39,12 @@ export function researchEffect(key) {
       build: (m) => `Bautempo +${pct(m)}`,
       repair: (m) => `Reparatur ${m}× so schnell`,
       abilityCd: (m) => `Rauch und Minen laden ${pct(m)} schneller`,
+      optics: (m) => `Sicht und Waffenreichweite der Einheiten +${pct(m)}`,
+      jam: (m) => `gegnerische Flak und SAM treffen eigene Hubschrauber ${pct(m)} seltener`,
     };
     return Object.entries(fx).map(([k, m]) => T[k](m)).join(', ');
   }
+  if (it2?.autoTurret) return 'Dachaufbauten von Gefechtstürmen und Häusern feuern auch ohne Besatzung';
   if (it2?.regen) return 'Bodenfahrzeuge reparieren sich selbst, wenn sie 6 s nicht getroffen wurden';
   if (key === 'smoke') return 'Fahrzeuge legen mit V eine Nebelwand: eigene Einheiten darin nehmen halb so viel Schaden';
   if (key === 'mines') return 'Baufahrzeuge legen mit M Minen, die Bodeneinheiten des Gegners treffen';
@@ -78,6 +83,10 @@ export function researchBlock(game, team, key) {
     if (rest.some((k) => !tech.done.includes(k))) return `Benötigt alle anderen Forschungen im Ast ${R.branches[it.branch]}`;
   } else if (it.req && !tech.done.includes(it.req)) return `Benötigt ${R.items[it.req].name}`;
   if (tech.tier < it.needs) return `Benötigt Stufe ${it.needs}`;
+  // Stadt (seit v4.88): Universität für Stufe 2 und 3, Rechenzentrum für den Ast KI
+  if (it.dc && cityLevel(game, team, 'dc') < 1) return game.city ? 'Benötigt ein Rechenzentrum in der Stadt' : 'Nur mit Stadt (Rechenzentrum)';
+  if (game.city && it.tier === 2 && cityLevel(game, team, 'uni') < 1) return 'Benötigt eine Universität in der Stadt';
+  if (game.city && it.tier === 3 && cityLevel(game, team, 'uni') < CITY.uniForTier3) return `Benötigt eine Universität der Stufe ${CITY.uniForTier3}`;
   return '';
 }
 
@@ -110,7 +119,9 @@ export function updateResearch(game, dt) {
     const tech = team.tech;
     const cur = tech.cur;
     if (!cur || !game.mainFob(team.id)) continue;
-    cur.t += dt;
+    // Stadt: jede Uni-Stufe über 1 beschleunigt, Strommangel bremst
+    const uni = game.city ? cityLevel(game, team.id, 'uni') : 0;
+    cur.t += game.city ? dt * (1 + CITY.uniSpeed * Math.max(0, uni - 1)) * powerRatio(game, team.id) : dt;
     const it = R.items[cur.key];
     if (cur.t < it.time) continue;
     tech.cur = null;
@@ -140,7 +151,7 @@ export function armorMul(game, u, amount) {
 }
 
 /** Faktor für Waffenreichweite und Sicht der Einheiten eines Teams (Wärmebildoptik), sonst 1. */
-export const opticsMul = (game, team) => (hasTech(game, team, 'optics') ? R.optics : 1);
+export const opticsMul = (game, team) => (hasTech(game, team, 'optics') ? R.optics : 1) * fxMul(game, team, 'optics');
 
 /** Produkt der Wirkung `stat` (fx) aller erforschten Verbesserungen des Teams, sonst 1. */
 export function fxMul(game, team, stat) {
