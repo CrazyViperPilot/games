@@ -370,14 +370,28 @@ function releaseCell(game, c, col, row) {
   });
 }
 
-/** Hat die Zelle eine Straße als Nachbarn (4er-Nachbarschaft)? */
-export function hasRoad(c, col, row) {
+/** Hat die Zelle eine Straße als direkten Nachbarn (4er-Nachbarschaft)? */
+function roadNext(c, col, row) {
   const r = KIND_ID.road;
   return (
     (col > 0 && c.kind[idx(c, col - 1, row)] === r) ||
     (col < c.cols - 1 && c.kind[idx(c, col + 1, row)] === r) ||
     (row > 0 && c.kind[idx(c, col, row - 1)] === r) ||
     (row < c.rows - 1 && c.kind[idx(c, col, row + 1)] === r)
+  );
+}
+
+/** Straßenanschluss: Nachbar ist Straße. Wohnen und Gewerbe reichen auch über genau eine Zelle gleicher Art
+ *  (Wohnen-Wohnen-Straße ok, Wohnen-Gewerbe-Straße für Wohnen nicht); die Zelle dazwischen muss selbst direkt an der Straße liegen. */
+export function hasRoad(c, col, row) {
+  if (roadNext(c, col, row)) return true;
+  const k = c.kind[idx(c, col, row)];
+  if (k !== KIND_ID.res && k !== KIND_ID.com) return false;
+  return (
+    (col > 0 && c.kind[idx(c, col - 1, row)] === k && roadNext(c, col - 1, row)) ||
+    (col < c.cols - 1 && c.kind[idx(c, col + 1, row)] === k && roadNext(c, col + 1, row)) ||
+    (row > 0 && c.kind[idx(c, col, row - 1)] === k && roadNext(c, col, row - 1)) ||
+    (row < c.rows - 1 && c.kind[idx(c, col, row + 1)] === k && roadNext(c, col, row + 1))
   );
 }
 

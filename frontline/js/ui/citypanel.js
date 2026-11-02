@@ -129,7 +129,7 @@ export class CityPanel {
     const res = this.game.issue(this.team, { type: 'city', kind: this.tool, ...d });
     if (!res.ok) this.onMessage(res.reason);
     else if (res.broke) this.onMessage(this.tool === 'road' ? 'Zu wenig Baumaterial für alle Zellen' : 'Zu wenig Geld für alle Zellen');
-    else if (res.noRoad) this.onMessage('Gebäude wachsen nur mit einer Straße direkt daneben');
+    else if (res.noRoad) this.onMessage('Gebäude wachsen nur mit Straße daneben (Wohnen/Gewerbe auch über eine Zelle gleicher Art)');
     this.update(true);
   }
 

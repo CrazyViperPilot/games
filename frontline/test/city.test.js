@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
 import { CITY } from '../js/data/city.js';
 import { AI } from '../js/ai/ai.js';
-import { canZone, cityNoise, freePop, aiCity, aiDefend, aiRaid, KIND_ID } from '../js/game/city.js';
+import { canZone, cityNoise, freePop, aiCity, aiDefend, aiRaid, hasRoad, KIND_ID } from '../js/game/city.js';
 
 const run = (g, s) => { for (let t = 0; t < s * 20; t++) g.update(0.05); };
 // Ursprung (c, r) eines w × h großen, ganz bebaubaren Rechtecks im Gebiet des Teams, nahe der Hauptstadt
@@ -447,4 +447,20 @@ test('Zufriedenheit sinkt bei Beschuss der Stadt', () => {
   g.city[0].hitLog = Array.from({ length: CITY.happy.hitsBad }, () => ({ x: m.x, y: m.y, t: g.time }));
   run(g, 1);
   assert.ok(g.city[0].stats.happy < calm - 0.1, `${g.city[0].stats.happy} < ${calm}`);
+});
+
+test('Straßenanschluss: Wohnen/Gewerbe über genau eine Zelle gleicher Art', () => {
+  const cols = 6, rows = 1;
+  const mk = (...k) => ({ cols, rows, kind: Uint8Array.from(k) });
+  const R = KIND_ID.road, W = KIND_ID.res, G = KIND_ID.com, B = KIND_ID.bm;
+  const c = mk(R, W, W, G, W, 0);
+  assert.ok(hasRoad(c, 1, 0)); // direkt
+  assert.ok(hasRoad(c, 2, 0)); // Wohnen-Wohnen-Straße
+  assert.ok(!hasRoad(c, 3, 0) || false); // Gewerbe hinter Wohnen: nein
+  const d = mk(R, G, W, 0, 0, 0);
+  assert.ok(!hasRoad(d, 2, 0)); // Wohnen-Gewerbe-Straße: nicht für Wohnen
+  const e = mk(R, W, W, W, 0, 0);
+  assert.ok(!hasRoad(e, 3, 0)); // keine längeren Ketten
+  const f = mk(R, B, B, 0, 0, 0);
+  assert.ok(!hasRoad(f, 2, 0)); // Werke weiter nur direkt
 });
