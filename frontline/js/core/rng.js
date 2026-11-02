@@ -21,5 +21,9 @@ export function makeRng(seed) {
     range: (lo, hi) => lo + (hi - lo) * next(),
     int: (lo, hi) => lo + Math.floor(next() * (hi - lo + 1)),
     pick: (arr) => arr[Math.floor(next() * arr.length)],
+    getState: () => state, // nur für Spielstände (core/snapshot.js)
+    setState: (v) => {
+      state = v >>> 0;
+    },
   };
 }

@@ -16,6 +16,9 @@ import { Hud } from './ui/hud.js';
 import { CityPanel } from './ui/citypanel.js';
 import { showStartMenu, showPause, showHelp, showEnd, hideOverlay } from './ui/menu.js';
 import { pickMood, MOOD_SETTINGS } from './render/mood.js';
+import { snapshotGame, restoreGame, SAVE_FORMAT } from './game/savegame.js';
+import { pack, unpack } from './core/snapshot.js';
+import * as saves from './ui/saves.js';
 import { setWeather, WEATHER_NAMES, WEATHER_SETTINGS } from './game/weather.js';
 
 const params = new URLSearchParams(location.search);
@@ -112,7 +115,92 @@ function stopSession() {
 
 function quitToMenu() {
   stopSession();
-  showStartMenu(overlay, startGame, { wallet: loadWallet, resetWallet });
+  showStartMenu(overlay, startGame, { wallet: loadWallet, resetWallet, resume: resumeOffer });
+}
+
+// ---- Spielstand (Gerät + Webspace, ui/saves.js) ----------------------------------------------------------------
+
+const AUTOSAVE_MS = 90000; // Takt der Autospeicherung (Echtzeit, nur bei laufendem Spiel)
+const MIN_SAVE_TIME = 20; // erst ab dieser Spielzeit (s) lohnt ein Stand
+
+/** Stand der laufenden Partie packen. Liefert null, wenn es nichts zu speichern gibt (Ende, zu früh, Debug). */
+async function captureSave(s) {
+  const g = s.game;
+  if (DEBUG || s.ended || g.winner !== null || g.time < MIN_SAVE_TIME) return null;
+  const cam = s.camera;
+  const body = {
+    format: SAVE_FORMAT,
+    settings: s.settings,
+    view: { x: cam.x, y: cam.y, zoom: cam.zoom, iso: cam.iso, rot: cam.rot, speed: s.loop.speed },
+    snap: snapshotGame(g, s.ai),
+  };
+  const bytes = await pack(body);
+  const meta = {
+    savedAt: Date.now(),
+    format: SAVE_FORMAT,
+    gameTime: g.time,
+    points: [g.teams[0].points, g.teams[1].points],
+    winPoints: g.winPoints,
+    difficulty: s.settings.difficulty ?? 'normal',
+    size: bytes.length,
+  };
+  return { meta, bytes };
+}
+
+/** Speichert die laufende Partie; liefert einen Text für die Anzeige (oder null, wenn nichts gespeichert wurde). */
+async function saveNow(s) {
+  if (s.saving) return null;
+  s.saving = true;
+  try {
+    const rec = await captureSave(s);
+    if (!rec) return null;
+    s.lastSave = performance.now();
+    const where = await saves.saveBoth(rec);
+    return where === 'beide' ? 'Gespeichert (Gerät und Webspace)' : 'Gespeichert (nur Gerät, Webspace nicht erreichbar)';
+  } catch (err) {
+    return `Speichern fehlgeschlagen: ${err.message ?? err}`;
+  } finally {
+    s.saving = false;
+  }
+}
+
+/** Angebot im Startmenü: neuester Stand von Gerät oder Webspace (einmal geladen, dann beim Fortsetzen genutzt). */
+let offered = null;
+const resumeOffer = {
+  async find() {
+    offered = DEBUG ? null : await saves.findBest();
+    if (!offered || offered.rec.meta.format !== SAVE_FORMAT) return (offered = null);
+    return { text: saves.describe(offered.rec.meta, offered.source) };
+  },
+  onResume() {
+    if (offered) resumeGame(offered.rec).catch((err) => {
+      showStartMenu(overlay, startGame, { wallet: loadWallet, resetWallet, resume: resumeOffer });
+      alert(`Spielstand lässt sich nicht laden: ${err.message ?? err}`);
+    });
+  },
+  onDiscard() {
+    offered = null;
+    saves.discardAll();
+  },
+};
+
+async function resumeGame(rec) {
+  const body = await unpack(rec.bytes);
+  if (body.format !== SAVE_FORMAT) throw new Error('Stand stammt von einer anderen Version');
+  const { game, ai } = restoreGame(body.snap);
+  stopSession();
+  hideOverlay(overlay);
+  settings = body.settings ?? settings;
+  buildSession(game, ai, settings, body.view);
+  // Beim Fortsetzen erst pausiert: Zeit zum Umsehen
+  session.loop.paused = true;
+  showPause(overlay, resume, quitToMenu, () => {});
+}
+
+async function quitAndSave() {
+  const s = session;
+  if (s) await saveNow(s);
+  quitToMenu();
 }
 
 /** Aktionen für Hilfe, Tastatur und HUD. */
@@ -139,7 +227,10 @@ const app = {
       resume();
     } else {
       s.loop.paused = true;
-      showPause(overlay, resume, quitToMenu);
+      const s2 = s;
+      showPause(overlay, resume, quitAndSave, (setText) => {
+        saveNow(s2).then((t) => t && setText(t));
+      });
     }
   },
   toggleView() {
@@ -222,6 +313,7 @@ function frame(s) {
   s.last = now;
   s.input.update(dt);
   s.cityPanel?.update();
+  if (!s.loop.paused && !s.ended && now - s.lastSave > AUTOSAVE_MS) saveNow(s);
 
   for (const ev of s.game.drainEvents()) {
     if (ev.type !== 'message' || (ev.team !== HUMAN && ev.team !== -1)) continue;
@@ -239,6 +331,7 @@ function frame(s) {
   if (g.winner !== null && !s.ended) {
     s.ended = true;
     saveWallet(g.teams[HUMAN].res.money);
+    if (!DEBUG) saves.discardAll(); // beendete Partie nicht fortsetzbar
     sound.end(g.winner === HUMAN);
     showEnd(
       overlay,
@@ -268,8 +361,19 @@ function startGame(opts) {
     game.weather.next = Infinity; // bleibt so (Grafik prüfen)
   }
   const ai = new AI(game, AI_TEAM, opts.difficulty);
+  buildSession(game, ai, opts, null);
+}
+
+/** Oberfläche und Schleife um ein (neues oder geladenes) Spiel aufbauen. view = gespeicherte Kameraansicht oder null. */
+function buildSession(game, ai, opts, view) {
+  const seed = game.seed;
   const camera = new Camera(BALANCE.map.width, BALANCE.map.height);
   camera.iso = loadIso();
+  if (view) {
+    camera.iso = !!view.iso;
+    camera.rot = view.rot ?? 0;
+    camera.zoom = view.zoom ?? 1;
+  }
   const renderer = new Renderer(canvas, game, camera, HUMAN);
   const moodSetting = DEBUG && MOOD_SETTINGS.includes(params.get('mood')) ? params.get('mood') : opts.mood ?? 'off';
   renderer.mood = pickMood(moodSetting, seed, game.weather.season); // nur Optik, ?debug=1&mood=night
@@ -288,7 +392,11 @@ function startGame(opts) {
   app.onLayout = applyInsets; // HUD klappt ein/aus
   applyInsets();
   const home = controller.homeBase();
-  if (home) camera.centerOn(home.x, home.y);
+  if (view) {
+    camera.x = view.x;
+    camera.y = view.y;
+    camera.clamp();
+  } else if (home) camera.centerOn(home.x, home.y);
   if (REVEAL) {
     renderer.revealAll = true;
     minimap.revealAll = true;
@@ -303,7 +411,7 @@ function startGame(opts) {
 
   const cityPanel = game.city ? new CityPanel(hudRoot.parentElement ?? document.body, game, HUMAN, (t) => hud.pushMessage(t), (x, y) => camera.centerOn(x, y)) : null;
   renderer.cityUi = cityPanel; // Baumodus: Gebiet und gezogenes Rechteck zeichnen (nur lesen)
-  const s = { game, ai, camera, renderer, minimap, controller, hud, input, cityPanel, onResize, loop: null, ended: false, last: null };
+  const s = { game, ai, camera, renderer, minimap, controller, hud, input, cityPanel, onResize, loop: null, ended: false, last: null, settings: opts, saving: false, lastSave: performance.now() };
   s.loop = createLoop({
     tickRate: BALANCE.tickRate,
     update(dt) {
@@ -313,14 +421,19 @@ function startGame(opts) {
     },
     render: () => frame(s),
   });
-  s.loop.speed = startSpeed();
+  s.loop.speed = view?.speed ?? startSpeed();
   session = s;
   if (DEBUG) window.frontlineSound = sound;
   if (DEBUG) window.frontline = s; // Konsole/Tests: Zugriff auf Spielzustand
   s.loop.start();
 }
 
-showStartMenu(overlay, startGame);
+showStartMenu(overlay, startGame, { wallet: loadWallet, resetWallet, resume: resumeOffer });
+
+// Beim Verlassen/Wegwischen der App sichern (lokal sicher, Webspace, wenn die Zeit reicht)
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && session && !session.loop.paused) saveNow(session);
+});
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

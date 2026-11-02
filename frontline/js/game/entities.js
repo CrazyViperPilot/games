@@ -48,6 +48,12 @@ export function createUnit(id, type, team, x, y) {
     crate: 0, // ID der getragenen Versorgungskiste (crates.js; negativ), 0 = keine
   };
   // `ammo` = Munitionswert (Lagereinheiten) der vorhandenen Schüsse; Zuweisen füllt alle Waffen im gleichen Verhältnis
+  defineAmmo(u, def);
+  return u;
+}
+
+/** `ammo` als Eigenschaft anlegen (auch nach dem Laden eines Spielstands, core/snapshot.js übergeht Zugriffsmethoden). */
+export function defineAmmo(u, def) {
   Object.defineProperty(u, 'ammo', {
     enumerable: true,
     get() {
@@ -60,7 +66,6 @@ export function createUnit(id, type, team, x, y) {
       for (const w of this.weapons) w.rounds = w.spec.rounds * f;
     },
   });
-  return u;
 }
 
 /** Füllt die Waffen der Reihe nach mit `amount` Munition (Lagereinheiten) auf; liefert, was verbraucht wurde. */

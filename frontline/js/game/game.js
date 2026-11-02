@@ -7,7 +7,7 @@ import { generateMap } from './map.js';
 import { blockers } from './mapdata.js';
 import { Grid } from './grid.js';
 import { reliefOf } from './relief.js';
-import { createUnit, createBuilding, isFoe, canAttack, inRange } from './entities.js';
+import { createUnit, createBuilding, defineAmmo, isFoe, canAttack, inRange } from './entities.js';
 import { Fog } from './fog.js';
 import { updateEconomy, smoothIncome } from './economy.js';
 import { createCity, updateCity, cmdCity, cmdTrade, cityNoise, freePop, crewOf, payMetal } from './city.js';
@@ -198,10 +198,7 @@ export class Game {
         lastWarn: -1e9,
         reinforceTimer: 0, // Zeit seit dem letzten Soldaten-Nachschub (economy.js)
       };
-      // Lesbare Summe über alle fertigen eigenen FOB-Lager; nie direkt schreiben
-      for (const k of STOCK_KEYS) {
-        Object.defineProperty(team.res, k, { enumerable: true, get: () => this.stockOf(id, k) });
-      }
+      this.bindStocks(team);
       return team;
     });
     createResearch(this, research); // Stufen und Verbesserungen je Team (team.tech)
@@ -228,6 +225,19 @@ export class Game {
   }
 
   // ---- Zustand und Hilfen -------------------------------------------------------
+
+  /** Lesbare Summe über alle fertigen eigenen FOB-Lager (team.res.bm/mun/fuel); nie direkt schreiben. */
+  bindStocks(team) {
+    for (const k of STOCK_KEYS) {
+      Object.defineProperty(team.res, k, { enumerable: true, configurable: true, get: () => this.stockOf(team.id, k) });
+    }
+  }
+
+  /** Nach dem Laden eines Spielstands (core/snapshot.js übergeht Getter): Lagersummen und `ammo` der Einheiten wieder anlegen. */
+  restoreAccessors() {
+    for (const team of this.teams) this.bindStocks(team);
+    for (const u of this.units) defineAmmo(u, u.def);
+  }
 
   newId() {
     return this.nextId++;

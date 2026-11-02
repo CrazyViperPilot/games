@@ -175,3 +175,6 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 Sonstiges: `sw.js` Service Worker (network-first, Präfix `frontline-`), `manifest.json`, `css/`, `icons/`, `assets/` (Lizenzen in `assets/LICENSES/`),
 `tools/render-models/` (Werkzeug zum Vorrendern der Iso-Modelle), `tools/doc-tables.mjs` (erzeugt die Wertetabellen in PRD §6, `npm run docs`),
 `test/` (node --test; `config.test.js` prüft die Config, `doctables.test.js` die PRD-Tabellen).
+
+## 8. Spielstand
+`core/snapshot.js` wandelt einen Objektgraphen (Maps, Sets, Typed Arrays, Zyklen, Klasseninstanzen, `makeRng`-Zustand) in JSON und zurück; `game/savegame.js` meldet Klassen (`CLASSES`) und feste Spieldaten (`STATICS`: nur Verweise) an und bietet `snapshotGame` / `restoreGame`. `ui/saves.js` speichert in IndexedDB und auf dem Webspace (PHP `frontline/api.php` im Repo vipervocs), `main.js` ruft es auf (`captureSave`, `resumeGame`). Regeln und Pflege: PRD §16.

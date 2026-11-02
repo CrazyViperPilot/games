@@ -131,7 +131,8 @@ function writeMapSel(v) {
  * Startmenü: onStart({difficulty, winPoints, mapId, radio, weather, research, river}) beim Klick auf Start (mapId 'random' oder Karten-ID,
  * radio = Sendemast-Sieg, weather = 'off' | 'random' | Jahreszeit, research = Forschungsstufen, river = Flüsse auf Zufallskarten).
  */
-export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.money, resetWallet = () => {} } = {}) {
+export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.money, resetWallet = () => {}, resume = null } = {}) {
+  // resume: { find(): Promise<{ text, source } | null>, onResume(), onDiscard() } – gespeicherte Partie (Gerät oder Webspace), siehe ui/saves.js
   const D = BALANCE.menuDefaults; // Standards: js/data/balance.js
   let difficulty = D.difficulty;
   let mapSel = readMapSel(); // 'random' | Karten-ID
@@ -148,6 +149,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
     'start',
     `<section class="menu start">
       <h1 class="logo">FRONTLINE</h1>
+      <div class="resume" data-resume hidden></div>
       <p class="tag">Echtzeit-Strategie · Einheiten an die Front bringen, versorgen und die Konfliktzone halten</p>
       <div class="field">
         <span class="flabel">Schwierigkeit</span>
@@ -211,6 +213,19 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
     if (el) el.innerHTML = `Kasse: <b>${wallet()}</b> Geld (bleibt von Runde zu Runde) · <button type="button" class="btn-sm" data-act="resetWallet">zurücksetzen</button>`;
   };
   showWallet();
+  if (resume) {
+    const box = root.querySelector('[data-resume]');
+    resume
+      .find()
+      .then((info) => {
+        if (!info || root.dataset.kind !== 'start') return;
+        box.innerHTML = `<p><b>Gespeicherte Partie</b><br>${esc(info.text)}</p>
+          <div class="stack"><button type="button" class="primary" data-act="resume">Fortsetzen</button>
+          <button type="button" class="btn-sm" data-act="discardSave">Spielstand löschen</button></div>`;
+        box.hidden = false;
+      })
+      .catch(() => {});
+  }
   const mark = () => {
     root.querySelectorAll('[data-diff]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.diff === difficulty)));
     root.querySelectorAll('[data-pts]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.pts) === winPoints)));
@@ -336,7 +351,16 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
       sound = b.dataset.sound === '1';
       writeFlag(SOUND_KEY, sound);
     }
-    else if (b.dataset.act === 'resetWallet') {
+    else if (b.dataset.act === 'resume') {
+      hideOverlay(root);
+      resume.onResume();
+      return;
+    } else if (b.dataset.act === 'discardSave') {
+      if (!confirm('Gespeicherte Partie wirklich löschen?')) return;
+      const box = root.querySelector('[data-resume]');
+      box.hidden = true;
+      resume.onDiscard();
+    } else if (b.dataset.act === 'resetWallet') {
       resetWallet();
       showWallet();
     } else if (b.dataset.act === 'start') {
@@ -349,7 +373,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
 }
 
 /** Pausenmenü: onResume() bei „Weiter“, onQuit() bei „Zum Startmenü“. */
-export function showPause(root, onResume, onQuit) {
+export function showPause(root, onResume, onQuit, onSave = null) {
   show(
     root,
     'pause',
@@ -357,10 +381,15 @@ export function showPause(root, onResume, onQuit) {
       <h2>Pause</h2>
       <div class="stack">
         <button type="button" class="primary" data-act="resume">Weiter (P)</button>
-        <button type="button" data-act="quit">Zum Startmenü</button>
+        <button type="button" data-act="quit">Speichern und zum Startmenü</button>
       </div>
+      <p class="muted small center" data-savestate></p>
     </section>`,
   );
+  onSave?.((t) => {
+    const el = root.querySelector('[data-savestate]');
+    if (el) el.textContent = t;
+  });
   root.onclick = (e) => {
     const b = e.target.closest('[data-act]');
     if (!b) return;
