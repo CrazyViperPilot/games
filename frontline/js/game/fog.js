@@ -4,6 +4,7 @@ import { BALANCE } from '../data/balance.js';
 import { RELIEF, FINE_N } from './relief.js';
 import { weatherSight } from './weather.js';
 import { opticsMul } from './research.js';
+import { CITY } from '../data/city.js';
 
 const CONSTRUCTION_SIGHT = BALANCE.construction.siteSight; // Baustellen sehen weniger
 const RAY_GAP = 44; // Abstand benachbarter Sichtstrahlen am Rand (px), kleiner als eine Nebelzelle
@@ -151,6 +152,9 @@ export class Fog {
       const sight = (b.built ? b.def.sight : CONSTRUCTION_SIGHT) * m;
       if (sight > 0) this.markEntity(relief, b, sight);
     }
+    // eigene Stadtgebäude (Wohnen, Gewerbe, Förderung, Werke …) lichten den Nebel wie andere Gebäude
+    const cc = game.city?.[team];
+    if (cc) for (const e of cc.ents.values()) if (e.alive) this.markEntity(relief, e, CITY.sight * m);
   }
 
   cellIndex(x, y) {
