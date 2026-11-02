@@ -23,6 +23,7 @@
   --ink: rgba(0, 0, 0, 0.12);
   --c0: #f7b267; --c1: #8ec5f2; --c2: #a8db8c; --c3: #f5e17a; --c4: #c9abef;
   --c5: #f5abc9; --c6: #7fd8cc; --c7: #dcc49e; --c8: #c9ccd3; --c9: #f0907f;
+  --c10: #d2e46b; --c11: #e48cd6; --c12: #b98e6e;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -34,6 +35,7 @@
     --accent: #9b78ea; --btn: #362f42; --btn-text: #f1ebf5; --ink: rgba(255, 255, 255, 0.11);
     --c0: #a8682a; --c1: #3f6f9e; --c2: #4c7f38; --c3: #93832a; --c4: #6d529c;
     --c5: #9c4d70; --c6: #2c8277; --c7: #85704d; --c8: #5c616b; --c9: #a14a3e;
+    --c10: #7a8a2a; --c11: #94428a; --c12: #7a5238;
     color-scheme: dark;
   }
 }
@@ -45,6 +47,7 @@
   --accent: #9b78ea; --btn: #362f42; --btn-text: #f1ebf5; --ink: rgba(255, 255, 255, 0.11);
   --c0: #a8682a; --c1: #3f6f9e; --c2: #4c7f38; --c3: #93832a; --c4: #6d529c;
   --c5: #9c4d70; --c6: #2c8277; --c7: #85704d; --c8: #5c616b; --c9: #a14a3e;
+  --c10: #7a8a2a; --c11: #94428a; --c12: #7a5238;
   color-scheme: dark;
 }
 
@@ -115,6 +118,7 @@ h1 span { color: var(--accent); }
 .mode.easy { border-left: 8px solid var(--c2); }
 .mode.medium { border-left: 8px solid var(--c0); }
 .mode.hard { border-left: 8px solid var(--c9); }
+.mode.expert { border-left: 8px solid var(--c11); }
 .streak { margin: -4px 0 0; min-height: 1.2em; color: var(--muted); text-align: center; font-size: 0.9rem; }
 .free-title { margin: 4px 0 0; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
 .free { display: flex; flex-direction: column; gap: 8px; }
@@ -173,7 +177,7 @@ h1 span { color: var(--accent); }
 @keyframes hop { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-18%) scale(1.08); } }
 
 .r0 { --c: var(--c0); } .r1 { --c: var(--c1); } .r2 { --c: var(--c2); } .r3 { --c: var(--c3); } .r4 { --c: var(--c4); }
-.r5 { --c: var(--c5); } .r6 { --c: var(--c6); } .r7 { --c: var(--c7); } .r8 { --c: var(--c8); } .r9 { --c: var(--c9); }
+.r5 { --c: var(--c5); } .r6 { --c: var(--c6); } .r7 { --c: var(--c7); } .r8 { --c: var(--c8); } .r9 { --c: var(--c9); } .r10 { --c: var(--c10); } .r11 { --c: var(--c11); } .r12 { --c: var(--c12); }
 /* Muster je Region, damit Farben nicht die einzige Unterscheidung sind */
 .r1 { background-image: repeating-linear-gradient(45deg, var(--ink) 0 2px, transparent 2px 9px); }
 .r2 { background-image: radial-gradient(var(--ink) 1.6px, transparent 2.2px); background-size: 9px 9px; }
@@ -184,6 +188,10 @@ h1 span { color: var(--accent); }
 .r7 { background-image: repeating-linear-gradient(45deg, var(--ink) 0 1.5px, transparent 1.5px 8px), repeating-linear-gradient(-45deg, var(--ink) 0 1.5px, transparent 1.5px 8px); }
 .r8 { background-image: radial-gradient(var(--ink) 3px, transparent 3.6px); background-size: 15px 15px; }
 .r9 { background-image: conic-gradient(var(--ink) 25%, transparent 0 50%, var(--ink) 0 75%, transparent 0); background-size: 12px 12px; }
+.r9 { background-image: repeating-linear-gradient(90deg, var(--ink) 0 4px, transparent 4px 10px); }
+.r10 { background-image: radial-gradient(var(--ink) 1.2px, transparent 1.8px); background-size: 6px 6px; }
+.r11 { background-image: repeating-linear-gradient(45deg, var(--ink) 0 4px, transparent 4px 12px); }
+.r12 { background-image: repeating-linear-gradient(0deg, var(--ink) 0 4px, transparent 4px 11px); }
 .no-patterns .cell { background-image: none; }
 
 .panel {

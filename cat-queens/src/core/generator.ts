@@ -6,7 +6,7 @@ import { solveLogically, type LogicResult, type Technique } from './logic';
 import { createRng, type Rng } from './rng';
 import { solve } from './solver';
 
-export type Difficulty = 'easy' | 'medium' | 'hard';
+export type Difficulty = 'easy' | 'medium' | 'hard' | 'expert';
 
 export interface DifficultySpec {
   /** Erlaubte Gittergrößen. */
@@ -24,6 +24,7 @@ export const DIFFICULTIES: Record<Difficulty, DifficultySpec> = {
   easy: { sizes: [5, 6, 7], minLevel: 0, maxLevel: 2, minScore: 0, maxTinyRegions: 1 },
   medium: { sizes: [7, 8], minLevel: 3, maxLevel: 4, minScore: 8, maxTinyRegions: 1 },
   hard: { sizes: [9, 10], minLevel: 4, maxLevel: 6, minScore: 20, maxTinyRegions: 0 },
+  expert: { sizes: [11, 12, 13], minLevel: 4, maxLevel: 6, minScore: 30, maxTinyRegions: 0 },
 };
 
 export interface Rating {

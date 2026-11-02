@@ -28,7 +28,7 @@ describe('Hinweise', () => {
     expect(getHint(easy, marks).kind).toBe('solved');
   });
 
-  it.each(['easy', 'medium', 'hard'] as Difficulty[])('wer nur den Hinweisen folgt, löst %s-Rätsel – jeder Hinweis ist korrekt und neu', (difficulty) => {
+  it.each(['easy', 'medium', 'hard', 'expert'] as Difficulty[])('wer nur den Hinweisen folgt, löst %s-Rätsel – jeder Hinweis ist korrekt und neu', (difficulty) => {
     for (let i = 0; i < 6; i++) {
       const p = generatePuzzle({ seed: `hint-follow-${i}`, difficulty });
       const sol = solutionSet(p);

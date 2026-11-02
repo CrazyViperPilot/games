@@ -21,7 +21,7 @@ const SEEDS_PER_DIFFICULTY = 12;
 describe('randomSolution', () => {
   it('erzeugt für n=5..10 gültige Stellungen (je eine pro Zeile/Spalte, keine Berührung)', () => {
     const rng = createRng('sol');
-    for (let n = 5; n <= 10; n++) {
+    for (let n = 5; n <= 13; n++) {
       for (let i = 0; i < 50; i++) {
         const sol = randomSolution(n, rng);
         expect(new Set(sol).size).toBe(n);
@@ -34,7 +34,7 @@ describe('randomSolution', () => {
 describe('growRegions', () => {
   it('füllt das Gitter mit n zusammenhängenden Regionen, je eine Lösungskatze darin', () => {
     const rng = createRng('grow');
-    for (let n = 5; n <= 10; n++) {
+    for (let n = 5; n <= 13; n++) {
       for (let i = 0; i < 30; i++) {
         const sol = randomSolution(n, rng);
         const regions = growRegions(n, sol, rng);
@@ -66,7 +66,7 @@ describe('makeUnique', () => {
   });
 });
 
-describe.each(['easy', 'medium', 'hard'] as Difficulty[])('generatePuzzle(%s)', (difficulty) => {
+describe.each(['easy', 'medium', 'hard', 'expert'] as Difficulty[])('generatePuzzle(%s)', (difficulty) => {
   const spec = DIFFICULTIES[difficulty];
   const puzzles = Array.from({ length: SEEDS_PER_DIFFICULTY }, (_, i) => generatePuzzle({ seed: `test-${i}`, difficulty }));
 
@@ -116,9 +116,9 @@ describe.each(['easy', 'medium', 'hard'] as Difficulty[])('generatePuzzle(%s)', 
 });
 
 describe('feste Größen', () => {
-  it('erzeugt für jede Größe 5..10 ein eindeutiges Rätsel', () => {
-    for (let n = 5; n <= 10; n++) {
-      const difficulty: Difficulty = n <= 6 ? 'easy' : n <= 8 ? 'medium' : 'hard';
+  it('erzeugt für jede Größe 5..13 ein eindeutiges Rätsel', () => {
+    for (let n = 5; n <= 13; n++) {
+      const difficulty: Difficulty = n <= 6 ? 'easy' : n <= 8 ? 'medium' : n <= 10 ? 'hard' : 'expert';
       const p = generatePuzzle({ seed: `size-${n}`, difficulty, n });
       expect(p.n).toBe(n);
       expect(solve(n, p.regions, 2).count).toBe(1);

@@ -16,7 +16,7 @@ export interface Stats {
 }
 
 export function emptyStats(): Stats {
-  return { solved: { easy: 0, medium: 0, hard: 0 }, best: {}, daily: {}, streak: 0, bestStreak: 0, lastDaily: null, hintsUsed: 0 };
+  return { solved: { easy: 0, medium: 0, hard: 0, expert: 0 }, best: {}, daily: {}, streak: 0, bestStreak: 0, lastDaily: null, hintsUsed: 0 };
 }
 
 /** Tag davor als JJJJ-MM-TT (Kalenderrechnung ohne Zeitzonenfehler). */

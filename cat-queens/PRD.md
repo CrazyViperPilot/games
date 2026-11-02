@@ -40,6 +40,7 @@ Kein Backend, keine Werbung, kein Tracking.
 | Leicht | 5×5 bis 7×7 | Einschluss (2) | 0 | höchstens 1 |
 | Mittel | 7×7, 8×8 | Bedrohung (3) oder Zweiergruppe (4) | 8 | höchstens 1 |
 | Schwer | 9×9, 10×10 | Gruppe (4/5) oder Probieren (6) | 20 | keine |
+| Super schwer | 11×11 bis 13×13 | Gruppe (4/5) oder Probieren (6) | 30 | keine |
 
 ### Logik-Techniken (auch für den Hinweis-Knopf)
 1. **Einzelfeld:** Zeile, Spalte oder Region hat nur noch ein freies Feld → Katze.
@@ -65,11 +66,11 @@ Seed = `daily-JJJJ-MM-TT` (Ortszeit). Schwierigkeit nach Wochentag: Mo/Di leicht
 - Rückgängig, Neustart (lässt sich rückgängig machen), Hinweis, Timer, Zähler „Katzen x/N“.
 - Hinweis zeigt das Feld mit pulsierendem Rahmen, hebt die begründenden Zeilen/Spalten/Regionen hervor (Rest wird
   abgedunkelt) und erklärt den Schritt. Regionen heißen dabei nach ihrer Farbe (Orange, Blau, Grün, Gelb, Lila,
-  Rosa, Türkis, Sand, Grau, Rot).
+  Rosa, Türkis, Sand, Grau, Rot, Limette, Magenta, Braun; 13 Regionen bei 13×13).
 - Sieg: Katzen hüpfen, Fenster mit Zeit, Bestzeit-Meldung, Tages-Serie; „Nächstes Rätsel“ im freien Spiel.
 
 ## Menü, Spielstände, Statistik
-- Menü: Tagesrätsel (mit Datum, Stufe, Zeit wenn gelöst), freies Spiel Leicht/Mittel/Schwer (mit Bestzeit,
+- Menü: Tagesrätsel (mit Datum, Stufe, Zeit wenn gelöst), freies Spiel Leicht/Mittel/Schwer/Super schwer (nur im freien Spiel, nicht im Tagesrätsel) (mit Bestzeit,
   „▶ weiter“ wenn ein Spiel offen ist), Regeln, Statistik, Theme (Auto/Hell/Dunkel), Muster an/aus, Link zur Spielesammlung.
 - Je Modus ein eigener Spielstand (`catqueens-game-daily-JJJJ-MM-TT`, `catqueens-game-free-<stufe>`) mit Markierungen,
   Rückgängig-Liste, Zeit und Hinweisen. Alte Tagesrätsel-Stände werden beim Start gelöscht.

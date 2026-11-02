@@ -24,7 +24,8 @@ import { CROWN_CAT_SVG } from './ui/art';
 import { BoardView, type Highlight } from './ui/board-view';
 import { REGION_NAMES } from './ui/palette';
 
-const DIFF_NAME: Record<Difficulty, string> = { easy: 'Leicht', medium: 'Mittel', hard: 'Schwer' };
+const ALL_DIFFS: Difficulty[] = ['easy', 'medium', 'hard', 'expert'];
+const DIFF_NAME: Record<Difficulty, string> = { easy: 'Leicht', medium: 'Mittel', hard: 'Schwer', expert: 'Super schwer' };
 const WEEKDAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -247,7 +248,7 @@ function showMenu(): void {
       : '';
   const streak = currentStreak(stats, key);
   $('streak').textContent = streak ? `🔥 ${streak} ${streak === 1 ? 'Tag' : 'Tage'} in Folge` : '';
-  for (const d of ['easy', 'medium', 'hard'] as Difficulty[]) {
+  for (const d of ALL_DIFFS) {
     const btn = $(`free-${d}`);
     const stored = loadGame({ kind: 'free', difficulty: d });
     const sizes = DIFFICULTIES[d].sizes;
@@ -289,7 +290,7 @@ $('modal').addEventListener('click', (e) => {
 
 function showStats(): void {
   const key = dateKey(new Date());
-  const rows = (['easy', 'medium', 'hard'] as Difficulty[])
+  const rows = (ALL_DIFFS)
     .map((d) => `<tr><td>${DIFF_NAME[d]}</td><td>${stats.solved[d]}</td><td>${stats.best[d] !== undefined ? formatTime(stats.best[d]!) : '–'}</td></tr>`)
     .join('');
   showModal(
@@ -318,7 +319,7 @@ function showRules(): void {
 
 // ---------- Knöpfe ----------
 $('btn-daily').addEventListener('click', () => void startDaily());
-for (const d of ['easy', 'medium', 'hard'] as Difficulty[]) {
+for (const d of ALL_DIFFS) {
   $(`free-${d}`).addEventListener('click', () => void startFree(d));
   $(`free-${d}`).parentElement!.querySelector('.resume')!.addEventListener('click', () => void startFree(d, true));
 }
@@ -371,7 +372,7 @@ if (!localStorage.getItem('catqueens-seen-rules')) {
   showRules();
 }
 // Vorrat fürs freie Spiel anlegen, nacheinander, damit der Worker nicht blockiert.
-setTimeout(() => (['easy', 'medium', 'hard'] as Difficulty[]).forEach(prepareNext), 600);
+setTimeout(() => (ALL_DIFFS).forEach(prepareNext), 600);
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => undefined));

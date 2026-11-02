@@ -5,7 +5,7 @@ import { DIFFICULTIES, generatePuzzle, type Difficulty, type GeneratedPuzzle } f
 import { solve } from '../src/core/solver';
 
 const COUNT = Number(process.argv[2] ?? 100);
-const NAMES: Record<Difficulty, string> = { easy: 'Leicht', medium: 'Mittel', hard: 'Schwer' };
+const NAMES: Record<Difficulty, string> = { easy: 'Leicht', medium: 'Mittel', hard: 'Schwer', expert: 'Super schwer' };
 const TECH = { single: 'Einzelfeld', confine: 'Einschluss', attack: 'Bedrohung', group: 'Gruppe', lookahead: 'Probieren' } as const;
 
 const pct = (arr: number[], p: number) => [...arr].sort((a, b) => a - b)[Math.min(arr.length - 1, Math.floor(arr.length * p))];
@@ -14,7 +14,7 @@ const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
 console.log(`| Stufe | Größen | Ø Zeit | p95 | max | Ø Versuche | eindeutig | zusammenhängend | im Ziel | Ø Schritte | Ø Score | Techniken (Rätsel, die sie brauchen) |`);
 console.log(`|---|---|---|---|---|---|---|---|---|---|---|---|`);
 const samples: GeneratedPuzzle[] = [];
-for (const diff of ['easy', 'medium', 'hard'] as Difficulty[]) {
+for (const diff of ['easy', 'medium', 'hard', 'expert'] as Difficulty[]) {
   const spec = DIFFICULTIES[diff];
   const times: number[] = [];
   const list: GeneratedPuzzle[] = [];

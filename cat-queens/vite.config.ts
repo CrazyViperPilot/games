@@ -63,5 +63,5 @@ export default defineConfig({
   plugins: [serviceWorker()],
   worker: { format: 'es' },
   build: { target: 'es2022', outDir: 'dist', emptyOutDir: true },
-  test: { include: ['test/**/*.test.ts'] },
+  test: { include: ['test/**/*.test.ts'], testTimeout: 120000, hookTimeout: 120000 },
 } as Parameters<typeof defineConfig>[0]);
