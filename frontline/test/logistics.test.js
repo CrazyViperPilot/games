@@ -55,12 +55,12 @@ function fobRing(game, team, x0, y0, rMin = 950, rMax = 1300) {
   return game.spawnBuilding('fob', team, p.cx, p.cy, { built: true });
 }
 
-test('Haupt-FOB hat unendlich Vorrat: Laden entleert sie nicht, das Front-Lager zählt ohne sie', () => {
+test('Hauptstadt hat unendlich Vorrat: Laden entleert sie nicht, das Front-Lager zählt ohne sie', () => {
   const g = new Game({ seed: 7 });
   const f = fobOf(g, 0);
   assert.equal(f.main, true);
   assert.equal(f.infinite, true);
-  assert.equal(g.teams[0].res.bm, 0, 'Front-Lager ohne Haupt-FOB');
+  assert.equal(g.teams[0].res.bm, 0, 'Front-Lager ohne Hauptstadt');
   silence(g, 0);
   const truck = g.spawnUnit('truck', 0, f.x + 90, f.y + 90);
   f.store.bm = 450; // fast leer: wird aufgefüllt
@@ -69,11 +69,11 @@ test('Haupt-FOB hat unendlich Vorrat: Laden entleert sie nicht, das Front-Lager 
   assert.ok(truck.cargo.bm > 0 && truck.cargo.bm <= L.transferRate * 1.2, `Laderate begrenzt: ${truck.cargo.bm}`);
   run(g, 6);
   assert.equal(truck.cargo.bm, L.truckCapacity, 'LKW voll');
-  assert.equal(f.store.bm, L.storeCap, 'Lager der Haupt-FOB wird immer aufgefüllt');
+  assert.equal(f.store.bm, L.storeCap, 'Lager der Hauptstadt wird immer aufgefüllt');
   assert.equal(g.teams[0].res.bm, 0);
 });
 
-test('Front-FOB: LKW bringt Baumaterial aus der Haupt-FOB, das Front-Lager steigt', () => {
+test('Front-FOB: LKW bringt Baumaterial aus der Hauptstadt, das Front-Lager steigt', () => {
   const g = new Game({ seed: 7 });
   const f = fobOf(g, 0);
   silence(g, 0);
@@ -112,7 +112,7 @@ test('Bau zahlt aus dem Lager in Reichweite, nicht aus einem fernen Lager', () =
   const f = fobOf(g, 0);
   silence(g, 0);
   const far = fobRing(g, 0, f.x, f.y);
-  g.setStock(0, { bm: 0, mun: 0, fuel: 0 }); // Haupt-FOB leer
+  g.setStock(0, { bm: 0, mun: 0, fuel: 0 }); // Hauptstadt leer
   far.store.bm = 2000; // fern, aber nicht im Radius des Bauorts
   // Halle in der Nähe der leeren FOB (innerhalb ihres Radius)
   const p = g.canPlace(0, 'mortar', f.x + 150, f.y + 150);

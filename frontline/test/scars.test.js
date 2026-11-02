@@ -10,7 +10,7 @@ const S = BALANCE.scars;
 const DT = 1 / BALANCE.tickRate;
 const TILE = BALANCE.map.tile;
 
-/** Leere Karte ohne Startunits (nur die Haupt-FOBs bleiben). */
+/** Leere Karte ohne Startunits (nur die Hauptstädte bleiben). */
 function emptyGame() {
   const g = new Game({ map: createEmptyMap('Narben') });
   for (const u of g.units) u.alive = false;

@@ -23,7 +23,7 @@ function play(seed, level, minutes) {
 
 const of = (g, team, type) => g.buildings.filter((b) => b.alive && b.team === team && b.type === type);
 
-test('KI (schwer) baut die Haupt-FOB zur Festung aus: Tore, Mauern, Türme mit Besatzung und Aufbau, Hubschrauber', () => {
+test('KI (schwer) baut die Hauptstadt zur Festung aus: Tore, Mauern, Türme mit Besatzung und Aufbau, Hubschrauber', () => {
   const { game: g, heli } = play(5, 'hard', 14);
   const towers = of(g, 0, 'tower').filter((b) => b.built);
   assert.ok(of(g, 0, 'gate').length >= 3, `Tore ${of(g, 0, 'gate').length}`);

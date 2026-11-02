@@ -314,7 +314,7 @@ export function drawBuilding(ctx, b, color, zoom = 1) {
     ctx.fillRect(x0 + 2, by, (w - 4) * clamp(b.progress || 0, 0, 1), bh);
     if (!isWall) {
       ctx.fillStyle = 'rgba(255,255,255,0.75)';
-      fitText(ctx, BUILD_ABBR[b.type] || '', x0 + w / 2, y0 + h / 2 - bh, 10, z, w * 0.9);
+      fitText(ctx, (b.main ? 'HAUPTSTADT' : BUILD_ABBR[b.type]) || '', x0 + w / 2, y0 + h / 2 - bh, 10, z, w * 0.9);
     }
   } else if (b.type === 'wall') {
     ctx.fillStyle = WALL_GREY;
@@ -344,7 +344,7 @@ export function drawBuilding(ctx, b, color, zoom = 1) {
     ctx.lineWidth = 2 / z;
     ctx.strokeRect(x0 + 1, y0 + 1, w - 2, h - 2);
     ctx.fillStyle = 'rgba(255,255,255,0.92)';
-    fitText(ctx, BUILD_ABBR[b.type] || b.def.name, x0 + w / 2, y0 + h / 2, 11, z, w * 0.88);
+    fitText(ctx, (b.main ? 'HAUPTSTADT' : BUILD_ABBR[b.type]) || b.def.name, x0 + w / 2, y0 + h / 2, 11, z, w * 0.88);
     if (b.hp < b.maxHp) {
       ctx.fillStyle = `rgba(0,0,0,${(1 - b.hp / b.maxHp) * 0.45})`;
       ctx.fillRect(x0 + 1, y0 + 1, w - 2, h - 2);

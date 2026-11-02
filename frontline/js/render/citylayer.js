@@ -160,39 +160,18 @@ function drawTerritory(ren, ctx, team, known) {
     const q1 = Math.min(c.cols - 1, Math.ceil(V.x1 / S) + 1);
     const r0 = Math.max(0, Math.floor(V.y0 / S) - 1);
     const r1 = Math.min(c.rows - 1, Math.ceil(V.y1 / S) + 1);
-    const claim = c.claim;
-    const at = (q, r) => q >= 0 && r >= 0 && q < c.cols && r < c.rows && claim[r * c.cols + q];
     if (ui && own) {
+      // Baumodus: gesperrte Zellen dunkel (bauen kann man überall sonst, seit v4.87 ohne Gebietsgrenze)
       for (let r = r0; r <= r1; r++) {
         for (let q = q0; q <= q1; q++) {
           const i = r * c.cols + q;
-          if (!claim[i] || c.kind[i]) continue;
+          if (c.kind[i] || canZone(g, c, i)) continue;
           groundRect(ren, ctx, q * S + 1, r * S + 1, (q + 1) * S - 1, (r + 1) * S - 1);
-          ctx.fillStyle = canZone(g, c, i) ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.35)';
+          ctx.fillStyle = 'rgba(0,0,0,0.35)';
           ctx.fill();
         }
       }
     }
-    ctx.beginPath();
-    for (let r = r0; r <= r1; r++) {
-      for (let q = q0; q <= q1; q++) {
-        if (!claim[r * c.cols + q]) continue;
-        if (!own && !known((q + 0.5) * S, (r + 0.5) * S)) continue;
-        const x = q * S;
-        const y = r * S;
-        if (!at(q, r - 1)) groundLine(ren, ctx, x, y, x + S, y);
-        if (!at(q, r + 1)) groundLine(ren, ctx, x, y + S, x + S, y + S);
-        if (!at(q - 1, r)) groundLine(ren, ctx, x, y, x, y + S);
-        if (!at(q + 1, r)) groundLine(ren, ctx, x + S, y, x + S, y + S);
-      }
-    }
-    ctx.strokeStyle = g.teams[c.team].color;
-    ctx.globalAlpha = ui && own ? 0.95 : 0.6;
-    ctx.lineWidth = (ui && own ? 3 : 2) * z;
-    ctx.setLineDash([8 * z, 6 * z]);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.globalAlpha = 1;
   }
   const d = ui?.drag;
   if (d) {

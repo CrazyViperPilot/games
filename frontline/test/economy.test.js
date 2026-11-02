@@ -169,7 +169,7 @@ test('Ausbildung: Abbrechen erstattet den letzten Auftrag, der laufende behält 
   assert.ok(Math.abs(f.queueTimes[0] - 2) < 0.1, `Fortschritt ${f.queueTimes[0]}`);
 }));
 
-test('KI: setzt die Startarmee sofort ein, die Reserve bleibt an der Haupt-FOB', () => {
+test('KI: setzt die Startarmee sofort ein, die Reserve bleibt an der Hauptstadt', () => {
   const g = mk({ seed: 7 });
   const ai = new AI(g, 1, 'normal');
   ai.update(DT); // erster Denkschritt sofort
@@ -182,11 +182,11 @@ test('KI: setzt die Startarmee sofort ein, die Reserve bleibt an der Haupt-FOB',
   const reserve = combat.filter((u) => u.order.type !== 'attackMove');
   for (const u of reserve) {
     const dh = Math.hypot(u.x - home.x, u.y - home.y);
-    assert.ok(dh < 400, `Reserve ${dh.toFixed(0)} px von der Haupt-FOB`);
+    assert.ok(dh < 400, `Reserve ${dh.toFixed(0)} px von der Hauptstadt`);
   }
 });
 
-test('Nachschub: nach 6 s bei unter 29 Soldaten, ein Schütze kostenlos an der Haupt-FOB', () => {
+test('Nachschub: nach 6 s bei unter 29 Soldaten, ein Schütze kostenlos an der Hauptstadt', () => {
   const g = mk({ seed: 7 });
   for (const u of unitsOf(g, 0, 'rifleman').slice(0, 5)) u.alive = false;
   assert.equal(g.soldierCount(0), 24);
@@ -209,7 +209,7 @@ test('Nachschub: keiner bei 29 Soldaten', () => {
   assert.equal(unitsOf(g, 0).length, before);
 });
 
-test('Nachschub: keiner ohne lebende Haupt-FOB', () => {
+test('Nachschub: keiner ohne lebende Hauptstadt', () => {
   const g = mk({ seed: 7 });
   g.mainFob(0).alive = false;
   for (const u of unitsOf(g, 0, 'rifleman').slice(0, 5)) u.alive = false;

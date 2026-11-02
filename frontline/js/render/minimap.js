@@ -77,7 +77,7 @@ export class Minimap {
     ctx.lineWidth = 1.5 * px;
     ctx.stroke();
 
-    // Stadt: Gebiet blass, Gebäude kräftig in Teamfarbe (Bild je Team, neu nur wenn sich Gebiet oder Zellen ändern)
+    // Stadt: Zonen blass, Gebäude kräftig in Teamfarbe (Bild je Team, neu nur wenn sich Gebiet oder Zellen ändern)
     for (const c of g.city ?? []) {
       const img = this.cityImage(c, g.teams[c.team].color);
       ctx.imageSmoothingEnabled = false;
@@ -159,7 +159,7 @@ export class Minimap {
   cityImage(c, color) {
     this.cityImgs ??= new Map();
     let e = this.cityImgs.get(c.team);
-    const key = `${c.claimVer}/${c.ver}`;
+    const key = `${c.ver}`;
     if (e && e.key === key) return e.canvas;
     if (!e) {
       const canvas = document.createElement('canvas');
@@ -173,7 +173,7 @@ export class Minimap {
     const n = parseInt(color.slice(1), 16);
     const [R, G, B] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
     for (let i = 0; i < c.claim.length; i++) {
-      const a = c.level[i] && c.kind[i] !== 1 ? 230 : c.kind[i] ? 140 : c.claim[i] ? 45 : 0;
+      const a = c.level[i] && c.kind[i] !== 1 ? 230 : c.kind[i] ? 140 : 0;
       if (!a) continue;
       im.data[i * 4] = R;
       im.data[i * 4 + 1] = G;

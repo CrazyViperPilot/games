@@ -21,7 +21,7 @@ const WX_COLOR = { clear: '#f2c94c', rain: '#8fb3d9', fog: '#c8ccc4', snow: '#e8
 import { builderState, fobLabel, orderText } from './status.js';
 
 const RES_KEYS = ['money', 'bm', 'mun', 'fuel'];
-const SHORT_RES = { bm: 'BM', mun: 'MUN', fuel: 'TS' }; // Front-Lager: Summe der FOB-Lager ohne Haupt-FOB
+const SHORT_RES = { bm: 'BM', mun: 'MUN', fuel: 'TS' }; // Front-Lager: Summe der FOB-Lager ohne Hauptstadt
 const MSG_LIFE = 6000; // ms
 const MSG_MAX = 5;
 const DOM_EVERY = 200; // ms
@@ -236,7 +236,7 @@ export class Hud {
       el.rate.textContent = `${neg ? '−' : '+'}${fmtRate(Math.abs(v))}/s`;
       el.rate.style.color = neg ? NEG_COLOR : '';
       // Lagersorten: Summe aller fertigen FOB-Lager; Geld ist global
-      const lines = [k === 'money' ? `Geld (global): je Einheit in der Konfliktzone ${fmtDe(BALANCE.zone.unitIncome)}/s, in der Hot Zone ${fmtDe(BALANCE.hot.unitIncome)}/s, je eingelagerte Versorgungskiste ${fmtDe(BALANCE.crates.income)}/s; bleibt von Runde zu Runde` : 'Front-Lager: Summe der FOB-Lager ohne Haupt-FOB (die hat unendlich)'];
+      const lines = [k === 'money' ? `Geld (global): je Einheit in der Konfliktzone ${fmtDe(BALANCE.zone.unitIncome)}/s, in der Hot Zone ${fmtDe(BALANCE.hot.unitIncome)}/s, je eingelagerte Versorgungskiste ${fmtDe(BALANCE.crates.income)}/s; bleibt von Runde zu Runde` : 'Front-Lager: Summe der FOB-Lager ohne Hauptstadt (die hat unendlich)'];
       if (t.used[k] !== undefined) lines.push(`verbraucht: ${Math.floor(t.used[k])}`);
       const tip = lines.join('\n');
       if (el.box.title !== tip) el.box.title = tip;
@@ -435,7 +435,7 @@ export class Hud {
       if (g.research) h += this.researchInfo(b.team);
     } else if (b.type === 'fob') {
       h +=
-        '<div class="muted small lagerhead">Lager dieser FOB (LKW füllen es aus der Haupt-FOB)</div>' +
+        '<div class="muted small lagerhead">Lager dieser FOB (LKW füllen es aus der Hauptstadt)</div>' +
         storeRow('BM', b.store.bm, STORE_CAP, COLOR.bm) +
         storeRow('MUN', b.store.mun, STORE_CAP, COLOR.mun) +
         storeRow('TS', b.store.fuel, STORE_CAP, COLOR.fuel);
@@ -471,7 +471,7 @@ export class Hud {
     return h;
   }
 
-  /** Haupt-FOB: Soldaten-Nachschub (Restzeit bis zum nächsten Schützen oder Ruhezustand). */
+  /** Hauptstadt: Soldaten-Nachschub (Restzeit bis zum nächsten Schützen oder Ruhezustand). */
   reinforceInfo(b) {
     const g = this.game;
     const R = BALANCE.reinforce;
@@ -485,7 +485,7 @@ export class Hud {
     return `<div class="muted small">Nachschub: ${esc(UNITS[R.unit].name)} in ${left} s (${label})</div>`;
   }
 
-  /** Haupt-FOB mit Forschung: Stufe, erforschte Verbesserungen, laufende Forschung mit Fortschritt. */
+  /** Hauptstadt mit Forschung: Stufe, erforschte Verbesserungen, laufende Forschung mit Fortschritt. */
   researchInfo(team) {
     const tech = this.game.teams[team].tech;
     const items = BALANCE.research.items;

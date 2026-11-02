@@ -1,4 +1,4 @@
-// Forschungsstufen (v4.52, nach Age of Empires II und Empire Earth): Die Haupt-FOB forscht neben der Ausbildung, eins nach dem
+// Forschungsstufen (v4.52, nach Age of Empires II und Empire Earth): Die Hauptstadt forscht neben der Ausbildung, eins nach dem
 // anderen (Geld beim Start, Abbruch erstattet voll). Stufe 2 schaltet Scharfschützen, Schützenpanzer, Hubschrauber und Flakpanzer frei,
 // Stufe 3 Kampfpanzer, Kampfhubschrauber und SAM-Startrampe; dazu drei Verbesserungen: Schutzwesten (Infanterie), Verbundpanzerung (Fahrzeuge und
 // Hubschrauber) und Wärmebildoptik (Reichweite und Sicht der Einheiten). Aus (Standard): alles frei, keine Verbesserungen.
@@ -81,10 +81,10 @@ export function researchBlock(game, team, key) {
   return '';
 }
 
-/** { type: 'research', buildingId, key }: nur die Haupt-FOB, eine Forschung zugleich, Geld beim Start. */
+/** { type: 'research', buildingId, key }: nur die Hauptstadt, eine Forschung zugleich, Geld beim Start. */
 export function cmdResearch(game, team, cmd) {
   const b = game.getEntity(cmd.buildingId);
-  if (!b || b.kind !== 'building' || b.team !== team || !b.main) return fail('Nur die Haupt-FOB forscht');
+  if (!b || b.kind !== 'building' || b.team !== team || !b.main) return fail('Nur die Hauptstadt forscht');
   const why = researchBlock(game, team, cmd.key);
   if (why) return fail(why);
   const cost = { money: R.items[cmd.key].money };

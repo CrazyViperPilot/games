@@ -1,4 +1,4 @@
-// Wirtschaft: Produktion in der Haupt-FOB und Geldrate (docs/verlauf.md §5, §11.1). Geld kommt nur aus Zone und Hot Zone. Kein DOM.
+// Wirtschaft: Produktion in der Hauptstadt und Geldrate (docs/verlauf.md §5, §11.1). Geld kommt nur aus Zone und Hot Zone. Kein DOM.
 // Baufortschritt: construction.js. Nachfüllen und LKW: logistics.js.
 import { crewOf } from './city.js';
 import { BALANCE } from '../data/balance.js';
@@ -79,7 +79,7 @@ export function updateEconomy(game, dt) {
   // Soldaten-Nachschub (§12): kostenlos, unabhängig von Warteschlange und Ausbildungsplätzen
   for (const team of game.teams) updateReinforce(game, team, dt);
 
-  // Haupt-FOB: unendlicher Vorrat (das Lager wird immer wieder aufgefüllt; Laden und Nachfüllen haben ihre Raten)
+  // Hauptstadt: unendlicher Vorrat (das Lager wird immer wieder aufgefüllt; Laden und Nachfüllen haben ihre Raten)
   for (const b of game.buildings) {
     if (!b.alive || !b.infinite) continue;
     for (const k of STOCK_KEYS) b.store[k] = BALANCE.logistics.storeCap;
@@ -88,9 +88,9 @@ export function updateEconomy(game, dt) {
 }
 
 /**
- * Nachschub eines Teams: zählt nur, solange eine lebende fertige Haupt-FOB steht, zu wenig Soldaten
+ * Nachschub eines Teams: zählt nur, solange eine lebende fertige Hauptstadt steht, zu wenig Soldaten
  * (< soldierMin) und das Einheitenlimit (Plätze) nicht erreicht ist. Bei `interval` s erscheint ein Schütze an der
- * Haupt-FOB. Ist kein Feld frei, bleibt der Timer stehen (nächster Schritt). Sonst Timer = 0.
+ * Hauptstadt. Ist kein Feld frei, bleibt der Timer stehen (nächster Schritt). Sonst Timer = 0.
  */
 function updateReinforce(game, team, dt) {
   const R = BALANCE.reinforce;

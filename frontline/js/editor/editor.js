@@ -56,8 +56,8 @@ const TOOLS = [
   ['river', 'Fluss', 'Fluss', '≈', 'Ziehen gräbt ein Flussbett mit Ufern (Wasser ist unpassierbar); mehrere Striche ergeben einen gewundenen Fluss'],
   ['ford', 'Furt', 'Fluss', '⋯', `Tippen auf den Fluss legt eine Furt an: seichtes Wasser, durch das Bodeneinheiten mit halbem Tempo kommen (höchstens ${MAX_FORDS})`],
   ['bridge', 'Brücke', 'Fluss', '⊟', `Von Ufer zu Ufer über das Wasser ziehen (${BRIDGE_LEN[0]}–${BRIDGE_LEN[1]} px, beide Enden auf festem Grund): zerstörbar, Baufahrzeuge bauen sie wieder auf`],
-  ['spawn0', 'Start Blau', 'Spiel', '①', 'Tippen setzt den Startpunkt von Blau (Haupt-FOB)'],
-  ['spawn1', 'Start Rot', 'Spiel', '②', 'Tippen setzt den Startpunkt von Rot (Haupt-FOB)'],
+  ['spawn0', 'Start Blau', 'Spiel', '①', 'Tippen setzt den Startpunkt von Blau (Hauptstadt)'],
+  ['spawn1', 'Start Rot', 'Spiel', '②', 'Tippen setzt den Startpunkt von Rot (Hauptstadt)'],
   ['zone', 'Zone', 'Spiel', '◎', 'Tippen setzt die Mitte der Konfliktzone'],
   ['crate', 'Kiste', 'Spiel', '⊠', `Tippen setzt eine Versorgungskiste (Soldaten bringen sie zur FOB, +1 Geld/s; höchstens ${MAX_CRATES}). Für eine faire Karte gleich weit von beiden Starts setzen`],
 ];
@@ -589,7 +589,7 @@ function draw() {
   ctx.strokeStyle = '#c9a227';
   ctx.lineWidth = 2 * px;
   ctx.strokeRect(0, 0, W, H);
-  // Konfliktzone und Startpunkte mit Bauradius der Haupt-FOB (Kreise liegen auf dem Gelände)
+  // Konfliktzone und Startpunkte mit Bauradius der Hauptstadt (Kreise liegen auf dem Gelände)
   ctx.setTransform(d, 0, 0, d, 0, 0);
   ctx.strokeStyle = '#ffd24a';
   ctx.lineWidth = 2;
@@ -1267,7 +1267,7 @@ function showInspector() {
   } else if (s.k === 'rail') {
     rows.push('<div class="muted small">Enden ziehen, um das Gleis zu ändern. Neue Gleise rasten an Enden und Gleisen ein.</div>');
   } else if (s.k === 'spawn') {
-    rows.push('<div class="muted small">Ziehen verschiebt den Startpunkt. Die Haupt-FOB entsteht hier, Bauradius als Kreis.</div>');
+    rows.push('<div class="muted small">Ziehen verschiebt den Startpunkt. Die Hauptstadt entsteht hier, Bauradius als Kreis.</div>');
   } else if (s.k === 'bridge') {
     const len = Math.round(Math.hypot(s.o.x2 - s.o.x1, s.o.y2 - s.o.y1));
     rows.push(`<div class="muted small">Länge ${len} px (${BRIDGE_LEN[0]}–${BRIDGE_LEN[1]}). Enden ziehen, um die Brücke zu ändern; beide Enden gehören auf festen Grund. Im Spiel zerstörbar (A + Klick), ein Baufahrzeug baut sie für ${BALANCE.river.rebuildCost} Geld wieder auf.</div>`);

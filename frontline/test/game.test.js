@@ -64,7 +64,7 @@ function silence(game, team) {
   }
 }
 
-test('Startzustand: fertige Haupt-FOB mit Lager, Startunits, Geld', () => {
+test('Startzustand: fertige Hauptstadt mit Lager, Startunits, Geld', () => {
   const g = mk({ seed: 7 });
   for (let t = 0; t < 2; t++) {
     const f = fobOf(g, t);
@@ -118,7 +118,7 @@ test('Platzierung: Bauradius und Hindernisse', () => {
 test('FOB: Bauradien eigener FOBs dürfen sich nicht überlappen, höchstens 10 FOBs', () => {
   const g = mk({ seed: 7 });
   const f = fobOf(g, 0);
-  // 700 px neben der Haupt-FOB (eine Richtung ohne Hang oder Hindernis wählen)
+  // 700 px neben der Hauptstadt (eine Richtung ohne Hang oder Hindernis wählen)
   const near = [0, 1, 2, 3, 4, 5, 6, 7]
     .map((k) => g.canPlace(0, 'fob', f.x + Math.cos((k * Math.PI) / 4) * 700, f.y + Math.sin((k * Math.PI) / 4) * 700))
     .find((p) => !/Gelände|belegt/.test(p.reason ?? ''));
@@ -297,7 +297,7 @@ test('Eliminierung: Team ohne FOB und ohne Baufahrzeug verliert (LKW zählt nich
   assert.equal(g.winReason, 'eliminated');
 });
 
-test('Eliminierung: fällt die Haupt-FOB, verliert das Team; eine vordere FOB oder ein Baufahrzeug retten es nicht', () => {
+test('Eliminierung: fällt die Hauptstadt, verliert das Team; eine vordere FOB oder ein Baufahrzeug retten es nicht', () => {
   const g = mk({ seed: 7 });
   const main1 = fobOf(g, 1);
   const front = fobAt(g, 1, main1.x, main1.y);
@@ -308,13 +308,13 @@ test('Eliminierung: fällt die Haupt-FOB, verliert das Team; eine vordere FOB od
   const g2 = mk({ seed: 7 });
   const m = fobOf(g2, 1);
   fobAt(g2, 1, m.x, m.y);
-  m.hp = 0; // Haupt-FOB zerstört, Baufahrzeug und vordere FOB leben
+  m.hp = 0; // Hauptstadt zerstört, Baufahrzeug und vordere FOB leben
   g2.update(DT);
   assert.equal(g2.winner, 0);
   assert.equal(g2.winReason, 'eliminated');
 });
 
-test('Die Haupt-FOB kann nicht abgerissen werden und bildet als einzige Einheiten aus', () => {
+test('Die Hauptstadt kann nicht abgerissen werden und bildet als einzige Einheiten aus', () => {
   const g = mk({ seed: 7 });
   const f = fobOf(g, 0);
   assert.equal(g.issue(0, { type: 'demolish', buildingId: f.id }).ok, false);
@@ -323,7 +323,7 @@ test('Die Haupt-FOB kann nicht abgerissen werden und bildet als einzige Einheite
   const r = g.issue(0, { type: 'train', buildingId: front.id, unit: 'rifleman' });
   assert.equal(r.ok, false);
   for (const u of ['rifleman', 'at', 'truck', 'engineer', 'ifv', 'tank', 'littlebird', 'transporter', 'gunship']) {
-    assert.ok(f.produces.includes(u), `Haupt-FOB bildet ${u} aus`);
+    assert.ok(f.produces.includes(u), `Hauptstadt bildet ${u} aus`);
   }
 });
 
@@ -541,7 +541,7 @@ test('Abriss einer FOB: Lager geht an die nächste andere FOB, kein Material wir
   const site = g.spawnBuilding('fob', 0, cellOf(f.x) - 8, cellOf(f.y), { built: false });
   site.store.bm = 40;
   assert.equal(g.issue(0, { type: 'demolish', buildingId: site.id }).ok, true);
-  assert.equal(f.store.bm, 250 + 40, 'nächste FOB (die Haupt-FOB) nimmt das Baustellenlager');
+  assert.equal(f.store.bm, 250 + 40, 'nächste FOB (die Hauptstadt) nimmt das Baustellenlager');
   assert.equal(far.store.bm, 100, 'fernere FOB unberührt');
   assert.equal(g.issue(0, { type: 'demolish', buildingId: far.id }).ok, true);
   assert.equal(f.store.bm, 250 + 40 + 100, 'Lager der abgerissenen FOB geht an die andere; kein Materialgeschenk');

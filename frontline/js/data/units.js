@@ -1,8 +1,8 @@
 // Einheitenwerte (docs/verlauf.md §3.2, §11.2, §11.8).
 // weapons: Waffen mit rounds (Schuss im Vorrat), munCost (Munition aus dem FOB-Lager je Schuss beim Nachladen), cooldown, damage nach Panzerklasse,
 // optional targets (Klassen, gegen die diese Waffe bevorzugt wird). Daraus entstehen range, damage (bester Wert je Klasse) und ammoMax.
-// cost: fehlende Schlüssel = 0. Alle Einheiten entstehen in der Haupt-FOB; hotkey: Taste im Ausbildungsmenü.
-// buildTime: Ausbildungsrate der Haupt-FOB in Sekunden (eine Ausbildung nach der anderen).
+// cost: fehlende Schlüssel = 0. Alle Einheiten entstehen in der Hauptstadt; hotkey: Taste im Ausbildungsmenü.
+// buildTime: Ausbildungsrate der Hauptstadt in Sekunden (eine Ausbildung nach der anderen).
 // fuelMax: Treibstoffvorrat. Alle Einheiten kosten nur Geld und starten voll munitioniert und betankt.
 // builder: 'all' = darf alle Gebäude bauen und reparieren, 'fort' = nur Mauer und Tor, fehlt = kein Bauen.
 // Treffer bis zum Abschuss je Ziel (Einheitentyp, sonst Panzerklasse): Zahl oder SIDES(vorn, seitlich, hinten).
@@ -73,7 +73,7 @@ export const UNITS = {
     hotkey: 'T',
   },
   // Kommandeur (Held, nach Empire Earth): einer je Team, belegt keinen Platz. Aura (BALANCE.commander): eigene Einheiten in der Nähe
-  // schießen schneller, verletzte Infanterie heilt. Fällt er, bekommt der Gegner Punkte; die Haupt-FOB bildet einen neuen aus.
+  // schießen schneller, verletzte Infanterie heilt. Fällt er, bekommt der Gegner Punkte; die Hauptstadt bildet einen neuen aus.
   commander: {
     name: 'Kommandeur',
     short: 'Kommandeur', // Kurzname in der Befehlskarte

@@ -12,7 +12,7 @@ const DT = 1 / BALANCE.tickRate;
 const W = BALANCE.map.width;
 const H = BALANCE.map.height;
 
-/** Leere Karte mit Kisten; ohne Startunits (nur die Haupt-FOBs bleiben). */
+/** Leere Karte mit Kisten; ohne Startunits (nur die Hauptstädte bleiben). */
 function crateGame(crates) {
   const map = createEmptyMap('Kisten');
   map.crates = crates;
@@ -82,7 +82,7 @@ test('Aufheben und Einlagern: der nächste Soldat holt die Kiste, geht langsamer
   assert.equal(foe.hp, hp, 'Träger schießt nicht');
   assert.equal(g.issue(0, { type: 'attack', ids: [near.id], targetId: foe.id }).reason, 'Kistenträger schießen nicht');
   foe.alive = false;
-  // Einlagern in der Haupt-FOB
+  // Einlagern in der Hauptstadt
   run(g, 60, () => c.state === 'stored');
   const fob = g.mainFob(0);
   assert.equal(c.state, 'stored');
@@ -125,7 +125,7 @@ test('FOB fällt: ihre Kisten liegen wieder am Boden und zahlen nichts mehr', ()
   const men = [0, 1].map((i) => g.spawnUnit('rifleman', 0, 3000 + i * 200, 3060));
   men.forEach((u, i) => g.issue(0, { type: 'pickup', ids: [u.id], crateId: g.crates[i].id }));
   run(g, 30, () => g.crates.every((c) => c.state === 'stored'));
-  assert.ok(g.crates.every((c) => c.state === 'stored' && c.fobId === fob.id), 'zur nächsten FOB, nicht zur Haupt-FOB');
+  assert.ok(g.crates.every((c) => c.state === 'stored' && c.fobId === fob.id), 'zur nächsten FOB, nicht zur Hauptstadt');
   assert.equal(storedCrates(g, 0, fob.id), 2);
   fob.hp = 0;
   g.update(DT);

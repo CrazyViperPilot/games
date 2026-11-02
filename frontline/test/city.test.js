@@ -1,4 +1,4 @@
-// Stadt (city.js, PRD §15): Zonen, Wachstum, Einwohner, Erträge ins Lager der Haupt-FOB, Befehl und KI-Bauplan.
+// Stadt (city.js, PRD §15): Zonen, Wachstum, Einwohner, Erträge ins Lager der Hauptstadt, Befehl und KI-Bauplan.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
@@ -7,7 +7,7 @@ import { AI } from '../js/ai/ai.js';
 import { canZone, cityNoise, freePop, aiCity, aiDefend, aiRaid, KIND_ID } from '../js/game/city.js';
 
 const run = (g, s) => { for (let t = 0; t < s * 20; t++) g.update(0.05); };
-// Ursprung (c, r) eines w × h großen, ganz bebaubaren Rechtecks im Gebiet des Teams, nahe der Haupt-FOB
+// Ursprung (c, r) eines w × h großen, ganz bebaubaren Rechtecks im Gebiet des Teams, nahe der Hauptstadt
 function spot(g, w, h, team = 0) {
   const c = g.city[team];
   const m = g.mainFob(team);
@@ -52,7 +52,7 @@ test('ohne Stadt: unendliches Lager, Stadtbefehl abgelehnt', () => {
   assert.equal(paint(g, 'road', 0, 0, 1, 0).ok, false);
 });
 
-test('mit Stadt: endliches Startlager, Front-Summe ohne Haupt-FOB', () => {
+test('mit Stadt: endliches Startlager, Front-Summe ohne Hauptstadt', () => {
   const g = new Game({ seed: 3, city: true });
   const m = g.mainFob(0);
   assert.equal(m.infinite, false);
@@ -158,26 +158,23 @@ test('Stadtraster deckt die Karte: unter der FOB gesperrt, Gebäude sperren den 
   assert.equal(g.grid.passable(Math.floor((x0 + 32) / T), Math.floor((y0 + 32) / T), 0), true, 'Abriss gibt frei');
 });
 
-test('Gebiet: nur im eigenen Gebiet bauen, Gebäude erweitern es, nicht in die gegnerische Stadt', () => {
+test('Überall bauen (seit v4.87): auch fern der Hauptstadt, aber nicht auf gegnerischen Zellen', () => {
   const g = new Game({ seed: 3, city: true, startMoney: 5000 });
   const c = g.city[0];
-  const e = g.mainFob(1);
-  const [ec, er] = [Math.floor(e.x / c.cell), Math.floor(e.y / c.cell)];
-  const r = raw(g, 'road', ec + 3, er, ec + 3, er);
-  assert.equal(r.ok, false);
-  assert.match(r.reason, /Gebiet/);
-  const n0 = c.claim.reduce((a, v) => a + v, 0);
-  assert.ok(n0 > 100, `Gebiet um die Haupt-FOB: ${n0}`);
-  paint(g, 'road', 0, 0, 9, 0);
-  paint(g, 'res', 0, 1, 9, 1);
-  run(g, CITY.growTime + CITY.territory.interval + 1);
-  assert.ok(c.claim.reduce((a, v) => a + v, 0) >= n0, 'Gebiet wächst oder bleibt');
+  const z = g.zone;
+  // eine freie Zelle nahe der Kartenmitte (weit weg von der eigenen Hauptstadt)
+  let far = -1;
+  for (let i = 0; i < c.blocked.length && far < 0; i++) {
+    const q = i % c.cols;
+    const r = (i - q) / c.cols;
+    if (!c.blocked[i] && !c.claim[i] && Math.hypot((q + 0.5) * c.cell - z.x, (r + 0.5) * c.cell - z.y) < z.r + 600) far = i;
+  }
+  assert.ok(far >= 0);
+  const q = far % c.cols;
+  const r = (far - q) / c.cols;
+  assert.ok(raw(g, 'res', q, r, q, r).ok, 'weit draußen bauen geht');
   // Gegner darf eigene Zellen nicht überbauen
-  const i = at(g, 0, 0);
-  g.city[1].claim[i] = 1;
-  const col = i % c.cols;
-  const row = (i - col) / c.cols;
-  assert.equal(raw(g, 'res', col, row, col, row, 1).ok, false);
+  assert.equal(raw(g, 'com', q, r, q, r, 1).ok, false);
 });
 
 test('Soldaten kosten Einwohner: ohne freie Einwohner keine Ausbildung, Gefallene fehlen der Stadt', () => {
@@ -237,7 +234,7 @@ test('Flucht: Schüsse in der Konfliktzone leeren Wohnzellen, nach Ruhe kehren s
   assert.ok(c.stats.housing > 0, 'zurück nach der Ruhezeit');
 });
 
-test('Rohstoffvorkommen: jede Sorte nahe jeder Haupt-FOB, Karte unverändert', () => {
+test('Rohstoffvorkommen: jede Sorte nahe jeder Hauptstadt, Karte unverändert', () => {
   const a = new Game({ seed: 4, city: true });
   const b = new Game({ seed: 4 });
   assert.deepEqual([...a.grid.terrain], [...b.grid.terrain], 'Karte gleich mit und ohne Stadt');
@@ -362,7 +359,7 @@ test('Freie Planung: KI baut nicht neben frisch beschossenen Zellen', () => {
   const g = new Game({ seed: 3, city: true, startMoney: 20000 });
   const c = g.city[1];
   const m = g.mainFob(1);
-  c.hitLog = [{ x: m.x, y: m.y, t: g.time }]; // Treffer an der Haupt-FOB: die ganze Umgebung meiden
+  c.hitLog = [{ x: m.x, y: m.y, t: g.time }]; // Treffer an der Hauptstadt: die ganze Umgebung meiden
   const before = new Set(c.list);
   aiCity(g, 1, 'normal');
   const R = CITY.ai.dangerRadius;

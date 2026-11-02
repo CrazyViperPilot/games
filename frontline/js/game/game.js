@@ -47,7 +47,7 @@ const zeroRes = () => ({ money: 0, bm: 0, mun: 0, fuel: 0 });
 const START_STEP = 12; // Rastergröße der Startplätze (px)
 
 /**
- * Startaufstellung um die Haupt-FOB nach Truppengattung getrennt (BALANCE.startLayout): jede Gattung hat einen Ankerpunkt
+ * Startaufstellung um die Hauptstadt nach Truppengattung getrennt (BALANCE.startLayout): jede Gattung hat einen Ankerpunkt
  * (Winkel zur Kartenmitte, Abstand zur FOB) und füllt von dort aus die nächsten freien passierbaren Plätze im Raster,
  * nie überlappend. Beide Teams nutzen dieselbe Anordnung relativ zur Kartenmitte. Liefert die Mittelpunkte in der Reihenfolge von `types`.
  */
@@ -148,7 +148,7 @@ export class Game {
   /** radio: Sendemast als zweite Siegbedingung (Startmenü; ohne Angabe aus). */
   /** weather: 'off' | 'random' | 'summer' | 'autumn' | 'winter' (Wetter und Jahreszeit, weather.js; ohne Angabe aus). */
   /** research: Forschungsstufen (research.js; ohne Angabe aus: alle Einheiten frei, keine Verbesserungen). */
-  /** city: Zonenstadt hinter der Haupt-FOB (city.js; ohne Angabe aus: Haupt-FOB hat unendlich Material). */
+  /** city: Zonenstadt hinter der Hauptstadt (city.js; ohne Angabe aus: Hauptstadt hat unendlich Material). */
   /** river: Zufallskarte mit Flüssen, Brücken und Furten (river.js; ohne Angabe aus). Fertige Karten bringen ihre eigenen mit. */
   constructor({ seed = 1, winPoints = BALANCE.winPoints, startMoney = BALANCE.startRes.money, map = null, radio = false, weather = 'off', research = false, river = false, city = false } = {}) {
     this.seed = seed;
@@ -185,7 +185,7 @@ export class Game {
         id,
         name: BALANCE.teamNames[id],
         color: BALANCE.teamColors[id],
-        res: { money: startMoney }, // bm/mun/fuel: unten als Getter (Summe der Front-Lager ohne Haupt-FOB)
+        res: { money: startMoney }, // bm/mun/fuel: unten als Getter (Summe der Front-Lager ohne Hauptstadt)
         income: zeroRes(),
         rate: zeroRes(),
         flow: { bm: 0, mun: 0, fuel: 0 }, // Verbrauch aus Lagern je s (Nachfüllen)
@@ -209,7 +209,7 @@ export class Game {
     this.hot = createHot(this);
     this.fog = [new Fog(W, H), new Fog(W, H)];
 
-    // Startzustand: je Team die Haupt-FOB auf dem Spawn (unendlicher Vorrat), Startunits als Formation davor
+    // Startzustand: je Team die Hauptstadt auf dem Spawn (unendlicher Vorrat), Startunits als Formation davor
     for (let t = 0; t < 2; t++) {
       const sp = this.map.spawns[t];
       this.spawnBuilding('fob', t, this.grid.toCell(sp.x) - 1, this.grid.toCell(sp.y) - 1, { built: true, main: true });
@@ -220,7 +220,7 @@ export class Game {
       });
     }
     createHouses(this); // Stadthäuser zum Besetzen (Häuserkampf)
-    createCity(this, city); // Zonenstadt je Team, Haupt-FOB mit endlichem Lager (nur wenn eingeschaltet)
+    createCity(this, city); // Zonenstadt je Team, Hauptstadt mit endlichem Lager (nur wenn eingeschaltet)
     createCrates(this); // Versorgungskisten der Karte
     createAnimals(this); // Rehe und Wildschweine (nur Optik)
     createWeather(this, weather); // Jahreszeit und Wetter (eigener Zufall)
@@ -335,7 +335,7 @@ export class Game {
 
   // ---- Lager, Zahlung, Versorgung ----------------------------------------------------
 
-  /** Summe einer Sorte über die Lager aller fertigen eigenen FOBs außer der Haupt-FOB (Getter von team.res: das Front-Lager). */
+  /** Summe einer Sorte über die Lager aller fertigen eigenen FOBs außer der Hauptstadt (Getter von team.res: das Front-Lager). */
   stockOf(team, k) {
     let sum = 0;
     for (const b of this.buildings) {
@@ -344,14 +344,14 @@ export class Game {
     return sum;
   }
 
-  /** Haupt-FOB des Teams (lebend) oder null. */
+  /** Hauptstadt des Teams (lebend) oder null. */
   mainFob(team) {
     return this.buildings.find((b) => b.alive && b.team === team && b.main) ?? null;
   }
 
   /**
-   * Testhilfe: setzt das Lager der ersten fertigen FOB ohne Haupt-FOB auf {bm, mun, fuel} (fehlende Sorten = 0)
-   * und leert die übrigen Front-Lager. Die Haupt-FOB bleibt unverändert (unendlich).
+   * Testhilfe: setzt das Lager der ersten fertigen FOB ohne Hauptstadt auf {bm, mun, fuel} (fehlende Sorten = 0)
+   * und leert die übrigen Front-Lager. Die Hauptstadt bleibt unverändert (unendlich).
    */
   setStock(team, vals) {
     const fobs = this.buildings.filter((b) => b.alive && b.built && b.team === team && b.type === 'fob' && !b.infinite && !(b.main && this.city));
@@ -885,12 +885,12 @@ export class Game {
     return { ok: true, count: n };
   }
 
-  /** { type: 'train', buildingId, unit }: nur die Haupt-FOB; Einheiten kosten nur Geld (mit Forschung erst ab ihrer Stufe). */
+  /** { type: 'train', buildingId, unit }: nur die Hauptstadt; Einheiten kosten nur Geld (mit Forschung erst ab ihrer Stufe). */
   cmdTrain(team, cmd) {
     const b = this.getEntity(cmd.buildingId);
     if (!b || b.kind !== 'building' || b.team !== team) return fail('Kein eigenes Gebäude gewählt');
     if (!b.built) return fail('Gebäude ist noch im Bau');
-    if (!UNITS[cmd.unit] || !b.produces.includes(cmd.unit)) return fail('Nur die Haupt-FOB bildet Einheiten aus');
+    if (!UNITS[cmd.unit] || !b.produces.includes(cmd.unit)) return fail('Nur die Hauptstadt bildet Einheiten aus');
     if (unitLocked(this, team, cmd.unit)) return fail(lockReason(cmd.unit));
     if (b.queue.length >= BALANCE.queueMax) return fail('Warteschlange ist voll');
     if (this.slotsUsed(team) + (UNITS[cmd.unit].slots ?? 1) > BALANCE.slotCap) return fail('Einheitenlimit erreicht');
@@ -975,7 +975,7 @@ export class Game {
   cmdDemolish(team, cmd) {
     const b = this.getEntity(cmd.buildingId);
     if (!b || b.kind !== 'building' || b.team !== team) return fail('Kein eigenes Gebäude gewählt');
-    if (b.main) return fail('Die Haupt-FOB kann nicht abgerissen werden');
+    if (b.main) return fail('Die Hauptstadt kann nicht abgerissen werden');
     const factor = b.built ? BALANCE.demolishRefund : 1;
     const stock = { bm: b.store.bm, mun: b.store.mun, fuel: b.store.fuel };
     b.demolished = true;
@@ -1001,7 +1001,7 @@ export class Game {
     this.message(-1, `${BALANCE.teamNames[winner]} gewinnt ${how}`);
   }
 
-  /** Fällt die Haupt-FOB eines Teams, ist es verloren (nur sie bildet Einheiten aus). */
+  /** Fällt die Hauptstadt eines Teams, ist es verloren (nur sie bildet Einheiten aus). */
   checkElimination() {
     const lost = [];
     for (let t = 0; t < 2; t++) if (!this.mainFob(t)) lost.push(t);

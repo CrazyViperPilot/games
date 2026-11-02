@@ -44,7 +44,7 @@ function playAiVsAi(seed, minutes) {
   };
 }
 
-test('KI allein (Seed 7): nach 10 min ≥ 3 FOBs, eine FOB in der Zone, Front-Lager gefüllt, Haupt-FOB bildet aus', () => {
+test('KI allein (Seed 7): nach 10 min ≥ 3 FOBs, eine FOB in der Zone, Front-Lager gefüllt, Hauptstadt bildet aus', () => {
   const game = new Game({ seed: 7 });
   const ai = new AI(game, 1, 'normal');
   const steps = Math.round((10 * 60) / DT);
@@ -59,11 +59,11 @@ test('KI allein (Seed 7): nach 10 min ≥ 3 FOBs, eine FOB in der Zone, Front-La
   assert.ok(fobs.length >= 3, `fertige FOBs: ${fobs.length}`);
   assert.ok(nearest <= z.r, `nächste FOB ${nearest.toFixed(0)} px von der Zonenmitte`);
   assert.ok(game.units.some((u) => u.alive && u.team === 1 && u.type === 'engineer'), 'Baufahrzeug lebt');
-  assert.ok(game.mainFob(1), 'Haupt-FOB lebt');
+  assert.ok(game.mainFob(1), 'Hauptstadt lebt');
   const front = fobs.filter((f) => !f.main);
   assert.ok(front.some((f) => f.store.bm > 100), 'LKW haben Baumaterial an die Front gebracht');
   assert.ok(game.units.filter((u) => u.alive && u.team === 1).length > START_UNITS, 'Einheiten ausgebildet');
-  // kein Förderanlagen-Gebäude und nur die Haupt-FOB bildet aus
+  // kein Förderanlagen-Gebäude und nur die Hauptstadt bildet aus
   assert.ok(game.buildings.every((b) => b.main || b.produces.length === 0));
 });
 

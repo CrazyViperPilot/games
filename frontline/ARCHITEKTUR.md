@@ -41,7 +41,7 @@ Die Reihenfolge ist Absicht; ein neues System kommt an die Stelle, deren Ergebni
 | 2 | `updateResearch` | `research.js` | Forschungsfortschritt |
 | 2b | `updateAbilities` | `abilities.js` | Rauch, Minen, Feldwerkstatt |
 | 3 | `updateEconomy` | `economy.js` | `team.rate` zurücksetzen, Ausbildung, Soldaten-Nachschub |
-| 3a | `updateCity` | `city.js` | nur mit Stadt: Einwohner, Wachstum, Erträge ins Lager der Haupt-FOB, Steuern |
+| 3a | `updateCity` | `city.js` | nur mit Stadt: Einwohner, Wachstum, Erträge ins Lager der Hauptstadt, Steuern |
 | 4 | `updateGarrison`, `updateTowers` | `garrison.js`, `tower.js` | Ein- und Aussteigen in Stadthäuser und Gefechtstürme; Dachaufbauten werden fertig |
 | 5 | `updateFormations` | `formation.js` | Tempo geschlossener Gruppen |
 | 6 | `updateMovement` | `movement.js` | Wege planen und fahren, Verfolgen |
@@ -61,7 +61,7 @@ Die Reihenfolge ist Absicht; ein neues System kommt an die Stelle, deren Ergebni
 | 20 | `checkElimination` | `game.js` | Sieg durch Eliminierung |
 
 Startzustand im Konstruktor von `Game`: Karte (`generateMap` oder gespeicherte Karte), Raster, Höhengelände, Brücken, Teams,
-Forschung, Zone, Hot Zone, Nebel, Haupt-FOBs und Startarmee, Häuser, Kisten, Tiere, Wetter. Jedes System hat dafür ein `create…(game)`.
+Forschung, Zone, Hot Zone, Nebel, Hauptstädte und Startarmee, Häuser, Kisten, Tiere, Wetter. Jedes System hat dafür ein `create…(game)`.
 
 ## 4. Koordinaten
 
@@ -87,7 +87,7 @@ dazu von den Systemen: `houses, crates, bridges, wrecks, animals, weather, resea
 targetId, weapons [{ spec, rounds, cd }], ammo (Getter), fuel, cargo { bm, mun, fuel }, preset, passengers, house, crate, speedMul, anchorX/Y`.
 
 **Gebäude** (`kind: 'building'`): `id, type, team, def (= BUILDINGS[type]), x, y, cx, cy, w, h, hp, maxHp, alive, built, progress,
-queue [{ unit, payerId }], queueTimes, rallyX/Y, main (Haupt-FOB), store { bm, mun, fuel }, drill, fireTarget`.
+queue [{ unit, payerId }], queueTimes, rallyX/Y, main (Hauptstadt), store { bm, mun, fuel }, drill, fireTarget`.
 
 **Effekt** (nur Darstellung, `game.effects`): `{ type, x, y, x2, y2, team, t, life }`, angelegt mit `game.addEffect`.
 
@@ -120,7 +120,7 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 | `fortify` | `buildingId, towers?, tx?, ty?, ids?` | `tower.js` `cmdFortify` | FOB zur Festung ausbauen (Mauerring, Tore, Türme) |
 | `pickup`, `deliver`, `dropCrate` | `ids, crateId` / `ids, fobId` / `ids` | `crates.js` | Kiste aufheben / abliefern / fallen lassen |
 | `drill` | `ids` | `hotzone.js` `cmdDrill` | Bohrer starten |
-| `train`, `cancelTrain` | `buildingId, unit` / `buildingId` | `game.js` | Ausbildung in der Haupt-FOB / letzten Eintrag abbrechen |
+| `train`, `cancelTrain` | `buildingId, unit` / `buildingId` | `game.js` | Ausbildung in der Hauptstadt / letzten Eintrag abbrechen |
 | `research`, `cancelResearch` | `buildingId, key` / – | `research.js` | Forschung starten / abbrechen |
 | `smoke`, `mine` | `ids` | `abilities.js` | Nebelwand (Fahrzeuge) / Mine (Baufahrzeug) |
 | `rally` | `buildingId, x, y` | `game.js` `cmdRally` | Sammelpunkt |
@@ -144,7 +144,7 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 | `movement.js`, `pathfinding.js`, `grid.js`, `formation.js` | Bewegung, A*-Wegsuche, Zellenraster, Formationen |
 | `combat.js` | Zielsuche, Direktfeuer, Mörser, Flugabwehr, Schaden |
 | `logistics.js`, `construction.js` | LKW, Nachfüllen, Transport; Bauen und Reparieren |
-| `city.js` (Daten `js/data/city.js`, UI `js/ui/citypanel.js`, Karte `js/render/citylayer.js`) | Zonenstadt um die Haupt-FOB (PRD §15), Befehl `city`; Stadtgebäude belegen `grid.struct` mit `city.gridId` (keine Entity) |
+| `city.js` (Daten `js/data/city.js`, UI `js/ui/citypanel.js`, Karte `js/render/citylayer.js`) | Zonenstadt um die Hauptstadt (PRD §15), Befehl `city`; Stadtgebäude belegen `grid.struct` mit `city.gridId` (keine Entity) |
 | `garrison.js`, `tower.js`, `crates.js`, `commander.js`, `radio.js` | Häuserkampf, Festung (Gefechtsturm, Dachaufbau, Ausbau-Befehl), Versorgungskisten, Kommandeur, Sendemast |
 | `weather.js`, `research.js`, `river.js` | Wetter und Jahreszeit, Forschungsstufen, Fluss mit Brücken und Furten |
 | `fog.js` | Nebel des Krieges je Team, Sicht im Gelände |

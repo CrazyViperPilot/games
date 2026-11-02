@@ -1,5 +1,5 @@
 // Stadt (SimCity-Teil, PRD §15): Zonenraster je Team über die ganze Karte, Gebiet, Einwohner (auch als Truppen), Flucht aus der
-// Konfliktzone, Arbeit, Steuern und Werke, die das Lager der Haupt-FOB füllen.
+// Konfliktzone, Arbeit, Steuern und Werke, die das Lager der Hauptstadt füllen.
 // Nur aktiv, wenn das Spiel mit `city: true` startet. Kein DOM, deterministisch.
 import { CITY } from '../data/city.js';
 import { BALANCE } from '../data/balance.js';
@@ -24,7 +24,7 @@ export const GOODS = ['bm', 'mun', 'fuel', 'metal'];
 const zeroStats = () => ({ pop: 0, housing: 0, jobs: 0, jobsCom: 0, workers: 0, drafted: 0, free: 0, fled: 0, bm: 0, mun: 0, fuel: 0, metal: 0, money: 0, raw: { wood: 0, stone: 0, ore: 0, oil: 0 } });
 
 /**
- * Gesperrte Zellen (für beide Teams gleich): unter und um jede Haupt-FOB oder auf Hindernissen (Bäume, Wasser, Häuser, Gebäude).
+ * Gesperrte Zellen (für beide Teams gleich): unter und um jede Hauptstadt oder auf Hindernissen (Bäume, Wasser, Häuser, Gebäude).
  * Seit v4.82 deckt das Stadtraster die ganze Karte (Zelle CITY.cell, Ursprung 0/0).
  */
 function blockedCells(game, cols, rows) {
@@ -70,7 +70,7 @@ function zoneCells(game, cols, rows) {
 }
 
 /**
- * Rohstoffvorkommen (seit v4.83): je Haupt-FOB eine Gruppe jeder Sorte in ihrer Nähe, dazu umkämpfte Gruppen rund um die
+ * Rohstoffvorkommen (seit v4.83): je Hauptstadt eine Gruppe jeder Sorte in ihrer Nähe, dazu umkämpfte Gruppen rund um die
  * Konfliktzone, punktgespiegelt um ihre Mitte (beide Seiten gleich weit). Eigener Zufall aus dem Seed: die Karte bleibt unverändert.
  */
 function genDeposits(game, cols, rows, blocked) {
@@ -192,7 +192,7 @@ function placeBuilt(game, c, i, kind) {
   }
 }
 
-/** Startviertel (CITY.startQuarter): Straße und darunter Wohnen und Raffinerie nahe der Haupt-FOB, Ölquelle auf dem nächsten Öl. */
+/** Startviertel (CITY.startQuarter): Straße und darunter Wohnen und Raffinerie nahe der Hauptstadt, Ölquelle auf dem nächsten Öl. */
 function startQuarter(game, c) {
   const m = game.mainFob(c.team);
   if (!m) return;
@@ -238,7 +238,7 @@ export function cellAt(c, x, y) {
   return [Math.floor((x - c.x0) / c.cell), Math.floor((y - c.y0) / c.cell)];
 }
 
-/** Gebiet neu berechnen: Kreise um die eigenen fertigen FOBs (Haupt-FOB größer) und um fertige Stadtgebäude. */
+/** Gebiet neu berechnen: Kreise um die eigenen fertigen FOBs (Hauptstadt größer) und um fertige Stadtgebäude. */
 export function updateClaim(game, c) {
   const next = new Uint8Array(c.claim.length);
   const stamp = (x, y, rad) => {
@@ -581,7 +581,7 @@ export function forEnemyCity(game, team, x, y, radius, fn) {
 
 /**
  * Befehl `{ type: 'trade', good: 'bm'|'mun'|'fuel'|'metal', dir: 'sell'|'buy' }`: ein Los (CITY.market.lot) am Markt handeln.
- * Braucht einen fertigen eigenen Markt. BM, MUN, TS liegen im Lager der Haupt-FOB, Metall im Stadtlager.
+ * Braucht einen fertigen eigenen Markt. BM, MUN, TS liegen im Lager der Hauptstadt, Metall im Stadtlager.
  */
 export function cmdTrade(game, team, cmd) {
   const c = game.city?.[team];
@@ -591,7 +591,7 @@ export function cmdTrade(game, team, cmd) {
   for (const i of c.list) if (c.kind[i] === KIND_ID.market && c.level[i]) market = true;
   if (!market) return { ok: false, reason: 'Erst einen Markt bauen' };
   const main = game.mainFob(team);
-  if (!main && cmd.good !== 'metal') return { ok: false, reason: 'Haupt-FOB zerstört' };
+  if (!main && cmd.good !== 'metal') return { ok: false, reason: 'Hauptstadt zerstört' };
   const M = CITY.market;
   const cap = BALANCE.logistics.storeCap;
   const t = game.teams[team];
@@ -623,16 +623,16 @@ export function payMetal(game, team, unit, factor = 1) {
   return true;
 }
 
-/** Darf `team` die Zelle i ausweisen? Eigenes Gebiet, nicht gesperrt, nicht vom Gegner belegt. */
+/** Darf `team` die Zelle i ausweisen? Nicht gesperrt, nicht vom Gegner belegt (überall auf der Karte). */
 export function canZone(game, c, i) {
-  if (c.blocked[i] || !c.claim[i]) return false;
+  if (c.blocked[i]) return false; // seit v4.87 überall, nicht nur im Gebiet (das Gebiet nutzt nur noch die KI)
   for (const o of game.city) if (o !== c && o.kind[i]) return false;
   return true;
 }
 
 /**
  * Befehl `{ type: 'city', kind: 'road'|'res'|'com'|'bm'|'mun'|'fuel'|'erase', c0, r0, c1, r1 }`:
- * Rechteck (Spalten c0..c1, Zeilen r0..r1 im Kartenraster) ausweisen oder räumen. Nur im eigenen Gebiet.
+ * Rechteck (Spalten c0..c1, Zeilen r0..r1 im Kartenraster) ausweisen oder räumen. Überall, wo nichts gesperrt ist (seit v4.87).
  * Kostet Geld je Zelle, bis das Geld ausgeht.
  */
 export function cmdCity(game, team, cmd) {
@@ -683,7 +683,7 @@ export function cmdCity(game, team, cmd) {
       placed++;
     }
   }
-  const poor = (CITY.costBm[cmd.kind] ?? 0) > 0 ? 'Zu wenig Baumaterial im Haupt-Lager' : 'Zu wenig Geld';
+  const poor = (CITY.costBm[cmd.kind] ?? 0) > 0 ? 'Zu wenig Baumaterial im Lager der Hauptstadt' : 'Zu wenig Geld';
   if (!placed) return { ok: false, reason: broke ? poor : noDeposit ? 'Förderanlagen nur auf Rohstoffvorkommen' : outside ? 'Nur im eigenen Gebiet bauen' : 'Nichts zu ändern' };
   rebuildList(city);
   // Zonen ohne Straße daneben wachsen nicht (Förderanlagen schon): melden
@@ -694,7 +694,7 @@ export function cmdCity(game, team, cmd) {
   return { ok: true, placed, broke, noRoad };
 }
 
-// ---- KI: baut in Ringen um die Haupt-FOB nach außen, dazu kleine Viertel an vorderen FOBs (seit v4.82),
+// ---- KI: baut in Ringen um die Hauptstadt nach außen, dazu kleine Viertel an vorderen FOBs (seit v4.82),
 // Förderanlagen auf Vorkommen im Gebiet, Markt und Angriffe auf die gegnerische Stadt (seit v4.83) ----
 
 /** Ist die Zelle im Muster um den Anker (ac, ar) eine Straße? Jede roadEvery-te Zeile und die Spalte durch den Anker. */

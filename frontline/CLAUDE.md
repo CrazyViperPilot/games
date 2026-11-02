@@ -43,7 +43,7 @@ node --test test/radio.test.js    # nur eine Datei
 - URL-Parameter: `?debug=1` (kein Nebel, Taste M = +1000 Ressourcen, bis 10× Tempo), `?seed=N`, `?speed=N`, `?river=0|1`,
   `?gl=0` (ohne WebGL-Boden), `?sprites=0` (gemalte statt Bild-Sprites), `?debug=1&fog=1`, `?debug=1&weather=winter&wx=snow`.
 - Tests erzeugen ein `new Game({ seed, … })`, geben Befehle über `game.issue` und rufen `game.update(dt)` in einer Schleife.
-  Sie ändern Werte direkt (z. B. `BALANCE.slotCap = 1000`) und setzen sie danach zurück. `test/classic.js` gibt der Haupt-FOB ein endliches Lager.
+  Sie ändern Werte direkt (z. B. `BALANCE.slotCap = 1000`) und setzen sie danach zurück. `test/classic.js` gibt der Hauptstadt ein endliches Lager.
 - `test/config.test.js` findet Tippfehler in der Config (unbekannte Einheit, doppelte Taste, Startarmee über dem Limit, NaN …),
   `test/doctables.test.js` meldet veraltete PRD-Tabellen. Beide laufen auch in `npm test`.
 - CI: `.github/workflows/test-frontline.yml` läuft bei jeder Änderung unter `frontline/`.
@@ -117,7 +117,7 @@ Wo jedes Feature liegt. „KI“ = Konstanten-Präfix in `js/data/ai.js`, Logik 
 | Wetter und Jahreszeiten | §7 „Wetter“ | `weather` | `weather.js` | `WX_*` | `weatherfx.js`, `season.js` | `weather.test.js` |
 | Forschungsstufen und -baum | §7 „Forschungsstufen“ | `research` | `research.js`, `abilities.js` | `UPGRADES`, `UPGRADE_RESERVE` | `controller.js`, `hud.js` | `research.test.js` |
 | Zufallskarte, Stadt, Gehöfte, Felder | §7, §9a | `map`, `zone.r`, `MAPGEN` | `map.js`, `landscape.js` | – | `terrain.js`, `iso.js`, `isobuild.js`, `isosprites.js` | `map.test.js`, `fields.test.js` |
-| Stadt (Gebiet, Zonen, Einwohner auch als Truppen, Flucht, Werke füllen Haupt-Lager) | §15 | `CITY` | `city.js` (`updateCity`, `updateClaim`, `freePop`, `cityNoise`, `genDeposits`, `payMetal`, Befehle `city` und `trade`, Ziel-Entities `syncEntity`/`forEnemyCity`); Ausbildung prüft in `game.js` (`cmdTrain`), Zielsuche und Splash in `combat.js` | `aiCity`, `aiRaid` in `city.js`, aufgerufen von `ai.js` | `js/ui/citypanel.js` (Baumodus, Taste Y; Rechteck über `input.js`), `hud.js` (Knopf), `js/render/citylayer.js` (Karte, Gebiet), `minimap.js` | `city.test.js` |
+| Stadt (Gebiet, Zonen, Einwohner auch als Truppen, Flucht, Werke füllen Lager der Hauptstadt) | §15 | `CITY` | `city.js` (`updateCity`, `updateClaim`, `freePop`, `cityNoise`, `genDeposits`, `payMetal`, Befehle `city` und `trade`, Ziel-Entities `syncEntity`/`forEnemyCity`); Ausbildung prüft in `game.js` (`cmdTrain`), Zielsuche und Splash in `combat.js` | `aiCity`, `aiRaid` in `city.js`, aufgerufen von `ai.js` | `js/ui/citypanel.js` (Baumodus, Taste Y; Rechteck über `input.js`), `hud.js` (Knopf), `js/render/citylayer.js` (Karte, Gebiet), `minimap.js` | `city.test.js` |
 | Wracks und Krater (nur Optik) | §9 | `scars` | `scars.js` | – | `sprites.js` (`drawWreck`, `drawCrater`) | `scars.test.js` |
 | Tiere (nur Optik) | §9 | `animals` | `animals.js` | – | `sprites.js` (`drawAnimal*`) | `animals.test.js` |
 | KI allgemein | §10 | `difficulty` | – | `js/ai/ai.js` | – | `ai.test.js` |
@@ -135,7 +135,7 @@ Wo jedes Feature liegt. „KI“ = Konstanten-Präfix in `js/data/ai.js`, Logik 
 3. `CACHE_VERSION` in `sw.js` erhöhen, `npm run test:quick`, dann `npm test`. Schlägt ein Test fehl, der genau diesen Wert prüft: Test an die neue Regel anpassen, nicht umgekehrt.
 
 ### Neue Einheit
-1. `js/data/units.js`: ähnliche Einheit kopieren, neuen Schlüssel vergeben; `name`, `short`, Werte, `weapons`, `cost`, `buildTime`, `slots`, `hotkey` anpassen (Taste darf in der Haupt-FOB noch nicht belegt sein).
+1. `js/data/units.js`: ähnliche Einheit kopieren, neuen Schlüssel vergeben; `name`, `short`, Werte, `weapons`, `cost`, `buildTime`, `slots`, `hotkey` anpassen (Taste darf in der Hauptstadt noch nicht belegt sein).
 2. `js/data/buildings.js`: Schlüssel in `fob.produces` eintragen.
 3. `js/data/balance.js`: Stufe in `research.unitTier` (fehlt = sofort verfügbar).
 4. (entfällt: der Kurzname steht als `short` in units.js)

@@ -10,7 +10,7 @@ import { BALANCE } from '../js/data/balance.js';
 const G = BALANCE.garrison;
 const DT = 1 / BALANCE.tickRate;
 
-/** Leere Karte mit Häusern; ohne Startunits (nur die Haupt-FOBs bleiben). */
+/** Leere Karte mit Häusern; ohne Startunits (nur die Hauptstädte bleiben). */
 function townGame(buildings) {
   const map = createEmptyMap('Stadt');
   map.town.buildings.push(...buildings);

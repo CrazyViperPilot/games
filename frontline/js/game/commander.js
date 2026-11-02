@@ -1,6 +1,6 @@
 // Kommandeur (nach dem Strategen-Helden aus Empire Earth und dem Königsmord-Modus aus Age of Empires II): eine einmalige Einheit je
 // Team mit Aura. Eigene Einheiten in ihrem Umkreis schießen schneller (u.aura), verletzte Infanterie heilt dort, sobald sie eine Weile
-// nicht getroffen wurde. Fällt der Kommandeur, bekommt der Gegner Punkte; die Haupt-FOB kann einen neuen ausbilden.
+// nicht getroffen wurde. Fällt der Kommandeur, bekommt der Gegner Punkte; die Hauptstadt kann einen neuen ausbilden.
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 

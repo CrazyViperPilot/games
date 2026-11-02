@@ -1,4 +1,4 @@
-// Forschungsstufen: Stufe 2 und 3 schalten Einheiten frei, Verbesserungen stärken Panzerung, Reichweite und Sicht. Nur die Haupt-FOB
+// Forschungsstufen: Stufe 2 und 3 schalten Einheiten frei, Verbesserungen stärken Panzerung, Reichweite und Sicht. Nur die Hauptstadt
 // forscht, eins zugleich, Geld beim Start, Abbruch erstattet. Die KI forscht nach Zeitplan. Aus (Standard): alles frei.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,7 +21,7 @@ const run = (g, s, ais = []) => {
 };
 const mainOf = (g, t) => g.buildings.find((b) => b.main && b.team === t);
 
-/** Leere Karte ohne Starteinheiten (Haupt-FOBs bleiben). */
+/** Leere Karte ohne Starteinheiten (Hauptstädte bleiben). */
 function empty(opts = {}) {
   const g = new Game({ map: createEmptyMap(), ...opts });
   for (const u of g.units) u.alive = false;
@@ -91,7 +91,7 @@ test('Forschung: Geld beim Start, eine zugleich, Stufe 2 nach 60 s mit Meldung a
   assert.equal(g.teams[1].tech.tier, 1, 'der Gegner forscht für sich');
 });
 
-test('Abbruch erstattet das Geld; nur die Haupt-FOB forscht; ohne Geld keine Forschung', () => {
+test('Abbruch erstattet das Geld; nur die Hauptstadt forscht; ohne Geld keine Forschung', () => {
   const g = empty({ research: true });
   const t0 = g.teams[0];
   t0.res.money = 700;
@@ -104,8 +104,8 @@ test('Abbruch erstattet das Geld; nur die Haupt-FOB forscht; ohne Geld keine For
   run(g, 60);
   assert.equal(t0.tech.tier, 1, 'abgebrochen: keine Stufe');
   const fob = g.spawnBuilding('fob', 0, 100, 100, { built: true });
-  assert.deepEqual(g.issue(0, { type: 'research', buildingId: fob.id, key: 'tier2' }), { ok: false, reason: 'Nur die Haupt-FOB forscht' });
-  assert.deepEqual(g.issue(0, { type: 'research', buildingId: mainOf(g, 1).id, key: 'tier2' }), { ok: false, reason: 'Nur die Haupt-FOB forscht' });
+  assert.deepEqual(g.issue(0, { type: 'research', buildingId: fob.id, key: 'tier2' }), { ok: false, reason: 'Nur die Hauptstadt forscht' });
+  assert.deepEqual(g.issue(0, { type: 'research', buildingId: mainOf(g, 1).id, key: 'tier2' }), { ok: false, reason: 'Nur die Hauptstadt forscht' });
   t0.res.money = 100;
   assert.deepEqual(research(g, 'tier2'), { ok: false, reason: 'Zu wenig Geld' });
 });
@@ -162,7 +162,7 @@ test('Wärmebildoptik: Waffenreichweite +10 % (schießt ohne heranzufahren) und 
   assert.deepEqual([opticsMul(g, 0), opticsMul(g, 1)], [1, R.optics]);
 });
 
-test('Befehlskarte: Haupt-FOB zeigt Forschung (U), gesperrte Einheiten mit Grund; Forschungsmenü startet und bricht ab', () => {
+test('Befehlskarte: Hauptstadt zeigt Forschung (U), gesperrte Einheiten mit Grund; Forschungsmenü startet und bricht ab', () => {
   const g = empty({ research: true });
   g.teams[0].res.money = 3000;
   const c = new Controller(g, 0, null);

@@ -1,4 +1,4 @@
-// Kommandeur: einmalig je Team, Aura (schneller schießen, Infanterie heilt), sein Tod bringt dem Gegner Punkte, die Haupt-FOB bildet
+// Kommandeur: einmalig je Team, Aura (schneller schießen, Infanterie heilt), sein Tod bringt dem Gegner Punkte, die Hauptstadt bildet
 // einen neuen aus; die KI hält ihn hinter der Armee und ersetzt ihn.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -30,7 +30,7 @@ function empty() {
   return g;
 }
 
-test('Start: je Team genau ein Kommandeur nahe der Haupt-FOB; er belegt keinen Platz und zählt nicht als Soldat', () => {
+test('Start: je Team genau ein Kommandeur nahe der Hauptstadt; er belegt keinen Platz und zählt nicht als Soldat', () => {
   const g = new Game({ seed: 7 });
   for (const t of [0, 1]) {
     const cs = g.units.filter((u) => u.team === t && u.def.hero);
@@ -44,7 +44,7 @@ test('Start: je Team genau ein Kommandeur nahe der Haupt-FOB; er belegt keinen P
   }
 });
 
-test('Einmalig: ein zweiter wird abgelehnt (auch in der Warteschlange); nach seinem Tod bildet die Haupt-FOB einen neuen aus (C)', () => {
+test('Einmalig: ein zweiter wird abgelehnt (auch in der Warteschlange); nach seinem Tod bildet die Hauptstadt einen neuen aus (C)', () => {
   const g = new Game({ seed: 7 });
   const f = mainOf(g, 0);
   g.teams[0].res.money = 5000;

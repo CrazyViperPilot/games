@@ -1,6 +1,6 @@
 // KI-Gegner (docs/verlauf.md §5, §10.2, §11.5). Steuert nur über game.issue und liest den Zustand. Kein DOM.
 // Reihenfolge je Denkschritt: Baustellen pflegen, Verteidigung, Rückzug, Expansion (FOB-Baustellen: Zone, Relais, Flanken),
-// Forschung, Produktion (nur Haupt-FOB), Verteidigungsgebäude und Mauer, Brücken, Baufahrzeuge, LKW (Lieferant/Pendler/Versorger), Sammelpunkte, Armee.
+// Forschung, Produktion (nur Hauptstadt), Verteidigungsgebäude und Mauer, Brücken, Baufahrzeuge, LKW (Lieferant/Pendler/Versorger), Sammelpunkte, Armee.
 import { CITY } from '../data/city.js';
 import { aiCity, aiRaid, aiDefend } from '../game/city.js';
 import { BALANCE } from '../data/balance.js';
@@ -114,7 +114,7 @@ export class AI {
     this.rng = makeRng(game.seed + team);
     this.timer = this.cfg.think; // erster Denkschritt sofort
     this.budget = 0;
-    this.corridor = null; // Gasse vor der Haupt-FOB, in der nichts gebaut wird (Ausgang bleibt frei)
+    this.corridor = null; // Gasse vor der Hauptstadt, in der nichts gebaut wird (Ausgang bleibt frei)
     this.badSites = []; // { x, y, until } fehlgeschlagene FOB-Ziele
     this.siteSeen = new Map(); // FOB-Baustelle -> Zeitpunkt, seit dem sie auf Material wartet
     this.rallyAt = new Map(); // Gebäude-ID -> zuletzt gesetzter Sammelpunkt
@@ -193,7 +193,7 @@ export class AI {
     const fobs = own.filter((b) => b.type === 'fob');
     const builtFobs = fobs.filter((b) => b.built).sort((a, b) => a.id - b.id);
     const units = g.units.filter((u) => u.alive && u.team === t);
-    const home = builtFobs.find((b) => b.main) ?? null; // Haupt-FOB
+    const home = builtFobs.find((b) => b.main) ?? null; // Hauptstadt
     const ax = home ? home.x : fobs[0] ? fobs[0].x : g.map.spawns[t].x;
     const ay = home ? home.y : fobs[0] ? fobs[0].y : g.map.spawns[t].y;
     const zone = g.zone;
@@ -288,7 +288,7 @@ export class AI {
 
   /**
    * Freie Stelle für `type` in Ringen um (cx, cy), Winkel bevorzugt um `angle` (Standard 0).
-   * corridor: Gasse vor der Haupt-FOB meiden. Liefert {x, y} (Mitte des Fußabdrucks) oder null.
+   * corridor: Gasse vor der Hauptstadt meiden. Liefert {x, y} (Mitte des Fußabdrucks) oder null.
    */
   findSite(type, cx, cy, rMin, rMax, { angle = 0, corridor = false } = {}) {
     for (let r = rMin; r <= rMax; r += 32) {
@@ -343,7 +343,7 @@ export class AI {
     return best;
   }
 
-  /** Sammelpunkt: an der Zonen-FOB (Richtung Basis), sonst Richtung Zone vor der Haupt-FOB. */
+  /** Sammelpunkt: an der Zonen-FOB (Richtung Basis), sonst Richtung Zone vor der Hauptstadt. */
   gatherPoint(s) {
     if (s.zoneFob && s.zoneFob.built) {
       const v = unitVec(s.ax - s.zoneFob.x, s.ay - s.zoneFob.y);
@@ -522,7 +522,7 @@ export class AI {
   }
 
   /**
-   * Weitere FOBs: Relais auf dem Weg von der Haupt-FOB zur Zonen-FOB (Abstand RELAY_STEP), danach Flanken-FOBs im Kreis um
+   * Weitere FOBs: Relais auf dem Weg von der Hauptstadt zur Zonen-FOB (Abstand RELAY_STEP), danach Flanken-FOBs im Kreis um
    * die Zonen-FOB. Die Bauradien dürfen sich nicht überlappen (canPlace prüft das).
    */
   frontSite(s) {
@@ -557,7 +557,7 @@ export class AI {
 
   // ---- Produktion ------------------------------------------------------------------
 
-  /** Ausbildende Einrichtung für `type` (nur die Haupt-FOB): kürzeste Warteschlange. */
+  /** Ausbildende Einrichtung für `type` (nur die Hauptstadt): kürzeste Warteschlange. */
   pickProducer(s, type, qmax, towardZone) {
     let best = null;
     let bestKey = Infinity;
@@ -574,7 +574,7 @@ export class AI {
 
   /**
    * Baufahrzeuge (Ersatz zuerst – sie gründen FOBs und bauen Verteidigung), LKW, dann Kampfeinheiten nach Zielmischung.
-   * Einheiten kosten nur Geld; ausgebildet wird nur in der Haupt-FOB.
+   * Einheiten kosten nur Geld; ausgebildet wird nur in der Hauptstadt.
    */
   produce(s) {
     const g = this.game;
@@ -705,7 +705,7 @@ export class AI {
   }
 
   /**
-   * Mauerlinie quer zur Richtung Zone mit einem Tor in der Mitte (vor der Haupt-FOB, Achsen in Zellen).
+   * Mauerlinie quer zur Richtung Zone mit einem Tor in der Mitte (vor der Hauptstadt, Achsen in Zellen).
    * Gebaut von bis zu 3 nahen untätigen Schützen (Infanterie baut Mauern und Tore).
    */
   buildWall(s) {
@@ -756,7 +756,7 @@ export class AI {
   // ---- Festung ---------------------------------------------------------------------
 
   /**
-   * Festung (BALANCE.difficulty.<stufe>.fort): ab `from` baut die KI die Haupt-FOB, danach die vorderste FOB zur Festung aus
+   * Festung (BALANCE.difficulty.<stufe>.fort): ab `from` baut die KI die Hauptstadt, danach die vorderste FOB zur Festung aus
    * (Befehl `fortify`: Mauerring, Tore, Türme), besetzt die Türme mit freien Schützen, setzt Dachaufbauten (Mörser, SAM, Flak)
    * und kauft einen Transporthubschrauber, der die ausgebauten FOBs mit versorgt (manageTrucks).
    */
@@ -856,7 +856,7 @@ export class AI {
   }
 
   /**
-   * Zerstörte Brücken auf der eigenen Seite (näher an der eigenen Haupt-FOB als am gegnerischen Start): ein untätiges
+   * Zerstörte Brücken auf der eigenen Seite (näher an der eigenen Hauptstadt als am gegnerischen Start): ein untätiges
    * Baufahrzeug baut sie wieder auf, wenn das Geld reicht. Brücken auf der Seite des Gegners bleiben, wie sie sind.
    */
   rebuildBridges(s) {
@@ -908,7 +908,7 @@ export class AI {
     }
   }
 
-  /** Soll-Lagerstand einer FOB je Sorte: die Zonen-FOB braucht am meisten (Mörser, Flak, Nachladen); die Haupt-FOB ist unendlich. */
+  /** Soll-Lagerstand einer FOB je Sorte: die Zonen-FOB braucht am meisten (Mörser, Flak, Nachladen); die Hauptstadt ist unendlich. */
   wantOf(s, f) {
     const w = f === s.zoneFob ? { bm: 400, mun: 300, fuel: 150 } : f === s.home ? { bm: 300, mun: 200, fuel: 200 } : { bm: 300, mun: 150, fuel: 80 };
     if (s.own.some((b) => b.type === 'tower' && dist(b.x, b.y, f.x, f.y) <= DEF_RANGE)) {
@@ -1100,7 +1100,7 @@ export class AI {
    * (bei unbesetzter Zone schon ab 60 %). Nicht zu Hause stehende Einheiten folgen dem Befehl.
    * Einheiten mit fast leerem Vorrat bleiben zum Nachfüllen zurück.
    * In der Zone stehende Einheiten verteilen sich auf einem Kreis (r 400) statt im Zentrum zu klumpen.
-   * Ein Fünftel der ausrückenden Gruppe (ab 5 Einheiten) bleibt als Reserve an der Haupt-FOB.
+   * Ein Fünftel der ausrückenden Gruppe (ab 5 Einheiten) bleibt als Reserve an der Hauptstadt.
    */
   /**
    * Späher (Little Bird, unbewaffnet): fliegt an den Zonenrand auf der Gegnerseite, damit die Besatzung der Zone sichtbar wird
@@ -1271,8 +1271,8 @@ export class AI {
   }
 
   /**
-   * Sendemast (zweite Siegbedingung): ab difficulty.radioFrom spart die KI darauf (nicht bei Alarm an der Haupt-FOB) und setzt ihn hinter die
-   * Haupt-FOB, weg von der Zone. Das Baufahrzeug baut ihn wie jede Baustelle.
+   * Sendemast (zweite Siegbedingung): ab difficulty.radioFrom spart die KI darauf (nicht bei Alarm an der Hauptstadt) und setzt ihn hinter die
+   * Hauptstadt, weg von der Zone. Das Baufahrzeug baut ihn wie jede Baustelle.
    */
   buildRadio(s) {
     const g = this.game;
@@ -1341,8 +1341,8 @@ export class AI {
   }
 
   /**
-   * Forschung in der Haupt-FOB: ab cfg.research[0] s spart die KI auf Stufe 2, ab cfg.research[1] s auf Stufe 3 (nicht bei Alarm an
-   * der Haupt-FOB). Verbesserungen (ab Normal, cfg.upgrades) nur aus Überschuss, der Reihe nach (UPGRADES).
+   * Forschung in der Hauptstadt: ab cfg.research[0] s spart die KI auf Stufe 2, ab cfg.research[1] s auf Stufe 3 (nicht bei Alarm an
+   * der Hauptstadt). Verbesserungen (ab Normal, cfg.upgrades) nur aus Überschuss, der Reihe nach (UPGRADES).
    */
   research(s) {
     const g = this.game;
@@ -1365,7 +1365,7 @@ export class AI {
     if (key && money >= items[key].money + UPGRADE_RESERVE) g.issue(t, { type: 'research', buildingId: s.home.id, key });
   }
 
-  /** Gefallenen Kommandeur ersetzen (Haupt-FOB), sobald genug Geld für ihn und eine Reserve da ist. */
+  /** Gefallenen Kommandeur ersetzen (Hauptstadt), sobald genug Geld für ihn und eine Reserve da ist. */
   replaceCommander(s) {
     const g = this.game;
     if (!s.home || !s.home.built || g.time < CMD_FROM || hasCommander(g, this.team)) return;
@@ -1375,8 +1375,8 @@ export class AI {
   }
 
   /**
-   * Kommandeur hinter der Armee: CMD_BEHIND px hinter dem Schwerpunkt der Kampfeinheiten draußen (Richtung Haupt-FOB), damit seine
-   * Aura wirkt, er selbst aber nicht in der ersten Reihe steht. Sichtbare Gegner nahe: zurück zur Haupt-FOB. Ohne Armee draußen
+   * Kommandeur hinter der Armee: CMD_BEHIND px hinter dem Schwerpunkt der Kampfeinheiten draußen (Richtung Hauptstadt), damit seine
+   * Aura wirkt, er selbst aber nicht in der ersten Reihe steht. Sichtbare Gegner nahe: zurück zur Hauptstadt. Ohne Armee draußen
    * wartet er am Sammelpunkt.
    */
   guardCommander(s) {
@@ -1436,7 +1436,7 @@ export class AI {
     const idle = s.combat.filter((u) => u.order.type === 'idle' && !this.dryKind(u) && !(raiding && raiding.has(u.id)));
     if (!idle.length) return;
     const inZone = (u) => dist(u.x, u.y, z.x, z.y) <= z.r;
-    const ammoOk = true; // die Haupt-FOB hat unendlich Munition
+    const ammoOk = true; // die Hauptstadt hat unendlich Munition
 
     // Gegner in der Zone (sichtbar): deren Schwerpunkt ist das Ziel, sonst das Zonenzentrum
     const inside = s.enemies.filter((e) => dist(e.x, e.y, z.x, z.y) <= z.r);
@@ -1454,7 +1454,7 @@ export class AI {
       const ready = strength >= need || (z.owner === -1 && strength >= 0.6 * need);
       if (ready) {
         let go = idle.filter((u) => !inZone(u));
-        // Reserve: die Einheiten nahe der Haupt-FOB bleiben zur Verteidigung zurück (die große Startarmee rückt trotzdem aus)
+        // Reserve: die Einheiten nahe der Hauptstadt bleiben zur Verteidigung zurück (die große Startarmee rückt trotzdem aus)
         if (s.home && go.length >= 5) {
           go.sort((a, b) => dist(a.x, a.y, s.ax, s.ay) - dist(b.x, b.y, s.ax, s.ay));
           go = go.slice(Math.ceil(go.length * RESERVE));

@@ -24,7 +24,7 @@ export function builderState(game, b) {
 /** Name einer eigenen FOB nach Reihenfolge der Gründung: „FOB 2“ bzw. „FOB 2 (Baustelle)“. */
 export function fobLabel(game, b) {
   if (!b) return 'FOB';
-  if (b.main) return 'Haupt-FOB';
+  if (b.main) return 'Hauptstadt';
   const own = game.buildings.filter((x) => x.alive && x.team === b.team && x.type === 'fob' && !x.main);
   const i = own.indexOf(b);
   const n = i >= 0 ? i + 1 : '';

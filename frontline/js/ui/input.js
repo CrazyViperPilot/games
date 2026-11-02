@@ -319,7 +319,7 @@ export class Input {
     }
   }
 
-  /** Leertaste: Auswahl, sonst letzte Meldung, sonst Haupt-FOB. */
+  /** Leertaste: Auswahl, sonst letzte Meldung, sonst Hauptstadt. */
   jump() {
     const c = this.controller;
     const center = c.selectionCenter() || c.lastEvent;

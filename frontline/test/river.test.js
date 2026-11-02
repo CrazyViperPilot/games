@@ -47,7 +47,7 @@ function riverMap({ bridge = true, ford = false } = {}) {
   return map;
 }
 
-/** Spiel auf der Flusskarte ohne Starteinheiten (Haupt-FOBs bleiben). */
+/** Spiel auf der Flusskarte ohne Starteinheiten (Hauptstädte bleiben). */
 function riverGame(opts) {
   const g = new Game({ map: riverMap(opts) });
   for (const u of g.units) u.alive = false;

@@ -19,7 +19,7 @@ function scene(seed = 7) {
   return { g, x: z.x + 1500, y: z.y };
 }
 
-test('Scharfschütze: in der Haupt-FOB ausbildbar (Taste T), kostet Geld, lange Nachladezeit', () => {
+test('Scharfschütze: in der Hauptstadt ausbildbar (Taste T), kostet Geld, lange Nachladezeit', () => {
   assert.ok(UNITS.sniper);
   assert.equal(UNITS.sniper.hotkey, 'T');
   assert.equal(UNITS.sniper.cost.money, 220);

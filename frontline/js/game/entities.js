@@ -85,8 +85,8 @@ export function lacksAmmo(u) {
 /**
  * Gebäude als Baustelle (built = false, hp = 10 %) oder fertig – je nach Aufrufer.
  * x, y = Mittelpunkt des Fußabdrucks; Sammelpunkt 2 Zellen unterhalb.
- * Zusätzliche Felder: main (Haupt-FOB: bildet alle Einheiten aus, Verlust = Niederlage), infinite (unendliches Lager; bei der Haupt-FOB),
- * produces (ausbildbare Einheiten; nur die Haupt-FOB),
+ * Zusätzliche Felder: main (Hauptstadt: bildet alle Einheiten aus, Verlust = Niederlage), infinite (unendliches Lager; bei der Hauptstadt),
+ * produces (ausbildbare Einheiten; nur die Hauptstadt),
  * store (FOB-Lager, Baustellen nutzen es ebenfalls),
  * payerId (Lager, aus dem bezahlt wurde – für Erstattung), supplied (FOB-Baustelle hat ihr Material),
  * warnTime (Meldungszeit „Baustelle wartet …“).

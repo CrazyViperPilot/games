@@ -4,31 +4,31 @@
 export const CITY = {
   // ---- Schnelleinstellungen ----
   cell: 64, // Kantenlänge einer Stadtzelle auf der Karte (px, Vielfaches der Kachel 32); das Stadtraster deckt seit v4.82 die ganze Karte
-  fobMargin: 64, // um jede Haupt-FOB bleibt so viel Platz frei (px; dort erscheinen neue Einheiten)
+  fobMargin: 64, // um jede Hauptstadt bleibt so viel Platz frei (px; dort erscheinen neue Einheiten)
   // Gebiet (seit v4.82): gebaut werden darf nur in Zellen im eigenen Gebiet. Radien in Zellen.
-  territory: { main: 10, fob: 4, building: 2, interval: 1 }, // um die Haupt-FOB, um jede andere fertige FOB, um jedes fertige Stadtgebäude; Neuberechnung alle interval s
+  territory: { main: 10, fob: 4, building: 2, interval: 1 }, // um die Hauptstadt, um jede andere fertige FOB, um jedes fertige Stadtgebäude; Neuberechnung alle interval s
   // Einwohner als Truppen (seit v4.82): ausgebildete Einheiten brauchen so viele freie Einwohner (Startarmee und Nachschub nicht)
   crew: { default: 1, ifv: 3, tank: 3, flak: 2, sam: 2, littlebird: 2, transporter: 2, gunship: 2 },
   // Flucht (seit v4.82): Wohnzellen in der Konfliktzone leeren sich, wenn in ihnen oder den Nachbarzellen geschossen wird
   flee: { reach: 1, calm: 60 }, // Nachbarschaft (Zellen) und Ruhezeit (s), bis die Bewohner zurückziehen dürfen
-  startStock: { bm: 1500, mun: 600, fuel: 1000 }, // Startlager der Haupt-FOB bei eingeschalteter Stadt (sonst unendlich)
+  startStock: { bm: 1500, mun: 600, fuel: 1000 }, // Startlager der Hauptstadt bei eingeschalteter Stadt (sonst unendlich)
   yield: { bm: 0.1, mun: 0.06, fuel: 0.05, metal: 0.05 }, // höchster Ertrag je Arbeiter und Sekunde in Werken (BM-Werk, Munitionswerk, Raffinerie, Stahlwerk), begrenzt durch Rohstoffe
   taxPop: 0.03, // Geld/s je Einwohner
   taxCom: 0.15, // zusätzliches Geld/s je Arbeiter im Gewerbe
 
   // ---- Bau ----
   cost: { road: 0, res: 20, com: 30, bm: 40, mun: 40, fuel: 40, steel: 50, mine: 30, market: 60 }, // Geld je Zelle (Abriss kostenlos, keine Erstattung)
-  costBm: { road: 10 }, // Baumaterial je Zelle aus dem Lager der Haupt-FOB (seit v4.83: Straßen kosten Baumaterial statt Geld)
+  costBm: { road: 10 }, // Baumaterial je Zelle aus dem Lager der Hauptstadt (seit v4.83: Straßen kosten Baumaterial statt Geld)
 
   // ---- Rohstoffe (seit v4.83, PRD §15) ----
-  // Vorkommen auf der Karte: je Team eine Gruppe jeder Sorte nahe der Haupt-FOB, dazu umkämpfte Gruppen zwischen Basis und Zone.
+  // Vorkommen auf der Karte: je Team eine Gruppe jeder Sorte nahe der Hauptstadt, dazu umkämpfte Gruppen zwischen Basis und Zone.
   deposits: { home: { dist: [5, 9], size: 4 }, neutral: { count: 8, size: 5, ring: [6, 22] } }, // Abstand in Zellen, Zellen je Gruppe; ring = Zellen außerhalb der Konfliktzone
   // Förderanlage (Holzfäller, Steinbruch, Erzmine, Ölquelle je nach Vorkommen): Rohstoff je Arbeiter und Sekunde; braucht keine Straße
   extract: { wood: 0.3, stone: 0.3, ore: 0.25, oil: 0.3 },
   jobsMine: [0, 6, 12, 20], // Arbeitsplätze je Stufe einer Förderanlage
   // Verarbeitung: so viel Rohstoff braucht eine Einheit Produkt (BM aus Holz oder Stein, Metall aus Erz, Treibstoff aus Öl, Munition aus Metall)
   convert: { bm: 1, metal: 2, fuel: 1, mun: 0.5 },
-  // Startviertel (seit v4.84): steht zu Beginn fertig (Stufe 1) neben der Haupt-FOB, dazu eine Ölquelle auf dem nächsten Ölvorkommen
+  // Startviertel (seit v4.84): steht zu Beginn fertig (Stufe 1) neben der Hauptstadt, dazu eine Ölquelle auf dem nächsten Ölvorkommen
   startQuarter: { road: 3, row: ['res', 'fuel', 'res'] }, // Straßenlänge und die Zellen darunter
   startMetal: 400, // Metall im Hauptlager zu Beginn (Metall bleibt dort, LKW fahren es nicht)
   // Metall je ausgebildeter Einheit (zusätzlich zum Geld); fehlt die Sorte, kostet sie kein Metall
@@ -59,7 +59,7 @@ export const CITY = {
     perStep: 4, // so viele Zellen je Takt
     roadEvery: 3, // jede so vielte Zeile (vom Anker aus) wird Straße, dazu eine Straßenspalte durch den Anker
     quarter: 3, // Radius (Zellen) der kleinen Viertel an vorderen FOBs
-    quarterEvery: 3, // jeder so vielte Takt baut an einer vorderen FOB statt an der Haupt-FOB
+    quarterEvery: 3, // jeder so vielte Takt baut an einer vorderen FOB statt an der Hauptstadt
     mix: { com: 2, bm: 3, mun: 2, fuel: 2, steel: 2, market: 0.3 }, // Verhältnis der Arbeitsstätten
     sellAbove: 2700, // verkauft am Markt, wenn eine Sorte im Hauptlager darüber liegt
     buyMetalBelow: 150, // kauft Metall am Markt, wenn weniger da ist und genug Geld (reserve + Preis) bleibt

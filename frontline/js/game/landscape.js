@@ -238,7 +238,7 @@ export function buildLandscape(seed, keep, { river = false } = {}) {
       coarse[j * n + i] = Math.max(-118, Math.min(372, h));
     }
   }
-  // Startpunkte eben (Haupt-FOB und Startaufstellung), weicher Übergang
+  // Startpunkte eben (Hauptstadt und Startaufstellung), weicher Übergang
   for (const s of spawns) {
     const level = Math.max(DRY_LEVEL, coarse[Math.round(s.y / res) * n + Math.round(s.x / res)]);
     for (let j = 0; j < n; j++) {

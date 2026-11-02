@@ -44,7 +44,7 @@ test('Spawns liegen auf der Karte und sind punktsymmetrisch', () => {
   assert.deepStrictEqual(map.zone, { x: W / 2, y: H / 2, r: BALANCE.zone.r });
 });
 
-test('die Karte hat keine Ressourcenvorkommen mehr (Haupt-FOB hat unendlich Vorrat)', () => {
+test('die Karte hat keine Ressourcenvorkommen mehr (Hauptstadt hat unendlich Vorrat)', () => {
   const map = generateMap(6);
   assert.equal(map.nodes, undefined);
 });

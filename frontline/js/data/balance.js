@@ -26,15 +26,15 @@ export const QUICK = {
   winPoints: 100, // Siegpunkte (Standard; im Startmenü 25, 50 oder 100)
   pointEvery: 30, // Sekunden Zonenkontrolle je Siegpunkt
   radioHold: 1800, // Sekunden, die ein fertiger Sendemast stehen muss, bis sein Team gewinnt (30 min)
-  maxFobs: 10, // FOBs je Team, mit Haupt-FOB
+  maxFobs: 10, // FOBs je Team, mit Hauptstadt
   fobMaterial: 400, // Baumaterial, das eine FOB-Baustelle im Lager braucht, bevor gebaut wird
   storeCap: 3000, // Lager je Sorte (Baumaterial, Munition, Treibstoff) und FOB
   truckLoad: 400, // Ladung eines LKW (Summe aller Sorten)
-  trainSlots: 2, // so viele Einheiten bildet die Haupt-FOB gleichzeitig aus
+  trainSlots: 2, // so viele Einheiten bildet die Hauptstadt gleichzeitig aus
   queueMax: 5, // Länge der Ausbildungs-Warteschlange
   reinforceEvery: 6, // Sekunden je kostenloser Schütze, solange weniger als reinforce.soldierMin Soldaten leben
   // Startarmee: 2 Kampfpanzer (10 Plätze), 3 Schützenpanzer (9), 3 LKW und 1 Baufahrzeug (4), 29 Soldaten (22 Schützen, 7 Panzerabwehr) = 52 Plätze;
-  // dazu der Kommandeur (0 Plätze, hinten an der Haupt-FOB)
+  // dazu der Kommandeur (0 Plätze, hinten an der Hauptstadt)
   startUnits: ['truck', 'truck', 'truck', 'engineer', 'tank', 'tank', 'ifv', 'ifv', 'ifv', ...Array(22).fill('rifleman'), ...Array(7).fill('at'), 'commander'],
 };
 
@@ -46,11 +46,11 @@ export const BALANCE = {
   bounty: { inf: 0.25, vehicle: 0.6, building: 0.2, built: 0.2, notify: 100 },
   walletMax: QUICK.walletMax, // Obergrenze der Kasse, die von Runde zu Runde bleibt
   pointInterval: QUICK.pointEvery,
-  startRes: { money: QUICK.startMoney }, // Startgeld; die Haupt-FOB hat unendlich Baumaterial, Munition und Treibstoff
+  startRes: { money: QUICK.startMoney }, // Startgeld; die Hauptstadt hat unendlich Baumaterial, Munition und Treibstoff
   // Einheitenlimit in Plätzen je Team: Soldat/LKW/Baufahrzeug/Hubschrauber 1, Schützenpanzer 3, Kampfpanzer 5, Flak und SAM 2 (`slots` in units.js)
   slotCap: QUICK.unitLimit,
   startUnits: QUICK.startUnits,
-  // Startaufstellung nach Truppengattung getrennt um die Haupt-FOB. angle = Grad von der Richtung zur Kartenmitte (0 = vorn,
+  // Startaufstellung nach Truppengattung getrennt um die Hauptstadt. angle = Grad von der Richtung zur Kartenmitte (0 = vorn,
   // 90 = links, 180 = hinten), dist = Abstand des Ankerpunkts zur FOB-Mitte (px), gap = Lücke zwischen den Einheiten (px).
   // Eine Gattung füllt von ihrem Ankerpunkt aus die nächsten freien Plätze; Typen ohne Gruppe nehmen `fallback`.
   startLayout: {
@@ -72,16 +72,16 @@ export const BALANCE = {
   // Einheiten darin bringen statt unitIncome das Doppelte (unitIncome = 2 × zone.unitIncome, nicht zusätzlich).
   // drillMinFuel = Mindestvorrat der FOB, um einen Bohrer zu starten
   hot: { r: 300, speed: 40, wanderSpeed: 40 / 3, unitIncome: QUICK.moneyPerUnitHot, wanderMin: 25, wanderMax: 45, drillMinFuel: 10 },
-  // Bauradien eigener FOBs dürfen sich nicht überlappen (minDistOwn = 2 × buildRadius); höchstens 10 FOBs mit der Haupt-FOB
+  // Bauradien eigener FOBs dürfen sich nicht überlappen (minDistOwn = 2 × buildRadius); höchstens 10 FOBs mit der Hauptstadt
   fob: { buildRadius: 450, minDistOwn: 900, minDistEnemy: 700, max: QUICK.maxFobs },
   queueMax: QUICK.queueMax,
-  trainSlots: QUICK.trainSlots, // Ausbildungsplätze der Haupt-FOB: so viele Einträge der Warteschlange werden gleichzeitig ausgebildet
+  trainSlots: QUICK.trainSlots, // Ausbildungsplätze der Hauptstadt: so viele Einträge der Warteschlange werden gleichzeitig ausgebildet
   baseAttackWarn: 20, // s zwischen zwei Meldungen „Basis wird angegriffen“
   shortageWarn: 20, // s zwischen zwei Meldungen je Sorte und Team
   // Straßen der Karte (Stadtraster und Feldwege): Bodenfahrzeuge fahren darauf schneller; abseits verbrauchen sie mehr Treibstoff
   roads: { speedMul: 1.35, offroadFuel: 1.15 },
   fuelSlowMul: 0.25, // Tempo von Fahrzeugen ohne Treibstoff
-  // Soldaten-Nachschub (§12): kostenloser Schütze an der Haupt-FOB alle `interval` s, solange weniger als `soldierMin` Infanterie lebt
+  // Soldaten-Nachschub (§12): kostenloser Schütze an der Hauptstadt alle `interval` s, solange weniger als `soldierMin` Infanterie lebt
   reinforce: { interval: QUICK.reinforceEvery, soldierMin: 29, unit: 'rifleman' },
   demolishRefund: 0.25, // Abriss fertiger Gebäude (Baustellen: voll)
   scanInterval: 0.25, // Zielsuche
@@ -89,7 +89,7 @@ export const BALANCE = {
   leash: 300, // Idle-Einheiten verfolgen max. so weit vom Ankerpunkt
   // Logistik (§11.1–11.3)
   logistics: {
-    storeCap: QUICK.storeCap, // Obergrenze je Sorte und FOB-Lager (die Haupt-FOB wird darauf immer wieder aufgefüllt)
+    storeCap: QUICK.storeCap, // Obergrenze je Sorte und FOB-Lager (die Hauptstadt wird darauf immer wieder aufgefüllt)
     truckCapacity: QUICK.truckLoad, // Ladung eines LKW (Summe)
     transferRate: 100, // Laden/Entladen je s
     transferReach: 140, // LKW muss so nah an der FOB-Mitte stehen
@@ -120,7 +120,7 @@ export const BALANCE = {
     // Schwierigkeit über Verhalten: ab normal Späher und Konter-Mix, ab schwer Überfälle und Gruppen-Rückzug; hart ohne Einkommensbonus.
     // weather: nutzt das Wetter (bei schlechter Sicht früher ein Späher, im Nebel greift die Welle schon mit weniger Stärke an)
     // research: Spielzeit (s), ab der die KI auf Stufe 2 bzw. 3 spart; upgrades: forscht auch Verbesserungen (aus Überschuss)
-    // fobCap: FOBs mit Haupt-FOB (höchstens fob.max); radioFrom: Spielzeit (s), ab der sie einen Sendemast baut (Infinity = nie);
+    // fobCap: FOBs mit Hauptstadt (höchstens fob.max); radioFrom: Spielzeit (s), ab der sie einen Sendemast baut (Infinity = nie);
     // cratePickers: so viele Soldaten holen oder tragen gleichzeitig Versorgungskisten;
     // fort: baut ab Spielzeit `from` (s) bis zu `fobs` FOBs zur Festung aus (Mauerring, Tore, `towers` Türme mit Besatzung und Dachaufbau). Weitere KI-Werte: js/data/ai.js
     easy: { think: 3.0, incomeMult: 0.8, attackStrength: 2500, scout: false, counter: false, raid: false, fallback: false, weather: false, research: [240, 720], upgrades: false, fobCap: 3, radioFrom: Infinity, cratePickers: 1, fort: { from: Infinity, fobs: 0, towers: 0 } },
@@ -211,7 +211,7 @@ export const BALANCE = {
       winter: { clear: 4, snow: 4, fog: 2 },
     },
   },
-  // Forschungsstufen (nach Age of Empires II und Empire Earth, im Startmenü; ohne Angabe aus): die Haupt-FOB forscht neben der
+  // Forschungsstufen (nach Age of Empires II und Empire Earth, im Startmenü; ohne Angabe aus): die Hauptstadt forscht neben der
   // Ausbildung, eins nach dem anderen (money beim Start, time s, needs = nötige Stufe, tier = erreichte Stufe). unitTier: Stufe, ab
   // der eine Einheit ausgebildet werden kann (fehlt = von Anfang an; die Startarmee bleibt). Schutzwesten: Infanterie nimmt × vests
   // Schaden, Verbundpanzerung: Fahrzeuge und Hubschrauber × composite (ein Schuss, der das unverletzte Ziel sofort tötet, bleibt

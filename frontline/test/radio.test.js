@@ -23,7 +23,7 @@ const spot = (g, t) => {
   const f = mainOf(g, t);
   return { x: f.x + (t ? -200 : 200), y: f.y + (t ? -150 : 150) };
 };
-/** Fertiger Mast für Team t neben seiner Haupt-FOB. */
+/** Fertiger Mast für Team t neben seiner Hauptstadt. */
 function builtMast(g, t) {
   const p = g.canPlace(t, 'radio', spot(g, t).x, spot(g, t).y);
   assert.ok(p.ok, p.reason);
@@ -97,7 +97,7 @@ test('Zerstört: Zeit verfällt, ein neuer Mast beginnt von vorn; Baustelle zäh
   assert.equal(g.winner, null, 'Baustelle zählt nicht');
 });
 
-test('KI: baut ab ihrer Zeit einen Sendemast hinter der Haupt-FOB (spart vorher darauf)', () => {
+test('KI: baut ab ihrer Zeit einen Sendemast hinter der Hauptstadt (spart vorher darauf)', () => {
   const g = new Game({ seed: 3, radio: true });
   const ai = new AI(g, 1, 'hard');
   g.time = 600;
@@ -110,7 +110,7 @@ test('KI: baut ab ihrer Zeit einen Sendemast hinter der Haupt-FOB (spart vorher 
   assert.ok(site, 'Baustelle gesetzt');
   const f = mainOf(g, 1);
   const dz = (p) => Math.hypot(p.x - g.zone.x, p.y - g.zone.y);
-  assert.ok(dz(site) > dz(f) - 100, 'nicht vor der Haupt-FOB Richtung Zone');
+  assert.ok(dz(site) > dz(f) - 100, 'nicht vor der Hauptstadt Richtung Zone');
 });
 
 test('KI: gegen einen fremden Mast sammelt sie die Armee und greift ihn an', () => {

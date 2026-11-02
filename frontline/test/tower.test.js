@@ -19,7 +19,7 @@ function setup() {
   return { g, fob };
 }
 
-/** Fertiger Turm 5 Zellen rechts neben der Haupt-FOB. */
+/** Fertiger Turm 5 Zellen rechts neben der Hauptstadt. */
 function tower(g, fob) {
   return g.spawnBuilding('tower', 0, fob.cx + 6, fob.cy, { built: true });
 }

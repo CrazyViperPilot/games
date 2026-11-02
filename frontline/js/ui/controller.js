@@ -36,7 +36,7 @@ const HOTKEY_ALIAS = { Y: 'Z' }; // Flugabwehr auch mit Y
 const RADIO_TIP = `. Zweite Siegbedingung: steht er fertig ${Math.round(BALANCE.radio.hold / 60)} min, gewinnst du. Der Gegner sieht ihn dann überall. Nur einer je Team.`;
 const CMD = BALANCE.commander;
 const COMMANDER_TIP = `. Einmalig, belegt keinen Platz. Aura ${CMD.aura} px: eigene Einheiten schießen ${Math.round((CMD.fireRate - 1) * 100)} % schneller, verletzte Infanterie heilt. Fällt er, bekommt der Gegner ${CMD.deathPoints} Punkte.`;
-// Forschungsmenü der Haupt-FOB: Hauptkarte Q = nächste Stufe, W/E/R = Äste; im Ast Tasten in dieser Reihenfolge
+// Forschungsmenü der Hauptstadt: Hauptkarte Q = nächste Stufe, W/E/R = Äste; im Ast Tasten in dieser Reihenfolge
 const BRANCH_BTN = [['veh', 'W'], ['wpn', 'E'], ['abl', 'R']];
 const ITEM_KEYS = ['Q', 'W', 'E', 'R', 'T', 'A', 'S'];
 const isCarrier = (u) => u.def.cargoCap > 0; // LKW und Transporthubschrauber
@@ -188,7 +188,7 @@ export class Controller {
     return { x: x / s.length, y: y / s.length };
   }
 
-  /** Erste fertige eigene FOB (Haupt-FOB) oder null. */
+  /** Erste fertige eigene FOB (Hauptstadt) oder null. */
   homeBase() {
     return this.game.buildings.find((b) => b.alive && b.built && b.team === this.team && b.type === 'fob') || null;
   }
@@ -977,7 +977,7 @@ export class Controller {
     }
   }
 
-  /** Forschungsmenü öffnen (Haupt-FOB gewählt, Forschung eingeschaltet). */
+  /** Forschungsmenü öffnen (Hauptstadt gewählt, Forschung eingeschaltet). */
   startResearchMenu() {
     if (!this.game.research) {
       this.message('Forschung ist in dieser Partie ausgeschaltet');
@@ -986,7 +986,7 @@ export class Controller {
     this.setMode('research');
   }
 
-  /** Forschung in der Haupt-FOB beginnen; danach wieder die Ausbildung im Blick. */
+  /** Forschung in der Hauptstadt beginnen; danach wieder die Ausbildung im Blick. */
   research(fob, key) {
     if (this.issue({ type: 'research', buildingId: fob.id, key }).ok) this.setMode('normal');
   }
@@ -1041,7 +1041,7 @@ export class Controller {
     return this.anyFobCovers(cost) ? '' : this.lagerReason(cost);
   }
 
-  /** Grund für Ausbildung in der Haupt-FOB: Geld oder Einheitenlimit. */
+  /** Grund für Ausbildung in der Hauptstadt: Geld oder Einheitenlimit. */
   trainReason(b, cost) {
     const money = this.moneyReason(cost);
     if (money) return money;
@@ -1099,7 +1099,7 @@ export class Controller {
     return this.selectionCard();
   }
 
-  /** Forschungsmenü der Haupt-FOB: nächste Stufe (Q), Verbesserungen (W, E, R), laufende Forschung abbrechen (C). */
+  /** Forschungsmenü der Hauptstadt: nächste Stufe (Q), Verbesserungen (W, E, R), laufende Forschung abbrechen (C). */
   researchCard() {
     const g = this.game;
     const fob = this.selected().find((e) => e.kind === 'building' && e.main && e.built);

@@ -30,24 +30,24 @@ const KEYS = [
   ['B', 'Baumenü: Baufahrzeug alles (E Mauer, R Tor, T Mörser, Z Flak, V Gefechtsturm, X Bohrer, G Sendemast, F FOB-Baustelle) · Soldaten nur E Mauer, R Tor'],
   ['Festung', 'FOB gewählt: H = zur Festung ausbauen (Mauerring mit vier Toren, zwei Gefechtstürme an den Ecken zum Gegner) · Soldaten gewählt: Rechtsklick oder Tippen auf einen fertigen Turm besetzt ihn (3 Plätze, geschützt, mehr Reichweite) · Turm gewählt: T Mörser, Z Flak, N SAM aufs Dach (feuert nur mit Besatzung, Munition aus dem FOB-Lager), O Besatzung raus'],
   ['Bauen', 'Gebäude brauchen einen Bauer daneben: Baufahrzeug oder Soldaten (nur Mauer/Tor, aus getragenem Baumaterial, im Bauradius einer FOB)'],
-  ['Haupt-FOB', 'Ausbildung (nur hier, nur gegen Geld, zwei Einheiten gleichzeitig): Q Schütze · W PAK · T Scharfschütze · E LKW · R Baufahrzeug · A SPz · S KPz · D Little Bird · F Transporter · G AH-64 · J Flakpanzer · N SAM-Startrampe · C Kommandeur (einmalig)'],
-  ['U', 'Haupt-FOB gewählt, falls im Startmenü an: Forschung (eine zugleich, neben der Ausbildung) · Q nächste Stufe (Stufe 2: Scharfschütze, SPz, Little Bird, Transporter, Flakpanzer · Stufe 3: KPz, AH-64, SAM-Startrampe) · W Fahrzeuge (Motor, Zusatztank, Panzerungen, Feldwerkstatt) · E Waffen (Westen, Munition, Schnellfeuer, Zielfernrohre, Lenkraketen) · R Fähigkeiten (Optik, Schnellbau, Reparaturset, Nebelwerfer, Minen); je Ast eine Meisterschaft · C Abbruch · Esc zurück'],
+  ['Hauptstadt', 'Ausbildung (nur hier, nur gegen Geld, zwei Einheiten gleichzeitig): Q Schütze · W PAK · T Scharfschütze · E LKW · R Baufahrzeug · A SPz · S KPz · D Little Bird · F Transporter · G AH-64 · J Flakpanzer · N SAM-Startrampe · C Kommandeur (einmalig)'],
+  ['U', 'Hauptstadt gewählt, falls im Startmenü an: Forschung (eine zugleich, neben der Ausbildung) · Q nächste Stufe (Stufe 2: Scharfschütze, SPz, Little Bird, Transporter, Flakpanzer · Stufe 3: KPz, AH-64, SAM-Startrampe) · W Fahrzeuge (Motor, Zusatztank, Panzerungen, Feldwerkstatt) · E Waffen (Westen, Munition, Schnellfeuer, Zielfernrohre, Lenkraketen) · R Fähigkeiten (Optik, Schnellbau, Reparaturset, Nebelwerfer, Minen); je Ast eine Meisterschaft · C Abbruch · Esc zurück'],
   ['N / Z', 'Fahrzeuge gewählt, Nebelwerfer erforscht: N legt eine Nebelwand (eigene Einheiten darin nehmen halb so viel Schaden) · Baufahrzeug, Minen erforscht: Z legt eine Mine (trifft Bodeneinheiten des Gegners)'],
   ['L / U / T', 'LKW gewählt: Laden (dann FOB anklicken) · Entladen (FOB oder FOB-Baustelle) · Pendeln (Start-FOB, dann Ziel)'],
   ['Q / W / E / R', 'LKW gewählt: Ladungsart Gemischt · Baumaterial · Munition · Treibstoff'],
   ['Entf', 'Gebäude abreißen (25 % des Baumaterials zurück)'],
-  ['Lager', 'Die Haupt-FOB hat unendlich Baumaterial (mit „Stadt“ im Startmenü: nur, was die Werke der Stadt liefern), Munition und Treibstoff. Vordere FOBs haben ein eigenes Lager, das LKW füllen · Gebäude bezahlt die FOB in Reichweite · LKW versorgen Einheiten in der Nähe aus ihrer Ladung'],
+  ['Lager', 'Die Hauptstadt hat unendlich Baumaterial (mit „Stadt“ im Startmenü: nur, was die Werke der Stadt liefern), Munition und Treibstoff. Vordere FOBs haben ein eigenes Lager, das LKW füllen · Gebäude bezahlt die FOB in Reichweite · LKW versorgen Einheiten in der Nähe aus ihrer Ladung'],
   ['Munition', 'Jeder Schuss verbraucht Munition · ohne Vorrat feuern Einheiten nicht (FOB-MG kostet nichts)'],
   ['Treibstoff', 'Fahrzeuge verbrauchen Treibstoff nur beim Fahren · ohne Vorrat nur 25 % Tempo'],
   ['Esc', 'Abbrechen · Auswahl aufheben'],
   ['Strg + 0–9', 'Gruppe speichern · 0–9 wählt · zweimal drücken = Kamera hin'],
   ['Pfeile / Rand', 'Kamera bewegen · Mausrad = Zoom · rechte oder mittlere Taste ziehen'],
-  ['Leertaste', 'Kamera auf Auswahl oder letzte Meldung · H = Haupt-FOB'],
+  ['Leertaste', 'Kamera auf Auswahl oder letzte Meldung · H = Hauptstadt'],
   ['+ / −', 'Spielgeschwindigkeit'],
   ['V', 'Ansicht umschalten: 2D von oben / isometrisch'],
   [', / .', 'Isometrische Ansicht um 90° nach links / rechts drehen (auch Knöpfe ⟲ ⟳ oben)'],
   ['P', 'Pause'],
-  ['Y', 'Baumodus der Stadt an/aus (nur mit Stadt im Startmenü): Werkzeug rechts wählen, auf der Karte ein Rechteck ziehen (nur im eigenen Gebiet, gestrichelte Linie); zwei Finger schieben weiter; das Spiel läuft weiter · Ausgebildete Einheiten brauchen freie Einwohner (Soldat 1, Panzer 3, Hubschrauber 2) · Bewohner in der Konfliktzone fliehen bei Beschuss · Förderung nur auf Vorkommen (Wald, Fels, Erz, Öl), Werke verarbeiten das Geförderte, Fahrzeuge kosten Metall, Handel am Markt · Gegnerische Stadtgebäude per Rechtsklick angreifen, Ruinen wachsen nach 30 s neu'],
+  ['Y', 'Baumodus der Stadt an/aus (nur mit Stadt im Startmenü): Werkzeug rechts wählen, auf der Karte ein Rechteck ziehen (überall, wo nichts im Weg steht; dunkle Zellen sind gesperrt); zwei Finger schieben weiter; das Spiel läuft weiter · Ausgebildete Einheiten brauchen freie Einwohner (Soldat 1, Panzer 3, Hubschrauber 2) · Bewohner in der Konfliktzone fliehen bei Beschuss · Förderung nur auf Vorkommen (Wald, Fels, Erz, Öl), Werke verarbeiten das Geförderte, Fahrzeuge kosten Metall, Handel am Markt · Gegnerische Stadtgebäude per Rechtsklick angreifen, Ruinen wachsen nach 30 s neu'],
   ['F2', 'Ton an/aus (auch der Lautsprecher-Knopf oben)'],
   ['Minimap', 'Linksklick = Kamera, Rechtsklick = Bewegen'],
 ];
@@ -170,11 +170,11 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
         <div class="seg">${MOOD_SETTINGS.map((k) => `<button type="button" data-mood="${k}">${MOOD_LABELS[k]}</button>`).join('')}</div>
       </div>
       <div class="field">
-        <span class="flabel" title="Forschung in der Haupt-FOB: Stufe 2 schaltet Schützenpanzer, Hubschrauber und Flakpanzer frei, Stufe 3 Kampfpanzer, Kampfhubschrauber und SAM-Startrampe; dazu Verbesserungen für Panzerung und Reichweite">Forschung</span>
+        <span class="flabel" title="Forschung in der Hauptstadt: Stufe 2 schaltet Schützenpanzer, Hubschrauber und Flakpanzer frei, Stufe 3 Kampfpanzer, Kampfhubschrauber und SAM-Startrampe; dazu Verbesserungen für Panzerung und Reichweite">Forschung</span>
         <div class="seg"><button type="button" data-research="1">An</button><button type="button" data-research="0">Aus</button></div>
       </div>
       <div class="field">
-        <span class="flabel" title="Zonenstadt im eigenen Gebiet auf der ganzen Karte (Gebiet wächst um FOBs und Stadtgebäude): Wohnen, Gewerbe und Werke bauen; die Werke füllen das Lager der Haupt-FOB mit Baumaterial, Munition und Treibstoff (ohne Stadt hat sie unendlich davon); ausgebildete Einheiten kosten Einwohner">Stadt</span>
+        <span class="flabel" title="Stadt auf der ganzen Karte rund um die Hauptstadt (die erste FOB); Stadtgebäude, Straßen und Fabriken überall, FOBs braucht man nur für militärische Gebäude: Wohnen, Gewerbe und Werke bauen; die Werke füllen das Lager der Hauptstadt mit Baumaterial, Munition und Treibstoff (ohne Stadt hat sie unendlich davon); ausgebildete Einheiten kosten Einwohner">Stadt</span>
         <div class="seg"><button type="button" data-city="1">An</button><button type="button" data-city="0">Aus</button></div>
       </div>
       <div class="field">
@@ -195,11 +195,11 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
         <div class="mapbox" data-mapbox></div>
       </div>
       <ol class="howto">
-        <li>Du startest mit 2 Kampfpanzern, 3 Schützenpanzern, 29 Soldaten (22 Schützen, 7 Panzerabwehrsoldaten), 3 LKW, Baufahrzeug und deinem Kommandeur (goldener Stern: in seiner Nähe schießen deine Einheiten schneller und Verwundete heilen; fällt er, bekommt der Gegner 5 Punkte). Das Einheitenlimit beträgt 300 Plätze: Soldat 1, Schützenpanzer 3, Kampfpanzer 5, Flakpanzer und SAM-Startrampe 2. Die Haupt-FOB hat unendlich Baumaterial, Munition und Treibstoff und bildet alle Einheiten aus – nur Geld ist knapp. Ist oben Forschung an, gibt es Schützenpanzer, Hubschrauber und Flakpanzer erst ab Stufe 2, Kampfpanzer, Kampfhubschrauber und SAM-Startrampe ab Stufe 3 (die Startarmee bleibt).</li>
-        <li>LKW (E) bringen Nachschub aus der Haupt-FOB zu den vorderen FOBs und versorgen Einheiten in ihrer Nähe.</li>
+        <li>Du startest mit 2 Kampfpanzern, 3 Schützenpanzern, 29 Soldaten (22 Schützen, 7 Panzerabwehrsoldaten), 3 LKW, Baufahrzeug und deinem Kommandeur (goldener Stern: in seiner Nähe schießen deine Einheiten schneller und Verwundete heilen; fällt er, bekommt der Gegner 5 Punkte). Das Einheitenlimit beträgt 300 Plätze: Soldat 1, Schützenpanzer 3, Kampfpanzer 5, Flakpanzer und SAM-Startrampe 2. Die Hauptstadt hat unendlich Baumaterial, Munition und Treibstoff und bildet alle Einheiten aus – nur Geld ist knapp. Ist oben Forschung an, gibt es Schützenpanzer, Hubschrauber und Flakpanzer erst ab Stufe 2, Kampfpanzer, Kampfhubschrauber und SAM-Startrampe ab Stufe 3 (die Startarmee bleibt).</li>
+        <li>LKW (E) bringen Nachschub aus der Hauptstadt zu den vorderen FOBs und versorgen Einheiten in ihrer Nähe.</li>
         <li>Baufahrzeug (R): bis zu 10 FOBs (ohne überlappende Bauradien), Mörser, Flak, Bohrer und – falls oben an – einen Sendemast: steht er fertig 30 Minuten, ist die Partie gewonnen. Soldaten bauen aus wenig getragenem Baumaterial Mauern und Tore.</li>
         <li>Ist oben Fluss an, liegt vor jeder Startecke ein Fluss: über drei Brücken oder langsam durch zwei Furten. Brücken lassen sich sprengen (A, dann Brücke anklicken) und von Baufahrzeugen wieder aufbauen.</li>
-        <li>Konfliktzone halten: jede deiner Einheiten dort bringt Geld (0,4/s, in der Hot Zone 0,8/s), alle 30 s ein Punkt. Fällt deine Haupt-FOB, ist die Runde verloren.</li>
+        <li>Konfliktzone halten: jede deiner Einheiten dort bringt Geld (0,4/s, in der Hot Zone 0,8/s), alle 30 s ein Punkt. Fällt deine Hauptstadt, ist die Runde verloren.</li>
       </ol>
       <p class="muted small center" data-wallet></p>
       <button type="button" class="primary" data-act="start">Start</button>
@@ -395,8 +395,8 @@ export function showEnd(root, { winner, team, reason, stats }, onRestart) {
   let why;
   if (reason === 'points') why = `${who} hat ${stats.winPoints} Siegpunkte erreicht.`;
   else if (reason === 'radio') why = `${who} hat den Sendemast ${Math.round(BALANCE.radio.hold / 60)} Minuten gehalten.`;
-  else if (won) why = 'Die Haupt-FOB des Gegners ist zerstört.';
-  else why = 'Deine Haupt-FOB ist zerstört.';
+  else if (won) why = 'Die Hauptstadt des Gegners ist zerstört.';
+  else why = 'Deine Hauptstadt ist zerstört.';
   show(
     root,
     'end',
