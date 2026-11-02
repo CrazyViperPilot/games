@@ -47,7 +47,7 @@ const KEYS = [
   ['V', 'Ansicht umschalten: 2D von oben / isometrisch'],
   [', / .', 'Isometrische Ansicht um 90° nach links / rechts drehen (auch Knöpfe ⟲ ⟳ oben)'],
   ['P', 'Pause'],
-  ['Y', 'Baumodus der Stadt an/aus (nur mit Stadt im Startmenü): Werkzeug rechts wählen, auf der Karte ein Rechteck ziehen (nur im eigenen Gebiet, gestrichelte Linie); zwei Finger schieben weiter; das Spiel läuft weiter · Ausgebildete Einheiten brauchen freie Einwohner (Soldat 1, Panzer 3, Hubschrauber 2) · Bewohner in der Konfliktzone fliehen bei Beschuss'],
+  ['Y', 'Baumodus der Stadt an/aus (nur mit Stadt im Startmenü): Werkzeug rechts wählen, auf der Karte ein Rechteck ziehen (nur im eigenen Gebiet, gestrichelte Linie); zwei Finger schieben weiter; das Spiel läuft weiter · Ausgebildete Einheiten brauchen freie Einwohner (Soldat 1, Panzer 3, Hubschrauber 2) · Bewohner in der Konfliktzone fliehen bei Beschuss · Förderung nur auf Vorkommen (Wald, Fels, Erz, Öl), Werke verarbeiten das Geförderte, Fahrzeuge kosten Metall, Handel am Markt · Gegnerische Stadtgebäude per Rechtsklick angreifen, Ruinen wachsen nach 30 s neu'],
   ['F2', 'Ton an/aus (auch der Lautsprecher-Knopf oben)'],
   ['Minimap', 'Linksklick = Kamera, Rechtsklick = Bewegen'],
 ];

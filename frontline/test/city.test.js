@@ -51,17 +51,22 @@ test('mit Stadt: endliches Startlager, Front-Summe ohne Haupt-FOB', () => {
   assert.equal(g.teams[0].res.bm, 0);
 });
 
-test('Bauen kostet Geld, zu wenig Geld stoppt, Abriss ist kostenlos', () => {
+test('Bauen kostet Geld (Straßen Baumaterial), zu wenig stoppt, Abriss ist kostenlos', () => {
   const g = new Game({ seed: 3, city: true, startMoney: 100 });
-  const r = paint(g, 'road', 0, 0, 9, 0); // 10 x 5 = 50
+  const m = g.mainFob(0);
+  const bm0 = m.store.bm;
+  const r = paint(g, 'road', 0, 0, 9, 0); // 10 x 10 BM
   assert.ok(r.ok);
-  assert.equal(g.teams[0].res.money, 50);
-  const r2 = paint(g, 'bm', 0, 1, 4, 1); // 5 x 40 > 50 Geld: nur 1 Zelle
-  assert.equal(r2.placed, 1);
+  assert.equal(g.teams[0].res.money, 100);
+  assert.equal(m.store.bm, bm0 - 100);
+  const r2 = paint(g, 'bm', 0, 1, 4, 1); // 5 x 40 > 100 Geld: nur 2 Zellen
+  assert.equal(r2.placed, 2);
   assert.equal(r2.broke, true);
   assert.equal(paint(g, 'erase', 0, 1, 4, 1).ok, true);
-  assert.equal(g.teams[0].res.money, 10);
-  assert.equal(paint(g, 'res', 0, 1, 0, 1).ok, false); // zu wenig Geld (20 > 10)
+  assert.equal(g.teams[0].res.money, 20);
+  assert.equal(paint(g, 'com', 0, 1, 0, 1).ok, false); // zu wenig Geld (30 > 20)
+  m.store.bm = 5;
+  assert.match(paint(g, 'road', 0, 2, 0, 2).reason, /Baumaterial/);
 });
 
 test('Zone ohne Straße wächst nicht, mit Straße wird sie Gebäude', () => {
@@ -79,6 +84,11 @@ test('Wohnen + Werk + Straße: Einwohner arbeiten, Lager und Geld wachsen', () =
   paint(g, 'road', 0, 2, 5, 2);
   paint(g, 'res', 0, 1, 5, 1);
   paint(g, 'bm', 0, 3, 5, 3);
+  const c = g.city[0];
+  c.deposit[at(g, 0, 4)] = 1; // Wald direkt an der Stadt (Test)
+  c.deposit[at(g, 1, 4)] = 2; // Fels
+  assert.match(paint(g, 'mine', 2, 4, 2, 4).reason, /vorkommen/);
+  assert.ok(paint(g, 'mine', 0, 4, 1, 4).ok);
   const m = g.mainFob(0);
   m.store.bm = 0;
   const money0 = g.teams[0].res.money;
@@ -86,6 +96,8 @@ test('Wohnen + Werk + Straße: Einwohner arbeiten, Lager und Geld wachsen', () =
   const s = g.city[0].stats;
   assert.ok(s.pop > 8, `Einwohner ${s.pop}`);
   assert.ok(s.workers > 0 && s.bm > 0);
+  assert.ok(s.raw.wood > 0 && s.raw.stone > 0, 'Holzfäller und Steinbruch fördern');
+  assert.ok(s.bm <= s.raw.wood + s.raw.stone + 1e-9, 'BM nur aus Rohstoffen');
   assert.ok(m.store.bm > 50, `BM ${m.store.bm}`);
   assert.ok(g.teams[0].res.money > money0);
   assert.ok(m.store.bm <= 3000);
@@ -211,4 +223,96 @@ test('Flucht: Schüsse in der Konfliktzone leeren Wohnzellen, nach Ruhe kehren s
   run(g, CITY.flee.calm + 1);
   assert.equal(c.flee[i], 0);
   assert.ok(c.stats.housing > 0, 'zurück nach der Ruhezeit');
+});
+
+test('Rohstoffvorkommen: jede Sorte nahe jeder Haupt-FOB, Karte unverändert', () => {
+  const a = new Game({ seed: 4, city: true });
+  const b = new Game({ seed: 4 });
+  assert.deepEqual([...a.grid.terrain], [...b.grid.terrain], 'Karte gleich mit und ohne Stadt');
+  for (const team of [0, 1]) {
+    const c = a.city[team];
+    const m = a.mainFob(team);
+    for (let d = 1; d <= 4; d++) {
+      let near = false;
+      for (let i = 0; i < c.deposit.length; i++) {
+        if (c.deposit[i] !== d) continue;
+        const q = i % c.cols;
+        const r = (i - q) / c.cols;
+        if (Math.hypot((q + 0.5) * c.cell - m.x, (r + 0.5) * c.cell - m.y) < (CITY.territory.main + 1) * c.cell) near = true;
+      }
+      assert.ok(near, `Team ${team} Sorte ${d} im Gebiet`);
+    }
+  }
+});
+
+test('Metall: Erzmine + Stahlwerk liefern, Fahrzeuge kosten Metall, Abbruch erstattet', () => {
+  const g = new Game({ seed: 3, city: true, startMoney: 9000 });
+  const c = g.city[0];
+  paint(g, 'road', 0, 0, 9, 0);
+  paint(g, 'res', 0, 1, 9, 1);
+  paint(g, 'steel', 0, 2, 3, 2);
+  paint(g, 'road', 0, 3, 3, 3);
+  c.deposit[at(g, 5, 3)] = 3; // Erz
+  c.deposit[at(g, 6, 3)] = 3;
+  paint(g, 'mine', 5, 3, 6, 3);
+  run(g, 90);
+  assert.ok(c.stats.raw.ore > 0 && c.stats.metal > 0, `Metall/s ${c.stats.metal}`);
+  const m = g.mainFob(0);
+  c.metal = 50;
+  const r = g.issue(0, { type: 'train', buildingId: m.id, unit: 'tank' });
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /Metall/);
+  c.metal = 500;
+  assert.ok(g.issue(0, { type: 'train', buildingId: m.id, unit: 'tank' }).ok);
+  assert.equal(c.metal, 500 - CITY.metalCost.tank);
+  assert.ok(g.issue(0, { type: 'cancelTrain', buildingId: m.id }).ok);
+  assert.equal(c.metal, 500);
+});
+
+test('Markt: ohne Markt kein Handel, verkaufen und kaufen in Losen', () => {
+  const g = new Game({ seed: 3, city: true, startMoney: 5000 });
+  const m = g.mainFob(0);
+  assert.match(g.issue(0, { type: 'trade', good: 'bm', dir: 'sell' }).reason, /Markt/);
+  paint(g, 'road', 0, 0, 3, 0);
+  paint(g, 'market', 0, 1, 0, 1);
+  run(g, CITY.growTime + 1);
+  const bm = m.store.bm;
+  const money = g.teams[0].res.money;
+  assert.ok(g.issue(0, { type: 'trade', good: 'bm', dir: 'sell' }).ok);
+  assert.ok(m.store.bm < bm - CITY.market.lot + 50);
+  assert.ok(g.teams[0].res.money >= money + CITY.market.sell.bm - 1);
+  const metal = g.city[0].metal;
+  assert.ok(g.issue(0, { type: 'trade', good: 'metal', dir: 'buy' }).ok);
+  assert.ok(g.city[0].metal >= metal + CITY.market.lot - 1);
+});
+
+test('Angriff: Stadtgebäude nehmen Schaden, werden Ruine (Prämie), wachsen danach neu', () => {
+  const g = new Game({ seed: 3, city: true, startMoney: 5000 });
+  const c = g.city[0];
+  paint(g, 'road', 0, 0, 3, 0);
+  paint(g, 'res', 0, 1, 0, 1);
+  run(g, CITY.growTime + 1);
+  const i = at(g, 0, 1);
+  const e = c.ents.get(i);
+  assert.ok(e && e.hp === CITY.hp[1], 'Gebäude ist ein Ziel');
+  assert.equal(g.getEntity(e.id), e);
+  // gegnerischer Panzer daneben: schießt von selbst auf das Gebäude
+  for (const u of g.units) if (u.team === 0) { u.alive = false; u.hp = 0; } // keine Verteidiger
+  const tank = g.spawnUnit('tank', 1, e.x + 150, e.y);
+  g.fog[1].revealAll?.();
+  const money1 = g.teams[1].res.money;
+  g.fog[1].revealAll?.();
+  assert.ok(g.issue(1, { type: 'attack', ids: [tank.id], targetId: e.id }).ok, 'Angriffsbefehl auf ein Stadtgebäude');
+  for (let t = 0; t < 20 * 60 && c.level[i]; t++) {
+    g.fog[1].revealAll?.();
+    g.update(0.05);
+  }
+  assert.ok(tank.alive);
+  assert.equal(c.level[i], 0, 'zerstört');
+  assert.ok(c.timer[i] < 0, 'Ruine');
+  assert.ok(g.teams[1].res.money > money1, 'Prämie');
+  assert.equal(c.ents.has(i), false);
+  tank.alive = false; tank.hp = 0;
+  run(g, CITY.ruinTime + CITY.growTime + 2);
+  assert.equal(c.level[i], 1, 'wiederaufgebaut');
 });

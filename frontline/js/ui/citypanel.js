@@ -2,11 +2,17 @@
 // Mit einem Finger oder der linken Maustaste zieht man auf der Karte ein Rechteck (Input ruft begin/move/end), zwei Finger
 // schieben und zoomen weiter. Das Spiel läuft weiter. Liest game.city und ändert es nur über game.issue(team, { type: 'city', … }).
 import { CITY } from '../data/city.js';
-import { KINDS, KIND_NAME, cellAt } from '../game/city.js';
+import { KINDS, KIND_NAME, GOODS, cellAt } from '../game/city.js';
 
-export const CITY_COLORS = { road: '#8a8f86', res: '#4f8f5a', com: '#4a78b0', bm: '#a0703f', mun: '#8b96a8', fuel: '#9b7bc4', erase: '#d05050' };
-const ICON = { road: '▬', res: '⌂', com: '▣', bm: '⚒', mun: '✸', fuel: '⛽', erase: '✕' };
-const SHORT = { road: 'Straße', res: 'Wohnen', com: 'Gewerbe', bm: 'BM-Werk', mun: 'Mun.-Werk', fuel: 'Raffinerie', erase: 'Räumen' };
+export const CITY_COLORS = { road: '#8a8f86', res: '#4f8f5a', com: '#4a78b0', bm: '#a0703f', mun: '#8b96a8', fuel: '#9b7bc4', steel: '#7f8c99', mine: '#c9a14a', market: '#d6b84a', erase: '#d05050' };
+const ICON = { road: '▬', res: '⌂', com: '▣', bm: '⚒', mun: '✸', fuel: '⛽', steel: '⛓', mine: '⛏', market: '⚖', erase: '✕' };
+const SHORT = { road: 'Straße', res: 'Wohnen', com: 'Gewerbe', bm: 'BM-Werk', mun: 'Mun.-Werk', fuel: 'Raffinerie', steel: 'Stahlwerk', mine: 'Förderung', market: 'Markt', erase: 'Räumen' };
+const TIP = {
+  bm: 'Baumaterial aus Holz und Stein (Holzfäller, Steinbruch)', mun: 'Munition aus Metall', fuel: 'Treibstoff aus Öl (Ölquelle)',
+  steel: 'Metall aus Erz (Erzmine)', mine: 'Nur auf Rohstoffvorkommen: Holzfäller, Steinbruch, Erzmine oder Ölquelle; braucht keine Straße',
+  market: 'Handel: Überschuss verkaufen, Knappes teuer kaufen (Knopf Handel)', road: 'Kostet Baumaterial aus dem Haupt-Lager',
+};
+const GOOD_NAME = { bm: 'BM', mun: 'MUN', fuel: 'TS', metal: 'Metall' };
 const TOOLS = [...KINDS, 'erase'];
 const fmt = (v, d = 0) => v.toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d });
 
@@ -27,11 +33,12 @@ export class CityPanel {
     root.hidden = true;
     root.innerHTML = `
       <div class="city-tools">${TOOLS.map((k) => {
-        const price = k === 'erase' ? 'gratis' : `${CITY.cost[k]} G`;
+        const price = k === 'erase' ? 'gratis' : CITY.costBm[k] ? `${CITY.costBm[k]} BM` : `${CITY.cost[k]} G`;
         const name = k === 'erase' ? 'Räumen' : KIND_NAME[k];
-        return `<button type="button" class="ctool" data-tool="${k}" title="${name}" style="--c:${CITY_COLORS[k]}"><i>${ICON[k]}</i><span>${SHORT[k]}</span><small>${price}</small></button>`;
+        return `<button type="button" class="ctool" data-tool="${k}" title="${name}${TIP[k] ? `: ${TIP[k]}` : ''}" style="--c:${CITY_COLORS[k]}"><i>${ICON[k]}</i><span>${SHORT[k]}</span><small>${price}</small></button>`;
       }).join('')}</div>
-      <div class="city-acts"><button type="button" class="btn-sm" data-show>Zur Stadt</button><button type="button" class="btn-sm city-done" data-close>Fertig (Y)</button></div>`;
+      <div class="city-trade" hidden><small>Je ${CITY.market.lot} Stück, Preise in Geld</small>${GOODS.map((g) => `<div class="trow"><b>${GOOD_NAME[g]}</b><button type="button" class="btn-sm" data-trade="${g}" data-dir="sell" title="${CITY.market.lot} ${GOOD_NAME[g]} verkaufen">Verk. +${CITY.market.sell[g]}</button><button type="button" class="btn-sm" data-trade="${g}" data-dir="buy" title="${CITY.market.lot} ${GOOD_NAME[g]} kaufen">Kauf −${CITY.market.buy[g]}</button></div>`).join('')}</div>
+      <div class="city-acts"><button type="button" class="btn-sm" data-tradeview>Handel</button><button type="button" class="btn-sm" data-show>Zur Stadt</button><button type="button" class="btn-sm city-done" data-close>Fertig (Y)</button></div>`;
     parent.appendChild(strip);
     parent.appendChild(root);
     this.root = root;
@@ -42,6 +49,13 @@ export class CityPanel {
         const m = this.game.mainFob(this.team);
         if (m) this.onShow?.(m.x, m.y);
       }
+      if (e.target.closest('[data-tradeview]')) this.showTrade(this.root.querySelector('.city-trade').hidden);
+      const tr = e.target.closest('[data-trade]');
+      if (tr) {
+        const res = this.game.issue(this.team, { type: 'trade', good: tr.dataset.trade, dir: tr.dataset.dir });
+        if (!res.ok) this.onMessage(res.reason);
+        this.update(true);
+      }
       const t = e.target.closest('[data-tool]');
       if (t) {
         this.tool = t.dataset.tool;
@@ -49,6 +63,13 @@ export class CityPanel {
       }
     });
     this.mark();
+  }
+
+  /** Handel statt Werkzeugen zeigen (oder zurück). */
+  showTrade(on) {
+    this.root.querySelector('.city-trade').hidden = !on;
+    this.root.querySelector('.city-tools').hidden = on;
+    this.root.querySelector('[data-tradeview]').textContent = on ? 'Bauen' : 'Handel';
   }
 
   mark() {
@@ -105,7 +126,8 @@ export class CityPanel {
     const s = g.city[this.team].stats;
     const m = g.mainFob(this.team);
     const fled = s.fled ? ` (${fmt(s.fled)} geflohen)` : '';
-    const store = m ? `Lager BM ${fmt(m.store.bm)} +${fmt(s.bm, 1)} · MUN ${fmt(m.store.mun)} +${fmt(s.mun, 1)} · TS ${fmt(m.store.fuel)} +${fmt(s.fuel, 1)}` : 'Haupt-FOB zerstört';
+    const raw = s.raw;
+    const store = m ? `Metall ${fmt(g.city[this.team].metal)} ${s.metal >= 0 ? '+' : ''}${fmt(s.metal, 1)} · Förderung Holz ${fmt(raw.wood, 1)} Stein ${fmt(raw.stone, 1)} Erz ${fmt(raw.ore, 1)} Öl ${fmt(raw.oil, 1)} · Lager BM ${fmt(m.store.bm)} +${fmt(s.bm, 1)} · MUN ${fmt(m.store.mun)} +${fmt(s.mun, 1)} · TS ${fmt(m.store.fuel)} +${fmt(s.fuel, 1)}` : 'Haupt-FOB zerstört';
     this.strip.innerHTML = `<span>Einwohner ${fmt(s.pop)}/${fmt(s.housing)}${fled} · Truppen ${fmt(s.drafted)} · frei ${fmt(Math.max(0, s.free))} · Arbeit ${fmt(s.workers)}/${fmt(s.jobs)} · Steuern +${fmt(s.money, 1)}/s</span><span class="city-store">${store}</span>`;
   }
 

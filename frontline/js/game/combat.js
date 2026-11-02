@@ -8,6 +8,7 @@ import { auraCooldown } from './commander.js';
 import { weatherSight } from './weather.js';
 import { armorMul, opticsMul, fxMul, rangeMul, dealtMul, smokeMul } from './research.js';
 import { damageBridge, deckDist } from './river.js';
+import { forEnemyCity } from './city.js';
 
 const SCAN = BALANCE.scanInterval;
 const MAX_UNIT_RADIUS = 16; // größter Einheitenradius (Trefferkreis-Suche)
@@ -151,6 +152,7 @@ function findTarget(game, hash, s, radius, minRange, allowBuildings, dmg) {
     if (b.def.blocksAll || b.def.gate) continue;
     consider(b);
   }
+  if (!best) forEnemyCity(game, team, s.x, s.y, radius + 32, consider); // zuletzt: Gebäude der gegnerischen Stadt
   return best;
 }
 
@@ -297,15 +299,15 @@ function impact(game, p) {
     const d = deckDist(b, p.tx, p.ty);
     if (d < R) hit(game, b, (p.damage.struct || 0) * houseMult(p.damage) * (1 - d / R));
   }
-  for (const list of [game.units, game.buildings]) {
-    for (const e of list) {
-      if (!e.alive || e.team === p.team || e.house) continue;
-      const d = Math.max(0, Math.hypot(e.x - p.tx, e.y - p.ty) - radiusOf(e));
-      if (d >= R) continue;
-      const dmg = (p.damage[dmgKey(e)] || 0) * (1 - d / R);
-      hit(game, e, dmg);
-    }
-  }
+  const splash = (e) => {
+    if (!e.alive || e.team === p.team || e.house) return;
+    const d = Math.max(0, Math.hypot(e.x - p.tx, e.y - p.ty) - radiusOf(e));
+    if (d >= R) return;
+    const dmg = (p.damage[dmgKey(e)] || 0) * (1 - d / R);
+    hit(game, e, dmg);
+  };
+  for (const list of [game.units, game.buildings]) for (const e of list) splash(e);
+  forEnemyCity(game, p.team, p.tx, p.ty, R, splash); // Gebäude der gegnerischen Stadt
 }
 
 function updateProjectiles(game, dt) {

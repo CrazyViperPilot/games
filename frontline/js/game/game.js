@@ -10,7 +10,7 @@ import { reliefOf } from './relief.js';
 import { createUnit, createBuilding, isFoe, canAttack, inRange } from './entities.js';
 import { Fog } from './fog.js';
 import { updateEconomy, smoothIncome } from './economy.js';
-import { createCity, updateCity, cmdCity, cityNoise, freePop, crewOf } from './city.js';
+import { createCity, updateCity, cmdCity, cmdTrade, cityNoise, freePop, crewOf, payMetal } from './city.js';
 import { updateMovement, nearestPassable, planPath, setIdle, separate, exitHouse } from './movement.js';
 import { updateCombat } from './combat.js';
 import { updateZone } from './zone.js';
@@ -637,6 +637,8 @@ export class Game {
         return cmdDrill(this, team, cmd);
       case 'city':
         return cmdCity(this, team, cmd);
+      case 'trade':
+        return cmdTrade(this, team, cmd);
       case 'train':
         return this.cmdTrain(team, cmd);
       case 'cancelTrain':
@@ -896,6 +898,7 @@ export class Game {
     if (this.city && freePop(this, team) < crewOf(cmd.unit)) return fail('Zu wenig freie Einwohner (Stadt: Wohnen ausbauen)');
     const cost = UNITS[cmd.unit].cost;
     if (!this.canAfford(team, cost)) return fail(this.missingMoney());
+    if (!payMetal(this, team, cmd.unit)) return fail('Zu wenig Metall (Stadt: Erzmine und Stahlwerk oder Markt)');
     this.pay(team, cost);
     b.queue.push({ unit: cmd.unit, payerId: b.id });
     b.queueTimes.push(0);
@@ -953,6 +956,7 @@ export class Game {
     const cost = UNITS[entry.unit].cost;
     this.refund(team, cost);
     this.refundStock(team, entry.payerId, cost, 1, b.x, b.y);
+    payMetal(this, team, entry.unit, -1); // Metall zurück ins Stadtlager
     return { ok: true };
   }
 

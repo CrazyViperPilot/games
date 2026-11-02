@@ -1,5 +1,6 @@
 // Spieler-Steuerung (docs/verlauf.md §5 ui/controller.js, §11.3–11.8): Auswahl, Modi, Befehle und Befehlskarte. Kein DOM.
 // Hält den Ansichtszustand `view`, den renderer.render(view) liest. Befehle laufen nur über game.issue.
+import { cityEntityAt } from '../game/city.js';
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
@@ -550,6 +551,12 @@ export class Controller {
         rest = rest.filter((u) => !eng.includes(u));
         if (!rest.length) return;
       }
+    }
+    // Gebäude der gegnerischen Stadt (sichtbar): angreifen
+    const cityB = cityEntityAt(this.game, wx, wy);
+    if (cityB && cityB.team !== this.team && this.game.sees(this.team, cityB)) {
+      if (this.issue({ type: 'attack', ids: rest.map((u) => u.id), targetId: cityB.id }).ok) this.moveMarker(cityB.x, cityB.y);
+      return;
     }
     // Stadthaus: vom Gegner besetzt und sichtbar = angreifen; leer oder eigen = Soldaten besetzen es, die übrigen gehen hin
     const house = this.pickHouse(wx, wy);

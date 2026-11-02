@@ -602,6 +602,20 @@ export class Renderer {
           setRoofSnow(this.season === 'winter'); // Winter: Schnee auf den Dächern der Stadt
           drawTownBuilding(ctx, cam, it.o);
           setRoofSnow(false);
+          if (it.o.damage > 0.25) {
+            // beschädigtes Stadtgebäude (Stadt-Teil): Rauch über dem Dach
+            const p = cam.worldToScreen(it.o.x, it.o.y);
+            const k = cam.zoom;
+            ctx.save();
+            ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+            ctx.fillStyle = `rgba(40,36,34,${Math.min(0.75, it.o.damage).toFixed(2)})`;
+            for (const [dx, dy, r] of [[0, -46, 10], [6, -60, 13], [-4, -76, 16]]) {
+              ctx.beginPath();
+              ctx.arc(p.x + dx * k, p.y + dy * k, r * k, 0, Math.PI * 2);
+              ctx.fill();
+            }
+            ctx.restore();
+          }
         }
       }
       else if (it.t === 1) {
