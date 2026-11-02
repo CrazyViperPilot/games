@@ -11,8 +11,8 @@ export const CITY = {
   crew: { default: 1, ifv: 3, tank: 3, flak: 2, sam: 2, littlebird: 2, transporter: 2, gunship: 2 },
   // Flucht (seit v4.82): Wohnzellen in der Konfliktzone leeren sich, wenn in ihnen oder den Nachbarzellen geschossen wird
   flee: { reach: 1, calm: 60 }, // Nachbarschaft (Zellen) und Ruhezeit (s), bis die Bewohner zurückziehen dürfen
-  startStock: { bm: 1500, mun: 600, fuel: 600 }, // Startlager der Haupt-FOB bei eingeschalteter Stadt (sonst unendlich)
-  yield: { bm: 0.1, mun: 0.06, fuel: 0.03, metal: 0.05 }, // höchster Ertrag je Arbeiter und Sekunde in Werken (BM-Werk, Munitionswerk, Raffinerie, Stahlwerk), begrenzt durch Rohstoffe
+  startStock: { bm: 1500, mun: 600, fuel: 1000 }, // Startlager der Haupt-FOB bei eingeschalteter Stadt (sonst unendlich)
+  yield: { bm: 0.1, mun: 0.06, fuel: 0.05, metal: 0.05 }, // höchster Ertrag je Arbeiter und Sekunde in Werken (BM-Werk, Munitionswerk, Raffinerie, Stahlwerk), begrenzt durch Rohstoffe
   taxPop: 0.03, // Geld/s je Einwohner
   taxCom: 0.15, // zusätzliches Geld/s je Arbeiter im Gewerbe
 
@@ -24,10 +24,12 @@ export const CITY = {
   // Vorkommen auf der Karte: je Team eine Gruppe jeder Sorte nahe der Haupt-FOB, dazu umkämpfte Gruppen zwischen Basis und Zone.
   deposits: { home: { dist: [5, 9], size: 4 }, neutral: { count: 8, size: 5, ring: [6, 22] } }, // Abstand in Zellen, Zellen je Gruppe; ring = Zellen außerhalb der Konfliktzone
   // Förderanlage (Holzfäller, Steinbruch, Erzmine, Ölquelle je nach Vorkommen): Rohstoff je Arbeiter und Sekunde; braucht keine Straße
-  extract: { wood: 0.3, stone: 0.3, ore: 0.25, oil: 0.2 },
+  extract: { wood: 0.3, stone: 0.3, ore: 0.25, oil: 0.3 },
   jobsMine: [0, 6, 12, 20], // Arbeitsplätze je Stufe einer Förderanlage
   // Verarbeitung: so viel Rohstoff braucht eine Einheit Produkt (BM aus Holz oder Stein, Metall aus Erz, Treibstoff aus Öl, Munition aus Metall)
   convert: { bm: 1, metal: 2, fuel: 1, mun: 0.5 },
+  // Startviertel (seit v4.84): steht zu Beginn fertig (Stufe 1) neben der Haupt-FOB, dazu eine Ölquelle auf dem nächsten Ölvorkommen
+  startQuarter: { road: 3, row: ['res', 'fuel', 'res'] }, // Straßenlänge und die Zellen darunter
   startMetal: 400, // Metall im Hauptlager zu Beginn (Metall bleibt dort, LKW fahren es nicht)
   // Metall je ausgebildeter Einheit (zusätzlich zum Geld); fehlt die Sorte, kostet sie kein Metall
   metalCost: { truck: 20, engineer: 20, ifv: 60, tank: 120, flak: 60, sam: 80, littlebird: 60, transporter: 80, gunship: 120 },

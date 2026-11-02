@@ -17,7 +17,7 @@ function spot(g, w, h, team = 0) {
   for (let r = 0; r <= c.rows - h; r++) {
     for (let q = 0; q <= c.cols - w; q++) {
       let ok = true;
-      for (let y = r; ok && y < r + h; y++) for (let x = q; ok && x < q + w; x++) ok = canZone(g, c, y * c.cols + x);
+      for (let y = r; ok && y < r + h; y++) for (let x = q; ok && x < q + w; x++) ok = canZone(g, c, y * c.cols + x) && !c.kind[y * c.cols + x];
       if (!ok) continue;
       const d = Math.abs(q - fc) + Math.abs(r - fr);
       if (!best || d < best.d) best = { c: q, r, d };
@@ -34,6 +34,15 @@ const paint = (g, kind, c0, r0, c1, r1, team = 0) => {
   return raw(g, kind, b.c + c0, b.r + r0, b.c + c1, b.r + r1, team);
 };
 const at = (g, col, row) => { const b = base.get(g); return (b.r + row) * g.city[0].cols + b.c + col; };
+// Startviertel räumen (Tests, die eine leere Stadt brauchen)
+function clearStart(g, team = 0) {
+  const c = g.city[team];
+  for (const i of [...c.list]) {
+    const q = i % c.cols;
+    const r = (i - q) / c.cols;
+    g.issue(team, { type: 'city', kind: 'erase', c0: q, r0: r, c1: q, r1: r });
+  }
+}
 const raw = (g, kind, c0, r0, c1, r1, team = 0) => g.issue(team, { type: 'city', kind, c0, r0, c1, r1 });
 
 test('ohne Stadt: unendliches Lager, Stadtbefehl abgelehnt', () => {
@@ -81,6 +90,7 @@ test('Zone ohne Straße wächst nicht, mit Straße wird sie Gebäude', () => {
 
 test('Wohnen + Werk + Straße: Einwohner arbeiten, Lager und Geld wachsen', () => {
   const g = new Game({ seed: 3, city: true, startMoney: 3000 });
+  clearStart(g);
   paint(g, 'road', 0, 2, 5, 2);
   paint(g, 'res', 0, 1, 5, 1);
   paint(g, 'bm', 0, 3, 5, 3);
@@ -101,11 +111,12 @@ test('Wohnen + Werk + Straße: Einwohner arbeiten, Lager und Geld wachsen', () =
   assert.ok(m.store.bm > 50, `BM ${m.store.bm}`);
   assert.ok(g.teams[0].res.money > money0);
   assert.ok(m.store.bm <= 3000);
-  assert.equal(g.city[1].stats.pop, 0, 'andere Stadt unberührt');
+  assert.ok(g.city[1].stats.pop <= g.city[1].stats.housing, 'andere Stadt eigenständig');
 });
 
 test('Ausbau nur bei Bedarf: Wohnen ohne Arbeit bleibt Stufe 1', () => {
   const g = new Game({ seed: 3, city: true, startMoney: 3000 });
+  clearStart(g);
   paint(g, 'road', 0, 2, 3, 2);
   paint(g, 'res', 0, 1, 3, 1);
   run(g, CITY.growTime + CITY.upgradeTime * 3);
@@ -196,6 +207,7 @@ test('Soldaten kosten Einwohner: ohne freie Einwohner keine Ausbildung, Gefallen
 
 test('Flucht: Schüsse in der Konfliktzone leeren Wohnzellen, nach Ruhe kehren sie zurück', () => {
   const g = new Game({ seed: 3, city: true, startMoney: 5000 });
+  clearStart(g);
   const c = g.city[0];
   const z = g.zone;
   const zc = Math.floor(z.x / c.cell);
@@ -315,4 +327,17 @@ test('Angriff: Stadtgebäude nehmen Schaden, werden Ruine (Prämie), wachsen dan
   tank.alive = false; tank.hp = 0;
   run(g, CITY.ruinTime + CITY.growTime + 2);
   assert.equal(c.level[i], 1, 'wiederaufgebaut');
+});
+
+test('Startviertel: Raffinerie, Wohnen und Ölquelle stehen fertig, Treibstoff fließt', () => {
+  const g = new Game({ seed: 3, city: true });
+  for (const team of [0, 1]) {
+    const c = g.city[team];
+    const kinds = c.list.filter((i) => c.level[i]).map((i) => c.kind[i]);
+    assert.ok(kinds.includes(6) && kinds.includes(2) && kinds.includes(8), `Team ${team}: ${kinds}`);
+  }
+  const m = g.mainFob(0);
+  m.store.fuel = 0;
+  run(g, 30);
+  assert.ok(g.city[0].stats.fuel > 0 && m.store.fuel > 0, `TS ${m.store.fuel}`);
 });

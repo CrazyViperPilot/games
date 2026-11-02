@@ -172,7 +172,65 @@ export function createCity(game, enabled) {
     b.infinite = false; // endliches Lager: die Werke füllen es
     b.store = { ...CITY.startStock };
   }
-  for (const c of game.city) updateClaim(game, c);
+  for (const c of game.city) {
+    updateClaim(game, c);
+    startQuarter(game, c);
+    updateClaim(game, c);
+  }
+}
+
+/** Fertige Zelle setzen (Stufe 1) ohne Kosten und ohne Wartezeit: Startviertel. */
+function placeBuilt(game, c, i, kind) {
+  const col = i % c.cols;
+  const row = (i - col) / c.cols;
+  c.kind[i] = KIND_ID[kind];
+  if (kind !== 'road') {
+    if (!cellFree(game, c, col, row)) return;
+    occupyCell(game, c, col, row);
+    c.level[i] = 1;
+    syncEntity(game, c, i);
+  }
+}
+
+/** Startviertel (CITY.startQuarter): Straße und darunter Wohnen und Raffinerie nahe der Haupt-FOB, Ölquelle auf dem nächsten Öl. */
+function startQuarter(game, c) {
+  const m = game.mainFob(c.team);
+  if (!m) return;
+  const Q = CITY.startQuarter;
+  const n = Q.road;
+  const [fc, fr] = cellAt(c, m.x, m.y);
+  const ok = (i) => canZone(game, c, i) && !c.kind[i] && !c.deposit[i];
+  let best = null;
+  for (let r = Math.max(0, fr - 8); r <= Math.min(c.rows - 2, fr + 8); r++) {
+    for (let q = Math.max(0, fc - 8); q <= Math.min(c.cols - n, fc + 8); q++) {
+      let good = true;
+      for (let k = 0; good && k < n; k++) good = ok(r * c.cols + q + k) && ok((r + 1) * c.cols + q + k);
+      if (!good) continue;
+      const d = Math.abs(q + n / 2 - fc) + Math.abs(r - fr);
+      if (!best || d < best.d) best = { q, r, d };
+    }
+  }
+  if (best) {
+    for (let k = 0; k < n; k++) {
+      placeBuilt(game, c, best.r * c.cols + best.q + k, 'road');
+      const kind = Q.row[k];
+      if (kind) placeBuilt(game, c, (best.r + 1) * c.cols + best.q + k, kind);
+    }
+  }
+  let oil = -1;
+  let od = Infinity;
+  const D = DEPOSITS.indexOf('oil') + 1;
+  for (let i = 0; i < c.deposit.length; i++) {
+    if (c.deposit[i] !== D || !c.claim[i] || !canZone(game, c, i) || c.kind[i]) continue;
+    const q = i % c.cols;
+    const d = Math.hypot(q - fc, (i - q) / c.cols - fr);
+    if (d < od) {
+      od = d;
+      oil = i;
+    }
+  }
+  if (oil >= 0) placeBuilt(game, c, oil, 'mine');
+  rebuildList(c);
 }
 
 /** Zelle (Spalte, Zeile) eines Weltpunkts. */
