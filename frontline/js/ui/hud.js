@@ -9,6 +9,9 @@ import { heightMult } from '../game/combat.js';
 import { radios, radioLeft } from '../game/radio.js';
 import { SEASON_NAMES, WEATHER_NAMES, weatherEffect } from '../game/weather.js';
 import { RESEARCH_KEYS } from '../game/research.js';
+import { CITY } from '../data/city.js';
+import { KINDS, DEPOSITS, DEPOSIT_NAME, hasMarket, hasRoad } from '../game/city.js';
+import { CITY_TIP } from './citypanel.js';
 
 // Wettersymbole (16 × 16, Strichfarbe = currentColor)
 const WX_ICON = {
@@ -118,8 +121,8 @@ export class Hud {
     const g = this.game;
     const res = RES_KEYS.map(
       (k) =>
-        `<div class="res res-${k}" data-res="${k}"><i class="dot"></i><span class="lbl">${k === 'money' ? BALANCE.resNames[k] : `Front ${SHORT_RES[k]}`}</span>` +
-        `<b class="val">0</b><small class="rate">+0/s</small></div>`,
+        `<div class="res res-${k}" data-res="${k}"${k === 'money' && g.city ? ' data-act="market"' : ''}><i class="dot"></i><span class="lbl">${k === 'money' ? BALANCE.resNames[k] : `Front ${SHORT_RES[k]}`}</span>` +
+        `<b class="val">0</b><small class="rate">+0/s</small>${k === 'money' && g.city ? '<i class="mk-ico" aria-hidden="true">⚖</i>' : ''}</div>`,
     ).join('');
     const pts = [0, 1]
       .map(
@@ -185,6 +188,7 @@ export class Hud {
       else if (act.dataset.act === 'pause') this.app.togglePause?.();
       else if (act.dataset.act === 'help') this.app.toggleHelp?.();
       else if (act.dataset.act === 'city') this.app.toggleCity?.();
+      else if (act.dataset.act === 'market') this.app.toggleMarket?.();
       else if (act.dataset.act === 'sound') this.app.toggleSound?.();
       else if (act.dataset.act === 'view') this.app.toggleView?.();
       else if (act.dataset.act === 'rotl') this.app.rotateView?.(-1);
@@ -238,9 +242,12 @@ export class Hud {
       // Lagersorten: Summe aller fertigen FOB-Lager; Geld ist global
       const lines = [k === 'money' ? `Geld (global): je Einheit in der Konfliktzone ${fmtDe(BALANCE.zone.unitIncome)}/s, in der Hot Zone ${fmtDe(BALANCE.hot.unitIncome)}/s, je eingelagerte Versorgungskiste ${fmtDe(BALANCE.crates.income)}/s; bleibt von Runde zu Runde` : 'Front-Lager: Summe der FOB-Lager ohne Hauptstadt (die hat unendlich)'];
       if (t.used[k] !== undefined) lines.push(`verbraucht: ${Math.floor(t.used[k])}`);
+      if (k === 'money' && g.city) lines.push('Antippen: Marktmenü (mit fertigem Markt)');
       const tip = lines.join('\n');
       if (el.box.title !== tip) el.box.title = tip;
     }
+    // Geldanzeige als Knopf zum Marktmenü hervorheben, sobald ein Markt steht
+    if (g.city) this.res.money.box.classList.toggle('mk-on', hasMarket(g, this.team));
     for (let i = 0; i < 2; i++) {
       const tm = g.teams[i];
       const p = this.pts[i];
@@ -418,6 +425,7 @@ export class Hud {
 
   /** Gebäude: FOB (Lager, Baustelle), Baustelle (Fortschritt, Status), Förderanlage, Ausbildung. */
   buildingInfo(b) {
+    if (b.type === 'city') return this.cityInfo(b);
     const g = this.game;
     const f = b.hp / b.maxHp;
     const name = b.type === 'fob' ? fobLabel(g, b) : b.def.name;
@@ -468,6 +476,38 @@ export class Hud {
       if (rest.length) rows += `<div class="muted small">Warteschlange: ${rest.map((e) => esc(UNITS[e.unit].name)).join(', ')}</div>`;
       h += `<div class="queue">${rows}</div>`;
     }
+    return h;
+  }
+
+  /** Stadtgebäude (seit v4.94 antippbar): Stufe, Zustand, Wohn- oder Arbeitsplätze, Leistung, Warnungen (Straße, Strom, Flucht). */
+  cityInfo(b) {
+    const g = this.game;
+    const c = g.city[b.team];
+    const i = b.cityCell;
+    const k = KINDS[c.kind[i] - 1];
+    const lv = c.level[i];
+    const s = c.stats;
+    const f = b.hp / b.def.hp;
+    let h =
+      `<div class="title">${esc(b.def.name)} <small class="muted">Stufe ${lv} von ${CITY.maxLevel}</small></div>${bar(f, 'hp', hpColor(f))}` +
+      `<div class="muted small">${Math.ceil(b.hp)} / ${b.def.hp} HP</div>`;
+    const line = (t) => `<div class="small">${esc(t)}</div>`;
+    const PRODUCT = { bm: ['bm', 'BM'], mun: ['mun', 'MUN'], fuel: ['fuel', 'TS'], steel: ['metal', 'Metall'] };
+    if (k === 'res') h += line(`Wohnplätze ${CITY.housing[lv]} · Stadt: ${Math.floor(s.pop)} / ${s.housing} Einwohner`);
+    else if (k === 'com') h += line(`Arbeitsplätze ${CITY.jobsCom[lv]} · zahlt Steuern, macht die Stadt zufriedener`);
+    else if (k === 'market') h += line(`Arbeitsplätze ${CITY.jobsCom[lv]} · Handel: Knopf „Handel“ oder Geldanzeige oben antippen`);
+    else if (PRODUCT[k]) h += line(`Arbeitsplätze ${CITY.jobs[lv]} · Stadt gesamt +${fmtRate(s[PRODUCT[k][0]])} ${PRODUCT[k][1]}/s`);
+    else if (k === 'mine') {
+      const d = DEPOSITS[c.deposit[i] - 1];
+      h += line(`Arbeitsplätze ${CITY.jobsMine[lv]}${d ? ` · ${DEPOSIT_NAME[d]} gesamt ${fmtRate(s.raw[d])}/s` : ''}`);
+    } else if (k === 'power') h += line(`Liefert bis ${CITY.power.supply[lv]} Strom · Stadt ${Math.round(s.powerSupply)} / ${Math.round(s.powerUse)}`);
+    else if (k === 'uni') h += line(`Plätze ${CITY.jobsUni[lv]}`);
+    else if (k === 'dc') h += line(`Arbeitsplätze ${CITY.jobsDc[lv]}`);
+    if (CITY_TIP[k] && k !== 'market') h += `<div class="muted small">${esc(CITY_TIP[k])}</div>`;
+    const col = i % c.cols;
+    if (k !== 'mine' && !hasRoad(c, col, (i - col) / c.cols)) h += '<div class="warn small">Keine Straße daneben: wächst nicht weiter</div>';
+    if (s.powerRatio < 1 && CITY.power.use[k] && k !== 'res' && k !== 'com') h += `<div class="warn small">Strommangel: arbeitet mit ${Math.round(s.powerRatio * 100)} %</div>`;
+    if (k === 'res' && c.flee[i] > 0) h += `<div class="warn small">Bewohner geflohen (Beschuss), Rückkehr frühestens in ${Math.ceil(c.flee[i])} s</div>`;
     return h;
   }
 

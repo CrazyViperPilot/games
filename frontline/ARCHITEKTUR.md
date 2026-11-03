@@ -144,7 +144,7 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 | `movement.js`, `pathfinding.js`, `grid.js`, `formation.js` | Bewegung, A*-Wegsuche, Zellenraster, Formationen |
 | `combat.js` | Zielsuche, Direktfeuer, Mörser, Flugabwehr, Schaden |
 | `logistics.js`, `construction.js` | LKW, Nachfüllen, Transport; Bauen und Reparieren |
-| `city.js` (Daten `js/data/city.js`, UI `js/ui/citypanel.js`, Karte `js/render/citylayer.js`) | Zonenstadt um die Hauptstadt (PRD §15), Befehl `city`; Stadtgebäude belegen `grid.struct` mit `city.gridId` (keine Entity) |
+| `city.js` (Daten `js/data/city.js`, UI `js/ui/citypanel.js`, Karte `js/render/citylayer.js`) | Zonenstadt um die Hauptstadt (PRD §15), Befehl `city`; Stadtgebäude belegen `grid.struct` mit `city.gridId`; fertige Gebäude haben seit v4.83 eine Ziel-Entity (`kind: 'building'`, `type: 'city'`, nicht in `game.buildings`), die der Spieler seit v4.94 wählen kann |
 | `garrison.js`, `tower.js`, `crates.js`, `commander.js`, `radio.js` | Häuserkampf, Festung (Gefechtsturm, Dachaufbau, Ausbau-Befehl), Versorgungskisten, Kommandeur, Sendemast |
 | `weather.js`, `research.js`, `river.js` | Wetter und Jahreszeit, Forschungsstufen, Fluss mit Brücken und Furten |
 | `fog.js` | Nebel des Krieges je Team, Sicht im Gelände |

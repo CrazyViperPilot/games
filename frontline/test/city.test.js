@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
 import { CITY } from '../js/data/city.js';
 import { AI } from '../js/ai/ai.js';
-import { canZone, cityNoise, freePop, aiCity, aiDefend, aiRaid, hasRoad, KIND_ID } from '../js/game/city.js';
+import { canZone, cityNoise, freePop, aiCity, aiDefend, aiRaid, hasRoad, hasMarket, cityEntityAt, KIND_ID } from '../js/game/city.js';
 
 const run = (g, s) => { for (let t = 0; t < s * 20; t++) g.update(0.05); };
 // Ursprung (c, r) eines w × h großen, ganz bebaubaren Rechtecks im Gebiet des Teams, nahe der Hauptstadt
@@ -284,7 +284,14 @@ test('Markt: ohne Markt kein Handel, verkaufen und kaufen in Losen', () => {
   assert.match(g.issue(0, { type: 'trade', good: 'bm', dir: 'sell' }).reason, /Markt/);
   paint(g, 'road', 0, 0, 3, 0);
   paint(g, 'market', 0, 1, 0, 1);
+  assert.equal(hasMarket(g, 0), false); // ausgewiesen, noch nicht gewachsen
   run(g, CITY.growTime + 1);
+  assert.equal(hasMarket(g, 0), true); // Geldanzeige öffnet jetzt das Marktmenü (v4.94)
+  assert.equal(hasMarket(g, 1), false);
+  // das fertige Gebäude ist eine wählbare Entity des Teams (Auswahl zeigt Infos und Aktionen)
+  const mk = [...g.city[0].ents.values()].find((e) => g.city[0].kind[e.cityCell] === KIND_ID.market);
+  assert.ok(mk && mk.type === 'city' && mk.team === 0);
+  assert.equal(cityEntityAt(g, mk.x, mk.y), mk);
   const bm = m.store.bm;
   const money = g.teams[0].res.money;
   assert.ok(g.issue(0, { type: 'trade', good: 'bm', dir: 'sell' }).ok);

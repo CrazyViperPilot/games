@@ -13,7 +13,7 @@ import { Minimap } from './render/minimap.js';
 import { Controller } from './ui/controller.js';
 import { Input } from './ui/input.js';
 import { Hud } from './ui/hud.js';
-import { CityPanel } from './ui/citypanel.js';
+import { CityPanel, MarketPanel } from './ui/citypanel.js';
 import { showStartMenu, showPause, showHelp, showEnd, hideOverlay } from './ui/menu.js';
 import { pickMood, MOOD_SETTINGS } from './render/mood.js';
 import { snapshotGame, restoreGame, SAVE_FORMAT } from './game/savegame.js';
@@ -109,6 +109,7 @@ function stopSession() {
   s.input.destroy();
   window.removeEventListener('resize', s.onResize);
   s.cityPanel?.destroy();
+  s.market?.destroy();
   s.hud.destroy();
   clearCanvas();
 }
@@ -286,6 +287,19 @@ const app = {
     if (s.cityPanel.open) s.controller.cancel();
     s.hud.refresh?.();
   },
+  /** Marktmenü auf/zu (Geldanzeige, Aktion „Handel“ am Markt, Knopf „Handel“ im Baumodus); ohne fertigen Markt nur ein Hinweis. */
+  toggleMarket() {
+    const s = session;
+    if (!s || s.ended || !s.market || !overlay.hidden) return;
+    s.market.toggle();
+  },
+  /** Esc: offenes Marktmenü schließen; true, wenn es offen war. */
+  closeMarket() {
+    const m = session?.market;
+    if (!m?.open) return false;
+    m.toggle(false);
+    return true;
+  },
   /** Baumodus der Stadt offen? Dann die Stadtleiste (Input zieht damit Rechtecke auf der Karte). */
   cityBuild: () => (session?.cityPanel?.open && !session.ended ? session.cityPanel : null),
   toggleSound() {
@@ -313,6 +327,7 @@ function frame(s) {
   s.last = now;
   s.input.update(dt);
   s.cityPanel?.update();
+  s.market?.update();
   if (!s.loop.paused && !s.ended && now - s.lastSave > AUTOSAVE_MS) saveNow(s);
 
   for (const ev of s.game.drainEvents()) {
@@ -409,9 +424,12 @@ function buildSession(game, ai, opts, view) {
   };
   window.addEventListener('resize', onResize);
 
-  const cityPanel = game.city ? new CityPanel(hudRoot.parentElement ?? document.body, game, HUMAN, (t) => hud.pushMessage(t), (x, y) => camera.centerOn(x, y)) : null;
+  const cityPanel = game.city ? new CityPanel(hudRoot.parentElement ?? document.body, game, HUMAN, (t) => hud.pushMessage(t), (x, y) => camera.centerOn(x, y), () => app.toggleMarket()) : null;
   renderer.cityUi = cityPanel; // Baumodus: Gebiet und gezogenes Rechteck zeichnen (nur lesen)
-  const s = { game, ai, camera, renderer, minimap, controller, hud, input, cityPanel, onResize, loop: null, ended: false, last: null, settings: opts, saving: false, lastSave: performance.now() };
+  const market = game.city ? new MarketPanel(hudRoot.parentElement ?? document.body, game, HUMAN, (t) => hud.pushMessage(t)) : null;
+  controller.onMarket = () => app.toggleMarket();
+  controller.onCity = () => app.toggleCity();
+  const s = { game, ai, camera, renderer, minimap, controller, hud, input, cityPanel, market, onResize, loop: null, ended: false, last: null, settings: opts, saving: false, lastSave: performance.now() };
   s.loop = createLoop({
     tickRate: BALANCE.tickRate,
     update(dt) {

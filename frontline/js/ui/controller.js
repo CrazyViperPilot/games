@@ -1,6 +1,6 @@
 // Spieler-Steuerung (docs/verlauf.md §5 ui/controller.js, §11.3–11.8): Auswahl, Modi, Befehle und Befehlskarte. Kein DOM.
 // Hält den Ansichtszustand `view`, den renderer.render(view) liest. Befehle laufen nur über game.issue.
-import { cityEntityAt } from '../game/city.js';
+import { cityEntityAt, KINDS as CITY_KINDS } from '../game/city.js';
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
@@ -129,6 +129,8 @@ export class Controller {
     this.lastEvent = null; // Position der letzten Meldung (Leertaste)
     this.formation = 'loose'; // Formation für Marsch- und Angriffsbefehle (F schaltet weiter)
     this.onMessage = null; // Callback für HUD-Meldungen (text)
+    this.onMarket = null; // () => Marktmenü öffnen (main.js), Aktion „Handel“ eines gewählten Markts
+    this.onCity = null; // () => Baumodus der Stadt an/aus (main.js)
   }
 
   message(text) {
@@ -301,6 +303,29 @@ export class Controller {
     return best;
   }
 
+  /** Eigenes fertiges Stadtgebäude unter dem Weltpunkt (seit v4.94 wählbar) oder null. Isometrisch zählt auch ein Klick aufs Dach. */
+  pickCity(wx, wy) {
+    const g = this.game;
+    if (!g.city) return null;
+    const own = (e) => (e && e.team === this.team ? e : null);
+    const hit = own(cityEntityAt(g, wx, wy));
+    if (hit || !this.camera.iso) return hit;
+    const cam = this.camera;
+    const sp = cam.worldToScreen(wx, wy);
+    for (const lift of [TOWN_H.house * 0.6, TOWN_H.hall, TOWN_H.factory * 0.8]) {
+      const p = cam.screenToWorld(sp.x, sp.y + lift * cam.zoom);
+      const e = own(cityEntityAt(g, p.x, p.y));
+      if (e) return e;
+    }
+    return null;
+  }
+
+  /** Stadtgebäude aus der Auswahl nehmen (sie lassen sich nur einzeln wählen). */
+  dropCity() {
+    const sel = this.view.selection;
+    for (const id of [...sel]) if (this.game.getEntity(id)?.type === 'city') sel.delete(id);
+  }
+
   /** Eigene Besatzer des Hauses wählen (Klick aufs eigene besetzte Haus). */
   selectHouse(h, add) {
     const sel = this.view.selection;
@@ -322,11 +347,19 @@ export class Controller {
     if (!hit) {
       const h = this.pickHouse(wx, wy, (x) => x.team === this.team);
       if (h) {
+        this.dropCity();
         this.selectHouse(h, add);
+        return;
+      }
+      const cb = this.pickCity(wx, wy);
+      if (cb) {
+        sel.clear();
+        sel.add(cb.id);
         return;
       }
     }
     if (!add) sel.clear();
+    else this.dropCity();
     if (!hit) return;
     if (add && sel.has(hit.id)) sel.delete(hit.id);
     else sel.add(hit.id);
@@ -352,6 +385,7 @@ export class Controller {
       return;
     }
     if (!add) sel.clear();
+    else this.dropCity();
     for (const u of units) sel.add(u.id);
   }
 
@@ -473,6 +507,13 @@ export class Controller {
     const ownHouse = hit ? null : this.pickHouse(wx, wy, (h) => h.team === this.team);
     if (ownHouse && !this.selectedUnits().some((u) => canGarrison(u) && u.house !== ownHouse.id)) {
       this.selectHouse(ownHouse, shift);
+      return;
+    }
+    // Eigenes Stadtgebäude: wählen (Info und Aktionen, z. B. Handel am Markt), auch wenn Einheiten gewählt sind
+    const cityHit = hit || ownHouse ? null : this.pickCity(wx, wy);
+    if (cityHit) {
+      this.view.selection.clear();
+      this.view.selection.add(cityHit.id);
       return;
     }
     // Standardaktion mit gewählten Einheiten: Tippen auf Boden = Gehen, auf sichtbaren Gegner = Angriff (ohne Angriff-Knopf)
@@ -1199,6 +1240,7 @@ export class Controller {
     const sel = this.selected();
     const units = sel.filter((e) => e.kind === 'unit');
     const blds = sel.filter((e) => e.kind === 'building');
+    if (!units.length && blds.length === 1 && blds[0].type === 'city') return this.cityCard(blds[0]);
     if (!units.length && blds.length) return this.buildingCard(blds);
 
     const perm = this.buildPermission();
@@ -1348,6 +1390,29 @@ export class Controller {
         }),
       );
     }
+    return card;
+  }
+
+  /** Gewähltes Stadtgebäude: Handel (nur Markt), Baumodus, Abreißen (wie „Räumen“ im Baumodus, ohne Erstattung). */
+  cityCard(b) {
+    const c = this.game.city[b.team];
+    const i = b.cityCell;
+    const col = i % c.cols;
+    const row = (i - col) / c.cols;
+    const card = [];
+    if (CITY_KINDS[c.kind[i] - 1] === 'market') {
+      card.push(entry('Handel', 'T', { tip: 'Marktmenü: Waren kaufen und verkaufen (T, auch über die Geldanzeige oben)', action: () => this.onMarket?.() }));
+    }
+    card.push(
+      entry('Baumodus', 'Y', { tip: 'Baumodus der Stadt öffnen (Y)', action: () => this.onCity?.() }),
+      entry('Abreißen', 'Entf', {
+        tip: `${b.def.name} abreißen (Entf): kostenlos, keine Erstattung`,
+        action: () => {
+          this.issue({ type: 'city', kind: 'erase', c0: col, r0: row, c1: col, r1: row });
+          this.view.selection.delete(b.id);
+        },
+      }),
+    );
     return card;
   }
 

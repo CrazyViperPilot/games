@@ -1241,6 +1241,7 @@ export class Renderer {
 
   /** Sammelpunkt-Linie mit kleiner Flagge. */
   drawRally(ctx, b, z) {
+    if (b.rallyX === undefined) return; // Stadtgebäude haben keinen Sammelpunkt
     ctx.save();
     ctx.strokeStyle = hexA(ACCENT, 0.75);
     ctx.fillStyle = ACCENT;

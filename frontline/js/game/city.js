@@ -633,6 +633,14 @@ export function forEnemyCity(game, team, x, y, radius, fn) {
   }
 }
 
+/** Hat `team` mindestens einen fertigen Markt? (Handel, Marktmenü über die Geldanzeige) */
+export function hasMarket(game, team) {
+  const c = game.city?.[team];
+  if (!c) return false;
+  for (const i of c.list) if (c.kind[i] === KIND_ID.market && c.level[i]) return true;
+  return false;
+}
+
 /**
  * Befehl `{ type: 'trade', good: 'bm'|'mun'|'fuel'|'metal', dir: 'sell'|'buy' }`: ein Los (CITY.market.lot) am Markt handeln.
  * Braucht einen fertigen eigenen Markt. BM, MUN, TS liegen im Lager der Hauptstadt, Metall im Stadtlager.
@@ -641,9 +649,7 @@ export function cmdTrade(game, team, cmd) {
   const c = game.city?.[team];
   if (!c) return { ok: false, reason: 'Die Stadt ist in dieser Partie ausgeschaltet' };
   if (!GOODS.includes(cmd.good) || (cmd.dir !== 'sell' && cmd.dir !== 'buy')) return { ok: false, reason: 'Unbekannter Handel' };
-  let market = false;
-  for (const i of c.list) if (c.kind[i] === KIND_ID.market && c.level[i]) market = true;
-  if (!market) return { ok: false, reason: 'Erst einen Markt bauen' };
+  if (!hasMarket(game, team)) return { ok: false, reason: 'Erst einen Markt bauen' };
   const main = game.mainFob(team);
   if (!main && cmd.good !== 'metal') return { ok: false, reason: 'Hauptstadt zerstört' };
   const M = CITY.market;
