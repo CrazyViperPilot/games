@@ -1,7 +1,7 @@
 // Simfurt Service Worker: network-first, Cache nur als Offline-Fallback. Eigener Cache (Präfix simfurt-).
 // Bei Änderungen an Dateien CACHE_NAME hochzählen. API-Aufrufe (anderer Ursprung) werden nie gecacht.
 const CACHE_PREFIX = 'simfurt-';
-const CACHE_NAME = CACHE_PREFIX + 'v1';
+const CACHE_NAME = CACHE_PREFIX + 'v2';
 const ASSETS = ['./', './index.html', './style.css', './manifest.json', './js/main.js', './js/sim.js', './js/data.js', './js/render.js', './js/save.js',
   './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png'];
 

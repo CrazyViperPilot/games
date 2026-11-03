@@ -1,5 +1,5 @@
 // Simfurt – Oberfläche, Eingabe (Touch + Maus), Spielschleife.
-import { N, BUILD, CATS, ZONES, OVERLAYS, MONTHS, Z_R, Z_C, Z_I, Z_B, ZONE_UNLOCK, CITY_NAMES, START_MONEY } from './data.js';
+import { N, MAP_SIZES, BUILD, CATS, ZONES, OVERLAYS, MONTHS, Z_R, Z_C, Z_I, Z_B, ZONE_UNLOCK, CITY_NAMES, START_MONEY } from './data.js';
 import {
   newCity, tick, refresh, applyTool, toolCost, placeBuilding, canPlace, unlocked, unlockNeed, tileInfo, takeLoan, repayLoan, inb, idx, roadAt, dateStr, say,
 } from './sim.js';
@@ -366,11 +366,11 @@ async function startLoad(n) {
 function newGameDialog(n) {
   const name = CITY_NAMES[Math.floor(Math.random() * CITY_NAMES.length)];
   sheet('Neue Stadt', `<p>Dein Main fließt irgendwo durch die Karte. Platz ${n} wird überschrieben.</p>
-    <input type="text" id="nName" value="${name}" maxlength="24"><div class="chk" style="margin-top:10px"><input type="checkbox" id="nDis" checked><label for="nDis">Katastrophen</label></div>
+    <input type="text" id="nName" value="${name}" maxlength="24"><h3 class="sec">Kartengröße</h3><select id="nSize" style="width:100%;padding:10px;border-radius:10px;background:var(--bg);color:var(--text);border:1px solid var(--line);font:inherit">${MAP_SIZES.map((n) => `<option value="${n}">${n} × ${n}${n === 64 ? ' (klein, flott)' : n === 128 ? ' (groß wie im Original)' : ''}</option>`).join('')}</select><div class="chk" style="margin-top:10px"><input type="checkbox" id="nDis" checked><label for="nDis">Katastrophen</label></div>
     <button class="btn pri" id="nGo">Los geht's – ${eur(START_MONEY)} Startkapital</button><button class="btn" id="nBack">Zurück</button>`);
   $('nBack').onclick = () => openMenu(!S);
   $('nGo').onclick = () => {
-    const s = newCity({ name: $('nName').value.trim() || 'Simfurt', seed: (Math.random() * 1e9) | 0 });
+    const s = newCity({ name: $('nName').value.trim() || 'Simfurt', seed: (Math.random() * 1e9) | 0, size: Number($('nSize').value) });
     s.disasters = $('nDis').checked;
     startGame(s, n); saveNow(false);
   };

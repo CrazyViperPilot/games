@@ -1,10 +1,11 @@
 // Simfurt – Simulation (reine Logik, ohne DOM). Ein Tick = ein Monat.
 import {
-  N, START_MONEY, START_YEAR, T_GRASS, T_WATER, T_TREES, Z_NONE, Z_R, Z_C, Z_I, Z_B, ZONES, BUILD,
+  N, setMapSize, START_MONEY, START_YEAR, T_GRASS, T_WATER, T_TREES, Z_NONE, Z_R, Z_C, Z_I, Z_B, ZONES, BUILD,
   ROAD_COST, BRIDGE_COST, BULLDOZE_COST, ROAD_UPKEEP, ZONE_UNLOCK, MILESTONES, MONTHS,
 } from './data.js';
 
-export const NN = N * N;
+export let NN = N * N;
+export function setSize(n) { setMapSize(n); NN = n * n; }
 export const idx = (x, y) => y * N + x;
 export const inb = (x, y) => x >= 0 && y >= 0 && x < N && y < N;
 
@@ -19,9 +20,10 @@ const rint = (s, n) => Math.floor(rand(s) * n);
 const hash = (i, k = 0) => { let h = Math.imul(i + 1 + k * 7919, 0x9E3779B1); h ^= h >>> 15; h = Math.imul(h, 0x85EBCA6B); return ((h ^ (h >>> 13)) >>> 0) / 4294967296; };
 
 // ---------------------------------------------------------------- Neue Stadt / Karte
-export function newCity({ name = 'Simfurt', seed = 1 } = {}) {
+export function newCity({ name = 'Simfurt', seed = 1, size = 64 } = {}) {
+  setSize(size);
   const s = {
-    v: 1, name, seed, rng: (seed * 2654435761) >>> 0, year: START_YEAR, month: 0, money: START_MONEY, loan: 0,
+    v: 1, size, name, seed, rng: (seed * 2654435761) >>> 0, year: START_YEAR, month: 0, money: START_MONEY, loan: 0,
     rates: { r: 9, c: 9, i: 9 }, disasters: true,
     terrain: new Uint8Array(NN), road: new Uint8Array(NN), zone: new Uint8Array(NN), lvl: new Uint8Array(NN),
     vr: new Uint8Array(NN), occ: new Uint16Array(NN), fire: new Uint8Array(NN), flood: new Uint8Array(NN),
@@ -60,7 +62,7 @@ function generateMap(s) {
     nx += (rand(s) - 0.5) * 1.4;
     const xi = Math.round(nx); if (xi > 1 && xi < N - 2) { s.terrain[idx(xi, y)] = T_WATER; }
   }
-  const n1 = noise(s, 6), n2 = noise(s, 14);
+  const sc = N / 64, n1 = noise(s, Math.round(6 * sc)), n2 = noise(s, Math.round(14 * sc));
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const i = idx(x, y);
     if (s.terrain[i] === T_WATER) continue;
@@ -70,7 +72,7 @@ function generateMap(s) {
   // Startfläche am Fluss freihalten
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const i = idx(x, y);
-    if (s.terrain[i] === T_TREES && (x > 18 && x < 46 && y > 14 && y < 50) && hash(i, 3) < 0.65) s.terrain[i] = T_GRASS;
+    if (s.terrain[i] === T_TREES && (x > N * 0.28 && x < N * 0.72 && y > N * 0.22 && y < N * 0.78) && hash(i, 3) < 0.65) s.terrain[i] = T_GRASS;
   }
 }
 

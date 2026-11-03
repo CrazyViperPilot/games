@@ -8,7 +8,7 @@ Eigenständiges Städtebauspiel im Frankfurter Gewand (Main, Skyline, Bankenvier
 - Spielstand lokal (IndexedDB) **und** auf Daniels Webspace (PHP, `simfurt/api.php` im Repo `CrazyViperPilot/vipervocs`, Deploy per dortiger Action, analog Frontline/Fruhno).
 
 ## Spielprinzip
-Karte 64×64 Kacheln mit Fluss (Main) und Wald, isometrisch (Canvas 2D, Sprite-Cache). Ein Tick = ein Monat (Start Januar 1990). Der Spieler legt Straßen, Zonen, Kraftwerke und Dienste an; die Stadt wächst automatisch nach Nachfrage.
+Karte wählbar 64×64, 96×96 oder 128×128 Kacheln (Größe wie im Original: 128; im Neue-Stadt-Dialog, im Spielstand gespeichert) mit Fluss (Main) und Wald, isometrisch (Canvas 2D, Sprite-Cache). Ein Tick = ein Monat (Start Januar 1990). Der Spieler legt Straßen, Zonen, Kraftwerke und Dienste an; die Stadt wächst automatisch nach Nachfrage.
 
 ### Zonen (Rechteck ziehen, 10 €/Kachel, Bankenviertel 30 €)
 Wohnen (R), Gewerbe (C), Industrie (I), **Bankenviertel (B, ab 3.000 Einw.)** mit bis zu 4 Stufen (Skyline: Pyramiden-, Antennen-, Zwillingsdächer). R/C/I haben 3 Stufen. Eine Parzelle entwickelt sich nur mit **Straße** (≤ 2 Kacheln) und **Strom**. Stufenaufstieg hängt am **Grundwert** (und bei Banken an Bildung, bei Wohnen an Luft).
@@ -40,4 +40,4 @@ Strom: Gaskraftwerk, Windpark (ab 800), Solarpark (ab 4.000). Dienste: Polizei, 
 Vanilla ES-Module, kein Build. `js/data.js` (Daten), `js/sim.js` (Logik), `js/render.js` (isometrische Sprites, Autos, Overlays), `js/save.js`, `js/main.js` (UI/Eingabe/Schleife). Tests: `node simfurt/test/sim.test.js` (Workflow `test-simfurt.yml`). Service Worker network-first, Cache-Name in `sw.js` bei Änderungen hochzählen.
 
 ## Bewusst offen / Ideen
-Sound und Musik, Tag/Nacht, Wasserversorgung, Schienen/S-Bahn, Szenarien (z. B. Hochwasser 1995), Hochwasserschutz-Deiche, Bevölkerungsgruppen, höhere Karten (Hügel/Taunus), Kartengröße wählbar, Rückgängig-Knopf.
+Sound und Musik, Tag/Nacht, Wasserversorgung, Schienen/S-Bahn, Szenarien (z. B. Hochwasser 1995), Hochwasserschutz-Deiche, Bevölkerungsgruppen, höhere Karten (Hügel/Taunus), Rückgängig-Knopf.

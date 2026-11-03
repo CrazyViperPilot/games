@@ -1,5 +1,7 @@
 // Simfurt – Spieldaten: Karte, Zonen, Gebäude, Freischaltungen. Keine Abhängigkeit von DOM (läuft auch in Node-Tests).
-export const N = 64;                 // Kartenkante in Kacheln
+export let N = 64;                   // Kartenkante in Kacheln (wählbar: 64, 96, 128)
+export const MAP_SIZES = [64, 96, 128];
+export function setMapSize(n) { N = n; }
 export const START_MONEY = 40000;
 export const START_YEAR = 1990;
 export const MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];

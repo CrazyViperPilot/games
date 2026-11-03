@@ -409,7 +409,7 @@ export class Renderer {
   tileCenter(x, y) { return [(x - y) * 32 + this.cam.x * 0, (x + y) * 16 + 16]; }
   clampCam() {
     const c = this.cam; const lim = N * 32 + 120;
-    c.x = Math.max(-lim * 0.75, Math.min(lim * 0.75, c.x)); c.y = Math.max(-40, Math.min(N * 32 + 40, c.y));
+    c.x = Math.max(-lim * 0.95, Math.min(lim * 0.95, c.x)); c.y = Math.max(-40, Math.min(N * 32 + 40, c.y));
     c.z = Math.max(0.3, Math.min(2.4, c.z));
   }
   centerOn(tx, ty) { this.cam.x = (tx - ty) * 32; this.cam.y = (tx + ty) * 16 + 16; this.clampCam(); }

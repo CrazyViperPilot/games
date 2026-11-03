@@ -102,4 +102,19 @@ test('Alle Gebäude haben Größe, Kosten und Freischaltung', () => {
   for (const [k, b] of Object.entries(BUILD)) { assert.ok(b.w > 0 && b.h > 0 && b.cost > 0 && b.unlock >= 0 && b.name, k); }
 });
 
+test('Kartengröße 128: Karte, Wachstum und Speichern passen', () => {
+  const s = newCity({ seed: 2, size: 128 }); s.disasters = false; s.money = 1e6; s.peakPop = 1e6;
+  assert.strictEqual(N, 128); assert.strictEqual(s.terrain.length, 128 * 128);
+  assert.ok(s.terrain.filter((t) => t === T_WATER).length > 500);
+  for (let x = 40; x < 80; x++) applyTool(s, 'road', x, 30);
+  for (let x = 40; x < 80; x++) for (let y = 26; y < 29; y++) applyTool(s, 'zone1', x, y);
+  placeBuilding(s, 'gas', 55, 32);
+  const t0 = Date.now(); for (let k = 0; k < 24; k++) tick(s);
+  console.log('   24 Ticks (128): ' + (Date.now() - t0) + ' ms');
+  assert.ok(s.stats.pop > 0);
+  const r = deserialize(serialize(s));
+  assert.strictEqual(N, 128); assert.deepStrictEqual(r.lvl, s.lvl); assert.strictEqual(r.stats.pop, s.stats.pop);
+  const small = deserialize(serialize(newCity({ seed: 1 }))); assert.strictEqual(N, 64); assert.strictEqual(small.terrain.length, 4096);
+});
+
 console.log(`${n} Tests ok`);

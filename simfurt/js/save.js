@@ -15,7 +15,7 @@ export { toB64, fromB64 };
 
 export function serialize(s) {
   const o = {
-    format: FORMAT, name: s.name, seed: s.seed, rng: s.rng, year: s.year, month: s.month, money: s.money, loan: s.loan, rates: s.rates, disasters: s.disasters,
+    format: FORMAT, size: N, name: s.name, seed: s.seed, rng: s.rng, year: s.year, month: s.month, money: s.money, loan: s.loan, rates: s.rates, disasters: s.disasters,
     bld: s.bld, nextId: s.nextId, ms: s.ms, msgs: s.msgs.slice(-30), hist: s.hist, occupancy: s.occupancy, demand: s.demand, ticks: s.ticks, seen: s.seen, peakPop: s.peakPop || 0,
   };
   for (const k of ARR) o[k] = toB64(s[k]);
@@ -25,7 +25,7 @@ export function serialize(s) {
 export function deserialize(text) {
   const o = JSON.parse(text);
   if (o.format !== FORMAT) throw new Error('Unbekanntes Format');
-  const s = newCity({ name: o.name, seed: o.seed });
+  const s = newCity({ name: o.name, seed: o.seed, size: o.size || 64 });
   for (const k of ['rng', 'year', 'month', 'money', 'loan', 'rates', 'disasters', 'bld', 'nextId', 'ms', 'msgs', 'hist', 'occupancy', 'demand', 'ticks', 'seen', 'peakPop']) if (o[k] !== undefined) s[k] = o[k];
   for (const k of ARR) { const u = fromB64(o[k]); if (u.length !== N * N) throw new Error('Kartengröße passt nicht'); s[k].set(u); }
   s.occ.fill(0);
@@ -35,7 +35,7 @@ export function deserialize(text) {
 }
 
 export function metaOf(s) {
-  return { savedAt: Date.now(), format: FORMAT, name: s.name, year: s.year, month: s.month, pop: s.stats ? s.stats.pop : 0, money: Math.round(s.money) };
+  return { savedAt: Date.now(), format: FORMAT, size: N, name: s.name, year: s.year, month: s.month, pop: s.stats ? s.stats.pop : 0, money: Math.round(s.money) };
 }
 
 // ---------------------------------------------------------------- Komprimierung
