@@ -566,6 +566,10 @@ body.city-mode:not(.city-folded) .city-fab { display: none; }
 /* Großer Stadt-Knopf für Touch (ohne Tastatur), nur bei eingeschalteter Stadt */
 .city-fab { position: fixed; right: calc(10px + env(safe-area-inset-right, 0px)); top: 50px; z-index: 20; min-height: 44px; padding: 0 16px; border-radius: 10px; border: 2px solid var(--accent); background: #1d231df0; color: var(--text); font-size: 15px; font-weight: 700; cursor: pointer; pointer-events: auto; }
 .city-fab:active { background: #2e372e; }
+/* Baufahrzeug-Knopf (seit v4.95): unter dem Stadt-Knopf, ohne Stadt an dessen Stelle */
+.builder-fab { top: 104px; }
+.builder-fab.no-city { top: 50px; }
+body.city-mode:not(.city-folded) .builder-fab { top: 50px; }
 
 /* Gespeicherte Partie im Startmenü (ui/saves.js) */
 .resume { margin: 8px 0 14px; padding: 10px 12px; border: 1px solid var(--muted); border-radius: 8px; text-align: center; font-size: 14px; }

@@ -133,6 +133,7 @@ export class Hud {
       )
       .join('');
     return `
+      <button type="button" class="city-fab builder-fab${g.city ? '' : ' no-city'}" data-act="builder" title="Nächstes Baufahrzeug (J)">🚧 Bauer</button>
       ${g.city ? '<button type="button" class="city-fab" data-act="city" title="Stadt verwalten (Y)">🏙 Stadt</button>' : ''}
       <header class="top">
         <div class="res-row">${res}</div>
@@ -187,6 +188,7 @@ export class Hud {
       if (act.dataset.act === 'speed') this.app.cycleSpeed?.();
       else if (act.dataset.act === 'pause') this.app.togglePause?.();
       else if (act.dataset.act === 'help') this.app.toggleHelp?.();
+      else if (act.dataset.act === 'builder') this.app.nextBuilder?.();
       else if (act.dataset.act === 'city') this.app.toggleCity?.();
       else if (act.dataset.act === 'market') this.app.toggleMarket?.();
       else if (act.dataset.act === 'sound') this.app.toggleSound?.();

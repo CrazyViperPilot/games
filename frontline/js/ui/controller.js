@@ -389,6 +389,22 @@ export class Controller {
     for (const u of units) sel.add(u.id);
   }
 
+  /** Seit v4.95: wählt das nächste eigene Baufahrzeug (builder 'all') und gibt es zurück; wiederholt = reihum durch alle. */
+  selectNextBuilder() {
+    const list = this.game.units.filter((u) => u.alive && !u.house && u.team === this.team && u.def.builder === 'all').sort((a, b) => a.id - b.id);
+    if (!list.length) {
+      this.message('Kein Baufahrzeug vorhanden.');
+      return null;
+    }
+    const cur = this.selectedUnits().length === 1 ? this.selectedUnits()[0] : null;
+    const i = cur ? list.findIndex((u) => u.id === cur.id) : -1;
+    const u = list[(i + 1) % list.length];
+    const sel = this.view.selection;
+    sel.clear();
+    sel.add(u.id);
+    return u;
+  }
+
   /** Alle eigenen Einheiten dieses Typs im sichtbaren Ausschnitt. */
   selectSameType(id) {
     const e = this.game.getEntity(id);

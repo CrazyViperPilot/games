@@ -327,6 +327,12 @@ export class Input {
     else this.goHome();
   }
 
+  /** J / Knopf „Bauer“: nächstes Baufahrzeug wählen und Kamera darauf. */
+  nextBuilder() {
+    const u = this.controller.selectNextBuilder();
+    if (u) this.camera.centerOn(u.x, u.y);
+  }
+
   goHome() {
     const h = this.controller.homeBase();
     if (h) this.camera.centerOn(h.x, h.y);
@@ -384,6 +390,10 @@ export class Input {
         if (app.closeMarket?.()) return; // Marktmenü zuerst schließen
         if (app.cityBuild?.()) app.toggleCity?.();
         else this.controller.cancel();
+        return;
+      case 'j':
+      case 'J':
+        this.nextBuilder();
         return;
       case 'h':
       case 'H':

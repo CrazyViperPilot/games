@@ -27,6 +27,7 @@ const KEYS = [
   ['S', 'Stopp'],
   ['F', 'Formation wechseln: Locker, Linie, Keil, Kolonne (Panzer vorn, Gruppe marschiert geschlossen)'],
   ['Wetter', 'Falls im Startmenü an: Regen und Schnee −20 % Sicht, Nebel −35 % · Schneefall bremst Fahrzeuge um 20 %, Winterboden um 10 % · das Wetter wechselt alle paar Minuten (Anzeige oben, antippen erklärt es) · bei schlechter Sicht lohnt ein Späher'],
+  ['J', 'Nächstes Baufahrzeug wählen und Kamera darauf (auch Knopf „Bauer“ rechts oben); wiederholt = reihum durch alle'],
   ['B', 'Baumenü: Baufahrzeug alles (E Mauer, R Tor, T Mörser, Z Flak, V Gefechtsturm, X Bohrer, G Sendemast, F FOB-Baustelle) · Soldaten nur E Mauer, R Tor'],
   ['Festung', 'FOB gewählt: H = zur Festung ausbauen (Mauerring mit vier Toren, zwei Gefechtstürme an den Ecken zum Gegner) · Soldaten gewählt: Rechtsklick oder Tippen auf einen fertigen Turm besetzt ihn (3 Plätze, geschützt, mehr Reichweite) · Turm gewählt: T Mörser, Z Flak, N SAM aufs Dach (feuert nur mit Besatzung, Munition aus dem FOB-Lager), O Besatzung raus'],
   ['Bauen', 'Gebäude brauchen einen Bauer daneben: Baufahrzeug oder Soldaten (nur Mauer/Tor, aus getragenem Baumaterial, im Bauradius einer FOB)'],

@@ -278,6 +278,13 @@ const app = {
     s.loop.speed = SPEEDS[(nearestSpeedIndex(s.loop.speed) + 1) % SPEEDS.length];
     s.hud.pushMessage(`Tempo ${s.loop.speed}×`);
   },
+  /** Nächstes Baufahrzeug wählen und anfahren (J, Knopf „Bauer“). */
+  nextBuilder() {
+    const s = session;
+    if (!s || s.ended || !overlay.hidden) return;
+    s.input.nextBuilder();
+    s.hud.refresh?.();
+  },
   toggleCity() {
     const s = session;
     if (!s || s.ended || !s.cityPanel) return;
