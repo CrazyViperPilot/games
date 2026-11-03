@@ -52,6 +52,30 @@ const KEYS = [
   ['Minimap', 'Linksklick = Kamera, Rechtsklick = Bewegen'],
 ];
 
+// Vollbild (wie Katzen-Queens): installiert startet die App per Manifest (`display: fullscreen`) ohne Status- und Navigationsleiste.
+// Im Browser-Tab, oder solange Android das geänderte Manifest einer schon installierten App noch nicht übernommen hat,
+// schaltet der Schalter im Start- und Pausenmenü die Fullscreen API. Läuft die App schon per Manifest im Vollbild, bleibt er verborgen.
+const fsOn = () => !!document.fullscreenElement;
+const fsToggleable = () =>
+  !!document.documentElement.requestFullscreen && document.fullscreenEnabled !== false &&
+  (fsOn() || !matchMedia('(display-mode: fullscreen)').matches);
+function setFullscreen(on) {
+  if (on === fsOn()) return;
+  const p = on ? document.documentElement.requestFullscreen({ navigationUI: 'hide' }) : document.exitFullscreen();
+  p?.catch?.(() => {});
+}
+/** Schalter im offenen Menü an den Vollbild-Zustand anpassen (auch nach Zurück-Geste oder Esc). */
+function markFullscreen(root) {
+  root.querySelectorAll('[data-fsbox]').forEach((el) => { el.hidden = !fsToggleable(); });
+  root.querySelectorAll('[data-fs]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.fs === '1') === fsOn())));
+}
+if (typeof document !== 'undefined') {
+  document.addEventListener('fullscreenchange', () => {
+    const root = document.getElementById('overlay');
+    if (root && !root.hidden) markFullscreen(root);
+  });
+}
+
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 function fmtTime(s) {
@@ -187,6 +211,10 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
         <span class="flabel" title="Schüsse, Explosionen, Fahrzeuge, Wetter und Meldungen; selbst erzeugt, ohne Dateien. Im Spiel: Taste F2 oder der Lautsprecher-Knopf oben">Ton</span>
         <div class="seg"><button type="button" data-sound="1">An</button><button type="button" data-sound="0">Aus</button></div>
       </div>
+      <div class="field" data-fsbox hidden>
+        <span class="flabel" title="Ohne Status- und Navigationsleiste spielen. Installiert startet Frontline von selbst im Vollbild">Vollbild</span>
+        <div class="seg"><button type="button" data-fs="1">An</button><button type="button" data-fs="0">Aus</button></div>
+      </div>
       <div class="field">
         <span class="flabel">Karte</span>
         <div class="seg">
@@ -236,6 +264,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
     root.querySelectorAll('[data-city]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.city === '1') === city)));
     root.querySelectorAll('[data-river]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.river === '1') === river)));
     root.querySelectorAll('[data-sound]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.sound === '1') === sound)));
+    markFullscreen(root);
   };
   const renderMapBox = () => {
     const box = root.querySelector('[data-mapbox]');
@@ -347,6 +376,8 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
     } else if (b.dataset.river) {
       river = b.dataset.river === '1';
       writeFlag(RIVER_KEY, river);
+    } else if (b.dataset.fs) {
+      setFullscreen(b.dataset.fs === '1');
     } else if (b.dataset.sound) {
       sound = b.dataset.sound === '1';
       writeFlag(SOUND_KEY, sound);
@@ -383,6 +414,10 @@ export function showPause(root, onResume, onQuit, onSave = null) {
         <button type="button" class="primary" data-act="resume">Weiter (P)</button>
         <button type="button" data-act="quit">Speichern und zum Startmenü</button>
       </div>
+      <div class="field" data-fsbox hidden>
+        <span class="flabel">Vollbild</span>
+        <div class="seg"><button type="button" data-fs="1">An</button><button type="button" data-fs="0">Aus</button></div>
+      </div>
       <p class="muted small center" data-savestate></p>
     </section>`,
   );
@@ -390,7 +425,10 @@ export function showPause(root, onResume, onQuit, onSave = null) {
     const el = root.querySelector('[data-savestate]');
     if (el) el.textContent = t;
   });
+  markFullscreen(root);
   root.onclick = (e) => {
+    const f = e.target.closest('[data-fs]');
+    if (f) return setFullscreen(f.dataset.fs === '1');
     const b = e.target.closest('[data-act]');
     if (!b) return;
     hideOverlay(root);
