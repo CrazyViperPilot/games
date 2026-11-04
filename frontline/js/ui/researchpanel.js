@@ -13,6 +13,13 @@ const LANES = Object.keys(R.lanes);
 const TIERS = Array.from({ length: R.tiers }, (_, i) => i + 1);
 const fmt = (v) => Math.floor(v).toLocaleString('de-DE');
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+/** innerHTML nur bei Änderung setzen (seit v5.12): ein Neubau zwischen Fingerauflegen und Loslassen schluckt sonst den Tipp
+ *  auf einen Knopf darin („Erforschen“, ✕). Was sich laufend ändert (Balken, Restzeit, fehlendes Geld), setzen die *Live-Teile direkt. */
+function setHtml(el, html) {
+  if (el.rsHtml === html) return;
+  el.rsHtml = html;
+  el.innerHTML = html;
+}
 
 export class ResearchPanel {
   constructor(parent, game, team, onMessage = () => {}) {
@@ -148,29 +155,51 @@ export class ResearchPanel {
       h.className = `rs-tier${t <= tech.tier ? ' open' : ''}${n >= R.perTier ? ' full' : ''}`;
       h.querySelector('small').textContent = t > tech.tier ? '🔒' : `${Math.min(n, R.perTier)} / ${R.perTier}${n > R.perTier ? ` (+${n - R.perTier})` : ''}`;
     }
-    this.root.querySelector('[data-rs-cur]').innerHTML = this.queueHtml();
-    this.root.querySelector('[data-rs-info]').innerHTML = this.infoHtml();
+    setHtml(this.root.querySelector('[data-rs-cur]'), this.queueHtml());
+    this.queueLive();
+    setHtml(this.root.querySelector('[data-rs-info]'), this.infoHtml());
+    this.infoLive();
   }
 
-  /** Warteschlange: laufende Forschung mit Balken und Restzeit, dahinter die wartenden; je ✕ zum Abbrechen. */
+  /** Warteschlange: laufende Forschung mit Balken und Restzeit (queueLive), dahinter die wartenden; je ✕ zum Abbrechen. */
   queueHtml() {
     const g = this.game;
     const tech = g.teams[this.team].tech;
     if (!g.mainFob(this.team)) return '<b class="rs-warn">Keine Hauptstadt: Forschung ruht</b>';
-    const sp = researchSpeed(g, this.team);
     let h = `<b>Warteschlange</b>`;
     if (g.city && cityLevel(g, this.team, 'uni') < 1) h += '<small class="rs-warn">Ohne Universität ruht die Forschung (Stadt: Universität bauen)</small>';
     if (!tech.cur) return `${h}<span class="rs-muted">Keine Forschung läuft. Bis zu ${R.queueMax + 1} lassen sich einreihen.</span>`;
     const it = R.items[tech.cur.key];
-    const left = sp > 0 ? Math.ceil((it.time - tech.cur.t) / sp) : Infinity;
     h += `<div class="rs-q cur"><span>${esc(it.name)}</span><button type="button" class="btn-sm" data-rs-cancel="${tech.cur.key}" title="Abbrechen: das Geld kommt ganz zurück">✕</button></div>` +
-      `<div class="rs-bar"><i style="width:${Math.min(100, (tech.cur.t / it.time) * 100)}%"></i></div>` +
-      `<small class="rs-muted">${Number.isFinite(left) ? `noch ${left} s` : 'steht'}${g.city && Number.isFinite(left) ? ` · ${citySum(g, this.team, 'dc')} Rechenzentrum-Stufen` : ''}</small>`;
+      `<div class="rs-bar"><i data-rs-bar></i></div><small class="rs-muted" data-rs-left></small>`;
     tech.queue.forEach((k, i) => {
       h += `<div class="rs-q"><span>${i + 1}. ${esc(R.items[k].name)}</span><button type="button" class="btn-sm" data-rs-cancel="${k}" title="Aus der Warteschlange nehmen (Geld zurück; was davon abhängt, fällt auch heraus)">✕</button></div>`;
     });
     for (let i = tech.queue.length; i < R.queueMax; i++) h += `<div class="rs-q free"><span>${i + 1}. frei</span></div>`;
     return h;
+  }
+
+  /** Balken und Restzeit der laufenden Forschung, ohne die Knöpfe neu zu bauen. */
+  queueLive() {
+    const g = this.game;
+    const tech = g.teams[this.team].tech;
+    const bar = this.root.querySelector('[data-rs-bar]');
+    if (!tech.cur || !bar) return;
+    const it = R.items[tech.cur.key];
+    const sp = researchSpeed(g, this.team);
+    const left = sp > 0 ? Math.ceil((it.time - tech.cur.t) / sp) : Infinity;
+    bar.style.width = `${Math.min(100, (tech.cur.t / it.time) * 100)}%`;
+    this.root.querySelector('[data-rs-left]').textContent =
+      `${Number.isFinite(left) ? `noch ${left} s` : 'steht'}${g.city && Number.isFinite(left) ? ` · ${citySum(g, this.team, 'dc')} Rechenzentrum-Stufen` : ''}`;
+  }
+
+  /** Grund (z. B. „Fehlt: 37 Geld“, ändert sich mit dem Geld) als Text und Knopf-Tooltip, ohne den Knopf neu zu bauen. */
+  infoLive() {
+    const why = (this.sel && R.items[this.sel] && this.state(this.sel).why) || '';
+    const w = this.root.querySelector('[data-rs-why]');
+    if (w) w.textContent = why;
+    const go = this.root.querySelector('[data-rs-start]');
+    if (go) go.title = why;
   }
 
   infoHtml() {
@@ -188,11 +217,11 @@ export class ResearchPanel {
       st.s === 'done' ? '<span class="rs-ok">✓ Erforscht</span>'
       : st.s === 'cur' ? '<span class="rs-ok">Wird erforscht …</span>'
       : st.s === 'queued' ? `<span class="rs-ok">Wartet (Platz ${st.n})</span>`
-      : `<button type="button" class="btn-sm rs-go${st.s === 'ok' ? '' : ' off'}" data-rs-start${st.why ? ` title="${esc(st.why)}"` : ''}>${busy ? 'Einreihen' : 'Erforschen'} · ${it.money} G</button>`;
+      : `<button type="button" class="btn-sm rs-go${st.s === 'ok' ? '' : ' off'}" data-rs-start>${busy ? 'Einreihen' : 'Erforschen'} · ${it.money} G</button>`;
     const time = this.game.city ? `${it.time} s (ohne Rechenzentrum)` : `${it.time} s`;
     return `<b>${esc(it.name)}</b><small class="rs-muted">${R.lanes[it.lane].icon} ${esc(R.lanes[it.lane].name)} · Stufe ${it.tier}</small>` +
       `<p>${esc(eff)}</p><small class="rs-muted">${it.money} Geld · ${time} · ${esc(req.join(' · '))}</small>` +
-      `${st.why ? `<small class="rs-warn">${esc(st.why)}</small>` : ''}${btn}`;
+      `${st.why ? '<small class="rs-warn" data-rs-why></small>' : ''}${btn}`;
   }
 
   destroy() {
