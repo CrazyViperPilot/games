@@ -34,6 +34,8 @@ export function careOf(game, e) {
 export const careClass = (u) => (u.def.air ? 'air' : u.def.armor === 'inf' ? 'inf' : 'ground');
 /** Werke (Verarbeitung in updateCity): BM-Werk, Munitionswerk, Raffinerie, Stahlwerk, Hütte (seit v5.19), Kerosin-Raffinerie (seit v5.19). */
 export const WORKS = ['bm', 'mun', 'fuel', 'steel', 'smelter', 'kero'];
+/** Dieselben Werkarten (seit v5.19, für js/game/transport.js). */
+export const WORKS_KINDS = WORKS;
 /** Rohstoffvorkommen (Code im Raster `deposit`): 0 keins. */
 export const DEPOSITS = ['wood', 'stone', 'ore', 'oil'];
 export const DEPOSIT_NAME = { wood: 'Wald', stone: 'Fels', ore: 'Erz', oil: 'Öl' };
@@ -967,6 +969,45 @@ export function hasRoad(c, col, row) {
     (row > 0 && c.kind[idx(c, col, row - 1)] === k && roadNext(c, col, row - 1)) ||
     (row < c.rows - 1 && c.kind[idx(c, col, row + 1)] === k && roadNext(c, col, row + 1))
   );
+}
+
+/** Straßenzellen (4er-Nachbarschaft) um die Zellen `cells`, ohne Doppelte, an `out` angehängt. */
+function roadsAround(c, cells, out) {
+  for (const j of cells) {
+    const q = j % c.cols;
+    const r = (j - q) / c.cols;
+    for (const [x, y] of [[q - 1, r], [q + 1, r], [q, r - 1], [q, r + 1]]) {
+      if (x < 0 || y < 0 || x >= c.cols || y >= c.rows) continue;
+      const n = idx(c, x, y);
+      if (roadAt(c, n) && !out.includes(n)) out.push(n);
+    }
+  }
+  return out;
+}
+
+/**
+ * Anschluss eines Gebäudes für den Transport (seit v5.19, PRD §15): alle Straßenzellen, die an eine seiner Zellen grenzen (Gebäude
+ * mit Anker a, Großbau inklusive). Hat es keine, gilt wie in hasRoad die Kette: Anschluss eines direkt benachbarten Gebäudes gleicher
+ * Art (nur Wohnen, Gewerbe, BM-Werk). Liefert ein Array der Zellenindizes (leer = kein Anschluss).
+ */
+export function accessCells(c, a) {
+  const anchor = anchorOf(c, a);
+  const k = c.kind[anchor];
+  const cells = cellsOf(c, anchor);
+  const own = roadsAround(c, cells, []);
+  if (own.length || !CHAIN.has(k)) return own;
+  const out = [];
+  for (const j of cells) {
+    const q = j % c.cols;
+    const r = (j - q) / c.cols;
+    for (const [x, y] of [[q - 1, r], [q + 1, r], [q, r - 1], [q, r + 1]]) {
+      if (x < 0 || y < 0 || x >= c.cols || y >= c.rows) continue;
+      const n = idx(c, x, y);
+      if (c.kind[n] !== k || anchorOf(c, n) === anchor) continue;
+      roadsAround(c, cellsOf(c, anchorOf(c, n)), out);
+    }
+  }
+  return out;
 }
 
 /** Summen (Wohnplätze, Arbeitsplätze je Art) aus den gebauten Zellen; geflohene Wohnzellen zählen nicht. */
