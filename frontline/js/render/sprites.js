@@ -7,7 +7,7 @@ import { BUILDINGS } from '../data/buildings.js';
 const TILE = BALANCE.map.tile;
 const OUTLINE = 'rgba(0,0,0,0.65)';
 const GOLD = '#f2c94c';
-export const BUILD_ABBR = { fob: 'FOB', depot: 'FZ-HALLE', extractor: 'FÖR', mortar: 'MÖR', aa: 'FLA', tower: 'TURM', helipad: 'HELI', drill: 'BOHR', radio: 'MAST' };
+export const BUILD_ABBR = { fob: 'FOB', depot: 'FZ-HALLE', extractor: 'FÖR', mortar: 'MÖR', aa: 'FLA', tower: 'TURM', helipad: 'HELI', drill: 'BOHR', radio: 'MAST', phalanx: 'PHALANX' };
 export const NODE_COLOR = { bm: '#8b5a2b', mun: '#d9b600', fuel: '#3b2350' };
 export const NODE_LABEL = { bm: 'BM', mun: 'MUN', fuel: 'TS' };
 const WALL_GREY = '#8c9089';

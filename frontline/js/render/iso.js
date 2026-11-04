@@ -19,6 +19,7 @@ export const BUILD_H = {
   mortar: 30,
   tower: 74, // Gefechtsturm (Festung)
   aa: 38,
+  phalanx: 24, // flacher Sockel, die Kuppel sitzt obendrauf
   wall: 30,
   gate: 24,
 };

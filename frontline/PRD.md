@@ -88,6 +88,7 @@ Nicht im Umfang: Netzwerk-Multiplayer, Kampagne, Speichern laufender Partien, Mu
 | Tor | Wie Mauer, aber eigene Einheiten fahren hindurch |
 | Mörser | Indirektes Feuer, Reichweite 800 px (Mindestreichweite 200), Flächenschaden. **Ziel wählen** (G oder Rechtsklick auf die Karte): ein Schuss alle **20 s**, solange die FOB Munition hat; ohne Ziel schießt er automatisch auf sichtbare Gegner. Reichweitenkreis und Ziel werden bei Auswahl gezeichnet. Trifft keine Hubschrauber |
 | Flugabwehr | Schießt **Hubschrauber** ab (Reichweite 320, 35 Schaden je Schuss), fängt gegnerische Mörsergranaten ab und beschießt Bodenziele schwach. Munition aus der FOB |
+| Phalanx (seit v4.99) | Nahbereichsschutz nach dem CIWS-Geschütz: nur Baufahrzeug (Taste C), im Bauradius einer FOB (Militärgebäude, auch mit Stadt), 2×2, 800 Geld, 300 Baumaterial, 200 Munition, **120 s Bauzeit**. Reichweite **225 px = halber FOB-Bauradius**. Schießt nur auf **Hubschrauber** (Dauerfeuer, 10 Stöße/s à 25 Schaden) und fängt gegnerische **Mörsergranaten** zu 95 % ab (ein Versuch alle 0,2 s). **Sehr teurer Betrieb:** je Feuerstoß 5 Munition aus dem FOB-Lager und 1 Geld aus der Kasse (Dauerfeuer = 50 Munition und 10 Geld je Sekunde), je Abfangversuch 15 Munition und 5 Geld; fehlt eins, schweigt sie (Meldung „Phalanx: zu wenig Geld für Munition“). Die KI baut sie nicht |
 | Gefechtsturm (seit v4.73) | 2×2, 220 Baumaterial, nur Baufahrzeug; 3 Soldaten besetzen ihn, Dach trägt einen Aufbau (§5a) |
 | Bohrer | Zieht die Hot Zone an (Abschnitt 7); 2×2, 150 Baumaterial, braucht beim Betrieb Treibstoff aus der FOB |
 | Sendemast (seit v4.50) | Zweite Siegbedingung (§7), nur wenn im Startmenü eingeschaltet; nur Baufahrzeug, einer je Team, 2×2 |
@@ -165,6 +166,7 @@ Die Tabellen „Werte“ und „Waffen und Schaden“ erzeugt `npm run docs` aus
 | Tor | R | 800 | 1×1 | 25 Baumaterial | 4 s |
 | Mörser | T | 700 | 2×2 | 200 Baumaterial, 60 Munition | 20 s |
 | Flugabwehr | Z | 700 | 2×2 | 180 Baumaterial, 40 Munition | 18 s |
+| Phalanx | C | 900 | 2×2 | 800 Geld, 300 Baumaterial, 200 Munition | 120 s |
 | Gefechtsturm | V | 1500 | 2×2 | 220 Baumaterial | 25 s |
 | Sendemast | G | 3000 | 2×2 | 2000 Geld, 600 Baumaterial | 120 s |
 | Bohrer | X | 600 | 2×2 | 150 Baumaterial | 20 s |
@@ -194,6 +196,7 @@ Schaden je Schuss nach Panzerklasse des Ziels (Inf = Infanterie, Leicht, Schwer,
 | FOB (Gebäude) | 220 | 0,6 | – | – | 12 | 4 | 1 | 4 | 2 | kostenlos |
 | Mörser (Gebäude) | 800 | 20 | – | 4 | 60 | 50 | 25 | 80 | – | min. 200 px; Fläche 60 px; Granate mit Flugzeit |
 | Flugabwehr (Gebäude) | 320 | 0,4 | – | 0,25 | 10 | 12 | 2 | 4 | 35 | fängt Mörsergranaten ab (350 px, 70 %) |
+| Phalanx (Gebäude) | 225 | 0,1 | – | 5 | – | – | – | – | 25 | dazu 1 Geld je Schuss; fängt Mörsergranaten ab (225 px, 95 %, alle 0,2 s, je Versuch 15 Munition und 5 Geld) |
 <!-- auto:weapons:end -->
 
 Das Spiel wählt je Ziel automatisch die Waffe mit dem besten Schaden bzw. die „bevorzugte“ Waffe für die Panzerklasse des Ziels; Waffen ohne Munition schweigen.
@@ -344,7 +347,7 @@ Direktfeuer richtet sich nach Trefferzahlen (volles Ziel); Seite = Winkel zur Fa
 | A + Linksklick | Angriffsbewegung; auf eine intakte Brücke = sie beschießen, bis sie einstürzt (§7, nur so greift jemand eine Brücke an) |
 | S | Stopp |
 | F (Einheiten gewählt) | **Formation** wechseln (seit v4.48, nach Age of Empires II): Locker → Linie → Keil → Kolonne; gilt für alle folgenden Marsch- und Angriffsbefehle (Rechtsklick/Tippen und A), ab zwei Bodeneinheiten. Reihenfolge: Kampfpanzer vorn, dann Schützenpanzer, Infanterie (Schütze, PAK), Scharfschützen, unbewaffnete Fahrzeuge (LKW, Baufahrzeug) hinten; Linie: Panzer in der Mitte, Infanterie an den Flügeln (bis 10 je Reihe); Keil: gefüllter Keil mit der Spitze am Ziel; Kolonne: einzeln, ab 9 Einheiten zu zweit. Abstand 26–44 px (nach der größten Einheit). Die Gruppe marschiert **geschlossen**: Grundtempo ist das der langsamsten Bodeneinheit, wer mehr als 16 px vor dem Nachzügler liegt, bremst (bis 10 %), wer mehr als 80 px hinter dem Mittel liegt, holt mit eigenem Tempo auf; ein festgefahrenes Mitglied (3 s ohne Fortschritt) hält niemanden auf. Am Ziel rückt jeder genau auf seinen Platz. Hubschrauber fliegen locker hinter der Formation und bremsen sie nicht. Die Zielmarke zeigt kurz die Plätze. `BALANCE.formation`, `js/game/formation.js` |
-| B | Baumenü (Baufahrzeug: alles, Soldaten: nur Mauer/Tor); darin E Mauer, R Tor, T Mörser, Z/Y Flugabwehr, X Bohrer, G Sendemast (wenn eingeschaltet), F FOB-Baustelle |
+| B | Baumenü (Baufahrzeug: alles, Soldaten: nur Mauer/Tor); darin E Mauer, R Tor, T Mörser, Z/Y Flugabwehr, C Phalanx, X Bohrer, G Sendemast (wenn eingeschaltet), F FOB-Baustelle |
 | Mörser gewählt | G Ziel wählen (oder Rechtsklick auf die Karte) · C Ziel löschen |
 | Bohrer gewählt | G aktivieren |
 | Transportfahrzeuge | Infanterie wählen + **I** (Einsteigen, dann Fahrzeug antippen) oder Rechtsklick auf LKW / Baufahrzeug / Schützenpanzer / Hubschrauber = einsteigen · Fahrzeug wählen + **O** und Zielpunkt = absetzen · Transporthubschrauber: L/U/T wie LKW |
@@ -540,6 +543,7 @@ Alle Geräusche werden im Browser mit WebAudio **selbst erzeugt** (Rauschen und 
 - **Format-Version** `SAVE_FORMAT` (`js/game/savegame.js`): bei jeder Änderung, die gespeicherte Zustände unlesbar macht (neue Pflichtfelder im Spielzustand ohne Vorgabe, umbenannte Klassen), erhöhen; alte Stände werden dann nicht mehr angeboten. Neue Klassen mit Instanzen im Spielzustand in `CLASSES` (`savegame.js`) eintragen, sonst meldet `test/save.test.js` einen Fehler. Funktionen oder Getter im Zustand werden nicht gespeichert (Beispiel `ammo`: `Game.restoreAccessors`).
 
 ## Änderungsverlauf
+- v4.99: **Phalanx als Gebäude** (§5, §6): neues Militärgebäude für das Baufahrzeug (Taste C, im FOB-Bauradius), Nahbereichsschutz nach dem CIWS-Geschütz. Lange Bauzeit (120 s), Reichweite halber FOB-Radius (225 px), schießt Hubschrauber im Dauerfeuer ab und fängt Mörsergranaten zu 95 % ab; jeder Schuss kostet viel Munition aus der FOB und dazu Geld (`moneyPerShot` in `buildings.js`). Flugabwehr und Phalanx zeigen beim Abfangen jetzt einen Feuerstoß zur Granate. Die KI baut sie nicht. Cache v112.
 - v4.98: **Eigenes Forschungsmenü** (§7, §9): großer Knopf „🔬 Forschung“ rechts oben direkt unter „🏙 Stadt“ (der Knopf „Bauer“ rückt eine Reihe tiefer; die Knöpfe rücken nach, wenn Stadt oder Forschung aus sind). Er öffnet ein Fenster mit dem ganzen Forschungsbaum: Stufen oben, Äste als Spalten, Zustand je Forschung, Einzelheiten und „Erforschen“ rechts, laufende Forschung mit Restzeit und Abbrechen. Ersetzt die Forschungs-Befehlskarte der Hauptstadt (Äste über Q/W/E/R/T); „Forschung“ (U) an der Hauptstadt öffnet jetzt dasselbe Fenster. Cache v111.
 - v4.91: **Zonen über Nachbarfeld** (§15): Wohnen und Gewerbe zählen als angebunden, wenn genau eine Zelle gleicher Art (selbst an der Straße) dazwischen liegt. Cache v104.
 - v4.92: **Sicht um Stadtgebäude** (§15): jedes eigene Stadtgebäude (Wohnen, Gewerbe, Förderung, Werke …) lichtet den Kriegsnebel in `CITY.sight` (160 px) um sich, wie andere Gebäude (Wetter verkürzt, Gelände verdeckt). Cache v105.

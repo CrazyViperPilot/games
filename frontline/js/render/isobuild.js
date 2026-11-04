@@ -688,7 +688,7 @@ export function drawTeamBuilding(ctx, cam, b, color) {
     top = drawBox(ctx, cam, x0, y0, x1, y1, h, body, { roof: isWall ? '#b3b7b0' : tint(color, 0.25) });
     const cx = (top[0].x + top[2].x) / 2;
     const cy = (top[0].y + top[2].y) / 2;
-    if (!isWall) {
+    if (!isWall && b.type !== 'phalanx') {
       ctx.save();
       ctx.fillStyle = 'rgba(255,255,255,0.92)';
       ctx.textAlign = 'center';
@@ -747,6 +747,28 @@ export function drawTeamBuilding(ctx, cam, b, color) {
       ctx.lineTo(cx - 9 * z, cy - 20 * z);
       ctx.moveTo(cx + 5 * z, cy);
       ctx.lineTo(cx + 1 * z, cy - 20 * z);
+      ctx.stroke();
+    } else if (b.type === 'phalanx') {
+      // Phalanx: Drehsockel, große weiße Radarkuppel (statt Kürzel), Gatling-Rohr schräg nach oben
+      ctx.fillStyle = '#4b504b';
+      ctx.beginPath();
+      ctx.ellipse(cx, cy + 2 * z, 15 * z, 7 * z, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#23272a';
+      ctx.lineWidth = 5 * z;
+      ctx.beginPath();
+      ctx.moveTo(cx + 4 * z, cy - 6 * z);
+      ctx.lineTo(cx + 22 * z, cy - 22 * z);
+      ctx.stroke();
+      ctx.fillStyle = '#eef0ec';
+      ctx.strokeStyle = OUTLINE;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(cx - 2 * z, cy - 8 * z, 11 * z, Math.PI, 0);
+      ctx.lineTo(cx + 9 * z, cy + 2 * z);
+      ctx.lineTo(cx - 13 * z, cy + 2 * z);
+      ctx.closePath();
+      ctx.fill();
       ctx.stroke();
     } else if (b.type === 'extractor') {
       ctx.fillStyle = '#2b2f2b';

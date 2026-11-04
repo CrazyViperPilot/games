@@ -92,3 +92,75 @@ test('Tempo: gemessen aus der Verschiebung, auch bei Logistikflügen', () => {
   run(g, DT);
   assert.ok(Math.abs(heli.speedNow - 170) < 1e-6, `Tempo ${heli.speedNow}`);
 });
+
+// ---- Phalanx (Gebäude, seit v4.99) ----
+import { BUILDINGS } from '../js/data/buildings.js';
+import { createShell } from '../js/game/entities.js';
+import { canBuild } from '../js/game/construction.js';
+
+/** FOB (Team 0, Lager voll Munition) mit fertiger Phalanx daneben, weit weg von den Basen. */
+function phalanxScene() {
+  const { g, x, y } = scene();
+  const c = g.grid.toCell(x);
+  const r = g.grid.toCell(y);
+  const fob = g.spawnBuilding('fob', 0, c - 1, r - 1, { built: true });
+  fob.store.mun = 3000;
+  const ph = g.spawnBuilding('phalanx', 0, c + 3, r - 1, { built: true });
+  g.teams[0].res.money = 1000;
+  return { g, fob, ph };
+}
+
+test('Phalanx: Reichweite halber FOB-Radius, lange Bauzeit, nur Baufahrzeug', () => {
+  const P = BUILDINGS.phalanx;
+  assert.equal(P.weapon.range, BALANCE.fob.buildRadius / 2);
+  assert.equal(P.aa.range, BALANCE.fob.buildRadius / 2);
+  assert.ok(P.buildTime >= 90, 'lange Bauzeit');
+  assert.ok(P.weapon.ammoPerShot > BUILDINGS.aa.weapon.ammoPerShot * 10, 'frisst viel mehr Munition als die Flugabwehr');
+  assert.equal(canBuild(UNITS.engineer, 'phalanx'), true);
+  assert.equal(canBuild(UNITS.rifleman, 'phalanx'), false);
+});
+
+test('Phalanx: schießt Hubschrauber in Reichweite, kostet Munition und Geld, verschont Bodentruppen', () => {
+  const { g, fob, ph } = phalanxScene();
+  const heli = g.spawnUnit('littlebird', 1, ph.x + 150, ph.y);
+  heli.hp = 1e6;
+  const far = g.spawnUnit('littlebird', 1, ph.x, ph.y + 320); // außerhalb von 225 px
+  far.hp = 1e6;
+  const rifle = g.spawnUnit('rifleman', 1, ph.x + 200, ph.y); // in Reichweite der Phalanx, außer Reichweite des FOB-MG
+  rifle.hp = 1e6;
+  const fobMun = fob.store.mun;
+  run(g, 2);
+  const shots = (fobMun - fob.store.mun) / BUILDINGS.phalanx.weapon.ammoPerShot;
+  assert.ok(shots >= 10, `Dauerfeuer, nicht ${shots} Stöße`);
+  assert.equal(g.teams[0].res.money, 1000 - shots * BUILDINGS.phalanx.weapon.moneyPerShot, 'je Stoß Geld aus der Kasse');
+  assert.ok(heli.hp < 1e6, 'Hubschrauber getroffen');
+  assert.equal(far.hp, 1e6, 'außerhalb der Reichweite nichts');
+  assert.equal(rifle.hp, 1e6, 'Infanterie bleibt verschont');
+});
+
+test('Phalanx: ohne Geld schweigt sie', () => {
+  const { g, fob, ph } = phalanxScene();
+  g.teams[0].res.money = 0;
+  const heli = g.spawnUnit('littlebird', 1, ph.x + 150, ph.y);
+  const fobMun = fob.store.mun;
+  run(g, 2);
+  assert.equal(heli.hp, heli.def.hp);
+  assert.equal(fob.store.mun, fobMun, 'keine Munition verbraucht');
+});
+
+test('Phalanx: fängt Mörsergranaten ab', () => {
+  const { g, fob, ph } = phalanxScene();
+  const w = BUILDINGS.mortar.weapon;
+  let caught = 0;
+  for (let i = 0; i < 10; i++) {
+    g.projectiles.push(createShell(g.newId(), 1, ph.x + 700, ph.y, fob.x, fob.y, w));
+    let hit = false;
+    for (let k = 0; k < Math.round(3 / DT); k++) {
+      g.update(DT);
+      if (g.effects.some((e) => e.type === 'intercept')) hit = true;
+    }
+    if (hit) caught++;
+  }
+  assert.ok(caught >= 8, `mindestens 8 von 10 abgefangen, nicht ${caught}`);
+  assert.equal(fob.hp, fob.maxHp, 'die FOB bleibt heil');
+});

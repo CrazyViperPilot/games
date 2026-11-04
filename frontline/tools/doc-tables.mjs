@@ -70,7 +70,11 @@ function weaponsTable() {
     if (w.splash) notes.push(`Fläche ${fmt(w.splash)} px`);
     if (w.shell) notes.push('Granate mit Flugzeit');
     if (!w.ammoPerShot) notes.push('kostenlos');
-    if (b.aa) notes.push(`fängt Mörsergranaten ab (${fmt(b.aa.range)} px, ${pct(b.aa.chance)})`);
+    if (w.moneyPerShot) notes.push(`dazu ${fmt(w.moneyPerShot)} Geld je Schuss`);
+    if (b.aa) {
+      const extra = b.aa.moneyPerShot ? `, alle ${fmt(b.aa.cooldown)} s, je Versuch ${fmt(b.aa.ammoPerShot)} Munition und ${fmt(b.aa.moneyPerShot)} Geld` : '';
+      notes.push(`fängt Mörsergranaten ab (${fmt(b.aa.range)} px, ${pct(b.aa.chance)}${extra})`);
+    }
     rows.push([`${b.name} (Gebäude)`, fmt(w.range), fmt(w.cooldown), '–', w.ammoPerShot ? fmt(w.ammoPerShot) : '–', ...CLASSES.map((c) => dmg(w.damage, c)), notes.join('; ') || '–']);
   }
   return table(['Waffe', 'Reichweite', 'Kadenz (s)', 'Schuss', 'Munition je Schuss', ...CLASSES.map((c) => CLASS_NAMES[c]), 'Hinweis'], rows);

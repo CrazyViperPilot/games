@@ -104,7 +104,7 @@ Wo jedes Feature liegt. „KI“ = Konstanten-Präfix in `js/data/ai.js`, Logik 
 | Bewegung, Wegsuche, Raster | – | `slope.pathCost`, `leash` | `movement.js`, `pathfinding.js`, `grid.js` | – | – | `path.test.js` |
 | Formationen | §8 | `formation` | `formation.js` | Keil bei Angriffswellen | `controller.js` (Taste F) | `formation.test.js` |
 | Kampf, Waffen, Schaden, Treffer | §6 „Waffen“, „Treffer“ | `UNITS.*.weapons`, `BUILDINGS.*.weapon`, `height` | `combat.js`, `entities.js` | `FALLBACK_*`, `RAID_*` | `sprites.js` (Effekte) | `hits.test.js`, `game.test.js` |
-| Flugabwehr (Flak, SAM, Flugabwehrstellung) | §6 | `airFire`, `UNITS.flak`, `UNITS.sam`, `BUILDINGS.aa` | `combat.js` | baut Flak/SAM noch nicht | `sprites.js`, `isosprites.js` | `airdefense.test.js` |
+| Flugabwehr (Flak, SAM, Flugabwehrstellung, Phalanx) | §5, §6 | `airFire`, `UNITS.flak`, `UNITS.sam`, `BUILDINGS.aa`, `BUILDINGS.phalanx` (`moneyPerShot`) | `combat.js` | baut Flak/SAM noch nicht | `sprites.js`, `isosprites.js` | `airdefense.test.js` |
 | Scharfschütze, Tarnung | §6 | `stealth`, `UNITS.sniper` | `game.js` (`sees`), `combat.js` | baut ihn nicht | – | `sniper.test.js` |
 | Nebel und Sicht | §7, §9 | `fogInterval`, `sightHeight` | `fog.js` | – | `renderer.js`, `minimap.js` | `terrain.test.js` |
 | Gelände: Höhe, Hänge, Seen | §7 „Gelände“ | `height`, `slope`, `sightHeight` | `relief.js`, `landscape.js` | – | `ground.js` (WebGL), `reliefimg.js` | `relief.test.js`, `terrain.test.js` |

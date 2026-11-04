@@ -77,19 +77,24 @@ export function heightMult(game, s, t) {
 }
 
 /**
- * Zieht Munition für einen Schuss eines Gebäudes aus dem Lager seines Versorgers (supplierOf) ab.
- * false (Mangelmeldung), wenn es nicht reicht.
+ * Zieht Munition für einen Schuss eines Gebäudes aus dem Lager seines Versorgers (supplierOf) ab, dazu `money` Geld aus der Kasse
+ * (Phalanx: moneyPerShot). false (Mangelmeldung), wenn eins nicht reicht; dann wird nichts abgezogen.
  */
-function takeAmmo(game, s, need) {
-  if (!(need > 0)) return true;
-  const stats = game.teams[s.team].used;
-  const sup = game.supplierOf(s);
-  if (!sup || sup.store.mun < need) {
+function takeAmmo(game, s, need, money = 0) {
+  if (!(need > 0) && !(money > 0)) return true;
+  const team = game.teams[s.team];
+  const sup = need > 0 ? game.supplierOf(s) : null;
+  if (need > 0 && (!sup || sup.store.mun < need)) {
     game.shortage(s.team, 'mun');
     return false;
   }
-  sup.store.mun -= need;
-  stats.mun += need;
+  if (money > 0 && team.res.money < money) {
+    game.notify(s.team, 'ammoMoney', `${s.def.name}: zu wenig Geld für Munition`);
+    return false;
+  }
+  if (sup) sup.store.mun -= need;
+  team.used.mun += need;
+  team.res.money -= money;
   return true;
 }
 
@@ -166,7 +171,7 @@ function fireDirect(game, s, t, w) {
     game.addEffect('shell', s.x, s.y, s.team, t.x, t.y, 'cannon');
     game.addEffect('explosion', t.x, t.y, s.team, t.x, t.y, 'hit');
   } else {
-    game.addEffect('tracer', s.x, s.y, s.team, t.x, t.y, 'base');
+    game.addEffect('tracer', s.x, s.y, s.team, t.x, t.y, w.snd ?? 'base');
   }
   s.cooldown = w.cooldown;
   hit(game, t, dmg);
@@ -242,12 +247,12 @@ function tryFire(game, s, t, w) {
     const d = Math.hypot(t.x - s.x, t.y - s.y);
     if (d < w.minRange || !inRange(s, t, w.range)) return;
     if (!game.isVisible(s.team, t.x, t.y)) return;
-    if (!takeAmmo(game, s, w.ammoPerShot)) return;
+    if (!takeAmmo(game, s, w.ammoPerShot, w.moneyPerShot)) return;
     fireShell(game, s, t.x, t.y, w);
     return;
   }
   if (!inRange(s, t, w.range)) return;
-  if (!takeAmmo(game, s, w.ammoPerShot)) return;
+  if (!takeAmmo(game, s, w.ammoPerShot, w.moneyPerShot)) return;
   fireDirect(game, s, t, w);
 }
 
@@ -257,11 +262,11 @@ function fireAtGround(game, b, w) {
   const t = b.fireTarget;
   const d = Math.hypot(t.x - b.x, t.y - b.y);
   if (d < w.minRange || d > w.range) return;
-  if (!takeAmmo(game, b, w.ammoPerShot)) return;
+  if (!takeAmmo(game, b, w.ammoPerShot, w.moneyPerShot)) return;
   fireShell(game, b, t.x, t.y, w);
 }
 
-/** Flugabwehr: jede bereite Flugabwehr fängt die nächste gegnerische Granate in Reichweite mit `chance` ab. */
+/** Flugabwehr und Phalanx: jede bereite fängt die nächste gegnerische Granate in Reichweite mit `chance` ab. */
 function interceptShells(game) {
   for (const b of game.buildings) {
     if (!b.alive || !b.built || !b.def.aa || b.aaCooldown > 0 || (b.def.roofKind && !b.occupants.length && !autoTurret(game, b.team))) continue;
@@ -276,8 +281,9 @@ function interceptShells(game) {
       }
     }
     if (!best) continue;
-    if (!takeAmmo(game, b, b.def.aa.ammoPerShot)) continue;
+    if (!takeAmmo(game, b, b.def.aa.ammoPerShot, b.def.aa.moneyPerShot)) continue;
     b.aaCooldown = b.def.aa.cooldown;
+    game.addEffect('tracer', b.x, b.y, b.team, best.x, best.y, b.def.weapon?.snd ?? 'flak'); // Feuerstoß zur Granate
     if (game.rng.next() < b.def.aa.chance) {
       best.alive = false;
       game.addEffect('intercept', best.x, best.y, b.team);

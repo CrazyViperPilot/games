@@ -1,7 +1,9 @@
 // Gebäudewerte (docs/verlauf.md §3.3). w, h in Zellen. Alle Gebäude haben Rüstung 'struct'.
 // Optional: weapon {range, minRange, cooldown, damage, splash, shell, ammoPerShot}, aa {range, cooldown, chance, ammoPerShot},
 // buildable (false = nur per LKW), blocksAll (Mauer), gate (Tor), cap/reach/roofs (Gefechtsturm).
-// hotkey: Taste im Baumenü, null = keine.
+// hotkey: Taste im Baumenü, null = keine. moneyPerShot (weapon, aa): Geld je Schuss aus der Kasse des Teams, zusätzlich zur Munition.
+import { BALANCE } from './balance.js';
+
 export const BUILDINGS = {
   fob: {
     name: 'FOB',
@@ -97,6 +99,35 @@ export const BUILDINGS = {
       splash: 0,
       shell: false,
       ammoPerShot: 0.25,
+    },
+  },
+  // Phalanx (Nahbereichsschutz nach dem CIWS-Geschütz, seit v4.99): Gatling unter weißer Kuppel, nur Baufahrzeug, im Bauradius einer FOB.
+  // Reichweite = halber FOB-Bauradius. Schießt nur auf Luftziele und fängt gegnerische Mörsergranaten fast sicher ab.
+  // Teuer im Betrieb: jeder Feuerstoß kostet viel Munition aus dem FOB-Lager und Geld aus der Kasse (moneyPerShot); fehlt eins, schweigt sie.
+  phalanx: {
+    name: 'Phalanx',
+    short: 'Phalanx', // Kurzname in der Befehlskarte
+    armor: 'struct',
+    w: 2,
+    h: 2,
+    hp: 900,
+    sight: 300,
+    cost: { money: 800, bm: 300, mun: 200 },
+    buildTime: 120, // lange Bauzeit (wie der Sendemast)
+    hotkey: 'C', // C wie CIWS (P ist Pause)
+    produces: [],
+    // Abfangen: alle 0,2 s ein Versuch auf die nächste Granate in Reichweite, 95 % Treffer, je Versuch 15 Munition und 5 Geld
+    aa: { range: BALANCE.fob.buildRadius / 2, cooldown: 0.2, chance: 0.95, ammoPerShot: 15, moneyPerShot: 5 },
+    weapon: {
+      range: BALANCE.fob.buildRadius / 2,
+      minRange: 0,
+      cooldown: 0.1, // Dauerfeuer: 10 Feuerstöße je Sekunde
+      damage: { air: 25 }, // nur Hubschrauber
+      splash: 0,
+      shell: false,
+      ammoPerShot: 5, // 50 Munition je Sekunde Dauerfeuer
+      moneyPerShot: 1, // 10 Geld je Sekunde Dauerfeuer
+      snd: 'mg', // Klang (js/audio/sound.js)
     },
   },
   // Gefechtsturm (Festung, PRD §5a): bis zu `cap` Soldaten besetzen ihn, sind dort geschützt und schießen mit `reach` px mehr Reichweite
