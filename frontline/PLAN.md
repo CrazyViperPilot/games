@@ -152,6 +152,22 @@ Ziele je Ware: `TARGET = { wood: ['bm'], stone: ['bm'], ore: ['smelter'], oil: [
   (`CITY.care` um `refuel: <Anteil des Tanks je s>` ergänzen, z. B. 0.05).
 - Ohne Stadt: nichts ändert sich (Tests prüfen das).
 
+### AP3b – Gewerbe neu ausbalanciert (Datei: `js/data/city.js`, `js/game/city.js`, `js/game/flow.js`, Tests)
+Aus der Analyse (Gewerbe war mit Abstand die stärkste Geldquelle, Zufriedenheit sättigte früh, Hinweis in der Flussanzeige griff kaum):
+- **Steuer senken:** `CITY.taxCom` 0.15 → **0.07** (Geld/s je Gewerbe-Arbeiter).
+- **Gewerbe braucht Waren:** Jedes Gewerbe (und der Markt) verbraucht `CITY.shop.need` Baumaterial je Arbeiter und Sekunde
+  (Startwert 0.004) aus dem Lager, über die Straße angeliefert (Weg Gewerbe ↔ Lager wie beim Munitionswerk, Last = Bedarf).
+  Versorgung `v = angekommen / Bedarf` (0 … 1; ohne Weg oder leeres Lager 0). Steuer des Gewerbes und sein Anteil an der Zufriedenheit
+  (`shops`) wirken mit `CITY.shop.base + (1 − CITY.shop.base) × v` (Startwert base 0.3). So wird das Lager eine Senke für Überschüsse.
+- **Eigene Nachfrage:** Gewerbe wächst (neue Stufe) nur, solange Gewerbe-Arbeitsplätze ≤ Einwohner × `CITY.shop.per` (0.25);
+  Stufe 1 entsteht wie bisher immer.
+- **Einheitlicher Nenner:** `shop` in der Zufriedenheit teilt durch `pool` (arbeitsfähige Einwohner) statt `pop`, wie die Steuer.
+- **Flussanzeige:** Hinweis „Gewerbe bauen“ nur, wenn der Läden-Anteil der Zufriedenheit unter 50 % liegt (nicht bei jeder niedrigen
+  Zufriedenheit); neuer Hinweis „Gewerbe ohne Waren“, wenn v < 0.5.
+- `s.jobsCom` bleibt (wird jetzt für den Hinweis gelesen).
+- PRD §15: Gewerbe-Absatz neu, KI-Mix-Text an den Code angleichen (inkl. Markt 0,3), „Uni ab 6 Arbeitsstätten (Zellen, auch Gewerbe)“.
+- Test: Gewerbe ohne Straßenweg zum Lager zahlt nur base-Anteil Steuer; mit Weg und BM im Lager voll; BM im Lager sinkt.
+
 ### AP4 – Startviertel und KI (Dateien: `js/game/city.js` – `startQuarter`, `aiCity`, `aiNeed`, `depositCells`, neue Hilfsfunktion `connectRoad`)
 - `connectRoad(game, c, a, pay)`: Breitensuche über ausweisbare, leere, freie Zellen (`canZone`, `!c.kind`, `cellFree`) von den
   Nachbarzellen des Gebäudes `a` zur nächsten Straßenzelle, die mit dem Lager verbunden ist; legt dort Straßen (pay: über `game.issue`
