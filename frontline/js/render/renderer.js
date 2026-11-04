@@ -605,7 +605,7 @@ export class Renderer {
         if (hs && hs.ruined && known(hs.x, hs.y)) drawRubble(ctx, cam, it.o);
         else {
           setRoofSnow(this.season === 'winter'); // Winter: Schnee auf den Dächern der Stadt
-          drawTownBuilding(ctx, cam, it.o);
+          if (it.o.part?.t !== 'tree' || !drawTreeSprite(ctx, cam, it.o.part, this.season)) drawTownBuilding(ctx, cam, it.o, this.season); // Bäume der Großbauten als Bild
           setRoofSnow(false);
           if (it.o.damage > 0.25) {
             // beschädigtes Stadtgebäude (Stadt-Teil): Rauch über dem Dach

@@ -4,9 +4,9 @@
 import { BALANCE } from '../data/balance.js';
 import { drawUniversityIso } from './university.js';
 import { drawWorksIso, WORKS_KINDS } from './works.js';
-import { drawBigPart } from './bigbuild.js';
+import { drawBigPart, VEH, VEH_COLOR } from './bigbuild.js';
 import { drawCityHallIso } from './cityhall.js';
-import { drawBox, drawRotBox, wallPoint, wallQuad, buildingHeight, TOWN_H } from './iso.js';
+import { drawBox, drawRotBox, wallPoint, wallQuad, buildingHeight, TOWN_H, drawTree } from './iso.js';
 import { shade, tint, hexA } from './sprites.js';
 import { snowy } from './season.js';
 
@@ -271,9 +271,9 @@ export function drawBench(ctx, cam, b) {
 }
 
 /** Gebäude der Stadt (Haus, Halle, Fabrik) mit Fenstern, Türen, Toren, Balkonen und Dachaufbauten. */
-export function drawTownBuilding(ctx, cam, b) {
+export function drawTownBuilding(ctx, cam, b, season = 'summer') {
   if (b.kind === 'bigpart') {
-    drawBigPart(ctx, cam, b.part, b.color); // Körper eines Großbaus (Kraftwerk, Kaserne, Fabrikhalle, Flughafen; bigbuild.js)
+    drawBigBody(ctx, cam, b, season); // Körper eines Großbaus (Kraftwerk, Kaserne, Fabrikhalle, Flughafen; bigbuild.js)
     return;
   }
   if (b.kind === 'uni') {
@@ -385,6 +385,137 @@ export function drawTownBuilding(ctx, cam, b) {
     ctx.fillRect(c.x - 5 * z, base - 50 * z, 10 * z, 6 * z);
     ctx.fillStyle = '#55585b';
     ctx.fillRect(c.x - 6.5 * z, base - 60 * z, 13 * z, 5 * z);
+  }
+}
+
+// ---- Körper der Großbauten mit Schmuck (seit v5.11: Kaserne und Fabrikhalle; Maße und Schmuck in bigbuild.js) ----
+
+/** Ein Körper eines Großbaus: Baum, Fahrzeug, Quader mit Fenstern, Toren, Satteldach oder Sheddach; sonst wie bisher (bigbuild.js). */
+function drawBigBody(ctx, cam, b, season) {
+  const p = b.part;
+  if (p.t === 'tree') {
+    drawTree(ctx, cam, p, season); // gemalter Baum (renderer.js nimmt vorher das Baum-Bild, wenn geladen)
+    return;
+  }
+  if (p.t === 'veh') {
+    drawYardVehicle(ctx, cam, p);
+    return;
+  }
+  if (p.t !== 'box' || !p.fine) {
+    drawBigPart(ctx, cam, p, b.color);
+    return;
+  }
+  const base = p.base ?? 0;
+  const top = drawBox(ctx, cam, p.x0, p.y0, p.x1, p.y1, p.h, p.c, { base, roof: p.roof, noShadow: base > 0, noTop: !!p.gable, wallS: shade(p.c, 0.12), wallE: shade(p.c, 0.34) });
+  const detail = cam.zoom >= DETAIL_ZOOM;
+  const seed = hash(p.x0, p.y0);
+  for (const w of top.walls) {
+    if (!base && p.h > 8) plinth(ctx, w, p.c);
+    if (p.stripe) fillPolys(ctx, [wallQuad(w, 0, 1, p.h - 4.5, p.h - 1)], b.color); // Band in Teamfarbe unter der Dachkante
+    if (!detail || w.len * w.z < 14) continue;
+    if (p.ribs) {
+      // Wellblech: feine senkrechte Rippen
+      const segs = [];
+      const n = Math.floor(w.len / 6);
+      for (let i = 1; i < n; i++) segs.push([wallPoint(w, i / n, 4), wallPoint(w, i / n, p.h)]);
+      lines(ctx, segs, 'rgba(0,0,0,0.1)');
+    }
+    const gt = p.gates?.e.includes(w.edge) ? p.gates : null;
+    const dr = p.door?.includes(w.edge);
+    if (p.win) {
+      const rows = gt ? p.win.filter(([h0]) => h0 > gt.h + 4) : p.win;
+      const dw = 8 / w.len;
+      if (rows.length) windows(ctx, w, rows, { gap: p.wg ?? 20, ww: p.ww ?? 8, seed, lit: 0.22, skip: dr ? (t, r) => r === 0 && Math.abs(t - 0.5) < dw * 1.6 : null });
+    }
+    if (gt) for (let i = 0; i < gt.n; i++) gate(ctx, w, (i + 0.5) / gt.n, gt.w, gt.h, '#c9b24a', '#8b9096');
+    if (dr) door(ctx, w, 0.5, 8, Math.min(12, p.h - 3), '#4a4f55');
+  }
+  if (p.gable) gableRoof(ctx, cam, p.x0, p.y0, p.x1, p.y1, base + p.h, p.gable, p.roof, p.c);
+  if (p.saw) sawRoof(ctx, cam, p, base + p.h);
+}
+
+/** Sheddach: n Zähne entlang x, jeder steigt nach +x an und hat dort eine senkrechte Glasfläche (für jede Drehung richtig verdeckt). */
+function sawRoof(ctx, cam, p, H) {
+  const z = cam.zoom;
+  const { n, rh } = p.saw;
+  const P = (x, y, h) => {
+    const q = cam.worldToScreen(x, y);
+    return { x: q.x, y: q.y - h * z };
+  };
+  const ym = (p.y0 + p.y1) / 2;
+  const dir = (nx, ny) => {
+    const o = cam.worldToScreen(p.x0, ym);
+    const q = cam.worldToScreen(p.x0 + nx * 10, ym + ny * 10);
+    return { x: q.x - o.x, y: q.y - o.y };
+  };
+  const dx = dir(1, 0); // Glasseite (+x)
+  const dyN = dir(0, -1);
+  const roof = snowy(p.roof);
+  const slope = dir(-1, 0).x < 0 ? tint(roof, 0.12) : shade(roof, 0.2);
+  const glass = dx.x < 0 ? '#86aac2' : '#5d7f97';
+  const step = (p.x1 - p.x0) / n;
+  const teeth = [];
+  for (let i = 0; i < n; i++) teeth.push([p.x0 + i * step, p.x0 + (i + 1) * step]);
+  teeth.sort((a, b) => cam.worldToScreen(a[0], ym).y - cam.worldToScreen(b[0], ym).y);
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = OUTLINE;
+  const face = (pts, fill) => {
+    ctx.beginPath();
+    pts.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)));
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.stroke();
+  };
+  for (const [a0, a1] of teeth) {
+    face([P(a0, p.y0, H), P(a1, p.y0, H + rh), P(a1, p.y1, H + rh), P(a0, p.y1, H)], slope);
+    if (dx.y > 0.01) {
+      face([P(a1, p.y0, H), P(a1, p.y1, H), P(a1, p.y1, H + rh), P(a1, p.y0, H + rh)], glass);
+      if (z >= DETAIL_ZOOM) {
+        const segs = [];
+        const m = Math.max(2, Math.round((p.y1 - p.y0) / 14));
+        for (let k = 1; k < m; k++) {
+          const y = p.y0 + ((p.y1 - p.y0) * k) / m;
+          segs.push([P(a1, y, H), P(a1, y, H + rh)]);
+        }
+        lines(ctx, segs, 'rgba(235,240,240,0.55)');
+      }
+    }
+    for (const [y, s] of [[p.y0, -1], [p.y1, 1]]) {
+      if (dyN.y * -s > 0.01) face([P(a0, y, H), P(a1, y, H), P(a1, y, H + rh)], shade(p.c, dyN.x * -s < 0 ? 0.12 : 0.34));
+    }
+  }
+  ctx.restore();
+}
+
+/** Fahrzeug auf dem Hof (Panzer, Schützenpanzer, Lkw, Jeep) aus Quadern, Front nach +x bzw. +y (bigbuild.js VEH). */
+function drawYardVehicle(ctx, cam, p) {
+  const ax = p.ax === 'x';
+  const d = VEH[p.v];
+  const f = d.l / 2;
+  const C = VEH_COLOR;
+  // Quader in Fahrzeugachsen: u entlang (Front +), v quer
+  const part = (u0, u1, v0, v1, h, color, o = {}) => {
+    const [x0, x1, y0, y1] = ax ? [p.x + u0, p.x + u1, p.y + v0, p.y + v1] : [p.x + v0, p.x + v1, p.y + u0, p.y + u1];
+    return drawBox(ctx, cam, x0, y0, x1, y1, h, color, { wallS: shade(color, 0.15), wallE: shade(color, 0.38), ...o });
+  };
+  if (p.v === 'tank') {
+    part(-f, f, -d.w / 2, d.w / 2, 7, '#3d4228', { roof: C });
+    part(-8, 5, -6, 6, 5, tint(C, 0.06), { base: 7, noShadow: true });
+    part(5, f + 11, -1.2, 1.2, 2.4, '#3d4528', { base: 9, noShadow: true });
+  } else if (p.v === 'apc') {
+    part(-f, f, -d.w / 2, d.w / 2, 10, C, { roof: tint(C, 0.08) });
+    part(-4, 4, -4, 4, 4, shade(C, 0.1), { base: 10, noShadow: true });
+    part(4, f + 3, -0.8, 0.8, 1.6, '#3d4528', { base: 12, noShadow: true });
+  } else if (p.v === 'truck') {
+    part(-f, f, -d.w / 2, d.w / 2, 4, '#2d2f2a', { roof: '#3d4228' }); // Fahrgestell
+    part(f - 9, f, -d.w / 2, d.w / 2, 9, '#4f5a33', { base: 4, noShadow: true, roof: '#5a6440' }); // Kabine
+    part(-f, f - 11, -d.w / 2, d.w / 2, 9, '#7a8150', { base: 4, noShadow: true }); // Plane
+  } else {
+    part(-f, f, -d.w / 2, d.w / 2, 6, C, { roof: tint(C, 0.1) });
+    part(-5, 2, -d.w / 2 + 1, d.w / 2 - 1, 3.5, '#34495e', { base: 6, noShadow: true, roof: '#4b5a3a' }); // Bügel und Scheibe
   }
 }
 
