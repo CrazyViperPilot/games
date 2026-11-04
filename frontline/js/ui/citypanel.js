@@ -139,6 +139,7 @@ export class CityPanel {
     if (!res.ok) this.onMessage(res.reason);
     else if (res.broke) this.onMessage(this.tool === 'road' ? 'Zu wenig Baumaterial für alle Zellen' : 'Zu wenig Geld für alle Zellen');
     else if (res.occupied) this.onMessage('Belegte Zellen bleiben, wie sie sind: erst räumen');
+    else if (res.kept) this.onMessage('Geräumt; Rohstoffvorkommen und Förderanlagen bleiben stehen (Förderanlage einzeln wählen und abreißen)');
     else if (res.felled) this.onMessage(`Bäume gefällt: ${res.felled} ${res.felled === 1 ? 'Zelle' : 'Zellen'} frei zum Bauen`);
     else if (res.noRoad) this.onMessage('Gebäude wachsen nur mit Straße daneben (Wohnen/Gewerbe auch über eine Zelle gleicher Art)');
     this.update(true);

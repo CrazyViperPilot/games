@@ -122,6 +122,31 @@ test('Wohnen + Werk + Straße: Einwohner arbeiten, Lager und Geld wachsen', () =
   assert.ok(g.city[1].stats.pop <= g.city[1].stats.housing, 'andere Stadt eigenständig');
 });
 
+test('Räumen lässt Rohstoffvorkommen und Förderanlagen stehen; nur Abreißen (demolish) entfernt eine Förderanlage', () => {
+  const g = new Game({ seed: 3, city: true, startMoney: 3000 });
+  clearStart(g);
+  const c = g.city[0];
+  assert.ok(paint(g, 'res', 1, 4, 1, 4).ok); // legt auch den Bauplatz der Testzellen fest
+  c.deposit[at(g, 0, 4)] = 1; // Wald (Test)
+  const dep = c.deposit.slice();
+  assert.ok(paint(g, 'mine', 0, 4, 0, 4).ok);
+  const mine = c.kind[at(g, 0, 4)];
+  const r = paint(g, 'erase', 0, 4, 1, 4);
+  assert.equal(r.ok, true, 'Wohnen daneben wird geräumt');
+  assert.equal(r.kept, true);
+  assert.equal(c.kind[at(g, 0, 4)], mine, 'Förderanlage bleibt');
+  assert.equal(c.deposit[at(g, 0, 4)], 1, 'Vorkommen bleibt');
+  assert.equal(c.kind[at(g, 1, 4)], 0, 'Wohnen geräumt');
+  const only = paint(g, 'erase', 0, 4, 0, 4);
+  assert.equal(only.ok, false);
+  assert.match(only.reason, /Rohstoffvorkommen/);
+  const b = base.get(g);
+  assert.ok(g.issue(0, { type: 'city', kind: 'erase', c0: b.c, r0: b.r + 4, c1: b.c, r1: b.r + 4, demolish: true }).ok, 'Abreißen');
+  assert.equal(c.kind[at(g, 0, 4)], 0, 'Förderanlage abgerissen');
+  assert.equal(c.deposit[at(g, 0, 4)], 1, 'Vorkommen bleibt auch dann');
+  for (let i = 0; i < dep.length; i++) if (i !== at(g, 0, 4)) assert.equal(c.deposit[i], dep[i]);
+});
+
 test('Nichts überbauen: belegte Zellen bleiben, erst räumen, dann neu ausweisen', () => {
   const g = new Game({ seed: 3, city: true, startMoney: 3000 });
   clearStart(g);

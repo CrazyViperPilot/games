@@ -1397,7 +1397,7 @@ export class Controller {
       entry('Abreißen', 'Entf', {
         tip: `${b.def.name} abreißen (Entf): kostenlos, keine Erstattung`,
         action: () => {
-          this.issue({ type: 'city', kind: 'erase', c0: col, r0: row, c1: col, r1: row });
+          this.issue({ type: 'city', kind: 'erase', c0: col, r0: row, c1: col, r1: row, demolish: true }); // gewähltes Gebäude: auch eine Förderanlage
           this.view.selection.delete(b.id);
         },
       }),

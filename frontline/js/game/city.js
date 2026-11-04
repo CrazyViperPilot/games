@@ -1438,12 +1438,18 @@ export function cmdCity(game, team, cmd) {
   let stuck = false;
   let manned = false; // besetztes Haus im Weg
   let razed = 0; // abgerissene Gebäude der Karte
+  let kept = false; // Rohstoffvorkommen beim Räumen übersprungen (seit v5.19)
   const main = game.mainFob(team);
   const S = city.cell;
   const scan = erase ? woodScan(game, c0 * S, r0 * S, (c1 + 1) * S, (r1 + 1) * S) : null;
   for (let row = r0; row <= r1; row++) {
     for (let col = c0; col <= c1; col++) {
       const i = idx(city, col, row);
+      if (erase && city.deposit[i] && !cmd.demolish) {
+        // Räumen lässt Rohstoffvorkommen (und Förderanlagen darauf) stehen; nur „Abreißen“ eines gewählten Gebäudes entfernt sie
+        kept = true;
+        continue;
+      }
       if (erase && city.blocked[i]) {
         // Gebäude der Karte abreißen (seit v5.16, kostenlos): Häuser, Hallen, Fabriken; besetzte bleiben stehen
         const list = clearableAt(game, city, col, row);
@@ -1506,7 +1512,7 @@ export function cmdCity(game, team, cmd) {
   }
   const poor = broke === 'bm' ? 'Zu wenig Baumaterial im Lager der Hauptstadt' : 'Zu wenig Geld';
   if (!placed) {
-    const reason = broke ? poor : occupied ? 'Dort steht schon etwas: erst räumen' : noDeposit ? 'Förderanlagen nur auf Rohstoffvorkommen' : outside ? 'Nur im eigenen Gebiet bauen' : manned ? 'Besetzte Häuser lassen sich nicht räumen' : stuck ? 'Nur Bäume und Häuser lassen sich räumen, kein Fels, Wasser, Turm oder Mauer' : 'Nichts zu ändern';
+    const reason = kept && erase ? 'Rohstoffvorkommen werden beim Räumen nicht angetastet' : broke ? poor : occupied ? 'Dort steht schon etwas: erst räumen' : noDeposit ? 'Förderanlagen nur auf Rohstoffvorkommen' : outside ? 'Nur im eigenen Gebiet bauen' : manned ? 'Besetzte Häuser lassen sich nicht räumen' : stuck ? 'Nur Bäume und Häuser lassen sich räumen, kein Fels, Wasser, Turm oder Mauer' : 'Nichts zu ändern';
     return { ok: false, reason };
   }
   rebuildList(city);
@@ -1515,7 +1521,7 @@ export function cmdCity(game, team, cmd) {
   if (!erase && cmd.kind !== 'road' && cmd.kind !== 'mine') {
     for (let row = r0; row <= r1 && !noRoad; row++) for (let col = c0; col <= c1; col++) if (city.kind[idx(city, col, row)] === id && !hasRoad(city, col, row)) noRoad = true;
   }
-  return { ok: true, placed, broke: !!broke, noRoad, occupied, felled, razed, manned };
+  return { ok: true, placed, broke: !!broke, noRoad, occupied, felled, razed, manned, kept };
 }
 
 // ---- KI: baut in Ringen um die Hauptstadt nach außen, dazu kleine Viertel an vorderen FOBs (seit v4.82),

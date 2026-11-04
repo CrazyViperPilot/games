@@ -191,6 +191,8 @@ Aus der Analyse (Gewerbe war mit Abstand die stärkste Geldquelle, Zufriedenheit
 ### AP6 – Doku und Feinschliff (Dateien: `PRD.md`, `ARCHITEKTUR.md`, `CLAUDE.md`, `sw.js`)
 - PRD §15 neuer Abschnitt „Straßentransport (seit v5.19)“ mit 1.1–1.5 in Worten, Ressourcenanzeige, Markt, Kerosin, Umbenennung
   Stahl; Änderungsverlauf v5.19; `npm run docs`; `CACHE_VERSION` +1; Feature-Landkarte und „Wo ändere ich was?“ (CITY.transport).
+- PRD §15 „Räumen“: seit v5.19 lässt Räumen Rohstoffvorkommen und Förderanlagen stehen (Meldung), nur „Abreißen“ eines gewählten
+  Gebäudes (`cmd.demolish`) entfernt eine Förderanlage; das Vorkommen bleibt immer (schon umgesetzt, nur dokumentieren).
 - `npm test` vollständig grün, Laufzeit nicht mehr als 15 % länger als vorher.
 
 ---
