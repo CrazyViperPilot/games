@@ -975,7 +975,7 @@ export class Game {
     if (this.city && freePop(this, team) < crewOf(cmd.unit)) return fail('Zu wenig freie Einwohner (Stadt: Wohnen ausbauen)');
     const cost = UNITS[cmd.unit].cost;
     if (!this.canAfford(team, cost)) return fail(this.missingMoney());
-    if (!payMetal(this, team, cmd.unit)) return fail('Zu wenig Metall (Stadt: Erzmine und Stahlwerk oder Markt)');
+    if (!payMetal(this, team, cmd.unit)) return fail('Zu wenig Stahl (Stadt: Erzmine, Hütte und Stahlwerk oder Markt)');
     this.pay(team, cost);
     b.queue.push({ unit: cmd.unit, payerId: b.id });
     b.queueTimes.push(0);
@@ -1033,7 +1033,7 @@ export class Game {
     const cost = UNITS[entry.unit].cost;
     this.refund(team, cost);
     this.refundStock(team, entry.payerId, cost, 1, b.x, b.y);
-    payMetal(this, team, entry.unit, -1); // Metall zurück ins Stadtlager
+    payMetal(this, team, entry.unit, -1); // Stahl zurück ins Stadtlager
     return { ok: true };
   }
 

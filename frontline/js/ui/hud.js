@@ -512,7 +512,7 @@ export class Hud {
       `<div class="title">${esc(b.def.name)} <small class="muted">Stufe ${lv} von ${CITY.maxLevel}</small></div>${bar(f, 'hp', hpColor(f))}` +
       `<div class="muted small">${Math.ceil(b.hp)} / ${b.def.hp} HP</div>`;
     const line = (t) => `<div class="small">${esc(t)}</div>`;
-    const PRODUCT = { bm: ['bm', 'BM'], mun: ['mun', 'MUN'], fuel: ['fuel', 'TS'], steel: ['metal', 'Metall'] };
+    const PRODUCT = { bm: ['bm', 'BM'], mun: ['mun', 'MUN'], fuel: ['fuel', 'TS'], steel: ['metal', 'Stahl'] };
     if (k === 'res') h += line(`Wohnplätze ${CITY.housing[lv]} · Stadt: ${Math.floor(s.pop)} / ${s.housing} Einwohner`);
     else if (k === 'com') h += line(`Arbeitsplätze ${CITY.jobsCom[lv]} · zahlt Steuern, macht die Stadt zufriedener`);
     else if (k === 'market') h += line(`Arbeitsplätze ${CITY.jobsCom[lv]} · Handel: Knopf „Handel“ oder Geldanzeige oben antippen`);
@@ -531,15 +531,15 @@ export class Hud {
         const down = jets.filter((u) => u.parked);
         h += line(`Plätze ${jetsAt(g, b)} / ${BALANCE.jets.capacity} · am Boden ${down.length}, startbereit ${down.filter((u) => u.jet.ready).length} · in der Luft ${jets.length - down.length}`);
       }
-      h += '<div class="muted small">Zahlt direkt aus der Stadt: Geld, Metall, Einwohner</div>';
+      h += '<div class="muted small">Zahlt direkt aus der Stadt: Geld, Stahl, Einwohner</div>';
     }
     const care = careOf(g, b);
     if (care) {
       // Heilen und Reparieren (seit v5.01)
       const what = { inf: 'Heilt Soldaten', ground: 'Repariert Bodenfahrzeuge', air: 'Repariert Hubschrauber' }[care.units];
       const pct = Math.round(care.rate * (CITY.care.levelMul[lv] ?? 1) * 1000) / 10;
-      h += line(`${what} im Umkreis von ${care.radius} Feldern · ${pct.toLocaleString('de-DE')} % HP/s${care.units === 'inf' ? '' : ' · kostet Metall'}`);
-      if (care.units !== 'inf' && c.metal < 1) h += '<div class="warn small">Kein Metall im Stadtlager: repariert nicht</div>';
+      h += line(`${what} im Umkreis von ${care.radius} Feldern · ${pct.toLocaleString('de-DE')} % HP/s${care.units === 'inf' ? '' : ' · kostet Stahl'}`);
+      if (care.units !== 'inf' && c.metal < 1) h += '<div class="warn small">Kein Stahl im Stadtlager: repariert nicht</div>';
     }
     if (CITY_TIP[k] && k !== 'market' && !b.produces && !care) h += `<div class="muted small">${esc(CITY_TIP[k])}</div>`;
     const col = i % c.cols;

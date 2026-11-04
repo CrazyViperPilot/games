@@ -11,12 +11,13 @@ import { RELIEF } from './relief.js';
 import { bridgeUnder } from './river.js';
 
 /** Zellenarten (Code im Raster): 0 leer. Neue Arten nur hinten anhängen (Code = Index + 1). */
-export const KINDS = ['road', 'res', 'com', 'bm', 'mun', 'fuel', 'steel', 'mine', 'market', 'power', 'uni', 'dc', 'barracks', 'factory', 'heliport', 'hospital', 'airport'];
+export const KINDS = ['road', 'res', 'com', 'bm', 'mun', 'fuel', 'steel', 'mine', 'market', 'power', 'uni', 'dc', 'barracks', 'factory', 'heliport', 'hospital', 'airport', 'smelter', 'kero'];
 export const KIND_ID = Object.fromEntries(KINDS.map((k, i) => [k, i + 1]));
 export const KIND_NAME = {
   road: 'Straße', res: 'Wohnen', com: 'Gewerbe', bm: 'Baumaterial-Werk', mun: 'Munitionswerk', fuel: 'Raffinerie',
   steel: 'Stahlwerk', mine: 'Förderanlage', market: 'Markt', power: 'Kraftwerk', uni: 'Universität', dc: 'Rechenzentrum',
   barracks: 'Kaserne', factory: 'Fabrikhalle', heliport: 'Heliport', hospital: 'Krankenhaus', airport: 'Flughafen',
+  smelter: 'Hütte', kero: 'Kerosin-Raffinerie',
 };
 /** Ausbildungsgebäude der Stadt (seit v4.96): Zellenart → Einheiten (CITY.produces). */
 export const TRAINER_KINDS = Object.keys(CITY.produces);
@@ -31,15 +32,18 @@ export function careOf(game, e) {
 }
 /** Welche Pflege braucht die Einheit? 'inf' Soldaten, 'air' Hubschrauber, 'ground' Bodenfahrzeuge. */
 export const careClass = (u) => (u.def.air ? 'air' : u.def.armor === 'inf' ? 'inf' : 'ground');
-const WORKS = ['bm', 'mun', 'fuel', 'steel'];
+/** Werke (Verarbeitung in updateCity): BM-Werk, Munitionswerk, Raffinerie, Stahlwerk, Hütte (seit v5.19), Kerosin-Raffinerie (seit v5.19). */
+export const WORKS = ['bm', 'mun', 'fuel', 'steel', 'smelter', 'kero'];
 /** Rohstoffvorkommen (Code im Raster `deposit`): 0 keins. */
 export const DEPOSITS = ['wood', 'stone', 'ore', 'oil'];
 export const DEPOSIT_NAME = { wood: 'Wald', stone: 'Fels', ore: 'Erz', oil: 'Öl' };
 export const MINE_NAME = { wood: 'Holzfäller', stone: 'Steinbruch', ore: 'Erzmine', oil: 'Ölquelle' };
 /** Waren am Markt. */
-export const GOODS = ['bm', 'mun', 'fuel', 'metal'];
+export const GOODS = ['bm', 'mun', 'fuel', 'metal', 'kero'];
+/** Waren im Stadtlager (Obergrenze BALANCE.logistics.storeCap); die übrigen liegen im Lager der Hauptstadt. Stahl heißt intern metal. */
+export const CITY_STORE_GOODS = ['metal', 'kero'];
 
-const zeroStats = () => ({ powerSupply: 0, powerUse: 0, powerRatio: 1, happy: 1, pop: 0, housing: 0, jobs: 0, jobsCom: 0, workers: 0, drafted: 0, free: 0, fled: 0, bm: 0, mun: 0, fuel: 0, metal: 0, money: 0, raw: { wood: 0, stone: 0, ore: 0, oil: 0 } });
+const zeroStats = () => ({ powerSupply: 0, powerUse: 0, powerRatio: 1, happy: 1, pop: 0, housing: 0, jobs: 0, jobsCom: 0, workers: 0, drafted: 0, free: 0, fled: 0, bm: 0, mun: 0, fuel: 0, kero: 0, iron: 0, metal: 0, money: 0, raw: { wood: 0, stone: 0, ore: 0, oil: 0 } });
 
 /**
  * Gesperrte Zellen (für beide Teams gleich): unter und um jede Hauptstadt oder auf Hindernissen (Bäume, Wasser, Häuser, Gebäude).
@@ -323,7 +327,8 @@ function createTeamCity(game, team, shared) {
     inZone, // 1 = Zelle in der Konfliktzone
     deposit, // Rohstoffvorkommen je Zelle (Index in DEPOSITS + 1), für beide Teams gleich
     mapRoads: game.roads?.kind ?? null, // Stadtstraßen der Karte (roads.js, seit v5.03): zählen als Straße, für beide Teams gleich
-    metal: CITY.startMetal, // Metall im Hauptlager (nur hier, LKW fahren es nicht)
+    metal: CITY.startMetal, // Stahl im Stadtlager (nur hier, LKW fahren es nicht)
+    kero: CITY.startKero, // Kerosin im Stadtlager (seit v5.19)
     ents: new Map(), // Zelle → Ziel-Entity des Gebäudes (beschießbar, seit v4.83)
     cols,
     rows,
@@ -748,6 +753,7 @@ function placeBig(game, team, c, kind, col, row) {
 export function migrateCity(game) {
   if (!game.city) return;
   for (const c of game.city) {
+    c.kero ??= 0; // Kerosin im Stadtlager (seit v5.19)
     c.part ??= new Int32Array(c.kind.length);
     if (c.mapRoads === undefined) c.mapRoads = game.roads?.kind ?? null; // vor v5.03: Stadtstraßen der Karte
     let changed = false;
@@ -965,8 +971,8 @@ export function hasRoad(c, col, row) {
 
 /** Summen (Wohnplätze, Arbeitsplätze je Art) aus den gebauten Zellen; geflohene Wohnzellen zählen nicht. */
 function totals(c) {
-  const t = { housing: 0, fled: 0, jobsCom: 0, bm: 0, mun: 0, fuel: 0, steel: 0, mine: { wood: 0, stone: 0, ore: 0, oil: 0 }, market: 0, power: 0, powerJobs: 0, uni: 0, dc: 0, jobsOther: 0, use: 0 };
-  t.n = { bm: 0, mun: 0, fuel: 0, steel: 0, mine: { wood: 0, stone: 0, ore: 0, oil: 0 } }; // fertige Gebäude je Art (Flussanzeige)
+  const t = { housing: 0, fled: 0, jobsCom: 0, bm: 0, mun: 0, fuel: 0, steel: 0, smelter: 0, kero: 0, mine: { wood: 0, stone: 0, ore: 0, oil: 0 }, market: 0, power: 0, powerJobs: 0, uni: 0, dc: 0, jobsOther: 0, use: 0 };
+  t.n = { bm: 0, mun: 0, fuel: 0, steel: 0, smelter: 0, kero: 0, mine: { wood: 0, stone: 0, ore: 0, oil: 0 } }; // fertige Gebäude je Art (Flussanzeige)
   for (const i of c.list) {
     const lv = c.level[i];
     if (!lv || isPart(c, i)) continue; // ein Großbau zählt einmal (über seine Mitte)
@@ -1110,7 +1116,7 @@ export function updateCity(game, dt) {
     c.drafted = drafted;
 
     const t = totals(c);
-    const jobs = t.jobsCom + t.bm + t.mun + t.fuel + t.steel + t.mineJobs + t.jobsOther;
+    const jobs = t.jobsCom + t.bm + t.mun + t.fuel + t.steel + t.smelter + t.kero + t.mineJobs + t.jobsOther;
 
     // Einwohner ziehen ein oder ab, bis die Wohnplätze gefüllt sind (ohne Arbeit nur ein kleiner Anfang)
     const target = jobs > 0 ? t.housing : Math.min(t.housing, CITY.startPop);
@@ -1176,22 +1182,43 @@ export function updateCity(game, dt) {
     for (const d of DEPOSITS) s.raw[d] = t.mine[d] * eff * CITY.extract[d];
     const Y = CITY.yield;
     const K = CITY.convert;
+    // Kette (CITY.chain, seit v5.19): Erz → Hütte → Roheisen → Stahlwerk → Stahl (Stadtlager) → Munitionswerk. Öl geht anteilig nach
+    // Arbeitsplätzen an Raffinerie (Treibstoff) und Kerosin-Raffinerie (Kerosin, Stadtlager). Noch ohne Transportlogik (AP1).
+    const ironCap = t.smelter * eff * Y.iron;
+    const steelCap = t.steel * eff * Y.metal;
+    const ironIn = Math.min(ironCap, s.raw.ore / K.iron); // Roheisen, das die Erze hergeben
+    const metalOut = Math.min(steelCap, ironIn / K.metal); // Stahl: das Stahlwerk nimmt nur so viel Roheisen
+    s.iron = metalOut * K.metal; // Roheisen, das wirklich zum Stahlwerk läuft (kein Lager)
+    // Öl: zuerst der Anteil nach Arbeitsplätzen (begrenzt auf das, was das Werk schafft), dann der Rest an das andere Werk, dann
+    // wieder der Rest an die Raffinerie (kein Öl verfällt, solange eine Raffinerie es verarbeiten kann)
+    const oilJobs = t.fuel + t.kero;
+    const oilShare = oilJobs > 0 ? (s.raw.oil * t.fuel) / oilJobs : 0;
+    const fuelNeed = t.fuel * eff * Y.fuel * K.fuel; // Öl, das die Raffinerie je s schafft
+    const keroNeed = t.kero * eff * Y.kero * K.kero; // Öl, das die Kerosin-Raffinerie je s schafft
+    const oilFuel0 = Math.min(oilShare, fuelNeed);
+    const oilKero = Math.min(s.raw.oil - oilFuel0, keroNeed);
+    const oilFuel = Math.min(s.raw.oil - oilKero, fuelNeed);
     s.bm = Math.min(t.bm * eff * Y.bm, (s.raw.wood + s.raw.stone) / K.bm);
-    s.fuel = Math.min(t.fuel * eff * Y.fuel, s.raw.oil / K.fuel);
-    const metalIn = Math.min(t.steel * eff * Y.metal, s.raw.ore / K.metal);
-    s.mun = Math.min(t.mun * eff * Y.mun, (c.metal / Math.max(dt, 1e-6) + metalIn) / K.mun); // Munition braucht Metall
-    s.metal = metalIn - s.mun * K.mun;
+    s.fuel = Math.min(t.fuel * eff * Y.fuel, oilFuel / K.fuel);
+    s.kero = Math.min(t.kero * eff * Y.kero, oilKero / K.kero);
+    const stock = c.metal / Math.max(dt, 1e-6); // Stahl aus dem Stadtlager je s (für die Munition)
+    s.mun = Math.min(t.mun * eff * Y.mun, (stock + metalOut) / K.mun); // Munition braucht Stahl
+    s.metal = metalOut - s.mun * K.mun;
     // Für die Flussanzeige (js/game/flow.js, CITY.chain): je Produkt Leistung der Werke (cap), was die Rohstoffe hergeben (inp), Erzeugung (gross)
-    s.cap = { bm: t.bm * eff * Y.bm, fuel: t.fuel * eff * Y.fuel, metal: t.steel * eff * Y.metal, mun: t.mun * eff * Y.mun };
-    s.inp = { bm: (s.raw.wood + s.raw.stone) / K.bm, fuel: s.raw.oil / K.fuel, metal: s.raw.ore / K.metal, mun: (c.metal / Math.max(dt, 1e-6) + metalIn) / K.mun };
-    s.gross = { bm: s.bm, fuel: s.fuel, metal: metalIn, mun: s.mun };
+    s.cap = { bm: t.bm * eff * Y.bm, iron: ironCap, fuel: t.fuel * eff * Y.fuel, kero: t.kero * eff * Y.kero, metal: steelCap, mun: t.mun * eff * Y.mun };
+    s.inp = { bm: (s.raw.wood + s.raw.stone) / K.bm, iron: s.raw.ore / K.iron, fuel: oilFuel / K.fuel, kero: oilKero / K.kero, metal: ironIn / K.metal, mun: (stock + metalOut) / K.mun };
+    s.gross = { bm: s.bm, iron: s.iron, fuel: s.fuel, kero: s.kero, metal: metalOut, mun: s.mun };
     s.n = t.n;
     s.fill = fill;
     s.mood = mood;
-    const made = (c.made ??= { bm: 0, mun: 0, fuel: 0, metal: 0 }); // Summe, die wirklich ins Lager kam (Flussanzeige misst damit den Verbrauch)
+    const made = (c.made ??= { bm: 0, mun: 0, fuel: 0, metal: 0, kero: 0 }); // Summe, die wirklich ins Lager kam (Flussanzeige misst damit den Verbrauch)
+    made.kero ??= 0; // Stände vor v5.19
     const metal0 = c.metal;
     c.metal = Math.max(0, Math.min(BALANCE.logistics.storeCap, c.metal + s.metal * dt));
     made.metal += Math.max(0, c.metal - metal0 + s.mun * K.mun * dt); // was das Stahlwerk ins Stadtlager bringt (das Munitionswerk zählt als Verbrauch)
+    const kero0 = c.kero;
+    c.kero = Math.max(0, Math.min(BALANCE.logistics.storeCap, c.kero + s.kero * dt));
+    made.kero += Math.max(0, c.kero - kero0);
     s.money = (pool * CITY.taxPop + t.jobsCom * fill * CITY.taxCom) * mood;
     c.stats = s;
 
@@ -1325,8 +1352,8 @@ export function hasMarket(game, team) {
 }
 
 /**
- * Befehl `{ type: 'trade', good: 'bm'|'mun'|'fuel'|'metal', dir: 'sell'|'buy' }`: ein Los (CITY.market.lot) am Markt handeln.
- * Braucht einen fertigen eigenen Markt. BM, MUN, TS liegen im Lager der Hauptstadt, Metall im Stadtlager.
+ * Befehl `{ type: 'trade', good: 'bm'|'mun'|'fuel'|'metal'|'kero', dir: 'sell'|'buy' }`: ein Los (CITY.market.lot) am Markt handeln.
+ * Braucht einen fertigen eigenen Markt. BM, MUN, TS liegen im Lager der Hauptstadt, Stahl und Kerosin im Stadtlager.
  */
 export function cmdTrade(game, team, cmd) {
   const c = game.city?.[team];
@@ -1334,16 +1361,17 @@ export function cmdTrade(game, team, cmd) {
   if (!GOODS.includes(cmd.good) || (cmd.dir !== 'sell' && cmd.dir !== 'buy')) return { ok: false, reason: 'Unbekannter Handel' };
   if (!hasMarket(game, team)) return { ok: false, reason: 'Erst einen Markt bauen' };
   const main = game.mainFob(team);
-  if (!main && cmd.good !== 'metal') return { ok: false, reason: 'Hauptstadt zerstört' };
+  const inCity = CITY_STORE_GOODS.includes(cmd.good);
+  if (!main && !inCity) return { ok: false, reason: 'Hauptstadt zerstört' };
   const M = CITY.market;
-  const cap = cmd.good === 'metal' ? BALANCE.logistics.storeCap : BALANCE.logistics.capitalCap; // Stadtlager bzw. Lager der Hauptstadt
+  const cap = inCity ? BALANCE.logistics.storeCap : BALANCE.logistics.capitalCap; // Stadtlager bzw. Lager der Hauptstadt
   const t = game.teams[team];
-  const have = cmd.good === 'metal' ? c.metal : main.store[cmd.good];
+  const have = inCity ? c[cmd.good] : main.store[cmd.good];
   const add = (v) => {
-    if (cmd.good === 'metal') c.metal = Math.min(cap, c.metal + v);
+    if (inCity) c[cmd.good] = Math.min(cap, c[cmd.good] + v);
     else main.store[cmd.good] = Math.min(cap, main.store[cmd.good] + v);
-    c.traded ??= { bm: 0, mun: 0, fuel: 0, metal: 0 }; // Summe der Käufe minus Verkäufe (Flussanzeige: zählt nicht als Verbrauch)
-    c.traded[cmd.good] += v;
+    c.traded ??= { bm: 0, mun: 0, fuel: 0, metal: 0, kero: 0 }; // Summe der Käufe minus Verkäufe (Flussanzeige: zählt nicht als Verbrauch)
+    c.traded[cmd.good] = (c.traded[cmd.good] ?? 0) + v;
   };
   if (cmd.dir === 'sell') {
     if (have < M.lot) return { ok: false, reason: 'Zu wenig zum Verkaufen' };

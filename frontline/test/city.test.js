@@ -317,23 +317,23 @@ test('Rohstoffvorkommen nie auf Wasser, Furten, Brücken oder Stadtstraßen (auc
   }
 });
 
-test('Metall: Erzmine + Stahlwerk liefern, Fahrzeuge kosten Metall, Abbruch erstattet', () => {
+test('Stahl: Erzmine, Hütte und Stahlwerk liefern, Fahrzeuge kosten Stahl, Abbruch erstattet', () => {
   const g = new Game({ seed: 3, city: true, startMoney: 9000 });
   const c = g.city[0];
   paint(g, 'road', 0, 0, 9, 0);
   paint(g, 'res', 0, 1, 9, 1);
   assert.ok(paint(g, 'steel', 0, 2, 1, 3).ok); // 2 × 2 (seit v5.08), Straße darunter
-  paint(g, 'road', 0, 4, 3, 4);
+  assert.ok(paint(g, 'smelter', 3, 2, 4, 3).ok); // Hütte (seit v5.19): Erz → Roheisen, Roheisen → Stahlwerk
+  paint(g, 'road', 0, 4, 4, 4);
   c.deposit[at(g, 5, 3)] = 3; // Erz
   c.deposit[at(g, 6, 3)] = 3;
   paint(g, 'mine', 5, 3, 6, 3);
   run(g, 90);
-  assert.ok(c.stats.raw.ore > 0 && c.stats.metal > 0, `Metall/s ${c.stats.metal}`);
-  const m = g.mainFob(0);
+  assert.ok(c.stats.raw.ore > 0 && c.stats.iron > 0 && c.stats.metal > 0, `Stahl/s ${c.stats.metal}, Roheisen/s ${c.stats.iron}`);
   c.metal = 50;
   const r = g.issue(0, { type: 'train', buildingId: trainerFor(g, 'tank').id, unit: 'tank' });
   assert.equal(r.ok, false);
-  assert.match(r.reason, /Metall/);
+  assert.match(r.reason, /Stahl/);
   c.metal = 500;
   assert.ok(g.issue(0, { type: 'train', buildingId: trainerFor(g, 'tank').id, unit: 'tank' }).ok);
   assert.equal(c.metal, 500 - CITY.metalCost.tank);

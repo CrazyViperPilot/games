@@ -8,6 +8,8 @@ import { BUILDINGS } from '../js/data/buildings.js';
 import { MIX } from '../js/data/ai.js';
 import { MAPGEN } from '../js/data/mapgen.js';
 import { WEATHER_SETTINGS } from '../js/game/weather.js';
+import { CITY } from '../js/data/city.js';
+import { KIND_ID, KIND_NAME, WORKS, GOODS } from '../js/game/city.js';
 
 const RES = Object.keys(BALANCE.resNames);
 const positive = (v) => typeof v === 'number' && v > 0;
@@ -102,4 +104,26 @@ test('Forschung, Schwierigkeit, KI-Mischung und Startmenü', () => {
   const m = BALANCE.menuDefaults;
   assert.ok(BALANCE.difficulty[m.difficulty], `menuDefaults.difficulty = ${m.difficulty}`);
   assert.ok(WEATHER_SETTINGS.includes(m.weather), `menuDefaults.weather = ${m.weather}`);
+});
+
+test('Stadt (v5.19): Zellenarten stabil, Hütte und Kerosin-Raffinerie vollständig, Ketten und Märkte passen', () => {
+  // IDs bestehender Zellenarten bleiben (Speicherstände); neue Arten stehen hinten
+  assert.equal(KIND_ID.road, 1);
+  assert.equal(KIND_ID.airport, 17, 'Flughafen bleibt Nummer 17');
+  assert.equal(KIND_ID.smelter, 18, 'Hütte hinten angehängt');
+  assert.equal(KIND_ID.kero, 19, 'Kerosin-Raffinerie hinten angehängt');
+  for (const k of ['smelter', 'kero']) {
+    assert.ok(KIND_NAME[k], `KIND_NAME.${k} fehlt`);
+    assert.ok(CITY.size[k] >= 2, `CITY.size.${k} (Werke sind 2 × 2)`);
+    assert.ok(CITY.cost[k] > 0, `CITY.cost.${k}`);
+    assert.ok(CITY.power.use[k] > 0, `CITY.power.use.${k}`);
+    assert.ok(WORKS.includes(k), `${k} gehört zu WORKS`);
+  }
+  for (const w of WORKS) assert.ok(CITY.yield[CITY.chain[w].to] > 0, `Werk ${w}: keine Ausbeute für ${CITY.chain[w].to}`);
+  for (const g of ['iron', 'kero']) assert.ok(CITY.yield[g] > 0 && CITY.convert[g] > 0, `yield/convert ${g}`);
+  assert.ok(CITY.startKero >= 0 && Number.isFinite(CITY.startKero), 'startKero');
+  for (const g of GOODS) assert.ok(CITY.market.sell[g] > 0 && CITY.market.buy[g] > 0, `Markt: Preis für ${g} fehlt`);
+  assert.ok(CITY.ai.lowKero > 0, 'ai.lowKero');
+  const t = CITY.transport;
+  for (const f of ['cap', 'mapCap', 'commute', 'maxDist', 'reroute', 'smooth']) assert.ok(positive(t[f]), `CITY.transport.${f}`);
 });

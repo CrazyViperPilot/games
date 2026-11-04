@@ -4,32 +4,33 @@
 // Dazu das Marktmenü (MarketPanel, seit v4.94): Fenster zum Handeln, geöffnet über Geldanzeige, Markt-Auswahl oder „Handel“.
 import { CITY } from '../data/city.js';
 import { BALANCE } from '../data/balance.js';
-import { KINDS, KIND_NAME, GOODS, cellAt, hasMarket, sizeOf, bigAnchorAt } from '../game/city.js';
+import { KINDS, KIND_NAME, GOODS, CITY_STORE_GOODS, cellAt, hasMarket, sizeOf, bigAnchorAt } from '../game/city.js';
 
 // Farben je Zellenart (Werkzeug, Grundstück, Symbol auf der Karte): Wohnen grün (privat), Gewerbe blau (kommerziell), Werke erdig,
 // Markt gold, Militär (Kaserne, Fabrikhalle, Heliport) oliv. Symbole: Werkzeugleiste und Schilder über den Gebäuden (citylayer.js).
-export const CITY_COLORS = { road: '#8a8f86', res: '#4f9a5a', com: '#3f7fd0', bm: '#b0743c', mun: '#8b96a8', fuel: '#9b7bc4', steel: '#7f8c99', mine: '#c9a14a', market: '#e6b422', power: '#e0c040', uni: '#6fa8dc', dc: '#4fc3c7', barracks: '#7d8f45', factory: '#7d8f45', heliport: '#7d8f45', hospital: '#e8707e', airport: '#7d8f45', erase: '#d05050' };
-export const CITY_ICON = { road: '▬', res: '⌂', com: '▣', bm: '⚒', mun: '✸', fuel: '⛽', steel: '⛓', mine: '⛏', market: '⚖', power: '⚡', uni: '🎓', dc: '🖥', barracks: '⚔', factory: '🔧', heliport: '🚁', hospital: '✚', airport: '✈', erase: '✕' };
+export const CITY_COLORS = { road: '#8a8f86', res: '#4f9a5a', com: '#3f7fd0', bm: '#b0743c', mun: '#8b96a8', fuel: '#9b7bc4', steel: '#7f8c99', mine: '#c9a14a', market: '#e6b422', power: '#e0c040', uni: '#6fa8dc', dc: '#4fc3c7', barracks: '#7d8f45', factory: '#7d8f45', heliport: '#7d8f45', hospital: '#e8707e', airport: '#7d8f45', smelter: '#a0522d', kero: '#56b3e6', erase: '#d05050' };
+export const CITY_ICON = { road: '▬', res: '⌂', com: '▣', bm: '⚒', mun: '✸', fuel: '⛽', steel: '⛓', mine: '⛏', market: '⚖', power: '⚡', uni: '🎓', dc: '🖥', barracks: '⚔', factory: '🔧', heliport: '🚁', hospital: '✚', airport: '✈', smelter: '🔥', kero: '🛢', erase: '✕' };
 const ICON = CITY_ICON;
 const CARE = CITY.care.by;
-const SHORT = { road: 'Straße', res: 'Wohnen', com: 'Gewerbe', bm: 'BM-Werk', mun: 'Mun.-Werk', fuel: 'Raffinerie', steel: 'Stahlwerk', mine: 'Förderung', market: 'Markt', power: 'Kraftwerk', uni: 'Universität', dc: 'Rechenz.', barracks: 'Kaserne', factory: 'Fabrikhalle', heliport: 'Heliport', hospital: 'Krankenhaus', airport: 'Flughafen', erase: 'Räumen' };
+const SHORT = { road: 'Straße', res: 'Wohnen', com: 'Gewerbe', bm: 'BM-Werk', mun: 'Mun.-Werk', fuel: 'Raffinerie', steel: 'Stahlwerk', smelter: 'Hütte', kero: 'Kerosin-Raf.', mine: 'Förderung', market: 'Markt', power: 'Kraftwerk', uni: 'Universität', dc: 'Rechenz.', barracks: 'Kaserne', factory: 'Fabrikhalle', heliport: 'Heliport', hospital: 'Krankenhaus', airport: 'Flughafen', erase: 'Räumen' };
 export const CITY_TIP = {
-  bm: 'Großbau 2 × 2 (Ziegelei mit Holzlager): Baumaterial aus Holz und Stein (Holzfäller, Steinbruch)', mun: 'Großbau 2 × 2 (Bunker mit Riesenpatrone): Munition aus Metall',
+  bm: 'Großbau 2 × 2 (Ziegelei mit Holzlager): Baumaterial aus Holz und Stein (Holzfäller, Steinbruch)', mun: 'Großbau 2 × 2 (Bunker mit Riesenpatrone): Munition aus Stahl',
   fuel: 'Großbau 2 × 2 (großer Öltank, Destillationstürme): Treibstoff aus Öl (Ölquelle)',
-  steel: 'Großbau 2 × 2 (Hochofen mit Winderhitzern): Metall aus Erz (Erzmine)', mine: 'Nur auf Rohstoffvorkommen: Holzfäller, Steinbruch, Erzmine oder Ölquelle; braucht keine Straße',
+  steel: 'Großbau 2 × 2 (Stahlwerk mit Walzstraße): Stahl aus Roheisen (Hütte)', smelter: `Großbau ${CITY.size.smelter} × ${CITY.size.smelter} Zellen (Hochofen mit Glut und Schornstein): Roheisen aus Erz (Erzmine); das Roheisen fährt zum Stahlwerk`,
+  kero: `Großbau ${CITY.size.kero} × ${CITY.size.kero} Zellen (Kugeltanks mit blauen Tankringen): Kerosin aus Öl (Ölquelle), Vorrat im Stadtlager; für F-16 am Flughafen und Hubschrauber am Heliport`, mine: 'Nur auf Rohstoffvorkommen: Holzfäller, Steinbruch, Erzmine oder Ölquelle; braucht keine Straße',
   market: 'Handel: Überschuss verkaufen, Knappes teuer kaufen (Knopf Handel, Markt antippen oder Geldanzeige oben)', road: 'Kostet Baumaterial aus dem Lager der Hauptstadt',
   power: `Großbau ${CITY.size.power} × ${CITY.size.power} Zellen: Strom für Werke, Förderung, Uni und Rechenzentrum (stadtweit); ohne genug Strom arbeiten sie langsamer`,
   uni: 'Großbau 3 × 3 Zellen (antippen, das Quadrat folgt dem Finger; Straße an einer Seite); ohne fertige Universität ruht jede Forschung (eine reicht)',
   dc: `Beschleunigt die Forschung: jede Stufe jedes Rechenzentrums +${Math.round(CITY.research.dcSpeed * 100)} % (höchstens ${CITY.research.maxSpeed}-fach)`,
   barracks: `Großbau ${CITY.size.barracks} × ${CITY.size.barracks} Zellen: bildet Soldaten aus (Schützen, Panzerabwehr, Scharfschützen, Kommandeur); bezahlt direkt aus der Stadt. Heilt Soldaten im Umkreis von ${CARE.barracks.radius} Feldern`,
-  factory: `Großbau ${CITY.size.factory} × ${CITY.size.factory} Zellen: baut alle Fahrzeuge (LKW, Baufahrzeug, Schützen- und Kampfpanzer, Flak, SAM); bezahlt direkt aus der Stadt. Repariert Bodenfahrzeuge im Umkreis von ${CARE.factory.radius} Feldern (kostet Metall)`,
-  heliport: `Baut Hubschrauber (Little Bird, Transporter, AH-64); bezahlt direkt aus der Stadt. Repariert Hubschrauber im Umkreis von ${CARE.heliport.radius} Feldern (kostet Metall)`,
+  factory: `Großbau ${CITY.size.factory} × ${CITY.size.factory} Zellen: baut alle Fahrzeuge (LKW, Baufahrzeug, Schützen- und Kampfpanzer, Flak, SAM); bezahlt direkt aus der Stadt. Repariert Bodenfahrzeuge im Umkreis von ${CARE.factory.radius} Feldern (kostet Stahl)`,
+  heliport: `Baut Hubschrauber (Little Bird, Transporter, AH-64); bezahlt direkt aus der Stadt. Repariert Hubschrauber im Umkreis von ${CARE.heliport.radius} Feldern (kostet Stahl)`,
   airport: `Großbau ${CITY.size.airport} × ${CITY.size.airport} Zellen mit zwei Start- und Landebahnen und Tower; baut F-16 (bezahlt direkt aus der Stadt) und bietet Platz für ${BALANCE.jets.capacity} Flugzeuge, die dort landen, tanken, nachladen und repariert werden`,
   erase: 'Entfernt eigene Stadtzellen (ohne Erstattung), fällt Bäume und Wald und reißt leere Häuser, Hallen und Fabriken der Karte ab, damit dort gebaut werden kann (Fels, Wasser, Türme, besetzte Häuser bleiben)',
   hospital: `Heilt eigene Soldaten im Umkreis von ${CARE.hospital.radius} Feldern, schneller als die Kaserne (${Math.round(CARE.hospital.rate * 100)} % HP/s auf Stufe 1)`,
 };
-const GOOD_NAME = { bm: 'BM', mun: 'MUN', fuel: 'TS', metal: 'Metall' };
-const GOOD_LONG = { bm: 'Baumaterial', mun: 'Munition', fuel: 'Treibstoff', metal: 'Metall' };
+const GOOD_NAME = { bm: 'BM', mun: 'MUN', fuel: 'TS', metal: 'Stahl', kero: 'Kerosin' };
+const GOOD_LONG = { bm: 'Baumaterial', mun: 'Munition', fuel: 'Treibstoff', metal: 'Stahl', kero: 'Kerosin' };
 const TOOLS = [...KINDS, 'erase'];
 const fmt = (v, d = 0) => v.toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d });
 
@@ -153,7 +154,7 @@ export class CityPanel {
     const m = g.mainFob(this.team);
     const fled = s.fled ? ` (${fmt(s.fled)} geflohen)` : '';
     const raw = s.raw;
-    const store = m ? `Metall ${fmt(g.city[this.team].metal)} ${s.metal >= 0 ? '+' : ''}${fmt(s.metal, 1)} · Förderung Holz ${fmt(raw.wood, 1)} Stein ${fmt(raw.stone, 1)} Erz ${fmt(raw.ore, 1)} Öl ${fmt(raw.oil, 1)} · Lager BM ${fmt(m.store.bm)} +${fmt(s.bm, 1)} · MUN ${fmt(m.store.mun)} +${fmt(s.mun, 1)} · TS ${fmt(m.store.fuel)} +${fmt(s.fuel, 1)}` : 'Hauptstadt zerstört';
+    const store = m ? `Stahl ${fmt(g.city[this.team].metal)} ${s.metal >= 0 ? '+' : ''}${fmt(s.metal, 1)} · Förderung Holz ${fmt(raw.wood, 1)} Stein ${fmt(raw.stone, 1)} Erz ${fmt(raw.ore, 1)} Öl ${fmt(raw.oil, 1)} · Lager BM ${fmt(m.store.bm)} +${fmt(s.bm, 1)} · MUN ${fmt(m.store.mun)} +${fmt(s.mun, 1)} · TS ${fmt(m.store.fuel)} +${fmt(s.fuel, 1)}` : 'Hauptstadt zerstört';
     this.strip.innerHTML = `<span>Strom ${fmt(s.powerSupply)}/${fmt(s.powerUse)}${s.powerRatio < 1 ? ' ⚠' : ''} · Zufriedenheit ${fmt(s.happy * 100)} % · Einwohner ${fmt(s.pop)}/${fmt(s.housing)}${fled} · Truppen ${fmt(s.drafted)} · frei ${fmt(Math.max(0, s.free))} · Arbeit ${fmt(s.workers)}/${fmt(s.jobs)} · Steuern +${fmt(s.money, 1)}/s</span><span class="city-store">${store}</span>`;
   }
 
@@ -183,10 +184,10 @@ export class MarketPanel {
     root.setAttribute('aria-label', 'Markt');
     root.innerHTML = `
       <div class="mk-head"><b>⚖ Markt</b><span class="mk-money" data-mk-money></span><button type="button" class="btn-sm mk-close" data-mk-close title="Schließen (Esc)" aria-label="Schließen">✕</button></div>
-      <div class="mk-rows">${GOODS.map((g) => `<div class="mk-row"><span class="mk-good" title="${GOOD_LONG[g]}${g === 'metal' ? ' (Stadtlager)' : ' (Lager der Hauptstadt)'}"><b>${GOOD_NAME[g]}</b><small data-mk-have="${g}">0</small></span>` +
+      <div class="mk-rows">${GOODS.map((g) => `<div class="mk-row"><span class="mk-good" title="${GOOD_LONG[g]}${CITY_STORE_GOODS.includes(g) ? ' (Stadtlager)' : ' (Lager der Hauptstadt)'}"><b>${GOOD_NAME[g]}</b><small data-mk-have="${g}">0</small></span>` +
         `<button type="button" class="btn-sm mk-sell" data-trade="${g}" data-dir="sell" title="${M.lot} ${GOOD_LONG[g]} verkaufen">Verkaufen <b>+${M.sell[g]}</b></button>` +
         `<button type="button" class="btn-sm mk-buy" data-trade="${g}" data-dir="buy" title="${M.lot} ${GOOD_LONG[g]} kaufen">Kaufen <b>−${M.buy[g]}</b></button></div>`).join('')}</div>
-      <small class="mk-note">Je ${M.lot} Stück, Preise in Geld. BM, MUN, TS im Lager der Hauptstadt, Metall im Stadtlager.</small>`;
+      <small class="mk-note">Je ${M.lot} Stück, Preise in Geld. BM, MUN, TS im Lager der Hauptstadt, Stahl und Kerosin im Stadtlager.</small>`;
     parent.appendChild(root);
     this.root = root;
     root.addEventListener('click', (e) => {
@@ -230,13 +231,14 @@ export class MarketPanel {
     const main = g.mainFob(this.team);
     this.root.querySelector('[data-mk-money]').textContent = `Geld ${fmt(Math.floor(money))}`;
     for (const k of GOODS) {
-      const have = k === 'metal' ? g.city[this.team].metal : main ? main.store[k] : 0;
-      this.root.querySelector(`[data-mk-have="${k}"]`).textContent = main || k === 'metal' ? fmt(Math.floor(have)) : '–';
+      const inCity = CITY_STORE_GOODS.includes(k);
+      const have = inCity ? g.city[this.team][k] : main ? main.store[k] : 0;
+      this.root.querySelector(`[data-mk-have="${k}"]`).textContent = main || inCity ? fmt(Math.floor(have)) : '–';
       const sell = this.root.querySelector(`[data-trade="${k}"][data-dir="sell"]`);
       const buy = this.root.querySelector(`[data-trade="${k}"][data-dir="buy"]`);
       // ausgegraut, aber antippbar: der Grund kommt dann als Meldung
-      sell.classList.toggle('off', (!main && k !== 'metal') || have < M.lot);
-      buy.classList.toggle('off', (!main && k !== 'metal') || money < M.buy[k] || have + M.lot > (k === 'metal' ? L.storeCap : L.capitalCap));
+      sell.classList.toggle('off', (!main && !inCity) || have < M.lot);
+      buy.classList.toggle('off', (!main && !inCity) || money < M.buy[k] || have + M.lot > (inCity ? L.storeCap : L.capitalCap));
     }
   }
 

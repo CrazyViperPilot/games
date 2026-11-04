@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
 import { CITY } from '../js/data/city.js';
 import { KINDS, DEPOSITS } from '../js/game/city.js';
-import { resourceFlow, flowLayout, FlowMeter, teamStock, FLOW_GOODS } from '../js/game/flow.js';
+import { resourceFlow, flowLayout, FlowMeter, teamStock, FLOW_GOODS, FLOW_MIDS } from '../js/game/flow.js';
 
 const run = (g, s, fn) => { for (let t = 0; t < s * 20; t++) { g.update(0.05); fn?.(); } };
 
@@ -17,9 +17,33 @@ test('CITY.chain deckt alle Rohstoffe, Werke und Waren ab', () => {
   for (const d of DEPOSITS) assert.ok(froms.includes(d), `Vorkommen ${d} fehlt in CITY.chain`);
   for (const g of [...Object.keys(CITY.convert), ...Object.keys(CITY.yield)]) assert.ok(tos.includes(g), `Ware ${g} wird in CITY.chain nicht erzeugt`);
   for (const w of Object.keys(CITY.chain)) assert.ok(KINDS.includes(w), `CITY.chain.${w} ist keine Zellenart`);
-  for (const g of tos) assert.ok(FLOW_GOODS.includes(g), `Ware ${g} fehlt in FLOW_GOODS`);
+  for (const g of tos) assert.ok(FLOW_GOODS.includes(g) || FLOW_MIDS.includes(g), `Ware ${g} fehlt in FLOW_GOODS und FLOW_MIDS`);
+  // Zwischenprodukte (Roheisen) ohne Lager: ein Werk erzeugt sie, ein anderes verarbeitet sie
+  for (const g of FLOW_MIDS) assert.ok(froms.includes(g), `Zwischenprodukt ${g} wird von keinem Werk verarbeitet`);
   const L = flowLayout();
   for (const l of L.links) assert.ok(L.nodes[l.from].col < L.nodes[l.to].col, `Kante ${l.from} → ${l.to} läuft nach links`);
+});
+
+test('Kette seit v5.19: Erz → Hütte → Roheisen → Stahlwerk → Stahl; Öl → Raffinerie und Kerosin-Raffinerie → Kerosin', () => {
+  const { nodes } = flowLayout();
+  assert.equal(nodes['mid:iron'].type, 'mid', 'Roheisen ist ein Zwischenprodukt');
+  assert.equal(nodes['store:iron'], undefined, 'Roheisen hat kein Lager');
+  assert.ok(nodes['mid:iron'].ins.includes('works:smelter') && nodes['mid:iron'].outs.includes('works:steel'));
+  assert.ok(nodes['works:steel'].ins.includes('mid:iron') && nodes['works:steel'].outs.includes('store:metal'));
+  assert.ok(nodes['raw:oil'].outs.includes('works:fuel') && nodes['raw:oil'].outs.includes('works:kero'));
+  assert.ok(nodes['works:kero'].outs.includes('store:kero'));
+  assert.ok(nodes['store:kero'].col > nodes['works:kero'].col);
+});
+
+test('Roheisen ohne Stahlwerk: die Hütte meldet es, kein Erz wird als Bestand gezählt', () => {
+  const g = new Game({ seed: 7, city: true });
+  run(g, 2);
+  const c = g.city[0];
+  c.stats = { ...c.stats, fill: 1, powerRatio: 1, happy: 1, mood: 1, jobs: 10, raw: { wood: 0, stone: 0, ore: 1, oil: 0 }, cap: { iron: 2, metal: 0 }, inp: { iron: 1, metal: 0 }, gross: { iron: 0, metal: 0 }, n: { smelter: 1, steel: 0, mine: { wood: 0, stone: 0, ore: 1, oil: 0 } } };
+  const f = resourceFlow(g, 0);
+  assert.equal(f.nodes['works:smelter'].status, 'bad');
+  assert.match(f.nodes['works:smelter'].note, /ohne Stahlwerk/);
+  assert.equal(f.nodes['mid:iron'].status, 'ok');
 });
 
 test('Graph passt zu den Zahlen der Simulation', () => {

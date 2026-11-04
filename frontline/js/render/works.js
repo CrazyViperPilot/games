@@ -1,5 +1,6 @@
 // Werke als 2 × 2-Großbauten (seit v5.08, PRD §15): BM-Werk (Ziegelei mit Holzlager), Munitionswerk (Bunker mit Riesenpatrone),
-// Raffinerie (großer Öltank, Destillationstürme) und Stahlwerk (Hochofen mit Winderhitzern). Jede Anlage ist vierfach symmetrisch
+// Raffinerie (großer Öltank, Destillationstürme) und Stahlwerk (Hochofen mit Winderhitzern); seit v5.19 außerdem Hütte (Hochofen mit
+// Glut, Schornstein) und Kerosin-Raffinerie (Kugeltanks mit blauen Tankringen). Jede Anlage ist vierfach symmetrisch
 // (Drehung um 90° ergibt dasselbe Bild), darum zeichnet die Iso-Ansicht wie bei der Universität für jede Drehung der Karte dasselbe
 // Bild. Stufe 2 und 3 fügen Türme, Lager und Schornsteine hinzu. 2D: dieselbe Anlage von oben.
 // Nur Zeichnen (liest b = { x, y, kind, level, color, damage }; Mitte des Quadrats in Weltkoordinaten, es reicht bis ±64).
@@ -8,9 +9,9 @@ import { iso, poly, box, lit, pyramid, FACE, OUTLINE, DETAIL } from './universit
 import { shade, tint } from './sprites.js';
 import { snowy } from './season.js';
 
-export const WORKS_KINDS = ['bm', 'mun', 'fuel', 'steel'];
+export const WORKS_KINDS = ['bm', 'mun', 'fuel', 'steel', 'smelter', 'kero'];
 /** Boden unter dem fertigen Werk (Pflaster, Schotter, Erde). */
-export const WORKS_GROUND = { bm: '#b39a74', mun: '#8b9273', fuel: '#8f9398', steel: '#7a756f' };
+export const WORKS_GROUND = { bm: '#b39a74', mun: '#8b9273', fuel: '#8f9398', steel: '#7a756f', smelter: '#7d6a5c', kero: '#8a9aa6' };
 
 const TANK = '#e9ecef'; // Öltank: helles Silber
 const PIPE = '#9aa1a8';
@@ -23,6 +24,8 @@ const OLIVE = '#6f7448';
 const STEEL = '#5b6570';
 const RUST = '#6e4a3b';
 const GLOW = '#ffb347';
+const BLUE = '#2f7fd1'; // Tankringe der Kerosin-Raffinerie
+const SLAG = '#6f675e'; // Hütte: Hallen aus dunklem Stein
 
 // Maße je Stufe (Weltpixel ab der Mitte)
 const FUEL = [null,
@@ -41,6 +44,18 @@ const BM = [null,
   { hall: 22, hallH: 14, chim: 5, chimH: 44, logs: 11, logsH: 10, at: 42, bricks: false, roof: false },
   { hall: 24, hallH: 15, chim: 6, chimH: 54, logs: 12, logsH: 12, at: 43, bricks: true, roof: true },
   { hall: 26, hallH: 16, chim: 6.5, chimH: 62, logs: 12, logsH: 14, at: 43, bricks: true, roof: true }];
+// Hütte (seit v5.19): hoher Hochofenschacht mit Glut oben, Gießhalle; ab Stufe 2 Schornstein an der hinteren Ecke
+const SMELT = [null,
+  { hall: 22, hallH: 12, tower: 9, towerH: 46, at: 40, chim: 0, chimH: 0 },
+  { hall: 24, hallH: 13, tower: 10, towerH: 58, at: 41, chim: 4, chimH: 60 },
+  { hall: 26, hallH: 14, tower: 11, towerH: 70, at: 42, chim: 4.5, chimH: 80 }];
+// Kerosin-Raffinerie (seit v5.19): Kugeltanks (2, 3, 4 je Stufe) mit blauen Ringen, Pumpenhaus in der Mitte; ab Stufe 3 Fackel
+const KERO = [null,
+  { tank: 13, tankH: 22, at: 24, n: 2, pump: 8, pumpH: 9, stack: 0, stackH: 0 },
+  { tank: 14, tankH: 26, at: 25, n: 3, pump: 9, pumpH: 11, stack: 0, stackH: 0 },
+  { tank: 15, tankH: 30, at: 26, n: 4, pump: 10, pumpH: 13, stack: 3, stackH: 46 }];
+/** Tankpositionen je Anzahl Tanks (diagonal, dann die Ecken). */
+const KERO_TANKS = { 2: [[-1, -1], [1, 1]], 3: [[-1, -1], [1, -1], [-1, 1]], 4: [[-1, -1], [1, -1], [-1, 1], [1, 1]] };
 
 const CORNERS = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
 const EDGES = [[-1, 0], [0, -1], [1, 0], [0, 1]];
@@ -51,6 +66,8 @@ export function worksLift(kind, level) {
   if (kind === 'fuel') return Math.max(FUEL[lv].tankH + 10, FUEL[lv].colH) + 14;
   if (kind === 'steel') return Math.max(STEELW[lv].hallH + STEELW[lv].furnH, STEELW[lv].chimH) + 12;
   if (kind === 'mun') return MUN[lv].bunkH + MUN[lv].shellH * 1.6 + 12;
+  if (kind === 'smelter') return Math.max(SMELT[lv].hallH + SMELT[lv].towerH + 8, SMELT[lv].chimH) + 12;
+  if (kind === 'kero') return Math.max(KERO[lv].tankH + 10, KERO[lv].stackH + 6) + 14;
   return BM[lv].chimH + 12;
 }
 
@@ -709,10 +726,152 @@ function tri4(ctx, x, y, s, color) {
   t([[x + s, y - s], [x + s, y + s], [x, y]], shade(C, 0.3));
 }
 
+// ---------- Hütte: Hochofenschacht mit Glut, Gießhalle, Schornstein ----------
+
+function smelterIso(g, L, color) {
+  const items = [];
+  const H = L.hallH;
+  const s = L.hall;
+  const T = L.tower;
+  const HT = L.towerH;
+  if (L.chim) {
+    items.push({ d: -2 * L.at, f: () => {
+      const u = -L.at;
+      const v = -L.at;
+      cyl(g, u, v, L.chim, 0, L.chimH, '#f1efe9', false);
+      for (const f of [0.2, 0.5, 0.8]) band(g, u, v, L.chim, L.chimH * f, L.chimH * f + L.chimH * 0.1, '#c8372d');
+      cyl(g, u, v, L.chim + 0.6, L.chimH - 2, L.chimH, '#3a3a3a');
+    } });
+  }
+  items.push({ d: 0, f: () => {
+    box(g, -s, s, -s, s, 0, H, SLAG, shade(SLAG, 0.15));
+    if (g.z >= DETAIL) {
+      // glühende Fensterbänder der Gießhalle
+      const { P } = g;
+      poly(g, [P(-s + 4, s + 0.2, H * 0.3), P(s - 4, s + 0.2, H * 0.3), P(s - 4, s + 0.2, H * 0.6), P(-s + 4, s + 0.2, H * 0.6)], lit(GLOW, ...FACE.s), null);
+    }
+    frustum(g, 0, 0, T, T * 0.78, H, H + HT, '#7d5a48', false); // Hochofenschacht
+    for (const f of [0.3, 0.6]) band(g, 0, 0, T * 0.92, H + HT * f, H + HT * f + 2.5, '#3b2d27');
+    cyl(g, 0, 0, T + 2.5, H + HT * 0.7, H + HT * 0.74, '#4a4f55'); // Gichtbühne
+    frustum(g, 0, 0, T * 0.78, T * 0.5, H + HT * 0.74, H + HT, '#5b4337', true); // Gichtkopf
+    // Glut oben
+    const { P, ctx, z } = g;
+    const [cx, cy] = P(0, 0, H + HT);
+    const R = T * 0.5 * z;
+    const glow = ctx.createRadialGradient(cx, cy, R * 0.1, cx, cy, R * 2.4);
+    glow.addColorStop(0, 'rgba(255,230,140,0.95)');
+    glow.addColorStop(0.35, 'rgba(255,150,60,0.6)');
+    glow.addColorStop(1, 'rgba(255,120,40,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, R * 2.4, R * 1.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    flag(g, T * 0.3, T * 0.3, H + HT, color, 10);
+  } });
+  shadowBox(g, -s, s, -s, s, H + HT * 0.3);
+  if (L.chim) shadowCyl(g, -L.at, -L.at, L.chim, L.chimH);
+  paint(items);
+}
+
+function smelterTop(ctx, x, y, L, color) {
+  const s = L.hall;
+  ctx.fillStyle = 'rgba(0,0,0,0.28)';
+  ctx.fillRect(x - s + 6, y - s + 6, s * 2, s * 2);
+  ctx.fillStyle = shade(SLAG, 0.1);
+  ctx.fillRect(x - s, y - s, s * 2, s * 2);
+  ctx.fillStyle = tint(SLAG, 0.12);
+  ctx.fillRect(x - s, y - s, s * 2, s * 0.5);
+  ctx.fillStyle = GLOW; // Oberlichter mit Glut
+  for (const [su, sv] of EDGES) ctx.fillRect(x + su * (s - 6) - (sv ? s * 0.5 : 2), y + sv * (s - 6) - (su ? s * 0.5 : 2), sv ? s : 4, su ? s : 4);
+  if (L.chim) {
+    circle(ctx, x - L.at + 4, y - L.at + 4, L.chim, 'rgba(0,0,0,0.28)');
+    ball(ctx, x - L.at, y - L.at, L.chim + 1, '#f1efe9');
+    ctx.strokeStyle = '#c8372d';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x - L.at, y - L.at, L.chim - 0.5, 0, Math.PI * 2);
+    ctx.stroke();
+    circle(ctx, x - L.at, y - L.at, L.chim * 0.5, '#2e2e2e');
+  }
+  circle(ctx, x + 4, y + 4, L.tower + 2, 'rgba(0,0,0,0.28)');
+  ball(ctx, x, y, L.tower + 2, '#4a4f55'); // Gichtbühne
+  ball(ctx, x, y, L.tower, '#7d5a48');
+  const glow = ctx.createRadialGradient(x, y, 1, x, y, L.tower * 0.7);
+  glow.addColorStop(0, '#fff2a8');
+  glow.addColorStop(0.5, GLOW);
+  glow.addColorStop(1, 'rgba(230,90,30,0.9)');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(x, y, L.tower * 0.55, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = color; // Teamfarbe am Rand der Halle
+  ctx.fillRect(x + s - 8, y - s, 8, 5);
+}
+
+// ---------- Kerosin-Raffinerie: Kugeltanks mit blauen Ringen, Pumpenhaus, Fackel ----------
+
+function keroIso(g, L, color) {
+  const items = [];
+  for (const [su, sv] of KERO_TANKS[L.n]) {
+    const u = su * L.at;
+    const v = sv * L.at;
+    items.push({ d: u + v, f: () => {
+      cyl(g, u, v, L.tank, 0, L.tankH, TANK, false);
+      band(g, u, v, L.tank * 1.02, L.tankH * 0.3, L.tankH * 0.3 + 2.5, BLUE); // blaue Tankringe
+      band(g, u, v, L.tank * 1.02, L.tankH * 0.62, L.tankH * 0.62 + 2.5, BLUE);
+      cap(g, u, v, L.tank, L.tankH, '#d9dde1', 0.6); // gewölbte Kuppe
+      seam(g, u, v, L.tank, L.tankH * 0.5);
+    } });
+  }
+  items.push({ d: 0, f: () => {
+    cyl(g, 0, 0, L.pump + 3, 0, 2, CONCRETE); // Auffangwanne
+    box(g, -L.pump, L.pump, -L.pump, L.pump, 2, 2 + L.pumpH, '#c9ced4', shade('#c9ced4', 0.15));
+    box(g, -L.pump, L.pump, -L.pump, -L.pump + 3, 2 + L.pumpH - 2, 2 + L.pumpH, color); // Teamfarbe am Dachrand
+  } });
+  if (L.stack) {
+    items.push({ d: -L.pump - 6, f: () => {
+      const v = -L.pump - 6;
+      cyl(g, 0, v, L.stack, 0, L.stackH, '#cfd4d9', false);
+      for (const f of [0.35, 0.7]) cyl(g, 0, v, L.stack + 1, L.stackH * f, L.stackH * f + 1.5, '#7d858d');
+      flame(g, 0, v, L.stackH, 0.8);
+    } });
+  }
+  for (const [su, sv] of KERO_TANKS[L.n]) shadowCyl(g, su * L.at, sv * L.at, L.tank, L.tankH);
+  shadowBox(g, -L.pump, L.pump, -L.pump, L.pump, 2 + L.pumpH);
+  paint(items);
+}
+
+function keroTop(ctx, x, y, L, color) {
+  const tanks = KERO_TANKS[L.n];
+  for (const [su, sv] of tanks) circle(ctx, x + su * L.at + 4, y + sv * L.at + 4, L.tank + 1, 'rgba(0,0,0,0.25)');
+  ring(ctx, x, y, L.at + L.tank + 5, CONCRETE); // Auffangring
+  for (const [su, sv] of tanks) {
+    const u = x + su * L.at;
+    const v = y + sv * L.at;
+    ball(ctx, u, v, L.tank, TANK);
+    ctx.strokeStyle = BLUE;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(u, v, L.tank - 2, 0, Math.PI * 2);
+    ctx.stroke();
+    circle(ctx, u, v, 2.5, '#9aa1a8');
+  }
+  circle(ctx, x + 3, y + 3, L.pump + 1, 'rgba(0,0,0,0.25)');
+  ctx.fillStyle = '#c9ced4'; // Pumpenhaus
+  ctx.fillRect(x - L.pump, y - L.pump, L.pump * 2, L.pump * 2);
+  ctx.fillStyle = color;
+  ctx.fillRect(x - L.pump, y - L.pump, L.pump * 2, 3);
+  if (L.stack) {
+    const v = y - L.pump - 6;
+    ball(ctx, x, v, L.stack + 0.5, '#cfd4d9');
+    ball(ctx, x, v, 2, GLOW);
+  }
+}
+
 // ---------- Einstieg ----------
 
-const ISO = { fuel: [fuelIso, FUEL], steel: [steelIso, STEELW], mun: [munIso, MUN], bm: [bmIso, BM] };
-const TOP = { fuel: [fuelTop, FUEL], steel: [steelTop, STEELW], mun: [munTop, MUN], bm: [bmTop, BM] };
+const ISO = { fuel: [fuelIso, FUEL], steel: [steelIso, STEELW], mun: [munIso, MUN], bm: [bmIso, BM], smelter: [smelterIso, SMELT], kero: [keroIso, KERO] };
+const TOP = { fuel: [fuelTop, FUEL], steel: [steelTop, STEELW], mun: [munTop, MUN], bm: [bmTop, BM], smelter: [smelterTop, SMELT], kero: [keroTop, KERO] };
 
 /** Isometrisch: ganze Anlage in einem Zug, gleiches Bild für jede Drehung der Karte (vierfach symmetrisch). */
 export function drawWorksIso(ctx, cam, b) {

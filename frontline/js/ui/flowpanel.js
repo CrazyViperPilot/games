@@ -9,8 +9,8 @@ const NH = 56; // Höhe
 const PITCH = 66; // Abstand der Reihen
 const W = 860; // Breite des Graphen
 const TOP = 18; // Platz für die Spaltenköpfe
-const COLOR = { wood: '#7fa650', stone: '#a3a8ad', ore: '#c0714f', oil: '#7d6aa8', bm: '#b58248', metal: '#8fb3c9', fuel: '#9b7bc4', mun: '#d9b600' };
-const UNIT = { bm: 'BM', metal: 'Metall', fuel: 'TS', mun: 'MUN' };
+const COLOR = { wood: '#7fa650', stone: '#a3a8ad', ore: '#c0714f', oil: '#7d6aa8', bm: '#b58248', iron: '#b9a48a', metal: '#8fb3c9', fuel: '#9b7bc4', kero: '#56b3e6', mun: '#d9b600' };
+const UNIT = { bm: 'BM', iron: 'Roheisen', metal: 'Stahl', fuel: 'TS', kero: 'Kerosin', mun: 'MUN' };
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const int = (v) => Math.floor(v).toLocaleString('de-DE');
 
@@ -81,7 +81,7 @@ export class FlowPanel {
       const here = nodes.filter((n) => n.col === c);
       const works = here.filter((n) => n.type === 'works');
       const later = works.some((n) => n.ins.some((id) => f.nodes[id].type === 'store')); // Werk nimmt aus einem Lager
-      const t = c === 0 ? 'Förderung' : c === f.cols - 1 ? 'Lager · Verbrauch' : later ? 'Weiterverarbeitung' : works.length ? 'Werke' : 'Zwischenlager';
+      const t = c === 0 ? 'Förderung' : c === f.cols - 1 ? 'Lager · Verbrauch' : later ? 'Weiterverarbeitung' : works.length ? 'Werke' : here.some((n) => n.type === 'mid') ? 'Zwischenprodukt' : 'Zwischenlager';
       h += `<text class="fl-col" x="${c * step + NW / 2}" y="11">${t}</text>`;
     }
     // Linien: Anschlüsse je Knoten nach Reihe der Gegenseite gestaffelt
@@ -119,6 +119,9 @@ export class FlowPanel {
         t1 += ` ×${n.count}`;
         t2 = `${fmtFlow(n.out)} / ${fmtFlow(n.cap)} ${UNIT[n.good] ?? n.good}/s`;
         if (n.count > 0) bar = `<rect class="fl-bar" x="10" y="${NH - 6}" width="${((NW - 20) * Math.min(1, n.util ?? 0)).toFixed(1)}" height="3" rx="1.5"/>`;
+      } else if (n.type === 'mid') {
+        // Zwischenprodukt (Roheisen): kein Lager, nur Menge je s
+        t2 = `${fmtFlow(n.rate)} ${esc(n.unit)}/s · ohne Lager`;
       } else {
         t1 += `<tspan class="fl-where"> ${esc(n.where)}</tspan>`;
         t2 = n.made === null ? int(n.stock) : `${int(n.stock)} · +${fmtFlow(n.made)} −${fmtFlow(n.use)}/s`;

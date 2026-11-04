@@ -1405,7 +1405,7 @@ export class Controller {
     if (b.produces) {
       card.push(
         entry('Abbruch', null, {
-          tip: 'Letzten Auftrag abbrechen (Geld und Metall werden erstattet)',
+          tip: 'Letzten Auftrag abbrechen (Geld und Stahl werden erstattet)',
           enabled: b.queue.length > 0,
           reason: 'Nichts in der Warteschlange',
           action: () => this.cancelTrain(),
@@ -1432,12 +1432,12 @@ export class Controller {
       else if (this.game.slotsUsed(ready.team) + (def.slots ?? 1) > BALANCE.slotCap) reason = 'Einheitenlimit erreicht';
       else if (def.hero && hasCommander(this.game, ready.team)) reason = 'Nur ein Kommandeur je Team';
       else if (this.game.city && freePop(this.game, ready.team) < crewOf(u)) reason = 'Zu wenig freie Einwohner (Stadt: Wohnen ausbauen)';
-      else if (this.game.city && this.game.city[ready.team].metal < (CITY.metalCost[u] ?? 0)) reason = 'Zu wenig Metall (Stadt: Erzmine und Stahlwerk oder Markt)';
+      else if (this.game.city && this.game.city[ready.team].metal < (CITY.metalCost[u] ?? 0)) reason = 'Zu wenig Stahl (Stadt: Erzmine, Hütte und Stahlwerk oder Markt)';
       else reason = trainCheck(this.game, ready, u) ?? this.trainReason(ready, def.cost); // Flughafen: Platz für Flugzeuge
       card.push(
         entry(def.short || def.name, def.hotkey, {
           cost: costText(def.cost),
-          tip: `${def.name}: ${longCost(def.cost)}${this.game.city && CITY.metalCost[u] ? `, ${CITY.metalCost[u]} Metall, ${crewOf(u)} Einwohner` : this.game.city ? `, ${crewOf(u)} Einwohner` : ''}${def.hero ? COMMANDER_TIP : ''}`,
+          tip: `${def.name}: ${longCost(def.cost)}${this.game.city && CITY.metalCost[u] ? `, ${CITY.metalCost[u]} Stahl, ${crewOf(u)} Einwohner` : this.game.city ? `, ${crewOf(u)} Einwohner` : ''}${def.hero ? COMMANDER_TIP : ''}`,
           enabled: !reason,
           reason,
           action: () => this.train(u),

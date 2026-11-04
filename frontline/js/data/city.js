@@ -12,17 +12,17 @@ export const CITY = {
   // Flucht (seit v4.82): Wohnzellen in der Konfliktzone leeren sich, wenn in ihnen oder den Nachbarzellen geschossen wird
   flee: { reach: 1, calm: 60 }, // Nachbarschaft (Zellen) und Ruhezeit (s), bis die Bewohner zurückziehen dürfen
   startStock: { bm: 1500, mun: 600, fuel: 1000 }, // Startlager der Hauptstadt bei eingeschalteter Stadt (sonst unendlich)
-  yield: { bm: 0.1, mun: 0.06, fuel: 0.05, metal: 0.05 }, // höchster Ertrag je Arbeiter und Sekunde in Werken (BM-Werk, Munitionswerk, Raffinerie, Stahlwerk), begrenzt durch Rohstoffe
+  yield: { bm: 0.1, mun: 0.06, fuel: 0.05, metal: 0.05, iron: 0.06, kero: 0.04 }, // höchster Ertrag je Arbeiter und Sekunde in Werken (BM-Werk, Munitionswerk, Raffinerie, Kerosin-Raffinerie, Hütte, Stahlwerk), begrenzt durch Rohstoffe
   sight: 160, // Sichtradius (px) jedes fertigen Stadtgebäudes: hebt den Kriegsnebel um die eigene Stadt auf
   taxPop: 0.03, // Geld/s je Einwohner
   taxCom: 0.15, // zusätzliches Geld/s je Arbeiter im Gewerbe
 
   // ---- Bau ----
-  cost: { road: 0, res: 20, com: 30, bm: 40, mun: 40, fuel: 40, steel: 50, mine: 30, market: 60, power: 80, uni: 400, dc: 250, barracks: 80, factory: 150, heliport: 200, hospital: 120, airport: 800 }, // Geld je Zelle, bei Großbauten (size) je Gebäude (Abriss kostenlos, keine Erstattung)
+  cost: { road: 0, res: 20, com: 30, bm: 40, mun: 40, fuel: 40, steel: 50, smelter: 50, kero: 50, mine: 30, market: 60, power: 80, uni: 400, dc: 250, barracks: 80, factory: 150, heliport: 200, hospital: 120, airport: 800 }, // Geld je Zelle, bei Großbauten (size) je Gebäude (Abriss kostenlos, keine Erstattung)
   // Großbauten (seit v5.00): Kantenlänge in Zellen (fehlt = 1; seit v5.03 auch gerade). Ein Großbau ist ein Gebäude: eine Stufe, ein
   // Ziel mit Trefferpunkten hp × Kantenlänge, Arbeitsplätze und Strom wie eine Zelle; Straße an irgendeiner Außenzelle reicht.
   // Seit v5.08 sind auch die Werke (BM-Werk, Munitionswerk, Raffinerie, Stahlwerk) 2 × 2 groß, mit eigenem Aussehen (render/works.js).
-  size: { uni: 3, power: 2, barracks: 4, factory: 8, airport: 10, bm: 2, mun: 2, fuel: 2, steel: 2 },
+  size: { uni: 3, power: 2, barracks: 4, factory: 8, airport: 10, bm: 2, mun: 2, fuel: 2, steel: 2, smelter: 2, kero: 2 },
   // Räumen reißt seit v5.16 auch diese Gebäude der Karte ab (Häuser, Hallen, Fabriken der Zonenstadt und außerhalb), kostenlos wie das
   // übrige Räumen; besetzte Häuser nicht. Wachtürme, Zug, Mauern, Fels und Wasser bleiben.
   clearable: ['house', 'hall', 'factory'],
@@ -61,26 +61,35 @@ export const CITY = {
   // Förderanlage (Holzfäller, Steinbruch, Erzmine, Ölquelle je nach Vorkommen): Rohstoff je Arbeiter und Sekunde; braucht keine Straße
   extract: { wood: 0.3, stone: 0.3, ore: 0.25, oil: 0.3 },
   jobsMine: [0, 6, 12, 20], // Arbeitsplätze je Stufe einer Förderanlage
-  // Verarbeitung: so viel Rohstoff braucht eine Einheit Produkt (BM aus Holz oder Stein, Metall aus Erz, Treibstoff aus Öl, Munition aus Metall)
-  convert: { bm: 1, metal: 2, fuel: 1, mun: 0.5 },
+  // Verarbeitung: so viel Rohstoff braucht eine Einheit Produkt (BM aus Holz oder Stein, Roheisen aus Erz, Stahl aus Roheisen, Treibstoff
+  // und Kerosin aus Öl, Munition aus Stahl). Seit v5.19: Erz → Roheisen (Hütte), Roheisen → Stahl (Stahlwerk, bisher Erz → Metall)
+  convert: { bm: 1, iron: 2, metal: 1, fuel: 1, kero: 1.2, mun: 0.5 },
   // Ressourcenkette (seit v5.08) für die Flussanzeige (Knopf „Ressourcen“, js/game/flow.js, PRD §15 „Ressourcenanzeige“):
   // Werk → aus welchen Rohstoffen (Vorkommen) oder Waren es was macht. Reihenfolge = Reihenfolge der Verarbeitung.
   // Bei jeder Änderung an Rohstoffen, Werken oder Waren hier und in updateCity (js/game/city.js) mitpflegen; test/flow.test.js prüft beides.
   chain: {
     bm: { from: ['wood', 'stone'], to: 'bm' }, // Baumaterial-Werk: Holz oder Stein → Baumaterial
-    steel: { from: ['ore'], to: 'metal' }, // Stahlwerk: Erz → Metall (bleibt im Stadtlager)
+    smelter: { from: ['ore'], to: 'iron' }, // Hütte (seit v5.19): Erz → Roheisen (Zwischenprodukt, ohne Lager)
+    steel: { from: ['iron'], to: 'metal' }, // Stahlwerk: Roheisen → Stahl (Schlüssel metal, bleibt im Stadtlager)
     fuel: { from: ['oil'], to: 'fuel' }, // Raffinerie: Öl → Treibstoff
-    mun: { from: ['metal'], to: 'mun' }, // Munitionswerk: Metall → Munition
+    kero: { from: ['oil'], to: 'kero' }, // Kerosin-Raffinerie (seit v5.19): Öl → Kerosin (Stadtlager)
+    mun: { from: ['metal'], to: 'mun' }, // Munitionswerk: Stahl → Munition
   },
   // Startviertel (seit v4.84): steht zu Beginn fertig (Stufe 1) neben der Hauptstadt, dazu eine Ölquelle auf dem nächsten Ölvorkommen
   // Seit v5.03: über der Straße die Großbauten Kaserne (4 × 4) und Fabrikhalle (8 × 8) nebeneinander, big = [Art, Spalte ab Straßenanfang]
   // Ein Großbau in row (seit v5.08 die 2 × 2-Raffinerie) beginnt an seiner Spalte und reicht nach rechts und unten (dort null).
   startQuarter: { road: 12, row: ['res', 'fuel', null, 'res'], big: [['barracks', 0], ['factory', 4]] }, // Straßenlänge, die Zellen darunter, die Großbauten darüber
-  startMetal: 400, // Metall im Hauptlager zu Beginn (Metall bleibt dort, LKW fahren es nicht)
+  startMetal: 400, // Stahl im Hauptlager zu Beginn (Stahl bleibt dort, LKW fahren es nicht; Schlüssel metal)
+  startKero: 300, // Kerosin im Stadtlager zu Beginn (seit v5.19; F-16 und Hubschrauber tanken es)
   // Metall je ausgebildeter Einheit (zusätzlich zum Geld); fehlt die Sorte, kostet sie kein Metall
   metalCost: { truck: 20, engineer: 20, fobTruck: 80, ifv: 60, tank: 120, flak: 60, sam: 80, gepard: 100, pzh: 140, littlebird: 60, transporter: 80, gunship: 120, f16: 160 },
   // Markt: handelt in Losen; verkaufen bringt wenig, kaufen kostet viel (Geld je Los)
-  market: { lot: 100, sell: { bm: 20, mun: 30, fuel: 30, metal: 40 }, buy: { bm: 80, mun: 120, fuel: 120, metal: 160 } },
+  market: { lot: 100, sell: { bm: 20, mun: 30, fuel: 30, metal: 40, kero: 35 }, buy: { bm: 80, mun: 120, fuel: 120, metal: 160, kero: 140 } },
+
+  // ---- Straßentransport (seit v5.19, Werte für AP2/AP3; PRD §15 „Straßentransport“) ----
+  // cap: Einheiten je s, die eine eigene Straßenzelle trägt; mapCap: Stadtstraßen der Karte. commute: Last je Arbeiter zum Wohnen (je s).
+  // maxDist: längster Weg in Zellen (weiter = kein Ziel); reroute: s zwischen den Wegeberechnungen; smooth: s, bis der Stau-Faktor folgt.
+  transport: { cap: 12, mapCap: 20, commute: 0.05, maxDist: 160, reroute: 3, smooth: 2 },
 
   // ---- Wissen (seit v4.88, Stufe 5) ----
   // Seit v5.04: ohne fertige Universität ruht jede Forschung (eine reicht, ihre Stufe zählt nicht). Rechenzentren beschleunigen sie:
@@ -95,7 +104,7 @@ export const CITY = {
   power: {
     base: 40,
     supply: [0, 60, 120, 200],
-    use: { res: 1, com: 3, market: 3, bm: 8, mun: 8, fuel: 8, steel: 10, mine: 4, uni: 12, dc: 30, power: 0, barracks: 2, factory: 8, heliport: 6, hospital: 6, airport: 12 },
+    use: { res: 1, com: 3, market: 3, bm: 8, mun: 8, fuel: 8, kero: 8, smelter: 10, steel: 10, mine: 4, uni: 12, dc: 30, power: 0, barracks: 2, factory: 8, heliport: 6, hospital: 6, airport: 12 },
   },
   // Zufriedenheit 0 … 1 = base + shops × Versorgung (Gewerbe-Arbeiter je Einwohner, voll ab shopPer) + safety × Sicherheit
   // (weniger Treffer auf die Stadt in den letzten 60 s, null ab hitsBad) + power × Strom. Wirkung: Erträge und Steuern × (lo + span × Zufriedenheit),
@@ -126,7 +135,7 @@ export const CITY = {
     roadEvery: 3, // jede so vielte Zeile (vom Anker aus) wird Straße, dazu eine Straßenspalte durch den Anker
     quarter: 3, // Radius (Zellen) der kleinen Viertel an vorderen FOBs
     quarterEvery: 3, // jeder so vielte Takt baut an einer vorderen FOB statt an der Hauptstadt
-    mix: { com: 2, bm: 3, mun: 2, fuel: 2, steel: 2, market: 0.3 }, // Verhältnis der Arbeitsstätten (Kraftwerk, Uni, Rechenzentrum nach Bedarf)
+    mix: { com: 2, bm: 3, mun: 2, fuel: 2, kero: 1, smelter: 2, steel: 2, market: 0.3 }, // Verhältnis der Arbeitsstätten (Kraftwerk, Uni, Rechenzentrum nach Bedarf)
     powerMargin: 1.15, // baut ein Kraftwerk, wenn das Stromangebot unter Bedarf × powerMargin fällt
     uniFrom: 6, // Arbeitsstätten, ab denen sie eine Universität baut
     dcFrom: 16, // … ein Rechenzentrum (nach der Uni)
@@ -136,7 +145,8 @@ export const CITY = {
     raidSize: 4, // so viele Fahrzeuge greifen an
     // Freie Planung (seit v4.85): Engpässe heben das Gewicht einer Zone im Mix
     lowStock: 800, // BM, MUN, TS im Hauptlager darunter = knapp
-    lowMetal: 300, // Metall darunter = knapp
+    lowMetal: 300, // Stahl darunter = knapp
+    lowKero: 200, // Kerosin im Stadtlager darunter = knapp (seit v5.19)
     lowFree: 8, // freie Einwohner darunter = Wohnen knapp
     lowMoney: 400, // Geld darunter = Gewerbe knapp
     boost: 4, // so viel stärker zählt eine knappe Zone

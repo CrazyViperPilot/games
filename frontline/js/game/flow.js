@@ -3,23 +3,29 @@
 // Lager mit Erzeugung und Verbrauch. Markiert Engpässe und nennt sie in Worten. Die Kette kommt nur aus CITY.chain, die Zahlen
 // aus c.stats (updateCity), den Lagern und der LKW-Ladung. Liest nur. Kein DOM.
 // Neue Rohstoffe, Werke oder Waren: CITY.chain und die Felder cap/inp/gross/n in updateCity pflegen; test/flow.test.js prüft das.
+// Zwischenprodukte (Roheisen, seit v5.19) haben keinen Bestand: sie laufen direkt vom Werk zum nächsten (Knotentyp 'mid').
 import { CITY } from '../data/city.js';
 import { BALANCE } from '../data/balance.js';
-import { DEPOSITS, DEPOSIT_NAME, MINE_NAME, KIND_NAME } from './city.js';
+import { DEPOSITS, DEPOSIT_NAME, MINE_NAME, KIND_NAME, CITY_STORE_GOODS } from './city.js';
 
-export const GOOD_NAME = { bm: 'Baumaterial', mun: 'Munition', fuel: 'Treibstoff', metal: 'Metall' };
-const GOOD_SHORT = { bm: 'BM', mun: 'MUN', fuel: 'TS', metal: 'Metall' };
+export const GOOD_NAME = { bm: 'Baumaterial', mun: 'Munition', fuel: 'Treibstoff', metal: 'Stahl', kero: 'Kerosin', iron: 'Roheisen' };
+const GOOD_SHORT = { bm: 'BM', mun: 'MUN', fuel: 'TS', metal: 'Stahl', kero: 'Kerosin', iron: 'Roheisen' };
 const WORKS_SHORT = { bm: 'BM-Werk' };
 const RAW_NAME = { wood: 'Holz', stone: 'Stein', ore: 'Erz', oil: 'Öl' }; // Rohstoff (DEPOSIT_NAME nennt das Vorkommen)
-export const FLOW_GOODS = ['bm', 'mun', 'fuel', 'metal']; // Waren mit Lager (BM, MUN, TS in den FOB-Lagern, Metall im Stadtlager)
+/** Waren mit Lager (BM, MUN, TS in den Lagern der Hauptstadt, Stahl und Kerosin im Stadtlager). */
+export const FLOW_GOODS = ['bm', 'mun', 'fuel', 'metal', 'kero'];
+/** Zwischenprodukte ohne Lager (seit v5.19): Roheisen von der Hütte zum Stahlwerk. */
+export const FLOW_MIDS = ['iron'];
+const TIP_FULL = { metal: 'Mehr Fahrzeuge ausbilden oder am Markt verkaufen.', kero: 'Kerosin am Flughafen oder bei Hubschraubern verbrauchen oder am Markt verkaufen.' };
 const isRaw = (x) => DEPOSITS.includes(x);
+const isMid = (x) => FLOW_MIDS.includes(x);
 const WORKS = Object.keys(CITY.chain);
 
 /** Aufbau des Graphen (nur aus CITY.chain): Knoten mit Spalte und Reihe, Kanten. Einmal berechnet. */
 let LAYOUT = null;
 export function flowLayout() {
   if (LAYOUT) return LAYOUT;
-  const nodes = {}; // id → { id, type: 'raw'|'works'|'store', key, col, row, ins: [id], outs: [id] }
+  const nodes = {}; // id → { id, type: 'raw'|'works'|'mid'|'store', key, col, row, ins: [id], outs: [id] }
   const add = (id, type, key, col) => (nodes[id] ??= { id, type, key, col, row: 0, ins: [], outs: [] });
   const links = [];
   const link = (a, b) => {
@@ -29,13 +35,15 @@ export function flowLayout() {
   };
   let r = 0;
   for (const w of WORKS) for (const f of CITY.chain[w].from) if (isRaw(f) && !nodes[`raw:${f}`]) add(`raw:${f}`, 'raw', f, 0).row = r++;
+  const idOf = (f) => (isRaw(f) ? `raw:${f}` : isMid(f) ? `mid:${f}` : `store:${f}`);
   for (const w of WORKS) {
     const L = CITY.chain[w];
-    const src = L.from.map((f) => (isRaw(f) ? `raw:${f}` : `store:${f}`));
+    const src = L.from.map(idOf);
     for (const id of src) if (!nodes[id]) throw new Error(`CITY.chain.${w}: ${id} kommt vor seinem Werk`);
     const wn = add(`works:${w}`, 'works', w, 1 + Math.max(...src.map((id) => nodes[id].col)));
     for (const id of src) link(id, wn.id);
-    link(wn.id, add(`store:${L.to}`, 'store', L.to, wn.col + 1).id);
+    const out = isMid(L.to) ? add(`mid:${L.to}`, 'mid', L.to, wn.col + 1) : add(`store:${L.to}`, 'store', L.to, wn.col + 1);
+    link(wn.id, out.id);
   }
   // Lager, aus denen kein Werk mehr nimmt, stehen ganz rechts
   const cols = 1 + Math.max(...Object.values(nodes).map((n) => n.col));
@@ -52,9 +60,10 @@ export function flowLayout() {
   return LAYOUT;
 }
 
-/** Bestand je Ware: alle eigenen Lager (ohne unendliche Hauptstadt), Ladung der LKW, Metall im Stadtlager. */
+/** Bestand je Ware: alle eigenen Lager (ohne unendliche Hauptstadt), Ladung der LKW, Stahl und Kerosin im Stadtlager. */
 export function teamStock(game, team) {
-  const st = { bm: 0, mun: 0, fuel: 0, metal: game.city?.[team]?.metal ?? 0 };
+  const c = game.city?.[team];
+  const st = { bm: 0, mun: 0, fuel: 0, metal: c?.metal ?? 0, kero: c?.kero ?? 0 };
   for (const b of game.buildings) {
     if (b.team !== team || !b.alive || !b.store || b.infinite) continue;
     for (const k of ['bm', 'mun', 'fuel']) st[k] += b.store[k] ?? 0;
@@ -128,8 +137,9 @@ export function resourceFlow(game, team, rates = null) {
   const links = LL.map((l) => ({ ...l, good: null, rate: 0 }));
   const linkOf = (a, b) => links.find((l) => l.from === a && l.to === b);
 
-  // Förderung
+  // Förderung (Zwischenprodukte starten ohne Verbrauch)
   for (const n of Object.values(nodes)) {
+    if (n.type === 'mid') n.used = 0;
     if (n.type !== 'raw') continue;
     n.name = MINE_NAME[n.key] ?? DEPOSIT_NAME[n.key] ?? n.key;
     n.unit = RAW_NAME[n.key] ?? DEPOSIT_NAME[n.key] ?? n.key;
@@ -155,16 +165,17 @@ export function resourceFlow(game, team, rates = null) {
       const l = linkOf(m.id, n.id);
       l.rate = r;
       l.good = m.key;
-      if (m.type === 'raw') m.used += r;
+      if (m.type === 'raw' || m.type === 'mid') m.used += r;
     }
-    const lo = linkOf(n.id, `store:${L.to}`);
+    const outNode = nodes[n.outs[0]]; // Lager oder Zwischenprodukt
+    const lo = linkOf(n.id, outNode.id);
     lo.rate = n.out;
     lo.good = L.to;
     const what = ins.map((m) => (m.type === 'raw' ? m.unit : GOOD_NAME[m.key])).join(' oder ');
     const rawIns = ins.filter((m) => m.type === 'raw');
     if (n.count === 0) {
-      // Ohne Werk verfällt geförderter Rohstoff; Waren aus einem Lager (Metall) bleiben liegen
-      const lost = rawIns.reduce((a, m) => a + m.rate, 0);
+      // Ohne Werk verfällt geförderter Rohstoff, den kein anderes gebautes Werk nimmt; Waren aus einem Lager (Stahl) bleiben liegen
+      const lost = rawIns.reduce((a, m) => a + (m.outs.some((id) => id !== n.id && (s.n?.[nodes[id].key] ?? 0) > 0) ? 0 : m.rate), 0);
       n.status = lost > EPS ? 'bad' : 'off';
       n.note = lost > EPS ? 'fehlt · Rohstoff verfällt' : 'nicht gebaut';
       if (lost > EPS) issue(2.2, `Kein ${n.name}: ${fmtFlow(lost)} ${what}/s verfallen.`, `${n.name} bauen.`);
@@ -176,9 +187,20 @@ export function resourceFlow(game, team, rates = null) {
       issue(2.5, `${n.name} steht: keine Arbeiter oder kein Strom.`, 'Wohnen oder ein Kraftwerk bauen.');
       continue;
     }
+    if (outNode.type === 'mid') {
+      // Roheisen ohne Stahlwerk: die Hütte kann nichts liefern (Stahlwerk bauen)
+      const next = nodes[outNode.outs[0]];
+      if ((s.n?.[next.key] ?? 0) === 0) {
+        n.status = 'bad';
+        n.note = `${GOOD_NAME[outNode.key]} ohne ${KIND_NAME[next.key]}`;
+        n.noNext = true;
+        issue(2.3, `${n.name}: ${GOOD_NAME[outNode.key]} hat kein ${KIND_NAME[next.key]}, das es verarbeitet.`, `${KIND_NAME[next.key]} bauen.`);
+        continue;
+      }
+    }
     n.util = Math.min(1, n.out / n.cap);
     if (n.inp < n.cap * 0.85) {
-      // Rohstoff ist der Engpass: das Werk wartet
+      // Rohstoff oder Zwischenprodukt ist der Engpass: das Werk wartet
       n.status = 'warn';
       n.note = `wartet · Auslastung ${pct(n.util)}`;
       const empty = rawIns.length === 0 || rawIns.every((m) => m.count === 0);
@@ -192,7 +214,9 @@ export function resourceFlow(game, team, rates = null) {
         const st = nodes[ins.find((m) => m.type === 'store').id];
         st.starved = true;
       }
-      const mines = rawIns.map((m) => m.name).join(' oder ');
+      // Wer liefert nach: Förderanlage (Rohstoff) oder Vorwerk (Roheisen von der Hütte)
+      const feeders = ins.map((m) => (m.type === 'raw' ? m.name : m.type === 'mid' ? KIND_NAME[nodes[m.ins[0]].key] : null)).filter(Boolean);
+      const mines = feeders.join(' oder ');
       issue(1 + (1 - n.util), `${n.name} nur ${pct(n.util)} ausgelastet: zu wenig ${what}.`, mines ? `${mines} bauen oder ausbauen.` : `Mehr ${what} erzeugen.`);
     } else if (n.cap < n.inp * 0.85 && rawIns.length) {
       n.status = 'bad';
@@ -213,14 +237,29 @@ export function resourceFlow(game, team, rates = null) {
     } else if (n.waste > EPS) {
       n.status = 'warn';
       n.note = `${fmtFlow(n.waste)}/s verfällt`;
-      const w = nodes[n.outs[0]];
-      if (w && w.count > 0) (lostBy[w.id] ??= []).push(n);
+      const w = n.outs.map((id) => nodes[id]).find((x) => x.count > 0 && !x.noNext); // erstes gebautes Werk, das ihn nimmt
+      if (w) (lostBy[w.id] ??= []).push(n);
     } else n.note = 'wird ganz verarbeitet';
   }
   for (const [id, list] of Object.entries(lostBy)) {
     const w = nodes[id];
     const share = list.reduce((a, m) => a + m.waste, 0) / Math.max(EPS, list.reduce((a, m) => a + m.rate, 0)); // Anteil, der verfällt
-    issue(1.5 + share, `${w.name} zu klein: ${list.map((m) => `${fmtFlow(m.waste)} ${m.unit}`).join(' + ')}/s verfallen.`, `${w.name} bauen oder ausbauen.`);
+    const lost = list.map((m) => `${fmtFlow(m.waste)} ${m.unit}`).join(' + ');
+    // Hütte: läuft das Roheisen nicht weiter, weil das Stahlwerk voll ausgelastet ist, ist das Stahlwerk der Engpass
+    const mid = w.outs.map((x) => nodes[x]).find((x) => x.type === 'mid');
+    const next = mid ? nodes[mid.outs[0]] : null;
+    if (next && (next.util ?? 0) >= 0.95) issue(1.5 + share, `${next.name} zu klein: ${w.name} liefert mehr Roheisen, als es verarbeitet. ${lost}/s verfallen.`, `${next.name} bauen oder ausbauen.`);
+    else issue(1.5 + share, `${w.name} zu klein: ${lost}/s verfallen.`, `${w.name} bauen oder ausbauen.`);
+  }
+  // Zwischenprodukte (Roheisen): kein Lager; was das Stahlwerk nicht nimmt, verfällt
+  for (const n of Object.values(nodes)) {
+    if (n.type !== 'mid') continue;
+    n.name = GOOD_NAME[n.key] ?? n.key;
+    n.unit = GOOD_SHORT[n.key] ?? n.key;
+    n.rate = s.gross?.[n.key] ?? 0;
+    n.waste = Math.max(0, n.rate - n.used);
+    n.status = n.waste > EPS ? 'warn' : 'ok';
+    n.note = n.waste > EPS ? `${fmtFlow(n.waste)}/s verfällt` : 'ohne Lager, wird ganz verarbeitet';
   }
   // Lager: Bestand, gemessene Erzeugung und Verbrauch
   const main = game.mainFob(team);
@@ -229,12 +268,13 @@ export function resourceFlow(game, team, rates = null) {
   for (const n of Object.values(nodes)) {
     if (n.type !== 'store') continue;
     const g = n.key;
+    const inCity = CITY_STORE_GOODS.includes(g);
     n.name = GOOD_NAME[g] ?? g;
     n.unit = GOOD_SHORT[g] ?? g;
-    n.where = g === 'metal' ? 'Stadtlager' : 'alle Lager';
+    n.where = inCity ? 'Stadtlager' : 'alle Lager';
     n.stock = stock[g];
-    const here = g === 'metal' ? c.metal : main?.store?.[g] ?? 0;
-    n.full = here >= (g === 'metal' ? cap : BALANCE.logistics.capitalCap ?? cap) - 1; // Stadtlager bzw. Lager der Hauptstadt (seit v5.06 größer)
+    const here = inCity ? c[g] : main?.store?.[g] ?? 0;
+    n.full = here >= (inCity ? cap : BALANCE.logistics.capitalCap ?? cap) - 1; // Stadtlager bzw. Lager der Hauptstadt (seit v5.06 größer)
     n.rate = s.gross?.[g] ?? 0;
     const r = rates?.[g];
     n.made = r ? r.made : null;
@@ -243,7 +283,7 @@ export function resourceFlow(game, team, rates = null) {
     if (n.full) {
       n.status = 'warn';
       n.note = 'Hauptlager voll';
-      if (n.rate > EPS) issue(0.8, `${n.name}: Lager der Hauptstadt voll, Erzeugung verfällt.`, g === 'metal' ? 'Mehr Fahrzeuge ausbilden oder am Markt verkaufen.' : 'Mit LKW zu den FOBs fahren oder am Markt verkaufen.');
+      if (n.rate > EPS) issue(0.8, `${n.name}: Lager der Hauptstadt voll, Erzeugung verfällt.`, TIP_FULL[g] ?? 'Mit LKW zu den FOBs fahren oder am Markt verkaufen.');
     } else if (r && r.net < -EPS) {
       const eta = n.stock / -r.net;
       n.status = eta < 600 ? 'bad' : 'warn';
