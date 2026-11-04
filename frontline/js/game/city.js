@@ -117,6 +117,80 @@ function fellTiles(game, c, col, row, scan) {
   return tiles;
 }
 
+/**
+ * Gebäude der Karte, die Räumen abreißen kann (seit v5.16, CITY.clearable) und die die Stadtzelle (col, row) berühren.
+ * Liefert null, wenn eines davon besetzt ist (dann bleibt alles stehen).
+ */
+function clearableAt(game, c, col, row) {
+  const S = c.cell;
+  const x0 = col * S;
+  const y0 = row * S;
+  const out = [];
+  for (const b of game.map.town?.buildings ?? []) {
+    if (!CITY.clearable.includes(b.kind) || b.angle) continue;
+    if (b.x + b.w / 2 <= x0 || b.x - b.w / 2 >= x0 + S || b.y + b.h / 2 <= y0 || b.y - b.h / 2 >= y0 + S) continue;
+    const h = game.houseBySrc?.get(b);
+    if (h && h.occupants.length) return null;
+    out.push(b);
+  }
+  return out;
+}
+
+/**
+ * Gebäude der Karte abreißen (Räumen, seit v5.16): aus map.town.buildings, Häuserliste und Entities streichen, die Kacheln im Raster
+ * wieder freigeben (außer wo anderes sperrt: Gebäude, Fels, Wald, Bäume, Wasser) und die Sperre der Stadtzellen neu bestimmen.
+ */
+function demolish(game, b, scan) {
+  const town = game.map.town;
+  town.buildings.splice(town.buildings.indexOf(b), 1);
+  scan.rects = scan.rects.filter((o) => !(o.x === b.x && o.y === b.y && o.w === b.w && o.h === b.h));
+  const h = game.houseBySrc?.get(b);
+  if (h) {
+    game.houses.splice(game.houses.indexOf(h), 1);
+    game.houseBySrc.delete(b);
+    game.entities.delete(h.id);
+    game.garrisoned = game.garrisoned.filter((o) => o !== h);
+  }
+  const g = game.grid;
+  const T = g.tile;
+  const inCircle = (o, x, y) => (x - o.x) ** 2 + (y - o.y) ** 2 <= o.r * o.r;
+  const pad = Math.max(b.w, b.h);
+  const near = blockers(town.buildings).filter((o) => Math.abs(o.x - b.x) < pad + o.w && Math.abs(o.y - b.y) < pad + o.h);
+  const wood = woodScan(game, b.x - b.w / 2, b.y - b.h / 2, b.x + b.w / 2, b.y + b.h / 2); // Bäume, Fels, Wald unter dem Gebäude
+  const q0 = Math.max(0, Math.floor((b.x - b.w / 2) / T));
+  const q1 = Math.min(g.cols - 1, Math.floor((b.x + b.w / 2) / T));
+  const r0 = Math.max(0, Math.floor((b.y - b.h / 2) / T));
+  const r1 = Math.min(g.rows - 1, Math.floor((b.y + b.h / 2) / T));
+  for (let r = r0; r <= r1; r++) {
+    for (let q = q0; q <= q1; q++) {
+      const x = g.center(q);
+      const y = g.center(r);
+      if (Math.abs(x - b.x) > b.w / 2 || Math.abs(y - b.y) > b.h / 2) continue;
+      const i = g.idx(q, r);
+      const still =
+        near.some((o) => Math.abs(x - o.x) <= o.w / 2 && Math.abs(y - o.y) <= o.h / 2) ||
+        wood.rocks.some((o) => inCircle(o, x, y)) ||
+        wood.forests.some((o) => inCircle(o, x, y)) ||
+        wood.trees.some((t) => g.toCell(t.x) === q && g.toCell(t.y) === r && !treeGone(game, t.x, t.y)) ||
+        (game.relief?.cellBlocked(q, r) && !g.isFord(q, r));
+      g.terrain[i] = still ? 1 : 0;
+    }
+  }
+  // Sperre der berührten Stadtzellen neu (gilt für beide Teams: blocked ist geteilt)
+  const c = game.city[0];
+  const S = c.cell;
+  const k = S / T;
+  const mains = game.buildings.filter((m) => m.main);
+  for (let row = Math.floor((b.y - b.h / 2) / S); row <= Math.floor((b.y + b.h / 2) / S); row++) {
+    for (let col = Math.floor((b.x - b.w / 2) / S); col <= Math.floor((b.x + b.w / 2) / S); col++) {
+      if (col < 0 || row < 0 || col >= c.cols || row >= c.rows) continue;
+      let bad = nearMain(mains, T, col * S, row * S);
+      for (let r = row * k; !bad && r < (row + 1) * k; r++) for (let q = col * k; q < (col + 1) * k; q++) if (!g.free(q, r)) bad = true;
+      c.blocked[row * c.cols + col] = bad ? 1 : 0;
+    }
+  }
+}
+
 /** Gefällte Zellen (1 = Bäume gefällt, für beide Teams gleich); alte Spielstände bekommen das Feld beim ersten Fällen. */
 function felledOf(game) {
   const c = game.city[0];
@@ -1306,7 +1380,8 @@ export function canZone(game, c, i) {
  * Befehl `{ type: 'city', kind: 'road'|'res'|'com'|'bm'|'mun'|'fuel'|'erase', c0, r0, c1, r1 }`:
  * Rechteck (Spalten c0..c1, Zeilen r0..r1 im Kartenraster) ausweisen oder räumen. Überall, wo nichts gesperrt ist (seit v4.87).
  * Kostet Geld je Zelle, bis das Geld ausgeht. Seit v5.10 nur auf leeren Zellen: Belegte Zellen werden nicht überbaut (erst räumen).
- * Räumen fällt seit v5.13 auch Bäume (Einzelbäume, Wald), wo danach gebaut werden kann.
+ * Räumen fällt seit v5.13 auch Bäume (Einzelbäume, Wald), wo danach gebaut werden kann, und reißt seit v5.16 leere Häuser, Hallen und
+ * Fabriken der Karte ab (CITY.clearable, kostenlos; besetzte nicht).
  */
 export function cmdCity(game, team, cmd) {
   const city = game.city?.[team];
@@ -1333,6 +1408,8 @@ export function cmdCity(game, team, cmd) {
   let occupied = false;
   let felled = 0;
   let stuck = false;
+  let manned = false; // besetztes Haus im Weg
+  let razed = 0; // abgerissene Gebäude der Karte
   const main = game.mainFob(team);
   const S = city.cell;
   const scan = erase ? woodScan(game, c0 * S, r0 * S, (c1 + 1) * S, (r1 + 1) * S) : null;
@@ -1340,6 +1417,18 @@ export function cmdCity(game, team, cmd) {
     for (let col = c0; col <= c1; col++) {
       const i = idx(city, col, row);
       if (erase && city.blocked[i]) {
+        // Gebäude der Karte abreißen (seit v5.16, kostenlos): Häuser, Hallen, Fabriken; besetzte bleiben stehen
+        const list = clearableAt(game, city, col, row);
+        if (!list) {
+          manned = true;
+          continue;
+        }
+        for (const b of list) demolish(game, b, scan);
+        if (list.length) razed += list.length;
+        if (!city.blocked[i]) {
+          placed++;
+          continue;
+        }
         // Bäume fällen (seit v5.13, kostenlos): nur wo danach gebaut werden kann; Fels, Wasser, Häuser bleiben gesperrt
         const tiles = fellTiles(game, city, col, row, scan);
         if (!tiles) {
@@ -1389,7 +1478,7 @@ export function cmdCity(game, team, cmd) {
   }
   const poor = broke === 'bm' ? 'Zu wenig Baumaterial im Lager der Hauptstadt' : 'Zu wenig Geld';
   if (!placed) {
-    const reason = broke ? poor : occupied ? 'Dort steht schon etwas: erst räumen' : noDeposit ? 'Förderanlagen nur auf Rohstoffvorkommen' : outside ? 'Nur im eigenen Gebiet bauen' : stuck ? 'Nur Bäume lassen sich räumen, kein Fels, Wasser oder Haus' : 'Nichts zu ändern';
+    const reason = broke ? poor : occupied ? 'Dort steht schon etwas: erst räumen' : noDeposit ? 'Förderanlagen nur auf Rohstoffvorkommen' : outside ? 'Nur im eigenen Gebiet bauen' : manned ? 'Besetzte Häuser lassen sich nicht räumen' : stuck ? 'Nur Bäume und Häuser lassen sich räumen, kein Fels, Wasser, Turm oder Mauer' : 'Nichts zu ändern';
     return { ok: false, reason };
   }
   rebuildList(city);
@@ -1398,7 +1487,7 @@ export function cmdCity(game, team, cmd) {
   if (!erase && cmd.kind !== 'road' && cmd.kind !== 'mine') {
     for (let row = r0; row <= r1 && !noRoad; row++) for (let col = c0; col <= c1; col++) if (city.kind[idx(city, col, row)] === id && !hasRoad(city, col, row)) noRoad = true;
   }
-  return { ok: true, placed, broke: !!broke, noRoad, occupied, felled };
+  return { ok: true, placed, broke: !!broke, noRoad, occupied, felled, razed, manned };
 }
 
 // ---- KI: baut in Ringen um die Hauptstadt nach außen, dazu kleine Viertel an vorderen FOBs (seit v4.82),

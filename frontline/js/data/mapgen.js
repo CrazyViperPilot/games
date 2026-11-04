@@ -47,6 +47,16 @@ export const MAPGEN = {
     roadW: 64, // Straßenbreite (= eine Stadtzelle; die Straßen der Zone sind Stadtstraßen, js/game/roads.js)
     avenueW: 64, // die zwei Straßen am Zentrumsplatz (seit v5.03 so breit wie alle anderen)
     towerSize: 80, // Grundfläche eines Wachturms
+    // Große Blöcke (seit v5.16): je 2 × 2 Häuserblöcke ohne die Straßen dazwischen (innen 11 × 11 Stadtzellen, Platz für einen
+    // Flughafen 10 × 10). Angabe [i, j] = Block links oben (Blockindex vom Zentrum, i nach rechts, j nach unten); das Spiegelbild
+    // [-i-1, -j-1] entsteht automatisch (punktsymmetrisch). empty: true = freies Bauland (Häuser, Bäume, Autos entfallen),
+    // sonst bleibt die Bebauung stehen und lässt sich im Stadtmodus mit „Räumen“ abreißen. Die Bahnzeile (j = 0) bleibt frei.
+    bigBlocks: [
+      { at: [1, -5], empty: true },
+      { at: [3, 1], empty: true },
+      { at: [2, -3], empty: false },
+      { at: [5, -2], empty: false },
+    ],
   },
   // Gebäude außerhalb der Zone
   outposts: {

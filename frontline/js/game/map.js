@@ -246,6 +246,33 @@ const TOWER_AT = [
   { x: CX - 0.86 * ZONE_R, y: CY - 190 },
 ];
 
+/** Große Blöcke (MAPGEN.town.bigBlocks) samt Spiegelbild: Blockindizes i0..i0+1, j0..j0+1. */
+const BIG_BLOCKS = MAPGEN.town.bigBlocks.flatMap(({ at: [i, j], empty }) => [
+  { i, j, empty },
+  { i: -i - 1, j: -j - 1, empty },
+]);
+
+/** Innenfläche eines großen Blocks in px (zwischen den Mittellinien der äußeren Straßen). */
+function bigRect(g) {
+  return { x0: CX + (g.i - 0.5) * BLOCK, x1: CX + (g.i + 1.5) * BLOCK, y0: CY + (g.j - 0.5) * BLOCK, y1: CY + (g.j + 1.5) * BLOCK };
+}
+
+/**
+ * Teilstücke der Rasterstraße k (Mittellinie bei (k + 0.5) · BLOCK, 'v' senkrecht, 'h' waagrecht) von a bis b (relativ zur Zonenmitte),
+ * ohne die Stücke, die durch einen großen Block laufen.
+ */
+function cutRoad(k, dir, a, b) {
+  let parts = [[a, b]];
+  for (const g of BIG_BLOCKS) {
+    const [line, across] = dir === 'v' ? [g.i, g.j] : [g.j, g.i];
+    if (k !== line) continue;
+    const c0 = (across - 0.5) * BLOCK;
+    const c1 = (across + 1.5) * BLOCK;
+    parts = parts.flatMap(([p, q]) => [[p, Math.min(q, c0)], [Math.max(p, c1), q]].filter(([u, v]) => v - u > 1));
+  }
+  return parts;
+}
+
 function buildTown(rng) {
   const roads = [];
   const buildings = [];
@@ -260,8 +287,9 @@ function buildTown(rng) {
     const half = Math.sqrt(Math.max(0, (ZONE_R - 60) ** 2 - off * off));
     if (half < 100) continue;
     const w = Math.abs(off) < BLOCK / 2 + 1 ? AVENUE_W : ROAD_W;
-    roads.push({ x1: CX + off, y1: CY - half, x2: CX + off, y2: CY + half, w });
-    roads.push({ x1: CX - half, y1: CY + off, x2: CX + half, y2: CY + off, w });
+    // Große Blöcke: Straßenstücke zwischen ihren zwei Blöcken entfallen (Lücke von Kreuzung zu Kreuzung)
+    for (const [a, b] of cutRoad(k, 'v', -half, half)) roads.push({ x1: CX + off, y1: CY + a, x2: CX + off, y2: CY + b, w });
+    for (const [a, b] of cutRoad(k, 'h', -half, half)) roads.push({ x1: CX + a, y1: CY + off, x2: CX + b, y2: CY + off, w });
   }
   // Zufahrtsstraßen (Feldwege) von den Spawns zur Stadtkante
   for (const s of SPAWNS) {
@@ -364,6 +392,16 @@ function buildTown(rng) {
       for (let i = cars.length - 1; i >= 0; i--) if (hit(cars[i], 40, 40)) cars.splice(i, 1);
       buildings.push({ x: Math.round(p.x), y: Math.round(p.y), w: TOWER_SIZE, h: TOWER_SIZE, kind: 'tower' });
     }
+  }
+  // Große Blöcke (seit v5.16): Autos auf den entfallenen Straßen weg; leere Blöcke ganz freiräumen (Bauland)
+  for (const g of BIG_BLOCKS) {
+    const r = bigRect(g);
+    const inner = (o, pad) => o.x > r.x0 + pad && o.x < r.x1 - pad && o.y > r.y0 + pad && o.y < r.y1 - pad;
+    for (let i = cars.length - 1; i >= 0; i--) if (inner(cars[i], 40)) cars.splice(i, 1);
+    if (!g.empty) continue;
+    for (let i = buildings.length - 1; i >= 0; i--) if (inner(buildings[i], 0) && buildings[i].kind !== 'tower') buildings.splice(i, 1);
+    for (let i = trees.length - 1; i >= 0; i--) if (inner(trees[i], 0)) trees.splice(i, 1);
+    for (let i = parks.length - 1; i >= 0; i--) if (inner(parks[i], 0)) parks.splice(i, 1);
   }
   // Bahnkorridor freiräumen, dann den stehenden Zug (Lok an der Ostseite) auf die Schiene stellen
   const free = (arr, pad) => arr.filter((o) => !inRail(o.y, pad(o)));
@@ -777,4 +815,9 @@ function placeFarms(seed, town, outpostBuildings, obstacles, trees, relief) {
   }
   town.fields = fields;
   roads.push(...tracks);
+}
+
+/** Innenflächen der großen Blöcke der Zonenstadt in px {x0, y0, x1, y1, empty} (Tests, seit v5.16). */
+export function townBigBlocks() {
+  return BIG_BLOCKS.map((g) => ({ ...bigRect(g), empty: g.empty }));
 }

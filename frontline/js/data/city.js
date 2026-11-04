@@ -23,6 +23,9 @@ export const CITY = {
   // Ziel mit Trefferpunkten hp × Kantenlänge, Arbeitsplätze und Strom wie eine Zelle; Straße an irgendeiner Außenzelle reicht.
   // Seit v5.08 sind auch die Werke (BM-Werk, Munitionswerk, Raffinerie, Stahlwerk) 2 × 2 groß, mit eigenem Aussehen (render/works.js).
   size: { uni: 3, power: 2, barracks: 4, factory: 8, airport: 10, bm: 2, mun: 2, fuel: 2, steel: 2 },
+  // Räumen reißt seit v5.16 auch diese Gebäude der Karte ab (Häuser, Hallen, Fabriken der Zonenstadt und außerhalb), kostenlos wie das
+  // übrige Räumen; besetzte Häuser nicht. Wachtürme, Zug, Mauern, Fels und Wasser bleiben.
+  clearable: ['house', 'hall', 'factory'],
   costBm: { road: 10, barracks: 100, factory: 200, heliport: 150, hospital: 80, airport: 400 }, // Baumaterial je Zelle aus dem Lager der Hauptstadt (seit v4.83: Straßen kosten Baumaterial statt Geld)
 
   // ---- Ausbildung (seit v4.96, PRD §15) ----
