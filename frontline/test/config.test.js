@@ -74,7 +74,7 @@ test('Startarmee, Nachschub und Einheitenlimit passen zusammen', () => {
 
 test('Forschung, Schwierigkeit, KI-Mischung und Startmenü', () => {
   // Forschungsbaum (js/data/research.js): je Ast eine Forschung je Stufe, nur bekannte Gruppen, Werte und Fähigkeiten
-  const GROUPS = new Set([...Object.values(RESEARCH.groups), 'veh', 'air', 'all', 'bld']);
+  const GROUPS = new Set([...Object.values(RESEARCH.groups).flat(), 'veh', 'air', 'all', 'bld']); // eine Einheit kann mehreren Gruppen angehören (Gepard)
   const STATS = new Set(['range', 'sight', 'dmg', 'dmgInf', 'dmgVeh', 'dmgAir', 'rof', 'armor', 'speed', 'fuel', 'acc', 'evade', 'regen', 'rearm', 'build', 'repair', 'abilityCd']);
   for (const t of Object.keys(RESEARCH.groups)) assert.ok(UNITS[t], `research.groups: unbekannte Einheit '${t}'`);
   assert.equal(RESEARCH.money.length, RESEARCH.tiers);

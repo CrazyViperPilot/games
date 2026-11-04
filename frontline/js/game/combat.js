@@ -204,11 +204,28 @@ export function unitHitChance(s, t, w) {
   return p * (1 - BALANCE.airFire.falloff * Math.min(1, Math.hypot(t.x - s.x, t.y - s.y) / w.range));
 }
 
+/**
+ * Granate einer Artillerie-Einheit (Waffe mit shell, seit v5.18) auf den Punkt (tx, ty): streut zufällig um bis zu spread px
+ * (Forschung acc verkleinert die Streuung), fliegt shellSpeed px/s und trifft mit Splash (impact).
+ */
+function fireUnitShell(game, u, w, tx, ty) {
+  const r = (w.spec.spread ?? 0) / modOf(game, u, 'acc') * Math.sqrt(game.rng.next());
+  const a = game.rng.next() * Math.PI * 2;
+  const p = createShell(game.newId(), u.team, u.x, u.y, tx + Math.cos(a) * r, ty + Math.sin(a) * r, w.spec);
+  p.mul = modOf(game, u, 'dmg');
+  game.projectiles.push(p);
+  game.addEffect('muzzle', u.x, u.y, u.team, tx, ty, 'mortar');
+}
+
 /** Waffe w der Einheit u feuert auf t (Vorrat, Abklingzeit, Effekt, Trefferwurf, Schaden). */
 function fireWeapon(game, u, w, t) {
   w.rounds -= 1;
   w.cd = (auraCooldown(u, w.spec.cooldown) * modOf(game, u, 'rof')) / (u.house ? houseFire(game, u) : 1); // Kommandeur in der Nähe, MG-Nest im Haus: schneller
   game.teams[u.team].used.mun += w.spec.munCost;
+  if (w.spec.shell) {
+    fireUnitShell(game, u, w, t.x, t.y);
+    return;
+  }
   if ((w.spec.damage.light || 0) >= 60) {
     game.addEffect('shell', u.x, u.y, u.team, t.x, t.y, w.spec.id);
     game.addEffect('explosion', t.x, t.y, u.team, t.x, t.y, 'hit');
@@ -221,8 +238,25 @@ function fireWeapon(game, u, w, t) {
   hit(game, t, shotDamage(w.spec, u, t, heightMult(game, u, t)) * dealtMul(game, u, t));
 }
 
-/** Reichweite der Waffe w von u gegen t (Forschung, Hauswand)? */
-const weaponReaches = (game, u, w, t) => inRange(u, t, w.spec.range * rangeMul(game, u) + reachBonus(game, u));
+/** Reichweite der Waffe w von u gegen t (Forschung, Hauswand; Artillerie nicht unter minRange)? */
+const weaponReaches = (game, u, w, t) =>
+  inRange(u, t, w.spec.range * rangeMul(game, u) + reachBonus(game, u)) && !(w.spec.minRange && Math.hypot(t.x - u.x, t.y - u.y) < w.spec.minRange);
+
+/** Artillerie mit gewähltem Punkt (u.fireTarget, Befehl mortarTarget): feuert dorthin, solange Vorrat und Reichweite reichen. */
+function unitFireAtGround(game, u) {
+  const t = u.fireTarget;
+  const d = Math.hypot(t.x - u.x, t.y - u.y);
+  let dry = false;
+  for (const w of u.weapons) {
+    if (!w.spec.shell || w.cd > 0 || d > w.spec.range * rangeMul(game, u) || d < (w.spec.minRange ?? 0)) continue;
+    if (w.rounds < 1) {
+      dry = true;
+      continue;
+    }
+    fireWeapon(game, u, w, t);
+  }
+  if (dry) game.shortage(u.team, 'mun');
+}
 
 /**
  * Einheit schießt auf t. Waffenwahl unter den schussbereiten Waffen in Reichweite, die dem Ziel schaden:
@@ -442,6 +476,10 @@ export function updateCombat(game, dt) {
     if (!u.alive || !u.weapons.length || u.crate || u.parked || jetGrounded(u)) continue; // Kistenträger haben die Hände voll, Jets am Boden (Hangar, Rollen, Start, Ausrollen) schießen nicht
     const o = u.order.type;
     if (NO_FIRE.has(o)) continue;
+    if (u.fireTarget && o !== 'attack') {
+      unitFireAtGround(game, u); // Artillerie: Feuer auf den gewählten Punkt statt Zielsuche
+      continue;
+    }
     const par = u.def.parallel && u.weapons.length > 1;
     if (par && u.scanTimer <= 0) for (const w of u.weapons) w.targetId = weaponTarget(game, hash, u, w)?.id ?? null; // eigenes Ziel je Waffe
     if (o === 'attack') {
@@ -453,7 +491,8 @@ export function updateCombat(game, dt) {
     // idle / attackMove: automatische Zielsuche
     if (u.scanTimer <= 0) {
       u.scanTimer = SCAN;
-      const t = findTarget(game, hash, u, u.def.sight * wx * sightMul(game, u) + reachBonus(game, u), 0, true, u.def.damage);
+      const R = u.def.indirect ? u.def.range * rangeMul(game, u) : u.def.sight * wx * sightMul(game, u) + reachBonus(game, u); // Artillerie: so weit sie schießt (Sicht des Teams)
+      const t = findTarget(game, hash, u, R, u.def.minRange || 0, true, u.def.damage);
       u.targetId = t ? t.id : null;
     }
     const t = u.targetId !== null ? resolveTarget(game, u.targetId) : null;

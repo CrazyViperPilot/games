@@ -16,7 +16,7 @@ export const BUILDINGS = {
     buildTime: 30,
     hotkey: null,
     // bildet nur die Hauptstadt aus (entities.js: b.produces); alle anderen FOBs bilden nichts aus
-    produces: ['rifleman', 'at', 'sniper', 'truck', 'engineer', 'fobTruck', 'ifv', 'tank', 'flak', 'sam', 'littlebird', 'transporter', 'gunship', 'commander'],
+    produces: ['rifleman', 'at', 'sniper', 'truck', 'engineer', 'fobTruck', 'ifv', 'tank', 'flak', 'sam', 'gepard', 'pzh', 'littlebird', 'transporter', 'gunship', 'commander'],
     weapon: {
       range: 220,
       minRange: 0,

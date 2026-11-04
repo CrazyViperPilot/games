@@ -1,4 +1,4 @@
-// Forschung (seit v5.04, PRD §7 „Forschung“): Baum aus 10 Stufen und 7 Ästen (js/data/research.js). Die Hauptstadt forscht neben der
+// Forschung (seit v5.04, PRD §7 „Forschung“): Baum aus 10 Stufen und 8 Ästen (js/data/research.js). Die Hauptstadt forscht neben der
 // Ausbildung, eins nach dem anderen; bis zu RESEARCH.queueMax weitere warten (Geld beim Einreihen, Abbruch erstattet voll). Eine
 // Stufe ist offen, wenn auf der Stufe davor RESEARCH.perTier Forschungen fertig sind; jede Forschung braucht ihren Vorgänger im Ast.
 // Mit Stadt braucht jede Forschung eine fertige Universität; Rechenzentren beschleunigen sie (CITY.research), Strommangel bremst.
@@ -19,7 +19,7 @@ const ADD = new Set(['regen']); // Werte, die sich addieren (sonst multipliziere
 
 const GROUP_NAME = {
   inf: 'Infanterie', tank: 'Kampfpanzer', ifv: 'Schützenpanzer', aa: 'Flak und SAM', log: 'LKW und Baufahrzeuge', heli: 'Hubschrauber',
-  jet: 'Kampfflugzeuge', veh: 'Bodenfahrzeuge', air: 'Hubschrauber und Kampfflugzeuge', all: 'alle Einheiten', bld: 'Militärgebäude',
+  jet: 'Kampfflugzeuge', spaa: 'Flakpanzer Gepard', art: 'Panzerhaubitze', veh: 'Bodenfahrzeuge', air: 'Hubschrauber und Kampfflugzeuge', all: 'alle Einheiten', bld: 'Militärgebäude',
 };
 const STAT_TEXT = {
   range: (m) => `Waffenreichweite +${pct(m)}`,
@@ -50,7 +50,8 @@ const UNLOCK_TEXT = {
 export function researchEffect(key) {
   const it = R.items[key];
   if (!it) return '';
-  const parts = Object.entries(it.fx ?? {}).map(([g, st]) => `${GROUP_NAME[g]}: ${Object.entries(st).map(([s, v]) => STAT_TEXT[s](v)).join(', ')}`);
+  const text = (g, s, v) => (g === 'art' && s === 'acc' ? `Streuung der Granaten −${Math.round((1 - 1 / v) * 100)} %` : STAT_TEXT[s](v)); // Artillerie: Genauigkeit
+  const parts = Object.entries(it.fx ?? {}).map(([g, st]) => `${GROUP_NAME[g]}: ${Object.entries(st).map(([s, v]) => text(g, s, v)).join(', ')}`);
   if (it.unlock) parts.push(UNLOCK_TEXT[it.unlock]);
   return parts.join(' · ');
 }
@@ -223,7 +224,8 @@ function mods(tech) {
 export function unitGroups(u) {
   const out = ['all'];
   const g = R.groups[u.type];
-  if (g) out.push(g);
+  if (Array.isArray(g)) out.push(...g);
+  else if (g) out.push(g);
   if (u.def.air) out.push('air');
   else if (u.def.armor !== 'inf') out.push('veh');
   return out;

@@ -4,6 +4,7 @@ import { BALANCE } from '../data/balance.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { CITY } from '../data/city.js';
 import { careOf, treeGone } from '../game/city.js';
+import { rangeMul } from '../game/research.js';
 import { buildTerrain } from './terrain.js';
 import { lacksAmmo } from '../game/entities.js';
 import {
@@ -987,6 +988,10 @@ export class Renderer {
         this.drawMortarRange(ctx, b, z);
         continue;
       }
+      if (b && b.kind === 'unit' && b.def.indirect && b.team === this.team) {
+        this.drawMortarRange(ctx, b, z); // Artillerie: gleiche Kreise wie der Mörser
+        continue;
+      }
       if (b && b.kind === 'unit' && b.def.hero && !b.house) {
         // Kommandeur: Umkreis seiner Aura
         this.groundArc(ctx, b.x, b.y, BALANCE.commander.aura);
@@ -1020,14 +1025,16 @@ export class Renderer {
 
   /** Mörser: Reichweite (außen), Mindestreichweite (innen) und gewähltes Ziel. */
   drawMortarRange(ctx, b, z) {
-    const w = b.def.weapon;
+    const w = b.def.weapon ?? b.weapons?.find((x) => x.spec.shell)?.spec; // Mörser (Gebäude) oder Artillerie (Einheit)
+    if (!w) return;
+    const range = w.range * rangeMul(this.game, b);
     const drape = this.draping();
     const k = drape ? z : 1;
     ctx.save();
     if (drape) ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.setLineDash([(10 / z) * k, (8 / z) * k]);
     ctx.lineWidth = (2 / z) * k;
-    this.groundArc(ctx, b.x, b.y, w.range);
+    this.groundArc(ctx, b.x, b.y, range);
     ctx.fillStyle = 'rgba(255,170,60,0.05)';
     ctx.fill();
     ctx.strokeStyle = 'rgba(255,170,60,0.75)';

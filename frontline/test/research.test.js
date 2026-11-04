@@ -31,10 +31,10 @@ function empty(opts = {}) {
 }
 const research = (g, key, t = 0) => g.issue(t, { type: 'research', buildingId: mainOf(g, t).id, key });
 
-test('Baum: 10 Stufen, 7 Äste, 70 Forschungen; jede hat Vorgänger im Ast und eine Wirkung in Worten', () => {
+test('Baum: 10 Stufen, 8 Äste (seit v5.18), 80 Forschungen; jede hat Vorgänger im Ast und eine Wirkung in Worten', () => {
   assert.equal(R.tiers, 10);
-  assert.equal(Object.keys(R.lanes).length, 7);
-  assert.equal(RESEARCH_KEYS.length, 70);
+  assert.equal(Object.keys(R.lanes).length, 8);
+  assert.equal(RESEARCH_KEYS.length, 80);
   for (const k of RESEARCH_KEYS) {
     const it = R.items[k];
     assert.equal(it.req, it.tier > 1 ? `${it.lane}${it.tier - 1}` : null);

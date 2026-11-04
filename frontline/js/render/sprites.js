@@ -119,6 +119,50 @@ export function drawUnit(ctx, u, color, zoom = 1, aim = null, now = 0, iso = fal
     ctx.beginPath();
     ctx.arc(-1, -1, 1.5, 0, Math.PI * 2);
     ctx.fill();
+  } else if (u.type === 'gepard') {
+    // Flakpanzer Gepard: breite Kettenwanne, Turm mit zwei langen 35-mm-Rohren seitlich und drehender Radarschüssel
+    ctx.rotate(hull);
+    ctx.fillStyle = '#23272a';
+    ctx.fillRect(-12, -9, 24, 2.8);
+    ctx.fillRect(-12, 6.2, 24, 2.8);
+    ctx.fillStyle = dark;
+    ctx.fillRect(-11, -6.5, 22, 13);
+    ctx.strokeRect(-11, -6.5, 22, 13);
+    ctx.rotate(turret);
+    ctx.fillStyle = '#2b2f2b';
+    for (const y of [-6.2, 4.8]) {
+      ctx.fillRect(-1, y, 19, 1.4);
+      ctx.strokeRect(-1, y, 19, 1.4);
+    }
+    ctx.fillStyle = color;
+    ctx.fillRect(-6, -5, 11, 10);
+    ctx.strokeRect(-6, -5, 11, 10);
+    ctx.save();
+    ctx.translate(-3, 0);
+    ctx.rotate((now / 600) % (Math.PI * 2)); // Suchradar dreht sich
+    ctx.fillStyle = light;
+    ctx.fillRect(-1, -4.5, 2, 9);
+    ctx.restore();
+  } else if (u.type === 'pzh') {
+    // Panzerhaubitze: lange Wanne, großer Turm hinten, sehr langes Rohr mit Mündungsbremse
+    ctx.rotate(hull);
+    ctx.fillStyle = '#23272a';
+    ctx.fillRect(-13, -9, 26, 2.8);
+    ctx.fillRect(-13, 6.2, 26, 2.8);
+    ctx.fillStyle = dark;
+    ctx.fillRect(-12, -6.5, 24, 13);
+    ctx.strokeRect(-12, -6.5, 24, 13);
+    ctx.translate(-3, 0);
+    ctx.rotate(turret);
+    ctx.fillStyle = '#2b2f2b';
+    ctx.fillRect(2, -1.2, 24, 2.4);
+    ctx.strokeRect(2, -1.2, 24, 2.4);
+    ctx.fillRect(24, -2, 3, 4);
+    ctx.fillStyle = color;
+    ctx.fillRect(-7, -6, 13, 12);
+    ctx.strokeRect(-7, -6, 13, 12);
+    ctx.fillStyle = light;
+    ctx.fillRect(-4, -3.5, 4, 2.5);
   } else if (u.type === 'flak' || u.type === 'sam') {
     // Flakpanzer: Wanne mit Ketten, zwei Rohre auf dem Turm. SAM: Wanne mit Startrampe, vier Raketenspitzen auf dem Turm
     ctx.rotate(hull);

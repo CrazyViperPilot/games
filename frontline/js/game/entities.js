@@ -157,7 +157,7 @@ export function createShell(id, team, sx, sy, tx, ty, def) {
     x: sx,
     y: sy,
     t: 0,
-    duration: d / 300,
+    duration: d / (def.shellSpeed ?? 300), // Mörser 300 px/s, Haubitze schneller
     damage: def.damage,
     splash: def.splash,
     alive: true,

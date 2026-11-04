@@ -124,6 +124,8 @@ Gebäude können abgerissen werden (Erstattung 25 % Baumaterial). **Einheitenlim
 | AH-64 (Kampfhubschrauber) | Hauptstadt | Bordkanone und 10 Raketen (Tabelle oben), 650 HP, 70 Treibstoff; Nachtanken/-laden in einer FOB |
 | Flakpanzer (seit v4.54) | Hauptstadt | **2 Plätze**, 300 HP, Schnellfeuer-Flak gegen Hubschrauber, schießt nur auf Luftziele. **20 Munition je Schuss**, Reichweite 330, 0,8 s Kadenz, 40 Schaden je Treffer. **Trefferchance** 85 % gegen ein stehendes Ziel, sinkt mit dessen Tempo (×120 / (120 + Tempo in px/s), also gegen Little Bird bei voller Fahrt rund 35 %), und mit der Entfernung (bis −30 % am Waffenrand). Verfehlte Schüsse kosten trotzdem Munition. |
 | SAM-Startrampe (seit v4.54) | Hauptstadt | **2 Plätze**, 350 HP, vier **wärmesuchende Raketen** gegen Hubschrauber (nur Luftziele). **250 Munition je Rakete**, **10 s Nachladezeit** zwischen den Raketen, Reichweite 420, 350 Schaden (Little Bird 1 Treffer, Transporthubschrauber und AH-64 2). Trefferchance 90 %, kein Tempo-Abzug (die Rakete folgt der Wärme), nur Entfernung (bis −30 %). |
+| Flakpanzer Gepard (seit v5.18) | Hauptstadt (mit Stadt: Fabrikhalle) | **3 Plätze**, 450 HP, Such- und Feuerleitradar (Sicht 480). **Zwillingskanone 35 mm**: Reichweite 420, 0,35 s Kadenz, 80 Schuss à 8 Munition, Trefferchance 80 % mit Tempo-Faktor speedRef 400 (die Flak hat 120): trifft auch die schnelle **F-16** gut. Bevorzugt Luftziele (32 Schaden gegen Hubschrauber und Flugzeuge), gegen leichte Bodenziele brauchbar (14), gegen Panzer kaum (2). 650 Geld, mit Stadt 100 Metall und 3 Einwohner, 16 s, Taste **P** (`UNITS.gepard`). Zählt in der Forschung zur Gruppe Gepard und zur Flugabwehr |
+| Panzerhaubitze (seit v5.18, nach der Panzerhaubitze 2000) | Hauptstadt (mit Stadt: Fabrikhalle) | **4 Plätze**, 500 HP, langsam. **Haubitze 155 mm**: Granaten bis **1400 px** weit, nicht näher als 260 px, 7 s Kadenz, 30 Schuss à 25 Munition, Splash 75 px (90 gegen Soldaten, 110 leicht, 80 schwer, 140 Gebäude, nichts gegen Luftziele), Streuung bis 70 px um den Zielpunkt, Fluggeschwindigkeit 480 px/s. Sucht Ziele über ihre ganze Reichweite, braucht aber die **Sicht des Teams** (Späher, andere Einheiten, Gebäude). **Feuer auf Punkt (G)** wie der Mörser (Befehl `mortarTarget` mit Einheiten), **Ziel löschen (C)**; Bewegen oder Stopp beendet es. 900 Geld, mit Stadt 140 Metall und 4 Einwohner, 22 s, Taste **O** (`UNITS.pzh`) |
 | F-16 (Kampfflugzeug, seit v5.03) | Flughafen (nur mit Stadt) | **3 Plätze**, 450 HP, sehr schnell (420 px/s), fliegt immer (kreist im Abstand 280 px um seinen Befehlspunkt, dreht höchstens 2,4 rad/s). **Zwei Lenkraketen** (Reichweite 640, 2,5 s Kadenz, 150 Munition je Rakete, Trefferchance 92 %, nur Entfernungsabzug): 1150 gegen schwere, 650 gegen leichte Fahrzeuge, 700 gegen Gebäude und **Luftziele** (Hubschrauber, andere Flugzeuge); also **zwei Ziele je Einsatz**. **Treibstoff 55 s Flug** (seit v5.14, vorher 45 s; Verbrauch auch beim Kreisen, Reichweite ≈ 23 000 px). Fliegt selbst zum Flughafen zurück, wenn keine Rakete mehr da ist oder der Treibstoff für den Heimweg × 1,3 + 4 s nicht mehr reicht; landet dort, tankt und lädt in 25 s voll (aus dem Lager der Hauptstadt) und wird repariert (4 % HP/s). Abgestellt steht sie im Hangar: nicht angreifbar, schießt nicht; fällt der Flughafen, ist sie verloren. Ohne Flughafen mit freiem Platz stürzt sie ab, wenn der Treibstoff leer ist. Ein Befehl (Bewegen, Angriff, Angriffsmarsch) an eine startbereite F-16 lässt sie starten. **Start und Landung wie ein Flugzeug (seit v5.15):** sie rollt vom Stellplatz über den Rollweg zu Bahn 1 (wartet am Haltepunkt, bis die Bahn frei ist; Rolltempo 60 px/s), beschleunigt im Startlauf und hebt bei 62 % ihres Tempos ab, steigt in 3 s auf Reisehöhe (erst geradeaus). Zum Landen fliegt sie eine Platzrunde (Gegenanflug seitlich der Bahn, dann Endanflug mit 55 % Tempo), sinkt im Gleitpfad auf Bahn 2, setzt in der Aufsetzzone auf, rollt aus und rollt zu ihrem Stellplatz (Landerichtung von der Seite, auf der die Platzrunde in die Karte passt; verpasst sie die Zone, startet sie durch). Am Boden schießt sie nicht. Knopf **Landen (L)**, dann den eigenen Flughafen anklicken (oder Rechtsklick darauf): sie landet dort, auch auf einem anderen eigenen Flughafen mit freiem Platz (Befehl `land`). 1400 Geld, 160 Metall, 2 Einwohner, 40 s (`UNITS.f16`, `BALANCE.jets`, `js/game/aircraft.js`). Flak trifft sie wegen des Tempos selten, die SAM normal |
 | Kommandeur (Held, seit v4.49) | Hauptstadt | **Einmalig je Team**, belegt **keinen Platz**, jedes Team startet mit ihm (hinten an der Hauptstadt). Maschinenpistole (schwach). **Aura 300 px:** eigene Einheiten darin schießen **10 % schneller** (Abklingzeit ÷ 1,1), verletzte Infanterie darin heilt **1,5 HP/s**, sobald sie 6 s nicht getroffen wurde (Fahrzeuge nicht). **Fällt er, bekommt der Gegner 5 Punkte** (kann die Partie entscheiden; auch als Passagier eines zerstörten Fahrzeugs). Danach bildet die Hauptstadt (mit Stadt die Kaserne) einen neuen aus (C, 400 Geld, 20 s); ein zweiter, auch in der Warteschlange, wird abgelehnt. Goldener Stern über der Figur (für beide Seiten sichtbar, soweit in Sicht), gewählt zeigt er den Aura-Kreis. Zählt nicht als Soldat für den Nachschub. `BALANCE.commander`, `js/game/commander.js` |
 
@@ -161,6 +163,8 @@ Die Tabellen „Werte“ und „Waffen und Schaden“ erzeugt `npm run docs` aus
 | F-16 | K | 3 | 450 | 420 | 560 | 640 | 1400 Geld | 40 s | 55 / 1 |
 | Flakpanzer | J | 2 | 300 | 70 | 380 | 330 | 220 Geld | 10 s | 40 / 0,4 |
 | SAM-Startrampe | N | 2 | 350 | 65 | 440 | 420 | 300 Geld | 12 s | 40 / 0,4 |
+| Flakpanzer Gepard | P | 3 | 450 | 62 | 480 | 420 | 650 Geld | 16 s | 45 / 0,35 |
+| Panzerhaubitze | O | 4 | 500 | 50 | 280 | 1400 | 900 Geld | 22 s | 40 / 0,35 |
 <!-- auto:units:end -->
 
 <!-- auto:buildings:start -->
@@ -199,6 +203,8 @@ Schaden je Schuss nach Panzerklasse des Ziels (Inf = Infanterie, Leicht, Schwer,
 | F-16: Lenkrakete | 640 | 2,5 | 2 | 150 | 160 | 650 | 1150 | 700 | 700 | 700 | Trefferchance 92 % × Entfernungs-Faktor |
 | Flakpanzer: Flak | 330 | 0,8 | 30 | 20 | – | – | – | – | 40 | 40 | Trefferchance 85 % × Tempo-Faktor × Entfernungs-Faktor; nur Luftziele |
 | SAM-Startrampe: Wärmesuchrakete | 420 | 10 | 4 | 250 | – | – | – | – | 350 | 350 | Trefferchance 90 % × Entfernungs-Faktor; nur Luftziele |
+| Flakpanzer Gepard: Zwillingskanone 35 mm | 420 | 0,35 | 80 | 8 | 8 | 14 | 2 | 6 | 32 | 32 | bevorzugt gegen Luft; Trefferchance 80 % × Tempo-Faktor × Entfernungs-Faktor |
+| Panzerhaubitze: Haubitze 155 mm | 1400 | 7 | 30 | 25 | 90 | 110 | 80 | 140 | – | – | – |
 | FOB (Gebäude) | 220 | 0,6 | – | – | 12 | 4 | 1 | 4 | 2 | 2 | kostenlos |
 | Mörser (Gebäude) | 800 | 20 | – | 4 | 60 | 50 | 25 | 80 | – | – | min. 200 px; Fläche 60 px; Granate mit Flugzeit |
 | Flugabwehr (Gebäude) | 320 | 0,4 | – | 0,25 | 10 | 12 | 2 | 4 | 35 | 35 | fängt Mörsergranaten ab (350 px, 70 %) |
@@ -302,7 +308,7 @@ Direktfeuer richtet sich nach Trefferzahlen (volles Ziel); Seite = Winkel zur Fa
 ### Forschung (seit v5.04 ein Baum mit 10 Stufen, nach dem Technologiebaum aus Civilization; vorher seit v4.52 drei Stufen)
 - Im Startmenü schaltbar („Forschung“: An/Aus, gemerkt, Standard An; `Game({ research })`, ohne Angabe aus: keine Verbesserungen).
 - **Alle Einheiten sind von Anfang an frei** (auch ohne Forschung). Die Forschung schaltet keine Einheiten mehr frei, sie **verbessert** sie: Werte je Einheitengruppe und drei Fähigkeiten (Nebel, Minen, autonome Türme). Daniels Wunsch: Panzer bekommen von Stufe zu Stufe mehr Kanonenreichweite, mehr Fahr-Reichweite usw.; das System lehnt sich an die Freischaltungen der Fahrzeuge in Battlefield 4 / Battlefield 6 (Optik, Munition, Panzerung, Gegenmaßnahmen, Wartung) und an Wardogs an.
-- **Aufbau:** 10 Stufen (Spalten) und 7 Äste (Zeilen): 🪖 Infanterie, 🛡 Kampfpanzer, ⚙ Schützenpanzer und Flugabwehr, ✈ Luftwaffe (Hubschrauber, F-16), 🔧 Logistik und Pioniere, 🏰 Stellungen (Militärgebäude), 🖥 Elektronik und KI. Je Ast und Stufe genau eine Forschung, 70 insgesamt (Schlüssel `<Ast><Stufe>`, z. B. `tank5`). Daten: `js/data/research.js` (`RESEARCH`), Logik `js/game/research.js`.
+- **Aufbau:** 10 Stufen (Spalten) und 8 Äste (Zeilen, seit v5.18): 🪖 Infanterie, 🛡 Kampfpanzer, ⚙ Schützenpanzer und Flugabwehr, 🎯 Artillerie und Gepard (Panzerhaubitze und Flakpanzer Gepard: Reichweite, Tank, Genauigkeit bzw. Streuung der Granaten, Kadenz, Radar, Panzerung; der Gepard zählt auch zur Flugabwehr des Asts ⚙), ✈ Luftwaffe (Hubschrauber, F-16), 🔧 Logistik und Pioniere, 🏰 Stellungen (Militärgebäude), 🖥 Elektronik und KI. Je Ast und Stufe genau eine Forschung, 80 insgesamt (Schlüssel `<Ast><Stufe>`, z. B. `tank5`). Daten: `js/data/research.js` (`RESEARCH`), Logik `js/game/research.js`.
 - **Regeln:** Jede Forschung braucht ihren **Vorgänger im selben Ast** (Stufe davor). Eine Stufe ist **offen**, wenn auf der Stufe davor **3 Forschungen** fertig sind (`perTier`; welche, ist egal; weitere der alten Stufe darf man jederzeit nachholen). Preis je Stufe 250 / 350 / 450 / 550 / 700 / 850 / 1000 / 1200 / 1400 / 1600 Geld, Zeit 30 bis 102 s (+8 s je Stufe).
 - **Warteschlange:** Die Hauptstadt forscht eins zugleich, **bis zu 3 weitere warten** (`queueMax`). Bezahlt wird beim Einreihen; ✕ nimmt eine Forschung heraus und erstattet ganz, was davon abhängt (Nachfolger, Stufe), fällt mit heraus und wird auch erstattet. Beim Einreihen zählt, was läuft und wartet, schon als erforscht: man kann also z. B. Richtoptik, Gefechtsausbildung, Maschinenkanone und danach schon Zusatztanks (Stufe 2) einreihen. Ist eine fertig, rückt die nächste nach.
 - **Stadt:** Ohne **fertige Universität** ruht jede Forschung (eine reicht, ihre Stufe zählt nicht; Meldung „Forschung ruht: keine Universität in der Stadt“). **Rechenzentren beschleunigen:** Tempo × (1 + 20 % × Summe der Stufen aller Rechenzentren), höchstens dreifach (`CITY.research`); Strommangel bremst im Verhältnis. Ohne Stadt forscht die Hauptstadt mit Tempo 1.
@@ -320,6 +326,7 @@ Alle 70 Forschungen (aus `js/data/research.js` erzeugt, `npm run docs`):
 | 1 | 🪖 Infanterie | Gefechtsausbildung | `inf1` | 250 Geld, 30 s | Infanterie: Schaden +8 % |
 | 1 | 🛡 Kampfpanzer | Richtoptik | `tank1` | 250 Geld, 30 s | Kampfpanzer: Waffenreichweite +6 %, Sicht +5 % |
 | 1 | ⚙ Schützenpanzer und Flugabwehr | Maschinenkanone | `mech1` | 250 Geld, 30 s | Schützenpanzer: Schaden +10 % |
+| 1 | 🎯 Artillerie und Gepard | Ballistikrechner | `art1` | 250 Geld, 30 s | Panzerhaubitze: Waffenreichweite +8 % |
 | 1 | ✈ Luftwaffe | Rotorwartung | `air1` | 250 Geld, 30 s | Hubschrauber: Reichweite mit einer Tankfüllung +18 % |
 | 1 | 🔧 Logistik und Pioniere | Geländereifen | `log1` | 250 Geld, 30 s | LKW und Baufahrzeuge: Tempo +10 % |
 | 1 | 🏰 Stellungen | Sandsäcke | `def1` | 250 Geld, 30 s | Militärgebäude: nehmen 10 % weniger Schaden |
@@ -327,6 +334,7 @@ Alle 70 Forschungen (aus `js/data/research.js` erzeugt, `npm run docs`):
 | 2 | 🪖 Infanterie | Schutzwesten | `inf2` | 350 Geld, 38 s | Infanterie: nehmen 10 % weniger Schaden |
 | 2 | 🛡 Kampfpanzer | Zusatztanks | `tank2` | 350 Geld, 38 s | Kampfpanzer: Reichweite mit einer Tankfüllung +18 % |
 | 2 | ⚙ Schützenpanzer und Flugabwehr | Suchradar | `mech2` | 350 Geld, 38 s | Flak und SAM: Waffenreichweite +8 %, Sicht +10 % |
+| 2 | 🎯 Artillerie und Gepard | Zusatztanks | `art2` | 350 Geld, 38 s | Panzerhaubitze: Reichweite mit einer Tankfüllung +18 % · Flakpanzer Gepard: Reichweite mit einer Tankfüllung +18 % |
 | 2 | ✈ Luftwaffe | Stabilisierte Bordkanone | `air2` | 350 Geld, 38 s | Hubschrauber: Schaden +8 % |
 | 2 | 🔧 Logistik und Pioniere | Schnellbau | `log2` | 350 Geld, 38 s | alle Einheiten: Bautempo +20 % |
 | 2 | 🏰 Stellungen | Schwere MG | `def2` | 350 Geld, 38 s | Militärgebäude: Schaden +10 % |
@@ -334,6 +342,7 @@ Alle 70 Forschungen (aus `js/data/research.js` erzeugt, `npm run docs`):
 | 3 | 🪖 Infanterie | Zielfernrohre | `inf3` | 450 Geld, 46 s | Infanterie: Waffenreichweite +8 %, Sicht +5 % |
 | 3 | 🛡 Kampfpanzer | Wuchtgeschosse (APFSDS) | `tank3` | 450 Geld, 46 s | Kampfpanzer: Schaden +10 % |
 | 3 | ⚙ Schützenpanzer und Flugabwehr | Leichtbaupanzerung | `mech3` | 450 Geld, 46 s | Schützenpanzer: nehmen 10 % weniger Schaden · Flak und SAM: nehmen 10 % weniger Schaden |
+| 3 | 🎯 Artillerie und Gepard | Zielfolgeradar | `art3` | 450 Geld, 46 s | Flakpanzer Gepard: Waffenreichweite +8 %, Sicht +10 % |
 | 3 | ✈ Luftwaffe | Nachbrenner | `air3` | 450 Geld, 46 s | Kampfflugzeuge: Tempo +8 % |
 | 3 | 🔧 Logistik und Pioniere | Zusatzkanister | `log3` | 450 Geld, 46 s | LKW und Baufahrzeuge: Reichweite mit einer Tankfüllung +25 % |
 | 3 | 🏰 Stellungen | Mörser-Feuerleitung | `def3` | 450 Geld, 46 s | Militärgebäude: Waffenreichweite +8 % |
@@ -341,6 +350,7 @@ Alle 70 Forschungen (aus `js/data/research.js` erzeugt, `npm run docs`):
 | 4 | 🪖 Infanterie | Erweiterte Magazine | `inf4` | 550 Geld, 54 s | Infanterie: feuern 9 % schneller |
 | 4 | 🛡 Kampfpanzer | Verbundpanzerung | `tank4` | 550 Geld, 54 s | Kampfpanzer: nehmen 10 % weniger Schaden |
 | 4 | ⚙ Schützenpanzer und Flugabwehr | Zusatztanks | `mech4` | 550 Geld, 54 s | Schützenpanzer: Reichweite mit einer Tankfüllung +18 % · Flak und SAM: Reichweite mit einer Tankfüllung +18 % |
+| 4 | 🎯 Artillerie und Gepard | Wetter- und Vermessungsdaten | `art4` | 550 Geld, 54 s | Panzerhaubitze: Streuung der Granaten −20 % |
 | 4 | ✈ Luftwaffe | Panzerglaskanzel | `air4` | 550 Geld, 54 s | Hubschrauber: nehmen 10 % weniger Schaden · Kampfflugzeuge: nehmen 10 % weniger Schaden |
 | 4 | 🔧 Logistik und Pioniere | Reparaturset | `log4` | 550 Geld, 54 s | alle Einheiten: Reparatur 1,5× so schnell |
 | 4 | 🏰 Stellungen | Stahlbeton | `def4` | 550 Geld, 54 s | Militärgebäude: nehmen 12 % weniger Schaden |
@@ -348,6 +358,7 @@ Alle 70 Forschungen (aus `js/data/research.js` erzeugt, `npm run docs`):
 | 5 | 🪖 Infanterie | Feldsanitäter | `inf5` | 700 Geld, 62 s | Infanterie: heilen sich selbst um 1,2 % HP/s (nach 6 s ohne Treffer) |
 | 5 | 🛡 Kampfpanzer | Ladeautomat | `tank5` | 700 Geld, 62 s | Kampfpanzer: feuern 14 % schneller |
 | 5 | ⚙ Schützenpanzer und Flugabwehr | Annäherungszünder | `mech5` | 700 Geld, 62 s | Flak und SAM: Trefferchance gelenkter Waffen +10 % |
+| 5 | 🎯 Artillerie und Gepard | Automatischer Lader | `art5` | 700 Geld, 62 s | Panzerhaubitze: feuern 18 % schneller · Flakpanzer Gepard: feuern 9 % schneller |
 | 5 | ✈ Luftwaffe | Täuschkörper (Flares) | `air5` | 700 Geld, 62 s | Hubschrauber und Kampfflugzeuge: gegnerische Flak, SAM und Lenkraketen treffen 15 % seltener |
 | 5 | 🔧 Logistik und Pioniere | Nebelwerfer | `log5` | 700 Geld, 62 s | Fahrzeuge und Hubschrauber legen mit V eine Nebelwand: eigene Einheiten darin nehmen halb so viel Schaden |
 | 5 | 🏰 Stellungen | Autonome Türme | `def5` | 700 Geld, 62 s | Dachaufbauten von Gefechtstürmen und Häusern feuern auch ohne Besatzung |
@@ -355,6 +366,7 @@ Alle 70 Forschungen (aus `js/data/research.js` erzeugt, `npm run docs`):
 | 6 | 🪖 Infanterie | Keramikplatten | `inf6` | 850 Geld, 70 s | Infanterie: nehmen 12 % weniger Schaden |
 | 6 | 🛡 Kampfpanzer | Gasturbine | `tank6` | 850 Geld, 70 s | Kampfpanzer: Tempo +12 % |
 | 6 | ⚙ Schützenpanzer und Flugabwehr | Programmierbare Munition | `mech6` | 850 Geld, 70 s | Schützenpanzer: feuern 14 % schneller, Schaden gegen Infanterie +10 % |
+| 6 | 🎯 Artillerie und Gepard | Programmierbare Zerlegemunition | `art6` | 850 Geld, 70 s | Flakpanzer Gepard: Trefferchance gelenkter Waffen +12 %, Schaden +10 % |
 | 6 | ✈ Luftwaffe | Konforme Tanks | `air6` | 850 Geld, 70 s | Kampfflugzeuge: Reichweite mit einer Tankfüllung +25 % · Hubschrauber: Reichweite mit einer Tankfüllung +11 % |
 | 6 | 🔧 Logistik und Pioniere | Fertigteilbau | `log6` | 850 Geld, 70 s | alle Einheiten: Bautempo +20 % |
 | 6 | 🏰 Stellungen | Schnellladung | `def6` | 850 Geld, 70 s | Militärgebäude: feuern 14 % schneller |
@@ -362,6 +374,7 @@ Alle 70 Forschungen (aus `js/data/research.js` erzeugt, `npm run docs`):
 | 7 | 🪖 Infanterie | Tandem-Gefechtskopf | `inf7` | 1000 Geld, 78 s | Infanterie: Schaden gegen Fahrzeuge und Gebäude +18 % |
 | 7 | 🛡 Kampfpanzer | Feuerleitrechner | `tank7` | 1000 Geld, 78 s | Kampfpanzer: Waffenreichweite +10 % |
 | 7 | ⚙ Schützenpanzer und Flugabwehr | Feuerleitradar | `mech7` | 1000 Geld, 78 s | Flak und SAM: Waffenreichweite +10 % |
+| 7 | 🎯 Artillerie und Gepard | Minenschutz und Zusatzpanzerung | `art7` | 1000 Geld, 78 s | Panzerhaubitze: nehmen 10 % weniger Schaden · Flakpanzer Gepard: nehmen 10 % weniger Schaden |
 | 7 | ✈ Luftwaffe | Panzerabwehrraketen (Hellfire) | `air7` | 1000 Geld, 78 s | Hubschrauber: Schaden gegen Fahrzeuge und Gebäude +15 %, Waffenreichweite +8 % |
 | 7 | 🔧 Logistik und Pioniere | Minenleger | `log7` | 1000 Geld, 78 s | Baufahrzeuge legen mit M Minen, die Bodeneinheiten des Gegners treffen |
 | 7 | 🏰 Stellungen | Radarstellung | `def7` | 1000 Geld, 78 s | Militärgebäude: Sicht +15 % |
@@ -369,6 +382,7 @@ Alle 70 Forschungen (aus `js/data/research.js` erzeugt, `npm run docs`):
 | 8 | 🪖 Infanterie | Leichtes Sturmgepäck | `inf8` | 1200 Geld, 86 s | Infanterie: Tempo +10 % |
 | 8 | 🛡 Kampfpanzer | Reaktivpanzerung | `tank8` | 1200 Geld, 86 s | Kampfpanzer: nehmen 12 % weniger Schaden |
 | 8 | ⚙ Schützenpanzer und Flugabwehr | Panzerabwehrlenkwaffe | `mech8` | 1200 Geld, 86 s | Schützenpanzer: Schaden gegen Fahrzeuge und Gebäude +20 %, Waffenreichweite +6 % |
+| 8 | 🎯 Artillerie und Gepard | Reichweitengesteigerte Granaten | `art8` | 1200 Geld, 86 s | Panzerhaubitze: Waffenreichweite +12 % |
 | 8 | ✈ Luftwaffe | Mittelstrecken-Lenkwaffen | `air8` | 1200 Geld, 86 s | Kampfflugzeuge: Waffenreichweite +12 %, Trefferchance gelenkter Waffen +6 % |
 | 8 | 🔧 Logistik und Pioniere | Gepanzerte LKW | `log8` | 1200 Geld, 86 s | LKW und Baufahrzeuge: nehmen 15 % weniger Schaden |
 | 8 | 🏰 Stellungen | Abfangsystem (C-RAM) | `def8` | 1200 Geld, 86 s | Militärgebäude: Trefferchance gelenkter Waffen +12 % |
@@ -376,6 +390,7 @@ Alle 70 Forschungen (aus `js/data/research.js` erzeugt, `npm run docs`):
 | 9 | 🪖 Infanterie | Wärmebildvisier | `inf9` | 1400 Geld, 94 s | Infanterie: Sicht +12 %, Waffenreichweite +6 % |
 | 9 | 🛡 Kampfpanzer | Bordwerkstatt | `tank9` | 1400 Geld, 94 s | Kampfpanzer: heilen sich selbst um 0,8 % HP/s (nach 6 s ohne Treffer), Reichweite mit einer Tankfüllung +11 % |
 | 9 | ⚙ Schützenpanzer und Flugabwehr | Allradantrieb | `mech9` | 1400 Geld, 94 s | Schützenpanzer: Tempo +10 % · Flak und SAM: Tempo +10 % |
+| 9 | 🎯 Artillerie und Gepard | Feuerleitrechner mit Laser | `art9` | 1400 Geld, 94 s | Flakpanzer Gepard: feuern 14 % schneller, Waffenreichweite +6 % |
 | 9 | ✈ Luftwaffe | Schnellwartung | `air9` | 1400 Geld, 94 s | Kampfflugzeuge: am Flughafen 30 % schneller bereit · Hubschrauber: heilen sich selbst um 0,8 % HP/s (nach 6 s ohne Treffer) |
 | 9 | 🔧 Logistik und Pioniere | Feldwerkstatt | `log9` | 1400 Geld, 94 s | Bodenfahrzeuge: heilen sich selbst um 0,5 % HP/s (nach 6 s ohne Treffer) · alle Einheiten: Reparatur 1,3× so schnell |
 | 9 | 🏰 Stellungen | Bunkerbau | `def9` | 1400 Geld, 94 s | Militärgebäude: nehmen 10 % weniger Schaden, Waffenreichweite +5 % |
@@ -383,6 +398,7 @@ Alle 70 Forschungen (aus `js/data/research.js` erzeugt, `npm run docs`):
 | 10 | 🪖 Infanterie | Spezialkräfte | `inf10` | 1600 Geld, 102 s | Infanterie: Schaden +10 %, feuern 11 % schneller, nehmen 10 % weniger Schaden |
 | 10 | 🛡 Kampfpanzer | Kampfwertsteigerung | `tank10` | 1600 Geld, 102 s | Kampfpanzer: Schaden +10 %, Waffenreichweite +6 %, nehmen 8 % weniger Schaden |
 | 10 | ⚙ Schützenpanzer und Flugabwehr | Vernetzte Flugabwehr | `mech10` | 1600 Geld, 102 s | Flak und SAM: Schaden +15 %, Trefferchance gelenkter Waffen +10 % · Schützenpanzer: nehmen 8 % weniger Schaden |
+| 10 | 🎯 Artillerie und Gepard | GPS-gelenkte Granaten | `art10` | 1600 Geld, 102 s | Panzerhaubitze: Streuung der Granaten −29 %, Schaden +10 % |
 | 10 | ✈ Luftwaffe | Luftüberlegenheit | `air10` | 1600 Geld, 102 s | Hubschrauber und Kampfflugzeuge: Schaden +10 %, nehmen 8 % weniger Schaden |
 | 10 | 🔧 Logistik und Pioniere | Pionierbataillon | `log10` | 1600 Geld, 102 s | alle Einheiten: Bautempo +25 %, Nebel und Minen laden 40 % schneller |
 | 10 | 🏰 Stellungen | Festungsartillerie | `def10` | 1600 Geld, 102 s | Militärgebäude: Schaden +12 %, feuern 11 % schneller |
@@ -636,6 +652,7 @@ Alle Geräusche werden im Browser mit WebAudio **selbst erzeugt** (Rauschen und 
 - **Format-Version** `SAVE_FORMAT` (`js/game/savegame.js`): bei jeder Änderung, die gespeicherte Zustände unlesbar macht (neue Pflichtfelder im Spielzustand ohne Vorgabe, umbenannte Klassen), erhöhen; alte Stände werden dann nicht mehr angeboten. Seit v5.14 ist es 2 (größere Karte): Stände von v5.11 und älter mit der alten Kartengröße werden nicht mehr fortgesetzt. Neue Klassen mit Instanzen im Spielzustand in `CLASSES` (`savegame.js`) eintragen, sonst meldet `test/save.test.js` einen Fehler. Funktionen oder Getter im Zustand werden nicht gespeichert (Beispiel `ammo`: `Game.restoreAccessors`).
 
 ## Änderungsverlauf
+- v5.18: **Flakpanzer Gepard und Panzerhaubitze, 8. Forschungsast** (§6, §7 „Forschung“, Daniels Wunsch): Gepard (P, 3 Plätze): Zwillingskanone mit Radar, trifft auch die F-16 gut. Panzerhaubitze (O, 4 Plätze, nach der Panzerhaubitze 2000): Artillerie bis 1400 px mit Mindestreichweite, Splash und Streuung, Ziele über die Sicht des Teams, Feuer auf einen Punkt (G). Beide in der Hauptstadt bzw. der Fabrikhalle. Neuer Ast 🎯 „Artillerie und Gepard“ mit 10 Forschungen: Reichweite, Zusatztanks, Radar, Genauigkeit (Streuung), Ladeautomat, Munition, Panzerung, GPS-Granaten. Einheiten können seit v5.18 mehreren Forschungsgruppen angehören (Gepard: eigene Gruppe und Flugabwehr). Die KI forscht den neuen Ast zuletzt und bildet beide Fahrzeuge noch nicht aus. Cache v131.
 - v5.17: **Schönere Stadtgebäude** (§15, Daniels Wunsch „Gebäude schöner, zuerst die Stadtgebäude“): Alle 1 × 1-Gebäude der Stadt (Wohnen, Gewerbe, Markt, Rechenzentrum, Krankenhaus, Heliport, Förderanlagen je Vorkommen) haben je Stufe ein eigenes, detailreiches Bild in 2D und Iso statt grauer Kästen und Kenney-Hallen; Wohnen und Gewerbe in drei Farbvarianten, im Winter Schnee auf Dächern, Rasen und Bäumen. Schilder und Rauch sitzen über dem höchsten Punkt. Gemalte Bilder werden je Maßstab zwischengespeichert (ein `drawImage` je Gebäude, höchstens 6 ms Malen je Bild), darum laufen auch große Städte flüssig. Der Landeplatz des Heliports gehört jetzt zu seinem Bild. Nur Bild, Spielregeln unverändert. Neue Dateien `js/render/townhouses.js`, `js/render/spritecache.js`. Cache v130.
 - v5.16: **Große Blöcke in der Zonenstadt, Räumen reißt Häuser ab** (§7, §15, Daniels Wunsch): Die Zonenstadt hat 8 große Blöcke (2 × 2 Blöcke ohne Straßen dazwischen, innen 11 × 11 Stadtzellen, punktsymmetrisch; 4 leer, 4 bebaut; `MAPGEN.town.bigBlocks`), groß genug für Flughafen, Fabrikhalle oder Kaserne. Räumen reißt leere Wohnhäuser, Hallen und Fabriken der Karte kostenlos ab (`CITY.clearable`), besetzte nicht. Regel 4 bewusst gebrochen: Die Zonenstadt jeder Zufallskarte ändert sich in diesen Blöcken (Zufallsfolge und Rest der Karte bleiben gleich). Code: `js/game/map.js` (`cutRoad`, `townBigBlocks`), `js/game/city.js` (`clearableAt`, `demolish`). Test `test/bigblocks.test.js`. Cache v129.
 - v5.15: **F-16 startet und landet wie ein Flugzeug, Knopf „Landen“, Waffen gegen Flugzeuge, Panzer feuern parallel, Vorkommen nie auf Wasser** (§6, §15, Daniels Wunsch): Die F-16 rollt vom Stellplatz zur Startbahn, startet nach einem Startlauf und steigt; zur Landung fliegt sie eine Platzrunde, gleitet auf die Landebahn, rollt aus und zu ihrem Stellplatz (`BALANCE.jets`: taxi, accel, rotate, climb, approach, glide …; Heimweg-Reserve 8 statt 4 s). Neuer Befehl `land` mit Knopf **Landen (L)**: danach den eigenen Flughafen anklicken. Neue Schadensklasse „Flugzeug“ (`jet`): Soldaten treffen keine Flugzeuge, Panzer-MGs sehr wenig, Kampfhubschrauber mittel. Kampf- und Schützenpanzer feuern MG und Hauptwaffe gleichzeitig auf eigene Ziele (`parallel`). Rohstoffvorkommen entstehen nie auf Wasser, Furten, Brücken oder Stadtstraßen und halten Abstand zum Ufer (`CITY.deposits.shore`; die Vorkommen mancher Seeds liegen dadurch etwas anders). Cache v128.

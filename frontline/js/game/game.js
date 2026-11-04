@@ -613,7 +613,10 @@ export class Game {
       case 'attack':
         return this.cmdAttack(team, cmd);
       case 'stop':
-        for (const u of this.ownUnits(team, cmd.ids)) setIdle(u);
+        for (const u of this.ownUnits(team, cmd.ids)) {
+          setIdle(u);
+          u.fireTarget = null; // Stopp beendet auch das Feuer der Artillerie auf einen Punkt
+        }
         return { ok: true };
       case 'build':
         return this.cmdBuild(team, cmd);
@@ -760,6 +763,7 @@ export class Game {
     const ty = Math.min(Math.max(cmd.y, 0), H);
     const go = (u, x, y, form) => {
       u.targetId = null;
+      u.fireTarget = null; // Artillerie: neuer Marsch beendet das Feuer auf den Punkt
       u.order = { type: cmd.type, x, y, targetId: null, ...(form ? { form } : {}) };
       planPath(this, u, x, y);
       if (u.path.length === 0) setIdle(u);
@@ -910,17 +914,32 @@ export class Game {
    */
   cmdMortarTarget(team, cmd) {
     const mortars = [];
+    const guns = []; // Artillerie-Einheiten (Panzerhaubitze, seit v5.18)
     for (const id of new Set(cmd.ids || [])) {
       const b = this.getEntity(id);
       if (b && b.kind === 'building' && b.team === team && b.def.weapon && b.def.weapon.shell) mortars.push(b);
+      else if (b && b.kind === 'unit' && b.alive && b.team === team && b.def.indirect) guns.push(b);
     }
-    if (!mortars.length) return fail('Kein Mörser gewählt');
+    if (!mortars.length && !guns.length) return fail('Kein Mörser und keine Artillerie gewählt');
     if (!Number.isFinite(cmd.x) || !Number.isFinite(cmd.y)) {
-      for (const b of mortars) b.fireTarget = null;
-      return { ok: true, count: mortars.length };
+      for (const b of [...mortars, ...guns]) b.fireTarget = null;
+      return { ok: true, count: mortars.length + guns.length };
     }
     let n = 0;
     let reason = 'Ziel außer Reichweite';
+    for (const u of guns) {
+      const w = u.weapons.find((x) => x.spec.shell)?.spec;
+      const d = dist(u.x, u.y, cmd.x, cmd.y);
+      const max = w.range * rangeMul(this, u);
+      if (d > max) reason = `Ziel außer Reichweite (max. ${Math.round(max)} px)`;
+      else if (d < w.minRange) reason = `Ziel zu nah (min. ${w.minRange} px)`;
+      else {
+        u.fireTarget = { x: cmd.x, y: cmd.y };
+        setIdle(u);
+        u.fireTarget = { x: cmd.x, y: cmd.y };
+        n++;
+      }
+    }
     for (const b of mortars) {
       if (!b.built) {
         reason = 'Mörser ist noch im Bau';

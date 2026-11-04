@@ -817,9 +817,9 @@ export class Controller {
 
   /** Mörser-Ziel: Klick auf die Karte, alle gewählten Mörser in Reichweite feuern dorthin. */
   confirmMortarTarget(wx, wy) {
-    const ids = this.selected().filter((e) => e.kind === 'building' && e.def.weapon && e.def.weapon.shell).map((e) => e.id);
+    const ids = this.selected().filter((e) => (e.kind === 'building' && e.def.weapon && e.def.weapon.shell) || (e.kind === 'unit' && e.def.indirect)).map((e) => e.id);
     if (!ids.length) {
-      this.message('Kein Mörser gewählt');
+      this.message('Kein Mörser und keine Artillerie gewählt');
       this.setMode('normal');
       return;
     }
@@ -1115,7 +1115,7 @@ export class Controller {
       case 'routeTo':
         return 'Pendeln: Ziel-FOB anklicken · Esc bricht ab';
       case 'mortarTarget':
-        return 'Mörser: Ziel auf der Karte anklicken (Kreis zeigt Reichweite) · Esc bricht ab';
+        return 'Mörser / Artillerie: Ziel auf der Karte anklicken (Kreis zeigt Reichweite) · Esc bricht ab';
       case 'dropoff':
         return 'Absetzen: Zielpunkt anklicken · Esc bricht ab';
       case 'landAt':
@@ -1245,6 +1245,22 @@ export class Controller {
           enabled: p.ok || deployers.length > 1,
           reason: p.reason,
           action: () => this.issue({ type: 'deploy', ids: deployers.map((u) => u.id) }),
+        }),
+      );
+    }
+    const guns = units.filter((u) => u.def.indirect);
+    if (guns.length) {
+      const w = guns[0].weapons.find((x) => x.spec.shell)?.spec;
+      card.push(
+        entry('Feuer auf Punkt', 'G', {
+          tip: `Artillerie (G): Punkt anklicken; die Panzerhaubitze schießt dorthin (${w?.minRange ?? 0}–${w?.range ?? 0} px), bis du das Ziel löschst, sie bewegst oder stoppst. Ohne Ziel feuert sie selbst auf Gegner, die dein Team sieht.`,
+          action: () => this.setMode('mortarTarget'),
+        }),
+        entry('Ziel löschen', 'C', {
+          tip: 'Feuerziel löschen (C): die Artillerie sucht wieder selbst Ziele',
+          enabled: guns.some((u) => u.fireTarget),
+          reason: 'Kein Ziel gewählt',
+          action: () => this.issue({ type: 'mortarTarget', ids: guns.map((u) => u.id) }),
         }),
       );
     }

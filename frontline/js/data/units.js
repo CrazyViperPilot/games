@@ -341,12 +341,57 @@ export const UNITS = {
     fuelMax: 40,
     hotkey: 'N',
   },
+  // Flakpanzer Gepard (seit v5.18): Zwillings-Maschinenkanone mit Such- und Feuerleitradar. Trifft auch schnelle Flugzeuge (speedRef
+  // hoch, siehe BALANCE.airFire), weite Sicht (Radar); gegen leichte Bodenziele brauchbar, gegen Panzer kaum. Bevorzugt Luftziele.
+  gepard: {
+    name: 'Flakpanzer Gepard',
+    short: 'Gepard', // Kurzname in der Befehlskarte
+    slots: 3,
+    armor: 'light',
+    hp: 450,
+    speed: 62,
+    radius: 13,
+    sight: 480,
+    weapons: [
+      { id: 'twin35', name: 'Zwillingskanone 35 mm', range: 420, cooldown: 0.35, rounds: 80, munCost: 8, hitChance: 0.8, speedRef: 400, targets: ['air'], damage: { inf: 8, light: 14, heavy: 2, struct: 6, air: 32, jet: 32 } },
+    ],
+    cost: { money: 650 },
+    buildTime: 16,
+    producedAt: 'fob',
+    fuelPerSec: 0.35,
+    fuelMax: 45,
+    hotkey: 'P',
+  },
+  // Panzerhaubitze (seit v5.18, nach der Panzerhaubitze 2000): Artillerie. Schießt Granaten (shell) weit über das Gefecht, nicht näher als
+  // minRange; Ziele muss das Team sehen (eigene Einheiten oder Gebäude). Splash-Schaden um den Einschlag, Streuung spread px
+  // (Forschung „acc“ verkleinert sie), Fluggeschwindigkeit shellSpeed px/s. Auch Feuer auf einen Punkt (G, wie der Mörser).
+  pzh: {
+    name: 'Panzerhaubitze',
+    short: 'PzH', // Kurzname in der Befehlskarte
+    slots: 4,
+    armor: 'light',
+    hp: 500,
+    speed: 50,
+    radius: 14,
+    sight: 280,
+    indirect: true, // Zielsuche über die Reichweite (Sicht des Teams), nicht über die eigene Sicht
+    weapons: [
+      { id: 'howitzer', name: 'Haubitze 155 mm', range: 1400, minRange: 260, cooldown: 7, rounds: 30, munCost: 25, shell: true, splash: 75, spread: 70, shellSpeed: 480, damage: { inf: 90, light: 110, heavy: 80, struct: 140 } },
+    ],
+    cost: { money: 900 },
+    buildTime: 22,
+    producedAt: 'fob',
+    fuelPerSec: 0.35,
+    fuelMax: 40,
+    hotkey: 'O',
+  },
 };
 
 // Abgeleitete Gesamtwerte aus den Waffen: größte Reichweite, bester Schaden je Klasse, Munitionswert des vollen Vorrats.
 for (const def of Object.values(UNITS)) {
   if (!def.weapons) continue;
   def.range = Math.max(...def.weapons.map((w) => w.range));
+  def.minRange = Math.max(0, ...def.weapons.map((w) => w.minRange ?? 0)); // Artillerie: nicht näher
   def.cooldown = def.weapons[0].cooldown;
   def.damage = {};
   for (const w of def.weapons) {

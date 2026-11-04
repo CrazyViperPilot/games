@@ -8,7 +8,7 @@ export const CITY = {
   // Gebiet (seit v4.82): gebaut werden darf nur in Zellen im eigenen Gebiet. Radien in Zellen.
   territory: { main: 10, fob: 4, building: 2, interval: 1 }, // um die Hauptstadt, um jede andere fertige FOB, um jedes fertige Stadtgebäude; Neuberechnung alle interval s
   // Einwohner als Truppen (seit v4.82): ausgebildete Einheiten brauchen so viele freie Einwohner (Startarmee und Nachschub nicht)
-  crew: { default: 1, fobTruck: 2, ifv: 3, tank: 3, flak: 2, sam: 2, littlebird: 2, transporter: 2, gunship: 2, f16: 2 },
+  crew: { default: 1, fobTruck: 2, ifv: 3, tank: 3, flak: 2, sam: 2, gepard: 3, pzh: 4, littlebird: 2, transporter: 2, gunship: 2, f16: 2 },
   // Flucht (seit v4.82): Wohnzellen in der Konfliktzone leeren sich, wenn in ihnen oder den Nachbarzellen geschossen wird
   flee: { reach: 1, calm: 60 }, // Nachbarschaft (Zellen) und Ruhezeit (s), bis die Bewohner zurückziehen dürfen
   startStock: { bm: 1500, mun: 600, fuel: 1000 }, // Startlager der Hauptstadt bei eingeschalteter Stadt (sonst unendlich)
@@ -33,7 +33,7 @@ export const CITY = {
   // Geld aus der Kasse, Metall aus dem Stadtlager, Einwohner als Truppen; kein LKW nötig, egal wo sie stehen.
   produces: {
     barracks: ['rifleman', 'at', 'sniper', 'commander'], // Kaserne: Soldaten
-    factory: ['truck', 'engineer', 'fobTruck', 'ifv', 'tank', 'flak', 'sam'], // Fabrikhalle: alle Fahrzeuge (auch das FOB-Fahrzeug)
+    factory: ['truck', 'engineer', 'fobTruck', 'ifv', 'tank', 'flak', 'sam', 'gepard', 'pzh'], // Fabrikhalle: alle Fahrzeuge (auch das FOB-Fahrzeug)
     heliport: ['littlebird', 'transporter', 'gunship'], // Heliport: Hubschrauber
     airport: ['f16'], // Flughafen (seit v5.03): Kampfflugzeuge, die dort auch landen, tanken und nachladen (BALANCE.jets)
   },
@@ -78,7 +78,7 @@ export const CITY = {
   startQuarter: { road: 12, row: ['res', 'fuel', null, 'res'], big: [['barracks', 0], ['factory', 4]] }, // Straßenlänge, die Zellen darunter, die Großbauten darüber
   startMetal: 400, // Metall im Hauptlager zu Beginn (Metall bleibt dort, LKW fahren es nicht)
   // Metall je ausgebildeter Einheit (zusätzlich zum Geld); fehlt die Sorte, kostet sie kein Metall
-  metalCost: { truck: 20, engineer: 20, fobTruck: 80, ifv: 60, tank: 120, flak: 60, sam: 80, littlebird: 60, transporter: 80, gunship: 120, f16: 160 },
+  metalCost: { truck: 20, engineer: 20, fobTruck: 80, ifv: 60, tank: 120, flak: 60, sam: 80, gepard: 100, pzh: 140, littlebird: 60, transporter: 80, gunship: 120, f16: 160 },
   // Markt: handelt in Losen; verkaufen bringt wenig, kaufen kostet viel (Geld je Los)
   market: { lot: 100, sell: { bm: 20, mun: 30, fuel: 30, metal: 40 }, buy: { bm: 80, mun: 120, fuel: 120, metal: 160 } },
 

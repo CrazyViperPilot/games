@@ -1,4 +1,4 @@
-// Forschungsbaum (seit v5.04, PRD §7 „Forschung“): 10 Stufen, 7 Äste, je Ast und Stufe eine Verbesserung (70 insgesamt).
+// Forschungsbaum (seit v5.04, PRD §7 „Forschung“): 10 Stufen, 8 Äste (seit v5.18), je Ast und Stufe eine Verbesserung (80 insgesamt).
 // Inspiration: die Freischaltungen der Fahrzeuge in Battlefield 4 / Battlefield 6 (Optik, Munition, Panzerung, Gegenmaßnahmen,
 // Wartung) und die Ausbaustufen aus Wardogs, als Baum wie in Civilization (Stufen als Spalten, Äste als Zeilen, Linien zum Vorgänger).
 // Regeln: Auf jeder Stufe müssen perTier Forschungen fertig sein, bevor Stufe + 1 offen ist. Jede Forschung braucht ihren Vorgänger
@@ -7,12 +7,12 @@
 //
 // Wirkung fx: { Gruppe: { Wert: Faktor } }. Faktoren mehrerer Forschungen multiplizieren sich (regen addiert sich).
 //   Gruppen: inf Infanterie · tank Kampfpanzer · ifv Schützenpanzer · aa Flak und SAM · log LKW und Baufahrzeug · heli Hubschrauber ·
-//   jet Kampfflugzeuge · veh alle Bodenfahrzeuge · air Hubschrauber und Jets · all alle Einheiten · bld Militärgebäude (FOB, Mörser,
+//   jet Kampfflugzeuge · spaa Flakpanzer Gepard · art Panzerhaubitze · veh alle Bodenfahrzeuge · air Hubschrauber und Jets · all alle Einheiten · bld Militärgebäude (FOB, Mörser,
 //   Flugabwehr, Phalanx, Gefechtsturm, Mauern, Bohrer, Sendemast); Stadtgebäude zählen nicht.
 //   Werte: range Waffenreichweite · sight Sicht · dmg Schaden · dmgInf / dmgVeh / dmgAir Schaden gegen Infanterie / Fahrzeuge
 //   (und Gebäude) / Luftziele · rof Nachladezeit (kleiner = schneller) · armor erlittener Schaden (kleiner = besser; ein Schuss, der das
 //   unverletzte Ziel sofort tötet, bleibt tödlich) · speed Tempo · fuel Treibstoffverbrauch (kleiner = größere Reichweite) · acc
-//   Trefferchance gelenkter Waffen (Flak, SAM, Raketen der F-16, Abfangen) · evade Trefferchance gegnerischer gelenkter Waffen ·
+//   Trefferchance gelenkter Waffen (Flak, SAM, Gepard, Raketen der F-16, Abfangen; bei der Artillerie: Streuung ÷ acc) · evade Trefferchance gegnerischer gelenkter Waffen ·
 //   regen Selbstheilung (Anteil der HP je s, nach 6 s ohne Treffer) · rearm Bodenzeit der Jets · build Bautempo · repair Reparatur ·
 //   abilityCd Abklingzeit von Nebel und Minen.
 //   unlock: schaltet eine Fähigkeit frei (smoke Nebelwand, mines Minen, autoturret Dachwaffen ohne Besatzung).
@@ -23,10 +23,10 @@ export const RESEARCH = {
   queueMax: 3, // so viele Forschungen dürfen hinter der laufenden warten (bezahlt beim Einreihen, Abbruch erstattet)
   money: [250, 350, 450, 550, 700, 850, 1000, 1200, 1400, 1600], // Preis je Stufe (Geld)
   time: [30, 38, 46, 54, 62, 70, 78, 86, 94, 102], // Forschungszeit je Stufe (s, ohne Rechenzentrum)
-  // Einheit → Gruppe (fehlt = keine eigene Gruppe, dann gelten nur all, veh und air)
+  // Einheit → Gruppe oder Liste von Gruppen (fehlt = keine eigene Gruppe, dann gelten nur all, veh und air); der Gepard zählt auch zu aa
   groups: {
     rifleman: 'inf', at: 'inf', sniper: 'inf', commander: 'inf',
-    tank: 'tank', ifv: 'ifv', flak: 'aa', sam: 'aa', truck: 'log', engineer: 'log',
+    tank: 'tank', ifv: 'ifv', flak: 'aa', sam: 'aa', gepard: ['spaa', 'aa'], pzh: 'art', truck: 'log', engineer: 'log',
     littlebird: 'heli', transporter: 'heli', gunship: 'heli', f16: 'jet',
   },
   // Äste in Reihenfolge der Zeilen im Menü; je Ast 10 Forschungen (Stufe 1 bis 10)
@@ -77,6 +77,22 @@ export const RESEARCH = {
         { name: 'Panzerabwehrlenkwaffe', short: 'PAL', fx: { ifv: { dmgVeh: 1.2, range: 1.06 } } },
         { name: 'Allradantrieb', short: 'Allrad', fx: { ifv: { speed: 1.1 }, aa: { speed: 1.1 } } },
         { name: 'Vernetzte Flugabwehr', short: 'Vernetzt', fx: { aa: { dmg: 1.15, acc: 1.1 }, ifv: { armor: 0.92 } } },
+      ],
+    },
+    art: {
+      name: 'Artillerie und Gepard',
+      icon: '🎯',
+      items: [
+        { name: 'Ballistikrechner', short: 'Ballistik', fx: { art: { range: 1.08 } } },
+        { name: 'Zusatztanks', short: 'Tanks', fx: { art: { fuel: 0.85 }, spaa: { fuel: 0.85 } } },
+        { name: 'Zielfolgeradar', short: 'Radar', fx: { spaa: { range: 1.08, sight: 1.1 } } },
+        { name: 'Wetter- und Vermessungsdaten', short: 'Vermessung', fx: { art: { acc: 1.25 } } },
+        { name: 'Automatischer Lader', short: 'Lader', fx: { art: { rof: 0.85 }, spaa: { rof: 0.92 } } },
+        { name: 'Programmierbare Zerlegemunition', short: 'Zerlegem.', fx: { spaa: { acc: 1.12, dmg: 1.1 } } },
+        { name: 'Minenschutz und Zusatzpanzerung', short: 'Schutz', fx: { art: { armor: 0.9 }, spaa: { armor: 0.9 } } },
+        { name: 'Reichweitengesteigerte Granaten', short: 'Reichw.', fx: { art: { range: 1.12 } } },
+        { name: 'Feuerleitrechner mit Laser', short: 'Feuerleit.', fx: { spaa: { rof: 0.88, range: 1.06 } } },
+        { name: 'GPS-gelenkte Granaten', short: 'GPS', fx: { art: { acc: 1.4, dmg: 1.1 } } },
       ],
     },
     air: {
