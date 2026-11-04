@@ -160,6 +160,25 @@ export function drawUnit(ctx, u, color, zoom = 1, aim = null, now = 0, iso = fal
     ctx.fillStyle = light;
     ctx.fillRect(4, -5, 5, 10);
     ctx.strokeRect(4, -5, 5, 10);
+  } else if (u.type === 'fobTruck') {
+    // FOB-Fahrzeug: langer Sattelzug mit Container (gelbe Streifen) und Antennenmast in Teamfarbe
+    ctx.rotate(hull);
+    ctx.fillStyle = '#23272a';
+    ctx.fillRect(-13, -8, 26, 2);
+    ctx.fillRect(-13, 6, 26, 2);
+    ctx.fillStyle = dark;
+    ctx.fillRect(-13, -7, 19, 14);
+    ctx.strokeRect(-13, -7, 19, 14);
+    ctx.fillStyle = '#c9a227';
+    for (const x of [-10, -4, 2]) ctx.fillRect(x, -7, 2, 14);
+    ctx.fillStyle = light;
+    ctx.fillRect(7, -6, 6, 12);
+    ctx.strokeRect(7, -6, 6, 12);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(-7, 0, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
   } else if (u.type === 'engineer') {
     // Baufahrzeug: Wanne mit Ketten, Kabine und Kran-Arm mit Schaufel nach vorn
     ctx.rotate(hull);

@@ -138,6 +138,29 @@ export const UNITS = {
     seats: 1,
     hotkey: 'R',
   },
+  fobTruck: {
+    name: 'FOB-Fahrzeug',
+    short: 'FOB-Fz.', // Kurzname in der Befehlskarte
+    slots: 2,
+    armor: 'light',
+    hp: 600,
+    speed: 60,
+    radius: 14,
+    sight: 260,
+    range: 0,
+    cooldown: 0,
+    damage: null,
+    cost: { money: 500 },
+    buildTime: 30,
+    producedAt: 'fob',
+    ammoPerShot: 0,
+    fuelPerSec: 0.4,
+    fuelMax: 50,
+    // Knopf „Aufbauen“ (Befehl deploy): wird an seiner Stelle sofort zur fertigen FOB (ohne Bauzeit);
+    // sie startet mit BALANCE.fob.startStock (QUICK.fobStartStock) ihres Lagers je Sorte. Seit v5.09 das einzige Mittel für neue FOBs.
+    deploys: 'fob',
+    hotkey: 'B',
+  },
   ifv: {
     name: 'Schützenpanzer',
     short: 'SPz', // Kurzname in der Befehlskarte

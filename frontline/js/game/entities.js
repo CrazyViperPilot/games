@@ -93,7 +93,7 @@ export function lacksAmmo(u) {
  * Zusätzliche Felder: main (Hauptstadt: bildet alle Einheiten aus, Verlust = Niederlage), infinite (unendliches Lager; bei der Hauptstadt),
  * produces (ausbildbare Einheiten; nur die Hauptstadt),
  * store (FOB-Lager, Baustellen nutzen es ebenfalls),
- * payerId (Lager, aus dem bezahlt wurde – für Erstattung), supplied (FOB-Baustelle hat ihr Material),
+ * payerId (Lager, aus dem bezahlt wurde – für Erstattung),
  * warnTime (Meldungszeit „Baustelle wartet …“).
  */
 export function createBuilding(id, type, team, cx, cy, tile) {
@@ -135,7 +135,6 @@ export function createBuilding(id, type, team, cx, cy, tile) {
     payerId: null,
     fireTarget: null, // Mörser: gewähltes Ziel {x, y}
     drill: def.drill ? { builtAt: null, state: 'warmup', endAt: 0, readyAt: 0, activatedAt: 0, frac: 0 } : null, // Bohrer
-    supplied: type !== 'fob', // FOB-Baustelle: erst nach 400 Baumaterial im eigenen Lager
     warnTime: -1e9,
     // Gefechtsturm: Besatzung (wie ein Stadthaus), Dachaufbau (roof) und laufender Aufbau (roofJob)
     ...(def.cap ? { occupants: [], pw: w * tile, ph: h * tile, reach: def.reach, roof: null, roofJob: null } : {}),

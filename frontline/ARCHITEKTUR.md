@@ -107,7 +107,7 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 | `stop` | `ids` | `game.js` | Anhalten |
 | `build` | `building, x, y, ids` oder `siteId, ids` | `game.js` `cmdBuild` | Baustelle setzen bzw. an Baustelle helfen |
 | `buildWall` | `building, x1, y1, x2, y2, ids` | `game.js` `cmdBuildWall` | Mauer- oder Torlinie |
-| `buildFob` | `ids, x, y` | `game.js` `cmdBuildFob` | FOB-Baustelle setzen |
+| `deploy` | `ids`, optional `x, y` (≤ `fob.deploySnap` vom Fahrzeug) | `game.js` `cmdDeploy` | FOB-Fahrzeug wird an seiner Stelle (oder der nächsten freien) zur fertigen FOB (seit v5.09; `buildFob` antwortet nur noch mit einem Fehler) |
 | `repair` | `ids, targetId` | `construction.js` `cmdRepair` | Gebäude reparieren |
 | `repairBridge` | `ids, bridgeId` | `river.js` `cmdRepairBridge` | Brücke wieder aufbauen |
 | `load`, `unload` | `ids, fobId, preset?` | `logistics.js` | LKW an einer FOB laden / entladen |

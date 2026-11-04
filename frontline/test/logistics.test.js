@@ -288,17 +288,6 @@ test('Befehle: Route braucht zwei eigene FOBs, Ladung nur für LKW; Preset wechs
   assert.equal(g.issue(0, { type: 'setPreset', ids: [truck.id], preset: '1' }).ok, false);
 });
 
-test('LKW baut keine FOB mehr (buildFob nur mit Baufahrzeug)', () => {
-  const g = mk({ seed: 7 });
-  const f = fobOf(g, 0);
-  silence(g, 0);
-  const truck = g.spawnUnit('truck', 0, f.x + 60, f.y);
-  const p = freeFobSpot(g, 0, f.x, f.y, 950, 1300);
-  const r = g.issue(0, { type: 'buildFob', ids: [truck.id], x: p.x, y: p.y });
-  assert.equal(r.ok, false);
-  assert.equal(r.reason, 'Nur Baufahrzeuge gründen FOB-Baustellen');
-});
-
 test('Mauer per LKW-Ladung außerhalb des FOB-Radius: Ladung zahlt, Lager der FOB unberührt', () => {
   const g = mk({ seed: 7 });
   const f = fobOf(g, 0);

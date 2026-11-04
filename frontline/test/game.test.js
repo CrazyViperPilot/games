@@ -436,51 +436,57 @@ test('Soldaten tragen wenig Baumaterial: reicht es nicht, baut nichts; in der FO
   assert.equal(f.store.bm, bm0 - BUILDINGS.wall.cost.bm);
 });
 
-test('buildFob: Baufahrzeug setzt sofort eine FOB-Baustelle, kostet nichts und braucht 400 Material im Lager', () => {
+test('FOB-Fahrzeug: Hauptstadt bildet es aus, Aufbauen macht sofort eine fertige FOB mit 20 % Lager', () => {
   const g = mk({ seed: 7 });
   const f = fobOf(g, 0);
-  const eng = unitsOf(g, 0, 'engineer')[0];
+  assert.ok(f.produces.includes('fobTruck'), 'Hauptstadt bildet FOB-Fahrzeuge aus');
   const spot = findSpot(g, 0, 'fob', f.x, f.y, 950, 1300);
   assert.ok(spot, 'freie FOB-Stelle');
-  const bmBefore = g.teams[0].res.bm;
+  const v = g.spawnUnit('fobTruck', 0, spot.x, spot.y);
+  const fobs = () => g.buildings.filter((b) => b.alive && b.team === 0 && b.type === 'fob').length;
+  const n0 = fobs();
 
-  const r = g.issue(0, { type: 'buildFob', ids: [eng.id], x: spot.x, y: spot.y });
+  // zu nah an der Hauptstadt: geht nicht, das Fahrzeug bleibt
+  const near = g.spawnUnit('fobTruck', 0, f.x + 200, f.y);
+  const bad = g.issue(0, { type: 'deploy', ids: [near.id] });
+  assert.equal(bad.ok, false);
+  assert.equal(bad.reason, 'Zu nah an einer eigenen FOB');
+  assert.equal(near.alive, true);
+
+  const r = g.issue(0, { type: 'deploy', ids: [v.id] });
   assert.equal(r.ok, true, r.reason);
-  const site = g.getEntity(r.id);
-  assert.equal(site.built, false);
-  assert.equal(site.supplied, false);
-  assert.equal(g.teams[0].res.bm, bmBefore, 'nichts bezahlt');
+  const fob = g.getEntity(r.ids[0]);
+  assert.equal(fob.built, true, 'sofort fertig, ohne Bauzeit');
+  assert.equal(fob.hp, fob.maxHp);
+  const share = Math.round(BALANCE.logistics.storeCap * BALANCE.fob.startStock);
+  assert.equal(share, 600);
+  assert.deepEqual(fob.store, { bm: share, mun: share, fuel: share });
+  assert.equal(v.alive, false, 'das Fahrzeug ist jetzt die FOB');
+  run(g, 1);
+  assert.equal(fobs(), n0 + 1);
+  assert.equal(g.getEntity(v.id), null);
 
-  // ohne Material: kein Fortschritt, auch mit Baufahrzeug vor Ort
-  run(g, 60);
-  assert.equal(site.built, false, 'wartet auf Material');
-  assert.equal(site.progress, 0);
-  assert.ok(g.drainEvents().some((e) => e.text === 'Baustelle wartet auf Material'));
-
-  // 400 Baumaterial in das Lager der Baustelle (wie per LKW): Fortschritt mit Baufahrzeug, dann fertig
-  site.store.bm = 400;
-  run(g, 25);
-  assert.equal(site.supplied, true);
-  assert.equal(site.store.bm, 0, 'die 400 wurden verbraucht');
-  run(g, 15);
-  assert.equal(site.built, true, 'FOB (30 s) fertig');
-  assert.equal(g.buildings.filter((b) => b.team === 0 && b.type === 'fob' && b.built).length, 2);
+  // blockierte Stelle (Mauer unter dem Fahrzeug): die FOB entsteht auf der nächsten freien Stelle daneben
+  const spot2 = findSpot(g, 0, 'fob', f.x, f.y, 1900, 2600);
+  assert.ok(spot2, 'zweite FOB-Stelle');
+  const v2 = g.spawnUnit('fobTruck', 0, spot2.x, spot2.y);
+  const wall = g.spawnBuilding('wall', 0, g.grid.toCell(v2.x), g.grid.toCell(v2.y), { built: true });
+  const r2 = g.issue(0, { type: 'deploy', ids: [v2.id] });
+  assert.equal(r2.ok, true, r2.reason);
+  const fob2 = g.getEntity(r2.ids[0]);
+  assert.ok(Math.hypot(fob2.x - v2.x, fob2.y - v2.y) <= BALANCE.fob.deploySnap + 48, 'nahe am Fahrzeug');
+  assert.ok(!(wall.cx >= fob2.cx && wall.cx < fob2.cx + 3 && wall.cy >= fob2.cy && wall.cy < fob2.cy + 3), 'nicht auf der Mauer');
 });
 
-test('buildFob: ohne Baufahrzeug in Reichweite wartet die Baustelle, auch mit Material', () => {
+test('Baufahrzeug baut keine FOB mehr', () => {
   const g = mk({ seed: 7 });
   const f = fobOf(g, 0);
-  const spot = findSpot(g, 0, 'fob', f.x, f.y, 950, 1300);
-  const site = g.spawnBuilding('fob', 0, g.canPlace(0, 'fob', spot.x, spot.y).cx, g.canPlace(0, 'fob', spot.x, spot.y).cy, { built: false });
-  site.store.bm = 400;
-  // das Start-Baufahrzeug ist weit weg und hat keinen Auftrag
   const eng = unitsOf(g, 0, 'engineer')[0];
-  eng.x = f.x - 1200;
-  eng.y = f.y + 1200;
-  run(g, 40);
-  assert.equal(site.built, false);
-  assert.equal(site.progress, 0);
-  assert.ok(g.drainEvents().some((e) => e.text === 'Baustelle wartet auf Bauer'));
+  const spot = findSpot(g, 0, 'fob', f.x, f.y, 950, 1300);
+  const r = g.issue(0, { type: 'buildFob', ids: [eng.id], x: spot.x, y: spot.y });
+  assert.equal(r.ok, false);
+  assert.equal(g.issue(0, { type: 'build', ids: [eng.id], building: 'fob', x: spot.x, y: spot.y }).ok, false);
+  assert.equal(g.issue(0, { type: 'deploy', ids: [eng.id] }).ok, false, 'Baufahrzeug kann nicht aufbauen');
 });
 
 test('Reparatur: Baufahrzeug heilt, kostet Baumaterial aus dem Lager des Zahlers', () => {

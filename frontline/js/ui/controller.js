@@ -21,7 +21,7 @@ const WALL_MAX = 40; // max. Zellen je Mauerzug (Vorschau und Befehl)
 const DOUBLE_MS = 350; // Doppelklick auf einen Typ = alle dieses Typs im Bild
 const GROUP_DOUBLE_MS = 500; // Gruppentaste zweimal = Kamera hin
 const PICK_PX = 16; // Trefferradius in Bildschirm-Pixeln
-const TARGET_MODES = ['board', 'storm', 'place', 'wall', 'attackMove', 'fobTarget', 'loadFob', 'unloadFob', 'routeFrom', 'routeTo', 'mortarTarget', 'dropoff'];
+const TARGET_MODES = ['board', 'storm', 'place', 'wall', 'attackMove', 'loadFob', 'unloadFob', 'routeFrom', 'routeTo', 'mortarTarget', 'dropoff'];
 const BUILD_MENU = Object.keys(BUILDINGS).filter((k) => BUILDINGS[k].hotkey && BUILDINGS[k].buildable !== false);
 // Befehle, die der Ton quittiert (Marsch, Angriff, Bau …); Ausbildung und Forschung melden sich über ihre Meldungen
 const FORTIFY_KEYS = [['sandbags', 'Z'], ['mgnest', 'N'], ['wire', 'W']];
@@ -30,7 +30,7 @@ const FORTIFY_TIPS = {
   mgnest: 'Die Besatzer schießen schneller.',
   wire: 'Stürmer machen nur 60 % Schaden.',
 };
-const ORDER_SOUND = new Set(['move', 'attackMove', 'attack', 'garrison', 'ungarrison', 'storm', 'fortifyHouse', 'board', 'pickup', 'deliver', 'load', 'unload', 'route', 'build', 'repair', 'buildFob', 'buildWall', 'mortarTarget', 'dropoff', 'repairBridge']);
+const ORDER_SOUND = new Set(['move', 'attackMove', 'attack', 'garrison', 'ungarrison', 'storm', 'fortifyHouse', 'board', 'pickup', 'deliver', 'load', 'unload', 'route', 'build', 'repair', 'deploy', 'buildWall', 'mortarTarget', 'dropoff', 'repairBridge']);
 const RES_KEYS = ['money', 'bm', 'mun', 'fuel'];
 const CARGO_KEYS = ['bm', 'mun', 'fuel']; // Lagersorten (FOB-Lager, LKW-Ladung)
 const SHORT = { money: 'G', bm: 'BM', mun: 'MUN', fuel: 'TS' };
@@ -475,9 +475,6 @@ export class Controller {
       case 'attackMove':
         this.confirmAttackMove(wx, wy, shift);
         return;
-      case 'fobTarget':
-        this.confirmFob(wx, wy, shift);
-        return;
       case 'loadFob':
         this.confirmTruckFob('load', wx, wy);
         return;
@@ -734,22 +731,7 @@ export class Controller {
     if (!shift) this.setMode('normal');
   }
 
-  /** Baufahrzeuge setzen eine FOB-Baustelle (keine Kosten; 400 Baumaterial kommen per LKW). */
-  confirmFob(wx, wy, shift) {
-    const ids = this.selectedUnits().filter((e) => e.type === 'engineer').map((e) => e.id);
-    if (!ids.length) {
-      this.message('Kein Baufahrzeug gewählt');
-      this.setMode('normal');
-      return;
-    }
-    const r = this.issue({ type: 'buildFob', ids, x: wx, y: wy });
-    if (!r.ok) return;
-    this.moveMarker(wx, wy);
-    if (shift) this.updatePointer(wx, wy);
-    else this.setMode('normal');
-  }
-
-  /** Laden oder Entladen: Klick auf eigene FOB (Entladen auch auf FOB-Baustelle). */
+  /** Laden oder Entladen: Klick auf eigene FOB. */
   confirmTruckFob(kind, wx, wy) {
     const ids = this.selectedUnits().filter(isCarrier).map((e) => e.id);
     if (!ids.length) {
@@ -759,7 +741,7 @@ export class Controller {
     }
     const fob = this.pickB(wx, wy, (e) => e.team === this.team && e.type === 'fob');
     if (!fob) {
-      this.message(kind === 'load' ? 'Eigene fertige FOB anklicken' : 'Eigene FOB oder FOB-Baustelle anklicken');
+      this.message('Eigene FOB anklicken');
       return;
     }
     if (this.issue({ type: kind, ids, fobId: fob.id }).ok) this.setMode('normal');
@@ -782,12 +764,12 @@ export class Controller {
     this.setMode('routeTo');
   }
 
-  /** Pendeln, Schritt 2: Ziel-FOB (oder Baustelle). */
+  /** Pendeln, Schritt 2: Ziel-FOB. */
   confirmRouteTo(wx, wy) {
     const ids = this.selectedUnits().filter(isCarrier).map((e) => e.id);
     const fob = this.pickB(wx, wy, (e) => e.team === this.team && e.type === 'fob');
     if (!fob) {
-      this.message('Ziel: eigene FOB oder FOB-Baustelle anklicken');
+      this.message('Ziel: eigene FOB anklicken');
       return;
     }
     if (fob.id === this.routeFromId) {
@@ -958,9 +940,6 @@ export class Controller {
       case 'place':
         this.view.placement = this.placementFor(this.placeType, wx, wy);
         break;
-      case 'fobTarget':
-        this.view.placement = this.placementFor('fob', wx, wy);
-        break;
       case 'wall':
         this.view.placement = this.wallPreview(wx, wy);
         break;
@@ -994,16 +973,6 @@ export class Controller {
       return;
     }
     this.setMode('attackMove');
-  }
-
-  /** Baumenü-Eintrag F: FOB-Baustelle setzen (Baufahrzeug gewählt). */
-  startFobTarget() {
-    if (!this.selectedUnits().some((e) => e.type === 'engineer')) {
-      this.message('Kein Baufahrzeug gewählt');
-      return;
-    }
-    this.setMode('fobTarget');
-    if (this.pointer) this.updatePointer(this.pointer.x, this.pointer.y);
   }
 
   /** LKW-Modi: 'loadFob' (L), 'unloadFob' (U), 'routeFrom' (T, Start-FOB). */
@@ -1101,16 +1070,14 @@ export class Controller {
         return `Mauer: Maus gedrückt halten und ziehen (max. ${WALL_MAX} Zellen)`;
       case 'attackMove':
         return 'Angriffsbewegung: Ziel anklicken (auf eine Brücke: sprengen) · Esc bricht ab';
-      case 'fobTarget':
-        return 'FOB-Baustelle: Standort anklicken · Esc bricht ab';
       case 'loadFob':
         return 'LKW laden: eigene fertige FOB anklicken · Esc bricht ab';
       case 'unloadFob':
-        return 'LKW entladen: eigene FOB oder FOB-Baustelle anklicken · Esc bricht ab';
+        return 'LKW entladen: eigene FOB anklicken · Esc bricht ab';
       case 'routeFrom':
         return 'Pendeln: Start-FOB (fertig) anklicken · Esc bricht ab';
       case 'routeTo':
-        return 'Pendeln: Ziel-FOB oder FOB-Baustelle anklicken · Esc bricht ab';
+        return 'Pendeln: Ziel-FOB anklicken · Esc bricht ab';
       case 'mortarTarget':
         return 'Mörser: Ziel auf der Karte anklicken (Kreis zeigt Reichweite) · Esc bricht ab';
       case 'dropoff':
@@ -1139,7 +1106,7 @@ export class Controller {
     return card;
   }
 
-  /** Baumenü: Baufahrzeug alles (plus F FOB-Baustelle), Infanterie nur Mauer/Tor. */
+  /** Baumenü: Baufahrzeug alles, Infanterie nur Mauer/Tor (FOBs: FOB-Fahrzeug, Aufbauen). */
   buildCard() {
     const perm = this.buildPermission();
     const card = [];
@@ -1156,15 +1123,6 @@ export class Controller {
             enabled: !reason,
             reason,
             action: () => this.beginPlacement(key),
-          }),
-        );
-      }
-      if (perm.level === 'all') {
-        card.push(
-          entry('FOB-Baustelle', 'F', {
-            cost: '400 BM',
-            tip: 'FOB-Baustelle: Standort anklicken. Danach 400 Baumaterial per LKW ins Lager der Baustelle, dann baut das Baufahrzeug (30 s).',
-            action: () => this.startFobTarget(),
           }),
         );
       }
@@ -1239,6 +1197,19 @@ export class Controller {
         );
       }
     }
+    const deployers = units.filter((u) => u.def.deploys);
+    if (deployers.length) {
+      const p = this.game.deploySpot(this.team, 'fob', deployers[0].x, deployers[0].y);
+      const share = Math.round(BALANCE.fob.startStock * 100);
+      card.push(
+        entry('Aufbauen', 'D', {
+          tip: `Aufbauen (D): das FOB-Fahrzeug wird an seiner Stelle (oder der nächsten freien daneben) sofort zur fertigen FOB, ohne Bauzeit. Sie startet mit ${share} % ihres Lagers je Sorte (${Math.round(BALANCE.logistics.storeCap * BALANCE.fob.startStock)} Baumaterial, Munition und Treibstoff). Abstand zu eigenen FOBs mindestens ${BALANCE.fob.minDistOwn} px, zu Gegnern ${BALANCE.fob.minDistEnemy} px, höchstens ${BALANCE.fob.max} FOBs.`,
+          enabled: p.ok || deployers.length > 1,
+          reason: p.reason,
+          action: () => this.issue({ type: 'deploy', ids: deployers.map((u) => u.id) }),
+        }),
+      );
+    }
     const riders = units.filter((u) => u.def.canRide);
     if (riders.length) {
       card.push(
@@ -1256,7 +1227,7 @@ export class Controller {
           action: () => this.startTruckMode('loadFob'),
         }),
         entry('Entladen', 'U', {
-          tip: 'Entladen (U): eigene FOB oder FOB-Baustelle anklicken',
+          tip: 'Entladen (U): eigene FOB anklicken',
           action: () => this.startTruckMode('unloadFob'),
         }),
         entry('Pendeln', 'T', {

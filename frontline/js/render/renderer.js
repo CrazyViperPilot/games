@@ -57,7 +57,6 @@ const H = BALANCE.map.height;
 const BG = '#0d110d';
 const BG_RGB = [13, 17, 13];
 const ACCENT = '#c9a227';
-const SITE_BM = BALANCE.construction.fobMaterial; // Material, das eine FOB-Baustelle braucht
 const CARGO_COLOR = { bm: '#a0703f', mun: '#d9b600', fuel: '#9b7bc4' }; // LKW-Ladung je Sorte
 const AMMO_COLOR = '#7f93ad'; // Munitionsbalken (grau-blau)
 const FUEL_COLOR = '#9b7bc4'; // Treibstoffbalken (violett)
@@ -1192,20 +1191,11 @@ export class Renderer {
     ctx.restore();
   }
 
-  /**
-   * Eigene Baustelle: FOB-Baustelle mit Materialbalken x/400 über dem Gebäude; ohne Bauer ein graues „!“ an der Ecke.
-   */
+  /** Eigene Baustelle: ohne Bauer ein graues „!“ an der Ecke. */
   drawSiteMarks(ctx, b, z) {
     const x0 = b.cx * TILE;
     const y0 = b.cy * TILE;
     const w = b.w * TILE;
-    if (b.type === 'fob' && !b.supplied) {
-      const yb = y0 - 7 / z;
-      const have = Math.min(SITE_BM, Math.floor(b.store.bm));
-      drawBar(ctx, x0, yb, w, 4 / z, b.store.bm / SITE_BM, CARGO_COLOR.bm);
-      ctx.fillStyle = 'rgba(255,255,255,0.9)';
-      fitText(ctx, `${have}/${SITE_BM}`, x0 + w / 2, yb - 7 / z, 10, z, w * 1.2);
-    }
     if (builderState(this.game, b) === 'none') {
       ctx.save();
       ctx.fillStyle = '#8c8f89';

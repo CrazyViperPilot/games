@@ -71,7 +71,7 @@ Darunter listet ein Inhaltsverzeichnis alle weiteren Abschnitte.
 | Startarmee | balance.js | `QUICK.startUnits` |
 | Kostenloser Soldaten-Nachschub | balance.js | `QUICK.reinforceEvery`, weitere in `BALANCE.reinforce` |
 | Zahl der FOBs / Bauradius, Mindestabstände | balance.js | `QUICK.maxFobs` / `BALANCE.fob` |
-| Baumaterial für eine FOB-Baustelle / Bau- und Reparaturtempo | balance.js | `QUICK.fobMaterial` / `BALANCE.construction` |
+| Startvorrat einer neuen FOB (Anteil des Lagers) / FOB-Fahrzeug (Preis, Tempo) / Bau- und Reparaturtempo | balance.js / units.js / balance.js | `QUICK.fobStartStock` / `UNITS.fobTruck` / `BALANCE.construction` |
 | Lagergröße vordere FOB / Hauptstadt, LKW-Ladung / Lade- und Nachfüllraten | balance.js | `QUICK.storeCap` / `QUICK.capitalCap`, `QUICK.truckLoad` / `BALANCE.logistics` |
 | Gleichzeitige Ausbildungen / Länge der Warteschlange | balance.js | `QUICK.trainSlots` / `QUICK.queueMax` |
 | Preis, Ausbildungszeit, HP, Tempo, Sicht einer Einheit | units.js | `cost`, `buildTime`, `hp`, `speed`, `sight` |
@@ -108,7 +108,7 @@ Wo jedes Feature liegt. „KI“ = Konstanten-Präfix in `js/data/ai.js`, Logik 
 | Konfliktzone, Punkte, Zonengeld | §7 | `zone`, `pointInterval` | `zone.js` | `WAVE_*`, `THREAT_*` | `renderer.js`, `hud.js` | `economy.test.js`, `game.test.js` |
 | Hot Zone und Bohrer | §7 „Hot Zone“, „Bohrer“ | `hot`, `BUILDINGS.drill` | `hotzone.js` | – | `renderer.js`, `hud.js` | `game.test.js` |
 | Lager, LKW, Nachfüllen, Transport, Einsteigen | §3 | `logistics` | `logistics.js` | `SUPPLY_*`, `SURPLUS_MIN`, `ROUTE_HOLD` | `renderer.js`, `controller.js` | `logistics.test.js` |
-| Bauen, Reparieren, FOB-Baustellen | §4, §5 | `construction`, `fob` | `construction.js`, `game.js` (`canPlace`, `cmdBuild`) | `difficulty.fobCap`, `RELAY_STEP`, `FLANK_R`, `WALL_*` | `controller.js` (Baumenü), `sprites.js`, `isobuild.js`, Hauptstadt als Rathaus `cityhall.js` | `game.test.js` |
+| Bauen, Reparieren, neue FOBs (FOB-Fahrzeug, Aufbauen) | §4, §5 | `construction`, `fob`, `UNITS.fobTruck` | `construction.js`, `game.js` (`canPlace`, `cmdBuild`, `cmdDeploy`) | `difficulty.fobCap`, `FOBV_*`, `DEPLOY_REACH`, `RELAY_STEP`, `FLANK_R`, `WALL_*` (`expand`, `driveFobTruck`) | `controller.js` (Baumenü), `sprites.js`, `isobuild.js`, Hauptstadt als Rathaus `cityhall.js` | `game.test.js` |
 | Bewegung, Wegsuche, Raster | – | `slope.pathCost`, `leash` | `movement.js`, `pathfinding.js`, `grid.js` | – | – | `path.test.js` |
 | Formationen | §8 | `formation` | `formation.js` | Keil bei Angriffswellen | `controller.js` (Taste F) | `formation.test.js` |
 | Kampf, Waffen, Schaden, Treffer | §6 „Waffen“, „Treffer“ | `UNITS.*.weapons`, `BUILDINGS.*.weapon`, `height` | `combat.js`, `entities.js` | `FALLBACK_*`, `RAID_*` | `sprites.js` (Effekte) | `hits.test.js`, `game.test.js` |

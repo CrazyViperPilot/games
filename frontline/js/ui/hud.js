@@ -35,7 +35,6 @@ const PRESET_NAME = { mix: 'Gemischt', bm: 'Baumaterial', mun: 'Munition', fuel:
 const STORE_CAP = BALANCE.logistics.storeCap;
 const CAPITAL_CAP = BALANCE.logistics.capitalCap;
 const TRUCK_CAP = BALANCE.logistics.truckCapacity;
-const SITE_BM = BALANCE.construction.fobMaterial;
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const pct = (f) => `${Math.max(0, Math.min(1, f)) * 100}%`;
@@ -596,11 +595,8 @@ export class Hud {
     return `<div class="muted small">${esc(txt)}</div>`;
   }
 
-  /** Status einer Baustelle: Material (FOB-Baustelle), dann Baufahrzeug/Bauer, sonst Fortschritt. */
+  /** Status einer Baustelle: Baufahrzeug/Bauer, sonst Fortschritt. */
   siteStatus(b) {
-    if (b.type === 'fob' && !b.supplied && b.store.bm < SITE_BM) {
-      return `Wartet auf Material (${Math.min(Math.floor(b.store.bm), SITE_BM)}/${SITE_BM})`;
-    }
     const st = builderState(this.game, b);
     if (st === 'near') return `Im Bau · ${Math.floor(b.progress * 100)} %`;
     if (st === 'assigned') return 'Baufahrzeug unterwegs';

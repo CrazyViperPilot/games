@@ -26,7 +26,9 @@ import {
   RELAY_STEP,
   FLANK_R,
   RESERVE,
-  SITE_TIMEOUT,
+  FOBV_MAX,
+  DEPLOY_REACH,
+  FOBV_RETRY,
   BAD_TIME,
   ALARM_TIME,
   DRY,
@@ -88,7 +90,6 @@ import {
 } from '../data/ai.js'; // KI-Werte (js/data/ai.js)
 
 const DEF_RANGE = BALANCE.fob.buildRadius; // Bauradius = Verteidigungsradius einer FOB
-const FOB_COST = BALANCE.construction.fobMaterial; // Baumaterial, das eine FOB-Baustelle braucht
 const ZONE_FOB_R = BALANCE.zone.r * 0.6; // Zonen-FOB: Mittelpunkt höchstens so weit von der Zonenmitte
 const SCOUT_MONEY = UNITS.littlebird.cost.money; // Geld, ab dem ein Späher ausgebildet wird
 const KEYS = ['bm', 'mun', 'fuel'];
@@ -121,15 +122,16 @@ export class AI {
     this.budget = 0;
     this.corridor = null; // Gasse vor der Hauptstadt, in der nichts gebaut wird (Ausgang bleibt frei)
     this.badSites = []; // { x, y, until } fehlgeschlagene FOB-Ziele
-    this.siteSeen = new Map(); // FOB-Baustelle -> Zeitpunkt, seit dem sie auf Material wartet
+    this.fobGoal = new Map(); // FOB-Fahrzeug-ID -> { x, y, tries } Ziel, an dem es aufbaut
     this.rallyAt = new Map(); // Gebäude-ID -> zuletzt gesetzter Sammelpunkt
-    this.roles = new Map(); // LKW-ID -> 'lief' | 'pend' | 'vers'
+    this.roles = new Map(); // LKW-ID -> 'pend' | 'vers'
     this.routes = new Map(); // LKW-ID -> { fromId, toId, k, t0 } (Pendler)
     this.engTarget = new Map(); // Baufahrzeug-ID -> Baustelle, zu der es geschickt wurde
     this.supplyAt = new Map(); // Versorger-ID -> letzter Zielpunkt
     this.memo = new Map(); // Befehlsschlüssel -> Zeitpunkt (gegen Befehls-Spam)
     this.hadZoneFob = false; // eine Zonen-FOB (auch Baustelle) existierte im letzten Denkschritt
     this.saveForScout = false; // produce bildet keine Kampfeinheiten aus, bis der Späher bezahlt ist
+    this.saveForFob = false; // ebenso, bis das nächste FOB-Fahrzeug bezahlt ist
     this.saveForRadio = false; // ebenso, bis der Sendemast bezahlt ist
     this.saveForResearch = false; // ebenso, bis die nächste Stufe bezahlt ist
     this.scoutHome = false; // Späher fliegt zum Auftanken heim
@@ -164,13 +166,12 @@ export class AI {
     }
     const s = this.snapshot();
     this.budget = MAX_PLACE;
-    this.maintainSites(s);
     if (this.hadZoneFob && !s.zoneFob) this.zoneBan = this.game.time + 150;
     this.hadZoneFob = !!s.zoneFob;
     this.defend(s);
     this.retreat(s);
     this.fallBack(s);
-    this.expand(s); // FOB-Baustellen setzen (Material liefert der Lieferant)
+    this.expand(s); // FOB-Fahrzeuge ausbilden, hinschicken und aufbauen
     this.scout(s); // vor produce: der Späher bekommt das Geld zuerst
     this.buildRadio(s);
     this.replaceCommander(s);
@@ -217,10 +218,6 @@ export class AI {
       !!home &&
       (own.some((b) => dist(b.x, b.y, ax, ay) <= DEF_RANGE && b.lastHitTime > g.time - ALARM_TIME) ||
         enemies.some((e) => dist(e.x, e.y, ax, ay) <= DEF_RANGE));
-    // FOB-Baustellen, die noch auf ihr Baumaterial warten (Zonen-FOB zuerst)
-    const needMat = fobs
-      .filter((f) => !f.built && !f.supplied && f.store.bm < FOB_COST)
-      .sort((a, b) => (b === zoneFob) - (a === zoneFob) || a.id - b.id);
 
     return {
       own,
@@ -241,7 +238,7 @@ export class AI {
       trucks: units.filter((u) => u.type === 'truck').sort((a, b) => a.id - b.id),
       helis: units.filter((u) => u.type === 'transporter').sort((a, b) => a.id - b.id),
       engineers: units.filter((u) => u.type === 'engineer').sort((a, b) => a.id - b.id),
-      needMat,
+      fobTrucks: units.filter((u) => u.def.deploys).sort((a, b) => a.id - b.id),
       alarm,
     };
   }
@@ -495,43 +492,57 @@ export class AI {
     }
   }
 
-  // ---- FOB-Baustellen --------------------------------------------------------------
+  // ---- Neue FOBs (FOB-Fahrzeuge, seit v5.09) ------------------------------------------
 
-  /** FOB-Baustellen, die zu lange auf Material warten, werden abgerissen (Stelle gesperrt). */
-  maintainSites(s) {
-    const g = this.game;
-    this.badSites = this.badSites.filter((b) => b.until > g.time);
-    for (const f of s.fobs) {
-      if (f.built || f.supplied || f.store.bm >= FOB_COST) {
-        this.siteSeen.delete(f.id);
-        continue;
-      }
-      if (!this.siteSeen.has(f.id)) this.siteSeen.set(f.id, g.time);
-      if (g.time - this.siteSeen.get(f.id) > SITE_TIMEOUT) {
-        this.siteSeen.delete(f.id);
-        this.badSites.push({ x: f.x, y: f.y, until: g.time + BAD_TIME });
-        g.issue(this.team, { type: 'demolish', buildingId: f.id });
-      }
-    }
-  }
-
-  /** FOB-Baustellen setzen: Zonen-FOB zuerst, dann Relais und Flanken; nur wenn Material bereitsteht. */
+  /**
+   * Ist Platz für eine weitere FOB, bildet die KI ein FOB-Fahrzeug aus (höchstens FOBV_MAX gleichzeitig) und spart darauf
+   * (außer bei Alarm an der Hauptstadt). Danach fährt es zum Ziel und baut dort auf.
+   */
   expand(s) {
     const g = this.game;
-    if (!s.engineers.length || !s.builtFobs.length) return;
-    if (s.fobs.length >= this.fobCap()) return;
-    if (s.needMat.length >= 1 || s.fobs.filter((f) => !f.built).length >= 2) return;
-    // 400 Baumaterial müssen in einer FOB bereitliegen (der Lieferant lädt sie dort)
-    if (!s.builtFobs.some((f) => f.store.bm >= FOB_COST)) return;
+    this.saveForFob = false;
+    if (!s.builtFobs.length) return;
+    const queued = this.queued(s, 'fobTruck');
+    const open = s.fobTrucks.length + queued;
+    if (s.fobs.length + open < this.fobCap() && open < FOBV_MAX) {
+      if (g.teams[this.team].res.money >= UNITS.fobTruck.cost.money) {
+        const b = this.pickProducer(s, 'fobTruck', BALANCE.queueMax - 1, false);
+        if (b) g.issue(this.team, { type: 'train', buildingId: b.id, unit: 'fobTruck' });
+      } else if (!s.alarm) this.saveForFob = true;
+    }
+    for (const id of [...this.fobGoal.keys()]) if (!s.fobTrucks.some((u) => u.id === id)) this.fobGoal.delete(id);
+    for (const u of s.fobTrucks) this.driveFobTruck(s, u);
+  }
 
+  /** Ein FOB-Fahrzeug: Ziel wählen (Zonen-FOB zuerst, dann Relais und Flanken), hinfahren, dort aufbauen. */
+  driveFobTruck(s, u) {
+    const g = this.game;
+    let goal = this.fobGoal.get(u.id);
+    const block = () => {
+      this.badSites.push({ x: goal.x, y: goal.y, until: g.time + BAD_TIME });
+      this.fobGoal.delete(u.id);
+      goal = null;
+    };
+    if (goal && dist(u.x, u.y, goal.x, goal.y) <= DEPLOY_REACH) {
+      if (g.issue(this.team, { type: 'deploy', ids: [u.id], x: goal.x, y: goal.y }).ok) {
+        this.fobGoal.delete(u.id);
+        return;
+      }
+      block();
+    } else if (goal && u.order.type === 'idle') {
+      // angehalten (kein Weg, abgedrängt): neu losschicken, nach FOBV_RETRY Versuchen ist das Ziel gesperrt
+      if (++goal.tries > FOBV_RETRY) block();
+      else g.issue(this.team, { type: 'move', ids: [u.id], x: goal.x, y: goal.y });
+    }
+    if (goal) return;
     // Zonen-FOB zuerst – nicht kurz nach einem Verlust und nicht mitten in einer gegnerischen Übermacht
     const zoneHeld = s.zone.counts[1 - this.team] >= 4; // Besatzung der Zone ist öffentlich (wie bei der Zonenwertung)
     const zoneWanted = !s.zoneFob && g.time >= this.zoneBan && !zoneHeld;
     let site = zoneWanted ? this.zoneSite(s) : null;
     if (!site && s.zoneFob) site = this.frontSite(s);
-    if (!site) return;
-    const r = g.issue(this.team, { type: 'buildFob', x: site.x, y: site.y });
-    if (!r.ok) this.badSites.push({ x: site.x, y: site.y, until: g.time + BAD_TIME });
+    if (!site) return; // wartet, bis ein Ziel frei wird
+    this.fobGoal.set(u.id, { x: site.x, y: site.y, tries: 0 });
+    g.issue(this.team, { type: 'move', ids: [u.id], x: site.x, y: site.y });
   }
 
   /**
@@ -613,7 +624,7 @@ export class AI {
   }
 
   /**
-   * Baufahrzeuge (Ersatz zuerst – sie gründen FOBs und bauen Verteidigung), LKW, dann Kampfeinheiten nach Zielmischung.
+   * Baufahrzeuge (Ersatz zuerst – sie bauen Verteidigung), LKW, dann Kampfeinheiten nach Zielmischung (FOB-Fahrzeuge: expand).
    * Einheiten kosten Geld; ausgebildet wird in der Hauptstadt bzw. (mit Stadt) in Kaserne, Fabrikhalle und Heliport.
    */
   produce(s) {
@@ -643,7 +654,7 @@ export class AI {
     }
 
 
-    if (this.saveForScout || this.saveForRadio || this.saveForResearch) return; // Geld für Späher, Sendemast bzw. Stufe sparen
+    if (this.saveForScout || this.saveForRadio || this.saveForResearch || this.saveForFob) return; // Geld für Späher, Sendemast, Stufe bzw. FOB-Fahrzeug sparen
 
     const mix = this.counterMix(s);
 
@@ -852,25 +863,15 @@ export class AI {
 
   // ---- Baufahrzeuge ----------------------------------------------------------------
 
-  /** Läuft ein LKW-Auftrag, der Material zu dieser FOB-Baustelle bringt? */
-  hasDelivery(s, site) {
-    return s.trucks.some(
-      (t) => (t.order.type === 'unload' && t.order.targetId === site.id) || (t.order.type === 'route' && t.order.toId === site.id),
-    );
-  }
-
   /**
    * Untätige Baufahrzeuge fahren zu Baustellen, die sie bauen können und die weiter als ENG_NEAR entfernt sind
-   * (näher übernimmt die automatische Zuweisung der Engine). FOB-Baustellen erst, wenn ihr Material da ist
-   * oder gerade geliefert wird – so hängt kein Baufahrzeug an einer Baustelle ohne Material.
+   * (näher übernimmt die automatische Zuweisung der Engine).
    */
   manageEngineers(s) {
     const g = this.game;
     if (!s.engineers.length) return;
-    const ready = (b) => b.type !== 'fob' || b.supplied || b.store.bm >= FOB_COST || this.hasDelivery(s, b);
-    const sites = s.own.filter((b) => !b.built && ready(b));
+    const sites = s.own.filter((b) => !b.built);
     if (!sites.length) return;
-    const prio = (b) => (b.type === 'fob' ? 0 : 1);
     for (const u of s.engineers) {
       if (u.order.type !== 'idle') continue;
       let best = null;
@@ -879,7 +880,7 @@ export class AI {
         const taken = s.engineers.some(
           (e) => e !== u && ((e.order.type === 'build' && e.order.targetId === b.id) || (e.order.type === 'move' && this.engTarget.get(e.id) === b.id)),
         );
-        const key = prio(b) * 1500 + dist(u.x, u.y, b.x, b.y) + (taken ? 1000 : 0);
+        const key = dist(u.x, u.y, b.x, b.y) + (taken ? 1000 : 0);
         if (key < bestKey) {
           bestKey = key;
           best = b;
@@ -920,18 +921,17 @@ export class AI {
 
   // ---- LKW ---------------------------------------------------------------------------
 
-  /** Soll-Zahl der LKW je Rolle: 1 Lieferant (solange FOB-Baustellen möglich), Pendler je 2 Außen-FOBs (max. 3), Versorger. */
+  /** Soll-Zahl der LKW je Rolle: Pendler je 2 Außen-FOBs (max. 3), Versorger (seit v5.03 kein Lieferant für FOB-Baustellen). */
   truckQuota(s) {
-    const lief = s.fobs.length < this.fobCap() || s.needMat.length > 0 ? 1 : 0;
     const pend = Math.min(3, Math.ceil(Math.max(0, s.fobs.length - 1) / 2));
     const vers = s.combat.length >= 15 ? 1 : 0;
-    return { lief, pend, vers, total: lief + pend + vers };
+    return { pend, vers, total: pend + vers };
   }
 
   /** Rollen zuordnen (bestehende bleiben, wenn die Quote reicht); überzählige LKW pendeln. */
   assignRoles(s) {
     const q = this.truckQuota(s);
-    const have = { lief: 0, pend: 0, vers: 0 };
+    const have = { pend: 0, vers: 0 };
     const alive = new Set(s.trucks.map((x) => x.id));
     for (const id of [...this.roles.keys()]) if (!alive.has(id)) this.roles.delete(id);
     for (const id of [...this.routes.keys()]) if (!alive.has(id)) this.routes.delete(id);
@@ -942,7 +942,7 @@ export class AI {
     }
     for (const tr of s.trucks) {
       if (this.roles.has(tr.id)) continue;
-      const r = ['lief', 'pend', 'vers'].find((k) => have[k] < q[k]) ?? 'pend';
+      const r = ['pend', 'vers'].find((k) => have[k] < q[k]) ?? 'pend';
       this.roles.set(tr.id, r);
       have[r]++;
     }
@@ -962,18 +962,15 @@ export class AI {
     this.assignRoles(s);
     const fobsLoaded = s.builtFobs.length > 0;
     if (!fobsLoaded) return;
-    // FOB, aus der der Lieferant sein Baumaterial lädt (die mit dem meisten): hier exportieren Pendler kein Baumaterial
-    const reserveFob = s.needMat.length ? this.richest(s, 'bm') : null;
     const taken = new Set();
     for (const tr of s.trucks) {
       const role = this.roles.get(tr.id);
-      if (role === 'lief') this.manageLieferant(s, tr);
-      else if (role === 'vers') this.manageVersorger(s, tr);
+      if (role === 'vers') this.manageVersorger(s, tr);
     }
     for (const tr of s.trucks) {
-      if (this.roles.get(tr.id) === 'pend') this.managePendler(s, tr, taken, reserveFob);
+      if (this.roles.get(tr.id) === 'pend') this.managePendler(s, tr, taken);
     }
-    for (const h of s.helis) this.managePendler(s, h, taken, reserveFob); // Transporthubschrauber pendeln wie LKW (Luftweg)
+    for (const h of s.helis) this.managePendler(s, h, taken); // Transporthubschrauber pendeln wie LKW (Luftweg)
   }
 
   /** Fertige FOB mit dem größten Vorrat einer Sorte. */
@@ -981,29 +978,6 @@ export class AI {
     let best = null;
     for (const f of s.builtFobs) if (!best || f.store[k] > best.store[k]) best = f;
     return best;
-  }
-
-  /** Lieferant: lädt 400 Baumaterial an der reichsten FOB und entlädt es an der eigenen FOB-Baustelle. */
-  manageLieferant(s, tr) {
-    const g = this.game;
-    const site = s.needMat[0];
-    if (!site) return;
-    const o = tr.order.type;
-    if (o === 'load' || o === 'unload') return; // arbeitet noch
-    const sum = cargoTotal(tr);
-    if (tr.cargo.bm >= CAP - 20) {
-      if (this.once(`unl${tr.id}:${site.id}`, 6)) g.issue(this.team, { type: 'unload', ids: [tr.id], fobId: site.id });
-      return;
-    }
-    if (sum - tr.cargo.bm > 40) {
-      // fremde Ladung zuerst an der nächsten FOB abladen
-      const f = this.nearestBuilt(s, tr.x, tr.y);
-      if (f && this.once(`dmp${tr.id}`, 6)) g.issue(this.team, { type: 'unload', ids: [tr.id], fobId: f.id });
-      return;
-    }
-    const src = this.richest(s, 'bm');
-    if (!src || src.store.bm < CAP - tr.cargo.bm - 5) return; // erst laden, wenn eine volle Ladung da ist
-    if (this.once(`lod${tr.id}`, 4)) g.issue(this.team, { type: 'load', ids: [tr.id], fobId: src.id, preset: 'bm' });
   }
 
   nearestBuilt(s, x, y) {
@@ -1023,7 +997,7 @@ export class AI {
    * Bester Transport: Ziel-FOB und Sorte mit dem größten Bedarf (Zonen-FOB bevorzugt), Quelle = FOB mit dem
    * größten Überschuss dieser Sorte (mindestens SURPLUS_MIN).
    */
-  pendlerPlan(s, taken, reserveFob) {
+  pendlerPlan(s, taken) {
     let best = null;
     for (const to of s.builtFobs) {
       const wTo = this.wantOf(s, to);
@@ -1037,7 +1011,7 @@ export class AI {
         let sv = SURPLUS_MIN - 1;
         for (const f of s.builtFobs) {
           if (f === to) continue;
-          const sur = f.store[k] - 0.5 * this.wantOf(s, f)[k] - (k === 'bm' && f === reserveFob ? FOB_COST : 0);
+          const sur = f.store[k] - 0.5 * this.wantOf(s, f)[k];
           if (sur > sv) {
             sv = sur;
             src = f;
@@ -1050,7 +1024,7 @@ export class AI {
   }
 
   /** Pendler: Route von der Überschuss-FOB zur Bedarfs-FOB, Ladungsart nach Engpass. */
-  managePendler(s, tr, taken, reserveFob) {
+  managePendler(s, tr, taken) {
     const g = this.game;
     const cur = this.routes.get(tr.id);
     const o = tr.order;
@@ -1067,7 +1041,7 @@ export class AI {
         }
       }
     }
-    const plan = this.pendlerPlan(s, taken, reserveFob);
+    const plan = this.pendlerPlan(s, taken);
     if (!plan) {
       if (o.type === 'route' && cur) {
         // nichts mehr zu tun: Ladung (falls vorhanden) abliefern, sonst anhalten

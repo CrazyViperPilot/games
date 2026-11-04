@@ -243,6 +243,14 @@ export class Game {
     if (!this.roads) createRoads(this); // ältere Stände (vor v5.03): Stadtstraßen der Karte nachträglich
     migrateResearch(this); // ältere Stände (vor v5.04): alter Forschungsbaum
     migrateCity(this); // ältere Stände: Universität als 3 × 3-Großbau (seit v5.00)
+    // ältere Stände: FOB-Baustellen gibt es seit v5.09 nicht mehr, sie stehen jetzt fertig da (mit mindestens dem Startvorrat)
+    for (const b of this.buildings) {
+      if (!b.alive || b.type !== 'fob' || b.built) continue;
+      b.built = true;
+      b.progress = 1;
+      b.hp = b.maxHp;
+      for (const k of STOCK_KEYS) b.store[k] = Math.max(b.store[k], Math.round(BALANCE.logistics.storeCap * BALANCE.fob.startStock));
+    }
   }
 
   newId() {
@@ -523,7 +531,7 @@ export class Game {
   /**
    * Prüft, ob Gebäude `type` mit Mitte (x, y) gebaut werden darf.
    * Liefert { ok, reason, cx, cy, x, y, payer } (x, y = Mitte des Fußabdrucks).
-   * payer = { kind: 'fob'|'truck', id } – wer die Sorten zahlt (null bei FOB-Baustellen).
+   * payer = { kind: 'fob'|'truck', id } – wer die Sorten zahlt (null bei FOBs).
    * Mauer/Tor außerhalb eines FOB-Radius: eigener LKW mit Ladung ≤ truckSupplyRange.
    * carried: Soldaten zahlen aus ihrem getragenen Baumaterial (nur Mauer/Tor, nur im Bauradius einer FOB; kein Lager zahlt).
    */
@@ -612,7 +620,9 @@ export class Game {
       case 'buildWall':
         return this.cmdBuildWall(team, cmd);
       case 'buildFob':
-        return this.cmdBuildFob(team, cmd);
+        return fail('Baufahrzeuge bauen keine FOB mehr: FOB-Fahrzeug ausbilden und dort aufbauen');
+      case 'deploy':
+        return this.cmdDeploy(team, cmd);
       case 'repair':
         return cmdRepair(this, team, cmd);
       case 'repairBridge':
@@ -849,21 +859,47 @@ export class Game {
   }
 
   /**
-   * { type: 'buildFob', ids? (Baufahrzeuge), x, y }: legt sofort eine FOB-Baustelle an (nichts wird bezahlt).
-   * Sie braucht 400 Baumaterial im eigenen Lager (per LKW) und ein Baufahrzeug in der Nähe.
+   * { type: 'deploy', ids, x?, y? }: gewählte FOB-Fahrzeuge (UNITS.*.deploys) werden an ihrer Stelle sofort zur fertigen FOB
+   * (ohne Bauzeit, Regeln von canPlace: Abstände, Höchstzahl). Blockiert dort etwas (Baum, Haus), nimmt sie die nächste
+   * freie Stelle bis BALANCE.fob.deploySnap px entfernt. Mit x, y (KI: geplanter Standort) zählt dieser Punkt statt der
+   * Stelle des Fahrzeugs; er darf höchstens deploySnap px vom Fahrzeug entfernt sein. Die FOB startet mit BALANCE.fob.startStock ihres Lagers je Sorte;
+   * das Fahrzeug verschwindet (kein Wrack). Liefert { ok, ids } (neue FOBs) oder den Grund des ersten Fehlschlags.
    */
-  cmdBuildFob(team, cmd) {
-    let list = [];
-    if (cmd.ids && cmd.ids.length) {
-      list = this.ownUnits(team, cmd.ids).filter((u) => u.def.builder === 'all');
-      if (!list.length) return fail('Nur Baufahrzeuge gründen FOB-Baustellen');
+  cmdDeploy(team, cmd) {
+    const list = this.ownUnits(team, cmd.ids).filter((u) => u.def.deploys && !u.house);
+    if (!list.length) return fail('Kein FOB-Fahrzeug gewählt');
+    const ids = [];
+    let reason = '';
+    for (const u of list) {
+      const at = Number.isFinite(cmd.x) && Number.isFinite(cmd.y) ? { x: cmd.x, y: cmd.y } : u;
+      const p = dist(at.x, at.y, u.x, u.y) <= BALANCE.fob.deploySnap ? this.deploySpot(team, u.def.deploys, at.x, at.y) : { ok: false, reason: 'Zu weit vom FOB-Fahrzeug' };
+      if (!p.ok) {
+        reason ||= p.reason;
+        continue;
+      }
+      const f = this.spawnBuilding(u.def.deploys, team, p.cx, p.cy, { built: true });
+      for (const k of STOCK_KEYS) f.store[k] = Math.round(BALANCE.logistics.storeCap * BALANCE.fob.startStock);
+      setIdle(u);
+      u.alive = false; // hp bleibt: cleanup entfernt es ohne Wrack und ohne Abschussprämie
+      ids.push(f.id);
+      this.message(team, `${f.def.name} aufgebaut`, f.x, f.y);
     }
-    const p = this.canPlace(team, 'fob', cmd.x, cmd.y);
-    if (!p.ok) return fail(p.reason);
-    const site = this.spawnBuilding('fob', team, p.cx, p.cy, { built: false });
-    this.message(team, 'FOB-Baustelle errichtet', p.x, p.y);
-    for (const u of list) orderBuild(u, site);
-    return { ok: true, id: site.id };
+    if (!ids.length) return fail(reason);
+    return { ok: true, ids };
+  }
+
+  /** Platz für ein aufgebautes Gebäude: (x, y) selbst, sonst die nächste zulässige Stelle in Ringen bis fob.deploySnap px. */
+  deploySpot(team, type, x, y) {
+    const first = this.canPlace(team, type, x, y);
+    if (first.ok) return first;
+    for (let r = TILE; r <= BALANCE.fob.deploySnap; r += TILE) {
+      for (let k = 0; k < 8; k++) {
+        const a = (k * Math.PI) / 4;
+        const p = this.canPlace(team, type, x + Math.cos(a) * r, y + Math.sin(a) * r);
+        if (p.ok) return p;
+      }
+    }
+    return first;
   }
 
   /**
@@ -1003,7 +1039,7 @@ export class Game {
     b.hp = 0;
     this.grid.release(b); // Fläche sofort frei (cleanup gibt sie nur idempotent erneut frei)
     if (b.type === 'fob') {
-      // FOB-Baustellen werden nicht von einem Lager bezahlt: nur das eigene Lager geht an die nächste FOB
+      // FOBs werden nicht von einem Lager bezahlt: nur das eigene Lager geht an die nächste FOB
       this.refundStock(team, null, stock, 1, b.x, b.y);
     } else {
       this.refund(team, b.def.cost, factor);

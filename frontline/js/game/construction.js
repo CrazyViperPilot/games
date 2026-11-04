@@ -123,8 +123,7 @@ function stepRepairer(game, u, dt) {
  * Einheiten mit Ziel (Gefecht) bleiben unberührt.
  */
 function autoAssign(game) {
-  // FOB-Baustellen ohne Material ziehen keine Bauer an (sie würden dort ewig warten)
-  const sites = game.buildings.filter((b) => b.alive && !b.built && (b.type !== 'fob' || b.supplied || b.store.bm >= C.fobMaterial));
+  const sites = game.buildings.filter((b) => b.alive && !b.built);
   const damaged = game.buildings.filter((b) => b.alive && b.built && b.hp < b.maxHp);
   const assigned = new Map();
   for (const u of game.units) {
@@ -176,21 +175,13 @@ function countBuilders(game, b) {
 
 /**
  * Baufortschritt einer Baustelle: nur mit Bauer in Reichweite (≤ helperRange vom Gebäuderand, Auftrag
- * oder idle), höchstens maxBuilders. Die FOB-Baustelle verbraucht ihre 400 Baumaterial erst, wenn gebaut wird.
+ * oder idle), höchstens maxBuilders. FOBs sind nie Baustellen (seit v5.09: FOB-Fahrzeug, Befehl deploy).
  */
 function progressSite(game, b, dt) {
   const n = countBuilders(game, b);
-  if (b.type === 'fob' && !b.supplied && b.store.bm < C.fobMaterial) {
-    warnSite(game, b, 'Baustelle wartet auf Material');
-    return;
-  }
   if (n === 0) {
     warnSite(game, b, 'Baustelle wartet auf Bauer');
     return;
-  }
-  if (b.type === 'fob' && !b.supplied) {
-    b.store.bm -= C.fobMaterial;
-    b.supplied = true;
   }
   const f = (n * dt * fxMul(game, b.team, 'build')) / b.def.buildTime;
   b.progress += f;

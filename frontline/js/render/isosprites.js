@@ -54,7 +54,7 @@ const BUSH_VIEW = { ax: 36, ay: 50, w: 72 };
 // Fahrzeuge: je Modell und Team (0 = Blau, 1 = Rot) acht Bilder nach Bildschirmrichtung
 const SECTORS = ['e', 'se', 's', 'sw', 'w', 'nw', 'n', 'ne']; // 0° = rechts, im Uhrzeigersinn
 const TEAM_COLOR = ['blue', 'red'];
-const UNIT_MODEL = { truck: 'truck', engineer: 'pickup', tank: 'tank', gunship: 'apache', littlebird: 'littlebird', ifv: 'ifv', flak: 'flak', sam: 'sam', transporter: 'transporter' };
+const UNIT_MODEL = { truck: 'truck', fobTruck: 'truck', engineer: 'pickup', tank: 'tank', gunship: 'apache', littlebird: 'littlebird', ifv: 'ifv', flak: 'flak', sam: 'sam', transporter: 'transporter' };
 // Gemalte Fahrzeugmodelle (tools/gen-troops.mjs), siehe assets/iso/README.md: span = Bildbreite in Einheitenradien, ax/ay = Bodenpunkt im Bild
 const MODEL_VIEW = { truck: { span: 7, ax: 72, ay: 86 }, pickup: { span: 6.4, ax: 72, ay: 86 }, tank: { span: 6.5, ax: 72, ay: 82 }, apache: { span: 6.2, ax: 72, ay: 90 }, littlebird: { span: 6.8, ax: 72, ay: 90 }, ifv: { span: 5.6, ax: 72, ay: 82 }, flak: { span: 6.1, ax: 72, ay: 86 }, sam: { span: 6.1, ax: 72, ay: 86 }, transporter: { span: 7.2, ax: 72, ay: 90 } };
 const VEHICLES = {};
@@ -242,7 +242,31 @@ function drawInfantry(ctx, cam, u, p, type, aim) {
 export function drawUnitSprite(ctx, cam, u, p, aim = null, lift = 0) {
   const inf = INFANTRY_NAME[u.type];
   if (inf && u.team < 2) return drawInfantry(ctx, cam, u, p, inf, aim);
-  return drawModel(ctx, cam, u.type, u.team, u.angle, u.def.radius, p, lift);
+  if (!drawModel(ctx, cam, u.type, u.team, u.angle, u.def.radius, p, lift)) return false;
+  if (u.def.deploys) drawDeployMast(ctx, cam.zoom, u.def.radius, p, lift);
+  return true;
+}
+
+/** FOB-Fahrzeug (LKW-Modell, größer): Antennenmast mit gelbem Wimpel darüber, damit es sich vom LKW abhebt. */
+function drawDeployMast(ctx, z, radius, p, lift) {
+  const x = p.x;
+  const y0 = p.y - lift * z - radius * 1.2 * z;
+  const y1 = y0 - radius * 1.6 * z;
+  ctx.save();
+  ctx.strokeStyle = '#2b2f2b';
+  ctx.lineWidth = Math.max(1, 1.4 * z);
+  ctx.beginPath();
+  ctx.moveTo(x, y0);
+  ctx.lineTo(x, y1);
+  ctx.stroke();
+  ctx.fillStyle = '#c9a227';
+  ctx.beginPath();
+  ctx.moveTo(x, y1);
+  ctx.lineTo(x + radius * 0.9 * z, y1 + radius * 0.3 * z);
+  ctx.lineTo(x, y1 + radius * 0.6 * z);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
 }
 
 /** Fahrzeugmodell in der Blickrichtung `angle`; look(img) kann das Bild ersetzen (Wrack). false = Modell fehlt oder lädt noch. */

@@ -27,7 +27,7 @@ export const QUICK = {
   pointEvery: 30, // Sekunden Zonenkontrolle je Siegpunkt
   radioHold: 1800, // Sekunden, die ein fertiger Sendemast stehen muss, bis sein Team gewinnt (30 min)
   maxFobs: 10, // FOBs je Team, mit Hauptstadt
-  fobMaterial: 400, // Baumaterial, das eine FOB-Baustelle im Lager braucht, bevor gebaut wird
+  fobStartStock: 0.2, // Anteil des Lagers je Sorte (storeCap), mit dem eine aufgebaute FOB startet (FOB-Fahrzeug, units.js fobTruck)
   storeCap: 3000, // Lager je Sorte (Baumaterial, Munition, Treibstoff) und vordere FOB
   capitalCap: 100000, // Lager je Sorte der Hauptstadt (mit Stadt füllen es die Werke bis hierhin; ohne Stadt wird es immer wieder aufgefüllt)
   truckLoad: 400, // Ladung eines LKW (Summe aller Sorten)
@@ -60,7 +60,7 @@ export const BALANCE = {
       { types: ['tank', 'ifv'], angle: 0, dist: 330, gap: 26 }, // Panzer vorn
       { types: ['rifleman', 'sniper'], angle: 60, dist: 300, gap: 14 }, // Schützen links
       { types: ['at'], angle: -60, dist: 300, gap: 14 }, // Panzerabwehr rechts
-      { types: ['truck', 'engineer'], angle: 180, dist: 330, gap: 24 }, // Versorgung hinten
+      { types: ['truck', 'engineer', 'fobTruck'], angle: 180, dist: 330, gap: 24 }, // Versorgung hinten
       { types: ['flak', 'sam'], angle: -130, dist: 330, gap: 26 }, // Luftabwehr hinten rechts
       { types: ['littlebird', 'transporter', 'gunship'], angle: 130, dist: 380, gap: 40 }, // Hubschrauber hinten links
       { types: ['commander'], angle: 180, dist: 130, gap: 10 }, // Kommandeur dicht hinter der FOB
@@ -74,7 +74,9 @@ export const BALANCE = {
   // drillMinFuel = Mindestvorrat der FOB, um einen Bohrer zu starten
   hot: { r: 300, speed: 40, wanderSpeed: 40 / 3, unitIncome: QUICK.moneyPerUnitHot, wanderMin: 25, wanderMax: 45, drillMinFuel: 10 },
   // Bauradien eigener FOBs dürfen sich nicht überlappen (minDistOwn = 2 × buildRadius); höchstens 10 FOBs mit der Hauptstadt
-  fob: { buildRadius: 450, minDistOwn: 900, minDistEnemy: 700, max: QUICK.maxFobs },
+  // startStock: eine neue FOB (aufgebautes FOB-Fahrzeug) hat sofort diesen Anteil von storeCap je Sorte im Lager;
+  // deploySnap: ist die Stelle des Fahrzeugs blockiert (Baum, Haus), baut es bis so viele px daneben auf
+  fob: { buildRadius: 450, minDistOwn: 900, minDistEnemy: 700, max: QUICK.maxFobs, startStock: QUICK.fobStartStock, deploySnap: 128 },
   queueMax: QUICK.queueMax,
   trainSlots: QUICK.trainSlots, // Ausbildungsplätze der Hauptstadt: so viele Einträge der Warteschlange werden gleichzeitig ausgebildet
   baseAttackWarn: 20, // s zwischen zwei Meldungen „Basis wird angegriffen“
@@ -112,7 +114,6 @@ export const BALANCE = {
     autoHelpRange: 400, // idle Bauer hilft automatisch
     autoRepairRange: 300, // idle Baufahrzeug repariert automatisch
     assignInterval: 1, // s, Takt der automatischen Zuweisung
-    fobMaterial: QUICK.fobMaterial, // Baumaterial im Lager einer FOB-Baustelle, bevor gebaut wird
     repairRate: 0.02, // Anteil maxHp je s und Baufahrzeug
     repairCostShare: 0.5, // Baumaterial-Kosten = cost.bm × geheilt/maxHp × 0.5
     siteHpGrow: 0.9, // Baustellen-HP wächst um 90 % über die Bauzeit (Start 10 %)

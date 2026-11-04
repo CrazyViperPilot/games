@@ -153,8 +153,10 @@ function stepToward(grid, u, tx, ty, step) {
   const nx = u.x + (dx / d) * step;
   const ny = u.y + (dy / d) * step;
   if (tryMove(grid, u, nx, ny)) return true;
-  if (tryMove(grid, u, nx, u.y)) return true;
-  return tryMove(grid, u, u.x, ny);
+  // an einer Achse entlang gleiten; ein „Gleiten“ ohne Bewegung (Wegpunkt genau auf einer Achse) gilt als blockiert,
+  // sonst plant die Einheit nie neu und steht für immer vor einer neu gebauten Mauer
+  if (nx !== u.x && tryMove(grid, u, nx, u.y)) return true;
+  return ny !== u.y && tryMove(grid, u, u.x, ny);
 }
 
 /** Folgt dem Weg mit Tempo `speed * speedMul * dt`. false, wenn ein Wegpunkt blockiert ist (neu planen). */
