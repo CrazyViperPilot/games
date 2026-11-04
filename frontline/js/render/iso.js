@@ -27,7 +27,9 @@ export const BUILD_H = {
 export const AIR_LIFT = 46;
 export const GROUND_LIFT = 4;
 export const unitLift = (u) => (u.def.air ? AIR_LIFT : GROUND_LIFT);
-export const buildingHeight = (b) => BUILD_H[b.type] ?? 40;
+/** Hauptstadt (Rathaus, cityhall.js): Höhe bis zum Turmdach. */
+export const CAPITAL_H = 107;
+export const buildingHeight = (b) => (b.main ? CAPITAL_H : BUILD_H[b.type] ?? 40);
 
 /** Transform: Weltpunkt (wx, wy) landet im Bildschirmpunkt (sx, sy), Boden isometrisch, `scale` um diesen Punkt. */
 export function setIsoAt(ctx, cam, dpr, sx, sy, wx, wy, scale = 1) {

@@ -37,6 +37,7 @@ import {
   buildingHeight,
   TOWN_H,
 } from './iso.js';
+import { drawCityHallTop } from './cityhall.js';
 import { drawTownBuilding, drawTeamBuilding, drawCar, drawBench, drawRubble, drawCrate, drawWreckBox } from './isobuild.js';
 import { parkDeco } from './terrain.js';
 import { drawTreeSprite, drawRockSprite, drawBushSprite, drawCarSprite, drawUnitSprite, drawWreckSprite, setTeamBuildings } from './isosprites.js';
@@ -210,7 +211,8 @@ export class Renderer {
     for (const b of g.buildings) {
       if (!b.alive || (!g.alwaysVisible(team, b) && !known(b.x, b.y))) continue;
       if (!inRect(b.x, b.y, (Math.max(b.w, b.h) * TILE) / 2)) continue;
-      drawBuilding(ctx, b, g.teams[b.team].color, z);
+      if (b.main && b.built && b.type === 'fob') drawCityHallTop(ctx, b, g.teams[b.team].color); // Hauptstadt: Rathaus (cityhall.js)
+      else drawBuilding(ctx, b, g.teams[b.team].color, z);
       if (!b.built && b.team === team) this.drawSiteMarks(ctx, b, z);
     }
     const glow = 0.6 + 0.4 * Math.sin(now / 350);

@@ -3,6 +3,7 @@
 // spriteOverrides.house = (ctx, cam, b) => { …; return true; } ersetzt die gemalte Variante (Rückgabe true = erledigt).
 import { BALANCE } from '../data/balance.js';
 import { drawUniversityIso } from './university.js';
+import { drawCityHallIso } from './cityhall.js';
 import { drawBox, drawRotBox, wallPoint, wallQuad, buildingHeight, TOWN_H } from './iso.js';
 import { shade, tint, hexA } from './sprites.js';
 import { snowy } from './season.js';
@@ -686,6 +687,10 @@ export function drawTeamBuilding(ctx, cam, b, color) {
   }
   if (b.type === 'radio') {
     drawRadioMast(ctx, cam, b, color, x0, y0, x1, y1);
+    return;
+  }
+  if (b.main && b.type === 'fob') {
+    drawCityHallIso(ctx, cam, b, color); // Hauptstadt: modernes Rathaus, für jede Drehung dasselbe Bild (cityhall.js)
     return;
   }
   if (spriteOverrides[b.type]?.(ctx, cam, b, color)) return;

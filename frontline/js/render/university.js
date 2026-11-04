@@ -2,6 +2,7 @@
 // vier Seiten gleich aussieht, zeichnet die Iso-Ansicht für jede Drehung der Karte dasselbe Bild (Daniels Idee): die Drehung der
 // Kamera wird hier bewusst nicht beachtet. Stufe 1: Kuppelbau mit vier Säulenportalen; Stufe 2: dazu vier Flügel (Kreuzform),
 // höhere Kuppel mit Laterne; Stufe 3: Ecktürme mit Fahnen in Teamfarbe, Bäume im Hof. 2D: dieselbe Anlage von oben.
+// Helfer (iso, poly, box, lit, FACE, DETAIL) nutzt auch das Rathaus der Hauptstadt (cityhall.js).
 // Nur Zeichnen (liest b = { x, y, level, color, damage }; Rauch bei Schaden zeichnet renderer.js), keine Spielregeln. Boden (Pflaster, Rasen) zeichnet citylayer.js.
 import { ISO_K } from './camera.js';
 import { shade, tint } from './sprites.js';
@@ -17,7 +18,7 @@ const GOLD = '#e2b444';
 const DOME = ['#b5e2cf', '#64a58d', '#2c584b']; // Kupfer mit Patina: Licht, Mitte, Schatten
 const LEAF = ['#8fc46a', '#4f8a3c', '#2b5a26'];
 const OUTLINE = 'rgba(40,30,20,0.45)';
-const DETAIL = 0.42; // darunter keine Fenster, Säulen und Rippen (Leistung, zu klein zum Sehen)
+export const DETAIL = 0.42; // darunter keine Fenster, Säulen und Rippen (Leistung, zu klein zum Sehen)
 
 /** Maße je Stufe in Weltpixeln ab der Mitte (das Quadrat reicht bis ±96). */
 const LV = [
@@ -34,22 +35,22 @@ const LIGHT = (() => {
   const n = Math.hypot(...v);
   return v.map((x) => x / n);
 })();
-function lit(color, nu, nv, nh) {
+export function lit(color, nu, nv, nh) {
   const n = Math.hypot(nu, nv, nh) || 1;
   const d = Math.max(0, (nu * LIGHT[0] + nv * LIGHT[1] + nh * LIGHT[2]) / n);
   return shade(color, 1 - (0.56 + 0.44 * d));
 }
-const FACE = { top: [0, 0, 1], s: [0, 1, 0], e: [1, 0, 0] };
+export const FACE = { top: [0, 0, 1], s: [0, 1, 0], e: [1, 0, 0] };
 
 /** Zeichenkontext für eine Universität: Projektion lokaler Koordinaten (u, v nach rechts unten/links unten, h nach oben). */
-function iso(ctx, cam, b) {
+export function iso(ctx, cam, b) {
   const p = cam.worldToScreen(b.x, b.y);
   const z = cam.zoom;
   const k = ISO_K * z;
   return { ctx, z, P: (u, v, h = 0) => [p.x + (u - v) * k, p.y + (u + v) * k * 0.5 - h * z] };
 }
 
-function poly(g, pts, fill, stroke = OUTLINE) {
+export function poly(g, pts, fill, stroke = OUTLINE) {
   const { ctx } = g;
   ctx.beginPath();
   pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
@@ -64,7 +65,7 @@ function poly(g, pts, fill, stroke = OUTLINE) {
 }
 
 /** Quader: sichtbar sind die Wand nach +v (links), nach +u (rechts) und das Dach. */
-function box(g, u0, u1, v0, v1, h0, h1, wall, top = wall, stroke = OUTLINE) {
+export function box(g, u0, u1, v0, v1, h0, h1, wall, top = wall, stroke = OUTLINE) {
   const { P } = g;
   poly(g, [P(u0, v1, h0), P(u1, v1, h0), P(u1, v1, h1), P(u0, v1, h1)], lit(wall, ...FACE.s), stroke);
   poly(g, [P(u1, v0, h0), P(u1, v1, h0), P(u1, v1, h1), P(u1, v0, h1)], lit(wall, ...FACE.e), stroke);
