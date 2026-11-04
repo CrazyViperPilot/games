@@ -7,7 +7,7 @@ import { BALANCE } from '../js/data/balance.js';
 import { UNITS } from '../js/data/units.js';
 import { canZone, hasRoad, bigFits, bigCells, bigCenter, sizeOf, KIND_ID } from '../js/game/city.js';
 import { isFoe } from '../js/game/entities.js';
-import { airportsOf, freeSpace, AIRPORT } from '../js/game/aircraft.js';
+import { airportsOf, freeSpace, AIRPORT, jetGrounded } from '../js/game/aircraft.js';
 
 const DT = 0.05;
 const run = (g, s) => {
@@ -176,4 +176,74 @@ test('Flughafen: F-16 ausbilden, Hangar schützt, Einsatz mit zwei Raketen, Rüc
   assert.equal(b.alive, false, 'abgestellter Jet ist mit dem Flughafen verloren');
   run(g, UNITS.f16.fuelMax + 2);
   assert.equal(a.alive, false, 'ohne Treibstoff abgestürzt');
+});
+
+test('F-16: rollt zur Startbahn, Startlauf auf Bahn 1, landet auf Bahn 2 auf Befehl „Landen“ und rollt zum Stellplatz', () => {
+  const g = new Game({ seed: 3, city: true });
+  const { e: ap } = buildBig(g, 'airport');
+  assert.ok(g.issue(0, { type: 'train', buildingId: ap.id, unit: 'f16' }).ok);
+  run(g, UNITS.f16.buildTime + 1);
+  const [u] = g.units.filter((x) => x.def.jet);
+  const slot = u.jet.slot;
+  const z = g.zone;
+  assert.ok(g.issue(0, { type: 'move', ids: [u.id], x: z.x, y: z.y }).ok);
+  const R1 = AIRPORT.runways[0];
+  const R2 = AIRPORT.runways[1];
+  const seen = new Set();
+  let rollY = null;
+  let liftX = null;
+  for (let s = 0; s < 30 && u.jet.phase !== 'air'; s += DT) {
+    g.update(DT);
+    seen.add(u.jet.phase);
+    if (u.jet.phase !== 'air') assert.ok(jetGrounded(u), 'bis zum Abheben am Boden');
+    if (u.jet.phase === 'roll') rollY = u.y;
+    if (u.jet.phase === 'air') liftX = u.x;
+  }
+  assert.ok(seen.has('taxiOut') && seen.has('roll'), `rollt und startet (${[...seen]})`);
+  assert.equal(rollY, ap.y + R1.y, 'Startlauf auf Bahn 1');
+  assert.ok(liftX > ap.x + R1.x0 && liftX < ap.x + R1.x1, 'hebt über der Startbahn ab');
+  assert.ok(u.jet.alt < 0.1, 'steigt erst nach dem Abheben');
+  run(g, 4);
+  assert.ok(u.jet.alt > 0.9 && !jetGrounded(u), 'in der Luft auf Reisehöhe');
+  run(g, 6);
+  // Landen: Befehl mit Flughafen
+  assert.equal(g.issue(0, { type: 'land', ids: [u.id], airportId: 999999 }).ok, false, 'nur eigener Flughafen');
+  assert.ok(g.issue(0, { type: 'land', ids: [u.id], airportId: ap.id }).ok);
+  const phases = [];
+  let touchY = null;
+  let minAlt = 1;
+  for (let s = 0; s < 120 && !u.parked; s += DT) {
+    g.update(DT);
+    if (phases.at(-1) !== u.jet.phase) phases.push(u.jet.phase);
+    if (u.jet.phase === 'air' && u.jet.rtb) minAlt = Math.min(minAlt, u.jet.alt);
+    if (u.jet.phase === 'rollout' && touchY === null) touchY = u.y;
+  }
+  assert.ok(u.parked, `gelandet (${phases})`);
+  assert.deepEqual(phases.slice(-3), ['rollout', 'taxiIn', 'park'], 'ausrollen, zum Stellplatz rollen');
+  assert.ok(Math.abs(touchY - (ap.y + R2.y)) < 30, 'setzt auf Bahn 2 auf');
+  assert.ok(minAlt < 0.1, 'sinkt im Gleitpfad bis zum Boden');
+  const p = AIRPORT.slots[u.jet.slot];
+  assert.deepEqual([u.x, u.y], [ap.x + p.x, ap.y + p.y], 'auf dem Stellplatz');
+  assert.ok(u.jet.slot === slot || u.jet.slot >= 0);
+  assert.equal(u.order.type, 'idle');
+});
+
+test('Zwei F-16 starten nacheinander (Startbahn frei abwarten), keine schießt am Boden', () => {
+  const g = new Game({ seed: 3, city: true });
+  const { e: ap } = buildBig(g, 'airport');
+  for (let k = 0; k < 2; k++) assert.ok(g.issue(0, { type: 'train', buildingId: ap.id, unit: 'f16' }).ok);
+  run(g, UNITS.f16.buildTime + 1);
+  const jets = g.units.filter((x) => x.def.jet);
+  const foe = g.spawnUnit('tank', 1, ap.x, ap.y + AIRPORT.taxi.y);
+  foe.hp = 1e6;
+  g.fog[0].revealAll?.();
+  assert.ok(g.issue(0, { type: 'attackMove', ids: jets.map((u) => u.id), x: g.zone.x, y: g.zone.y }).ok);
+  let both = false;
+  for (let s = 0; s < 40 && !jets.every((u) => u.jet.phase === 'air'); s += DT) {
+    g.update(DT);
+    if (jets.every((u) => u.jet.phase === 'roll')) both = true;
+    for (const u of jets) if (jetGrounded(u)) assert.equal(u.weapons[0].rounds, 2, 'am Boden kein Schuss');
+  }
+  assert.equal(both, false, 'nie zwei zugleich im Startlauf');
+  assert.ok(jets.every((u) => u.jet.phase === 'air'), 'beide gestartet');
 });

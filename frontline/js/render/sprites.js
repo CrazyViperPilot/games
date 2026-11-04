@@ -3,6 +3,7 @@
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
+import { jetAlt } from '../game/aircraft.js';
 
 const TILE = BALANCE.map.tile;
 const OUTLINE = 'rgba(0,0,0,0.65)';
@@ -239,9 +240,10 @@ function drawJet(ctx, u, color, dark, light, hull, iso = false) {
     JET_BODY.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
     ctx.closePath();
   };
+  const alt = jetAlt(u); // 0 am Boden … 1 Reiseflughöhe: Schatten rückt mit der Höhe ab
   if (!iso) {
     ctx.save();
-    const off = u.parked ? 3 : 16;
+    const off = 3 + 13 * alt;
     ctx.translate(off, off * 1.2);
     ctx.rotate(hull);
     ctx.fillStyle = 'rgba(0,0,0,0.25)';
@@ -251,6 +253,8 @@ function drawJet(ctx, u, color, dark, light, hull, iso = false) {
   }
   ctx.save();
   ctx.rotate(hull);
+  const k = 0.86 + 0.14 * alt; // am Boden etwas kleiner, steigend größer (näher an der Kamera)
+  ctx.scale(k, k);
   ctx.fillStyle = color;
   path();
   ctx.fill();
@@ -267,8 +271,8 @@ function drawJet(ctx, u, color, dark, light, hull, iso = false) {
     if (w.rounds >= 1) ctx.fillRect(-4, -13.5, 7, 1.4);
     if (w.rounds >= 2) ctx.fillRect(-4, 12.1, 7, 1.4);
   }
-  if (!u.parked) {
-    ctx.fillStyle = 'rgba(255,170,60,0.85)'; // Nachbrenner
+  if (!u.parked && (u.jet?.phase === 'roll' || alt > 0.05)) {
+    ctx.fillStyle = 'rgba(255,170,60,0.85)'; // Nachbrenner (Startlauf und Flug, nicht beim Rollen)
     ctx.beginPath();
     ctx.moveTo(-18, -1.4);
     ctx.lineTo(-25, 0);

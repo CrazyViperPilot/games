@@ -1,7 +1,7 @@
 // Spieler-Steuerung (docs/verlauf.md §5 ui/controller.js, §11.3–11.8): Auswahl, Modi, Befehle und Befehlskarte. Kein DOM.
 // Hält den Ansichtszustand `view`, den renderer.render(view) liest. Befehle laufen nur über game.issue.
 import { cityEntityAt, freePop, crewOf, KINDS as CITY_KINDS } from '../game/city.js';
-import { trainCheck } from '../game/aircraft.js';
+import { trainCheck, isAirport, airportsOf } from '../game/aircraft.js';
 import { CITY } from '../data/city.js';
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
@@ -21,7 +21,7 @@ const WALL_MAX = 40; // max. Zellen je Mauerzug (Vorschau und Befehl)
 const DOUBLE_MS = 350; // Doppelklick auf einen Typ = alle dieses Typs im Bild
 const GROUP_DOUBLE_MS = 500; // Gruppentaste zweimal = Kamera hin
 const PICK_PX = 16; // Trefferradius in Bildschirm-Pixeln
-const TARGET_MODES = ['board', 'storm', 'place', 'wall', 'attackMove', 'loadFob', 'unloadFob', 'routeFrom', 'routeTo', 'mortarTarget', 'dropoff'];
+const TARGET_MODES = ['board', 'storm', 'place', 'wall', 'attackMove', 'loadFob', 'unloadFob', 'routeFrom', 'routeTo', 'mortarTarget', 'dropoff', 'landAt'];
 const BUILD_MENU = Object.keys(BUILDINGS).filter((k) => BUILDINGS[k].hotkey && BUILDINGS[k].buildable !== false);
 // Befehle, die der Ton quittiert (Marsch, Angriff, Bau …); Ausbildung und Forschung melden sich über ihre Meldungen
 const FORTIFY_KEYS = [['sandbags', 'Z'], ['mgnest', 'N'], ['wire', 'W']];
@@ -30,7 +30,7 @@ const FORTIFY_TIPS = {
   mgnest: 'Die Besatzer schießen schneller.',
   wire: 'Stürmer machen nur 60 % Schaden.',
 };
-const ORDER_SOUND = new Set(['move', 'attackMove', 'attack', 'garrison', 'ungarrison', 'storm', 'fortifyHouse', 'board', 'pickup', 'deliver', 'load', 'unload', 'route', 'build', 'repair', 'deploy', 'buildWall', 'mortarTarget', 'dropoff', 'repairBridge']);
+const ORDER_SOUND = new Set(['land', 'move', 'attackMove', 'attack', 'garrison', 'ungarrison', 'storm', 'fortifyHouse', 'board', 'pickup', 'deliver', 'load', 'unload', 'route', 'build', 'repair', 'deploy', 'buildWall', 'mortarTarget', 'dropoff', 'repairBridge']);
 const RES_KEYS = ['money', 'bm', 'mun', 'fuel'];
 const CARGO_KEYS = ['bm', 'mun', 'fuel']; // Lagersorten (FOB-Lager, LKW-Ladung)
 const SHORT = { money: 'G', bm: 'BM', mun: 'MUN', fuel: 'TS' };
@@ -490,6 +490,9 @@ export class Controller {
       case 'mortarTarget':
         this.confirmMortarTarget(wx, wy);
         return;
+      case 'landAt':
+        this.confirmLand(wx, wy);
+        return;
       case 'dropoff':
         this.confirmDropoff(wx, wy);
         return;
@@ -578,6 +581,14 @@ export class Controller {
         rest = units.filter((u) => !riders.includes(u));
         if (!rest.length) return;
       }
+    }
+    // Eigener Flughafen: Flugzeuge landen dort (die übrigen gehen hin)
+    const ap = rest.some((u) => u.def.jet) ? this.pickAirport(wx, wy) : null;
+    if (ap) {
+      const jets = rest.filter((u) => u.def.jet);
+      if (this.issue({ type: 'land', ids: jets.map((u) => u.id), airportId: ap.id }).ok) this.moveMarker(ap.x, ap.y);
+      rest = rest.filter((u) => !u.def.jet);
+      if (!rest.length) return;
     }
     // Versorgungskiste: der nächste Soldat ohne Kiste holt sie, die übrigen gehen mit
     const crate = this.pickCrate(wx, wy);
@@ -777,6 +788,31 @@ export class Controller {
       return;
     }
     if (this.issue({ type: 'route', ids, fromId: this.routeFromId, toId: fob.id }).ok) this.setMode('normal');
+  }
+
+  /** Eigener fertiger Flughafen an (wx, y) oder null. */
+  pickAirport(wx, wy) {
+    const e = this.pickCity(wx, wy);
+    return e && isAirport(this.game, e) ? e : null;
+  }
+
+  /** Landen (L): gewählte Flugzeuge landen auf dem angeklickten eigenen Flughafen. */
+  confirmLand(wx, wy) {
+    const ids = this.selectedUnits().filter((u) => u.def.jet).map((u) => u.id);
+    if (!ids.length) {
+      this.message('Kein Flugzeug gewählt');
+      this.setMode('normal');
+      return;
+    }
+    const ap = this.pickAirport(wx, wy);
+    if (!ap) {
+      this.message('Eigenen Flughafen anklicken');
+      return;
+    }
+    if (this.issue({ type: 'land', ids, airportId: ap.id }).ok) {
+      this.moveMarker(ap.x, ap.y);
+      this.setMode('normal');
+    }
   }
 
   /** Mörser-Ziel: Klick auf die Karte, alle gewählten Mörser in Reichweite feuern dorthin. */
@@ -1082,6 +1118,8 @@ export class Controller {
         return 'Mörser: Ziel auf der Karte anklicken (Kreis zeigt Reichweite) · Esc bricht ab';
       case 'dropoff':
         return 'Absetzen: Zielpunkt anklicken · Esc bricht ab';
+      case 'landAt':
+        return 'Landen: eigenen Flughafen anklicken · Esc bricht ab';
       case 'storm':
         return 'Stürmen: gegnerisch besetztes Haus anklicken · Esc bricht ab';
       case 'board':
@@ -1210,6 +1248,18 @@ export class Controller {
         }),
       );
     }
+    const jets = units.filter((u) => u.def.jet);
+    if (jets.length) {
+      const any = airportsOf(this.game, this.team).length > 0;
+      card.push(
+        entry('Landen', 'L', {
+          tip: 'Landen (L): danach den eigenen Flughafen anklicken (oder Rechtsklick darauf). Das Flugzeug fliegt die Platzrunde, landet auf der Landebahn, rollt aus und rollt zu seinem Stellplatz; dort wird es betankt und munitioniert.',
+          enabled: any,
+          reason: 'Kein eigener Flughafen',
+          action: () => this.setMode('landAt'),
+        }),
+      );
+    }
     const riders = units.filter((u) => u.def.canRide);
     if (riders.length) {
       card.push(
@@ -1313,7 +1363,7 @@ export class Controller {
       const jets = this.game.units.filter((u) => u.alive && u.jet?.home === b.id);
       card.push(
         entry('Staffel', 'W', {
-          tip: `Alle ${jets.length} Flugzeuge dieses Flughafens wählen (W); Befehl = Start, sobald betankt; Rechtsklick auf den eigenen Flughafen = landen`,
+          tip: `Alle ${jets.length} Flugzeuge dieses Flughafens wählen (W); Befehl = Start (Rollen zur Startbahn, Startlauf), sobald betankt; Landen (L) oder Rechtsklick auf den eigenen Flughafen = landen`,
           enabled: jets.length > 0,
           reason: 'Keine Flugzeuge stationiert',
           action: () => {

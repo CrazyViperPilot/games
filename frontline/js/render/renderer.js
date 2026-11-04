@@ -34,6 +34,7 @@ import {
   drawTree,
   drawRock,
   unitLift,
+  flying,
   buildingHeight,
   TOWN_H,
 } from './iso.js';
@@ -233,7 +234,7 @@ export class Renderer {
     for (const air of [false, true]) {
       // Hubschrauber zuletzt: sie fliegen über allem
       for (const u of g.units) {
-        if (!u.alive || u.house || (!!u.def.air && !u.parked) !== air || !shown(u) || !inRect(u.x, u.y, 30)) continue; // abgestellte Jets am Boden
+        if (!u.alive || u.house || flying(u) !== air || !shown(u) || !inRect(u.x, u.y, 30)) continue; // Jets am Boden mit den Bodeneinheiten
         let aim = null;
         if (u.targetId && u.def.range > 0) {
           const t = g.getEntity(u.targetId);
@@ -566,7 +567,7 @@ export class Renderer {
     const air = [];
     for (const u of g.units) {
       if (!u.alive || u.house || !shown(u) || !inRect(u.x, u.y, PAD)) continue;
-      if (u.def.air && !u.parked) air.push(u); // abgestellte Jets stehen am Boden
+      if (flying(u)) air.push(u); // Jets am Boden (abgestellt, rollend) stehen bei den Bodeneinheiten
       else items.push({ k: cam.depth(u.x, u.y), t: 5, o: u });
     }
     items.sort((a, b) => a.k - b.k);

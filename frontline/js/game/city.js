@@ -7,6 +7,8 @@ import { UNITS } from '../data/units.js';
 import { nearestPassable } from './movement.js';
 import { makeRng } from '../core/rng.js';
 import { blockers } from './mapdata.js';
+import { RELIEF } from './relief.js';
+import { bridgeUnder } from './river.js';
 
 /** Zellenarten (Code im Raster): 0 leer. Neue Arten nur hinten anhängen (Code = Index + 1). */
 export const KINDS = ['road', 'res', 'com', 'bm', 'mun', 'fuel', 'steel', 'mine', 'market', 'power', 'uni', 'dc', 'barracks', 'factory', 'heliport', 'hospital', 'airport'];
@@ -154,6 +156,28 @@ function zoneCells(game, cols, rows) {
 }
 
 /**
+ * Liegt Stadtzelle (q, r) ganz oder teilweise auf Wasser, einer Furt, einer Brücke oder einer Stadtstraße der Karte?
+ * Dort entstehen keine Vorkommen (seit v5.15): Brücken und Furten sind begehbar und darum nicht gesperrt (blockedCells),
+ * seichtes Wasser am Zellrand kann durchrutschen.
+ */
+function wetCell(game, q, r) {
+  const S = CITY.cell;
+  const g = game.grid;
+  const T = g.tile;
+  if (game.roads?.kind[r * game.roads.cols + q]) return true; // Zonenstraße oder Brückenfahrbahn
+  const rel = game.relief;
+  const m = CITY.deposits.shore; // Abstand zum Ufer (px), auch über den Zellrand hinaus
+  for (let y = r * S - m; y <= (r + 1) * S + m; y += T / 4) {
+    for (let x = q * S - m; x <= (q + 1) * S + m; x += T / 4) {
+      if (g.isFord(Math.floor(x / T), Math.floor(y / T))) return true;
+      if (rel && rel.heightAt(x, y) < RELIEF.water) return true;
+    }
+  }
+  for (const [dx, dy] of [[0.5, 0.5], [0, 0], [1, 0], [0, 1], [1, 1]]) if (bridgeUnder(game, (q + dx) * S, (r + dy) * S)) return true;
+  return false;
+}
+
+/**
  * Rohstoffvorkommen (seit v4.83): je Hauptstadt eine Gruppe jeder Sorte in ihrer Nähe, dazu umkämpfte Gruppen rund um die
  * Konfliktzone, punktgespiegelt um ihre Mitte (beide Seiten gleich weit). Eigener Zufall aus dem Seed: die Karte bleibt unverändert.
  */
@@ -162,7 +186,7 @@ function genDeposits(game, cols, rows, blocked) {
   const rng = makeRng(((game.seed | 0) * 2654435761 + 0x5eed) >>> 0);
   const D = CITY.deposits;
   const S = CITY.cell;
-  const free = (q, r) => q >= 1 && r >= 1 && q < cols - 1 && r < rows - 1 && !blocked[r * cols + q] && !dep[r * cols + q];
+  const free = (q, r) => q >= 1 && r >= 1 && q < cols - 1 && r < rows - 1 && !blocked[r * cols + q] && !dep[r * cols + q] && !wetCell(game, q, r);
   // Gruppe ab (q, r) zufällig wachsen lassen; gibt die Zahl der Zellen zurück
   const cluster = (q, r, type, size) => {
     if (!free(q, r)) return 0;

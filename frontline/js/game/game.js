@@ -30,7 +30,7 @@ import { updateAbilities, cmdAbility } from './abilities.js';
 import { createResearch, updateResearch, cmdResearch, cmdCancelResearch, rangeMul, migrateResearch } from './research.js';
 import { createBridges, updateBridges, cmdRepairBridge, bridgeUnder } from './river.js';
 import { createRoads } from './roads.js';
-import { updateAircraft, trainCheck } from './aircraft.js';
+import { updateAircraft, trainCheck, cmdLand } from './aircraft.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
@@ -661,6 +661,8 @@ export class Game {
         return cmdDropoff(this, team, cmd);
       case 'drill':
         return cmdDrill(this, team, cmd);
+      case 'land':
+        return cmdLand(this, team, cmd);
       case 'city':
         return cmdCity(this, team, cmd);
       case 'trade':

@@ -11,14 +11,14 @@ import { researchEffect } from '../js/game/research.js';
 
 export const PRD_PATH = fileURLToPath(new URL('../PRD.md', import.meta.url));
 
-const CLASSES = ['inf', 'light', 'heavy', 'struct', 'air'];
-const CLASS_NAMES = { inf: 'Inf', light: 'Leicht', heavy: 'Schwer', struct: 'Geb', air: 'Luft' };
+const CLASSES = ['inf', 'light', 'heavy', 'struct', 'air', 'jet'];
+const CLASS_NAMES = { inf: 'Inf', light: 'Leicht', heavy: 'Schwer', struct: 'Geb', air: 'Luft', jet: 'Flugzeug' };
 const UNIT_NAMES = Object.fromEntries(Object.entries(UNITS).map(([k, u]) => [k, u.name]));
 
 /** Zahl deutsch (Komma), höchstens 3 Nachkommastellen. */
 const fmt = (n) => String(Math.round(n * 1000) / 1000).replace('.', ',');
 const pct = (f) => `${fmt(f * 100)} %`;
-const dmg = (d, c) => (d && d[c] !== undefined ? fmt(d[c]) : '–');
+const dmg = (d, c) => (d && d[c] !== undefined ? fmt(d[c]) : c === 'jet' && d && d.air !== undefined ? fmt(d.air) : '–'); // Flugzeug: ohne eigenen Wert wie Luft
 const costText = (cost) =>
   Object.entries(cost ?? {})
     .filter(([, v]) => v > 0)
@@ -52,7 +52,7 @@ function weaponNote(w) {
   if (w.targets) notes.push(`bevorzugt gegen ${w.targets.map((c) => CLASS_NAMES[c] ?? UNIT_NAMES[c] ?? c).join(', ')}`);
   if (w.hits?.inf) notes.push(`Soldat: ${w.hits.inf} Treffer`);
   if (w.hitChance) notes.push(`Trefferchance ${pct(w.hitChance)}${w.speedRef ? ' × Tempo-Faktor' : ''} × Entfernungs-Faktor`);
-  if (CLASSES.filter((c) => c !== 'air').every((c) => !w.damage?.[c]) && w.damage?.air) notes.push('nur Luftziele');
+  if (CLASSES.filter((c) => c !== 'air' && c !== 'jet').every((c) => !w.damage?.[c]) && w.damage?.air) notes.push('nur Luftziele');
   return notes.join('; ') || '–';
 }
 

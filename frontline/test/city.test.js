@@ -8,6 +8,8 @@ import { AI } from '../js/ai/ai.js';
 import { treeGone } from '../js/game/city.js';
 import { KINDS, canZone, cityNoise, freePop, aiCity, aiDefend, aiRaid, hasRoad, hasMarket, cityEntityAt, cityTrainers, KIND_ID, sizeOf, cellsOf, isPart, forEnemyCity, migrateCity, cityLevel } from '../js/game/city.js';
 import { snapshotGame, restoreGame } from '../js/game/savegame.js';
+import { RELIEF } from '../js/game/relief.js';
+import { bridgeUnder } from '../js/game/river.js';
 
 const run = (g, s) => { for (let t = 0; t < s * 20; t++) g.update(0.05); };
 // Ursprung (c, r) eines w × h großen, ganz bebaubaren Rechtecks im Gebiet des Teams, nahe der Hauptstadt
@@ -286,6 +288,32 @@ test('Rohstoffvorkommen: jede Sorte nahe jeder Hauptstadt, Karte unverändert', 
       }
       assert.ok(near, `Team ${team} Sorte ${d} im Gebiet`);
     }
+  }
+});
+
+test('Rohstoffvorkommen nie auf Wasser, Furten, Brücken oder Stadtstraßen (auch nicht am Ufer)', () => {
+  for (const seed of [1, 3, 42, 1234]) {
+    const g = new Game({ seed, city: true, river: true });
+    const c = g.city[0];
+    const S = c.cell;
+    const T = g.grid.tile;
+    const m = CITY.deposits.shore;
+    let n = 0;
+    for (let i = 0; i < c.deposit.length; i++) {
+      if (!c.deposit[i]) continue;
+      n++;
+      const q = i % c.cols;
+      const r = (i - q) / c.cols;
+      assert.ok(!g.roads.kind[i], `Seed ${seed}: Vorkommen auf Stadtstraße/Brücke (${q}, ${r})`);
+      assert.ok(!bridgeUnder(g, (q + 0.5) * S, (r + 0.5) * S), `Seed ${seed}: Vorkommen auf Brücke (${q}, ${r})`);
+      for (let y = r * S - m; y <= (r + 1) * S + m; y += 8) {
+        for (let x = q * S - m; x <= (q + 1) * S + m; x += 8) {
+          assert.ok(!g.grid.isFord(Math.floor(x / T), Math.floor(y / T)), `Seed ${seed}: Vorkommen an einer Furt (${q}, ${r})`);
+          if (g.relief) assert.ok(g.relief.heightAt(x, y) >= RELIEF.water, `Seed ${seed}: Vorkommen am/auf Wasser (${q}, ${r})`);
+        }
+      }
+    }
+    assert.ok(n > 40, `Seed ${seed}: genug Vorkommen (${n})`);
   }
 });
 

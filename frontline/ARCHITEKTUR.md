@@ -114,6 +114,7 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 | `route` | `ids, fromId, toId, preset?` | `logistics.js` `cmdRoute` | LKW pendeln lassen |
 | `setPreset` | `ids, preset` | `logistics.js` | Ladungsart (`mix`, `bm`, `mun`, `fuel`) |
 | `mortarTarget` | `ids, x, y` | `game.js` `cmdMortarTarget` | Mörser auf einen Punkt richten |
+| `land` | `ids, airportId` | `aircraft.js` `cmdLand` | Flugzeuge landen auf dem eigenen Flughafen (Platzrunde, Landebahn, Ausrollen, Stellplatz; seit v5.15) |
 | `board` | `ids, heliId` | `logistics.js` `cmdBoard` | in ein Fahrzeug oder einen Hubschrauber einsteigen |
 | `dropoff` | `ids, x, y` | `logistics.js` `cmdDropoff` | Passagiere am Punkt absetzen |
 | `garrison`, `ungarrison` | `ids, houseId` (Haus oder Gefechtsturm) / `ids` | `garrison.js` | Haus oder Turm besetzen / verlassen |

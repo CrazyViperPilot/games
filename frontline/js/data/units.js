@@ -1,6 +1,8 @@
 // Einheitenwerte (docs/verlauf.md §3.2, §11.2, §11.8).
 // weapons: Waffen mit rounds (Schuss im Vorrat), munCost (Munition aus dem FOB-Lager je Schuss beim Nachladen), cooldown, damage nach Panzerklasse,
 // optional targets (Klassen, gegen die diese Waffe bevorzugt wird). Daraus entstehen range, damage (bester Wert je Klasse) und ammoMax.
+// Schadensklasse jet (seit v5.15) = Flugzeuge (F-16); fehlt sie, gilt air (Hubschrauber). Soldaten treffen keine Flugzeuge (jet: 0),
+// Panzer-MGs sehr wenig, Kampfhubschrauber mittel. parallel: true = alle Waffen feuern unabhängig, jede auf ihr eigenes Ziel (combat.js).
 // cost: fehlende Schlüssel = 0. Alle Einheiten entstehen in der Hauptstadt; hotkey: Taste im Ausbildungsmenü.
 // buildTime: Ausbildungsrate der Hauptstadt in Sekunden (eine Ausbildung nach der anderen).
 // fuelMax: Treibstoffvorrat. Alle Einheiten kosten nur Geld und starten voll munitioniert und betankt.
@@ -20,7 +22,7 @@ export const UNITS = {
     // Waffen: rounds = Schuss im Vorrat, munCost = Munition (FOB-Lager) je Schuss beim Nachladen.
     // Gewehr: 2 Magazine à 30 Schuss; 1 Magazin = 1 Munition.
     weapons: [
-      { id: 'rifle', name: 'Gewehr', range: 200, cooldown: 1.0, rounds: 60, munCost: 1 / 30, hits: { inf: 4 }, damage: { inf: 12, light: 3, heavy: 1, struct: 4, air: 3 } },
+      { id: 'rifle', name: 'Gewehr', range: 200, cooldown: 1.0, rounds: 60, munCost: 1 / 30, hits: { inf: 4 }, damage: { inf: 12, light: 3, heavy: 1, struct: 4, air: 3, jet: 0 } },
     ],
     cost: { money: 60 },
     buildTime: 5,
@@ -41,7 +43,7 @@ export const UNITS = {
     sight: 260,
     // Panzerfaust/RPG: 5 Schuss à 10 Munition, auch gegen Hubschrauber
     weapons: [
-      { id: 'rpg', name: 'RPG', range: 240, cooldown: 3.0, rounds: 5, munCost: 10, hits: { inf: 1, tank: SIDES(6, 4, 3), ifv: SIDES(4, 3, 2), light: 2 }, damage: { inf: 10, light: 90, heavy: 120, struct: 60, air: 40 } },
+      { id: 'rpg', name: 'RPG', range: 240, cooldown: 3.0, rounds: 5, munCost: 10, hits: { inf: 1, tank: SIDES(6, 4, 3), ifv: SIDES(4, 3, 2), light: 2 }, damage: { inf: 10, light: 90, heavy: 120, struct: 60, air: 40, jet: 0 } },
     ],
     cost: { money: 120 },
     buildTime: 8,
@@ -63,7 +65,7 @@ export const UNITS = {
     stealth: true, // getarnt: Gegner sehen ihn nur nahe (BALANCE.stealth) oder kurz nach einem Schuss
     // Scharfschützengewehr: ein Treffer tötet Infanterie, lange Nachladezeit, hohe Reichweite; gegen Fahrzeuge und Gebäude nahezu wirkungslos
     weapons: [
-      { id: 'sniper', name: 'Scharfschützengewehr', range: 480, cooldown: 8.0, rounds: 10, munCost: 4, hits: { inf: 1 }, damage: { inf: 200, light: 6, heavy: 1, struct: 2, air: 2 } },
+      { id: 'sniper', name: 'Scharfschützengewehr', range: 480, cooldown: 8.0, rounds: 10, munCost: 4, hits: { inf: 1 }, damage: { inf: 200, light: 6, heavy: 1, struct: 2, air: 2, jet: 0 } },
     ],
     cost: { money: 220 },
     buildTime: 10,
@@ -86,7 +88,7 @@ export const UNITS = {
     sight: 340,
     // Maschinenpistole: 3 Magazine à 30 Schuss
     weapons: [
-      { id: 'smg', name: 'Maschinenpistole', range: 180, cooldown: 0.6, rounds: 90, munCost: 1 / 30, hits: { inf: 6 }, damage: { inf: 10, light: 2, heavy: 1, struct: 2, air: 2 } },
+      { id: 'smg', name: 'Maschinenpistole', range: 180, cooldown: 0.6, rounds: 90, munCost: 1 / 30, hits: { inf: 6 }, damage: { inf: 10, light: 2, heavy: 1, struct: 2, air: 2, jet: 0 } },
     ],
     cost: { money: 400 },
     buildTime: 20,
@@ -166,6 +168,7 @@ export const UNITS = {
     short: 'SPz', // Kurzname in der Befehlskarte
     slots: 3,
     armor: 'light',
+    parallel: true, // MG und Granatwerfer feuern gleichzeitig auf eigene Ziele (seit v5.15)
     hp: 450,
     speed: 85,
     radius: 12,
@@ -173,7 +176,7 @@ export const UNITS = {
     // Granatwerfer: 60 Granaten à 10 Munition; MG: 300 Schuss à 5
     weapons: [
       { id: 'grenade', name: 'Granatwerfer', range: 240, cooldown: 2.0, rounds: 60, munCost: 10, targets: ['light', 'heavy', 'struct'], hits: { inf: 1, tank: SIDES(10, 8, 7), ifv: SIDES(8, 6, 5), light: 3 }, damage: { inf: 30, light: 40, heavy: 10, struct: 25 } },
-      { id: 'mg', name: 'MG', range: 220, cooldown: 0.25, rounds: 300, munCost: 5, hits: { inf: 2 }, damage: { inf: 9, light: 3, heavy: 1, struct: 3, air: 6 } },
+      { id: 'mg', name: 'MG', range: 220, cooldown: 0.25, rounds: 300, munCost: 5, hits: { inf: 2 }, damage: { inf: 9, light: 3, heavy: 1, struct: 3, air: 6, jet: 2 } },
     ],
     cost: { money: 250 },
     buildTime: 12,
@@ -188,6 +191,7 @@ export const UNITS = {
     short: 'KPz', // Kurzname in der Befehlskarte
     slots: 5,
     armor: 'heavy',
+    parallel: true, // MG und Hauptkanone feuern gleichzeitig auf eigene Ziele (seit v5.15)
     hp: 1100,
     speed: 60,
     radius: 15,
@@ -195,7 +199,7 @@ export const UNITS = {
     // Hauptkanone: 30 Schuss à 20 Munition, 6 s Nachladezeit; MG: 300 Schuss à 5
     weapons: [
       { id: 'cannon', name: 'Hauptkanone', range: 300, cooldown: 6, rounds: 30, munCost: 20, targets: ['light', 'heavy', 'struct'], hits: { inf: 1, tank: SIDES(4, 3, 2), ifv: SIDES(3, 3, 2), light: 2 }, damage: { inf: 45, light: 120, heavy: 150, struct: 120 } },
-      { id: 'mg', name: 'MG', range: 220, cooldown: 0.25, rounds: 300, munCost: 5, hits: { inf: 2 }, damage: { inf: 10, light: 3, heavy: 0, struct: 2, air: 3 } },
+      { id: 'mg', name: 'MG', range: 220, cooldown: 0.25, rounds: 300, munCost: 5, hits: { inf: 2 }, damage: { inf: 10, light: 3, heavy: 0, struct: 2, air: 3, jet: 1 } },
     ],
     cost: { money: 500 },
     buildTime: 20,
@@ -260,8 +264,8 @@ export const UNITS = {
     sight: 400,
     // Bordkanone: 300 Schuss à 10 Munition; 10 Raketen à 100 Munition (gegen Panzer, Gebäude, Hubschrauber)
     weapons: [
-      { id: 'cannon', name: 'Bordkanone', range: 340, cooldown: 0.5, rounds: 300, munCost: 10, damage: { inf: 22, light: 26, heavy: 30, struct: 18, air: 10 } },
-      { id: 'rocket', name: 'Raketen', range: 340, cooldown: 3, rounds: 10, munCost: 100, targets: ['heavy', 'struct', 'air'], damage: { inf: 40, light: 120, heavy: 220, struct: 120, air: 150 } },
+      { id: 'cannon', name: 'Bordkanone', range: 340, cooldown: 0.5, rounds: 300, munCost: 10, damage: { inf: 22, light: 26, heavy: 30, struct: 18, air: 10, jet: 12 } },
+      { id: 'rocket', name: 'Raketen', range: 340, cooldown: 3, rounds: 10, munCost: 100, targets: ['heavy', 'struct', 'air'], damage: { inf: 40, light: 120, heavy: 220, struct: 120, air: 150, jet: 110 } },
     ],
     cost: { money: 900 },
     buildTime: 28,

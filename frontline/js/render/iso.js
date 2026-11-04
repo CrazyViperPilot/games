@@ -3,6 +3,7 @@
 import { BALANCE } from '../data/balance.js';
 import { shade, tint, hexA, fitText } from './sprites.js';
 import { snowy } from './season.js';
+import { jetAlt, jetGrounded } from '../game/aircraft.js';
 
 const TILE = BALANCE.map.tile;
 const OUTLINE = 'rgba(0,0,0,0.55)';
@@ -27,8 +28,10 @@ export const BUILD_H = {
 export const AIR_LIFT = 46;
 export const GROUND_LIFT = 4;
 export const JET_LIFT = BALANCE.jets.lift; // Flughöhe der Jets (höher als Hubschrauber)
-/** Höhe einer Einheit über dem Boden: abgestellte Jets am Boden, fliegende Jets am höchsten, dann Hubschrauber. */
-export const unitLift = (u) => (u.parked ? GROUND_LIFT : u.def.jet ? JET_LIFT : u.def.air ? AIR_LIFT : GROUND_LIFT);
+/** Höhe einer Einheit über dem Boden: Jets je nach Flughöhe (am Boden, beim Start steigend, beim Landen sinkend), dann Hubschrauber. */
+/** Wird die Einheit über allem gezeichnet (fliegt)? Jets am Boden (abgestellt, rollend, Startlauf, Ausrollen) nicht. */
+export const flying = (u) => !!u.def.air && !u.parked && !jetGrounded(u);
+export const unitLift = (u) => (u.parked ? GROUND_LIFT : u.def.jet ? GROUND_LIFT + (JET_LIFT - GROUND_LIFT) * jetAlt(u) : u.def.air ? AIR_LIFT : GROUND_LIFT);
 /** Hauptstadt (Rathaus, cityhall.js): Höhe bis zum Turmdach. */
 export const CAPITAL_H = 107;
 export const buildingHeight = (b) => (b.main ? CAPITAL_H : BUILD_H[b.type] ?? 40);

@@ -45,7 +45,7 @@ test('Einheiten: Werte, Kosten, Waffen', () => {
     assert.ok(typeof u.short === 'string' && u.short, `UNITS.${k}.short fehlt (Kurzname)`);
     for (const w of u.weapons ?? []) {
       for (const f of ['range', 'cooldown', 'rounds']) assert.ok(positive(w[f]), `UNITS.${k} Waffe ${w.id}.${f} = ${w[f]}`);
-      for (const [c, v] of Object.entries(w.damage)) assert.ok(['inf', 'light', 'heavy', 'struct', 'air'].includes(c) && v >= 0, `UNITS.${k} Waffe ${w.id}.damage.${c}`);
+      for (const [c, v] of Object.entries(w.damage)) assert.ok(['inf', 'light', 'heavy', 'struct', 'air', 'jet'].includes(c) && v >= 0, `UNITS.${k} Waffe ${w.id}.damage.${c}`);
     }
   }
 });

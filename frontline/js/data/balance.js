@@ -227,9 +227,36 @@ export const BALANCE = {
   river: { ford: 0.5, fordCost: 30, fordDepth: 12, deck: 80, bridgeHp: 2400, rebuildCost: 200, rebuild: 30, reach: 90 },
   // Kampfflugzeuge (seit v5.03, PRD §6 „F-16“, §15 „Flughafen“): ein Flughafen bietet capacity Plätze. In der Luft dreht ein Jet
   // höchstens turn rad/s und kreist im Abstand orbit (px) um seinen Befehlspunkt. Er fliegt zurück, wenn der Treibstoff für den
-  // Heimweg × reserve plus margin s nicht mehr reicht oder keine Rakete mehr da ist; landet in landReach (px) um die Landebahn.
+  // Heimweg × reserve plus margin s nicht mehr reicht oder keine Rakete mehr da ist; landet über eine Platzrunde auf Bahn 2 (Werte unten).
   // Am Boden in rearm s voll betankt und munitioniert (aus dem Lager der Hauptstadt) und repair × maxHp je s repariert.
-  jets: { capacity: 20, turn: 2.4, orbit: 280, reserve: 1.3, margin: 4, landReach: 150, rearm: 25, repair: 0.04, lift: 92 },
+  jets: {
+    capacity: 20,
+    turn: 2.4,
+    orbit: 280,
+    reserve: 1.3,
+    margin: 8, // s Treibstoff Reserve über dem Heimweg (seit v5.15 8 statt 4: Platzrunde und Rollen)
+    rearm: 25,
+    repair: 0.04,
+    lift: 92,
+    // Start und Landung (seit v5.15, aircraft.js): Rollen am Boden, Startlauf, Steigflug, Platzrunde, Gleitpfad, Ausrollen
+    taxi: 60, // Rolltempo am Boden (px/s)
+    taxiTurn: 3, // Drehrate am Boden (rad/s)
+    taxiWait: 12, // s, so lange wartet ein rollender Jet höchstens hinter einem anderen
+    gap: 40, // Abstand zum Vordermann beim Rollen (px)
+    accel: 110, // Beschleunigung im Startlauf und danach (px/s²)
+    rotate: 0.62, // Anteil des Reisetempos, bei dem er abhebt
+    climb: 3, // s vom Boden bis zur Reiseflughöhe
+    downwind: 0.75, // Tempo im Gegenanflug (Anteil des Reisetempos)
+    approach: 0.55, // Tempo im Endanflug (Anteil)
+    slow: 90, // Verzögerung in der Luft (px/s²)
+    decel: 120, // Bremsen nach dem Aufsetzen (px/s²)
+    final: 700, // Länge des Endanflugs vor der Schwelle (px)
+    base: 500, // erst westlich von Schwelle − base dreht er in den Endanflug ein (px)
+    pattern: 260, // seitlicher Abstand des Gegenanflugs zur Landebahn (px)
+    glide: 520, // Gleitpfad: auf so vielen px vor der Aufsetzmarke sinkt er von Reiseflughöhe auf den Boden
+    touch: 40, // Aufsetzmarke hinter der Schwelle von Bahn 2 (px)
+    zone: 220, // Aufsetzzone: bis so weit hinter der Marke darf er noch aufsetzen, sonst Durchstarten (px)
+  },
   // Tiere (rein optisch, nach den Jagdtieren aus Age of Empires II): `pairs` Rudelpaare (punktsymmetrisch) außerhalb der Zone, Rehe
   // (deer Tiere je Rudel) und Wildschweine (boar). Sie grasen und ziehen langsam (walk px/s) weiter; kommt eine Einheit näher als
   // scare (je Art: Infanterie, Fahrzeug, Hubschrauber) oder knallt es in boom px, flieht das ganze Rudel (run px/s) flee px weit.

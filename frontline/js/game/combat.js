@@ -12,6 +12,7 @@ import { armorMul, modOf, rangeMul, sightMul, dealtMul, smokeMul, hasUnlock } fr
 const autoTurret = (game, team) => hasUnlock(game, team, 'autoturret');
 import { damageBridge, deckDist } from './river.js';
 import { forEnemyCity } from './city.js';
+import { jetGrounded } from './aircraft.js';
 
 const SCAN = BALANCE.scanInterval;
 const MAX_UNIT_RADIUS = 16; // größter Einheitenradius (Trefferkreis-Suche)
@@ -25,7 +26,22 @@ export function weaponOf(e) {
   return e.kind === 'unit' ? null : (e.def.weapon ?? null);
 }
 
-const dmgKey = (e) => (e.kind === 'building' ? 'struct' : e.def.armor);
+const dmgKey = (e) => (e.kind === 'building' ? 'struct' : e.def.jet ? 'jet' : e.def.armor);
+
+/**
+ * Schaden einer Schadenstabelle gegen e. Flugzeuge (def.jet, seit v5.15) haben die eigene Klasse 'jet'; fehlt sie in der
+ * Tabelle, gilt der Wert gegen Hubschrauber ('air'), so treffen Flak, SAM und Flugabwehr Jets wie bisher.
+ */
+const dmgVs = (table, e) => {
+  const k = dmgKey(e);
+  return (k === 'jet' ? (table.jet ?? table.air) : table[k]) || 0;
+};
+
+/** Ist die Waffe für die Klasse des Ziels vorgesehen (targets; Jets zählen wie 'air')? */
+const meant = (spec, e) => {
+  const k = dmgKey(e);
+  return !!spec.targets && (spec.targets.includes(k) || (k === 'jet' && spec.targets.includes('air')));
+};
 
 /** Reichweite aus einem Stadthaus zählt ab der Hauswand (die Besatzer schießen aus den Fenstern). */
 const reachBonus = (game, u) => (u.house ? (game.entities.get(u.house)?.reach ?? 0) : 0);
@@ -49,7 +65,7 @@ export function shotDamage(spec, s, t, mult = 1) {
   if (t.kind === 'house' || t.kind === 'bridge') return (spec.damage.struct || 0) * mult * houseMult(spec.damage);
   const table = spec.hits;
   const entry = table && t.kind === 'unit' ? (table[t.type] ?? table[t.def.armor]) : undefined;
-  if (entry === undefined) return (spec.damage[dmgKey(t)] || 0) * mult;
+  if (entry === undefined) return dmgVs(spec.damage, t) * mult;
   const n = typeof entry === 'number' ? entry : entry[sectorOf(s, t)];
   const k = mult === 1 ? n : Math.max(1, Math.round(n / mult));
   return (t.def.hp / k) * 1.001;
@@ -143,7 +159,7 @@ function findTarget(game, hash, s, radius, minRange, allowBuildings, dmg) {
   let bestD = Infinity;
   const consider = (e) => {
     if (!e.alive || !isFoe(team, e) || e.house) return;
-    if (!(dmg[dmgKey(e)] > 0)) return; // z. B. Mörser und Panzer können keine Hubschrauber treffen
+    if (!(dmgVs(dmg, e) > 0)) return; // z. B. Mörser und Panzer können keine Hubschrauber treffen, Soldaten keine Flugzeuge
     if (leashed && Math.hypot(e.x - s.anchorX, e.y - s.anchorY) > Math.max(BALANCE.leash, radius) + radiusOf(e)) return;
     const d = Math.hypot(e.x - s.x, e.y - s.y);
     if (d < minRange || d > radius + radiusOf(e)) return;
@@ -188,26 +204,43 @@ export function unitHitChance(s, t, w) {
   return p * (1 - BALANCE.airFire.falloff * Math.min(1, Math.hypot(t.x - s.x, t.y - s.y) / w.range));
 }
 
+/** Waffe w der Einheit u feuert auf t (Vorrat, Abklingzeit, Effekt, Trefferwurf, Schaden). */
+function fireWeapon(game, u, w, t) {
+  w.rounds -= 1;
+  w.cd = (auraCooldown(u, w.spec.cooldown) * modOf(game, u, 'rof')) / (u.house ? houseFire(game, u) : 1); // Kommandeur in der Nähe, MG-Nest im Haus: schneller
+  game.teams[u.team].used.mun += w.spec.munCost;
+  if ((w.spec.damage.light || 0) >= 60) {
+    game.addEffect('shell', u.x, u.y, u.team, t.x, t.y, w.spec.id);
+    game.addEffect('explosion', t.x, t.y, u.team, t.x, t.y, 'hit');
+  } else {
+    game.addEffect('tracer', u.x, u.y, u.team, t.x, t.y, w.spec.id);
+  }
+  if (u.def.stealth) u.revealedUntil = game.time + BALANCE.stealth.revealTime; // ein Schuss verrät die Stellung
+  // Flak und SAM: Treffer nur mit Wurf (Trefferchance, siehe unitHitChance); daneben geht der Schuss, der Schaden bleibt aus
+  if (w.spec.hitChance !== undefined && !(game.rng.next() < unitHitChance(u, t, w.spec) * modOf(game, u, 'acc') * modOf(game, t, 'evade'))) return; // Forschung: Zünder, Radar; Flares, Störsender des Ziels
+  hit(game, t, shotDamage(w.spec, u, t, heightMult(game, u, t)) * dealtMul(game, u, t));
+}
+
+/** Reichweite der Waffe w von u gegen t (Forschung, Hauswand)? */
+const weaponReaches = (game, u, w, t) => inRange(u, t, w.spec.range * rangeMul(game, u) + reachBonus(game, u));
+
 /**
  * Einheit schießt auf t. Waffenwahl unter den schussbereiten Waffen in Reichweite, die dem Ziel schaden:
  * zuerst eine Waffe, die für die Panzerklasse des Ziels vorgesehen ist (targets), sonst die mit dem
  * besten Schaden je Munition. Ohne einen vollen Schuss: Mangelmeldung, keine Abklingzeit.
  */
 function tryFireUnit(game, u, t) {
-  const key = dmgKey(t);
-  const bonus = reachBonus(game, u);
-  const reach = rangeMul(game, u); // Wärmebildoptik, Zielfernrohre: weiter
   let pick = null;
   let pickScore = -1;
   let dry = false;
   for (const w of u.weapons) {
-    const dmg = w.spec.damage[key] || 0;
-    if (!(dmg > 0) || !inRange(u, t, w.spec.range * reach + bonus) || w.cd > 0) continue;
+    const dmg = dmgVs(w.spec.damage, t);
+    if (!(dmg > 0) || !weaponReaches(game, u, w, t) || w.cd > 0) continue;
     if (w.rounds < 1) {
       dry = true;
       continue;
     }
-    const score = (w.spec.targets && w.spec.targets.includes(key) ? 1e6 : 0) + dmg / w.spec.munCost;
+    const score = (meant(w.spec, t) ? 1e6 : 0) + dmg / w.spec.munCost;
     if (score > pickScore) {
       pick = w;
       pickScore = score;
@@ -217,19 +250,68 @@ function tryFireUnit(game, u, t) {
     if (dry) game.shortage(u.team, 'mun');
     return;
   }
-  pick.rounds -= 1;
-  pick.cd = (auraCooldown(u, pick.spec.cooldown) * modOf(game, u, 'rof')) / (u.house ? houseFire(game, u) : 1); // Kommandeur in der Nähe, MG-Nest im Haus: schneller
-  game.teams[u.team].used.mun += pick.spec.munCost;
-  if ((pick.spec.damage.light || 0) >= 60) {
-    game.addEffect('shell', u.x, u.y, u.team, t.x, t.y, pick.spec.id);
-    game.addEffect('explosion', t.x, t.y, u.team, t.x, t.y, 'hit');
-  } else {
-    game.addEffect('tracer', u.x, u.y, u.team, t.x, t.y, pick.spec.id);
+  fireWeapon(game, u, pick, t);
+}
+
+/** Bevorzugt die Waffe diese Zielklasse? Mit targets: diese Klassen; sonst die Klasse mit ihrem höchsten Schaden (MG: Infanterie). */
+function prefers(spec, e) {
+  if (spec.targets) return meant(spec, e);
+  spec.bestKey ??= Object.entries(spec.damage).reduce((a, b) => (b[1] > a[1] ? b : a))[0];
+  return dmgKey(e) === spec.bestKey;
+}
+
+/**
+ * Eigenes Ziel einer Waffe (parallel feuernde Einheiten, def.parallel): nächster sichtbarer Gegner in Reichweite, dem sie schadet,
+ * zuerst einer der Klasse, die sie bevorzugt (prefers), sonst irgendeiner. null, wenn keiner.
+ */
+function weaponTarget(game, hash, u, w) {
+  const R = w.spec.range * rangeMul(game, u) + reachBonus(game, u);
+  const leashed = u.order.type === 'idle';
+  let best = null;
+  let bestScore = Infinity;
+  const consider = (e) => {
+    if (!e.alive || !isFoe(u.team, e) || e.house || !(dmgVs(w.spec.damage, e) > 0)) return;
+    const d = Math.hypot(e.x - u.x, e.y - u.y);
+    if (d > R + radiusOf(e)) return;
+    if (leashed && Math.hypot(e.x - u.anchorX, e.y - u.anchorY) > Math.max(BALANCE.leash, R) + radiusOf(e)) return;
+    if (!game.sees(u.team, e)) return;
+    const score = d + (prefers(w.spec, e) ? 0 : 1e6);
+    if (score < bestScore) {
+      best = e;
+      bestScore = score;
+    }
+  };
+  for (const e of nearby(hash, u.x, u.y, R + MAX_UNIT_RADIUS)) consider(e);
+  for (const h of game.garrisoned) consider(h);
+  if (best && prefers(w.spec, best)) return best;
+  for (const b of game.buildings) if (!b.def.blocksAll && !b.def.gate) consider(b);
+  if (!best) forEnemyCity(game, u.team, u.x, u.y, R + 32, consider);
+  return best;
+}
+
+/**
+ * Parallel feuernde Einheit (def.parallel, seit v5.15: Kampf- und Schützenpanzer): jede Waffe schießt für sich, z. B. das MG auf
+ * Soldaten und gleichzeitig die Hauptkanone auf ein Fahrzeug. t = Hauptziel (Befehl oder Zielsuche): eine Waffe, die dafür
+ * vorgesehen ist, schießt darauf; die übrigen auf ihr eigenes Ziel (weaponTarget), sonst ebenfalls auf t.
+ */
+function fireParallel(game, u, t) {
+  let dry = false;
+  for (const w of u.weapons) {
+    if (w.cd > 0) continue;
+    const ok = (e) => !!e && isFoe(u.team, e) && dmgVs(w.spec.damage, e) > 0 && weaponReaches(game, u, w, e);
+    const own = w.targetId != null ? resolveTarget(game, w.targetId) : null;
+    let aim = null;
+    if (ok(t) && prefers(w.spec, t)) aim = t;
+    else if (ok(own)) aim = own;
+    else if (ok(t)) aim = t;
+    if (!aim) continue;
+    if (w.rounds < 1) {
+      dry = true;
+      continue;
+    }
+    fireWeapon(game, u, w, aim);
   }
-  if (u.def.stealth) u.revealedUntil = game.time + BALANCE.stealth.revealTime; // ein Schuss verrät die Stellung
-  // Flak und SAM: Treffer nur mit Wurf (Trefferchance, siehe unitHitChance); daneben geht der Schuss, der Schaden bleibt aus
-  if (pick.spec.hitChance !== undefined && !(game.rng.next() < unitHitChance(u, t, pick.spec) * modOf(game, u, 'acc') * modOf(game, t, 'evade'))) return; // Forschung: Zünder, Radar; Flares, Störsender des Ziels
-  hit(game, t, shotDamage(pick.spec, u, t, heightMult(game, u, t)) * dealtMul(game, u, t));
+  if (dry) game.shortage(u.team, 'mun');
 }
 
 function fireShell(game, s, tx, ty, w) {
@@ -315,7 +397,7 @@ function impact(game, p) {
     if (!e.alive || e.team === p.team || e.house || e.parked) return; // abgestellte Jets: im Hangar
     const d = Math.max(0, Math.hypot(e.x - p.tx, e.y - p.ty) - radiusOf(e));
     if (d >= R) return;
-    const dmg = (p.damage[dmgKey(e)] || 0) * (1 - d / R) * (p.mul ?? 1);
+    const dmg = dmgVs(p.damage, e) * (1 - d / R) * (p.mul ?? 1);
     hit(game, e, dmg);
   };
   for (const list of [game.units, game.buildings]) for (const e of list) splash(e);
@@ -356,12 +438,15 @@ export function updateCombat(game, dt) {
   const wx = weatherSight(game); // Regen, Nebel und Schnee verkürzen die Zielsuche (Forschung: Optik, Drohnen verlängern sie)
 
   for (const u of units) {
-    if (!u.alive || !u.weapons.length || u.crate || u.parked) continue; // Kistenträger haben die Hände voll, abgestellte Jets stehen im Hangar
+    if (!u.alive || !u.weapons.length || u.crate || u.parked || jetGrounded(u)) continue; // Kistenträger haben die Hände voll, Jets am Boden (Hangar, Rollen, Start, Ausrollen) schießen nicht
     const o = u.order.type;
     if (NO_FIRE.has(o)) continue;
+    const par = u.def.parallel && u.weapons.length > 1;
+    if (par && u.scanTimer <= 0) for (const w of u.weapons) w.targetId = weaponTarget(game, hash, u, w)?.id ?? null; // eigenes Ziel je Waffe
     if (o === 'attack') {
+      if (par) u.scanTimer = u.scanTimer <= 0 ? SCAN : u.scanTimer;
       const t = resolveTarget(game, u.order.targetId);
-      if (canAttack(u.team, t)) tryFireUnit(game, u, t);
+      if (canAttack(u.team, t)) (par ? fireParallel : tryFireUnit)(game, u, t);
       continue;
     }
     // idle / attackMove: automatische Zielsuche
@@ -370,10 +455,9 @@ export function updateCombat(game, dt) {
       const t = findTarget(game, hash, u, u.def.sight * wx * sightMul(game, u) + reachBonus(game, u), 0, true, u.def.damage);
       u.targetId = t ? t.id : null;
     }
-    if (u.targetId !== null) {
-      const t = resolveTarget(game, u.targetId);
-      if (isFoe(u.team, t)) tryFireUnit(game, u, t);
-    }
+    const t = u.targetId !== null ? resolveTarget(game, u.targetId) : null;
+    if (par) fireParallel(game, u, isFoe(u.team, t) ? t : null);
+    else if (isFoe(u.team, t)) tryFireUnit(game, u, t);
   }
 
   for (const b of buildings) {
