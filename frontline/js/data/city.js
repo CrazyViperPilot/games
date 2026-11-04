@@ -47,6 +47,7 @@ export const CITY = {
     delay: 6, // s ohne Treffer, bevor geheilt oder repariert wird
     levelMul: [0, 1, 1.5, 2], // Tempo × je Stufe des Gebäudes
     metalShare: 0.5, // Reparatur kostet Metall aus dem Stadtlager: metalCost der Einheit × repariert/maxHp × metalShare (Soldaten gratis)
+    refuel: 0.05, // seit v5.19: Anteil des Treibstofftanks je s, den ein Heliport seinen Hubschraubern im Umkreis gibt; Kerosin kommt aus dem Stadtlager (c.kero), 1 Einheit je Treibstoffeinheit
     by: {
       barracks: { units: 'inf', radius: 2, rate: 0.02 }, // Soldaten, Anteil maxHp je s (Stufe 1: 50 s von 0 auf voll)
       factory: { units: 'ground', radius: 2, rate: 0.02 }, // Bodenfahrzeuge

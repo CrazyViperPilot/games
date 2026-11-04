@@ -6,7 +6,8 @@ import { CITY } from '../js/data/city.js';
 import { BALANCE } from '../js/data/balance.js';
 import { AI } from '../js/ai/ai.js';
 import { treeGone } from '../js/game/city.js';
-import { KINDS, canZone, cityNoise, freePop, aiCity, aiDefend, aiRaid, hasRoad, hasMarket, cityEntityAt, cityTrainers, KIND_ID, sizeOf, cellsOf, isPart, forEnemyCity, migrateCity, cityLevel } from '../js/game/city.js';
+import { KINDS, canZone, cityNoise, freePop, aiCity, aiDefend, aiRaid, hasRoad, hasMarket, cityEntityAt, cityTrainers, KIND_ID, sizeOf, cellsOf, isPart, forEnemyCity, migrateCity, cityLevel, accessCells, roadAt, cellRect } from '../js/game/city.js';
+import { transportOf } from '../js/game/transport.js';
 import { snapshotGame, restoreGame } from '../js/game/savegame.js';
 import { RELIEF } from '../js/game/relief.js';
 import { bridgeUnder } from '../js/game/river.js';
@@ -49,6 +50,75 @@ function clearStart(g, team = 0) {
   }
 }
 const raw = (g, kind, c0, r0, c1, r1, team = 0) => g.issue(team, { type: 'city', kind, c0, r0, c1, r1 });
+// Nachbarzellen (4er) einer Zelle, nur innerhalb des Rasters.
+function nbOf(c, j) {
+  const q = j % c.cols;
+  const r = (j - q) / c.cols;
+  const out = [];
+  if (q > 0) out.push(j - 1);
+  if (q < c.cols - 1) out.push(j + 1);
+  if (r > 0) out.push(j - c.cols);
+  if (r < c.rows - 1) out.push(j + c.cols);
+  return out;
+}
+// Breitensuche über freie, bebaubare Zellen ab `starts` bis goal(j) gilt; baut dann je Zelle des Weges eine Straße (Befehl).
+function connect(g, team, starts, goal) {
+  const c = g.city[team];
+  const n = c.cols * c.rows;
+  const prev = new Int32Array(n).fill(-1);
+  const seen = new Uint8Array(n);
+  const q = [];
+  const free = (k) => !seen[k] && !c.kind[k] && canZone(g, c, k);
+  for (const k of starts) if (free(k)) { seen[k] = 1; q.push(k); }
+  for (let h = 0; h < q.length; h++) {
+    const j = q[h];
+    if (goal(j)) {
+      for (let x = j; x !== -1; x = prev[x]) raw(g, 'road', x % c.cols, Math.floor(x / c.cols), x % c.cols, Math.floor(x / c.cols), team);
+      return true;
+    }
+    for (const k of nbOf(c, j)) if (free(k)) { seen[k] = 1; prev[k] = j; q.push(k); }
+  }
+  return false;
+}
+// Straße vom Gebäude mit Anker a zum nächsten Straßennetz (seit v5.19 braucht Produktion einen Weg). Hat es schon einen Anschluss: nichts.
+function linkRoad(g, team, a) {
+  const c = g.city[team];
+  if (accessCells(c, a).length) return;
+  const starts = [];
+  for (const j of cellsOf(c, a)) starts.push(...nbOf(c, j));
+  assert.ok(connect(g, team, starts, (j) => nbOf(c, j).some((k) => roadAt(c, k))), `keine Straße zu Gebäude ${a} möglich`);
+}
+// Das Straßennetz, an dem Gebäude a hängt, an das Lager der Hauptstadt anschließen (seit v5.19 braucht ein Werk einen Weg dorthin).
+// Hat a schon einen Weg zum Lager, passiert nichts.
+function linkMain(g, team, a) {
+  const c = g.city[team];
+  if (transportOf(g, c).routes.get(a)?.to === 'main') return;
+  const m = g.mainFob(team);
+  const T = g.grid.tile;
+  const e = CITY.fobMargin + c.cell;
+  const x0 = m.cx * T - e;
+  const x1 = (m.cx + m.w) * T + e;
+  const y0 = m.cy * T - e;
+  const y1 = (m.cy + m.h) * T + e;
+  const reach = (j) => {
+    const r = cellRect(c, j % c.cols, Math.floor(j / c.cols));
+    return r.x0 < x1 && r.x1 > x0 && r.y0 < y1 && r.y1 > y0;
+  };
+  // Straßen des Netzes um a (Breitensuche über Straßenzellen)
+  const net = accessCells(c, a).slice();
+  const seen = new Uint8Array(c.cols * c.rows);
+  for (const j of net) seen[j] = 1;
+  for (let h = 0; h < net.length; h++) {
+    for (const k of nbOf(c, net[h])) {
+      if (seen[k] || !roadAt(c, k)) continue;
+      seen[k] = 1;
+      net.push(k);
+    }
+  }
+  const starts = [];
+  for (const j of net) starts.push(...nbOf(c, j));
+  assert.ok(connect(g, team, starts, reach), 'kein Straßenanschluss zum Lager möglich');
+}
 // Ausbildungsgebäude der Stadt (seit v4.96), das `unit` ausbildet (Startviertel: Kaserne und Fabrikhalle)
 const trainerFor = (g, unit, team = 0) => cityTrainers(g, team).find((e) => e.produces.includes(unit));
 
@@ -107,6 +177,9 @@ test('Wohnen + Werk + Straße: Einwohner arbeiten, Lager und Geld wachsen', () =
   assert.match(paint(g, 'mine', 5, 4, 5, 4).reason, /vorkommen/);
   assert.match(paint(g, 'mine', 2, 4, 2, 4).reason, /räumen/, 'BM-Werk steht dort: nicht überbauen');
   assert.ok(paint(g, 'mine', 0, 4, 1, 4).ok);
+  linkRoad(g, 0, at(g, 0, 4)); // Förderanlagen brauchen eine Straße (seit v5.19)
+  linkRoad(g, 0, at(g, 1, 4));
+  linkMain(g, 0, c.list.find((i) => c.kind[i] === KIND_ID.bm)); // das Netz erreicht das Lager (seit v5.19 braucht BM einen Weg dorthin)
   const m = g.mainFob(0);
   m.store.bm = 0;
   const money0 = g.teams[0].res.money;
@@ -353,6 +426,10 @@ test('Stahl: Erzmine, Hütte und Stahlwerk liefern, Fahrzeuge kosten Stahl, Abbr
   c.deposit[at(g, 5, 3)] = 3; // Erz
   c.deposit[at(g, 6, 3)] = 3;
   paint(g, 'mine', 5, 3, 6, 3);
+  linkRoad(g, 0, at(g, 5, 3)); // Erzmine braucht eine Straße zur Hütte (seit v5.19)
+  linkRoad(g, 0, at(g, 6, 3));
+  paint(g, 'res', 7, 4, 7, 4); // Wohnen an der Erzstraße: Förderung, Hütte und Stahlwerk pendeln dorthin (seit v5.19 nötig)
+  linkMain(g, 0, c.list.find((i) => c.kind[i] === KIND_ID.steel));
   run(g, 90);
   assert.ok(c.stats.raw.ore > 0 && c.stats.iron > 0 && c.stats.metal > 0, `Stahl/s ${c.stats.metal}, Roheisen/s ${c.stats.iron}`);
   c.metal = 50;
@@ -428,6 +505,8 @@ test('Startviertel: Raffinerie, Wohnen und Ölquelle stehen fertig, Treibstoff f
     const kinds = c.list.filter((i) => c.level[i]).map((i) => c.kind[i]);
     assert.ok(kinds.includes(6) && kinds.includes(2) && kinds.includes(8), `Team ${team}: ${kinds}`);
   }
+  const c0 = g.city[0];
+  linkRoad(g, 0, c0.list.find((i) => c0.kind[i] === KIND_ID.mine && c0.level[i])); // Ölquelle an die Straße (seit v5.19 Pflicht)
   const m = g.mainFob(0);
   m.store.fuel = 0;
   run(g, 30);

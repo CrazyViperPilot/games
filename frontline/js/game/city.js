@@ -9,6 +9,7 @@ import { makeRng } from '../core/rng.js';
 import { blockers } from './mapdata.js';
 import { RELIEF } from './relief.js';
 import { bridgeUnder } from './river.js';
+import { transportOf, pathEff, addLoad, beginLoads, settleLoads } from './transport.js';
 
 /** Zellenarten (Code im Raster): 0 leer. Neue Arten nur hinten anhängen (Code = Index + 1). */
 export const KINDS = ['road', 'res', 'com', 'bm', 'mun', 'fuel', 'steel', 'mine', 'market', 'power', 'uni', 'dc', 'barracks', 'factory', 'heliport', 'hospital', 'airport', 'smelter', 'kero'];
@@ -45,7 +46,7 @@ export const GOODS = ['bm', 'mun', 'fuel', 'metal', 'kero'];
 /** Waren im Stadtlager (Obergrenze BALANCE.logistics.storeCap); die übrigen liegen im Lager der Hauptstadt. Stahl heißt intern metal. */
 export const CITY_STORE_GOODS = ['metal', 'kero'];
 
-const zeroStats = () => ({ powerSupply: 0, powerUse: 0, powerRatio: 1, happy: 1, pop: 0, housing: 0, jobs: 0, jobsCom: 0, workers: 0, drafted: 0, free: 0, fled: 0, bm: 0, mun: 0, fuel: 0, kero: 0, iron: 0, metal: 0, money: 0, raw: { wood: 0, stone: 0, ore: 0, oil: 0 } });
+const zeroStats = () => ({ powerSupply: 0, powerUse: 0, powerRatio: 1, happy: 1, pop: 0, housing: 0, jobs: 0, jobsCom: 0, workers: 0, drafted: 0, free: 0, fled: 0, bm: 0, mun: 0, fuel: 0, kero: 0, iron: 0, metal: 0, money: 0, lost: 0, jam: 1, raw: { wood: 0, stone: 0, ore: 0, oil: 0 }, cap: { bm: 0, iron: 0, fuel: 0, kero: 0, metal: 0, mun: 0 }, inp: { bm: 0, iron: 0, fuel: 0, kero: 0, metal: 0, mun: 0 }, gross: { bm: 0, iron: 0, fuel: 0, kero: 0, metal: 0, mun: 0 } });
 
 /**
  * Gesperrte Zellen (für beide Teams gleich): unter und um jede Hauptstadt oder auf Hindernissen (Bäume, Wasser, Häuser, Gebäude).
@@ -1114,6 +1115,31 @@ function dropEntity(game, c, i) {
   trainersOf(c).delete(e);
 }
 
+/** Arbeitsspeicher je Stadt (einmal angelegt, kein Allokieren im Schritt): Eingang je Gebäude und Wirkung je Gebäude. */
+const SCRATCH = new WeakMap();
+function scratchOf(c) {
+  let w = SCRATCH.get(c);
+  if (!w) {
+    const n = c.cols * c.rows;
+    w = { arr: new Float64Array(n), eff: new Float64Array(n) };
+    SCRATCH.set(c, w);
+  }
+  return w;
+}
+
+/** Werke in der Reihenfolge der Verarbeitung (Hütte liefert Roheisen ans Stahlwerk, bevor dieses rechnet). */
+const WORK_ORDER = ['smelter', 'steel', 'bm', 'fuel', 'kero'];
+
+/** Arbeitsplätze eines fertigen Gebäudes (wie totals; Förderanlage nur mit Vorkommen). */
+function jobsOf(c, i, k, lv) {
+  if (k === 'mine') return DEPOSITS[c.deposit[i] - 1] ? CITY.jobsMine[lv] : 0;
+  if (k === 'com' || k === 'market') return CITY.jobsCom[lv];
+  if (k === 'uni') return CITY.jobsUni[lv];
+  if (k === 'dc') return CITY.jobsDc[lv];
+  if (k === 'power' || WORKS.includes(k)) return CITY.jobs[lv];
+  return 0;
+}
+
 /** Ein Simulationsschritt der Stadt beider Teams. Nach updateEconomy aufrufen. */
 export function updateCity(game, dt) {
   if (!game.city) return;
@@ -1173,7 +1199,7 @@ export function updateCity(game, dt) {
       const kind = KINDS[c.kind[i] - 1];
       const col = i % c.cols;
       const row = (i - col) / c.cols;
-      if (kind === 'road' || (kind !== 'mine' && !hasRoad(c, col, row))) continue;
+      if (kind === 'road' || !hasRoad(c, col, row)) continue; // seit v5.19 auch Förderanlagen: ohne Straße wachsen sie nicht
       const lv = c.level[i];
       if (lv >= CITY.maxLevel) continue;
       const need = lv === 0 ? CITY.growTime : CITY.upgradeTime;
@@ -1194,7 +1220,8 @@ export function updateCity(game, dt) {
     }
     if (built) updateClaim(game, c);
 
-    // Arbeit, Förderung, Verarbeitung, Steuern
+    // Arbeit, Förderung, Verarbeitung, Lager, Steuern (seit v5.19, AP3, PLAN 1.4): Rechnung je Gebäude über seinen Lieferweg.
+    // Pendler und Lieferwege kommen aus js/game/transport.js; Last und Stau laufen je Schritt (beginLoads … settleLoads).
     const fill = jobs > 0 ? Math.min(1, pool / jobs) : 0;
     const s = zeroStats();
     s.pop = pop;
@@ -1206,6 +1233,8 @@ export function updateCity(game, dt) {
     s.jobsCom = t.jobsCom;
     s.workers = jobs * fill;
     s.market = t.market;
+    s.fill = fill;
+    s.n = t.n; // fertige Gebäude je Art (Flussanzeige)
     // Strom (Stufe 3): Angebot aus Notstrom und Kraftwerken; Mangel bremst Förderung und Werke
     s.powerSupply = CITY.power.base + t.power * fill;
     s.powerUse = t.use;
@@ -1217,60 +1246,125 @@ export function updateCity(game, dt) {
     const safe = 1 - Math.min(1, hits / H.hitsBad);
     s.happy = pop > 0 ? Math.min(1, H.base + H.shops * shop + H.safety * safe + H.power * s.powerRatio) : 1;
     const mood = H.lo + H.span * s.happy;
-    const eff = fill * s.powerRatio * mood; // Besetzung × Strom × Zufriedenheit
+    s.mood = mood;
     s.uni = t.uni;
     s.dc = t.dc;
-    for (const d of DEPOSITS) s.raw[d] = t.mine[d] * eff * CITY.extract[d];
+    // eff_b = Besetzung × Strom × Zufriedenheit × Pendlerwirkung des Gebäudes (kein Pendlerweg: 0)
+    const base = fill * s.powerRatio * mood;
+    const tr = transportOf(game, c);
+    const W = scratchOf(c);
+    const eff = W.eff;
+    const arr = W.arr; // Ankunft am Eingang je Gebäude (Rate je s), nur für Werke und Förderung gelesen
+    arr.fill(0);
+    beginLoads(tr);
+    for (const i of c.list) {
+      const lv = c.level[i];
+      if (!lv || isPart(c, i)) continue;
+      const k = KINDS[c.kind[i] - 1];
+      if (k === 'road') continue;
+      let pend = 1;
+      if (tr.commute.has(i)) {
+        // Arbeitsstätte: Pendler laufen über den Pendlerweg zur nächsten Wohnung (Last), die Arbeit wirkt mit dessen Stau
+        const p = tr.commute.get(i);
+        pend = pathEff(tr, p);
+        const jobsB = jobsOf(c, i, k, lv);
+        if (p && jobsB > 0) addLoad(tr, p, jobsB * fill * CITY.transport.commute);
+      }
+      eff[i] = base * pend;
+    }
     const Y = CITY.yield;
     const K = CITY.convert;
-    // Kette (CITY.chain, seit v5.19): Erz → Hütte → Roheisen → Stahlwerk → Stahl (Stadtlager) → Munitionswerk. Öl geht anteilig nach
-    // Arbeitsplätzen an Raffinerie (Treibstoff) und Kerosin-Raffinerie (Kerosin, Stadtlager). Noch ohne Transportlogik (AP1).
-    const ironCap = t.smelter * eff * Y.iron;
-    const steelCap = t.steel * eff * Y.metal;
-    const ironIn = Math.min(ironCap, s.raw.ore / K.iron); // Roheisen, das die Erze hergeben
-    const metalOut = Math.min(steelCap, ironIn / K.metal); // Stahl: das Stahlwerk nimmt nur so viel Roheisen
-    s.iron = metalOut * K.metal; // Roheisen, das wirklich zum Stahlwerk läuft (kein Lager)
-    // Öl: zuerst der Anteil nach Arbeitsplätzen (begrenzt auf das, was das Werk schafft), dann der Rest an das andere Werk, dann
-    // wieder der Rest an die Raffinerie (kein Öl verfällt, solange eine Raffinerie es verarbeiten kann)
-    const oilJobs = t.fuel + t.kero;
-    const oilShare = oilJobs > 0 ? (s.raw.oil * t.fuel) / oilJobs : 0;
-    const fuelNeed = t.fuel * eff * Y.fuel * K.fuel; // Öl, das die Raffinerie je s schafft
-    const keroNeed = t.kero * eff * Y.kero * K.kero; // Öl, das die Kerosin-Raffinerie je s schafft
-    const oilFuel0 = Math.min(oilShare, fuelNeed);
-    const oilKero = Math.min(s.raw.oil - oilFuel0, keroNeed);
-    const oilFuel = Math.min(s.raw.oil - oilKero, fuelNeed);
-    s.bm = Math.min(t.bm * eff * Y.bm, (s.raw.wood + s.raw.stone) / K.bm);
-    s.fuel = Math.min(t.fuel * eff * Y.fuel, oilFuel / K.fuel);
-    s.kero = Math.min(t.kero * eff * Y.kero, oilKero / K.kero);
-    const stock = c.metal / Math.max(dt, 1e-6); // Stahl aus dem Stadtlager je s (für die Munition)
-    s.mun = Math.min(t.mun * eff * Y.mun, (stock + metalOut) / K.mun); // Munition braucht Stahl
-    s.metal = metalOut - s.mun * K.mun;
-    // Für die Flussanzeige (js/game/flow.js, CITY.chain): je Produkt Leistung der Werke (cap), was die Rohstoffe hergeben (inp), Erzeugung (gross)
-    s.cap = { bm: t.bm * eff * Y.bm, iron: ironCap, fuel: t.fuel * eff * Y.fuel, kero: t.kero * eff * Y.kero, metal: steelCap, mun: t.mun * eff * Y.mun };
-    s.inp = { bm: (s.raw.wood + s.raw.stone) / K.bm, iron: s.raw.ore / K.iron, fuel: oilFuel / K.fuel, kero: oilKero / K.kero, metal: ironIn / K.metal, mun: (stock + metalOut) / K.mun };
-    s.gross = { bm: s.bm, iron: s.iron, fuel: s.fuel, kero: s.kero, metal: metalOut, mun: s.mun };
-    s.n = t.n;
-    s.fill = fill;
-    s.mood = mood;
+    // Förderung: Rohstoff je Förderanlage, Fluss zum nächsten Ziel (Werk); ohne Weg geht er verloren
+    for (const i of c.list) {
+      const lv = c.level[i];
+      if (!lv || isPart(c, i) || KINDS[c.kind[i] - 1] !== 'mine') continue;
+      const d = DEPOSITS[c.deposit[i] - 1];
+      if (!d) continue;
+      const roh = CITY.jobsMine[lv] * eff[i] * CITY.extract[d];
+      s.raw[d] += roh;
+      const r = tr.routes.get(i);
+      const p = r ? r.path : null;
+      addLoad(tr, p, roh);
+      if (!p) s.lost += roh;
+      else arr[r.to] += roh * pathEff(tr, p);
+    }
+    // Werke in Kettenfolge (Hütte → Stahlwerk, dann BM, Raffinerien): Ausstoß = min(Leistung, Eingang / Verbrauch), Fluss zum Ziel
+    const main = game.mainFob(id);
+    const credit = !!main?.built; // Lager der Hauptstadt steht (sonst gehen Waren zum Lager verloren)
+    for (const k of WORK_ORDER) {
+      const prod = CITY.chain[k].to;
+      for (const i of c.list) {
+        const lv = c.level[i];
+        if (!lv || isPart(c, i) || KINDS[c.kind[i] - 1] !== k) continue;
+        const cap = CITY.jobs[lv] * eff[i] * Y[prod]; // Leistung je s
+        const inp = arr[i] / K[prod]; // Produkt je s, das der Eingang hergibt
+        const out = Math.min(cap, inp);
+        s.cap[prod] += cap;
+        s.inp[prod] += inp;
+        s.gross[prod] += out;
+        const r = tr.routes.get(i);
+        const p = r && (r.to !== 'main' || credit) ? r.path : null;
+        addLoad(tr, p, out);
+        if (!p) s.lost += out;
+        else if (r.to === 'main') s[prod] += out * pathEff(tr, p); // Ankunft im Lager (bm, fuel, kero, metal = Stahl)
+        else arr[r.to] += out * pathEff(tr, p); // Roheisen zum Stahlwerk
+      }
+    }
+    s.iron = s.gross.iron;
+    // Lager gutschreiben (vor den Munitionswerken, die den Stahl daraus ziehen)
     const made = (c.made ??= { bm: 0, mun: 0, fuel: 0, metal: 0, kero: 0 }); // Summe, die wirklich ins Lager kam (Flussanzeige misst damit den Verbrauch)
     made.kero ??= 0; // Stände vor v5.19
     const metal0 = c.metal;
-    c.metal = Math.max(0, Math.min(BALANCE.logistics.storeCap, c.metal + s.metal * dt));
-    made.metal += Math.max(0, c.metal - metal0 + s.mun * K.mun * dt); // was das Stahlwerk ins Stadtlager bringt (das Munitionswerk zählt als Verbrauch)
     const kero0 = c.kero;
-    c.kero = Math.max(0, Math.min(BALANCE.logistics.storeCap, c.kero + s.kero * dt));
-    made.kero += Math.max(0, c.kero - kero0);
-    s.money = (pool * CITY.taxPop + t.jobsCom * fill * CITY.taxCom) * mood;
-    c.stats = s;
-
-    const main = game.mainFob(id);
-    if (main && main.built) {
-      for (const k of ['bm', 'mun', 'fuel']) {
+    if (credit) {
+      for (const k of ['bm', 'fuel']) {
         const v0 = main.store[k];
         main.store[k] = Math.min(BALANCE.logistics.capitalCap, v0 + s[k] * dt);
         made[k] += Math.max(0, main.store[k] - v0);
       }
     }
+    c.metal = Math.max(0, Math.min(BALANCE.logistics.storeCap, metal0 + s.metal * dt));
+    c.kero = Math.max(0, Math.min(BALANCE.logistics.storeCap, kero0 + s.kero * dt));
+    made.kero += Math.max(0, c.kero - kero0);
+    // Munitionswerke: ziehen Stahl aus dem Stadtlager über ihren Weg (Hin: Stahl, zurück: Munition), höchstens was da ist
+    const stock = c.metal / Math.max(dt, 1e-6); // Stahl je s im Stadtlager
+    s.inp.mun = stock / K.mun;
+    let drawn = 0; // Stahl je s, den die Munitionswerke ziehen
+    for (const i of c.list) {
+      const lv = c.level[i];
+      if (!lv || isPart(c, i) || KINDS[c.kind[i] - 1] !== 'mun') continue;
+      const cap = CITY.jobs[lv] * eff[i] * Y.mun; // Munition je s
+      s.cap.mun += cap;
+      const p = tr.mun.get(i) ?? null;
+      if (!p) continue; // ohne Weg zum Lager: kein Stahl, keine Munition
+      const bed = Math.min(cap * K.mun, Math.max(0, stock - drawn));
+      const w = pathEff(tr, p);
+      addLoad(tr, p, bed);
+      const mun = (bed * w) / K.mun; // Munition je s am Werk
+      addLoad(tr, p, mun);
+      s.gross.mun += mun;
+      s.mun += mun * w; // Ankunft im Lager
+      drawn += bed;
+    }
+    s.metal -= drawn; // Stahl je s: Zugang der Stahlwerke minus Munitionswerke
+    c.metal = Math.max(0, c.metal - drawn * dt);
+    made.metal += Math.max(0, c.metal - metal0 + drawn * dt); // was die Stahlwerke ins Stadtlager bringen (Munition zählt als Verbrauch)
+    if (credit) {
+      const v0 = main.store.mun;
+      main.store.mun = Math.min(BALANCE.logistics.capitalCap, v0 + s.mun * dt);
+      made.mun += Math.max(0, main.store.mun - v0);
+    }
+    // Stau: kleinster Stau-Faktor auf den in diesem Schritt benutzten Straßen (1 ohne Stau), dann Glättung für den nächsten Schritt
+    let jam = 1;
+    for (let m = 0; m < tr.list.length; m++) {
+      const j = tr.list[m];
+      if (tr.load[j] > 0 && tr.factor[j] < jam) jam = tr.factor[j];
+    }
+    s.jam = jam;
+    settleLoads(tr, dt);
+    s.money = (pool * CITY.taxPop + t.jobsCom * fill * CITY.taxCom) * mood;
+    c.stats = s;
+
     team.res.money += s.money * dt;
     team.rate.money += s.money;
     updateCare(game, c, dt);
@@ -1286,10 +1380,33 @@ function updateCare(game, c, dt) {
   const givers = [];
   for (const [i, e] of c.ents) {
     const spec = C.by[KINDS[c.kind[i] - 1]];
-    if (spec && e.alive) givers.push({ e, spec, r2: ((spec.radius + (c.part?.[i] ? sizeOf(KINDS[c.kind[i] - 1]) : 1) / 2) * c.cell) ** 2, rate: spec.rate * (C.levelMul[c.level[i]] ?? 1) });
+    if (spec && e.alive) givers.push({ e, spec, r2: ((spec.radius + (c.part?.[i] ? sizeOf(KINDS[c.kind[i] - 1]) : 1) / 2) * c.cell) ** 2, rate: spec.rate * (C.levelMul[c.level[i]] ?? 1), heli: KINDS[c.kind[i] - 1] === 'heliport' });
   }
   if (!givers.length) return;
   const power = c.stats.powerRatio ?? 1;
+  // Tanken (seit v5.19): Hubschrauber im Umkreis eines Heliports tanken Kerosin aus dem Stadtlager (1 Einheit je Treibstoffeinheit).
+  // Kampfflugzeuge tanken am Flughafen (aircraft.js), nicht hier.
+  if (c.kero > 0 && givers.some((g) => g.heli)) {
+    for (const u of game.units) {
+      if (!u.alive || u.team !== c.team || !u.def.fuelMax || u.def.jet || u.fuel >= u.def.fuelMax || careClass(u) !== 'air') continue;
+      let near = false;
+      for (const g of givers) {
+        if (!g.heli) continue;
+        const dx = u.x - g.e.x;
+        const dy = u.y - g.e.y;
+        if (dx * dx + dy * dy <= g.r2) {
+          near = true;
+          break;
+        }
+      }
+      if (!near) continue;
+      const want = Math.min(u.def.fuelMax - u.fuel, u.def.fuelMax * C.refuel * power * dt);
+      const got = Math.min(want, c.kero);
+      u.fuel += got;
+      c.kero -= got;
+      if (got < want - 1e-9) game.shortage(c.team, 'fuel');
+    }
+  }
   for (const u of game.units) {
     if (!u.alive || u.team !== c.team || u.hp >= u.maxHp || game.time - u.lastHitTime < C.delay) continue;
     const cls = careClass(u);
@@ -1559,7 +1676,7 @@ export function cmdCity(game, team, cmd) {
   rebuildList(city);
   // Zonen ohne Straße daneben wachsen nicht (Förderanlagen schon): melden
   let noRoad = false;
-  if (!erase && cmd.kind !== 'road' && cmd.kind !== 'mine') {
+  if (!erase && cmd.kind !== 'road') {
     for (let row = r0; row <= r1 && !noRoad; row++) for (let col = c0; col <= c1; col++) if (city.kind[idx(city, col, row)] === id && !hasRoad(city, col, row)) noRoad = true;
   }
   return { ok: true, placed, broke: !!broke, noRoad, occupied, felled, razed, manned, kept };
