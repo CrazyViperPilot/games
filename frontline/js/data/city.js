@@ -18,8 +18,18 @@ export const CITY = {
   taxCom: 0.15, // zusätzliches Geld/s je Arbeiter im Gewerbe
 
   // ---- Bau ----
-  cost: { road: 0, res: 20, com: 30, bm: 40, mun: 40, fuel: 40, steel: 50, mine: 30, market: 60, power: 80, uni: 150, dc: 250 }, // Geld je Zelle (Abriss kostenlos, keine Erstattung)
-  costBm: { road: 10 }, // Baumaterial je Zelle aus dem Lager der Hauptstadt (seit v4.83: Straßen kosten Baumaterial statt Geld)
+  cost: { road: 0, res: 20, com: 30, bm: 40, mun: 40, fuel: 40, steel: 50, mine: 30, market: 60, power: 80, uni: 150, dc: 250, barracks: 80, factory: 150, heliport: 200 }, // Geld je Zelle (Abriss kostenlos, keine Erstattung)
+  costBm: { road: 10, barracks: 100, factory: 200, heliport: 150 }, // Baumaterial je Zelle aus dem Lager der Hauptstadt (seit v4.83: Straßen kosten Baumaterial statt Geld)
+
+  // ---- Ausbildung (seit v4.96, PRD §15) ----
+  // Mit Stadt bilden nur diese Stadtgebäude Truppen aus (die Hauptstadt nicht mehr). Sie bezahlen direkt aus der Stadt:
+  // Geld aus der Kasse, Metall aus dem Stadtlager, Einwohner als Truppen; kein LKW nötig, egal wo sie stehen.
+  produces: {
+    barracks: ['rifleman', 'at', 'sniper', 'commander'], // Kaserne: Soldaten
+    factory: ['truck', 'engineer', 'ifv', 'tank', 'flak', 'sam'], // Fabrikhalle: alle Fahrzeuge
+    heliport: ['littlebird', 'transporter', 'gunship'], // Heliport: Hubschrauber
+  },
+  trainSlots: [0, 2, 3, 4], // gleichzeitige Ausbildungen je Stufe (Stufe 1 wie früher die Hauptstadt)
 
   // ---- Rohstoffe (seit v4.83, PRD §15) ----
   // Vorkommen auf der Karte: je Team eine Gruppe jeder Sorte nahe der Hauptstadt, dazu umkämpfte Gruppen zwischen Basis und Zone.
@@ -30,7 +40,7 @@ export const CITY = {
   // Verarbeitung: so viel Rohstoff braucht eine Einheit Produkt (BM aus Holz oder Stein, Metall aus Erz, Treibstoff aus Öl, Munition aus Metall)
   convert: { bm: 1, metal: 2, fuel: 1, mun: 0.5 },
   // Startviertel (seit v4.84): steht zu Beginn fertig (Stufe 1) neben der Hauptstadt, dazu eine Ölquelle auf dem nächsten Ölvorkommen
-  startQuarter: { road: 3, row: ['res', 'fuel', 'res'] }, // Straßenlänge und die Zellen darunter
+  startQuarter: { road: 3, row: ['res', 'fuel', 'res'], top: ['barracks', null, 'factory'] }, // Straßenlänge, die Zellen darunter und darüber (seit v4.96 Kaserne und Fabrikhalle)
   startMetal: 400, // Metall im Hauptlager zu Beginn (Metall bleibt dort, LKW fahren es nicht)
   // Metall je ausgebildeter Einheit (zusätzlich zum Geld); fehlt die Sorte, kostet sie kein Metall
   metalCost: { truck: 20, engineer: 20, ifv: 60, tank: 120, flak: 60, sam: 80, littlebird: 60, transporter: 80, gunship: 120 },
@@ -51,7 +61,7 @@ export const CITY = {
   power: {
     base: 40,
     supply: [0, 60, 120, 200],
-    use: { res: 1, com: 3, market: 3, bm: 8, mun: 8, fuel: 8, steel: 10, mine: 4, uni: 12, dc: 30, power: 0 },
+    use: { res: 1, com: 3, market: 3, bm: 8, mun: 8, fuel: 8, steel: 10, mine: 4, uni: 12, dc: 30, power: 0, barracks: 2, factory: 8, heliport: 6 },
   },
   // Zufriedenheit 0 … 1 = base + shops × Versorgung (Gewerbe-Arbeiter je Einwohner, voll ab shopPer) + safety × Sicherheit
   // (weniger Treffer auf die Stadt in den letzten 60 s, null ab hitsBad) + power × Strom. Wirkung: Erträge und Steuern × (lo + span × Zufriedenheit),
@@ -102,6 +112,9 @@ export const CITY = {
     defendRange: 2500, // px, nur Einheiten in diesem Abstand
     defendCooldown: 12, // s zwischen zwei Verteidigungsbefehlen
     // Angriffsziele: Wert je Zellenart (geteilt durch Entfernung); Werke und Förderung zuerst
-    targetValue: { steel: 3, fuel: 3, mun: 3, power: 3, dc: 2.5, uni: 2, mine: 2.5, market: 2, bm: 2, com: 1, res: 0.5 },
+    targetValue: { steel: 3, fuel: 3, mun: 3, power: 3, dc: 2.5, uni: 2, mine: 2.5, market: 2, bm: 2, com: 1, res: 0.5, barracks: 2.5, factory: 3, heliport: 3 },
+    // Ausbildungsgebäude (seit v4.96): so viele will sie haben; ab moreFrom Arbeitsstätten je eins mehr (Heliport erst, wenn Hubschrauber freigeschaltet sind)
+    producers: { barracks: 1, factory: 1, heliport: 1 },
+    moreFrom: 14,
   },
 };

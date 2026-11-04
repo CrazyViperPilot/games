@@ -100,7 +100,7 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 
 | `cmd.type` | Felder | Handler (`js/game/`) | Wirkung |
 |---|---|---|---|
-| `city` | `kind` (`road`, `res`, `com`, `bm`, `mun`, `fuel`, `erase`), `c0, r0, c1, r1` | `city.js` `cmdCity` | Stadtzellen im Rechteck ausweisen oder räumen (nur mit Stadt) |
+| `city` | `kind` (Zellenart aus `KINDS` in `city.js`, z. B. `road`, `res`, `com`, `market`, `barracks`, `factory`, `heliport`, oder `erase`), `c0, r0, c1, r1` | `city.js` `cmdCity` | Stadtzellen im Rechteck ausweisen oder räumen (nur mit Stadt) |
 | `move`, `attackMove` | `ids, x, y, formation?` | `game.js` `cmdMove` | Marsch bzw. Angriffsmarsch, optional in Formation |
 | `attack` | `ids, targetId` | `game.js` `cmdAttack` | Ziel angreifen (auch Brücken) |
 | `stop` | `ids` | `game.js` | Anhalten |
@@ -120,7 +120,7 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 | `fortify` | `buildingId, towers?, tx?, ty?, ids?` | `tower.js` `cmdFortify` | FOB zur Festung ausbauen (Mauerring, Tore, Türme) |
 | `pickup`, `deliver`, `dropCrate` | `ids, crateId` / `ids, fobId` / `ids` | `crates.js` | Kiste aufheben / abliefern / fallen lassen |
 | `drill` | `ids` | `hotzone.js` `cmdDrill` | Bohrer starten |
-| `train`, `cancelTrain` | `buildingId, unit` / `buildingId` | `game.js` | Ausbildung in der Hauptstadt / letzten Eintrag abbrechen |
+| `train`, `cancelTrain` | `buildingId, unit` / `buildingId` | `game.js` | Ausbildung in der Hauptstadt (mit Stadt: Kaserne, Fabrikhalle, Heliport = Stadt-Entities mit `produces`, `queue`) / letzten Eintrag abbrechen |
 | `research`, `cancelResearch` | `buildingId, key` / – | `research.js` | Forschung starten / abbrechen |
 | `smoke`, `mine` | `ids` | `abilities.js` | Nebelwand (Fahrzeuge) / Mine (Baufahrzeug) |
 | `rally` | `buildingId, x, y` | `game.js` `cmdRally` | Sammelpunkt |

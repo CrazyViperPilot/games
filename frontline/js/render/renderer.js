@@ -46,7 +46,7 @@ import { drawWeather } from './weatherfx.js';
 import { drawMood } from './mood.js';
 import { drawBridgeTop, drawBridgeIso, drawBridgeBar, bridgeBar, fordPosts, drawFordPostTop, drawFordPostIso } from './bridge.js';
 import { bridgeUnder } from '../game/river.js';
-import { drawCityGround, drawCityTop, cityBuildings } from './citylayer.js';
+import { drawCityGround, drawCityTop, cityBuildings, drawCityBadges } from './citylayer.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
@@ -197,6 +197,7 @@ export class Renderer {
     this.drawScars(ctx, inRect, z);
     drawCityGround(this, ctx, team, known, inRect); // Stadt: Straßen und Grundstücke
     drawCityTop(this, ctx, team, known, inRect); // Stadt: Dächer
+    drawCityBadges(this, ctx, team, known, inRect, false); // Stadt: Schilder (Funktion, privat/kommerziell)
     this.drawZone(ctx, z);
     this.drawHot(ctx, z, now);
 
@@ -655,6 +656,8 @@ export class Renderer {
       }
       cam.unpin();
     }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawCityBadges(this, ctx, team, known, inRect, true); // Stadt: Schilder über den Dächern (über allen Gebäuden)
     for (const u of air) drawU(u);
 
     // Geschosse fliegen im Bogen, Effekte am Boden

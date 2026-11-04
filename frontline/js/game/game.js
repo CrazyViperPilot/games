@@ -10,7 +10,7 @@ import { reliefOf } from './relief.js';
 import { createUnit, createBuilding, defineAmmo, isFoe, canAttack, inRange } from './entities.js';
 import { Fog } from './fog.js';
 import { updateEconomy, smoothIncome } from './economy.js';
-import { createCity, updateCity, cmdCity, cmdTrade, cityNoise, freePop, crewOf, payMetal } from './city.js';
+import { createCity, updateCity, cmdCity, cmdTrade, cityNoise, freePop, crewOf, payMetal, cityTrainers, trainerKind, KIND_NAME } from './city.js';
 import { updateMovement, nearestPassable, planPath, setIdle, separate, exitHouse } from './movement.js';
 import { updateCombat } from './combat.js';
 import { updateZone } from './zone.js';
@@ -895,12 +895,15 @@ export class Game {
     return { ok: true, count: n };
   }
 
-  /** { type: 'train', buildingId, unit }: nur die Hauptstadt; Einheiten kosten nur Geld (mit Forschung erst ab ihrer Stufe). */
+  /** { type: 'train', buildingId, unit }: Hauptstadt, mit Stadt Kaserne/Fabrikhalle/Heliport; Einheiten kosten Geld (mit Forschung erst ab ihrer Stufe). */
   cmdTrain(team, cmd) {
     const b = this.getEntity(cmd.buildingId);
     if (!b || b.kind !== 'building' || b.team !== team) return fail('Kein eigenes Gebäude gewählt');
     if (!b.built) return fail('Gebäude ist noch im Bau');
-    if (!UNITS[cmd.unit] || !b.produces.includes(cmd.unit)) return fail('Nur die Hauptstadt bildet Einheiten aus');
+    if (!UNITS[cmd.unit] || !b.produces.includes(cmd.unit)) {
+      const k = this.city && trainerKind(cmd.unit);
+      return fail(k ? `${UNITS[cmd.unit]?.name ?? 'Einheit'}: nur in der ${KIND_NAME[k]} der Stadt` : 'Nur die Hauptstadt bildet Einheiten aus');
+    }
     if (unitLocked(this, team, cmd.unit)) return fail(lockReason(cmd.unit));
     if (b.queue.length >= BALANCE.queueMax) return fail('Warteschlange ist voll');
     if (this.slotsUsed(team) + (UNITS[cmd.unit].slots ?? 1) > BALANCE.slotCap) return fail('Einheitenlimit erreicht');
@@ -924,10 +927,7 @@ export class Game {
       n += s(u.def);
       for (const p of u.passengers) n += s(p.def);
     }
-    for (const b of this.buildings) {
-      if (!b.alive || b.team !== team) continue;
-      for (const e of b.queue) n += s(UNITS[e.unit]);
-    }
+    for (const b of this.trainers(team)) for (const e of b.queue) n += s(UNITS[e.unit]);
     return n;
   }
 
@@ -937,7 +937,7 @@ export class Game {
     for (const u of this.units) {
       if (u.alive && u.team === team) n += 1 + u.passengers.length;
     }
-    for (const b of this.buildings) if (b.alive && b.team === team) n += b.queue.length;
+    for (const b of this.trainers(team)) n += b.queue.length;
     return n;
   }
 
@@ -950,11 +950,14 @@ export class Game {
       if (soldier(u.def)) n += 1;
       for (const p of u.passengers) if (soldier(p.def)) n += 1;
     }
-    for (const b of this.buildings) {
-      if (!b.alive || b.team !== team) continue;
-      for (const e of b.queue) if (soldier(UNITS[e.unit])) n += 1;
-    }
+    for (const b of this.trainers(team)) for (const e of b.queue) if (soldier(UNITS[e.unit])) n += 1;
     return n;
+  }
+
+  /** Lebende Gebäude eines Teams mit Warteschlange: eigene Gebäude und (mit Stadt, seit v4.96) Kaserne, Fabrikhalle, Heliport. */
+  trainers(team) {
+    const out = this.buildings.filter((b) => b.alive && b.team === team);
+    return this.city ? out.concat(cityTrainers(this, team)) : out;
   }
 
   cmdCancelTrain(team, cmd) {

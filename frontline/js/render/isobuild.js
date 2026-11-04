@@ -282,6 +282,10 @@ export function drawTownBuilding(ctx, cam, b) {
     drawBox(ctx, cam, x0, y0, x1, y1, 22, '#a29f94', { roof: '#c4c1b6' });
     return;
   }
+  if (b.kind === 'barracks' || b.kind === 'vhall' || b.kind === 'heliport') {
+    drawMilitaryTown(ctx, cam, b, x0, y0, x1, y1, H, seed);
+    return;
+  }
   if (b.kind === 'platform') {
     const ang = b.angle || 0;
     drawRotBox(ctx, cam, b.x, b.y, b.w, b.h, ang, H, '#a7a8a2', { roof: '#bfbfb7' });
@@ -361,6 +365,82 @@ export function drawTownBuilding(ctx, cam, b) {
     ctx.fillStyle = '#55585b';
     ctx.fillRect(c.x - 6.5 * z, base - 60 * z, 13 * z, 5 * z);
   }
+}
+
+/** Fahnenmast mit Teamfarbe (Welt x, y; Höhe ab Boden h). */
+function flagPole(ctx, cam, x, y, base, h, color) {
+  const z = cam.zoom;
+  const p = cam.worldToScreen(x, y);
+  const y0 = p.y - base * z;
+  ctx.strokeStyle = '#d8d8d0';
+  ctx.lineWidth = Math.max(1, 1.6 * z);
+  ctx.beginPath();
+  ctx.moveTo(p.x, y0);
+  ctx.lineTo(p.x, y0 - h * z);
+  ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.fillRect(p.x, y0 - h * z, 13 * z, 8 * z);
+}
+
+/**
+ * Militärische Stadtgebäude (seit v4.96): Kaserne (zwei lange Blöcke mit Satteldach und Fahne), Fabrikhalle (große Halle mit Toren)
+ * und Heliport (Landeplatz am Boden aus citylayer.js, hier nur Turm mit Windsack). Oliv, damit sie neben Wohnhäusern auffallen.
+ */
+function drawMilitaryTown(ctx, cam, b, x0, y0, x1, y1, H, seed) {
+  const wall = '#8f9670';
+  const roof = '#56603a';
+  if (b.kind === 'barracks') {
+    const alongX = (seed & 1) === 0;
+    const gap = 4;
+    const halves = alongX
+      ? [[x0, y0, x1, (y0 + y1) / 2 - gap], [x0, (y0 + y1) / 2 + gap, x1, y1]]
+      : [[x0, y0, (x0 + x1) / 2 - gap, y1], [(x0 + x1) / 2 + gap, y0, x1, y1]];
+    for (const [a0, b0, a1, b1] of halves) {
+      const top = drawBox(ctx, cam, a0, b0, a1, b1, H, wall, { wallS: shade(wall, 0.2), wallE: shade(wall, 0.42), noTop: true });
+      top.cam = cam;
+      top.color = wall;
+      for (const w of top.walls) plinth(ctx, w, wall);
+      if (cam.zoom >= DETAIL_ZOOM) for (const w of top.walls) windows(ctx, w, [[9, 19]], { gap: 12, ww: 6, seed, lit: 0.3 });
+      gableRoof(ctx, cam, a0, b0, a1, b1, H, 8, roof, wall);
+    }
+    flagPole(ctx, cam, x1 - 3, y1 - 3, 0, 46, b.color ?? '#c33');
+    return;
+  }
+  if (b.kind === 'vhall') {
+    const top = drawBox(ctx, cam, x0, y0, x1, y1, H, '#868b78', { wallS: shade('#868b78', 0.2), wallE: shade('#868b78', 0.42), roof: '#5c6352' });
+    top.cam = cam;
+    top.color = '#868b78';
+    for (const w of top.walls) {
+      plinth(ctx, w, top.color);
+      if (w.len * w.z >= 24) gate(ctx, w, 0.5, w.len * 0.55, H * 0.62, '#c9b24a', '#6f7468');
+    }
+    if (cam.zoom >= DETAIL_ZOOM) {
+      roofBox(ctx, cam, b.x - (x1 - x0) * 0.22, b.y, 6, H, 5, '#4b5143');
+      roofBox(ctx, cam, b.x + (x1 - x0) * 0.22, b.y, 6, H, 5, '#4b5143');
+    }
+    flagPole(ctx, cam, x0 + 2, y1 - 2, H, 22, b.color ?? '#c33');
+    return;
+  }
+  // Heliport: Turm in der Ecke (der Landeplatz liegt am Boden), Windsack
+  const tx = x1 - 6;
+  const ty = y0 + 6;
+  drawBox(ctx, cam, tx - 6, ty - 6, tx + 6, ty + 6, H, '#9a9d92', { roof: '#4a4f4a' });
+  drawBox(ctx, cam, tx - 7.5, ty - 7.5, tx + 7.5, ty + 7.5, 6, '#5f7f8f', { base: H, noShadow: true, roof: '#3a4a52' });
+  const p = cam.worldToScreen(x0 + 4, y1 - 4);
+  const z = cam.zoom;
+  ctx.strokeStyle = '#d8d8d0';
+  ctx.lineWidth = Math.max(1, 1.4 * z);
+  ctx.beginPath();
+  ctx.moveTo(p.x, p.y);
+  ctx.lineTo(p.x, p.y - 26 * z);
+  ctx.stroke();
+  ctx.fillStyle = '#e8762c';
+  ctx.beginPath();
+  ctx.moveTo(p.x, p.y - 26 * z);
+  ctx.lineTo(p.x + 14 * z, p.y - 23 * z);
+  ctx.lineTo(p.x, p.y - 20 * z);
+  ctx.closePath();
+  ctx.fill();
 }
 
 // ---- Gebäude der Teams -------------------------------------------------------------------------------------------

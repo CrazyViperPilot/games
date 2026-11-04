@@ -1,6 +1,6 @@
-// Wirtschaft: Produktion in der Hauptstadt und Geldrate (docs/verlauf.md §5, §11.1). Geld kommt nur aus Zone und Hot Zone. Kein DOM.
+// Wirtschaft: Produktion (Hauptstadt, mit Stadt Kaserne/Fabrikhalle/Heliport) und Geldrate (docs/verlauf.md §5, §11.1). Geld kommt nur aus Zone und Hot Zone. Kein DOM.
 // Baufortschritt: construction.js. Nachfüllen und LKW: logistics.js.
-import { crewOf } from './city.js';
+import { crewOf, cityTrainers } from './city.js';
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { planPath, setIdle } from './movement.js';
@@ -49,9 +49,10 @@ export function updateEconomy(game, dt) {
 
   // Produktion (nur fertige Gebäude): die ersten trainSlots Einträge der Warteschlange bilden gleichzeitig aus,
   // jeder mit eigenem Fortschritt (b.queueTimes[i], parallel zu b.queue)
-  for (const b of game.buildings) {
+  // Mit Stadt (seit v4.96) bilden Kaserne, Fabrikhalle und Heliport aus (cityTrainers), Ausbildungsplätze je Stufe (b.trainSlots)
+  for (const b of game.city ? [...game.buildings, ...cityTrainers(game)] : game.buildings) {
     if (!b.alive || !b.built || b.queue.length === 0) continue;
-    const slots = Math.min(BALANCE.trainSlots, b.queue.length);
+    const slots = Math.min(b.trainSlots ?? BALANCE.trainSlots, b.queue.length);
     for (let i = 0; i < slots; i++) b.queueTimes[i] += dt;
     for (let i = 0; i < slots && i < b.queue.length; ) {
       const type = b.queue[i].unit;

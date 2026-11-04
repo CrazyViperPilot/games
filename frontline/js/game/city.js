@@ -3,16 +3,25 @@
 // Nur aktiv, wenn das Spiel mit `city: true` startet. Kein DOM, deterministisch.
 import { CITY } from '../data/city.js';
 import { BALANCE } from '../data/balance.js';
+import { UNITS } from '../data/units.js';
+import { unitLocked } from './research.js';
 import { nearestPassable } from './movement.js';
 import { makeRng } from '../core/rng.js';
 
 /** Zellenarten (Code im Raster): 0 leer. Neue Arten nur hinten anhängen (Code = Index + 1). */
-export const KINDS = ['road', 'res', 'com', 'bm', 'mun', 'fuel', 'steel', 'mine', 'market', 'power', 'uni', 'dc'];
+export const KINDS = ['road', 'res', 'com', 'bm', 'mun', 'fuel', 'steel', 'mine', 'market', 'power', 'uni', 'dc', 'barracks', 'factory', 'heliport'];
 export const KIND_ID = Object.fromEntries(KINDS.map((k, i) => [k, i + 1]));
 export const KIND_NAME = {
   road: 'Straße', res: 'Wohnen', com: 'Gewerbe', bm: 'Baumaterial-Werk', mun: 'Munitionswerk', fuel: 'Raffinerie',
   steel: 'Stahlwerk', mine: 'Förderanlage', market: 'Markt', power: 'Kraftwerk', uni: 'Universität', dc: 'Rechenzentrum',
+  barracks: 'Kaserne', factory: 'Fabrikhalle', heliport: 'Heliport',
 };
+/** Ausbildungsgebäude der Stadt (seit v4.96): Zellenart → Einheiten (CITY.produces). */
+export const TRAINER_KINDS = Object.keys(CITY.produces);
+/** Welches Stadtgebäude bildet `unit` aus? (Zellenart oder null) */
+export function trainerKind(unit) {
+  return TRAINER_KINDS.find((k) => CITY.produces[k].includes(unit)) ?? null;
+}
 const WORKS = ['bm', 'mun', 'fuel', 'steel'];
 /** Rohstoffvorkommen (Code im Raster `deposit`): 0 keins. */
 export const DEPOSITS = ['wood', 'stone', 'ore', 'oil'];
@@ -171,6 +180,7 @@ export function createCity(game, enabled) {
     if (!b.main) continue;
     b.infinite = false; // endliches Lager: die Werke füllen es
     b.store = { ...CITY.startStock };
+    b.produces = []; // seit v4.96: Truppen bilden Kaserne, Fabrikhalle und Heliport der Stadt aus
   }
   for (const c of game.city) {
     updateClaim(game, c);
@@ -200,11 +210,12 @@ function startQuarter(game, c) {
   const n = Q.road;
   const [fc, fr] = cellAt(c, m.x, m.y);
   const ok = (i) => canZone(game, c, i) && !c.kind[i] && !c.deposit[i];
+  const top = Q.top ? 1 : 0; // Zeile über der Straße (Kaserne, Fabrikhalle)
   let best = null;
-  for (let r = Math.max(0, fr - 8); r <= Math.min(c.rows - 2, fr + 8); r++) {
+  for (let r = Math.max(top, fr - 8); r <= Math.min(c.rows - 2, fr + 8); r++) {
     for (let q = Math.max(0, fc - 8); q <= Math.min(c.cols - n, fc + 8); q++) {
       let good = true;
-      for (let k = 0; good && k < n; k++) good = ok(r * c.cols + q + k) && ok((r + 1) * c.cols + q + k);
+      for (let k = 0; good && k < n; k++) good = ok(r * c.cols + q + k) && ok((r + 1) * c.cols + q + k) && (!top || !Q.top[k] || ok((r - 1) * c.cols + q + k));
       if (!good) continue;
       const d = Math.abs(q + n / 2 - fc) + Math.abs(r - fr);
       if (!best || d < best.d) best = { q, r, d };
@@ -215,6 +226,8 @@ function startQuarter(game, c) {
       placeBuilt(game, c, best.r * c.cols + best.q + k, 'road');
       const kind = Q.row[k];
       if (kind) placeBuilt(game, c, (best.r + 1) * c.cols + best.q + k, kind);
+      const up = Q.top?.[k];
+      if (up) placeBuilt(game, c, (best.r - 1) * c.cols + best.q + k, up);
     }
   }
   let oil = -1;
@@ -299,6 +312,7 @@ export function freePop(game, team) {
     if (!b.alive || b.team !== team) continue;
     for (const e of b.queue ?? []) queued += crewOf(e.unit);
   }
+  for (const b of trainersOf(c)) for (const e of b.queue) queued += crewOf(e.unit);
   return Math.floor(c.popF + 1e-6) - draftedCount(game, team) - queued;
 }
 
@@ -445,12 +459,41 @@ function syncEntity(game, c, i) {
     const r = cellRect(c, col, (i - col) / c.cols);
     const w = c.cell / game.grid.tile;
     e = { id: game.newId(), kind: 'building', type: 'city', cityCell: i, team: c.team, x: r.x, y: r.y, cx: r.x0 / game.grid.tile, cy: r.y0 / game.grid.tile, w, h: w, hp, alive: true, built: true, lastHitTime: -1e9, def: { name, hp, armor: 'struct', cost: { bm: CITY.bountyBm * lv } } };
+    if (CITY.produces[k]) {
+      // Ausbildungsgebäude (seit v4.96): Warteschlange wie die Hauptstadt früher, Sammelpunkt eine Zelle Richtung Konfliktzone
+      const z = game.zone ?? { x: r.x, y: r.y };
+      const d = Math.hypot(z.x - r.x, z.y - r.y) || 1;
+      Object.assign(e, { produces: CITY.produces[k], queue: [], queueTimes: [], trainSlots: CITY.trainSlots[lv], rallyX: r.x + ((z.x - r.x) / d) * c.cell * 1.5, rallyY: r.y + ((z.y - r.y) / d) * c.cell * 1.5 });
+      trainersOf(c).add(e);
+    }
     c.ents.set(i, e);
     game.entities.set(e.id, e);
     return;
   }
   e.hp += hp - e.def.hp;
   e.def = { ...e.def, name, hp, cost: { bm: CITY.bountyBm * lv } };
+  if (e.produces) e.trainSlots = CITY.trainSlots[lv];
+}
+
+/** Lebende Ausbildungsgebäude einer Stadt (Set, wird in syncEntity/dropEntity gepflegt; ältere Spielstände legen es neu an). */
+function trainersOf(c) {
+  return (c.trainers ??= new Set());
+}
+
+/** Ausbildungsgebäude der Stadt (Kaserne, Fabrikhalle, Heliport) eines Teams oder beider Teams (team weggelassen). */
+export function cityTrainers(game, team) {
+  if (!game.city) return [];
+  const out = [];
+  for (const c of game.city) if (team === undefined || c.team === team) for (const e of trainersOf(c)) if (e.alive) out.push(e);
+  return out;
+}
+
+/** Warteschlange eines Ausbildungsgebäudes erstatten (Geld und Metall), wenn der Besitzer es abreißt oder überbaut. */
+function refundQueue(game, team, e) {
+  for (const q of e?.queue ?? []) {
+    game.refund(team, UNITS[q.unit].cost);
+    payMetal(game, team, q.unit, -1);
+  }
 }
 
 function dropEntity(game, c, i) {
@@ -459,6 +502,7 @@ function dropEntity(game, c, i) {
   e.alive = false;
   game.entities.delete(e.id);
   c.ents.delete(i);
+  trainersOf(c).delete(e);
 }
 
 /** Ein Simulationsschritt der Stadt beider Teams. Nach updateEconomy aufrufen. */
@@ -728,13 +772,14 @@ export function cmdCity(game, team, cmd) {
         const price = CITY.cost[cmd.kind];
         const bm = CITY.costBm[cmd.kind] ?? 0;
         if (t.res.money < price || (bm && (!main || main.store.bm < bm))) {
-          broke = true;
+          broke = t.res.money < price ? 'money' : 'bm';
           continue;
         }
         t.res.money -= price;
         if (bm) main.store.bm -= bm;
       }
       if (city.level[i]) releaseCell(game, city, col, row);
+      refundQueue(game, team, city.ents.get(i)); // eigene Ausbildung zurück
       dropEntity(game, city, i);
       city.kind[i] = id;
       city.level[i] = 0;
@@ -743,7 +788,7 @@ export function cmdCity(game, team, cmd) {
       placed++;
     }
   }
-  const poor = (CITY.costBm[cmd.kind] ?? 0) > 0 ? 'Zu wenig Baumaterial im Lager der Hauptstadt' : 'Zu wenig Geld';
+  const poor = broke === 'bm' ? 'Zu wenig Baumaterial im Lager der Hauptstadt' : 'Zu wenig Geld';
   if (!placed) return { ok: false, reason: broke ? poor : noDeposit ? 'Förderanlagen nur auf Rohstoffvorkommen' : outside ? 'Nur im eigenen Gebiet bauen' : 'Nichts zu ändern' };
   rebuildList(city);
   // Zonen ohne Straße daneben wachsen nicht (Förderanlagen schon): melden
@@ -751,7 +796,7 @@ export function cmdCity(game, team, cmd) {
   if (!erase && cmd.kind !== 'road' && cmd.kind !== 'mine') {
     for (let row = r0; row <= r1 && !noRoad; row++) for (let col = c0; col <= c1; col++) if (city.kind[idx(city, col, row)] === id && !hasRoad(city, col, row)) noRoad = true;
   }
-  return { ok: true, placed, broke, noRoad };
+  return { ok: true, placed, broke: !!broke, noRoad };
 }
 
 // ---- KI: baut in Ringen um die Hauptstadt nach außen, dazu kleine Viertel an vorderen FOBs (seit v4.82),
@@ -770,7 +815,7 @@ function aiRoad(col, row, ac, ar) {
 function aiNeed(game, c, add) {
   const t = totals(c);
   const A = CITY.ai;
-  const count = { res: 0, com: 0, bm: 0, mun: 0, fuel: 0, steel: 0, market: 0, power: 0, uni: 0, dc: 0 };
+  const count = { res: 0, com: 0, bm: 0, mun: 0, fuel: 0, steel: 0, market: 0, power: 0, uni: 0, dc: 0, barracks: 0, factory: 0, heliport: 0 };
   for (const k in add) count[k] += add[k];
   for (const i of c.list) {
     const k = KINDS[c.kind[i] - 1];
@@ -781,6 +826,12 @@ function aiNeed(game, c, add) {
   // Strom, Universität, Rechenzentrum (seit v4.88) nach Bedarf
   const st = c.stats;
   if (st.powerSupply + (add.power ?? 0) * CITY.power.supply[1] < st.powerUse * A.powerMargin + 10 && (add.power ?? 0) < 1) return 'power';
+  // Ausbildungsgebäude (seit v4.96): ohne sie keine Truppen; Heliport erst, wenn Hubschrauber freigeschaltet sind
+  const more = work >= A.moreFrom ? 1 : 0;
+  for (const [k, n] of Object.entries(A.producers)) {
+    if (k === 'heliport' && (unitLocked(game, c.team, 'littlebird') || !work)) continue;
+    if (count[k] < n + (k === 'heliport' ? 0 : more)) return k;
+  }
   if (!count.uni && work >= A.uniFrom) return 'uni';
   if (!count.dc && count.uni && work >= A.dcFrom) return 'dc';
   if (count.res < work * 1.2 || (t.housing + t.fled < c.drafted + 20 && count.res <= work * 2) || (free < A.lowFree && count.res <= work * 2)) return 'res';

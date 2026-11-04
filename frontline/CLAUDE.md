@@ -79,7 +79,7 @@ Darunter listet ein Inhaltsverzeichnis alle weiteren Abschnitte.
 | Weitere KI-Werte (Wellen, Späher, Expansion, Kisten …) | js/data/ai.js | eine Konstante je Zeile mit Kommentar; Bedeutung: PRD §10 „KI-Konstanten“ |
 | Höhenvorteil, Tempo am Hang, Weitsicht von oben | balance.js | `BALANCE.height`, `BALANCE.slope`, `BALANCE.sightHeight` |
 | Festung (Mauerring, Zahl der Türme, Höhenvorteil, Fallschaden) / Turm (Plätze, Dachaufbauten, Preise) | balance.js / buildings.js | `BALANCE.fortress` / `BUILDINGS.tower` |
-| Stadt: Zellgröße, Gebiet, Einwohner je Einheit (`crew`), Flucht, Vorkommen, Förderung, Verarbeitung, Metall je Einheit, Markt, Trefferpunkte, Ruinen, Startlager, Erträge, Steuern, Kosten, Wachstum, KI | js/data/city.js | `CITY` |
+| Stadt: Ausbildungsgebäude (`produces`, `trainSlots`), Zellgröße, Gebiet, Einwohner je Einheit (`crew`), Flucht, Vorkommen, Förderung, Verarbeitung, Metall je Einheit, Markt, Trefferpunkte, Ruinen, Startlager, Erträge, Steuern, Kosten, Wachstum, KI | js/data/city.js | `CITY` |
 | Wetter, Häuserkampf, Kisten, Kommandeur, Formationen, Fluss, Tiere, Wracks, Tarnung, Flugabwehr | balance.js | `weather`, `garrison`, `crates`, `commander`, `formation`, `river`, `animals`, `scars`, `stealth`, `airFire` |
 | Kartengröße | balance.js | `BALANCE.map` (Vorsicht: ändert alle Karten und Tests) |
 | Aufbau der Zufallskarte (Hügel, Seen, Fluss, Stadt, Häuser, Felder, Kisten-Abstände) | js/data/mapgen.js | `MAPGEN.<abschnitt>` (ändert alle Zufallskarten) |
@@ -117,7 +117,7 @@ Wo jedes Feature liegt. „KI“ = Konstanten-Präfix in `js/data/ai.js`, Logik 
 | Wetter und Jahreszeiten | §7 „Wetter“ | `weather` | `weather.js` | `WX_*` | `weatherfx.js`, `season.js` | `weather.test.js` |
 | Forschungsstufen und -baum | §7 „Forschungsstufen“ | `research` | `research.js`, `abilities.js` | `UPGRADES`, `UPGRADE_RESERVE` | `controller.js`, `hud.js` | `research.test.js` |
 | Zufallskarte, Stadt, Gehöfte, Felder | §7, §9a | `map`, `zone.r`, `MAPGEN` | `map.js`, `landscape.js` | – | `terrain.js`, `iso.js`, `isobuild.js`, `isosprites.js` | `map.test.js`, `fields.test.js` |
-| Stadt (Gebiet, Zonen, Einwohner auch als Truppen, Flucht, Werke füllen Lager der Hauptstadt) | §15 | `CITY` | `city.js` (`updateCity` (Strom, Zufriedenheit), `cityLevel`, `powerRatio`, `updateClaim`, `freePop`, `cityNoise`, `genDeposits`, `payMetal`, Befehle `city` und `trade`, Ziel-Entities `syncEntity`/`forEnemyCity`); Ausbildung prüft in `game.js` (`cmdTrain`), Zielsuche und Splash in `combat.js` | `aiCity`, `aiRaid` in `city.js`, aufgerufen von `ai.js` | `js/ui/citypanel.js` (Baumodus, Taste Y; Rechteck über `input.js`; Marktmenü `MarketPanel`), `hud.js` (Knopf, Geldanzeige öffnet den Markt, Info `cityInfo`), `controller.js` (Stadtgebäude wählen `pickCity`, Aktionen `cityCard`), `js/render/citylayer.js` (Karte, Gebiet), `minimap.js` | `city.test.js` |
+| Stadt (Gebiet, Zonen, Einwohner auch als Truppen, Flucht, Werke füllen Lager der Hauptstadt, Ausbildung in Kaserne/Fabrikhalle/Heliport) | §15 | `CITY` | `city.js` (`cityTrainers`, `trainerKind`, Ausbildung selbst in `economy.js`, `updateCity` (Strom, Zufriedenheit), `cityLevel`, `powerRatio`, `updateClaim`, `freePop`, `cityNoise`, `genDeposits`, `payMetal`, Befehle `city` und `trade`, Ziel-Entities `syncEntity`/`forEnemyCity`); Ausbildung prüft in `game.js` (`cmdTrain`), Zielsuche und Splash in `combat.js` | `aiCity`, `aiRaid` in `city.js`, aufgerufen von `ai.js` | `js/ui/citypanel.js` (Baumodus, Taste Y; Rechteck über `input.js`; Marktmenü `MarketPanel`), `hud.js` (Knopf, Geldanzeige öffnet den Markt, Info `cityInfo`), `controller.js` (Stadtgebäude wählen `pickCity`, Aktionen `cityCard`), `js/render/citylayer.js` (Karte, Gebiet, Schilder `drawCityBadges`), `isobuild.js` (`drawMilitaryTown`), `minimap.js` | `city.test.js` |
 | Wracks und Krater (nur Optik) | §9 | `scars` | `scars.js` | – | `sprites.js` (`drawWreck`, `drawCrater`) | `scars.test.js` |
 | Tiere (nur Optik) | §9 | `animals` | `animals.js` | – | `sprites.js` (`drawAnimal*`) | `animals.test.js` |
 | KI allgemein | §10 | `difficulty` | – | `js/ai/ai.js` | – | `ai.test.js` |
@@ -136,7 +136,7 @@ Wo jedes Feature liegt. „KI“ = Konstanten-Präfix in `js/data/ai.js`, Logik 
 
 ### Neue Einheit
 1. `js/data/units.js`: ähnliche Einheit kopieren, neuen Schlüssel vergeben; `name`, `short`, Werte, `weapons`, `cost`, `buildTime`, `slots`, `hotkey` anpassen (Taste darf in der Hauptstadt noch nicht belegt sein).
-2. `js/data/buildings.js`: Schlüssel in `fob.produces` eintragen.
+2. `js/data/buildings.js`: Schlüssel in `fob.produces` eintragen, für Partien mit Stadt auch in `CITY.produces` (`js/data/city.js`: Kaserne, Fabrikhalle oder Heliport).
 3. `js/data/balance.js`: Stufe in `research.unitTier` (fehlt = sofort verfügbar).
 4. (entfällt: der Kurzname steht als `short` in units.js)
 5. Aussehen: 2D in `js/render/sprites.js` (`drawUnit`); Iso optional in `js/render/isosprites.js` (`UNIT_MODEL` / `INFANTRY_NAME`, sonst gemalt).

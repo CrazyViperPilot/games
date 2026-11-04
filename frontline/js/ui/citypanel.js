@@ -6,9 +6,12 @@ import { CITY } from '../data/city.js';
 import { BALANCE } from '../data/balance.js';
 import { KINDS, KIND_NAME, GOODS, cellAt, hasMarket } from '../game/city.js';
 
-export const CITY_COLORS = { road: '#8a8f86', res: '#4f8f5a', com: '#4a78b0', bm: '#a0703f', mun: '#8b96a8', fuel: '#9b7bc4', steel: '#7f8c99', mine: '#c9a14a', market: '#d6b84a', power: '#e0c040', uni: '#6fa8dc', dc: '#4fc3c7', erase: '#d05050' };
-const ICON = { road: '▬', res: '⌂', com: '▣', bm: '⚒', mun: '✸', fuel: '⛽', steel: '⛓', mine: '⛏', market: '⚖', power: '⚡', uni: '🎓', dc: '🖥', erase: '✕' };
-const SHORT = { road: 'Straße', res: 'Wohnen', com: 'Gewerbe', bm: 'BM-Werk', mun: 'Mun.-Werk', fuel: 'Raffinerie', steel: 'Stahlwerk', mine: 'Förderung', market: 'Markt', power: 'Kraftwerk', uni: 'Universität', dc: 'Rechenz.', erase: 'Räumen' };
+// Farben je Zellenart (Werkzeug, Grundstück, Symbol auf der Karte): Wohnen grün (privat), Gewerbe blau (kommerziell), Werke erdig,
+// Markt gold, Militär (Kaserne, Fabrikhalle, Heliport) oliv. Symbole: Werkzeugleiste und Schilder über den Gebäuden (citylayer.js).
+export const CITY_COLORS = { road: '#8a8f86', res: '#4f9a5a', com: '#3f7fd0', bm: '#b0743c', mun: '#8b96a8', fuel: '#9b7bc4', steel: '#7f8c99', mine: '#c9a14a', market: '#e6b422', power: '#e0c040', uni: '#6fa8dc', dc: '#4fc3c7', barracks: '#7d8f45', factory: '#7d8f45', heliport: '#7d8f45', erase: '#d05050' };
+export const CITY_ICON = { road: '▬', res: '⌂', com: '▣', bm: '⚒', mun: '✸', fuel: '⛽', steel: '⛓', mine: '⛏', market: '⚖', power: '⚡', uni: '🎓', dc: '🖥', barracks: '⚔', factory: '🔧', heliport: '🚁', erase: '✕' };
+const ICON = CITY_ICON;
+const SHORT = { road: 'Straße', res: 'Wohnen', com: 'Gewerbe', bm: 'BM-Werk', mun: 'Mun.-Werk', fuel: 'Raffinerie', steel: 'Stahlwerk', mine: 'Förderung', market: 'Markt', power: 'Kraftwerk', uni: 'Universität', dc: 'Rechenz.', barracks: 'Kaserne', factory: 'Fabrikhalle', heliport: 'Heliport', erase: 'Räumen' };
 export const CITY_TIP = {
   bm: 'Baumaterial aus Holz und Stein (Holzfäller, Steinbruch)', mun: 'Munition aus Metall', fuel: 'Treibstoff aus Öl (Ölquelle)',
   steel: 'Metall aus Erz (Erzmine)', mine: 'Nur auf Rohstoffvorkommen: Holzfäller, Steinbruch, Erzmine oder Ölquelle; braucht keine Straße',
@@ -16,6 +19,9 @@ export const CITY_TIP = {
   power: 'Strom für Werke, Förderung, Uni und Rechenzentrum (stadtweit); ohne genug Strom arbeiten sie langsamer',
   uni: 'Ohne Universität nur Forschungsstufe 1; Stufe 1 der Uni schaltet Forschungsstufe 2 frei, Stufe 3 die Forschungsstufe 3; höhere Stufen forschen schneller',
   dc: 'Schaltet den Forschungsast KI frei (Drohnen, KI-Zielerfassung, Autonome Türme, Störsender)',
+  barracks: 'Bildet Soldaten aus (Schützen, Panzerabwehr, Scharfschützen, Kommandeur); bezahlt direkt aus der Stadt',
+  factory: 'Baut alle Fahrzeuge (LKW, Baufahrzeug, Schützen- und Kampfpanzer, Flak, SAM); bezahlt direkt aus der Stadt',
+  heliport: 'Baut Hubschrauber (Little Bird, Transporter, AH-64); bezahlt direkt aus der Stadt',
 };
 const GOOD_NAME = { bm: 'BM', mun: 'MUN', fuel: 'TS', metal: 'Metall' };
 const GOOD_LONG = { bm: 'Baumaterial', mun: 'Munition', fuel: 'Treibstoff', metal: 'Metall' };
@@ -40,7 +46,7 @@ export class CityPanel {
     root.hidden = true;
     root.innerHTML = `
       <div class="city-tools">${TOOLS.map((k) => {
-        const price = k === 'erase' ? 'gratis' : CITY.costBm[k] ? `${CITY.costBm[k]} BM` : `${CITY.cost[k]} G`;
+        const price = k === 'erase' ? 'gratis' : [CITY.cost[k] ? `${CITY.cost[k]} G` : '', CITY.costBm[k] ? `${CITY.costBm[k]} BM` : ''].filter(Boolean).join(' + ');
         const name = k === 'erase' ? 'Räumen' : KIND_NAME[k];
         return `<button type="button" class="ctool" data-tool="${k}" title="${name}${CITY_TIP[k] ? `: ${CITY_TIP[k]}` : ''}" style="--c:${CITY_COLORS[k]}"><i>${ICON[k]}</i><span>${SHORT[k]}</span><small>${price}</small></button>`;
       }).join('')}</div>

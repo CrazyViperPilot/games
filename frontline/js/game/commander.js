@@ -12,7 +12,7 @@ export function hasCommander(game, team) {
     if (!u.alive || u.team !== team) continue;
     if (u.def.hero || u.passengers.some((p) => p.def.hero)) return true;
   }
-  return game.buildings.some((b) => b.alive && b.team === team && b.queue.some((e) => UNITS[e.unit].hero));
+  return game.trainers(team).some((b) => b.queue.some((e) => UNITS[e.unit].hero));
 }
 
 /** Aura je Schritt (vor dem Kampf): setzt u.aura für alle Einheiten und heilt die Infanterie im Umkreis eines Kommandeurs. */

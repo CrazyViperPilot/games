@@ -445,7 +445,9 @@ export class Hud {
       if (g.research) h += this.researchInfo(b.team);
     } else if (b.type === 'fob') {
       h +=
-        '<div class="muted small lagerhead">Lager dieser FOB (LKW füllen es aus der Hauptstadt)</div>' +
+        (b.main
+          ? '<div class="muted small lagerhead">Lager der Hauptstadt (die Werke der Stadt füllen es) · Truppen bilden Kaserne, Fabrikhalle und Heliport aus</div>'
+          : '<div class="muted small lagerhead">Lager dieser FOB (LKW füllen es aus der Hauptstadt)</div>') +
         storeRow('BM', b.store.bm, STORE_CAP, COLOR.bm) +
         storeRow('MUN', b.store.mun, STORE_CAP, COLOR.mun) +
         storeRow('TS', b.store.fuel, STORE_CAP, COLOR.fuel);
@@ -465,9 +467,14 @@ export class Hud {
       if (b.roof && !b.occupants.length) h += '<div class="warn small">Ohne Besatzung feuert der Aufbau nicht</div>';
     }
     if (b.drill && b.built) h += this.drillInfo(b);
+    return h + this.queueInfo(b);
+  }
+
+  /** Warteschlange: die ersten trainSlots Aufträge laufen gleichzeitig (Stadt: je Stufe b.trainSlots), je mit eigenem Fortschritt. */
+  queueInfo(b) {
+    let h = '';
     if (b.queue.length) {
-      // die ersten trainSlots Aufträge laufen gleichzeitig, je mit eigenem Fortschritt
-      const slots = Math.min(BALANCE.trainSlots, b.queue.length);
+      const slots = Math.min(b.trainSlots ?? BALANCE.trainSlots, b.queue.length);
       let rows = '';
       for (let i = 0; i < slots; i++) {
         const ut = UNITS[b.queue[i].unit];
@@ -505,11 +512,16 @@ export class Hud {
     } else if (k === 'power') h += line(`Liefert bis ${CITY.power.supply[lv]} Strom · Stadt ${Math.round(s.powerSupply)} / ${Math.round(s.powerUse)}`);
     else if (k === 'uni') h += line(`Plätze ${CITY.jobsUni[lv]}`);
     else if (k === 'dc') h += line(`Arbeitsplätze ${CITY.jobsDc[lv]}`);
-    if (CITY_TIP[k] && k !== 'market') h += `<div class="muted small">${esc(CITY_TIP[k])}</div>`;
+    else if (b.produces) {
+      h += line(`Bildet aus: ${b.produces.map((u) => UNITS[u].short || UNITS[u].name).join(', ')} · ${b.trainSlots} gleichzeitig (Stufe ${lv})`);
+      h += '<div class="muted small">Zahlt direkt aus der Stadt: Geld, Metall, Einwohner</div>';
+    }
+    if (CITY_TIP[k] && k !== 'market' && !b.produces) h += `<div class="muted small">${esc(CITY_TIP[k])}</div>`;
     const col = i % c.cols;
     if (k !== 'mine' && !hasRoad(c, col, (i - col) / c.cols)) h += '<div class="warn small">Keine Straße daneben: wächst nicht weiter</div>';
     if (s.powerRatio < 1 && CITY.power.use[k] && k !== 'res' && k !== 'com') h += `<div class="warn small">Strommangel: arbeitet mit ${Math.round(s.powerRatio * 100)} %</div>`;
     if (k === 'res' && c.flee[i] > 0) h += `<div class="warn small">Bewohner geflohen (Beschuss), Rückkehr frühestens in ${Math.ceil(c.flee[i])} s</div>`;
+    if (b.produces) h += this.queueInfo(b);
     return h;
   }
 

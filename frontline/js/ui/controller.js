@@ -1,6 +1,7 @@
 // Spieler-Steuerung (docs/verlauf.md §5 ui/controller.js, §11.3–11.8): Auswahl, Modi, Befehle und Befehlskarte. Kein DOM.
 // Hält den Ansichtszustand `view`, den renderer.render(view) liest. Befehle laufen nur über game.issue.
-import { cityEntityAt, KINDS as CITY_KINDS } from '../game/city.js';
+import { cityEntityAt, freePop, crewOf, KINDS as CITY_KINDS } from '../game/city.js';
+import { CITY } from '../data/city.js';
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
@@ -1415,7 +1416,7 @@ export class Controller {
     const i = b.cityCell;
     const col = i % c.cols;
     const row = (i - col) / c.cols;
-    const card = [];
+    const card = b.produces ? this.trainEntries([b]) : []; // Kaserne, Fabrikhalle, Heliport (seit v4.96)
     if (CITY_KINDS[c.kind[i] - 1] === 'market') {
       card.push(entry('Handel', 'T', { tip: 'Marktmenü: Waren kaufen und verkaufen (T, auch über die Geldanzeige oben)', action: () => this.onMarket?.() }));
     }
@@ -1429,10 +1430,21 @@ export class Controller {
         },
       }),
     );
+    if (b.produces) {
+      card.push(
+        entry('Abbruch', null, {
+          tip: 'Letzten Auftrag abbrechen (Geld und Metall werden erstattet)',
+          enabled: b.queue.length > 0,
+          reason: 'Nichts in der Warteschlange',
+          action: () => this.cancelTrain(),
+        }),
+      );
+    }
     return card;
   }
 
-  buildingCard(blds) {
+  /** Ausbildungs-Einträge der Befehlskarte für die gewählten Gebäude (Hauptstadt bzw. Ausbildungsgebäude der Stadt). */
+  trainEntries(blds) {
     const card = [];
     const types = [];
     for (const b of blds) {
@@ -1448,17 +1460,24 @@ export class Controller {
       else if (unitLocked(this.game, ready.team, u)) reason = lockReason(u);
       else if (this.game.slotsUsed(ready.team) + (def.slots ?? 1) > BALANCE.slotCap) reason = 'Einheitenlimit erreicht';
       else if (def.hero && hasCommander(this.game, ready.team)) reason = 'Nur ein Kommandeur je Team';
+      else if (this.game.city && freePop(this.game, ready.team) < crewOf(u)) reason = 'Zu wenig freie Einwohner (Stadt: Wohnen ausbauen)';
+      else if (this.game.city && this.game.city[ready.team].metal < (CITY.metalCost[u] ?? 0)) reason = 'Zu wenig Metall (Stadt: Erzmine und Stahlwerk oder Markt)';
       else reason = this.trainReason(ready, def.cost);
       card.push(
         entry(def.short || def.name, def.hotkey, {
           cost: costText(def.cost),
-          tip: `${def.name}: ${longCost(def.cost)}${def.hero ? COMMANDER_TIP : ''}`,
+          tip: `${def.name}: ${longCost(def.cost)}${this.game.city && CITY.metalCost[u] ? `, ${CITY.metalCost[u]} Metall, ${crewOf(u)} Einwohner` : this.game.city ? `, ${crewOf(u)} Einwohner` : ''}${def.hero ? COMMANDER_TIP : ''}`,
           enabled: !reason,
           reason,
           action: () => this.train(u),
         }),
       );
     }
+    return card;
+  }
+
+  buildingCard(blds) {
+    const card = this.trainEntries(blds);
     const mortars = blds.filter((b) => b.built && b.def.weapon && b.def.weapon.shell);
     if (mortars.length) {
       card.push(

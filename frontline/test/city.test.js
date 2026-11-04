@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
 import { CITY } from '../js/data/city.js';
 import { AI } from '../js/ai/ai.js';
-import { canZone, cityNoise, freePop, aiCity, aiDefend, aiRaid, hasRoad, hasMarket, cityEntityAt, KIND_ID } from '../js/game/city.js';
+import { canZone, cityNoise, freePop, aiCity, aiDefend, aiRaid, hasRoad, hasMarket, cityEntityAt, cityTrainers, KIND_ID } from '../js/game/city.js';
 
 const run = (g, s) => { for (let t = 0; t < s * 20; t++) g.update(0.05); };
 // Ursprung (c, r) eines w × h großen, ganz bebaubaren Rechtecks im Gebiet des Teams, nahe der Hauptstadt
@@ -44,6 +44,8 @@ function clearStart(g, team = 0) {
   }
 }
 const raw = (g, kind, c0, r0, c1, r1, team = 0) => g.issue(team, { type: 'city', kind, c0, r0, c1, r1 });
+// Ausbildungsgebäude der Stadt (seit v4.96), das `unit` ausbildet (Startviertel: Kaserne und Fabrikhalle)
+const trainerFor = (g, unit, team = 0) => cityTrainers(g, team).find((e) => e.produces.includes(unit));
 
 test('ohne Stadt: unendliches Lager, Stadtbefehl abgelehnt', () => {
   const g = new Game({ seed: 3 });
@@ -181,7 +183,7 @@ test('Soldaten kosten Einwohner: ohne freie Einwohner keine Ausbildung, Gefallen
   const g = new Game({ seed: 3, city: true, startMoney: 5000 });
   const m = g.mainFob(0);
   assert.equal(freePop(g, 0), 0, 'Startarmee kostet nichts, Stadt leer');
-  const r = g.issue(0, { type: 'train', buildingId: m.id, unit: 'rifleman' });
+  const r = g.issue(0, { type: 'train', buildingId: trainerFor(g, 'rifleman').id, unit: 'rifleman' });
   assert.equal(r.ok, false);
   assert.match(r.reason, /Einwohner/);
   paint(g, 'road', 0, 0, 9, 0);
@@ -191,7 +193,7 @@ test('Soldaten kosten Einwohner: ohne freie Einwohner keine Ausbildung, Gefallen
   run(g, 90);
   const pop = g.city[0].popF;
   assert.ok(freePop(g, 0) >= 1, `freie Einwohner ${freePop(g, 0)}`);
-  assert.ok(g.issue(0, { type: 'train', buildingId: m.id, unit: 'rifleman' }).ok);
+  assert.ok(g.issue(0, { type: 'train', buildingId: trainerFor(g, 'rifleman').id, unit: 'rifleman' }).ok);
   run(g, 10);
   const u = g.units.find((x) => x.team === 0 && x.crew === 1);
   assert.ok(u, 'ausgebildeter Schütze belegt einen Einwohner');
@@ -268,13 +270,13 @@ test('Metall: Erzmine + Stahlwerk liefern, Fahrzeuge kosten Metall, Abbruch erst
   assert.ok(c.stats.raw.ore > 0 && c.stats.metal > 0, `Metall/s ${c.stats.metal}`);
   const m = g.mainFob(0);
   c.metal = 50;
-  const r = g.issue(0, { type: 'train', buildingId: m.id, unit: 'tank' });
+  const r = g.issue(0, { type: 'train', buildingId: trainerFor(g, 'tank').id, unit: 'tank' });
   assert.equal(r.ok, false);
   assert.match(r.reason, /Metall/);
   c.metal = 500;
-  assert.ok(g.issue(0, { type: 'train', buildingId: m.id, unit: 'tank' }).ok);
+  assert.ok(g.issue(0, { type: 'train', buildingId: trainerFor(g, 'tank').id, unit: 'tank' }).ok);
   assert.equal(c.metal, 500 - CITY.metalCost.tank);
-  assert.ok(g.issue(0, { type: 'cancelTrain', buildingId: m.id }).ok);
+  assert.ok(g.issue(0, { type: 'cancelTrain', buildingId: trainerFor(g, 'tank').id }).ok);
   assert.equal(c.metal, 500);
 });
 
@@ -470,4 +472,67 @@ test('Straßenanschluss: Wohnen/Gewerbe über genau eine Zelle gleicher Art', ()
   assert.ok(!hasRoad(e, 3, 0)); // keine längeren Ketten
   const f = mk(R, B, B, 0, 0, 0);
   assert.ok(!hasRoad(f, 2, 0)); // Werke weiter nur direkt
+});
+
+test('Ausbildung mit Stadt (v4.96): Hauptstadt nicht, Kaserne Soldaten, Fabrikhalle Fahrzeuge, Heliport Hubschrauber', () => {
+  const g = new Game({ seed: 3, city: true, startMoney: 20000 });
+  const m = g.mainFob(0);
+  assert.deepEqual(m.produces, [], 'Hauptstadt bildet mit Stadt nichts aus');
+  assert.match(g.issue(0, { type: 'train', buildingId: m.id, unit: 'rifleman' }).reason, /Kaserne/);
+  const kas = trainerFor(g, 'rifleman');
+  const fab = trainerFor(g, 'tank');
+  assert.ok(kas && fab, 'Startviertel hat Kaserne und Fabrikhalle');
+  assert.equal(trainerFor(g, 'littlebird'), undefined, 'Heliport muss man bauen');
+  assert.match(g.issue(0, { type: 'train', buildingId: kas.id, unit: 'tank' }).reason, /Fabrikhalle/);
+  // Wohnraum für Truppen, Heliport an der Straße
+  paint(g, 'road', 0, 0, 9, 0);
+  paint(g, 'res', 0, 1, 7, 1);
+  paint(g, 'heliport', 8, 1, 8, 1);
+  paint(g, 'com', 0, 2, 3, 2);
+  paint(g, 'road', 0, 3, 3, 3);
+  run(g, 120);
+  const heli = trainerFor(g, 'littlebird');
+  assert.ok(heli, 'Heliport steht');
+  assert.ok(freePop(g, 0) >= 4, `freie Einwohner ${freePop(g, 0)}`);
+  const n0 = g.units.filter((u) => u.team === 0).length;
+  const metal0 = g.city[0].metal;
+  assert.ok(g.issue(0, { type: 'train', buildingId: kas.id, unit: 'rifleman' }).ok);
+  assert.ok(g.issue(0, { type: 'train', buildingId: fab.id, unit: 'truck' }).ok);
+  assert.ok(g.issue(0, { type: 'train', buildingId: heli.id, unit: 'littlebird' }).ok);
+  assert.equal(g.city[0].metal, metal0 - CITY.metalCost.truck - CITY.metalCost.littlebird, 'Metall direkt aus dem Stadtlager');
+  assert.equal(g.slotsUsed(0) > 0 && g.unitCount(0), n0 + 3, 'Warteschlangen der Stadt zählen');
+  run(g, 20);
+  const fresh = g.units.filter((u) => u.team === 0 && u.crew);
+  assert.deepEqual(fresh.map((u) => u.type).sort(), ['littlebird', 'rifleman', 'truck']);
+  const near = (u, b) => Math.hypot(u.x - b.x, u.y - b.y) < 400;
+  assert.ok(near(fresh.find((u) => u.type === 'rifleman'), kas), 'Schütze erscheint an der Kaserne');
+});
+
+test('Ausbildungsgebäude abreißen erstattet die Warteschlange, zerstört verfällt sie', () => {
+  const g = new Game({ seed: 3, city: true, startMoney: 5000 });
+  const c = g.city[0];
+  c.popF = 40; // Einwohner für die Ausbildung
+  const fab = trainerFor(g, 'tank');
+  const money0 = g.teams[0].res.money;
+  const metal0 = c.metal;
+  assert.ok(g.issue(0, { type: 'train', buildingId: fab.id, unit: 'tank' }).ok);
+  assert.ok(g.teams[0].res.money < money0 && c.metal < metal0);
+  const col = fab.cityCell % c.cols;
+  const row = (fab.cityCell - col) / c.cols;
+  assert.ok(g.issue(0, { type: 'city', kind: 'erase', c0: col, r0: row, c1: col, r1: row }).ok);
+  assert.equal(g.teams[0].res.money, money0);
+  assert.equal(c.metal, metal0);
+  assert.equal(trainerFor(g, 'tank'), undefined);
+  assert.equal(g.unitCount(0), g.units.filter((u) => u.team === 0).length, 'nichts mehr in Ausbildung');
+});
+
+test('KI mit Stadt bildet in Kaserne und Fabrikhalle aus und baut einen Heliport', () => {
+  const g = new Game({ seed: 5, city: true, startMoney: 4000 });
+  const ai = new AI(g, 1, 'normal');
+  const own = () => g.units.filter((u) => u.alive && u.team === 1 && u.crew).length;
+  for (let t = 0; t < 20 * 420; t++) { ai.update(0.05); g.update(0.05); }
+  assert.ok(own() >= 3, `KI hat Truppen ausgebildet: ${own()}`);
+  const kinds = new Set(cityTrainers(g, 1).map((e) => e.def.name));
+  assert.ok(kinds.has('Kaserne') && kinds.has('Fabrikhalle'), [...kinds].join(','));
+  assert.ok(kinds.has('Heliport') || g.city[1].list.some((i) => g.city[1].kind[i] === KIND_ID.heliport), 'Heliport ausgewiesen');
 });

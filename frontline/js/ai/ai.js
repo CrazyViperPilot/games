@@ -2,7 +2,7 @@
 // Reihenfolge je Denkschritt: Baustellen pflegen, Verteidigung, Rückzug, Expansion (FOB-Baustellen: Zone, Relais, Flanken),
 // Forschung, Produktion (nur Hauptstadt), Verteidigungsgebäude und Mauer, Brücken, Baufahrzeuge, LKW (Lieferant/Pendler/Versorger), Sammelpunkte, Armee.
 import { CITY } from '../data/city.js';
-import { aiCity, aiRaid, aiDefend } from '../game/city.js';
+import { aiCity, aiRaid, aiDefend, cityTrainers } from '../game/city.js';
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
@@ -203,7 +203,9 @@ export class AI {
     this.corridor = home ? { x: home.x, y: home.y, dx: dir.x, dy: dir.y } : null;
 
     const combat = units.filter((u) => u.def.range > 0 && !u.crate && !u.def.hero); // Kistenträger kämpfen nicht, der Kommandeur bleibt hinten
-    const queuedCombat = own.reduce((n, b) => n + b.queue.filter((e) => UNITS[e.unit ?? e].range > 0).length, 0);
+    // Ausbildende Gebäude: Hauptstadt, mit Stadt (seit v4.96) Kaserne, Fabrikhalle und Heliport
+    const producers = own.filter((b) => b.produces.length).concat(cityTrainers(g, t));
+    const queuedCombat = producers.reduce((n, b) => n + b.queue.filter((e) => UNITS[e.unit ?? e].range > 0).length, 0);
     const zoneFob = fobs.find((f) => dist(f.x, f.y, zone.x, zone.y) <= ZONE_FOB_R + 16) ?? null;
     const alarm =
       !!home &&
@@ -216,6 +218,7 @@ export class AI {
 
     return {
       own,
+      producers,
       fobs,
       builtFobs,
       home,
@@ -240,7 +243,7 @@ export class AI {
   /** Eingereihte Einheiten eines Typs in den Warteschlangen. */
   queued(s, unitType) {
     let n = 0;
-    for (const b of s.own) for (const e of b.queue) if ((e.unit ?? e) === unitType) n++;
+    for (const b of s.producers) for (const e of b.queue) if ((e.unit ?? e) === unitType) n++;
     return n;
   }
 
@@ -557,11 +560,11 @@ export class AI {
 
   // ---- Produktion ------------------------------------------------------------------
 
-  /** Ausbildende Einrichtung für `type` (nur die Hauptstadt): kürzeste Warteschlange. */
+  /** Ausbildende Einrichtung für `type` (Hauptstadt bzw. Kaserne, Fabrikhalle, Heliport): kürzeste Warteschlange. */
   pickProducer(s, type, qmax, towardZone) {
     let best = null;
     let bestKey = Infinity;
-    for (const b of s.own) {
+    for (const b of s.producers) {
       if (!b.built || !b.produces.includes(type) || b.queue.length >= qmax || unitLocked(this.game, this.team, type)) continue;
       const key = b.queue.length * 100000 + (towardZone ? dist(b.x, b.y, s.zone.x, s.zone.y) : b.id);
       if (key < bestKey) {
@@ -574,7 +577,7 @@ export class AI {
 
   /**
    * Baufahrzeuge (Ersatz zuerst – sie gründen FOBs und bauen Verteidigung), LKW, dann Kampfeinheiten nach Zielmischung.
-   * Einheiten kosten nur Geld; ausgebildet wird nur in der Hauptstadt.
+   * Einheiten kosten Geld; ausgebildet wird in der Hauptstadt bzw. (mit Stadt) in Kaserne, Fabrikhalle und Heliport.
    */
   produce(s) {
     const g = this.game;
@@ -609,7 +612,7 @@ export class AI {
 
     // Kampfeinheiten: welche Typen sind gerade ausbildbar?
     const avail = new Set();
-    for (const b of s.own) {
+    for (const b of s.producers) {
       if (!b.built || b.queue.length >= qmax) continue;
       for (const u of b.produces) if (mix[u] && !unitLocked(g, t, u)) avail.add(u); // gesperrte Stufe: noch nicht
     }
@@ -1086,7 +1089,7 @@ export class AI {
   rally(s) {
     if (!s.home) return;
     const gp = this.gatherPoint(s);
-    for (const b of s.own) {
+    for (const b of s.producers) {
       if (!b.built || !b.produces.length) continue;
       const prev = this.rallyAt.get(b.id);
       if (prev && dist(prev.x, prev.y, gp.x, gp.y) < RALLY_MOVE) continue;
@@ -1119,6 +1122,7 @@ export class AI {
       const bad = this.cfg.weather && weatherSight(g) < WX_SCOUT_SIGHT;
       const minArmy = bad ? WX_SCOUT_ARMY : SCOUT_MIN_ARMY;
       if (!s.home || s.combat.length < minArmy || g.time < (bad ? WX_SCOUT_FROM : SCOUT_FROM) || this.queued(s, 'littlebird')) return;
+      if (!s.producers.some((b) => b.produces.includes('littlebird'))) return; // Stadt ohne Heliport: kein Späher, nicht dafür sparen
       if (g.teams[t].res.money < SCOUT_MONEY) {
         this.saveForScout = true; // produce spart, bis der Späher bezahlbar ist
         return;
@@ -1370,8 +1374,8 @@ export class AI {
     const g = this.game;
     if (!s.home || !s.home.built || g.time < CMD_FROM || hasCommander(g, this.team)) return;
     if (g.teams[this.team].res.money < UNITS.commander.cost.money + CMD_RESERVE) return;
-    if (s.home.queue.length >= BALANCE.queueMax) return;
-    g.issue(this.team, { type: 'train', buildingId: s.home.id, unit: 'commander' });
+    const b = this.pickProducer(s, 'commander', BALANCE.queueMax, false); // Hauptstadt bzw. Kaserne
+    if (b) g.issue(this.team, { type: 'train', buildingId: b.id, unit: 'commander' });
   }
 
   /**

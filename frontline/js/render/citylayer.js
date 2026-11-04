@@ -3,11 +3,24 @@
 // über drawTownBuilding (renderer.js).
 import { KINDS, DEPOSITS, cellRect, canZone, hasRoad } from '../game/city.js';
 import { CITY } from '../data/city.js';
-import { CITY_COLORS } from '../ui/citypanel.js';
+import { CITY_COLORS, CITY_ICON } from '../ui/citypanel.js';
 
-const LOT = { res: '#5fa36a', com: '#5a88c4', bm: '#b07a43', mun: '#9aa4b4', fuel: '#a585cf', steel: '#7f8c99', mine: '#c9a14a', market: '#d6b84a', power: '#e0c040', uni: '#6fa8dc', dc: '#4fc3c7' };
-const ROOF = { res: '#8a4b3c', com: '#9aa3ab', bm: '#6e5a48', mun: '#5f6670', fuel: '#6a5a7e', steel: '#4f5862', mine: '#7a6440', market: '#b8863b', power: '#5a5a40', uni: '#7a3b30', dc: '#3a4a55' };
-const TOWN_KIND = { res: 'house', com: 'hall', bm: 'factory', mun: 'factory', fuel: 'factory', steel: 'factory', mine: 'hall', market: 'hall', power: 'factory', uni: 'hall', dc: 'hall' };
+// Grundstücke in der Farbe der Zellenart (wie die Werkzeugleiste): Wohnen grün, Gewerbe blau, Werke erdig, Markt gold, Militär oliv
+const LOT = CITY_COLORS;
+const ROOF = { res: '#8a4b3c', com: '#5f8fc8', bm: '#6e5a48', mun: '#5f6670', fuel: '#6a5a7e', steel: '#4f5862', mine: '#7a6440', market: '#c9952b', power: '#5a5a40', uni: '#7a3b30', dc: '#3a4a55', barracks: '#56603a', factory: '#5c6352', heliport: '#4a4f4a' };
+const TOWN_KIND = { res: 'house', com: 'hall', bm: 'factory', mun: 'factory', fuel: 'factory', steel: 'factory', mine: 'hall', market: 'hall', power: 'factory', uni: 'hall', dc: 'hall', barracks: 'barracks', factory: 'vhall', heliport: 'heliport' };
+/** Hex-Farbe a mit b mischen (t = Anteil von a). */
+function mix(a, b, t) {
+  const p = (h, i) => parseInt(h.slice(1 + i * 2, 3 + i * 2), 16);
+  return `rgb(${[0, 1, 2].map((i) => Math.round(p(a, i) * t + p(b, i) * (1 - t))).join(',')})`;
+}
+const LOT_BUILT = Object.fromEntries(Object.entries(LOT).map(([k, c]) => [k, mix(c, '#8b8d84', 0.5)])); // Pflaster unter Gebäuden, getönt
+// Schilder über den Gebäuden (seit v4.96): Funktionsgebäude groß mit Symbol, Wohnen und Gewerbe klein (privat ⌂ grün, kommerziell ▣ blau)
+const MINE_ICON = { wood: '🌲', stone: '⛰', ore: '⛏', oil: '🛢' };
+const MINE_COLOR = { wood: '#3f8a3f', stone: '#8f8f88', ore: '#c4612f', oil: '#34343a' };
+const SMALL = { res: 1, com: 1 };
+// Höhe des Schilds über dem Boden je Gebäudeform (Weltpixel, isometrisch)
+const BADGE_LIFT = { house: 50, hall: 56, factory: 74, barracks: 40, vhall: 52, heliport: 26 };
 // Rohstoffvorkommen: Bodenfarbe und Farbe der Tupfen (Bäume, Steine, Erzbrocken, Öllachen)
 const DEP_GROUND = { wood: 'rgba(30,70,30,0.55)', stone: 'rgba(120,120,115,0.55)', ore: 'rgba(140,70,40,0.55)', oil: 'rgba(20,20,24,0.6)' };
 const DEP_DOT = { wood: '#1f5a24', stone: '#b9b9b0', ore: '#c4612f', oil: '#0b0b0e' };
@@ -28,14 +41,17 @@ function* cells(game, team, known) {
   }
 }
 
+/** Seitenlänge eines Gebäudes der Stufe lv in der Zelle r (px): lässt einen farbigen Rand des Grundstücks frei. */
+const footprint = (r, lv) => r.x1 - r.x0 - 26 + lv * 6;
+
 /** Gebäude als Stadthaus-Objekte { x, y, w, h, kind } (Größe nach Ausbaustufe), für die Iso-Ansicht. */
 export function cityBuildings(game, team, known, inRect) {
   const out = [];
   for (const { c, k, lv, r, i } of cells(game, team, known)) {
     if (k === 'road' || !lv || !inRect(r.x, r.y)) continue;
-    const s = r.x1 - r.x0 - 22 + lv * 6; // Stufe 1 kleiner, Stufe 3 füllt fast die Zelle
+    const s = footprint(r, lv); // Stufe 1 kleiner, Stufe 3 füllt fast die Zelle (Rand zeigt die Farbe der Zone)
     const e = c.ents.get(i);
-    out.push({ x: r.x, y: r.y, w: s, h: k === 'res' ? s * 0.8 : s, kind: TOWN_KIND[k], damage: e ? 1 - e.hp / e.def.hp : 0 });
+    out.push({ x: r.x, y: r.y, w: s, h: k === 'res' ? s * 0.8 : s, kind: TOWN_KIND[k], color: c.team < 2 ? game.teams[c.team].color : '#888', damage: e ? 1 - e.hp / e.def.hp : 0 });
   }
   return out;
 }
@@ -79,12 +95,13 @@ export function drawCityGround(ren, ctx, team, known, inRect) {
       ctx.fill();
       continue;
     }
-    groundRect(ren, ctx, r.x0 + 2, r.y0 + 2, r.x1 - 2, r.y1 - 2);
-    ctx.fillStyle = lv ? '#8b8d84' : LOT[k] + '55';
+    groundRect(ren, ctx, r.x0 + 3, r.y0 + 3, r.x1 - 3, r.y1 - 3);
+    ctx.fillStyle = lv ? LOT_BUILT[k] : LOT[k] + '55';
     ctx.fill();
     ctx.strokeStyle = LOT[k];
-    ctx.lineWidth = ren.draping() ? 1.5 : 3;
+    ctx.lineWidth = ren.draping() ? Math.max(2, 4 * ren.camera.zoom) : 5;
     ctx.stroke();
+    if (lv && k === 'heliport') drawPad(ren, ctx, r);
     if (!lv && k !== 'mine' && c.team === team) {
       // ausgewiesen, aber noch nicht gebaut: Fortschritt als Balken, rot ohne Straße daneben
       const col = Math.floor(r.x0 / c.cell);
@@ -98,6 +115,20 @@ export function drawCityGround(ren, ctx, team, known, inRect) {
   }
   drawTerritory(ren, ctx, team, known);
   ctx.restore();
+}
+
+/** Landeplatz des Heliports: dunkler Kreis mit weißem Ring und „H“ auf dem Boden. */
+function drawPad(ren, ctx, r) {
+  const rad = (r.x1 - r.x0) * 0.36;
+  groundDot(ren, ctx, r.x, r.y, rad, '#3a3d3a');
+  groundDot(ren, ctx, r.x, r.y, rad * 0.86, '#e8e8e0');
+  groundDot(ren, ctx, r.x, r.y, rad * 0.76, '#3a3d3a');
+  const h = rad * 0.5;
+  ctx.beginPath();
+  for (const [x0, y0, x1, y1] of [[-0.6, -1, -0.6, 1], [0.6, -1, 0.6, 1], [-0.6, 0, 0.6, 0]]) groundLine(ren, ctx, r.x + x0 * h * 0.8, r.y + y0 * h, r.x + x1 * h * 0.8, r.y + y1 * h);
+  ctx.strokeStyle = '#f2f2ea';
+  ctx.lineWidth = ren.draping() ? Math.max(1.5, 4 * ren.camera.zoom) : 4;
+  ctx.stroke();
 }
 
 /** Kreis auf dem Boden (mit Gelände in Bildschirmkoordinaten). */
@@ -197,7 +228,13 @@ export function drawCityTop(ren, ctx, team, known, inRect) {
   for (const { c, k, lv, r, i } of cells(g, team, known)) {
     if (k === 'road' || !lv || !inRect(r.x, r.y, 64)) continue;
     const e = c.ents.get(i);
-    const s = r.x1 - r.x0 - 22 + lv * 6;
+    if (k === 'heliport') {
+      // Landeplatz liegt am Boden; nur ein kleiner Turm in der Ecke
+      ctx.fillStyle = ROOF.heliport;
+      ctx.fillRect(r.x1 - 18, r.y0 + 6, 12, 12);
+      continue;
+    }
+    const s = footprint(r, lv);
     const h = k === 'res' ? s * 0.8 : s;
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     ctx.fillRect(r.x - s / 2 + 4, r.y - h / 2 + 4, s, h);
@@ -205,13 +242,95 @@ export function drawCityTop(ren, ctx, team, known, inRect) {
     ctx.fillRect(r.x - s / 2, r.y - h / 2, s, h);
     ctx.fillStyle = 'rgba(255,255,255,0.18)';
     ctx.fillRect(r.x - s / 2, r.y - h / 2, s, h / 2); // Dachfirst: Lichtseite
-    if (k !== 'res' && k !== 'com') {
+    if (k !== 'res' && k !== 'com' && !CITY.produces[k] && k !== 'market') {
       ctx.fillStyle = '#3b3b3b'; // Schornstein der Werke
       ctx.fillRect(r.x + s / 4, r.y - h / 4, 7, 7);
     }
     if (e && e.hp < e.def.hp) {
       ctx.fillStyle = `rgba(20,10,5,${(0.6 * (1 - e.hp / e.def.hp)).toFixed(2)})`; // beschädigt: dunkler
       ctx.fillRect(r.x - s / 2, r.y - h / 2, s, h);
+    }
+  }
+}
+
+/** Schild (Kreis oder kleines Quadrat mit Symbol) als Bild, je Symbol und Farbe einmal gezeichnet. */
+const badgeCache = new Map();
+function badgeImage(icon, color, small) {
+  const key = `${icon}|${color}|${small ? 1 : 0}`;
+  let img = badgeCache.get(key);
+  if (img) return img;
+  const S = 64;
+  img = document.createElement('canvas');
+  img.width = S;
+  img.height = S;
+  const g = img.getContext('2d');
+  g.beginPath();
+  if (small) g.roundRect(6, 6, S - 12, S - 12, 12);
+  else g.arc(S / 2, S / 2, S / 2 - 4, 0, Math.PI * 2);
+  g.fillStyle = color;
+  g.fill();
+  g.lineWidth = small ? 5 : 6;
+  g.strokeStyle = small ? 'rgba(255,255,255,0.85)' : '#ffffff';
+  g.stroke();
+  g.fillStyle = '#ffffff';
+  if (icon === 'res' || icon === 'com') {
+    // kleine Zeichen als Formen (Schriftzeichen wären zu dünn): Wohnhaus mit Giebel bzw. Bürohaus mit Fensterreihen
+    g.beginPath();
+    if (icon === 'res') {
+      g.moveTo(32, 13);
+      g.lineTo(51, 30);
+      g.lineTo(46, 30);
+      g.lineTo(46, 50);
+      g.lineTo(18, 50);
+      g.lineTo(18, 30);
+      g.lineTo(13, 30);
+      g.closePath();
+      g.fill();
+      g.fillStyle = color;
+      g.fillRect(28, 37, 8, 13); // Tür
+    } else {
+      g.fillRect(17, 14, 30, 36);
+      g.fillStyle = color;
+      for (let y = 19; y < 44; y += 9) for (const x of [21, 30, 39]) g.fillRect(x, y, 5, 5); // Fenster
+    }
+  } else {
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.font = 'bold 34px system-ui, "Segoe UI Symbol", "Noto Color Emoji", "Segoe UI Emoji", sans-serif';
+    g.shadowColor = 'rgba(0,0,0,0.45)';
+    g.shadowBlur = 3;
+    g.fillText(icon, S / 2, S / 2 + 2);
+  }
+  badgeCache.set(key, img);
+  return img;
+}
+
+/**
+ * Schilder über den Stadtgebäuden (seit v4.96, nach Daniels Wunsch): Funktionsgebäude (Markt, Förderung, Werke, Strom, Uni,
+ * Rechenzentrum, Kaserne, Fabrikhalle, Heliport) mit großem Symbol in ihrer Farbe, Wohnen und Gewerbe mit kleinem Zeichen
+ * (⌂ grün = privat, ▣ blau = kommerziell). Größe auf dem Bildschirm fast fest, damit man sie auch weit herausgezoomt findet.
+ * 2D: Weltkoordinaten (Kontext skaliert); isometrisch: Bildschirmkoordinaten über dem Dach.
+ */
+export function drawCityBadges(ren, ctx, team, known, inRect, iso) {
+  const g = ren.game;
+  if (!g.city) return;
+  const cam = ren.camera;
+  const z = cam.zoom;
+  const big = Math.max(18, Math.min(34, 30 * z));
+  const small = Math.max(12, Math.min(22, 19 * z));
+  for (const { c, k, lv, r, i } of cells(g, team, known)) {
+    if (k === 'road' || !lv || !inRect(r.x, r.y, 64)) continue;
+    const sm = !!SMALL[k];
+    const d = k === 'mine' ? DEPOSITS[c.deposit[i] - 1] : null;
+    const img = badgeImage(sm ? k : d ? MINE_ICON[d] : CITY_ICON[k], d ? MINE_COLOR[d] : CITY_COLORS[k], sm);
+    const px = sm ? small : big;
+    if (iso) {
+      const p = cam.worldToScreen(r.x, r.y);
+      const lift = (BADGE_LIFT[TOWN_KIND[k]] ?? 50) * (0.75 + lv * 0.1);
+      ctx.drawImage(img, p.x - px / 2, p.y - lift * z - px, px, px);
+    } else {
+      const w = px / z;
+      ctx.drawImage(img, r.x - w / 2, r.y - w / 2, w, w);
     }
   }
 }
