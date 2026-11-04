@@ -1,4 +1,4 @@
-// Großbauten der Stadt ohne eigenes Bild (seit v5.03, PRD §15): Kraftwerk (2 × 2, hoher Schornstein und Kühlturm), Kaserne (4 × 4,
+// Großbauten der Stadt ohne eigenes Bild (seit v5.03, PRD §15; das Kraftwerk zeichnet seit v5.18 works.js): Kaserne (4 × 4,
 // Unterkünfte mit Ziegeldach um einen Exerzierplatz, Wache, Fahrzeuge; seit v5.11 mit Fenstern, Toren und Bäumen), Fabrikhalle
 // (8 × 8, Montagehalle mit Sheddach, Verwaltung, Lackiererei, Schornsteine, Fahrzeughof mit fertigen Fahrzeugen, Portalkran) und
 // Flughafen (10 × 10, zwei Start- und Landebahnen, Rollweg, Vorfeld mit 20 Stellplätzen, Hangars und Tower). Jede Anlage ist eine
@@ -10,7 +10,7 @@ import { drawBox } from './iso.js';
 import { shade, tint } from './sprites.js';
 
 /** Großbauten, die hier gezeichnet werden (die Universität hat ihr eigenes Bild, university.js). */
-export const BIG_KINDS = new Set(['power', 'barracks', 'factory', 'airport']);
+export const BIG_KINDS = new Set(['barracks', 'factory', 'airport']);
 
 const CONCRETE = '#b3afa4';
 /** Fahrzeuge auf Höfen (seit v5.11): Länge, Breite, Höhe der Wanne (Weltpixel). */
@@ -25,11 +25,7 @@ function groundOf(k, lv, half) {
   const g = [];
   const rect = (x0, y0, x1, y1, c) => g.push({ t: 'rect', x0, y0, x1, y1, c });
   const line = (x0, y0, x1, y1, c, w) => g.push({ t: 'line', x0, y0, x1, y1, c, w });
-  if (k === 'power') {
-    rect(-half + 3, -half + 3, half - 3, half - 3, '#bdb8ab');
-    rect(-58, 16, -10, 58, '#33312d'); // Kohlelager
-    rect(-56, 18, -12, 56, '#26241f');
-  } else if (k === 'barracks') {
+  if (k === 'barracks') {
     // Kaserne (seit v5.11): Rasen, Exerzierplatz mit Fahne, Wege, Fahrzeugplatz vor dem Schuppen, Zufahrt mit Wache von Süden
     rect(-half + 3, -half + 3, half - 3, half - 3, '#8ea364');
     rect(-84, -84, 64, -62, '#b9b49a'); // Gehweg vor der Unterkunft Nord
@@ -100,13 +96,7 @@ function bodiesOf(k, lv, half) {
   const box = (x0, y0, x1, y1, h, c, roof, base = 0, deco = null) => b.push({ t: 'box', x0, y0, x1, y1, h, base, c, roof, ...deco });
   const veh = (v, x, y, ax) => b.push({ t: 'veh', v, x, y, ax, h: VEH[v].h }); // Fahrzeug, Front nach +ax
   const cyl = (x, y, r, h, c, o = {}) => b.push({ t: 'cyl', x, y, r, r1: o.r1 ?? r, h, base: o.base ?? 0, c, band: o.band ?? null });
-  if (k === 'power') {
-    box(-58, -58, 12, 8, 26 + 4 * lv, '#c9c3b5', '#878c90'); // Turbinenhalle
-    box(-24, -48, 14, -10, 48 + 8 * lv, '#b7b0a2', '#6f7377'); // Kesselhaus
-    cyl(34, -34, 7, 118 + 22 * lv, '#d8d4cc', { r1: 5, band: '#c0392b' }); // Schornstein (hoch)
-    cyl(30, 30, 27, 62 + 8 * lv, '#cfcac0', { r1: 19 }); // Kühlturm
-    if (lv >= 3) cyl(-44, -30, 5, 96, '#d8d4cc', { r1: 4, band: '#c0392b' });
-  } else if (k === 'barracks') {
+  if (k === 'barracks') {
     // Kaserne (seit v5.11): zwei Unterkünfte mit Ziegeldach, Fahrzeugschuppen mit Toren, Wache mit Schranke, Fahrzeuge, Bäume;
     // Stufe 2: Stabsgebäude und Schützenpanzer; Stufe 3: Wachtürme in den Ecken und ein Panzer auf dem Exerzierplatz.
     const W = '#ddd2b0';
