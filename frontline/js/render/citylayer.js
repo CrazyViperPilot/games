@@ -1,7 +1,7 @@
 // Stadt auf der Karte (PRD §15): Straßen, ausgewiesene Zonen, Gebäude, Gebietsgrenzen und im Baumodus das gezogene Rechteck.
 // Liest nur game.city (und ren.cityUi, die Stadtleiste). 2D: flach von oben; isometrisch: Boden hier, Gebäude als Stadthäuser
 // über drawTownBuilding (renderer.js).
-import { KINDS, DEPOSITS, cellRect, canZone, hasRoad } from '../game/city.js';
+import { KINDS, KIND_ID, DEPOSITS, cellRect, canZone, hasRoad } from '../game/city.js';
 import { CITY } from '../data/city.js';
 import { CITY_COLORS, CITY_ICON } from '../ui/citypanel.js';
 
@@ -89,12 +89,7 @@ export function drawCityGround(ren, ctx, team, known, inRect) {
       for (const [fx, fy, fr] of DOTS) groundDot(ren, ctx, r.x0 + fx * 64, r.y0 + fy * 64, fr * 40, '#2b2826');
       continue;
     }
-    if (k === 'road') {
-      groundRect(ren, ctx, r.x0, r.y0, r.x1, r.y1);
-      ctx.fillStyle = '#55584f';
-      ctx.fill();
-      continue;
-    }
+    if (k === 'road') continue; // Straßen danach in einem Zug (drawRoads)
     groundRect(ren, ctx, r.x0 + 3, r.y0 + 3, r.x1 - 3, r.y1 - 3);
     ctx.fillStyle = lv ? LOT_BUILT[k] : LOT[k] + '55';
     ctx.fill();
@@ -113,6 +108,7 @@ export function drawCityGround(ren, ctx, team, known, inRect) {
       ctx.fill();
     }
   }
+  drawRoads(ren, ctx, team, known);
   drawTerritory(ren, ctx, team, known);
   ctx.restore();
 }
@@ -129,6 +125,275 @@ function drawPad(ren, ctx, r) {
   ctx.strokeStyle = '#f2f2ea';
   ctx.lineWidth = ren.draping() ? Math.max(1.5, 4 * ren.camera.zoom) : 4;
   ctx.stroke();
+}
+
+// Straßen (v4.97): je Zelle nach den Straßennachbarn Gerade, Kurve, Sackgasse, T-Stück oder Kreuzung. Gehweg an Seiten ohne
+// Anschluss, an Kurven als Bogen; weiße Mittellinie (gestrichelt, in Kurven gebogen); Kreuzungen und T-Stücke frei, davor
+// Zebrastreifen. Alles als Flächen in Zellkoordinaten; die drei Pfade (Asphalt, Gehweg, Markierung) für alle Straßen werden
+// nur neu gebaut, wenn sich Straßen, Sicht, Drehung oder Gelände ändern, sonst je Bild nur drei Füllungen.
+const ROAD = { asphalt: '#4e514b', walk: '#9b9a90', mark: 'rgba(240,238,226,0.88)', kerb: 7, line: 2.6 };
+const RN = 1, RE = 2, RS = 4, RW = 8; // Straßennachbarn
+const DNE = 16, DSE = 32, DSW = 64, DNW = 128; // Straße auch diagonal (dann keine Gehwegecke)
+const ZN = 256, ZE = 512, ZS = 1024, ZW = 2048; // Zebrastreifen an dieser Seite (Nachbar ist Kreuzung oder T-Stück)
+
+function isRoad(c, col, row) {
+  return col >= 0 && row >= 0 && col < c.cols && row < c.rows && c.kind[row * c.cols + col] === KIND_ID.road;
+}
+
+/** Zahl der Straßennachbarn (4er-Nachbarschaft). */
+function degree(c, col, row) {
+  return +isRoad(c, col, row - 1) + +isRoad(c, col + 1, row) + +isRoad(c, col, row + 1) + +isRoad(c, col - 1, row);
+}
+
+/** Bitmaske einer Straßenzelle: Nachbarn (RN, RE, RS, RW), Diagonalen (DNE …) und Zebrastreifen (ZN …). */
+export function roadMask(c, col, row) {
+  let m = 0;
+  if (isRoad(c, col, row - 1)) m |= RN;
+  if (isRoad(c, col + 1, row)) m |= RE;
+  if (isRoad(c, col, row + 1)) m |= RS;
+  if (isRoad(c, col - 1, row)) m |= RW;
+  if (isRoad(c, col + 1, row - 1)) m |= DNE;
+  if (isRoad(c, col + 1, row + 1)) m |= DSE;
+  if (isRoad(c, col - 1, row + 1)) m |= DSW;
+  if (isRoad(c, col - 1, row - 1)) m |= DNW;
+  const n = m & 15;
+  if (n === (RN | RS)) {
+    if (degree(c, col, row - 1) >= 3) m |= ZN;
+    if (degree(c, col, row + 1) >= 3) m |= ZS;
+  } else if (n === (RE | RW)) {
+    if (degree(c, col + 1, row) >= 3) m |= ZE;
+    if (degree(c, col - 1, row) >= 3) m |= ZW;
+  }
+  return m;
+}
+
+// Aktuelle Zelle beim Bauen der Pfade: Ursprung und Kante in Weltkoordinaten; mit Gelände (Q gesetzt) die vier Ecken
+// in Pfadkoordinaten (Punkte dazwischen bilinear).
+const Q = new Float64Array(8);
+let qx = 0;
+let qy = 0;
+let qS = 64;
+let qDrape = false;
+
+/** Punkt (u, v) der aktuellen Zelle (0 … S) an den Pfad anhängen. */
+function vtx(ctx, u, v, first) {
+  let x = qx + u;
+  let y = qy + v;
+  if (qDrape) {
+    const s = u / qS;
+    const t = v / qS;
+    const a = (1 - s) * (1 - t);
+    const b = s * (1 - t);
+    const d = s * t;
+    const e = (1 - s) * t;
+    x = Q[0] * a + Q[2] * b + Q[4] * d + Q[6] * e;
+    y = Q[1] * a + Q[3] * b + Q[5] * d + Q[7] * e;
+  }
+  if (first) ctx.moveTo(x, y);
+  else ctx.lineTo(x, y);
+}
+
+function rectUV(ctx, u0, v0, u1, v1) {
+  vtx(ctx, u0, v0, true);
+  vtx(ctx, u1, v0);
+  vtx(ctx, u1, v1);
+  vtx(ctx, u0, v1);
+  ctx.closePath();
+}
+
+/** Innere Ecke einer Kurve (wo beide Anschlüsse zusammenstoßen) als [u, v, Richtung u, Richtung v], sonst null. */
+function curveCorner(n, S) {
+  if (n === (RN | RE)) return [S, 0, -1, 1];
+  if (n === (RE | RS)) return [S, S, -1, -1];
+  if (n === (RS | RW)) return [0, S, 1, -1];
+  if (n === (RW | RN)) return [0, 0, 1, 1];
+  return null;
+}
+
+/** Gehweg: Streifen an Seiten ohne Anschluss, Ecken zwischen zwei Anschlüssen; in Kurven die Außenseite als Bogen. */
+function roadWalk(ctx, m, S) {
+  const k = ROAD.kerb;
+  const n = m & 15;
+  const cc = curveCorner(n, S);
+  if (cc) {
+    const [cu, cv, su, sv] = cc;
+    const R = S - k;
+    const steps = 8;
+    for (let j = 0; j <= steps; j++) {
+      const a = (j / steps) * Math.PI * 0.5;
+      vtx(ctx, cu + su * R * Math.cos(a), cv + sv * R * Math.sin(a), !j);
+    }
+    vtx(ctx, cu, cv + sv * S);
+    vtx(ctx, cu + su * S, cv + sv * S);
+    vtx(ctx, cu + su * S, cv);
+    ctx.closePath();
+    const diag = n === (RN | RE) ? DNE : n === (RE | RS) ? DSE : n === (RS | RW) ? DSW : DNW;
+    if (!(m & diag)) rectUV(ctx, Math.min(cu, cu + su * k), Math.min(cv, cv + sv * k), Math.max(cu, cu + su * k), Math.max(cv, cv + sv * k));
+    return;
+  }
+  if (!(n & RN)) rectUV(ctx, 0, 0, S, k);
+  if (!(n & RE)) rectUV(ctx, S - k, 0, S, S);
+  if (!(n & RS)) rectUV(ctx, 0, S - k, S, S);
+  if (!(n & RW)) rectUV(ctx, 0, 0, k, S);
+  if ((n & (RN | RE)) === (RN | RE) && !(m & DNE)) rectUV(ctx, S - k, 0, S, k);
+  if ((n & (RE | RS)) === (RE | RS) && !(m & DSE)) rectUV(ctx, S - k, S - k, S, S);
+  if ((n & (RS | RW)) === (RS | RW) && !(m & DSW)) rectUV(ctx, 0, S - k, k, S);
+  if ((n & (RW | RN)) === (RW | RN) && !(m & DNW)) rectUV(ctx, 0, 0, k, k);
+}
+
+/** Zebrastreifen quer über die Fahrbahn an einer Seite (vertical: Straße läuft Nord-Süd). */
+function zebra(ctx, S, vertical, near) {
+  const k = ROAD.kerb + 2;
+  const bars = 6;
+  const bw = 4;
+  const gap = (S - 2 * k - bars * bw) / (bars - 1);
+  const a = near ? 2 : S - 14;
+  for (let j = 0; j < bars; j++) {
+    const p = k + j * (bw + gap);
+    if (vertical) rectUV(ctx, p, a, p + bw, a + 12);
+    else rectUV(ctx, a, p, a + 12, p + bw);
+  }
+}
+
+/** Weiße Markierung: Mittellinie (gerade, Kurve, Sackgasse) und Zebrastreifen vor Kreuzungen. */
+function roadMarks(ctx, m, S) {
+  const n = m & 15;
+  const w = ROAD.line / 2;
+  const h = S / 2;
+  const cc = curveCorner(n, S);
+  if (cc) {
+    const [cu, cv, su, sv] = cc;
+    const L = Math.PI * 0.5 * h;
+    for (const [s0, s1] of [[8, 18], [L - 18, L - 8]]) {
+      const a0 = s0 / h;
+      const a1 = s1 / h;
+      for (let j = 0; j <= 3; j++) {
+        const a = a0 + ((a1 - a0) * j) / 3;
+        vtx(ctx, cu + su * (h + w) * Math.cos(a), cv + sv * (h + w) * Math.sin(a), !j);
+      }
+      for (let j = 3; j >= 0; j--) {
+        const a = a0 + ((a1 - a0) * j) / 3;
+        vtx(ctx, cu + su * (h - w) * Math.cos(a), cv + sv * (h - w) * Math.sin(a));
+      }
+      ctx.closePath();
+    }
+    return;
+  }
+  // Striche bei 10–22 und 42–54 (Takt 32): über Zellgrenzen gleichmäßig
+  const dashV = (v0) => rectUV(ctx, h - w, v0, h + w, v0 + 12);
+  const dashU = (u0) => rectUV(ctx, u0, h - w, u0 + 12, h + w);
+  if (n === (RN | RS)) {
+    if (m & ZN) zebra(ctx, S, true, true);
+    else dashV(10);
+    if (m & ZS) zebra(ctx, S, true, false);
+    else dashV(S - 22);
+  } else if (n === (RE | RW)) {
+    if (m & ZW) zebra(ctx, S, false, true);
+    else dashU(10);
+    if (m & ZE) zebra(ctx, S, false, false);
+    else dashU(S - 22);
+  } else if (n === RN) dashV(10);
+  else if (n === RS) dashV(S - 22);
+  else if (n === RW) dashU(10);
+  else if (n === RE) dashU(S - 22);
+}
+
+// Zwischenspeicher der Straßenpfade (eine Partie, eine Ansicht)
+const cache = { key: '', game: null, relief: null, paths: null };
+
+/**
+ * Alle sichtbaren Straßen (eigene immer, fremde wo erkundet): Asphalt, Gehweg, Markierung als je ein Pfad.
+ * Flach (2D und Iso ohne Gelände) in Weltkoordinaten unter der Welt-Transformation. Mit Gelände in Koordinaten
+ * „Weltpunkt durch die Iso-Drehung bei Zoom 1, minus Geländehöhe“: Bildschirm = Ursprung + Zoom · Punkt, also nur
+ * eine Transformation je Bild, solange die Drehung gleich bleibt.
+ */
+function drawRoads(ren, ctx, team, known) {
+  const g = ren.game;
+  const cam = ren.camera;
+  const drape = ren.draping();
+  const z = cam.zoom;
+  let ax = 0;
+  let ay = 0;
+  let u1x = 1;
+  let u1y = 0;
+  let u2x = 0;
+  let u2y = 1;
+  if (drape) {
+    const o = cam.worldToScreenFlat(0, 0);
+    const e1 = cam.worldToScreenFlat(1000, 0);
+    const e2 = cam.worldToScreenFlat(0, 1000);
+    ax = o.x;
+    ay = o.y;
+    u1x = (e1.x - o.x) / (1000 * z);
+    u1y = (e1.y - o.y) / (1000 * z);
+    u2x = (e2.x - o.x) / (1000 * z);
+    u2y = (e2.y - o.y) / (1000 * z);
+  }
+  // Fingerabdruck: alle Straßenzellen mit Sichtbarkeit, dazu die Ansicht
+  let h = 0;
+  let n = 0;
+  for (const c of g.city) {
+    for (const i of c.list) {
+      if (c.kind[i] !== KIND_ID.road) continue;
+      const col = i % c.cols;
+      const vis = c.team === team || known(c.x0 + (col + 0.5) * c.cell, c.y0 + ((i - col) / c.cols + 0.5) * c.cell);
+      h = (Math.imul(h, 31) + i * 4 + c.team * 2 + (vis ? 1 : 0)) | 0;
+      if (vis) n++;
+    }
+  }
+  if (!n) return;
+  const view = drape ? `${u1x.toFixed(5)},${u1y.toFixed(5)},${u2x.toFixed(5)},${u2y.toFixed(5)}` : 'flat';
+  const key = `${h}|${n}|${view}`;
+  if (key !== cache.key || cache.game !== g || cache.relief !== (drape ? cam.relief : null)) {
+    cache.key = key;
+    cache.game = g;
+    cache.relief = drape ? cam.relief : null;
+    cache.paths = buildRoads(g, team, known, drape ? cam.relief : null, u1x, u1y, u2x, u2y);
+  }
+  ctx.save();
+  if (drape) ctx.setTransform(ren.dpr * z, 0, 0, ren.dpr * z, ren.dpr * ax, ren.dpr * ay);
+  const [asphalt, walk, mark] = cache.paths;
+  ctx.fillStyle = ROAD.asphalt;
+  ctx.fill(asphalt);
+  ctx.fillStyle = ROAD.walk;
+  ctx.fill(walk);
+  ctx.fillStyle = ROAD.mark;
+  ctx.fill(mark);
+  ctx.restore();
+}
+
+/** Die drei Straßenpfade neu bauen (relief gesetzt: Pfadkoordinaten mit Gelände, siehe drawRoads). */
+function buildRoads(g, team, known, relief, u1x, u1y, u2x, u2y) {
+  const paths = [new Path2D(), new Path2D(), new Path2D()];
+  qDrape = !!relief;
+  for (const c of g.city) {
+    const S = c.cell;
+    for (const i of c.list) {
+      if (c.kind[i] !== KIND_ID.road) continue;
+      const col = i % c.cols;
+      const row = (i - col) / c.cols;
+      const x0 = c.x0 + col * S;
+      const y0 = c.y0 + row * S;
+      if (c.team !== team && !known(x0 + S / 2, y0 + S / 2)) continue;
+      qx = x0;
+      qy = y0;
+      qS = S;
+      if (relief) {
+        const pts = [x0, y0, x0 + S, y0, x0 + S, y0 + S, x0, y0 + S];
+        for (let k = 0; k < 8; k += 2) {
+          const x = pts[k];
+          const y = pts[k + 1];
+          Q[k] = x * u1x + y * u2x;
+          Q[k + 1] = x * u1y + y * u2y - relief.displayAt(x, y);
+        }
+      }
+      const m = roadMask(c, col, row);
+      rectUV(paths[0], 0, 0, S, S);
+      roadWalk(paths[1], m, S);
+      roadMarks(paths[2], m, S);
+    }
+  }
+  return paths;
 }
 
 /** Kreis auf dem Boden (mit Gelände in Bildschirmkoordinaten). */
