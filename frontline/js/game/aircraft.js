@@ -9,6 +9,7 @@ import { UNITS } from '../data/units.js';
 import { KIND_ID } from './city.js';
 import { resolveTarget, canAttack, isFoe } from './entities.js';
 import { setIdle } from './movement.js';
+import { modOf } from './research.js';
 
 const J = BALANCE.jets;
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
@@ -129,7 +130,7 @@ function stepParked(game, u, dt) {
   u.x = p.x;
   u.y = p.y;
   const main = game.mainFob(u.team);
-  const f = dt / J.rearm;
+  const f = dt / (J.rearm * modOf(game, u, 'rearm')); // Schnellwartung (Forschung)
   if (u.fuel < u.def.fuelMax) {
     const want = Math.min(u.def.fuelMax - u.fuel, u.def.fuelMax * f);
     const got = main ? (main.infinite ? want : Math.min(want, main.store.fuel)) : 0;
@@ -170,13 +171,13 @@ function stepParked(game, u, dt) {
 }
 
 /** Ein Flugschritt Richtung (tx, ty): Nase höchstens turn × dt drehen, dann mit voller Geschwindigkeit geradeaus. */
-function fly(u, tx, ty, dt) {
+function fly(u, tx, ty, dt, speed = u.def.speed) {
   const want = Math.atan2(ty - u.y, tx - u.x);
   let d = want - u.angle;
   d = Math.atan2(Math.sin(d), Math.cos(d));
   const m = J.turn * dt;
   u.angle += Math.max(-m, Math.min(m, d));
-  const v = u.def.speed * dt;
+  const v = speed * dt;
   u.x = Math.min(BALANCE.map.width, Math.max(0, u.x + Math.cos(u.angle) * v));
   u.y = Math.min(BALANCE.map.height, Math.max(0, u.y + Math.sin(u.angle) * v));
 }
@@ -184,7 +185,7 @@ function fly(u, tx, ty, dt) {
 /** Kreisen um (ox, oy) im Abstand orbit: Ziel ein Stück voraus auf dem Kreis. */
 function circle(u, ox, oy, dt) {
   const a = Math.atan2(u.y - oy, u.x - ox) + 0.7;
-  fly(u, ox + Math.cos(a) * J.orbit, oy + Math.sin(a) * J.orbit, dt);
+  fly(u, ox + Math.cos(a) * J.orbit, oy + Math.sin(a) * J.orbit, dt, u.jet.speed);
 }
 
 /** Liegt (x, y) auf dem Gelände eines eigenen Flughafens? Dann landet der Jet dort (Rechtsklick auf den eigenen Flughafen). */
@@ -198,8 +199,10 @@ function airportAt(game, team, x, y) {
 
 /** In der Luft: Treibstoff, Heimweg, Befehl (Ziel verfolgen, Punkt anfliegen, kreisen), Landung. */
 function stepAirborne(game, u, dt) {
-  u.fuel = Math.max(0, u.fuel - u.def.fuelPerSec * dt);
-  game.teams[u.team].used.fuel += u.def.fuelPerSec * dt;
+  const burn = u.def.fuelPerSec * modOf(game, u, 'fuel') * dt; // konforme Tanks (Forschung)
+  u.fuel = Math.max(0, u.fuel - burn);
+  game.teams[u.team].used.fuel += burn;
+  u.jet.speed = u.def.speed * modOf(game, u, 'speed'); // Nachbrenner (Forschung)
   if (u.fuel <= 0) {
     u.hp = 0; // leer: Absturz
     u.alive = false;
@@ -212,7 +215,7 @@ function stepAirborne(game, u, dt) {
   const asked = o.type === 'move' ? airportAt(game, u.team, o.x, o.y) : null;
   if (asked && freeSpace(game, asked) + (u.jet.home === asked.id ? 1 : 0) > 0) home = asked;
   const toHome = home ? dist(u.x, u.y, home.x + AIRPORT.landing.x, home.y + AIRPORT.landing.y) : 0;
-  const bingo = home && u.fuel <= (toHome / u.def.speed) * u.def.fuelPerSec * J.reserve + J.margin;
+  const bingo = home && u.fuel <= (toHome / u.jet.speed) * u.def.fuelPerSec * modOf(game, u, 'fuel') * J.reserve + J.margin;
   // Rückkehr wegen Treibstoff oder Raketen bleibt bis zur Landung (u.jet.rtb), auf Befehl nur, solange der Befehl gilt
   if (u.jet.rtb === 'asked' && !asked) u.jet.rtb = false;
   if (home && (u.jet.rtb || bingo || dry(u) || asked)) {
@@ -225,7 +228,7 @@ function stepAirborne(game, u, dt) {
       park(game, u, home);
       return;
     }
-    fly(u, l.x, l.y, dt);
+    fly(u, l.x, l.y, dt, u.jet.speed);
     return;
   }
   if (!home && !u.jet.lost) {
@@ -239,19 +242,19 @@ function stepAirborne(game, u, dt) {
       setIdle(u);
       return;
     }
-    fly(u, t.x, t.y, dt);
+    fly(u, t.x, t.y, dt, u.jet.speed);
     return;
   }
   if (o.type === 'move' || o.type === 'attackMove') {
     if (o.type === 'attackMove' && u.targetId !== null) {
       const t = resolveTarget(game, u.targetId);
       if (isFoe(u.team, t)) {
-        fly(u, t.x, t.y, dt);
+        fly(u, t.x, t.y, dt, u.jet.speed);
         return;
       }
     }
     if (dist(u.x, u.y, o.x, o.y) > J.orbit) {
-      fly(u, o.x, o.y, dt);
+      fly(u, o.x, o.y, dt, u.jet.speed);
       return;
     }
     const x = o.x;
@@ -266,7 +269,7 @@ function stepAirborne(game, u, dt) {
   if (u.targetId !== null) {
     const t = resolveTarget(game, u.targetId);
     if (isFoe(u.team, t) && dist(t.x, t.y, u.anchorX, u.anchorY) <= u.def.sight + J.orbit) {
-      fly(u, t.x, t.y, dt);
+      fly(u, t.x, t.y, dt, u.jet.speed);
       return;
     }
     u.targetId = null;

@@ -12,7 +12,8 @@ import { canGarrison, canEnter } from '../game/garrison.js';
 import { canCarry } from '../game/crates.js';
 import { FORMATIONS, FORMATION_NAMES } from '../game/formation.js';
 import { hasCommander } from '../game/commander.js';
-import { unitLocked, lockReason, hasTech } from '../game/research.js';
+import { hasUnlock } from '../game/research.js';
+import { RESEARCH } from '../data/research.js';
 import { deckDist } from '../game/river.js';
 import { unitLift, buildingHeight, TOWN_H } from '../render/iso.js';
 
@@ -1215,11 +1216,11 @@ export class Controller {
     );
     if (this.game.research) {
       const ground = units.filter((u) => !u.def.armor || u.def.armor !== 'inf');
-      if (ground.length && hasTech(this.game, this.team, 'smoke')) {
+      if (ground.length && hasUnlock(this.game, this.team, 'smoke')) {
         const cd = Math.ceil(Math.max(0, ...ground.map((u) => u.abilityCd || 0)));
         card.push(
           entry('Nebel', 'N', {
-            tip: `Nebelwand (N): legt an der Stelle der gewählten Fahrzeuge Rauch (${BALANCE.research.smoke.life} s). Eigene Einheiten darin nehmen halb so viel Schaden. Ladezeit ${BALANCE.research.smoke.cd} s.`,
+            tip: `Nebelwand (N): legt an der Stelle der gewählten Fahrzeuge Rauch (${RESEARCH.smoke.life} s). Eigene Einheiten darin nehmen halb so viel Schaden. Ladezeit ${RESEARCH.smoke.cd} s.`,
             enabled: units.every((u) => !(u.abilityCd > 0)) || ground.some((u) => !(u.abilityCd > 0)),
             reason: `Noch nicht bereit (${cd} s)`,
             action: () => this.issue({ type: 'smoke', ids: ground.map((u) => u.id) }),
@@ -1227,10 +1228,10 @@ export class Controller {
         );
       }
       const engs = units.filter((u) => u.type === 'engineer');
-      if (engs.length && hasTech(this.game, this.team, 'mines')) {
+      if (engs.length && hasUnlock(this.game, this.team, 'mines')) {
         card.push(
           entry('Mine', 'Z', {
-            tip: `Mine legen (Z): das Baufahrzeug legt an seiner Stelle eine Mine, unsichtbar für den Gegner. Sie trifft Bodeneinheiten des Gegners im Umkreis ${BALANCE.research.mine.blast} px mit ${BALANCE.research.mine.damage} Schaden. Höchstens ${BALANCE.research.mine.max}, Ladezeit ${BALANCE.research.mine.cd} s.`,
+            tip: `Mine legen (Z): das Baufahrzeug legt an seiner Stelle eine Mine, unsichtbar für den Gegner. Sie trifft Bodeneinheiten des Gegners im Umkreis ${RESEARCH.mine.blast} px mit ${RESEARCH.mine.damage} Schaden. Höchstens ${RESEARCH.mine.max}, Ladezeit ${RESEARCH.mine.cd} s.`,
             enabled: engs.some((u) => !(u.abilityCd > 0)),
             reason: 'Noch nicht bereit',
             action: () => this.issue({ type: 'mine', ids: engs.map((u) => u.id) }),
@@ -1391,7 +1392,6 @@ export class Controller {
       let reason = '';
       if (!producers.some((b) => b.built)) reason = 'Gebäude ist noch im Bau';
       else if (!ready) reason = 'Warteschlange ist voll';
-      else if (unitLocked(this.game, ready.team, u)) reason = lockReason(u);
       else if (this.game.slotsUsed(ready.team) + (def.slots ?? 1) > BALANCE.slotCap) reason = 'Einheitenlimit erreicht';
       else if (def.hero && hasCommander(this.game, ready.team)) reason = 'Nur ein Kommandeur je Team';
       else if (this.game.city && freePop(this.game, ready.team) < crewOf(u)) reason = 'Zu wenig freie Einwohner (Stadt: Wohnen ausbauen)';
@@ -1469,7 +1469,7 @@ export class Controller {
       const tech = this.game.teams[this.team].tech;
       card.push(
         entry('Forschung', 'U', {
-          tip: `Forschungsmenü (U, auch Knopf „Forschung“ rechts oben): Stufe ${tech.tier} von 3. Stufen schalten Einheiten frei, Verbesserungen stärken alle Einheiten.`,
+          tip: `Forschungsmenü (U, auch Knopf „Forschung“ rechts oben): Stufe ${tech.tier} von ${RESEARCH.tiers}, ${tech.done.length} erforscht. Alle Einheiten sind frei; Forschungen verbessern sie (bis zu ${RESEARCH.queueMax} warten in der Warteschlange).`,
           active: !!tech.cur,
           action: () => this.onResearch?.(),
         }),

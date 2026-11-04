@@ -69,12 +69,11 @@ export const CITY = {
   market: { lot: 100, sell: { bm: 20, mun: 30, fuel: 30, metal: 40 }, buy: { bm: 80, mun: 120, fuel: 120, metal: 160 } },
 
   // ---- Wissen (seit v4.88, Stufe 5) ----
-  // Universität: ohne sie nur Forschungsstufe 1; Uni-Stufe 1 schaltet Stufe 2 frei, uniForTier3 die Stufe 3. Jede Uni-Stufe über 1
-  // beschleunigt die Forschung um uniSpeed. Rechenzentrum: schaltet den Forschungsast „KI“ frei (BALANCE.research, branch 'ai').
+  // Seit v5.04: ohne fertige Universität ruht jede Forschung (eine reicht, ihre Stufe zählt nicht). Rechenzentren beschleunigen sie:
+  // Tempo × (1 + dcSpeed × Summe der Stufen aller Rechenzentren), höchstens maxSpeed; Strommangel bremst (js/data/research.js).
   jobsUni: [0, 8, 16, 28], // Studenten und Lehrer je Stufe (zählen als Arbeitsplätze)
   jobsDc: [0, 6, 12, 20], // Arbeitsplätze je Stufe im Rechenzentrum
-  uniForTier3: 3,
-  uniSpeed: 0.25,
+  research: { dcSpeed: 0.2, maxSpeed: 3 },
 
   // ---- Strom und Zufriedenheit (seit v4.88, Stufe 3) ----
   // Strom wirkt stadtweit (keine Leitungen). Angebot: base (Notstrom der Hauptstadt) + Kraftwerke (supply je Stufe × Besetzung).

@@ -25,8 +25,6 @@ test('Einheitenlimit: 300 Plätze, Flak und SAM belegen je 2', () => {
   assert.equal(UNITS.sam.slots, 2);
   assert.equal(UNITS.flak.hotkey, 'J');
   assert.equal(UNITS.sam.hotkey, 'N');
-  assert.equal(BALANCE.research.unitTier.flak, 2);
-  assert.equal(BALANCE.research.unitTier.sam, 3);
 });
 
 test('Flak: 20 Munition je Schuss und schießt nur auf Luftziele', () => {

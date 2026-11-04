@@ -3,7 +3,7 @@
 import { BALANCE } from '../data/balance.js';
 import { RELIEF, FINE_N } from './relief.js';
 import { weatherSight } from './weather.js';
-import { opticsMul } from './research.js';
+import { sightMul } from './research.js';
 import { CITY } from '../data/city.js';
 
 const CONSTRUCTION_SIGHT = BALANCE.construction.siteSight; // Baustellen sehen weniger
@@ -141,15 +141,15 @@ export class Fog {
     this.visible.fill(0);
     const relief = game.relief ?? null;
     const m = weatherSight(game);
-    const mu = m * opticsMul(game, team);
+    const mu = m;
     for (const u of game.units) {
       if (!u.alive || u.team !== team || !(u.def.sight > 0)) continue;
       // aus einem Haus: Sichtweite ab der Hauswand
-      this.markEntity(relief, u, u.def.sight * mu + (u.house ? (game.entities.get(u.house)?.reach ?? 0) : 0));
+      this.markEntity(relief, u, u.def.sight * mu * sightMul(game, u) + (u.house ? (game.entities.get(u.house)?.reach ?? 0) : 0));
     }
     for (const b of game.buildings) {
       if (!b.alive || b.team !== team) continue;
-      const sight = (b.built ? b.def.sight : CONSTRUCTION_SIGHT) * m;
+      const sight = (b.built ? b.def.sight * sightMul(game, b) : CONSTRUCTION_SIGHT) * m; // Radarstellung (Forschung)
       if (sight > 0) this.markEntity(relief, b, sight);
     }
     // eigene Stadtgebäude (Wohnen, Gewerbe, Förderung, Werke …) lichten den Nebel wie andere Gebäude

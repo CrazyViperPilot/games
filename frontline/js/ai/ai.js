@@ -11,7 +11,8 @@ import { makeRng } from '../core/rng.js';
 import { hasCommander } from '../game/commander.js';
 import { radioEta } from '../game/radio.js';
 import { weatherSight } from '../game/weather.js';
-import { unitLocked, researchBlock } from '../game/research.js';
+import { researchBlock, RESEARCH_KEYS } from '../game/research.js';
+import { RESEARCH } from '../data/research.js';
 import {
   JET_GROUP,
   JET_EVERY,
@@ -254,7 +255,7 @@ export class AI {
     const g = this.game;
     const t = this.team;
     const ports = airportsOf(g, t);
-    if (!ports.length || unitLocked(g, t, 'f16')) return;
+    if (!ports.length) return;
     const jets = s.units.filter((u) => u.def.jet);
     const want = CITY.ai.jets[this.difficulty] ?? CITY.ai.jets.normal;
     const queued = ports.reduce((n, b) => n + b.queue.length, 0);
@@ -601,7 +602,7 @@ export class AI {
     let best = null;
     let bestKey = Infinity;
     for (const b of s.producers) {
-      if (!b.built || !b.produces.includes(type) || b.queue.length >= qmax || unitLocked(this.game, this.team, type)) continue;
+      if (!b.built || !b.produces.includes(type) || b.queue.length >= qmax) continue;
       const key = b.queue.length * 100000 + (towardZone ? dist(b.x, b.y, s.zone.x, s.zone.y) : b.id);
       if (key < bestKey) {
         bestKey = key;
@@ -650,7 +651,7 @@ export class AI {
     const avail = new Set();
     for (const b of s.producers) {
       if (!b.built || b.queue.length >= qmax) continue;
-      for (const u of b.produces) if (mix[u] && !unitLocked(g, t, u)) avail.add(u); // gesperrte Stufe: noch nicht
+      for (const u of b.produces) if (mix[u]) avail.add(u);
     }
     if (!avail.size) return;
     let sumW = 0;
@@ -844,7 +845,7 @@ export class AI {
     const g = this.game;
     if (s.helis.length || this.queued(s, 'transporter') || !s.own.some((b) => b.type === 'tower' && b.built)) return;
     const cost = UNITS.transporter.cost.money;
-    if (g.teams[this.team].res.money < cost + HELI_MIN_MONEY || unitLocked(g, this.team, 'transporter')) return;
+    if (g.teams[this.team].res.money < cost + HELI_MIN_MONEY) return;
     const b = this.pickProducer(s, 'transporter', BALANCE.queueMax, false);
     if (b) g.issue(this.team, { type: 'train', buildingId: b.id, unit: 'transporter' });
   }
@@ -1153,7 +1154,6 @@ export class AI {
     const bird = s.units.find((u) => u.type === 'littlebird');
     if (!bird) {
       this.saveForScout = false;
-      if (unitLocked(g, t, 'littlebird')) return; // erst ab seiner Forschungsstufe
       // schlechte Sicht (Regen, Nebel, Schnee): der Späher ist mehr wert und kommt früher
       const bad = this.cfg.weather && weatherSight(g) < WX_SCOUT_SIGHT;
       const minArmy = bad ? WX_SCOUT_ARMY : SCOUT_MIN_ARMY;
@@ -1381,28 +1381,23 @@ export class AI {
   }
 
   /**
-   * Forschung in der Hauptstadt: ab cfg.research[0] s spart die KI auf Stufe 2, ab cfg.research[1] s auf Stufe 3 (nicht bei Alarm an
-   * der Hauptstadt). Verbesserungen (ab Normal, cfg.upgrades) nur aus Überschuss, der Reihe nach (UPGRADES).
+   * Forschung in der Hauptstadt (seit v5.04, Forschungsbaum): ab cfg.research[0] s Stufe für Stufe, in jeder Stufe die Äste in der
+   * Reihenfolge UPGRADES (zuerst die niedrigste offene Stufe), nur aus Überschuss (UPGRADE_RESERVE; auf Leicht ohne cfg.upgrades die
+   * doppelte Reserve) und höchstens eine wartende Forschung hinter der laufenden.
    */
   research(s) {
     const g = this.game;
     const t = this.team;
     this.saveForResearch = false;
-    if (!g.research || !s.home || !s.home.built) return;
+    if (!g.research || !s.home || !s.home.built || g.time < this.cfg.research[0]) return;
     const tech = g.teams[t].tech;
-    if (tech.cur) return;
-    const money = g.teams[t].res.money;
-    const items = BALANCE.research.items;
-    const [t2, t3] = this.cfg.research;
-    const tier = tech.tier === 1 && g.time >= t2 ? 'tier2' : tech.tier === 2 && g.time >= t3 ? 'tier3' : null;
-    if (tier && !s.alarm && !researchBlock(g, t, tier)) { // mit Stadt erst, wenn die Universität steht
-      if (money < items[tier].money) this.saveForResearch = true; // produce spart, bis die Stufe bezahlbar ist
-      else g.issue(t, { type: 'research', buildingId: s.home.id, key: tier });
-      return;
-    }
-    if (!this.cfg.upgrades) return;
-    const key = UPGRADES.find((k) => !researchBlock(g, t, k));
-    if (key && money >= items[key].money + UPGRADE_RESERVE) g.issue(t, { type: 'research', buildingId: s.home.id, key });
+    if (tech.cur && tech.queue.length >= 1) return;
+    const items = RESEARCH.items;
+    const key = RESEARCH_KEYS.filter((k) => !researchBlock(g, t, k)).sort(
+      (a, b) => items[a].tier - items[b].tier || UPGRADES.indexOf(items[a].lane) - UPGRADES.indexOf(items[b].lane),
+    )[0];
+    const reserve = UPGRADE_RESERVE * (this.cfg.upgrades ? 1 : 2);
+    if (key && g.teams[t].res.money >= items[key].money + reserve) g.issue(t, { type: 'research', buildingId: s.home.id, key });
   }
 
   /** Gefallenen Kommandeur ersetzen (Hauptstadt), sobald genug Geld für ihn und eine Reserve da ist. */

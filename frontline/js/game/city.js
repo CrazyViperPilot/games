@@ -4,7 +4,6 @@
 import { CITY } from '../data/city.js';
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
-import { unitLocked } from './research.js';
 import { nearestPassable } from './movement.js';
 import { makeRng } from '../core/rng.js';
 
@@ -990,6 +989,16 @@ export function cityLevel(game, team, kind) {
   return lv;
 }
 
+/** Summe der Stufen aller fertigen Gebäude dieser Art (Großbau einmal); ohne Stadt 0. */
+export function citySum(game, team, kind) {
+  const c = game.city?.[team];
+  if (!c) return 0;
+  const id = KIND_ID[kind];
+  let n = 0;
+  for (const i of c.list) if (c.kind[i] === id && !isPart(c, i)) n += c.level[i];
+  return n;
+}
+
 /** Stromverhältnis der Stadt (1 = genug Strom); ohne Stadt 1. */
 export function powerRatio(game, team) {
   return game.city?.[team]?.stats.powerRatio ?? 1;
@@ -1194,10 +1203,10 @@ function aiNeed(game, c, add, skip = null) {
   // Strom, Universität, Rechenzentrum (seit v4.88) nach Bedarf
   const st = c.stats;
   if (st.powerSupply + (add.power ?? 0) * CITY.power.supply[1] < st.powerUse * A.powerMargin + 10 && (add.power ?? 0) < 1 && !skip?.has('power')) return 'power';
-  // Ausbildungsgebäude (seit v4.96): ohne sie keine Truppen; Heliport erst, wenn Hubschrauber freigeschaltet sind
+  // Ausbildungsgebäude (seit v4.96): ohne sie keine Truppen; Heliport erst mit einer Arbeitsstätte
   const more = work >= A.moreFrom ? 1 : 0;
   for (const [k, n] of Object.entries(A.producers)) {
-    if (k === 'heliport' && (unitLocked(game, c.team, 'littlebird') || !work)) continue;
+    if (k === 'heliport' && !work) continue;
     if (skip?.has(k)) continue; // Großbau ohne Platz in diesem Takt (seit v5.03 auch Kaserne und Fabrikhalle)
     if (count[k] < n + (k === 'heliport' ? 0 : more)) return k;
   }
@@ -1322,7 +1331,7 @@ export function aiCity(game, team, difficulty) {
  */
 function aiAirport(game, c, main, reserve) {
   const A = CITY.ai;
-  if (!main || unitLocked(game, c.team, 'f16')) return false;
+  if (!main) return false;
   if (game.teams[c.team].res.money < CITY.cost.airport + reserve || main.store.bm < (CITY.costBm.airport ?? 0) + 200) return false;
   let work = 0;
   for (const i of c.list) {

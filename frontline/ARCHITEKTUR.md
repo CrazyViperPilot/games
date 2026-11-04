@@ -122,7 +122,7 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 | `pickup`, `deliver`, `dropCrate` | `ids, crateId` / `ids, fobId` / `ids` | `crates.js` | Kiste aufheben / abliefern / fallen lassen |
 | `drill` | `ids` | `hotzone.js` `cmdDrill` | Bohrer starten |
 | `train`, `cancelTrain` | `buildingId, unit` / `buildingId` | `game.js` | Ausbildung in der Hauptstadt (mit Stadt: Kaserne, Fabrikhalle, Heliport = Stadt-Entities mit `produces`, `queue`) / letzten Eintrag abbrechen |
-| `research`, `cancelResearch` | `buildingId, key` / – | `research.js` | Forschung starten / abbrechen |
+| `research`, `cancelResearch` | `buildingId, key` / `key?` | `research.js` | Forschung starten oder einreihen (bis 3 wartend, bezahlt beim Einreihen) / abbrechen (ohne `key` die laufende; Abhängige fallen mit heraus, alles erstattet) |
 | `smoke`, `mine` | `ids` | `abilities.js` | Nebelwand (Fahrzeuge) / Mine (Baufahrzeug) |
 | `rally` | `buildingId, x, y` | `game.js` `cmdRally` | Sammelpunkt |
 | `demolish` | `buildingId` | `game.js` `cmdDemolish` | Gebäude abreißen |
@@ -147,7 +147,7 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 | `logistics.js`, `construction.js` | LKW, Nachfüllen, Transport; Bauen und Reparieren |
 | `city.js` (Daten `js/data/city.js`, UI `js/ui/citypanel.js`, Karte `js/render/citylayer.js`) | Zonenstadt um die Hauptstadt (PRD §15), Befehl `city`; Stadtgebäude belegen `grid.struct` mit `city.gridId`; fertige Gebäude haben seit v4.83 eine Ziel-Entity (`kind: 'building'`, `type: 'city'`, nicht in `game.buildings`), die der Spieler seit v4.94 wählen kann |
 | `garrison.js`, `tower.js`, `crates.js`, `commander.js`, `radio.js` | Häuserkampf, Festung (Gefechtsturm, Dachaufbau, Ausbau-Befehl), Versorgungskisten, Kommandeur, Sendemast |
-| `weather.js`, `research.js`, `river.js` | Wetter und Jahreszeit, Forschungsstufen, Fluss mit Brücken und Furten |
+| `weather.js`, `research.js`, `river.js` | Wetter und Jahreszeit, Forschungsbaum (seit v5.04: `team.tech = { tier, done, cur, queue }`, Wirkung je Gruppe über `modOf(game, e, stat)`, Daten `js/data/research.js`), Fluss mit Brücken und Furten |
 | `roads.js` | Stadtstraßen der Karte (seit v5.03): Zonenstraßen und Brückenfahrbahnen als Zellen im Stadtraster (`game.roads.kind`: 1 Straße, 2 Brücke), für beide Teams Straßenanschluss (`city.roadAt`), nicht ausweisbar (`canZone`) |
 | `aircraft.js` | Flughafen und Kampfflugzeuge (seit v5.03): Anlage `AIRPORT` (Bahnen, Stellplätze; auch fürs Bild), `u.jet = { home, slot, ready, rtb }`, `u.parked` (im Hangar: `isFoe` falsch, schießt nicht), Ausbildungsprüfung `trainCheck` |
 | `fog.js` | Nebel des Krieges je Team, Sicht im Gelände |

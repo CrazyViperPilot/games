@@ -27,7 +27,7 @@ import { hasCommander, updateCommanders, commanderFallen } from './commander.js'
 import { updateRadio, radioStarted, radioLost } from './radio.js';
 import { createWeather, updateWeather } from './weather.js';
 import { updateAbilities, cmdAbility } from './abilities.js';
-import { createResearch, updateResearch, cmdResearch, cmdCancelResearch, unitLocked, lockReason, opticsMul } from './research.js';
+import { createResearch, updateResearch, cmdResearch, cmdCancelResearch, rangeMul, migrateResearch } from './research.js';
 import { createBridges, updateBridges, cmdRepairBridge, bridgeUnder } from './river.js';
 import { createRoads } from './roads.js';
 import { updateAircraft, trainCheck } from './aircraft.js';
@@ -241,6 +241,7 @@ export class Game {
     for (const team of this.teams) this.bindStocks(team);
     for (const u of this.units) defineAmmo(u, u.def);
     if (!this.roads) createRoads(this); // ältere Stände (vor v5.03): Stadtstraßen der Karte nachträglich
+    migrateResearch(this); // ältere Stände (vor v5.04): alter Forschungsbaum
     migrateCity(this); // ältere Stände: Universität als 3 × 3-Großbau (seit v5.00)
   }
 
@@ -776,7 +777,7 @@ export class Game {
     for (const u of units) {
       // Besatzer bleiben im Haus, solange das Ziel aus den Fenstern erreichbar ist; sonst gehen sie hinaus und verfolgen es
       const h = u.house ? this.getEntity(u.house) : null;
-      if (u.house && !(h && aim && inRange(u, aim, u.def.range * opticsMul(this, team) + h.reach))) exitHouse(this, u, t.x, t.y);
+      if (u.house && !(h && aim && inRange(u, aim, u.def.range * rangeMul(this, u) + h.reach))) exitHouse(this, u, t.x, t.y);
       u.order = { type: 'attack', x: t.x, y: t.y, targetId: t.id };
       u.targetId = t.id;
       u.path = [];
@@ -909,7 +910,6 @@ export class Game {
       const k = this.city && trainerKind(cmd.unit);
       return fail(k ? `${UNITS[cmd.unit]?.name ?? 'Einheit'}: nur in der ${KIND_NAME[k]} der Stadt` : 'Nur die Hauptstadt bildet Einheiten aus');
     }
-    if (unitLocked(this, team, cmd.unit)) return fail(lockReason(cmd.unit));
     const jetNo = trainCheck(this, b, cmd.unit); // Flughafen: Platz für das Flugzeug
     if (jetNo) return fail(jetNo);
     if (b.queue.length >= BALANCE.queueMax) return fail('Warteschlange ist voll');

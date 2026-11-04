@@ -412,7 +412,7 @@ test('KI verteidigt beschossene Stadtgebäude und greift gegnerische Werke zuers
 });
 
 // v4.88: Universität, Rechenzentrum, Strom, Zufriedenheit
-import { researchBlock } from '../js/game/research.js';
+import { researchBlock, researchSpeed } from '../js/game/research.js';
 const setLevel = (g, kind, lv, team = 0) => {
   const n = sizeOf(kind); // Großbau (Universität 3 × 3): Mitte des freien Quadrats
   const h = (n - 1) / 2;
@@ -424,24 +424,20 @@ const setLevel = (g, kind, lv, team = 0) => {
   return i;
 };
 
-test('Universität: ohne sie nur Stufe 1, Stufe 3 braucht Uni-Stufe 3; KI-Ast braucht Rechenzentrum', () => {
-  const g = new Game({ seed: 3, city: true, research: true });
-  assert.equal(researchBlock(g, 0, 'tier2'), 'Benötigt eine Universität in der Stadt');
-  assert.equal(researchBlock(g, 0, 'drones'), 'Benötigt Stufe 2');
-  const u = setLevel(g, 'uni', 1);
-  assert.equal(researchBlock(g, 0, 'tier2'), '');
-  g.teams[0].tech.tier = 2;
-  assert.equal(researchBlock(g, 0, 'tier3'), `Benötigt eine Universität der Stufe ${CITY.uniForTier3}`);
-  assert.equal(researchBlock(g, 0, 'drones'), 'Benötigt ein Rechenzentrum in der Stadt');
-  g.city[0].level[u] = CITY.uniForTier3;
-  assert.equal(researchBlock(g, 0, 'tier3'), '');
+test('Universität: ohne sie ruht die Forschung; Rechenzentren beschleunigen sie (seit v5.04)', () => {
+  const g = new Game({ seed: 3, city: true, research: true, startMoney: 5000 });
+  assert.equal(researchBlock(g, 0, 'tank1'), 'Benötigt eine Universität in der Stadt');
+  assert.equal(researchSpeed(g, 0), 0);
+  setLevel(g, 'uni', 1);
+  assert.equal(researchBlock(g, 0, 'tank1'), '');
+  assert.equal(researchSpeed(g, 0), 1 * (g.city[0].stats.powerRatio ?? 1));
+  setLevel(g, 'dc', 2);
   setLevel(g, 'dc', 1);
-  assert.equal(researchBlock(g, 0, 'drones'), '');
-  // ohne Stadt: Stufen wie bisher, KI-Ast gesperrt
+  assert.ok(Math.abs(researchSpeed(g, 0) - (1 + 3 * CITY.research.dcSpeed) * (g.city[0].stats.powerRatio ?? 1)) < 1e-9, 'alle Rechenzentren zählen');
+  // ohne Stadt: keine Universität nötig
   const n = new Game({ seed: 3, research: true });
-  assert.equal(researchBlock(n, 0, 'tier2'), '');
-  n.teams[0].tech.tier = 2;
-  assert.equal(researchBlock(n, 0, 'drones'), 'Nur mit Stadt (Rechenzentrum)');
+  assert.equal(researchBlock(n, 0, 'tank1'), '');
+  assert.equal(researchSpeed(n, 0), 1);
 });
 
 test('Strom: zu wenig Kraftwerke bremsen die Werke, ein Kraftwerk hilft', () => {

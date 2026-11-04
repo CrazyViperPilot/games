@@ -6,6 +6,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { BALANCE } from '../js/data/balance.js';
 import { UNITS } from '../js/data/units.js';
 import { BUILDINGS } from '../js/data/buildings.js';
+import { RESEARCH } from '../js/data/research.js';
+import { researchEffect } from '../js/game/research.js';
 
 export const PRD_PATH = fileURLToPath(new URL('../PRD.md', import.meta.url));
 
@@ -28,7 +30,6 @@ function unitsTable() {
   const rows = Object.entries(UNITS).map(([k, u]) => [
     u.name,
     u.hotkey ?? '–',
-    String(BALANCE.research.unitTier[k] ?? 1),
     String(u.slots ?? 1),
     fmt(u.hp),
     fmt(u.speed),
@@ -38,7 +39,7 @@ function unitsTable() {
     `${fmt(u.buildTime)} s`,
     u.fuelMax ? `${fmt(u.fuelMax)} / ${fmt(u.fuelPerSec)}` : '–',
   ]);
-  return table(['Einheit', 'Taste', 'Stufe', 'Plätze', 'HP', 'Tempo', 'Sicht', 'Reichweite', 'Preis', 'Ausbildung', 'Treibstoff (max / je s)'], rows);
+  return table(['Einheit', 'Taste', 'Plätze', 'HP', 'Tempo', 'Sicht', 'Reichweite', 'Preis', 'Ausbildung', 'Treibstoff (max / je s)'], rows);
 }
 
 function buildingsTable() {
@@ -80,9 +81,21 @@ function weaponsTable() {
   return table(['Waffe', 'Reichweite', 'Kadenz (s)', 'Schuss', 'Munition je Schuss', ...CLASSES.map((c) => CLASS_NAMES[c]), 'Hinweis'], rows);
 }
 
+/** Forschungsbaum (seit v5.04): je Stufe Preis und Zeit, je Ast die Forschung mit ihrer Wirkung. */
+function researchTable() {
+  const rows = [];
+  for (let t = 1; t <= RESEARCH.tiers; t++) {
+    for (const [lane, L] of Object.entries(RESEARCH.lanes)) {
+      const k = `${lane}${t}`;
+      rows.push([String(t), `${L.icon} ${L.name}`, RESEARCH.items[k].name, `\`${k}\``, `${fmt(RESEARCH.items[k].money)} Geld, ${fmt(RESEARCH.items[k].time)} s`, researchEffect(k)]);
+    }
+  }
+  return table(['Stufe', 'Ast', 'Forschung', 'Schlüssel', 'Preis, Zeit', 'Wirkung'], rows);
+}
+
 /** Alle erzeugten Tabellen: Name → Markdown. */
 export function renderTables() {
-  return { units: unitsTable(), buildings: buildingsTable(), weapons: weaponsTable() };
+  return { units: unitsTable(), buildings: buildingsTable(), weapons: weaponsTable(), research: researchTable() };
 }
 
 /** Setzt die Tabellen zwischen die Markierungen im PRD-Text. Fehlt eine Markierung, gibt es einen Fehler. */

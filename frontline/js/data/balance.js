@@ -9,7 +9,7 @@
 //   Logistik         logistics, shortageWarn, baseAttackWarn
 //   KI-Schwierigkeit difficulty (weitere KI-Werte: ai.js)
 //   Kampf, Gelände   height, slope, airFire, sightHeight, fogInterval, stealth, garrison, fortress, commander, formation, jets
-//   Wetter, Technik  weather, research, river
+//   Wetter, Technik  weather, river (Forschung: js/data/research.js)
 //   Nur Optik        scars, animals
 //   Startmenü        menuDefaults
 //   Texte, Farben    resNames, teamNames, teamColors
@@ -119,7 +119,7 @@ export const BALANCE = {
   difficulty: {
     // Schwierigkeit über Verhalten: ab normal Späher und Konter-Mix, ab schwer Überfälle und Gruppen-Rückzug; hart ohne Einkommensbonus.
     // weather: nutzt das Wetter (bei schlechter Sicht früher ein Späher, im Nebel greift die Welle schon mit weniger Stärke an)
-    // research: Spielzeit (s), ab der die KI auf Stufe 2 bzw. 3 spart; upgrades: forscht auch Verbesserungen (aus Überschuss)
+    // research: [Spielzeit (s), ab der die KI forscht, (frei)]; upgrades: false = Forschung nur mit doppelter Reserve (Leicht)
     // fobCap: FOBs mit Hauptstadt (höchstens fob.max); radioFrom: Spielzeit (s), ab der sie einen Sendemast baut (Infinity = nie);
     // cratePickers: so viele Soldaten holen oder tragen gleichzeitig Versorgungskisten;
     // fort: baut ab Spielzeit `from` (s) bis zu `fobs` FOBs zur Festung aus (Mauerring, Tore, `towers` Türme mit Besatzung und Dachaufbau). Weitere KI-Werte: js/data/ai.js
@@ -211,59 +211,7 @@ export const BALANCE = {
       winter: { clear: 4, snow: 4, fog: 2 },
     },
   },
-  // Forschungsstufen (nach Age of Empires II und Empire Earth, im Startmenü; ohne Angabe aus): die Hauptstadt forscht neben der
-  // Ausbildung, eins nach dem anderen (money beim Start, time s, needs = nötige Stufe, tier = erreichte Stufe). unitTier: Stufe, ab
-  // der eine Einheit ausgebildet werden kann (fehlt = von Anfang an; die Startarmee bleibt). Schutzwesten: Infanterie nimmt × vests
-  // Schaden, Verbundpanzerung: Fahrzeuge und Hubschrauber × composite (ein Schuss, der das unverletzte Ziel sofort tötet, bleibt
-  // tödlich); Wärmebildoptik: Waffenreichweite und Sicht der Einheiten × optics.
-  research: {
-    // short = Kurzname auf dem Knopf (Telefon: 50 px breit). branch: veh (Fahrzeuge) · wpn (Waffen) · abl (Fähigkeiten); needs = Mindeststufe; req = Voraussetzung (Schlüssel oder 'branch' =
-    // alle anderen Forschungen des Astes); fx = Wirkung, Faktoren verschiedener Forschungen multiplizieren sich (research.js fxMul):
-    // speed Bodenfahrzeug-Tempo · fuel Verbrauch · taken Schaden gegen Fahrzeuge und Hubschrauber (zusätzlich zu composite) ·
-    // dealtInf/dealtVeh/dealtAll Schaden der Schüsse · cd Abklingzeit · sniperRange · aa Flak und SAM · build Bautempo ·
-    // repair Reparaturtempo · abilityCd Abklingzeit von Rauch und Minen. regen = Selbstreparatur der Bodenfahrzeuge (Anteil von
-    // maxHp je s, wenn 6 s lang nicht getroffen); smoke / mines schalten die Einsatzknöpfe frei.
-    items: {
-      tier2: { name: 'Stufe 2', money: 600, time: 60, needs: 1, tier: 2 },
-      tier3: { name: 'Stufe 3', money: 1200, time: 90, needs: 2, tier: 3 },
-      // Fahrzeuge
-      engine1: { name: 'Motor I', short: 'Motor I', branch: 'veh', money: 500, time: 50, needs: 2, fx: { speed: 1.1 } },
-      engine2: { name: 'Motor II', short: 'Motor II', branch: 'veh', money: 900, time: 70, needs: 3, req: 'engine1', fx: { speed: 1.1 } },
-      fueltank: { name: 'Zusatztank', short: 'Tank+', branch: 'veh', money: 400, time: 40, needs: 2, fx: { fuel: 0.8 } },
-      composite: { name: 'Verbundpanzerung', short: 'Verbund', branch: 'veh', money: 800, time: 60, needs: 3 },
-      reactive: { name: 'Reaktivpanzerung', short: 'Reaktiv', branch: 'veh', money: 1000, time: 75, needs: 3, req: 'composite', fx: { taken: 0.9 } },
-      workshop: { name: 'Feldwerkstatt', short: 'Werkstatt', branch: 'veh', money: 600, time: 60, needs: 2, regen: 0.01 },
-      vmaster: { name: 'Panzerwaffe', short: 'Meister', branch: 'veh', money: 2000, time: 120, needs: 3, req: 'branch', fx: { speed: 1.1, taken: 0.9 } },
-      // Waffen
-      vests: { name: 'Schutzwesten', short: 'Westen', branch: 'wpn', money: 400, time: 45, needs: 2 },
-      ap: { name: 'Panzerbrechende Munition', short: 'Pz-Munition', branch: 'wpn', money: 600, time: 60, needs: 2, fx: { dealtVeh: 1.15 } },
-      frag: { name: 'Splittergranaten', short: 'Splitter', branch: 'wpn', money: 500, time: 50, needs: 2, fx: { dealtInf: 1.15 } },
-      scope: { name: 'Zielfernrohre', short: 'Zielfernr.', branch: 'wpn', money: 400, time: 45, needs: 2, fx: { sniperRange: 1.2 } },
-      rapid: { name: 'Schnellfeuer', short: 'Schnellf.', branch: 'wpn', money: 900, time: 75, needs: 3, fx: { cd: 0.88 } },
-      missiles: { name: 'Lenkraketen', short: 'Raketen', branch: 'wpn', money: 800, time: 70, needs: 3, fx: { aa: 1.25 } },
-      wmaster: { name: 'Waffenmeister', short: 'Meister', branch: 'wpn', money: 2000, time: 120, needs: 3, req: 'branch', fx: { dealtAll: 1.1 } },
-      // Fähigkeiten
-      optics: { name: 'Wärmebildoptik', short: 'Optik', branch: 'abl', money: 600, time: 60, needs: 2 },
-      fastbuild: { name: 'Schnellbau', short: 'Schnellbau', branch: 'abl', money: 500, time: 50, needs: 2, fx: { build: 1.25 } },
-      repairkit: { name: 'Reparaturset', short: 'Rep.-Set', branch: 'abl', money: 400, time: 40, needs: 2, fx: { repair: 2 } },
-      smoke: { name: 'Nebelwerfer', short: 'Nebelw.', branch: 'abl', money: 700, time: 60, needs: 2 },
-      mines: { name: 'Minen', short: 'Minen', branch: 'abl', money: 800, time: 70, needs: 3 },
-      amaster: { name: 'Eliteausbildung', short: 'Meister', branch: 'abl', money: 2000, time: 120, needs: 3, req: 'branch', fx: { abilityCd: 0.5, build: 1.25 } },
-      // KI (seit v4.88, nur mit Stadt und Rechenzentrum: dc = braucht ein fertiges Rechenzentrum)
-      drones: { name: 'Aufklärungsdrohnen', short: 'Drohnen', branch: 'ai', dc: true, money: 700, time: 60, needs: 2, fx: { optics: 1.15 } },
-      aitarget: { name: 'KI-Zielerfassung', short: 'KI-Ziel', branch: 'ai', dc: true, money: 1100, time: 80, needs: 3, req: 'drones', fx: { dealtAll: 1.12 } },
-      autoturret: { name: 'Autonome Türme', short: 'Auto-Turm', branch: 'ai', dc: true, money: 900, time: 70, needs: 2, autoTurret: true },
-      jammer: { name: 'Störsender', short: 'Störs.', branch: 'ai', dc: true, money: 800, time: 60, needs: 2, fx: { jam: 0.75 } },
-    },
-    branches: { veh: 'Fahrzeuge', wpn: 'Waffen', abl: 'Fähigkeiten', ai: 'KI' },
-    // Einsatzfähigkeiten (Tasten V und M): Rauch senkt den Schaden eigener Einheiten darin, Minen treffen Bodeneinheiten des Gegners
-    smoke: { r: 110, life: 14, cd: 45, taken: 0.5 },
-    mine: { trigger: 30, blast: 55, damage: 150, cd: 12, max: 8 },
-    unitTier: { sniper: 2, ifv: 2, littlebird: 2, transporter: 2, flak: 2, tank: 3, gunship: 3, sam: 3, f16: 3 },
-    vests: 0.85,
-    composite: 0.85,
-    optics: 1.1,
-  },
+  // Forschung: eigene Datei js/data/research.js (seit v5.04: 10 Stufen, 7 Äste, Wirkungen je Einheitengruppe)
   // Fluss mit Brücken und Furten (Zufallskarte, im Startmenü; ohne Angabe aus): Furten sind passierbar, Bodeneinheiten dort × ford
   // so schnell, die Wegsuche zahlt fordCost (Zehntel je Zelle) dazu und nimmt lieber eine Brücke. Wasser bis fordDepth unter dem
   // Spiegel zählt in einer Furt als seicht. Brücken (deck px breit) haben bridgeHp und nehmen nur auf Befehl Schaden (Häuser-Faktoren:

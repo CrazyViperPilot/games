@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BALANCE, QUICK } from '../js/data/balance.js';
+import { RESEARCH } from '../js/data/research.js';
 import { UNITS } from '../js/data/units.js';
 import { BUILDINGS } from '../js/data/buildings.js';
 import { MIX } from '../js/data/ai.js';
@@ -72,10 +73,24 @@ test('Startarmee, Nachschub und Einheitenlimit passen zusammen', () => {
 });
 
 test('Forschung, Schwierigkeit, KI-Mischung und Startmenü', () => {
-  const tiers = Math.max(...Object.values(BALANCE.research.items).map((i) => i.tier ?? 1));
-  for (const [t, tier] of Object.entries(BALANCE.research.unitTier)) {
-    assert.ok(UNITS[t], `research.unitTier: unbekannte Einheit '${t}'`);
-    assert.ok(tier >= 1 && tier <= tiers, `research.unitTier.${t} = ${tier}`);
+  // Forschungsbaum (js/data/research.js): je Ast eine Forschung je Stufe, nur bekannte Gruppen, Werte und Fähigkeiten
+  const GROUPS = new Set([...Object.values(RESEARCH.groups), 'veh', 'air', 'all', 'bld']);
+  const STATS = new Set(['range', 'sight', 'dmg', 'dmgInf', 'dmgVeh', 'dmgAir', 'rof', 'armor', 'speed', 'fuel', 'acc', 'evade', 'regen', 'rearm', 'build', 'repair', 'abilityCd']);
+  for (const t of Object.keys(RESEARCH.groups)) assert.ok(UNITS[t], `research.groups: unbekannte Einheit '${t}'`);
+  assert.equal(RESEARCH.money.length, RESEARCH.tiers);
+  assert.equal(RESEARCH.time.length, RESEARCH.tiers);
+  assert.ok(Object.keys(RESEARCH.lanes).length >= RESEARCH.perTier, 'genug Äste, um jede Stufe zu öffnen');
+  for (const [lane, L] of Object.entries(RESEARCH.lanes)) {
+    assert.equal(L.items.length, RESEARCH.tiers, `Ast ${lane}: ${L.items.length} statt ${RESEARCH.tiers} Forschungen`);
+    for (const it of L.items) {
+      assert.ok(it.name && it.short, `${lane}: Name und Kurzname`);
+      assert.ok(Object.keys(it.fx).length || it.unlock, `${it.name}: ohne Wirkung`);
+      if (it.unlock) assert.ok(['smoke', 'mines', 'autoturret'].includes(it.unlock), `${it.name}: unlock ${it.unlock}`);
+      for (const [g, st] of Object.entries(it.fx)) {
+        assert.ok(GROUPS.has(g), `${it.name}: Gruppe ${g}`);
+        for (const [k, v] of Object.entries(st)) assert.ok(STATS.has(k) && Number.isFinite(v) && v > 0, `${it.name}: ${g}.${k} = ${v}`);
+      }
+    }
   }
   const keys = Object.keys(BALANCE.difficulty.normal).sort();
   for (const [d, cfg] of Object.entries(BALANCE.difficulty)) {

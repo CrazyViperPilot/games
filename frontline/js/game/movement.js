@@ -3,7 +3,7 @@ import { BALANCE } from '../data/balance.js';
 import { findPath, lineOfSight } from './pathfinding.js';
 import { inRange, resolveTarget, isFoe, canAttack } from './entities.js';
 import { weatherSpeed } from './weather.js';
-import { rangeMul, fxMul } from './research.js';
+import { rangeMul, modOf } from './research.js';
 
 const REPATH = 1.0; // Neuplanung bei Verfolgung (s)
 const BLOCK_REPATH = 0.5; // Neuplanung nach blockiertem Wegpunkt (s)
@@ -246,7 +246,7 @@ export function drive(game, u, dt) {
   const fps = u.def.fuelPerSec || 0;
   if (fps > 0 && (u.x !== x0 || u.y !== y0)) {
     if (u.fuel > 0) {
-      const used = Math.min(u.fuel, fps * dt * (u.onRoad === false ? BALANCE.roads.offroadFuel : 1) * fxMul(game, u.team, 'fuel'));
+      const used = Math.min(u.fuel, fps * dt * (u.onRoad === false ? BALANCE.roads.offroadFuel : 1) * modOf(game, u, 'fuel')); // Zusatztanks (Forschung)
       u.fuel -= used;
       game.teams[u.team].used.fuel += used;
     }
@@ -415,7 +415,7 @@ export function updateMovement(game, dt) {
     u.speedMul *= weatherSpeed(game, u); // Schnee und Winterboden (weather.js)
     u.onRoad = groundVehicle(u) ? onRoad(game, u.x, u.y) : null; // Straße der Karte: schneller, sparsamer
     if (u.onRoad) u.speedMul *= BALANCE.roads.speedMul;
-    if (groundVehicle(u)) u.speedMul *= fxMul(game, u.team, 'speed'); // Motor I und II
+    u.speedMul *= modOf(game, u, 'speed'); // Forschung: Turbine, Reifen, Gepäck, Allrad …
     if (grid.ford && !u.def.air && grid.isFord(grid.toCell(u.x), grid.toCell(u.y))) u.speedMul *= BALANCE.river.ford; // durchs seichte Wasser
     if (u.order.form && u.formMul) u.speedMul *= u.formMul; // Formation fährt geschlossen (formation.js)
     // Tempo aus der Verschiebung seit dem letzten Schritt (auch Logistikflüge, die außerhalb von stepUnit fliegen)

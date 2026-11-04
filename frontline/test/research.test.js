@@ -1,17 +1,18 @@
-// Forschungsstufen: Stufe 2 und 3 schalten Einheiten frei, Verbesserungen stärken Panzerung, Reichweite und Sicht. Nur die Hauptstadt
-// forscht, eins zugleich, Geld beim Start, Abbruch erstattet. Die KI forscht nach Zeitplan. Aus (Standard): alles frei.
+// Forschungsbaum (seit v5.04): 10 Stufen, 7 Äste, je Stufe 3 fertige Forschungen öffnen die nächste, Vorgänger im Ast nötig,
+// Warteschlange bis 3, Geld beim Einreihen, Abbruch erstattet. Alle Einheiten sind frei; Forschungen verbessern Werte je Gruppe.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
 import { createEmptyMap } from '../js/game/mapdata.js';
 import { BALANCE } from '../js/data/balance.js';
+import { RESEARCH } from '../js/data/research.js';
+import { UNITS } from '../js/data/units.js';
 import { AI } from '../js/ai/ai.js';
 import { hit } from '../js/game/combat.js';
-import { unitLocked, armorMul, opticsMul, researchEffect, researchBlock } from '../js/game/research.js';
+import { armorMul, rangeMul, sightMul, modOf, researchEffect, researchBlock, migrateResearch, RESEARCH_KEYS } from '../js/game/research.js';
 import { Controller } from '../js/ui/controller.js';
-import { setWeather } from '../js/game/weather.js';
 
-const R = BALANCE.research;
+const R = RESEARCH;
 const DT = 1 / BALANCE.tickRate;
 const run = (g, s, ais = []) => {
   for (let i = 0; i < Math.round(s / DT); i++) {
@@ -28,233 +29,168 @@ function empty(opts = {}) {
   g.cleanup();
   return g;
 }
-const train = (g, unit, t = 0) => g.issue(t, { type: 'train', buildingId: mainOf(g, t).id, unit });
 const research = (g, key, t = 0) => g.issue(t, { type: 'research', buildingId: mainOf(g, t).id, key });
 
-test('Aus (Standard): alle Einheiten frei, keine Forschung, alle Faktoren 1', () => {
-  const g = empty({ seed: 4 });
+test('Baum: 10 Stufen, 7 Äste, 70 Forschungen; jede hat Vorgänger im Ast und eine Wirkung in Worten', () => {
+  assert.equal(R.tiers, 10);
+  assert.equal(Object.keys(R.lanes).length, 7);
+  assert.equal(RESEARCH_KEYS.length, 70);
+  for (const k of RESEARCH_KEYS) {
+    const it = R.items[k];
+    assert.equal(it.req, it.tier > 1 ? `${it.lane}${it.tier - 1}` : null);
+    assert.equal(it.money, R.money[it.tier - 1]);
+    assert.ok(researchEffect(k).length > 10, `${k}: ${researchEffect(k)}`);
+  }
+  assert.match(researchEffect('tank1'), /Kampfpanzer: Waffenreichweite \+6 %, Sicht \+5 %/);
+  assert.match(researchEffect('tank2'), /Reichweite mit einer Tankfüllung \+18 %/);
+});
+
+test('Aus (Standard): keine Forschung, alle Faktoren 1; an: alle Einheiten von Anfang an frei', () => {
+  const g = empty();
+  const tank = g.spawnUnit('tank', 0, 500, 500);
   assert.equal(g.research, false);
-  g.teams[0].res.money = 5000;
-  assert.ok(train(g, 'tank').ok);
-  assert.ok(train(g, 'gunship').ok);
-  assert.deepEqual(research(g, 'tier2'), { ok: false, reason: 'Forschung ist in dieser Partie ausgeschaltet' });
-  const u = g.spawnUnit('rifleman', 0, 500, 500);
-  assert.equal(armorMul(g, u, 30), 1);
-  assert.equal(opticsMul(g, 0), 1);
-  assert.equal(unitLocked(g, 0, 'tank'), false);
+  for (const s of ['range', 'sight', 'armor', 'dmg', 'speed', 'fuel']) assert.equal(modOf(g, tank, s), 1);
+  assert.equal(research(g, 'tank1').ok, false);
+  const on = empty({ research: true, startMoney: 1e6 });
+  for (const u of ['sniper', 'ifv', 'tank', 'littlebird', 'transporter', 'gunship', 'flak', 'sam']) {
+    const r = on.issue(0, { type: 'train', buildingId: mainOf(on, 0).id, unit: u });
+    assert.ok(r.ok || r.reason === 'Warteschlange ist voll', `${u}: ${r.reason}`);
+    if (!r.ok) mainOf(on, 0).queue.length = 0;
+  }
 });
 
-test('Gesperrt: Stufe 2 für Scharfschütze, SPz und Hubschrauber, Stufe 3 für Kampfpanzer und AH-64; der Rest von Anfang an', () => {
-  const g = empty({ research: true });
-  g.teams[0].res.money = 9000;
-  for (const u of ['sniper', 'ifv', 'littlebird', 'transporter']) assert.deepEqual(train(g, u), { ok: false, reason: 'Benötigt Stufe 2' }, u);
-  for (const u of ['tank', 'gunship']) assert.deepEqual(train(g, u), { ok: false, reason: 'Benötigt Stufe 3' }, u);
-  for (const u of ['rifleman', 'at', 'truck', 'engineer', 'commander']) assert.ok(train(g, u).ok, u);
-  assert.equal(g.teams[0].res.money, 9000 - 60 - 120 - 80 - 150 - 400, 'gesperrte Ausbildung kostet nichts');
-  // die Startarmee bleibt (Kampfpanzer und Schützenpanzer schon auf Stufe 1)
-  const full = new Game({ seed: 2, research: true });
-  assert.equal(full.units.filter((u) => u.team === 0 && u.type === 'tank').length, 2);
+test('Stufen: erst 3 Forschungen der Stufe davor; Vorgänger im Ast; Warteschlange bis 3, Geld beim Einreihen', () => {
+  const g = empty({ research: true, startMoney: 1e6 });
+  const tech = g.teams[0].tech;
+  assert.match(researchBlock(g, 0, 'tank2'), /Benötigt Richtoptik/);
+  assert.match(researchBlock(g, 0, 'tank2'), /Richtoptik/);
+  const m0 = g.teams[0].res.money;
+  assert.ok(research(g, 'tank1').ok);
+  assert.equal(tech.cur.key, 'tank1');
+  // Nachfolger darf schon warten (der Vorgänger läuft), Stufe 2 aber erst mit 3 geplanten Forschungen der Stufe 1
+  assert.match(researchBlock(g, 0, 'tank2'), /Stufe 2: erst 3 Forschungen der Stufe 1/);
+  assert.ok(research(g, 'inf1').ok);
+  assert.ok(research(g, 'mech1').ok);
+  assert.equal(researchBlock(g, 0, 'tank2'), '', 'mit drei geplanten Forschungen der Stufe 1');
+  assert.ok(research(g, 'tank2').ok);
+  assert.deepEqual(tech.queue, ['inf1', 'mech1', 'tank2']);
+  assert.equal(g.teams[0].res.money, m0 - 3 * R.money[0] - R.money[1], 'bezahlt beim Einreihen');
+  assert.match(researchBlock(g, 0, 'air1'), /Warteschlange voll/);
+  // Abbruch einer Stufe-1-Forschung: tank2 verliert seine Stufe und fällt mit heraus, beides erstattet
+  const m1 = g.teams[0].res.money;
+  assert.ok(g.issue(0, { type: 'cancelResearch', key: 'mech1' }).ok);
+  assert.deepEqual(tech.queue, ['inf1']);
+  assert.equal(g.teams[0].res.money, m1 + R.money[0] + R.money[1]);
+  // fertig: die nächste rückt nach, Meldungen
+  run(g, R.items.tank1.time + 0.5);
+  assert.deepEqual(tech.done, ['tank1']);
+  assert.equal(tech.cur.key, 'inf1');
+  assert.ok(research(g, 'mech1').ok);
+  run(g, R.items.inf1.time + R.items.mech1.time + 1);
+  assert.equal(tech.tier, 2, 'drei Forschungen der Stufe 1: Stufe 2 offen');
+  const msgs = g.drainEvents().filter((e) => e.type === 'message').map((e) => e.text);
+  assert.ok(msgs.some((t) => /Richtoptik erforscht/.test(t)));
+  assert.ok(msgs.includes('Forschungsstufe 2 offen'));
+  assert.ok(msgs.includes('Der Gegner forscht auf Stufe 2'));
+  // nur die Hauptstadt; ohne Geld nicht
+  const fob = g.spawnBuilding('fob', 0, 60, 60);
+  assert.equal(g.issue(0, { type: 'research', buildingId: fob.id, key: 'air1' }).ok, false);
+  g.teams[0].res.money = 0;
+  assert.equal(research(g, 'air1').ok, false);
 });
 
-test('Forschung: Geld beim Start, eine zugleich, Stufe 2 nach 60 s mit Meldung an beide; dann Stufe 3 und Verbesserungen', () => {
-  const g = empty({ research: true });
-  const t0 = g.teams[0];
-  t0.res.money = 5000;
-  assert.deepEqual(research(g, 'tier3'), { ok: false, reason: 'Benötigt Stufe 2' });
-  assert.deepEqual(research(g, 'vests'), { ok: false, reason: 'Benötigt Stufe 2' });
-  assert.ok(research(g, 'tier2').ok);
-  assert.equal(t0.res.money, 5000 - R.items.tier2.money);
-  assert.deepEqual(research(g, 'tier2'), { ok: false, reason: 'Wird gerade erforscht' });
-  g.drainEvents();
-  run(g, R.items.tier2.time - 1);
-  assert.equal(t0.tech.tier, 1);
-  assert.equal(train(g, 'ifv').reason, 'Benötigt Stufe 2');
-  run(g, 1.5);
-  assert.equal(t0.tech.tier, 2);
-  assert.equal(t0.tech.cur, null);
-  const msgs = g.drainEvents().filter((e) => e.type === 'message');
-  assert.ok(msgs.some((m) => m.team === 0 && m.text === 'Stufe 2 erreicht: Scharfschütze, Schützenpanzer, Little Bird, Transporthubschrauber und Flakpanzer freigeschaltet'));
-  assert.ok(msgs.some((m) => m.team === 1 && m.text === 'Der Gegner hat Stufe 2 erreicht'));
-  assert.ok(train(g, 'ifv').ok);
-  assert.equal(train(g, 'tank').reason, 'Benötigt Stufe 3');
-  assert.deepEqual(research(g, 'tier2'), { ok: false, reason: 'Bereits erforscht' });
-  assert.deepEqual(research(g, 'composite'), { ok: false, reason: 'Benötigt Stufe 3' });
-  assert.ok(research(g, 'vests').ok);
-  assert.deepEqual(research(g, 'tier3'), { ok: false, reason: 'Es läuft schon eine Forschung' });
-  run(g, R.items.vests.time + 0.5);
-  assert.deepEqual(t0.tech.done, ['tier2', 'vests']);
-  assert.ok(g.drainEvents().some((e) => e.type === 'message' && e.team === 0 && e.text === `Schutzwesten erforscht: ${researchEffect('vests')}`));
-  assert.ok(research(g, 'tier3').ok);
-  run(g, R.items.tier3.time + 0.5);
-  assert.equal(t0.tech.tier, 3);
-  assert.ok(train(g, 'tank').ok);
-  assert.equal(g.teams[1].tech.tier, 1, 'der Gegner forscht für sich');
-});
-
-test('Abbruch erstattet das Geld; nur die Hauptstadt forscht; ohne Geld keine Forschung', () => {
-  const g = empty({ research: true });
-  const t0 = g.teams[0];
-  t0.res.money = 700;
-  assert.deepEqual(g.issue(0, { type: 'cancelResearch' }), { ok: false, reason: 'Keine Forschung läuft' });
-  assert.ok(research(g, 'tier2').ok);
-  run(g, 20);
-  assert.ok(g.issue(0, { type: 'cancelResearch' }).ok);
-  assert.equal(t0.res.money, 700);
-  assert.equal(t0.tech.cur, null);
-  run(g, 60);
-  assert.equal(t0.tech.tier, 1, 'abgebrochen: keine Stufe');
-  const fob = g.spawnBuilding('fob', 0, 100, 100, { built: true });
-  assert.deepEqual(g.issue(0, { type: 'research', buildingId: fob.id, key: 'tier2' }), { ok: false, reason: 'Nur die Hauptstadt forscht' });
-  assert.deepEqual(g.issue(0, { type: 'research', buildingId: mainOf(g, 1).id, key: 'tier2' }), { ok: false, reason: 'Nur die Hauptstadt forscht' });
-  t0.res.money = 100;
-  assert.deepEqual(research(g, 'tier2'), { ok: false, reason: 'Zu wenig Geld' });
-});
-
-test('Panzerung: Schutzwesten (Infanterie) und Verbundpanzerung (Fahrzeuge, Hubschrauber) −15 %; ein tödlicher Volltreffer bleibt tödlich', () => {
+test('Wirkung: Kampfpanzer (Reichweite, Treibstoff, Panzerung), Infanterie (Westen, tödlicher Volltreffer bleibt), Gebäude, Sicht', () => {
   const g = empty({ research: true });
   const tech = g.teams[0].tech;
-  const inf = g.spawnUnit('rifleman', 0, 500, 500);
-  const tank = g.spawnUnit('tank', 0, 600, 500);
-  const heli = g.spawnUnit('littlebird', 0, 700, 500);
-  const take = (u, amount) => {
-    const hp = u.hp;
-    hit(g, u, amount);
-    return Math.round((hp - u.hp) * 1000) / 1000;
-  };
-  assert.deepEqual([take(inf, 20), take(tank, 100), take(heli, 20)], [20, 100, 20]);
-  tech.done.push('vests');
-  assert.deepEqual([take(inf, 20), take(tank, 100), take(heli, 20)], [17, 100, 20]);
-  tech.done.push('composite');
-  assert.deepEqual([take(inf, 20), take(tank, 100), take(heli, 20)], [17, 85, 17]);
-  assert.equal(take(g.spawnUnit('rifleman', 1, 800, 500), 20), 20, 'der Gegner hat nichts erforscht');
-  const fresh = g.spawnUnit('rifleman', 0, 900, 500);
-  hit(g, fresh, fresh.def.hp * 1.001); // Scharfschütze, Panzerfaust: ein Treffer tötet
-  assert.equal(fresh.alive, false, 'Volltreffer bleibt tödlich');
+  const tank = g.spawnUnit('tank', 0, 1000, 1000);
+  const rifle = g.spawnUnit('rifleman', 0, 1100, 1000);
+  tech.done.push('tank1', 'tank2', 'tank4', 'tank7', 'inf2', 'def1', 'elec1');
+  assert.ok(Math.abs(rangeMul(g, tank) - 1.06 * 1.1) < 1e-9, 'Richtoptik und Feuerleitrechner');
+  assert.ok(Math.abs(sightMul(g, tank) - 1.05 * 1.05) < 1e-9, 'Optik und Gefechtsfunk (alle Einheiten)');
+  assert.equal(modOf(g, tank, 'fuel'), 0.85);
+  assert.equal(armorMul(g, tank, 100), 0.9);
+  assert.equal(armorMul(g, rifle, 10), 0.9);
+  assert.equal(armorMul(g, rifle, rifle.def.hp), 1, 'Volltreffer bleibt tödlich');
+  assert.equal(modOf(g, rifle, 'range'), 1, 'Panzerforschung wirkt nicht auf Infanterie');
+  const fob = mainOf(g, 0);
+  assert.equal(armorMul(g, fob, 10), 0.9, 'Sandsäcke');
+  // Treffer: Panzer nimmt 10 % weniger
+  const hp = tank.hp;
+  hit(g, tank, 100);
+  assert.ok(Math.abs(hp - tank.hp - 90) < 1e-9);
+  // der Gegner hat nichts erforscht
+  const foe = g.spawnUnit('tank', 1, 3000, 3000);
+  assert.equal(rangeMul(g, foe), 1);
+  // Reichweite im Kampf: Ziel knapp außerhalb der Grundreichweite, aber innerhalb der erforschten
+  const target = g.spawnUnit('ifv', 1, 1000 + UNITS.tank.weapons[0].range * 1.1, 1000);
+  g.fog[0].revealAll?.();
+  g.issue(0, { type: 'attack', ids: [tank.id], targetId: target.id });
+  const x0 = tank.x;
+  run(g, 3);
+  assert.ok(target.hp < target.maxHp, 'schießt mit erforschter Reichweite');
+  assert.ok(Math.abs(tank.x - x0) < 5, 'ohne heranzufahren');
 });
 
-test('Wärmebildoptik: Waffenreichweite +10 % (schießt ohne heranzufahren) und Sicht +10 % (Nebel des Krieges)', () => {
-  const shoot = (optics) => {
-    const g = empty({ research: true });
-    if (optics) g.teams[0].tech.done.push('optics');
-    const me = g.spawnUnit('rifleman', 0, 2000, 2000);
-    const truck = g.spawnUnit('truck', 1, 2000 + 215, 2000); // Gewehr 200 + LKW-Radius 10 = 210 < 215 < 230
-    g.updateFog();
-    g.issue(0, { type: 'attack', ids: [me.id], targetId: truck.id });
-    run(g, 1.5);
-    return [Math.round(me.x - 2000), truck.hp < truck.maxHp];
-  };
-  const [movedOff] = shoot(false);
-  assert.ok(movedOff > 3, `ohne Optik fährt der Schütze heran (${movedOff} px)`);
-  assert.deepEqual(shoot(true), [0, true]);
-
-  const sees = (optics) => {
-    const g = empty({ research: true });
-    if (optics) g.teams[0].tech.done.push('optics');
-    g.spawnUnit('sniper', 0, 32 + 64 * 30, 32 + 64 * 30); // Sicht 440, mit Optik 484
-    const foe = g.spawnUnit('rifleman', 1, 32 + 64 * 38, 32 + 64 * 30); // 512 px: Zelle sichtbar bis Sicht + halbe Zelle
-    g.updateFog();
-    return g.sees(0, foe);
-  };
-  assert.equal(sees(false), false);
-  assert.equal(sees(true), true);
+test('Selbstheilung (Feldsanitäter), Nebel und Minen erst nach ihrer Forschung', () => {
   const g = empty({ research: true });
-  g.teams[1].tech.done.push('optics');
-  assert.deepEqual([opticsMul(g, 0), opticsMul(g, 1)], [1, R.optics]);
+  const tech = g.teams[0].tech;
+  const rifle = g.spawnUnit('rifleman', 0, 1000, 1000);
+  const tank = g.spawnUnit('tank', 0, 1200, 1000);
+  assert.match(g.issue(0, { type: 'smoke', ids: [tank.id] }).reason, /Nebelwerfer nicht erforscht/);
+  rifle.hp = 50;
+  rifle.lastHitTime = -100;
+  run(g, 2);
+  assert.equal(rifle.hp, 50, 'ohne Sanitäter keine Heilung');
+  tech.done.push('inf5', 'log5');
+  run(g, 2);
+  assert.ok(rifle.hp > 50, 'Feldsanitäter heilen');
+  assert.equal(g.issue(0, { type: 'smoke', ids: [tank.id] }).ok, true);
 });
 
-test('Befehlskarte: Hauptstadt zeigt Forschung (U), gesperrte Einheiten mit Grund; U öffnet das Forschungsmenü (eigenes Fenster)', () => {
-  const g = empty({ research: true });
-  g.teams[0].res.money = 3000;
+test('Befehlskarte: Forschung (U) öffnet das Menü, keine gesperrten Einheiten', () => {
+  const g = empty({ research: true, startMoney: 5000 });
   const c = new Controller(g, 0, null);
   let opened = 0;
   c.onResearch = () => opened++;
   c.view.selection.add(mainOf(g, 0).id);
-  const card = () => c.commandCard();
-  const btn = (k) => card().find((e) => e.hotkey === k);
-  assert.equal(btn('S').reason, 'Benötigt Stufe 3', 'Kampfpanzer gesperrt');
-  assert.equal(btn('A').reason, 'Benötigt Stufe 2', 'Schützenpanzer gesperrt');
-  assert.equal(btn('U').label, 'Forschung');
+  const btn = (k) => c.commandCard().find((e) => e.hotkey === k);
+  assert.equal(btn('S').reason, '', 'Kampfpanzer frei');
+  assert.equal(btn('G').reason, '', 'AH-64 frei');
   c.handleHotkey('U');
-  assert.equal(opened, 1, 'U öffnet das Forschungsfenster (seit v4.98)');
-  assert.equal(c.view.mode, 'normal', 'keine eigene Forschungskarte mehr');
+  assert.equal(opened, 1);
   assert.equal(btn('U').active, false);
-  const main = mainOf(g, 0);
-  assert.ok(g.issue(0, { type: 'research', buildingId: main.id, key: 'tier2' }).ok);
-  assert.equal(btn('U').active, true, 'Forschung läuft');
-  // Menü: Sperrgrund trotz laufender Forschung sichtbar (anyway), sonst „eine zugleich“
-  assert.equal(researchBlock(g, 0, 'vests'), 'Es läuft schon eine Forschung');
-  assert.equal(researchBlock(g, 0, 'vests', true), 'Benötigt Stufe 2');
-  assert.equal(researchBlock(g, 0, 'tier2', true), 'Wird gerade erforscht');
-  assert.equal(researchBlock(g, 0, 'tier3', true), 'Benötigt Stufe 2');
-  assert.ok(g.issue(0, { type: 'cancelResearch' }).ok);
-  assert.equal(g.teams[0].res.money, 3000);
-  // ohne Forschung: kein Eintrag
-  const off = empty();
-  const c2 = new Controller(off, 0, null);
-  c2.view.selection.add(mainOf(off, 0).id);
-  assert.equal(c2.commandCard().find((e) => e.label === 'Forschung'), undefined);
-  assert.equal(c2.commandCard().find((e) => e.hotkey === 'S').reason, '');
+  assert.ok(research(g, 'inf1').ok);
+  assert.equal(btn('U').active, true);
 });
 
-test('KI: spart nach Zeitplan auf Stufe 2 (Leicht später), forscht Verbesserungen aus Überschuss (nicht Leicht), bildet nichts Gesperrtes aus', () => {
-  const setup = (diff, time, money) => {
-    const g = new Game({ seed: 5, research: true });
-    const ai = new AI(g, 1, diff);
-    g.units.filter((u) => u.team === 1 && u.type === 'rifleman').slice(0, 20).forEach((u) => (u.alive = false));
-    g.cleanup();
-    g.time = time;
-    g.teams[1].res.money = money;
-    return { g, ai, tech: g.teams[1].tech };
-  };
-  let { g, ai, tech } = setup('normal', 140, 5000);
-  ai.think();
-  assert.equal(tech.cur, null, 'vor dem Zeitplan keine Stufe');
-  ({ g, ai, tech } = setup('normal', 150, 5000));
-  ai.think();
-  assert.equal(tech.cur?.key, 'tier2');
-  const queued = mainOf(g, 1).queue.map((e) => e.unit);
-  assert.ok(queued.length > 0, 'bildet weiter aus');
-  assert.ok(queued.every((u) => !unitLocked(g, 1, u)), `nichts Gesperrtes: ${queued.join(', ')}`);
-
-  ({ g, ai, tech } = setup('normal', 150, 400));
-  ai.think();
-  assert.equal(tech.cur, null);
-  assert.equal(ai.saveForResearch, true);
-  assert.ok(mainOf(g, 1).queue.every((e) => ['engineer', 'truck'].includes(e.unit)), 'spart: keine Kampfeinheiten');
-
-  ({ g, ai, tech } = setup('easy', 200, 5000));
-  ai.think();
-  assert.equal(tech.cur, null, 'Leicht erst ab 240 s');
-  g.time = 240;
-  ai.think();
-  assert.equal(tech.cur?.key, 'tier2');
-
-  // nach Stufe 2: Verbesserung aus Überschuss (Normal), Leicht nicht
-  for (const diff of ['normal', 'easy']) {
-    ({ g, ai, tech } = setup(diff, 200, 3000));
-    tech.tier = 2;
-    tech.done.push('tier2');
-    ai.think();
-    assert.equal(tech.cur?.key ?? null, diff === 'easy' ? null : 'vests', diff);
+test('KI: forscht ab ihrer Zeit Stufe für Stufe, höchstens eine wartend, nach den Regeln des Baums', () => {
+  const g = new Game({ seed: 3, research: true, startMoney: 4000 });
+  const ai = new AI(g, 1, 'hard');
+  const tech = g.teams[1].tech;
+  run(g, BALANCE.difficulty.hard.research[0] - 5, [ai]);
+  assert.equal(tech.cur, null, 'vor ihrer Zeit nichts');
+  for (let k = 0; k < 40; k++) {
+    g.teams[1].res.money = 5000;
+    run(g, 15, [ai]);
+    assert.ok(tech.queue.length <= 1);
   }
-  // Schwer: Stufe 3 ab 420 s
-  ({ g, ai, tech } = setup('hard', 420, 5000));
-  tech.tier = 2;
-  tech.done.push('tier2');
-  ai.think();
-  assert.equal(tech.cur?.key, 'tier3');
+  assert.ok(tech.done.length >= 4, `${tech.done.length} erforscht`);
+  assert.ok(tech.tier >= 2, `Stufe ${tech.tier}`);
+  for (const k of tech.done) {
+    const it = R.items[k];
+    if (it.req) assert.ok(tech.done.includes(it.req), `${k} ohne Vorgänger`);
+  }
 });
 
-test('KI: kein Späher vor Stufe 2 (Little Bird gesperrt), auch nicht bei Nebel', () => {
-  const g = new Game({ seed: 7, research: true });
-  const ai = new AI(g, 1, 'normal');
-  g.teams[1].res.money = 5000;
-  g.units.filter((u) => u.team === 1 && u.type === 'rifleman').slice(0, 10).forEach((u) => (u.alive = false));
-  g.cleanup();
-  g.time = 100;
-  setWeather(g, 'fog');
-  g.weather.next = Infinity;
-  ai.think();
-  assert.equal(ai.saveForScout, false);
-  assert.ok(!mainOf(g, 1).queue.some((e) => e.unit === 'littlebird'));
+test('Alte Spielstände: alter Forschungsbaum fällt weg, Stufe neu berechnet', () => {
+  const g = empty({ research: true });
+  const tech = g.teams[0].tech;
+  tech.done = ['tier2', 'vests', 'tank1', 'inf1', 'mech1'];
+  tech.cur = { key: 'engine1', t: 3 };
+  delete tech.queue;
+  migrateResearch(g);
+  assert.deepEqual(tech.done, ['tank1', 'inf1', 'mech1']);
+  assert.equal(tech.cur, null);
+  assert.deepEqual(tech.queue, []);
+  assert.equal(tech.tier, 2);
 });

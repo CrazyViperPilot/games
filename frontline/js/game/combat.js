@@ -6,10 +6,10 @@ import { damageHouse, houseFire } from './garrison.js';
 import { addCrater } from './scars.js';
 import { auraCooldown } from './commander.js';
 import { weatherSight } from './weather.js';
-import { armorMul, opticsMul, fxMul, rangeMul, dealtMul, smokeMul, hasTech } from './research.js';
+import { armorMul, modOf, rangeMul, sightMul, dealtMul, smokeMul, hasUnlock } from './research.js';
 
 /** Forschung „Autonome Türme“: Dachaufbauten feuern ohne Besatzung. */
-const autoTurret = (game, team) => hasTech(game, team, 'autoturret');
+const autoTurret = (game, team) => hasUnlock(game, team, 'autoturret');
 import { damageBridge, deckDist } from './river.js';
 import { forEnemyCity } from './city.js';
 
@@ -122,6 +122,7 @@ export function hit(game, target, amount) {
     return;
   }
   if (target.kind === 'unit') amount *= armorMul(game, target, amount) * smokeMul(game, target);
+  else if (target.kind === 'building') amount *= armorMul(game, target, amount); // Militärgebäude: Sandsäcke, Beton (Forschung)
   target.hp -= amount;
   target.lastHitTime = game.time;
   if (target.hp <= 0) {
@@ -165,7 +166,7 @@ function findTarget(game, hash, s, radius, minRange, allowBuildings, dmg) {
 }
 
 function fireDirect(game, s, t, w) {
-  const dmg = shotDamage(w, s, t, heightMult(game, s, t));
+  const dmg = shotDamage(w, s, t, heightMult(game, s, t)) * dealtMul(game, s, t); // Forschung (Stellungen)
   if ((w.damage.light || 0) >= 60) {
     // Panzerabwehr / Kampfpanzer: Geschoss plus kleine Explosion
     game.addEffect('shell', s.x, s.y, s.team, t.x, t.y, 'cannon');
@@ -173,7 +174,7 @@ function fireDirect(game, s, t, w) {
   } else {
     game.addEffect('tracer', s.x, s.y, s.team, t.x, t.y, w.snd ?? 'base');
   }
-  s.cooldown = w.cooldown;
+  s.cooldown = w.cooldown * modOf(game, s, 'rof');
   hit(game, t, dmg);
 }
 
@@ -217,7 +218,7 @@ function tryFireUnit(game, u, t) {
     return;
   }
   pick.rounds -= 1;
-  pick.cd = (auraCooldown(u, pick.spec.cooldown) * fxMul(game, u.team, 'cd')) / (u.house ? houseFire(game, u) : 1); // Kommandeur in der Nähe, MG-Nest im Haus: schneller
+  pick.cd = (auraCooldown(u, pick.spec.cooldown) * modOf(game, u, 'rof')) / (u.house ? houseFire(game, u) : 1); // Kommandeur in der Nähe, MG-Nest im Haus: schneller
   game.teams[u.team].used.mun += pick.spec.munCost;
   if ((pick.spec.damage.light || 0) >= 60) {
     game.addEffect('shell', u.x, u.y, u.team, t.x, t.y, pick.spec.id);
@@ -227,14 +228,16 @@ function tryFireUnit(game, u, t) {
   }
   if (u.def.stealth) u.revealedUntil = game.time + BALANCE.stealth.revealTime; // ein Schuss verrät die Stellung
   // Flak und SAM: Treffer nur mit Wurf (Trefferchance, siehe unitHitChance); daneben geht der Schuss, der Schaden bleibt aus
-  if (pick.spec.hitChance !== undefined && !(game.rng.next() < unitHitChance(u, t, pick.spec) * fxMul(game, t.team, 'jam'))) return; // Störsender des Ziels
+  if (pick.spec.hitChance !== undefined && !(game.rng.next() < unitHitChance(u, t, pick.spec) * modOf(game, u, 'acc') * modOf(game, t, 'evade'))) return; // Forschung: Zünder, Radar; Flares, Störsender des Ziels
   hit(game, t, shotDamage(pick.spec, u, t, heightMult(game, u, t)) * dealtMul(game, u, t));
 }
 
 function fireShell(game, s, tx, ty, w) {
-  game.projectiles.push(createShell(game.newId(), s.team, s.x, s.y, tx, ty, w));
+  const p = createShell(game.newId(), s.team, s.x, s.y, tx, ty, w);
+  p.mul = modOf(game, s, 'dmg'); // Forschung (Stellungen): stärkere Granaten
+  game.projectiles.push(p);
   game.addEffect('muzzle', s.x, s.y, s.team, s.x, s.y, 'mortar');
-  s.cooldown = w.cooldown;
+  s.cooldown = w.cooldown * modOf(game, s, 'rof');
 }
 
 /**
@@ -245,13 +248,13 @@ function tryFire(game, s, t, w) {
   if (s.cooldown > 0) return;
   if (w.shell) {
     const d = Math.hypot(t.x - s.x, t.y - s.y);
-    if (d < w.minRange || !inRange(s, t, w.range)) return;
+    if (d < w.minRange || !inRange(s, t, w.range * rangeMul(game, s))) return;
     if (!game.isVisible(s.team, t.x, t.y)) return;
     if (!takeAmmo(game, s, w.ammoPerShot, w.moneyPerShot)) return;
     fireShell(game, s, t.x, t.y, w);
     return;
   }
-  if (!inRange(s, t, w.range)) return;
+  if (!inRange(s, t, w.range * rangeMul(game, s))) return; // Mörser-Feuerleitung, Bunkerbau (Forschung)
   if (!takeAmmo(game, s, w.ammoPerShot, w.moneyPerShot)) return;
   fireDirect(game, s, t, w);
 }
@@ -261,7 +264,7 @@ function fireAtGround(game, b, w) {
   if (b.cooldown > 0) return;
   const t = b.fireTarget;
   const d = Math.hypot(t.x - b.x, t.y - b.y);
-  if (d < w.minRange || d > w.range) return;
+  if (d < w.minRange || d > w.range * rangeMul(game, b)) return;
   if (!takeAmmo(game, b, w.ammoPerShot, w.moneyPerShot)) return;
   fireShell(game, b, t.x, t.y, w);
 }
@@ -284,7 +287,7 @@ function interceptShells(game) {
     if (!takeAmmo(game, b, b.def.aa.ammoPerShot, b.def.aa.moneyPerShot)) continue;
     b.aaCooldown = b.def.aa.cooldown;
     game.addEffect('tracer', b.x, b.y, b.team, best.x, best.y, b.def.weapon?.snd ?? 'flak'); // Feuerstoß zur Granate
-    if (game.rng.next() < b.def.aa.chance) {
+    if (game.rng.next() < b.def.aa.chance * modOf(game, b, 'acc')) { // Abfangsystem (Forschung)
       best.alive = false;
       game.addEffect('intercept', best.x, best.y, b.team);
       game.message(b.team, 'Granate abgefangen', best.x, best.y);
@@ -312,7 +315,7 @@ function impact(game, p) {
     if (!e.alive || e.team === p.team || e.house || e.parked) return; // abgestellte Jets: im Hangar
     const d = Math.max(0, Math.hypot(e.x - p.tx, e.y - p.ty) - radiusOf(e));
     if (d >= R) return;
-    const dmg = (p.damage[dmgKey(e)] || 0) * (1 - d / R);
+    const dmg = (p.damage[dmgKey(e)] || 0) * (1 - d / R) * (p.mul ?? 1);
     hit(game, e, dmg);
   };
   for (const list of [game.units, game.buildings]) for (const e of list) splash(e);
@@ -350,8 +353,7 @@ export function updateCombat(game, dt) {
   }
 
   const hash = buildHash(units.filter((u) => u.alive));
-  const sightMul = weatherSight(game); // Regen, Nebel und Schnee verkürzen die Zielsuche
-  const optics = [opticsMul(game, 0), opticsMul(game, 1)]; // Wärmebildoptik verlängert sie
+  const wx = weatherSight(game); // Regen, Nebel und Schnee verkürzen die Zielsuche (Forschung: Optik, Drohnen verlängern sie)
 
   for (const u of units) {
     if (!u.alive || !u.weapons.length || u.crate || u.parked) continue; // Kistenträger haben die Hände voll, abgestellte Jets stehen im Hangar
@@ -365,7 +367,7 @@ export function updateCombat(game, dt) {
     // idle / attackMove: automatische Zielsuche
     if (u.scanTimer <= 0) {
       u.scanTimer = SCAN;
-      const t = findTarget(game, hash, u, u.def.sight * sightMul * optics[u.team] + reachBonus(game, u), 0, true, u.def.damage);
+      const t = findTarget(game, hash, u, u.def.sight * wx * sightMul(game, u) + reachBonus(game, u), 0, true, u.def.damage);
       u.targetId = t ? t.id : null;
     }
     if (u.targetId !== null) {
@@ -384,7 +386,7 @@ export function updateCombat(game, dt) {
     }
     if (b.scanTimer <= 0) {
       b.scanTimer = SCAN;
-      const t = findTarget(game, hash, b, w.range, w.minRange, true, w.damage);
+      const t = findTarget(game, hash, b, w.range * rangeMul(game, b), w.minRange, true, w.damage);
       b.targetId = t ? t.id : null;
     }
     if (b.targetId !== null) {

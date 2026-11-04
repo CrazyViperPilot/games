@@ -1,97 +1,135 @@
-// Forschungsstufen (v4.52, nach Age of Empires II und Empire Earth): Die Hauptstadt forscht neben der Ausbildung, eins nach dem
-// anderen (Geld beim Start, Abbruch erstattet voll). Stufe 2 schaltet Scharfschützen, Schützenpanzer, Hubschrauber und Flakpanzer frei,
-// Stufe 3 Kampfpanzer, Kampfhubschrauber und SAM-Startrampe; dazu drei Verbesserungen: Schutzwesten (Infanterie), Verbundpanzerung (Fahrzeuge und
-// Hubschrauber) und Wärmebildoptik (Reichweite und Sicht der Einheiten). Aus (Standard): alles frei, keine Verbesserungen.
-// Zustand je Team: team.tech = { tier, done: [Schlüssel], cur: { key, t } | null }.
-import { BALANCE } from '../data/balance.js';
-import { UNITS } from '../data/units.js';
+// Forschung (seit v5.04, PRD §7 „Forschung“): Baum aus 10 Stufen und 7 Ästen (js/data/research.js). Die Hauptstadt forscht neben der
+// Ausbildung, eins nach dem anderen; bis zu RESEARCH.queueMax weitere warten (Geld beim Einreihen, Abbruch erstattet voll). Eine
+// Stufe ist offen, wenn auf der Stufe davor RESEARCH.perTier Forschungen fertig sind; jede Forschung braucht ihren Vorgänger im Ast.
+// Mit Stadt braucht jede Forschung eine fertige Universität; Rechenzentren beschleunigen sie (CITY.research), Strommangel bremst.
+// Einheiten sind immer alle frei; Forschungen verbessern Werte je Einheitengruppe (fx) oder schalten Fähigkeiten frei (unlock).
+// Aus (Standard in new Game()): keine Verbesserungen. Zustand je Team: team.tech = { tier, done: [Schlüssel], cur: { key, t } | null,
+// queue: [Schlüssel] }. Kein DOM.
+import { RESEARCH } from '../data/research.js';
 import { CITY } from '../data/city.js';
-import { cityLevel, powerRatio } from './city.js';
+import { cityLevel, citySum, powerRatio } from './city.js';
 
-const R = BALANCE.research;
+const R = RESEARCH;
 export const RESEARCH_KEYS = Object.keys(R.items);
-const pct = (m) => `${Math.round(Math.abs(1 - m) * 100)} %`;
 const fail = (reason) => ({ ok: false, reason });
+const pct = (m) => `${Math.round(Math.abs(1 - m) * 100)} %`;
+const ADD = new Set(['regen']); // Werte, die sich addieren (sonst multiplizieren)
 
-/** Einheiten, die eine Stufe freischaltet (Namen in Reihenfolge von UNITS). */
-export const tierUnits = (tier) => Object.keys(UNITS).filter((k) => R.unitTier[k] === tier);
+// ---- Wirkung in Worten ----
 
-/** Wirkung eines Forschungsziels in Worten (Tooltip, Meldung). */
+const GROUP_NAME = {
+  inf: 'Infanterie', tank: 'Kampfpanzer', ifv: 'Schützenpanzer', aa: 'Flak und SAM', log: 'LKW und Baufahrzeuge', heli: 'Hubschrauber',
+  jet: 'Kampfflugzeuge', veh: 'Bodenfahrzeuge', air: 'Hubschrauber und Kampfflugzeuge', all: 'alle Einheiten', bld: 'Militärgebäude',
+};
+const STAT_TEXT = {
+  range: (m) => `Waffenreichweite +${pct(m)}`,
+  sight: (m) => `Sicht +${pct(m)}`,
+  dmg: (m) => `Schaden +${pct(m)}`,
+  dmgInf: (m) => `Schaden gegen Infanterie +${pct(m)}`,
+  dmgVeh: (m) => `Schaden gegen Fahrzeuge und Gebäude +${pct(m)}`,
+  dmgAir: (m) => `Schaden gegen Luftziele +${pct(m)}`,
+  rof: (m) => `feuern ${Math.round((1 / m - 1) * 100)} % schneller`,
+  armor: (m) => `nehmen ${pct(m)} weniger Schaden`,
+  speed: (m) => `Tempo +${pct(m)}`,
+  fuel: (m) => `Reichweite mit einer Tankfüllung +${Math.round((1 / m - 1) * 100)} %`,
+  acc: (m) => `Trefferchance gelenkter Waffen +${pct(m)}`,
+  evade: (m) => `gegnerische Flak, SAM und Lenkraketen treffen ${pct(m)} seltener`,
+  regen: (v) => `heilen sich selbst um ${(v * 100).toLocaleString('de-DE')} % HP/s (nach ${R.regenDelay} s ohne Treffer)`,
+  rearm: (m) => `am Flughafen ${pct(m)} schneller bereit`,
+  build: (m) => `Bautempo +${pct(m)}`,
+  repair: (m) => `Reparatur ${m.toLocaleString('de-DE')}× so schnell`,
+  abilityCd: (m) => `Nebel und Minen laden ${pct(m)} schneller`,
+};
+const UNLOCK_TEXT = {
+  smoke: 'Fahrzeuge und Hubschrauber legen mit V eine Nebelwand: eigene Einheiten darin nehmen halb so viel Schaden',
+  mines: 'Baufahrzeuge legen mit M Minen, die Bodeneinheiten des Gegners treffen',
+  autoturret: 'Dachaufbauten von Gefechtstürmen und Häusern feuern auch ohne Besatzung',
+};
+
+/** Wirkung einer Forschung in Worten (Menü, Meldung), z. B. „Kampfpanzer: Waffenreichweite +6 %, Sicht +5 %“. */
 export function researchEffect(key) {
   const it = R.items[key];
-  if (it?.tier) return `schaltet frei: ${tierUnits(it.tier).map((k) => UNITS[k].name).join(', ')}`;
-  if (key === 'vests') return `Infanterie nimmt ${pct(R.vests)} weniger Schaden`;
-  if (key === 'composite') return `Fahrzeuge und Hubschrauber nehmen ${pct(R.composite)} weniger Schaden`;
-  if (key === 'optics') return `Waffenreichweite und Sicht der Einheiten +${pct(R.optics)}`;
-  const it2 = R.items[key];
-  const fx = it2?.fx;
-  if (fx) {
-    const T = {
-      speed: (m) => `Bodenfahrzeuge ${pct(m)} schneller`,
-      fuel: (m) => `Treibstoffverbrauch −${pct(m)}`,
-      taken: (m) => `Fahrzeuge und Hubschrauber nehmen ${pct(m)} weniger Schaden`,
-      dealtVeh: (m) => `+${pct(m)} Schaden gegen Fahrzeuge`,
-      dealtInf: (m) => `+${pct(m)} Schaden gegen Infanterie`,
-      dealtAll: (m) => `+${pct(m)} Schaden`,
-      cd: (m) => `Waffen feuern ${Math.round((1 / m - 1) * 100)} % schneller`,
-      sniperRange: (m) => `Scharfschützen-Reichweite +${pct(m)}`,
-      aa: (m) => `Flak und SAM +${pct(m)} Schaden`,
-      build: (m) => `Bautempo +${pct(m)}`,
-      repair: (m) => `Reparatur ${m}× so schnell`,
-      abilityCd: (m) => `Rauch und Minen laden ${pct(m)} schneller`,
-      optics: (m) => `Sicht und Waffenreichweite der Einheiten +${pct(m)}`,
-      jam: (m) => `gegnerische Flak und SAM treffen eigene Hubschrauber ${pct(m)} seltener`,
-    };
-    return Object.entries(fx).map(([k, m]) => T[k](m)).join(', ');
-  }
-  if (it2?.autoTurret) return 'Dachaufbauten von Gefechtstürmen und Häusern feuern auch ohne Besatzung';
-  if (it2?.regen) return 'Bodenfahrzeuge reparieren sich selbst, wenn sie 6 s nicht getroffen wurden';
-  if (key === 'smoke') return 'Fahrzeuge legen mit V eine Nebelwand: eigene Einheiten darin nehmen halb so viel Schaden';
-  if (key === 'mines') return 'Baufahrzeuge legen mit M Minen, die Bodeneinheiten des Gegners treffen';
-  return '';
+  if (!it) return '';
+  const parts = Object.entries(it.fx ?? {}).map(([g, st]) => `${GROUP_NAME[g]}: ${Object.entries(st).map(([s, v]) => STAT_TEXT[s](v)).join(', ')}`);
+  if (it.unlock) parts.push(UNLOCK_TEXT[it.unlock]);
+  return parts.join(' · ');
 }
+
+// ---- Zustand ----
 
 /** Legt game.research und team.tech an (on: Forschung eingeschaltet). */
 export function createResearch(game, on) {
   game.research = !!on;
   game.smokes = [];
   game.mines = [];
-  for (const t of game.teams) t.tech = { tier: 1, done: [], cur: null };
+  for (const t of game.teams) t.tech = { tier: 1, done: [], cur: null, queue: [] };
 }
 
-/** Stufe, ab der eine Einheit ausgebildet werden kann (1 = von Anfang an). */
-export const unitTier = (type) => R.unitTier[type] ?? 1;
+/** Ältere Spielstände (vor v5.04): alte Forschungen gelten nicht mehr, laufende werden erstattet. */
+export function migrateResearch(game) {
+  for (const t of game.teams) {
+    const tech = (t.tech ??= { tier: 1, done: [], cur: null, queue: [] });
+    tech.queue ??= [];
+    if (tech.cur && !R.items[tech.cur.key]) tech.cur = null;
+    tech.done = tech.done.filter((k) => R.items[k]);
+    tech.tier = openTier(tech.done);
+  }
+}
 
-/** Ist diese Einheit für das Team noch gesperrt? Ohne Forschung nie. */
-export const unitLocked = (game, team, type) => !!game.research && unitTier(type) > game.teams[team].tech.tier;
+/** Höchste offene Stufe, wenn `have` (fertig oder geplant) erforscht ist. */
+function openTier(have) {
+  const set = have instanceof Set ? have : new Set(have);
+  let tier = 1;
+  while (tier < R.tiers) {
+    let n = 0;
+    for (const k of set) if (R.items[k]?.tier === tier) n++;
+    if (n < R.perTier) break;
+    tier++;
+  }
+  return tier;
+}
 
-export const lockReason = (type) => `Benötigt Stufe ${unitTier(type)}`;
+/** Fertige, laufende und eingereihte Forschungen des Teams (für die Planung der Warteschlange). */
+const planned = (tech) => new Set([...tech.done, ...(tech.cur ? [tech.cur.key] : []), ...tech.queue]);
 
-/** Hat das Team diese Verbesserung erforscht? */
+/** Hat das Team diese Forschung erforscht? */
 export const hasTech = (game, team, key) => !!game.research && game.teams[team].tech.done.includes(key);
 
-/** Warum das Forschungsziel jetzt nicht begonnen werden kann (ohne Geld); '' = möglich. anyway: laufende Forschung übergehen (Menü). */
-export function researchBlock(game, team, key, anyway = false) {
+/** Hat das Team die Fähigkeit (unlock) freigeschaltet? */
+export function hasUnlock(game, team, what) {
+  if (!game.research) return false;
+  return game.teams[team].tech.done.some((k) => R.items[k]?.unlock === what);
+}
+
+/**
+ * Warum die Forschung jetzt nicht eingereiht werden kann (ohne Geld); '' = möglich. Geplant zählt mit: was läuft oder schon wartet,
+ * gilt als erforscht (so darf man Vorgänger und Nachfolger zusammen einreihen).
+ */
+export function researchBlock(game, team, key) {
   if (!game.research) return 'Forschung ist in dieser Partie ausgeschaltet';
   const it = R.items[key];
   if (!it) return 'Unbekannte Forschung';
   const tech = game.teams[team].tech;
-  if (tech.done.includes(key) || (it.tier && tech.tier >= it.tier)) return 'Bereits erforscht';
+  if (tech.done.includes(key)) return 'Bereits erforscht';
   if (tech.cur?.key === key) return 'Wird gerade erforscht';
-  if (tech.cur && !anyway) return 'Es läuft schon eine Forschung';
-  if (it.req === 'branch') {
-    const rest = RESEARCH_KEYS.filter((k) => R.items[k].branch === it.branch && k !== key && !R.items[k].tier);
-    if (rest.some((k) => !tech.done.includes(k))) return `Benötigt alle anderen Forschungen im Ast ${R.branches[it.branch]}`;
-  } else if (it.req && !tech.done.includes(it.req)) return `Benötigt ${R.items[it.req].name}`;
-  if (tech.tier < it.needs) return `Benötigt Stufe ${it.needs}`;
-  // Stadt (seit v4.88): Universität für Stufe 2 und 3, Rechenzentrum für den Ast KI
-  if (it.dc && cityLevel(game, team, 'dc') < 1) return game.city ? 'Benötigt ein Rechenzentrum in der Stadt' : 'Nur mit Stadt (Rechenzentrum)';
-  if (game.city && it.tier === 2 && cityLevel(game, team, 'uni') < 1) return 'Benötigt eine Universität in der Stadt';
-  if (game.city && it.tier === 3 && cityLevel(game, team, 'uni') < CITY.uniForTier3) return `Benötigt eine Universität der Stufe ${CITY.uniForTier3}`;
+  if (tech.queue.includes(key)) return 'Steht schon in der Warteschlange';
+  const have = planned(tech);
+  if (it.req && !have.has(it.req)) return `Benötigt ${R.items[it.req].name}`;
+  if (openTier(have) < it.tier) return `Stufe ${it.tier}: erst ${R.perTier} Forschungen der Stufe ${it.tier - 1}`;
+  if (game.city && cityLevel(game, team, 'uni') < 1) return 'Benötigt eine Universität in der Stadt';
+  if (tech.cur && tech.queue.length >= R.queueMax) return `Warteschlange voll (${R.queueMax} wartende)`;
   return '';
 }
 
-/** { type: 'research', buildingId, key }: nur die Hauptstadt, eine Forschung zugleich, Geld beim Start. */
+/** Forschungstempo des Teams: mit Stadt × (1 + Rechenzentren) × Strom, ohne Universität 0; ohne Stadt 1. */
+export function researchSpeed(game, team) {
+  if (!game.city) return 1;
+  if (cityLevel(game, team, 'uni') < 1) return 0;
+  const C = CITY.research;
+  return Math.min(C.maxSpeed, 1 + C.dcSpeed * citySum(game, team, 'dc')) * powerRatio(game, team);
+}
+
+/** { type: 'research', buildingId, key }: nur die Hauptstadt; läuft nichts, startet sie, sonst wartet sie. Geld beim Einreihen. */
 export function cmdResearch(game, team, cmd) {
   const b = game.getEntity(cmd.buildingId);
   if (!b || b.kind !== 'building' || b.team !== team || !b.main) return fail('Nur die Hauptstadt forscht');
@@ -100,80 +138,142 @@ export function cmdResearch(game, team, cmd) {
   const cost = { money: R.items[cmd.key].money };
   if (!game.canAfford(team, cost)) return fail(game.missingMoney());
   game.pay(team, cost);
-  game.teams[team].tech.cur = { key: cmd.key, t: 0 };
-  return { ok: true };
-}
-
-/** { type: 'cancelResearch' }: laufende Forschung abbrechen, das Geld kommt ganz zurück. */
-export function cmdCancelResearch(game, team) {
   const tech = game.teams[team].tech;
-  if (!tech?.cur) return fail('Keine Forschung läuft');
-  game.refund(team, { money: R.items[tech.cur.key].money });
-  tech.cur = null;
+  if (!tech.cur) tech.cur = { key: cmd.key, t: 0 };
+  else tech.queue.push(cmd.key);
+  return { ok: true, queued: tech.cur.key !== cmd.key };
+}
+
+/**
+ * { type: 'cancelResearch', key? }: Forschung abbrechen (ohne key die laufende), das Geld kommt ganz zurück. Wartende, die damit
+ * ihren Vorgänger oder ihre Stufe verlieren, fallen ebenfalls heraus (auch erstattet). Danach rückt die nächste nach.
+ */
+export function cmdCancelResearch(game, team, cmd = {}) {
+  const tech = game.teams[team].tech;
+  const key = cmd.key ?? tech.cur?.key;
+  if (!key || (tech.cur?.key !== key && !tech.queue.includes(key))) return fail('Diese Forschung läuft nicht und wartet nicht');
+  const refund = (k) => game.refund(team, { money: R.items[k].money });
+  refund(key);
+  if (tech.cur?.key === key) tech.cur = null;
+  else tech.queue.splice(tech.queue.indexOf(key), 1);
+  // Warteschlange neu prüfen: nur, was mit den Vorgängern davor noch geht
+  const have = new Set([...tech.done, ...(tech.cur ? [tech.cur.key] : [])]);
+  const keep = [];
+  for (const k of tech.queue) {
+    const it = R.items[k];
+    have.add(k);
+    if ((it.req && !have.has(it.req)) || openTier(new Set([...have].filter((x) => x !== k))) < it.tier) {
+      have.delete(k);
+      refund(k);
+      continue;
+    }
+    keep.push(k);
+  }
+  tech.queue = keep;
+  if (!tech.cur && tech.queue.length) tech.cur = { key: tech.queue.shift(), t: 0 };
   return { ok: true };
 }
 
-/** Ein Schritt: Fortschritt der laufenden Forschung; fertig → Stufe bzw. Verbesserung, Meldung (Stufen erfährt auch der Gegner). */
+/** Ein Schritt: Fortschritt der laufenden Forschung; fertig → Meldung, nächste aus der Warteschlange. */
 export function updateResearch(game, dt) {
   if (!game.research) return;
   for (const team of game.teams) {
     const tech = team.tech;
     const cur = tech.cur;
     if (!cur || !game.mainFob(team.id)) continue;
-    // Stadt: jede Uni-Stufe über 1 beschleunigt, Strommangel bremst
-    const uni = game.city ? cityLevel(game, team.id, 'uni') : 0;
-    cur.t += game.city ? dt * (1 + CITY.uniSpeed * Math.max(0, uni - 1)) * powerRatio(game, team.id) : dt;
+    const sp = researchSpeed(game, team.id);
+    if (sp <= 0) {
+      game.notify(team.id, 'noUni', 'Forschung ruht: keine Universität in der Stadt', 30);
+      continue;
+    }
+    cur.t += dt * sp;
     const it = R.items[cur.key];
     if (cur.t < it.time) continue;
-    tech.cur = null;
     tech.done.push(cur.key);
-    if (it.tier) {
-      tech.tier = Math.max(tech.tier, it.tier);
-      const names = tierUnits(it.tier).map((k) => UNITS[k].name);
-      const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} und ${names[names.length - 1]}` : names[0];
-      game.message(team.id, `${it.name} erreicht: ${list} freigeschaltet`);
-      game.message(1 - team.id, `Der Gegner hat ${it.name} erreicht`);
-    } else {
-      game.message(team.id, `${it.name} erforscht: ${researchEffect(cur.key)}`);
+    tech.cur = tech.queue.length ? { key: tech.queue.shift(), t: 0 } : null;
+    const was = tech.tier;
+    tech.tier = openTier(tech.done);
+    game.message(team.id, `${it.name} erforscht: ${researchEffect(cur.key)}`);
+    if (tech.tier > was) {
+      game.message(team.id, `Forschungsstufe ${tech.tier} offen`);
+      game.message(1 - team.id, `Der Gegner forscht auf Stufe ${tech.tier}`);
     }
   }
 }
 
-/**
- * Schadensfaktor gegen eine Einheit (Schutzwesten für Infanterie, Verbundpanzerung für Fahrzeuge und Hubschrauber).
- * Ein Schuss, der das unverletzte Ziel sofort tötet (Scharfschütze, Panzerfaust gegen Soldaten), bleibt tödlich.
- */
-export function armorMul(game, u, amount) {
-  if (!game.research || amount >= u.def.hp) return 1;
-  const done = game.teams[u.team]?.tech.done;
-  if (!done?.length) return 1;
-  if (u.def.armor === 'inf') return done.includes('vests') ? R.vests : 1;
-  return (done.includes('composite') ? R.composite : 1) * fxMul(game, u.team, 'taken');
-}
+// ---- Wirkung im Spiel ----
 
-/** Faktor für Waffenreichweite und Sicht der Einheiten eines Teams (Wärmebildoptik), sonst 1. */
-export const opticsMul = (game, team) => (hasTech(game, team, 'optics') ? R.optics : 1) * fxMul(game, team, 'optics');
-
-/** Produkt der Wirkung `stat` (fx) aller erforschten Verbesserungen des Teams, sonst 1. */
-export function fxMul(game, team, stat) {
-  if (!game.research) return 1;
-  let m = 1;
-  for (const k of game.teams[team].tech.done) m *= R.items[k]?.fx?.[stat] ?? 1;
+/** Summe aller Wirkungen eines Teams je Gruppe und Wert (zwischengespeichert, neu, sobald eine Forschung fertig ist). */
+const cache = new WeakMap();
+function mods(tech) {
+  let c = cache.get(tech);
+  if (c && c.n === tech.done.length) return c.m;
+  const m = {};
+  for (const k of tech.done) {
+    for (const [g, st] of Object.entries(R.items[k]?.fx ?? {})) {
+      const o = (m[g] ??= {});
+      for (const [s, v] of Object.entries(st)) o[s] = ADD.has(s) ? (o[s] ?? 0) + v : (o[s] ?? 1) * v;
+    }
+  }
+  cache.set(tech, { n: tech.done.length, m });
   return m;
 }
 
-/** Waffenreichweite-Faktor einer Einheit: Wärmebildoptik, bei Scharfschützen Zielfernrohre. */
-export const rangeMul = (game, u) => opticsMul(game, u.team) * (u.type === 'sniper' ? fxMul(game, u.team, 'sniperRange') : 1);
+/** Gruppen einer Einheit: eigene (RESEARCH.groups), veh (Bodenfahrzeug) oder air (Hubschrauber, Jet), immer all. */
+export function unitGroups(u) {
+  const out = ['all'];
+  const g = R.groups[u.type];
+  if (g) out.push(g);
+  if (u.def.air) out.push('air');
+  else if (u.def.armor !== 'inf') out.push('veh');
+  return out;
+}
 
-/** Faktor auf den Schaden eines Schusses von s auf t (Munition, Granaten, Lenkraketen, Waffenmeister). */
+/** Wirkung `stat` auf die Gruppen `groups` eines Teams (Produkt, regen: Summe); ohne Forschung 1 bzw. 0. */
+export function teamMod(game, team, groups, stat) {
+  const add = ADD.has(stat);
+  if (!game.research || team < 0 || !game.teams[team]) return add ? 0 : 1;
+  const m = mods(game.teams[team].tech);
+  let v = add ? 0 : 1;
+  for (const g of groups) {
+    const x = m[g]?.[stat];
+    if (x !== undefined) v = add ? v + x : v * x;
+  }
+  return v;
+}
+
+/** Wirkung `stat` auf eine Einheit oder ein Militärgebäude (bld); Stadtgebäude und Neutrales: 1. */
+export function modOf(game, e, stat) {
+  if (!e || e.team < 0) return ADD.has(stat) ? 0 : 1;
+  if (e.kind === 'unit') return teamMod(game, e.team, unitGroups(e), stat);
+  if (e.kind === 'building' && e.type !== 'city') return teamMod(game, e.team, ['bld'], stat);
+  return ADD.has(stat) ? 0 : 1;
+}
+
+/** Wirkung `stat` für das ganze Team (Gruppe all: Bautempo, Reparatur, Abklingzeit der Fähigkeiten). */
+export const fxMul = (game, team, stat) => teamMod(game, team, ['all'], stat);
+
+/** Schadensfaktor gegen eine Einheit oder ein Militärgebäude. Ein Schuss, der das unverletzte Ziel sofort tötet, bleibt tödlich. */
+export function armorMul(game, e, amount) {
+  if (!game.research || amount >= (e.def?.hp ?? Infinity)) return 1;
+  return modOf(game, e, 'armor');
+}
+
+/** Faktor für die Sicht einer Einheit oder eines Gebäudes. */
+export const sightMul = (game, e) => modOf(game, e, 'sight');
+
+/** Faktor für die Waffenreichweite einer Einheit oder eines Gebäudes. */
+export const rangeMul = (game, e) => modOf(game, e, 'range');
+
+/** Faktor auf den Schaden eines Schusses von s auf t (allgemein und je Zielklasse). */
 export function dealtMul(game, s, t) {
-  if (!game.research || !game.teams[s.team].tech.done.length) return 1;
-  const m = fxMul(game, s.team, 'dealtAll') * fxMul(game, s.team, t.def.armor === 'inf' ? 'dealtInf' : 'dealtVeh');
-  return s.type === 'flak' || s.type === 'sam' ? m * fxMul(game, s.team, 'aa') : m;
+  if (!game.research) return 1;
+  const cls = t.kind === 'unit' ? (t.def.air ? 'dmgAir' : t.def.armor === 'inf' ? 'dmgInf' : 'dmgVeh') : 'dmgVeh';
+  return modOf(game, s, 'dmg') * modOf(game, s, cls);
 }
 
 /** Faktor Rauch: eigene Einheiten in einer Nebelwand ihres Teams nehmen weniger Schaden. */
 export function smokeMul(game, u) {
-  for (const s of game.smokes ?? []) if (s.team === u.team && Math.hypot(u.x - s.x, u.y - s.y) <= s.r) return BALANCE.research.smoke.taken;
+  for (const s of game.smokes ?? []) if (s.team === u.team && Math.hypot(u.x - s.x, u.y - s.y) <= s.r) return R.smoke.taken;
   return 1;
 }

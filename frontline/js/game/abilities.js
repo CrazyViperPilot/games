@@ -1,19 +1,20 @@
-// Einsatzfähigkeiten und Selbstreparatur aus der Forschung (§7): Nebelwand (V, Fahrzeuge), Minen (M, Baufahrzeuge),
-// Feldwerkstatt (Bodenfahrzeuge heilen langsam). Zustand: game.smokes [{x,y,r,team,until}], game.mines [{x,y,team}],
-// u.abilityCd (Sekunden bis zur nächsten Fähigkeit). Kein DOM. Die KI nutzt die Fähigkeiten nicht.
-import { BALANCE } from '../data/balance.js';
-import { hasTech, fxMul } from './research.js';
+// Einsatzfähigkeiten und Selbstheilung aus der Forschung (§7): Nebelwand (V, Fahrzeuge), Minen (M, Baufahrzeuge) und Selbstheilung
+// (Wert regen der Forschung: Feldsanitäter, Bordwerkstatt, Feldwerkstatt …). Zustand: game.smokes [{x,y,r,team,until}],
+// game.mines [{x,y,team}], u.abilityCd (Sekunden bis zur nächsten Fähigkeit). Kein DOM. Die KI nutzt Nebel und Minen nicht.
+import { RESEARCH } from '../data/research.js';
+import { hasUnlock, fxMul, modOf } from './research.js';
 import { hit } from './combat.js';
 
-const R = BALANCE.research;
+const R = RESEARCH;
 const fail = (reason) => ({ ok: false, reason });
 const isGroundVehicle = (u) => !u.def.air && u.def.armor !== 'inf';
+const unlockName = (what) => Object.values(R.items).find((it) => it.unlock === what)?.name ?? what;
 
 /** { type: 'smoke'|'mine', ids }: jede bereite Einheit mit passender Fähigkeit legt an ihrer Stelle Rauch bzw. eine Mine. */
 export function cmdAbility(game, team, cmd) {
   const smoke = cmd.type === 'smoke';
   const key = smoke ? 'smoke' : 'mines';
-  if (!hasTech(game, team, key)) return fail(`${R.items[key].name} nicht erforscht`);
+  if (!hasUnlock(game, team, key)) return fail(`${unlockName(key)} nicht erforscht`);
   const cfg = smoke ? R.smoke : R.mine;
   const units = game
     .ownUnits(team, cmd.ids)
@@ -34,7 +35,7 @@ export function cmdAbility(game, team, cmd) {
   return { ok: true };
 }
 
-/** Ein Schritt: Fähigkeits-Abklingzeiten, Rauch läuft ab, Minen lösen aus, Feldwerkstatt heilt. */
+/** Ein Schritt: Fähigkeits-Abklingzeiten, Rauch läuft ab, Minen lösen aus, Selbstheilung. */
 export function updateAbilities(game, dt) {
   if (!game.research) return;
   for (const u of game.units) if (u.alive && u.abilityCd > 0) u.abilityCd -= dt;
@@ -50,11 +51,9 @@ export function updateAbilities(game, dt) {
       if (u.alive && u.team !== m.team && !u.def.air && !u.house && Math.hypot(u.x - m.x, u.y - m.y) <= M.blast) hit(game, u, M.damage);
     }
   }
-  for (const team of game.teams) {
-    const rate = R.items.workshop.regen;
-    if (!hasTech(game, team.id, 'workshop')) continue;
-    for (const u of game.units) {
-      if (u.alive && u.team === team.id && isGroundVehicle(u) && u.hp < u.maxHp && game.time - u.lastHitTime > 6) u.hp = Math.min(u.maxHp, u.hp + u.maxHp * rate * dt);
-    }
+  for (const u of game.units) {
+    if (!u.alive || u.hp >= u.maxHp || game.time - u.lastHitTime <= R.regenDelay) continue;
+    const rate = modOf(game, u, 'regen');
+    if (rate > 0) u.hp = Math.min(u.maxHp, u.hp + u.maxHp * rate * dt);
   }
 }
