@@ -463,7 +463,7 @@ test('Zufriedenheit sinkt bei Beschuss der Stadt', () => {
   assert.ok(g.city[0].stats.happy < calm - 0.1, `${g.city[0].stats.happy} < ${calm}`);
 });
 
-test('Straßenanschluss: Wohnen/Gewerbe über genau eine Zelle gleicher Art', () => {
+test('Straßenanschluss: Wohnen/Gewerbe/BM-Werk über genau eine Zelle gleicher Art', () => {
   const cols = 6, rows = 1;
   const mk = (...k) => ({ cols, rows, kind: Uint8Array.from(k) });
   const R = KIND_ID.road, W = KIND_ID.res, G = KIND_ID.com, B = KIND_ID.bm;
@@ -475,8 +475,12 @@ test('Straßenanschluss: Wohnen/Gewerbe über genau eine Zelle gleicher Art', ()
   assert.ok(!hasRoad(d, 2, 0)); // Wohnen-Gewerbe-Straße: nicht für Wohnen
   const e = mk(R, W, W, W, 0, 0);
   assert.ok(!hasRoad(e, 3, 0)); // keine längeren Ketten
-  const f = mk(R, B, B, 0, 0, 0);
-  assert.ok(!hasRoad(f, 2, 0)); // Werke weiter nur direkt
+  const f = mk(R, B, B, B, 0, 0);
+  assert.ok(hasRoad(f, 2, 0)); // BM-Werk-BM-Werk-Straße (seit v5.05)
+  assert.ok(!hasRoad(f, 3, 0)); // auch hier keine längeren Ketten
+  const M = KIND_ID.mun;
+  assert.ok(!hasRoad(mk(R, B, W, 0, 0, 0), 2, 0)); // Wohnen hinter BM-Werk: nein
+  assert.ok(!hasRoad(mk(R, M, M, 0, 0, 0), 2, 0)); // andere Werke weiter nur direkt
 });
 
 test('Ausbildung mit Stadt (v4.96): Hauptstadt nicht, Kaserne Soldaten, Fabrikhalle Fahrzeuge, Heliport Hubschrauber', () => {

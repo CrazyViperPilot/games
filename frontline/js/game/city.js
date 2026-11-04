@@ -701,13 +701,17 @@ function roadNext(c, col, row) {
   );
 }
 
-/** Straßenanschluss: Nachbar ist Straße. Wohnen und Gewerbe reichen auch über genau eine Zelle gleicher Art
- *  (Wohnen-Wohnen-Straße ok, Wohnen-Gewerbe-Straße für Wohnen nicht); die Zelle dazwischen muss selbst direkt an der Straße liegen. */
+/** Arten, die ihren Straßenanschluss auch über genau eine Zelle gleicher Art bekommen (seit v5.05 auch das Baumaterial-Werk). */
+const CHAIN = new Set(['res', 'com', 'bm'].map((k) => KIND_ID[k]));
+
+/** Straßenanschluss: Nachbar ist Straße. Wohnen, Gewerbe und BM-Werk reichen auch über genau eine Zelle gleicher Art
+ *  (Wohnen-Wohnen-Straße ok, BM-Werk-BM-Werk-Straße ok, Wohnen-Gewerbe-Straße für Wohnen nicht); die Zelle dazwischen muss selbst
+ *  direkt an der Straße liegen. */
 export function hasRoad(c, col, row) {
   if (c.part?.[idx(c, col, row)]) return cellsOf(c, idx(c, col, row)).some((j) => roadNext(c, j % c.cols, Math.floor(j / c.cols))); // Großbau: irgendeine seiner Zellen
   if (roadNext(c, col, row)) return true;
   const k = c.kind[idx(c, col, row)];
-  if (k !== KIND_ID.res && k !== KIND_ID.com) return false;
+  if (!CHAIN.has(k)) return false;
   return (
     (col > 0 && c.kind[idx(c, col - 1, row)] === k && roadNext(c, col - 1, row)) ||
     (col < c.cols - 1 && c.kind[idx(c, col + 1, row)] === k && roadNext(c, col + 1, row)) ||
