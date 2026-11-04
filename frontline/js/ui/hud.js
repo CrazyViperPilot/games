@@ -11,6 +11,7 @@ import { SEASON_NAMES, WEATHER_NAMES, weatherEffect } from '../game/weather.js';
 import { RESEARCH } from '../data/research.js';
 import { CITY } from '../data/city.js';
 import { KINDS, DEPOSITS, DEPOSIT_NAME, hasMarket, hasRoad, careOf } from '../game/city.js';
+import { transportInfo, transportOf } from '../game/transport.js';
 import { jetsAt } from '../game/aircraft.js';
 import { CITY_TIP } from './citypanel.js';
 
@@ -512,7 +513,7 @@ export class Hud {
       `<div class="title">${esc(b.def.name)} <small class="muted">Stufe ${lv} von ${CITY.maxLevel}</small></div>${bar(f, 'hp', hpColor(f))}` +
       `<div class="muted small">${Math.ceil(b.hp)} / ${b.def.hp} HP</div>`;
     const line = (t) => `<div class="small">${esc(t)}</div>`;
-    const PRODUCT = { bm: ['bm', 'BM'], mun: ['mun', 'MUN'], fuel: ['fuel', 'TS'], steel: ['metal', 'Stahl'] };
+    const PRODUCT = { bm: ['bm', 'BM'], mun: ['mun', 'MUN'], fuel: ['fuel', 'TS'], steel: ['metal', 'Stahl'], smelter: ['iron', 'Roheisen'], kero: ['kero', 'Kerosin'] };
     if (k === 'res') h += line(`Wohnplätze ${CITY.housing[lv]} · Stadt: ${Math.floor(s.pop)} / ${s.housing} Einwohner`);
     else if (k === 'com') h += line(`Arbeitsplätze ${CITY.jobsCom[lv]} · zahlt Steuern, macht die Stadt zufriedener`);
     else if (k === 'market') h += line(`Arbeitsplätze ${CITY.jobsCom[lv]} · Handel: Knopf „Handel“ oder Geldanzeige oben antippen`);
@@ -533,6 +534,7 @@ export class Hud {
       }
       h += '<div class="muted small">Zahlt direkt aus der Stadt: Geld, Stahl, Einwohner</div>';
     }
+    h += this.transportText(g, c, i, k, s);
     const care = careOf(g, b);
     if (care) {
       // Heilen und Reparieren (seit v5.01)
@@ -547,6 +549,40 @@ export class Hud {
     if (s.powerRatio < 1 && CITY.power.use[k] && k !== 'res' && k !== 'com') h += `<div class="warn small">Strommangel: arbeitet mit ${Math.round(s.powerRatio * 100)} %</div>`;
     if (k === 'res' && c.flee[i] > 0) h += `<div class="warn small">Bewohner geflohen (Beschuss), Rückkehr frühestens in ${Math.ceil(c.flee[i])} s</div>`;
     if (b.produces) h += this.queueInfo(b);
+    return h;
+  }
+
+  /**
+   * Straßentransport eines Stadtgebäudes (seit v5.19, AP5, nur lesen): Lieferziel und Weg, Stau der Pendler, Waren der Gewerbe.
+   * Liefert HTML-Zeilen; Warnungen rot über die Klasse „warn“.
+   */
+  transportText(g, c, i, k, s) {
+    const line = (t) => `<div class="small">${esc(t)}</div>`;
+    const warn = (t) => `<div class="warn small">${esc(t)}</div>`;
+    const pct = (v) => `${Math.round(v * 100)} %`;
+    let h = '';
+    const SUPPLIER = ['mine', 'smelter', 'bm', 'steel', 'fuel', 'kero', 'mun'];
+    const WORKPLACE = ['mine', 'smelter', 'bm', 'steel', 'fuel', 'kero', 'mun', 'com', 'market', 'power', 'uni', 'dc'];
+    // Was ohne Weg fehlt: je Förderung die passende Verarbeitung, sonst das Lager
+    const TO = { wood: 'zu einem BM-Werk', stone: 'zu einem BM-Werk', ore: 'zu einer Hütte', oil: 'zu einer Raffinerie oder Kerosin-Raffinerie', smelter: 'zu einem Stahlwerk' };
+    if (SUPPLIER.includes(k)) {
+      const T = transportInfo(g, c, i);
+      if (T.to) {
+        h += line(`Liefert an: ${T.to} (${T.dist} ${T.dist === 1 ? 'Feld' : 'Felder'}) · Weg ${pct(T.eff)}`);
+      } else {
+        const d = k === 'mine' ? DEPOSITS[c.deposit[i] - 1] : k === 'smelter' ? 'smelter' : null;
+        h += warn(`Kein Straßenweg ${d ? TO[d] : 'zum Lager'}: die Ware geht verloren`);
+      }
+    }
+    if (WORKPLACE.includes(k)) {
+      const T = transportInfo(g, c, i);
+      if (T.noHome) h += warn('Keine Wohnung über die Straße erreichbar: keine Arbeiter');
+      else if (Math.round(T.commuteEff * 100) < 100) h += line(`Pendler: Stau ${pct(T.commuteEff)}`);
+    }
+    if (k === 'com' || k === 'market') {
+      h += line(`Waren: ${pct(s.shopSupply ?? 1)} versorgt (Baumaterial über die Straße)`);
+      if (transportOf(g, c).shop.get(i) === null) h += warn('Kein Straßenweg zum Lager: keine Waren');
+    }
     return h;
   }
 

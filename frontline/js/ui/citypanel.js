@@ -155,8 +155,15 @@ export class CityPanel {
     const m = g.mainFob(this.team);
     const fled = s.fled ? ` (${fmt(s.fled)} geflohen)` : '';
     const raw = s.raw;
-    const store = m ? `Stahl ${fmt(g.city[this.team].metal)} ${s.metal >= 0 ? '+' : ''}${fmt(s.metal, 1)} · Förderung Holz ${fmt(raw.wood, 1)} Stein ${fmt(raw.stone, 1)} Erz ${fmt(raw.ore, 1)} Öl ${fmt(raw.oil, 1)} · Lager BM ${fmt(m.store.bm)} +${fmt(s.bm, 1)} · MUN ${fmt(m.store.mun)} +${fmt(s.mun, 1)} · TS ${fmt(m.store.fuel)} +${fmt(s.fuel, 1)}` : 'Hauptstadt zerstört';
-    this.strip.innerHTML = `<span>Strom ${fmt(s.powerSupply)}/${fmt(s.powerUse)}${s.powerRatio < 1 ? ' ⚠' : ''} · Zufriedenheit ${fmt(s.happy * 100)} % · Einwohner ${fmt(s.pop)}/${fmt(s.housing)}${fled} · Truppen ${fmt(s.drafted)} · frei ${fmt(Math.max(0, s.free))} · Arbeit ${fmt(s.workers)}/${fmt(s.jobs)} · Steuern +${fmt(s.money, 1)}/s</span><span class="city-store">${store}</span>`;
+    const c = g.city[this.team];
+    const stahl = `Stahl ${fmt(c.metal)} ${s.metal >= 0 ? '+' : ''}${fmt(s.metal, 1)}`;
+    const kero = `Kerosin ${fmt(c.kero)} +${fmt(s.kero, 1)}`; // Kerosin im Stadtlager, Ertrag je s (seit v5.19)
+    const store = m ? `${stahl} · Förderung Holz ${fmt(raw.wood, 1)} Stein ${fmt(raw.stone, 1)} Erz ${fmt(raw.ore, 1)} Öl ${fmt(raw.oil, 1)} · Lager BM ${fmt(m.store.bm)} +${fmt(s.bm, 1)} · MUN ${fmt(m.store.mun)} +${fmt(s.mun, 1)} · TS ${fmt(m.store.fuel)} +${fmt(s.fuel, 1)} · ${kero}` : `${stahl} · ${kero} · Hauptstadt zerstört`;
+    // Straßentransport (seit v5.19): kleinster Stau-Faktor auf den benutzten Straßen, Waren ohne Weg je s
+    const jam = s.jam ?? 1;
+    const jamTxt = Math.round(jam * 100) < 100 ? ` · <b class="warn">Stau ${fmt(Math.round(jam * 100))} %</b>` : '';
+    const lostTxt = (s.lost ?? 0) > 0 ? ` · <b class="warn">ohne Weg ${fmt(s.lost, 1)}/s</b>` : '';
+    this.strip.innerHTML = `<span>Strom ${fmt(s.powerSupply)}/${fmt(s.powerUse)}${s.powerRatio < 1 ? ' ⚠' : ''} · Zufriedenheit ${fmt(s.happy * 100)} % · Einwohner ${fmt(s.pop)}/${fmt(s.housing)}${fled} · Truppen ${fmt(s.drafted)} · frei ${fmt(Math.max(0, s.free))} · Arbeit ${fmt(s.workers)}/${fmt(s.jobs)} · Steuern +${fmt(s.money, 1)}/s</span><span class="city-store">${store}${jamTxt}${lostTxt}</span>`;
   }
 
   destroy() {

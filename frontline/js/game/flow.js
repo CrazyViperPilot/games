@@ -308,6 +308,11 @@ export function resourceFlow(game, team, rates = null) {
   // Gewerbe braucht Baumaterial, über die Straße vom Lager (seit v5.19, AP3b): wenig versorgt = Steuer und Zufriedenheit fallen
   const sup = s.shopSupply ?? 1;
   if (sup < 0.5 && (s.jobsCom ?? 0) > 0) issue(1 + (0.5 - sup), `Gewerbe ohne Waren (Straße zum Lager, Baumaterial): nur ${pct(sup)} versorgt.`, 'Gewerbe per Straße an das Lager der Hauptstadt anschließen und Baumaterial nachproduzieren.');
+  // Straßentransport (seit v5.19, AP5): Stau auf den Straßen (kleinster Stau-Faktor) und Waren, die gar keinen Weg haben
+  const jam = s.jam ?? 1;
+  if (jam < 0.95) issue(1 + (1 - jam), `Stau auf den Straßen (${pct(jam)}): Waren und Pendler kommen langsamer.`, 'Eine zweite Straße zum Ziel legen (Straßen tragen 12/s, Stadtstraßen 20/s).');
+  const lost = s.lost ?? 0;
+  if (lost > EPS) issue(1.4, `Waren ohne Straßenweg: ${fmtFlow(lost)}/s gehen verloren.`, 'Werk oder Förderanlage per Straße an das nächste Werk bzw. das Lager anschließen.');
   issues.sort((a, b) => b.sev - a.sev);
 
   // Linien ohne Fluss bekommen trotzdem eine Ware (Farbe)

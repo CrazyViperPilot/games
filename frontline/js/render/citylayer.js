@@ -8,6 +8,7 @@ import { CITY } from '../data/city.js';
 import { CITY_COLORS, CITY_ICON } from '../ui/citypanel.js';
 import { drawUniversityTop, UNI_LAWNS } from './university.js';
 import { drawTownTop, townLift } from './townhouses.js';
+import { transportOf } from '../game/transport.js';
 
 // Grundstücke in der Farbe der Zellenart (wie die Werkzeugleiste): Wohnen grün, Gewerbe blau, Werke erdig, Markt gold, Militär oliv
 const LOT = CITY_COLORS;
@@ -152,8 +153,35 @@ export function drawCityGround(ren, ctx, team, known, inRect) {
     }
   }
   drawRoads(ren, ctx, team, known);
+  if (ren.cityUi?.open) drawLoads(ren, ctx, team, known, inRect); // Baumodus: Auslastung der Straßen
   drawTerritory(ren, ctx, team, known);
   ctx.restore();
+}
+
+// Auslastung der Straßen im Baumodus (seit v5.19, AP5): Last / Kapazität je Straßenzelle, grün unter 60 %, gelb bis 100 %, darüber rot.
+const LOAD_TINT = ['rgba(70,180,90,0.42)', 'rgba(235,195,40,0.5)', 'rgba(225,60,40,0.58)'];
+/**
+ * Straßen der eigenen Stadt (Eigenstraßen und Stadtstraßen der Karte) nach Auslastung tönen; nur Zellen mit Last. Die Last kommt aus
+ * transportOf (Stand des letzten Schritts). Stadtstraßen der Karte nur, wo erkundet.
+ */
+function drawLoads(ren, ctx, team, known, inRect) {
+  const c = ren.game.city?.[team];
+  if (!c) return;
+  const tr = transportOf(ren.game, c);
+  const S = c.cell;
+  for (let m = 0; m < tr.list.length; m++) {
+    const i = tr.list[m];
+    const L = tr.load[i];
+    if (!(L > 0)) continue;
+    const col = i % c.cols;
+    const r = cellRect(c, col, (i - col) / c.cols);
+    if (!inRect(r.x, r.y, S)) continue;
+    if (c.kind[i] !== KIND_ID.road && !known(r.x, r.y)) continue;
+    const q = L / tr.cap[i];
+    groundRect(ren, ctx, r.x0 + 2, r.y0 + 2, r.x1 - 2, r.y1 - 2);
+    ctx.fillStyle = LOAD_TINT[q < 0.6 ? 0 : q < 1 ? 1 : 2];
+    ctx.fill();
+  }
 }
 
 /**
@@ -729,6 +757,9 @@ export function drawCityBadges(ren, ctx, team, known, inRect, iso) {
   const z = cam.zoom;
   const big = Math.max(18, Math.min(34, 30 * z));
   const small = Math.max(12, Math.min(22, 19 * z));
+  // Baumodus: Warnzeichen (🚫) an Gebäuden ohne Lieferweg oder Pendlerweg der eigenen Stadt
+  const tr = ren.cityUi?.open && g.city[team] ? transportOf(g, g.city[team]) : null;
+  const warnImg = tr ? badgeImage('🚫', '#d02a2a', false) : null;
   for (const { c, k, lv, r: cell, i, big: whole, ctr } of cells(g, team, known)) {
     const r = whole ? ctr : cell; // Großbau: Schild über der Mitte
     if (k === 'road' || !lv || whole === 'part' || !inRect(r.x, r.y, 64)) continue;
@@ -736,13 +767,35 @@ export function drawCityBadges(ren, ctx, team, known, inRect, iso) {
     const d = k === 'mine' ? DEPOSITS[c.deposit[i] - 1] : null;
     const img = badgeImage(sm ? k : d ? MINE_ICON[d] : CITY_ICON[k], d ? MINE_COLOR[d] : CITY_COLORS[k], sm);
     const px = sm ? small : big;
+    let bx;
+    let by;
+    let bw;
     if (iso) {
       const p = cam.worldToScreen(r.x, r.y);
       const lift = whole ? (BIG_KINDS.has(k) ? Math.min(150, bigTop(k, lv) * 0.7) + 14 : WORKS_KINDS.includes(k) ? worksLift(k, lv) : BIG_LIFT[lv] ?? 110) : townLift(k, lv, d);
-      ctx.drawImage(img, p.x - px / 2, p.y - lift * z - px, px, px);
+      bx = p.x - px / 2;
+      by = p.y - lift * z - px;
+      bw = px;
     } else {
-      const w = px / z;
-      ctx.drawImage(img, r.x - w / 2, r.y - w / 2, w, w);
+      bw = px / z;
+      bx = r.x - bw / 2;
+      by = r.y - bw / 2;
+    }
+    ctx.drawImage(img, bx, by, bw, bw);
+    // Baumodus (seit v5.19, AP5): rotes Warnzeichen oben rechts, wenn ein Lieferweg oder Pendlerweg fehlt
+    if (tr && c.team === team && transportWarn(tr, k, i)) {
+      const ws = bw * 0.6;
+      ctx.drawImage(warnImg, bx + bw - ws * 0.6, by - ws * 0.4, ws, ws);
     }
   }
+}
+
+/** Arten, die etwas an ein Ziel liefern (Förderung, Werke, Munitionswerk). */
+const SUPPLIER_KINDS = new Set(['mine', 'smelter', 'bm', 'steel', 'fuel', 'kero', 'mun']);
+/** Warnung am Schild: Lieferant ohne Lieferweg, oder Arbeitsstätte ohne erreichbare Wohnung (Pendlerweg fehlt). */
+function transportWarn(tr, k, i) {
+  const r = tr.routes.get(i);
+  const noRoute = SUPPLIER_KINDS.has(k) && (!r || r.to === null);
+  const noHome = tr.commute.has(i) && tr.commute.get(i) === null;
+  return noRoute || noHome;
 }
