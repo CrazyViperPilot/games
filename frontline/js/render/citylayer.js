@@ -8,8 +8,8 @@ import { drawUniversityTop, UNI_LAWNS } from './university.js';
 
 // Grundstücke in der Farbe der Zellenart (wie die Werkzeugleiste): Wohnen grün, Gewerbe blau, Werke erdig, Markt gold, Militär oliv
 const LOT = CITY_COLORS;
-const ROOF = { res: '#8a4b3c', com: '#5f8fc8', bm: '#6e5a48', mun: '#5f6670', fuel: '#6a5a7e', steel: '#4f5862', mine: '#7a6440', market: '#c9952b', power: '#5a5a40', uni: '#7a3b30', dc: '#3a4a55', barracks: '#56603a', factory: '#5c6352', heliport: '#4a4f4a' };
-const TOWN_KIND = { res: 'house', com: 'hall', bm: 'factory', mun: 'factory', fuel: 'factory', steel: 'factory', mine: 'hall', market: 'hall', power: 'factory', uni: 'hall', dc: 'hall', barracks: 'barracks', factory: 'vhall', heliport: 'heliport' };
+const ROOF = { res: '#8a4b3c', com: '#5f8fc8', bm: '#6e5a48', mun: '#5f6670', fuel: '#6a5a7e', steel: '#4f5862', mine: '#7a6440', market: '#c9952b', power: '#5a5a40', uni: '#7a3b30', dc: '#3a4a55', barracks: '#56603a', factory: '#5c6352', heliport: '#4a4f4a', hospital: '#e4e2dc' };
+const TOWN_KIND = { res: 'house', com: 'hall', bm: 'factory', mun: 'factory', fuel: 'factory', steel: 'factory', mine: 'hall', market: 'hall', power: 'factory', uni: 'hall', dc: 'hall', barracks: 'barracks', factory: 'vhall', heliport: 'heliport', hospital: 'clinic' };
 /** Hex-Farbe a mit b mischen (t = Anteil von a). */
 function mix(a, b, t) {
   const p = (h, i) => parseInt(h.slice(1 + i * 2, 3 + i * 2), 16);
@@ -21,7 +21,7 @@ const MINE_ICON = { wood: '🌲', stone: '⛰', ore: '⛏', oil: '🛢' };
 const MINE_COLOR = { wood: '#3f8a3f', stone: '#8f8f88', ore: '#c4612f', oil: '#34343a' };
 const SMALL = { res: 1, com: 1 };
 // Höhe des Schilds über dem Boden je Gebäudeform (Weltpixel, isometrisch)
-const BADGE_LIFT = { house: 50, hall: 56, factory: 74, barracks: 40, vhall: 52, heliport: 26 };
+const BADGE_LIFT = { house: 50, hall: 56, factory: 74, barracks: 40, vhall: 52, heliport: 26, clinic: 62 };
 const BIG_LIFT = [0, 76, 98, 106]; // Universität je Stufe: über der Kuppel
 // Rohstoffvorkommen: Bodenfarbe und Farbe der Tupfen (Bäume, Steine, Erzbrocken, Öllachen)
 const DEP_GROUND = { wood: 'rgba(30,70,30,0.55)', stone: 'rgba(120,120,115,0.55)', ore: 'rgba(140,70,40,0.55)', oil: 'rgba(20,20,24,0.6)' };
@@ -574,7 +574,15 @@ export function drawCityTop(ren, ctx, team, known, inRect) {
     ctx.fillRect(r.x - s / 2, r.y - h / 2, s, h);
     ctx.fillStyle = 'rgba(255,255,255,0.18)';
     ctx.fillRect(r.x - s / 2, r.y - h / 2, s, h / 2); // Dachfirst: Lichtseite
-    if (k !== 'res' && k !== 'com' && !CITY.produces[k] && k !== 'market') {
+    if (k === 'hospital') {
+      // Krankenhaus: weißes Dach mit rotem Kreuz
+      const a = s * 0.3;
+      const t = s * 0.09;
+      ctx.fillStyle = '#d23a3a';
+      ctx.fillRect(r.x - a, r.y - t, a * 2, t * 2);
+      ctx.fillRect(r.x - t, r.y - a, t * 2, a * 2);
+    }
+    if (k !== 'res' && k !== 'com' && !CITY.produces[k] && k !== 'market' && k !== 'hospital') {
       ctx.fillStyle = '#3b3b3b'; // Schornstein der Werke
       ctx.fillRect(r.x + s / 4, r.y - h / 4, 7, 7);
     }

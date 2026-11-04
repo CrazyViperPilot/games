@@ -9,12 +9,12 @@ import { nearestPassable } from './movement.js';
 import { makeRng } from '../core/rng.js';
 
 /** Zellenarten (Code im Raster): 0 leer. Neue Arten nur hinten anhängen (Code = Index + 1). */
-export const KINDS = ['road', 'res', 'com', 'bm', 'mun', 'fuel', 'steel', 'mine', 'market', 'power', 'uni', 'dc', 'barracks', 'factory', 'heliport'];
+export const KINDS = ['road', 'res', 'com', 'bm', 'mun', 'fuel', 'steel', 'mine', 'market', 'power', 'uni', 'dc', 'barracks', 'factory', 'heliport', 'hospital'];
 export const KIND_ID = Object.fromEntries(KINDS.map((k, i) => [k, i + 1]));
 export const KIND_NAME = {
   road: 'Straße', res: 'Wohnen', com: 'Gewerbe', bm: 'Baumaterial-Werk', mun: 'Munitionswerk', fuel: 'Raffinerie',
   steel: 'Stahlwerk', mine: 'Förderanlage', market: 'Markt', power: 'Kraftwerk', uni: 'Universität', dc: 'Rechenzentrum',
-  barracks: 'Kaserne', factory: 'Fabrikhalle', heliport: 'Heliport',
+  barracks: 'Kaserne', factory: 'Fabrikhalle', heliport: 'Heliport', hospital: 'Krankenhaus',
 };
 /** Ausbildungsgebäude der Stadt (seit v4.96): Zellenart → Einheiten (CITY.produces). */
 export const TRAINER_KINDS = Object.keys(CITY.produces);
@@ -22,6 +22,13 @@ export const TRAINER_KINDS = Object.keys(CITY.produces);
 export function trainerKind(unit) {
   return TRAINER_KINDS.find((k) => CITY.produces[k].includes(unit)) ?? null;
 }
+/** Pflege (seit v5.01): Werte aus CITY.care.by für ein Stadtgebäude (Ziel-Entity) oder null, wenn es nicht heilt oder repariert. */
+export function careOf(game, e) {
+  if (e?.type !== 'city' || !game.city?.[e.team]) return null;
+  return CITY.care.by[KINDS[game.city[e.team].kind[e.cityCell] - 1]] ?? null;
+}
+/** Welche Pflege braucht die Einheit? 'inf' Soldaten, 'air' Hubschrauber, 'ground' Bodenfahrzeuge. */
+export const careClass = (u) => (u.def.air ? 'air' : u.def.armor === 'inf' ? 'inf' : 'ground');
 const WORKS = ['bm', 'mun', 'fuel', 'steel'];
 /** Rohstoffvorkommen (Code im Raster `deposit`): 0 keins. */
 export const DEPOSITS = ['wood', 'stone', 'ore', 'oil'];
@@ -832,7 +839,44 @@ export function updateCity(game, dt) {
     }
     team.res.money += s.money * dt;
     team.rate.money += s.money;
+    updateCare(game, c, dt);
   });
+}
+
+/**
+ * Heilen und Reparieren (seit v5.01): Kaserne, Fabrikhalle, Heliport und Krankenhaus pflegen eigene Einheiten in ihrem Umkreis
+ * (CITY.care). Tempo × Stufe × Strom; Fahrzeuge kosten Metall aus dem Stadtlager. Das schnellste Gebäude in Reichweite zählt.
+ */
+function updateCare(game, c, dt) {
+  const C = CITY.care;
+  const givers = [];
+  for (const [i, e] of c.ents) {
+    const spec = C.by[KINDS[c.kind[i] - 1]];
+    if (spec && e.alive) givers.push({ e, spec, r2: ((spec.radius + 0.5) * c.cell) ** 2, rate: spec.rate * (C.levelMul[c.level[i]] ?? 1) });
+  }
+  if (!givers.length) return;
+  const power = c.stats.powerRatio ?? 1;
+  for (const u of game.units) {
+    if (!u.alive || u.team !== c.team || u.hp >= u.maxHp || game.time - u.lastHitTime < C.delay) continue;
+    const cls = careClass(u);
+    let rate = 0;
+    for (const g of givers) {
+      if (g.spec.units !== cls || g.rate <= rate) continue;
+      const dx = u.x - g.e.x;
+      const dy = u.y - g.e.y;
+      if (dx * dx + dy * dy <= g.r2) rate = g.rate;
+    }
+    if (!rate) continue;
+    let heal = Math.min(u.maxHp - u.hp, u.maxHp * rate * power * dt);
+    const metal = (CITY.metalCost[u.type] ?? 0) * C.metalShare; // Metall für eine volle Reparatur
+    if (metal > 0) {
+      heal = Math.min(heal, (c.metal / metal) * u.maxHp);
+      c.metal = Math.max(0, c.metal - (metal * heal) / u.maxHp);
+    }
+    if (heal <= 0) continue;
+    u.hp += heal;
+    u.caredAt = game.time; // für die Anzeige (grünes Kreuz)
+  }
 }
 
 /** Höchste fertige Stufe einer Zellenart in der Stadt des Teams (0 = keine; ohne Stadt 0). */
@@ -1036,7 +1080,7 @@ function aiRoad(col, row, ac, ar) {
 function aiNeed(game, c, add, skip = null) {
   const t = totals(c);
   const A = CITY.ai;
-  const count = { res: 0, com: 0, bm: 0, mun: 0, fuel: 0, steel: 0, market: 0, power: 0, uni: 0, dc: 0, barracks: 0, factory: 0, heliport: 0 };
+  const count = { res: 0, com: 0, bm: 0, mun: 0, fuel: 0, steel: 0, market: 0, power: 0, uni: 0, dc: 0, barracks: 0, factory: 0, heliport: 0, hospital: 0 };
   for (const k in add) count[k] += add[k];
   for (const i of c.list) {
     const k = KINDS[c.kind[i] - 1];
@@ -1053,6 +1097,7 @@ function aiNeed(game, c, add, skip = null) {
     if (k === 'heliport' && (unitLocked(game, c.team, 'littlebird') || !work)) continue;
     if (count[k] < n + (k === 'heliport' ? 0 : more)) return k;
   }
+  if (!count.hospital && work >= A.hospitalFrom) return 'hospital';
   if (!count.uni && work >= A.uniFrom && !skip?.has('uni')) return 'uni';
   if (!count.dc && count.uni && work >= A.dcFrom) return 'dc';
   if (count.res < work * 1.2 || (t.housing + t.fled < c.drafted + 20 && count.res <= work * 2) || (free < A.lowFree && count.res <= work * 2)) return 'res';

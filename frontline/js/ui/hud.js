@@ -10,7 +10,7 @@ import { radios, radioLeft } from '../game/radio.js';
 import { SEASON_NAMES, WEATHER_NAMES, weatherEffect } from '../game/weather.js';
 import { RESEARCH_KEYS } from '../game/research.js';
 import { CITY } from '../data/city.js';
-import { KINDS, DEPOSITS, DEPOSIT_NAME, hasMarket, hasRoad } from '../game/city.js';
+import { KINDS, DEPOSITS, DEPOSIT_NAME, hasMarket, hasRoad, careOf } from '../game/city.js';
 import { CITY_TIP } from './citypanel.js';
 
 // Wettersymbole (16 × 16, Strichfarbe = currentColor)
@@ -523,7 +523,15 @@ export class Hud {
       h += line(`Bildet aus: ${b.produces.map((u) => UNITS[u].short || UNITS[u].name).join(', ')} · ${b.trainSlots} gleichzeitig (Stufe ${lv})`);
       h += '<div class="muted small">Zahlt direkt aus der Stadt: Geld, Metall, Einwohner</div>';
     }
-    if (CITY_TIP[k] && k !== 'market' && !b.produces) h += `<div class="muted small">${esc(CITY_TIP[k])}</div>`;
+    const care = careOf(g, b);
+    if (care) {
+      // Heilen und Reparieren (seit v5.01)
+      const what = { inf: 'Heilt Soldaten', ground: 'Repariert Bodenfahrzeuge', air: 'Repariert Hubschrauber' }[care.units];
+      const pct = Math.round(care.rate * (CITY.care.levelMul[lv] ?? 1) * 1000) / 10;
+      h += line(`${what} im Umkreis von ${care.radius} Feldern · ${pct.toLocaleString('de-DE')} % HP/s${care.units === 'inf' ? '' : ' · kostet Metall'}`);
+      if (care.units !== 'inf' && c.metal < 1) h += '<div class="warn small">Kein Metall im Stadtlager: repariert nicht</div>';
+    }
+    if (CITY_TIP[k] && k !== 'market' && !b.produces && !care) h += `<div class="muted small">${esc(CITY_TIP[k])}</div>`;
     const col = i % c.cols;
     if (k !== 'mine' && !hasRoad(c, col, (i - col) / c.cols)) h += '<div class="warn small">Keine Straße daneben: wächst nicht weiter</div>';
     if (s.powerRatio < 1 && CITY.power.use[k] && k !== 'res' && k !== 'com') h += `<div class="warn small">Strommangel: arbeitet mit ${Math.round(s.powerRatio * 100)} %</div>`;

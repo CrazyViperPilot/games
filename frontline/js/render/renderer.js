@@ -2,6 +2,8 @@
 // Granaten, Effekte, Nebel und Overlays. Liest game.projectiles/effects bei jedem Aufruf frisch. Kein Zugriff auf den Controller.
 import { BALANCE } from '../data/balance.js';
 import { BUILDINGS } from '../data/buildings.js';
+import { CITY } from '../data/city.js';
+import { careOf } from '../game/city.js';
 import { buildTerrain } from './terrain.js';
 import { lacksAmmo } from '../game/entities.js';
 import {
@@ -280,6 +282,7 @@ export class Renderer {
       if (!(sel.has(u.id) || hover === u || u.hp < u.maxHp)) continue;
       const bw = 24;
       this.drawHp(ctx, u.x - bw / 2, u.y - u.def.radius - HP_OFFSET / z, bw, u.hp / u.maxHp, z);
+      if (g.time - (u.caredAt ?? -9) < 0.5) this.drawCare(ctx, u.x - bw / 2, u.y - u.def.radius - HP_OFFSET / z, z);
     }
     for (const u of g.units) {
       if (u.alive && u.def.hero && !u.house && shown(u) && inRect(u.x, u.y, 30)) drawStar(ctx, u.x, u.y - u.def.radius - (HP_OFFSET + STAR_UP) / z, STAR_R / z, z);
@@ -721,6 +724,7 @@ export class Renderer {
       if (!(sel.has(u.id) || hover === u || u.hp < u.maxHp)) continue;
       upright(u.x, u.y, unitLift(u));
       this.drawHp(ctx, u.x - 12, u.y - u.def.radius - HP_OFFSET / z, 24, u.hp / u.maxHp, z);
+      if (g.time - (u.caredAt ?? -9) < 0.5) this.drawCare(ctx, u.x - 12, u.y - u.def.radius - HP_OFFSET / z, z);
     }
     for (const u of g.units) {
       if (!u.alive || !u.def.hero || u.house || !shown(u) || !inRect(u.x, u.y, PAD)) continue;
@@ -982,6 +986,16 @@ export class Renderer {
         ctx.fillStyle = 'rgba(242,201,76,0.06)';
         ctx.fill();
         ctx.strokeStyle = 'rgba(242,201,76,0.8)';
+        ctx.stroke();
+        continue;
+      }
+      const care = b && b.team === this.team ? careOf(g, b) : null;
+      if (care) {
+        // Stadtgebäude, das heilt oder repariert (seit v5.01): Umkreis in Grün
+        this.groundArc(ctx, b.x, b.y, (care.radius + 0.5) * CITY.cell);
+        ctx.fillStyle = 'rgba(63,212,106,0.07)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(63,212,106,0.85)';
         ctx.stroke();
         continue;
       }
@@ -1333,6 +1347,17 @@ export class Renderer {
 
   drawHp(ctx, x, y, w, frac, z) {
     drawBar(ctx, x, y, w, 4 / z, frac, hpColor(frac));
+  }
+
+  /** Grünes Kreuz links neben dem Lebensbalken: die Einheit wird gerade geheilt oder repariert (Stadtgebäude, seit v5.01). */
+  drawCare(ctx, x, y, z) {
+    const a = 4 / z;
+    const t = 1.4 / z;
+    const cx = x - a - 2 / z;
+    const cy = y + 2 / z;
+    ctx.fillStyle = '#3fd46a';
+    ctx.fillRect(cx - a, cy - t, a * 2, t * 2);
+    ctx.fillRect(cx - t, cy - a, t * 2, a * 2);
   }
 
   /** Auswahlrahmen (Bildschirmkoordinaten, Transformation bereits auf DPR gesetzt). */

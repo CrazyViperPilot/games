@@ -317,9 +317,10 @@ export function drawTownBuilding(ctx, cam, b) {
   if (b.kind === 'house') wall = HOUSE_WALLS[seed % HOUSE_WALLS.length];
   else if (b.kind === 'hall') wall = HALL_WALLS[seed % HALL_WALLS.length];
   else if (b.kind === 'station') wall = '#cdbb98';
+  else if (b.kind === 'clinic') wall = '#e9e7e1';
   else wall = FACT_WALLS[seed % FACT_WALLS.length];
   const opts = { wallS: shade(wall, 0.2), wallE: shade(wall, 0.42), noTop: b.kind === 'house' || b.kind === 'station' };
-  const top = drawBox(ctx, cam, x0, y0, x1, y1, H, wall, { ...opts, roof: b.kind === 'hall' ? '#b3b9bd' : '#6a6e70' });
+  const top = drawBox(ctx, cam, x0, y0, x1, y1, H, wall, { ...opts, roof: b.kind === 'hall' ? '#b3b9bd' : b.kind === 'clinic' ? '#d9dad6' : '#6a6e70' });
   top.cam = cam;
   top.color = wall;
   if (b.kind === 'house') {
@@ -346,6 +347,10 @@ export function drawTownBuilding(ctx, cam, b) {
       ctx.lineWidth = 1;
       ctx.stroke();
     }
+  } else if (b.kind === 'clinic') {
+    // Krankenhaus (Stadt, seit v5.01): helle Fassade mit Fensterreihen, rotes Kreuz auf dem Dach
+    hallDetails(ctx, top, seed);
+    roofCross(ctx, cam, b.x, b.y, H, Math.min(hw, hh) * 0.5, Math.min(hw, hh) * 0.15, '#d23a3a');
   } else if (b.kind === 'hall') {
     hallDetails(ctx, top, seed);
     if (z >= DETAIL_ZOOM) {
@@ -954,6 +959,23 @@ export function drawCrate(ctx, cam, x, y, s = 16, base = 0, glow = 0) {
   ctx.fillStyle = '#e8b830';
   ctx.fillRect(c.x - r, c.y - r * 0.6, r * 2, r * 1.2);
   ctx.restore();
+}
+
+/** Flaches Kreuz auf einem Dach der Höhe H (Mitte x/y, halbe Armlänge a, halbe Armbreite t, Weltmaße). */
+function roofCross(ctx, cam, x, y, H, a, t, color) {
+  const z = cam.zoom;
+  const quad = (qx0, qy0, qx1, qy1) => {
+    ctx.beginPath();
+    for (const [px, py] of [[qx0, qy0], [qx1, qy0], [qx1, qy1], [qx0, qy1]]) {
+      const p = cam.worldToScreen(px, py);
+      ctx.lineTo(p.x, p.y - H * z);
+    }
+    ctx.closePath();
+    ctx.fill();
+  };
+  ctx.fillStyle = color;
+  quad(x - a, y - t, x + a, y + t);
+  quad(x - t, y - a, x + t, y + a);
 }
 
 export function drawRubble(ctx, cam, b, burnt = false) {

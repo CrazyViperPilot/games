@@ -18,11 +18,11 @@ export const CITY = {
   taxCom: 0.15, // zusätzliches Geld/s je Arbeiter im Gewerbe
 
   // ---- Bau ----
-  cost: { road: 0, res: 20, com: 30, bm: 40, mun: 40, fuel: 40, steel: 50, mine: 30, market: 60, power: 80, uni: 400, dc: 250, barracks: 80, factory: 150, heliport: 200 }, // Geld je Zelle, bei Großbauten (size) je Gebäude (Abriss kostenlos, keine Erstattung)
+  cost: { road: 0, res: 20, com: 30, bm: 40, mun: 40, fuel: 40, steel: 50, mine: 30, market: 60, power: 80, uni: 400, dc: 250, barracks: 80, factory: 150, heliport: 200, hospital: 120 }, // Geld je Zelle, bei Großbauten (size) je Gebäude (Abriss kostenlos, keine Erstattung)
   // Großbauten (seit v5.00): Kantenlänge in Zellen (ungerade, fehlt = 1). Ein Großbau ist ein Gebäude: eine Stufe, ein Ziel mit
   // Trefferpunkten hp × Kantenlänge, Arbeitsplätze und Strom wie eine Zelle; Straße an irgendeiner Außenzelle reicht.
   size: { uni: 3 },
-  costBm: { road: 10, barracks: 100, factory: 200, heliport: 150 }, // Baumaterial je Zelle aus dem Lager der Hauptstadt (seit v4.83: Straßen kosten Baumaterial statt Geld)
+  costBm: { road: 10, barracks: 100, factory: 200, heliport: 150, hospital: 80 }, // Baumaterial je Zelle aus dem Lager der Hauptstadt (seit v4.83: Straßen kosten Baumaterial statt Geld)
 
   // ---- Ausbildung (seit v4.96, PRD §15) ----
   // Mit Stadt bilden nur diese Stadtgebäude Truppen aus (die Hauptstadt nicht mehr). Sie bezahlen direkt aus der Stadt:
@@ -33,6 +33,22 @@ export const CITY = {
     heliport: ['littlebird', 'transporter', 'gunship'], // Heliport: Hubschrauber
   },
   trainSlots: [0, 2, 3, 4], // gleichzeitige Ausbildungen je Stufe (Stufe 1 wie früher die Hauptstadt)
+
+  // ---- Heilen und Reparieren (seit v5.01, PRD §15) ----
+  // Ausbildungsgebäude pflegen ihre Einheiten: Kaserne heilt Soldaten, Fabrikhalle repariert Bodenfahrzeuge, Heliport Hubschrauber.
+  // Das Krankenhaus heilt nur Soldaten, schneller und weiter. Wirkt auf eigene Einheiten, deren Mitte im Umkreis liegt
+  // (radius Felder um das Gebäude, ein Feld = CITY.cell), erst delay s nach dem letzten Treffer; mehrere Gebäude zählen nicht doppelt.
+  care: {
+    delay: 6, // s ohne Treffer, bevor geheilt oder repariert wird
+    levelMul: [0, 1, 1.5, 2], // Tempo × je Stufe des Gebäudes
+    metalShare: 0.5, // Reparatur kostet Metall aus dem Stadtlager: metalCost der Einheit × repariert/maxHp × metalShare (Soldaten gratis)
+    by: {
+      barracks: { units: 'inf', radius: 2, rate: 0.02 }, // Soldaten, Anteil maxHp je s (Stufe 1: 50 s von 0 auf voll)
+      factory: { units: 'ground', radius: 2, rate: 0.02 }, // Bodenfahrzeuge
+      heliport: { units: 'air', radius: 2, rate: 0.03 }, // Hubschrauber
+      hospital: { units: 'inf', radius: 3, rate: 0.05 }, // Krankenhaus: Soldaten (Stufe 1: 20 s von 0 auf voll)
+    },
+  },
 
   // ---- Rohstoffe (seit v4.83, PRD §15) ----
   // Vorkommen auf der Karte: je Team eine Gruppe jeder Sorte nahe der Hauptstadt, dazu umkämpfte Gruppen zwischen Basis und Zone.
@@ -64,7 +80,7 @@ export const CITY = {
   power: {
     base: 40,
     supply: [0, 60, 120, 200],
-    use: { res: 1, com: 3, market: 3, bm: 8, mun: 8, fuel: 8, steel: 10, mine: 4, uni: 12, dc: 30, power: 0, barracks: 2, factory: 8, heliport: 6 },
+    use: { res: 1, com: 3, market: 3, bm: 8, mun: 8, fuel: 8, steel: 10, mine: 4, uni: 12, dc: 30, power: 0, barracks: 2, factory: 8, heliport: 6, hospital: 6 },
   },
   // Zufriedenheit 0 … 1 = base + shops × Versorgung (Gewerbe-Arbeiter je Einwohner, voll ab shopPer) + safety × Sicherheit
   // (weniger Treffer auf die Stadt in den letzten 60 s, null ab hitsBad) + power × Strom. Wirkung: Erträge und Steuern × (lo + span × Zufriedenheit),
@@ -115,9 +131,10 @@ export const CITY = {
     defendRange: 2500, // px, nur Einheiten in diesem Abstand
     defendCooldown: 12, // s zwischen zwei Verteidigungsbefehlen
     // Angriffsziele: Wert je Zellenart (geteilt durch Entfernung); Werke und Förderung zuerst
-    targetValue: { steel: 3, fuel: 3, mun: 3, power: 3, dc: 2.5, uni: 2, mine: 2.5, market: 2, bm: 2, com: 1, res: 0.5, barracks: 2.5, factory: 3, heliport: 3 },
+    targetValue: { steel: 3, fuel: 3, mun: 3, power: 3, dc: 2.5, uni: 2, mine: 2.5, market: 2, bm: 2, com: 1, res: 0.5, barracks: 2.5, factory: 3, heliport: 3, hospital: 2 },
     // Ausbildungsgebäude (seit v4.96): so viele will sie haben; ab moreFrom Arbeitsstätten je eins mehr (Heliport erst, wenn Hubschrauber freigeschaltet sind)
     producers: { barracks: 1, factory: 1, heliport: 1 },
     moreFrom: 14,
+    hospitalFrom: 10, // Arbeitsstätten, ab denen sie ein Krankenhaus baut (seit v5.01, eins reicht)
   },
 };

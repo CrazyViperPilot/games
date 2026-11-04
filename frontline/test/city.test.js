@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
 import { CITY } from '../js/data/city.js';
+import { BALANCE } from '../js/data/balance.js';
 import { AI } from '../js/ai/ai.js';
 import { canZone, cityNoise, freePop, aiCity, aiDefend, aiRaid, hasRoad, hasMarket, cityEntityAt, cityTrainers, KIND_ID, sizeOf, cellsOf, isPart, forEnemyCity, migrateCity, cityLevel } from '../js/game/city.js';
 import { snapshotGame, restoreGame } from '../js/game/savegame.js';
@@ -663,4 +664,64 @@ test('KI baut die Universität als 3 × 3-Großbau', () => {
   assert.ok(cellsOf(c, a).every((j) => !c.deposit[j]), 'nicht auf Vorkommen');
   assert.ok(hasRoad(c, a % c.cols, Math.floor(a / c.cols)), 'mit Straße');
   void ai;
+});
+
+test('Heilen und Reparieren (v5.01): Kaserne heilt Soldaten, Fabrikhalle repariert gegen Metall, erst nach dem Treffer-Abstand', () => {
+  const heal0 = BALANCE.commander.heal;
+  BALANCE.commander.heal = 0; // Kommandeur-Aura heilt sonst mit
+  try {
+    const g = new Game({ seed: 3, city: true });
+    const bar = trainerFor(g, 'rifleman');
+    const fac = trainerFor(g, 'tank');
+    const inf = g.units.filter((u) => u.alive && u.team === 0 && u.type === 'rifleman');
+    const [a, far, hit] = inf;
+    const tank = g.units.find((u) => u.alive && u.team === 0 && u.type === 'tank');
+    const put = (u, x, y, hp) => Object.assign(u, { x, y, hp, lastHitTime: -1e9 });
+    put(a, bar.x + 10, bar.y + 10, 30);
+    put(far, bar.x + CITY.cell * 6, bar.y, 30);
+    put(hit, bar.x - 10, bar.y + 10, 30);
+    put(tank, fac.x + 10, fac.y + 10, tank.maxHp / 2);
+    g.city[0].metal = 400;
+    hit.lastHitTime = g.time; // gerade getroffen: in den nächsten 6 s keine Pflege
+    const t0 = tank.hp;
+    run(g, 2);
+    const p = g.city[0].stats.powerRatio;
+    assert.ok(Math.abs(a.hp - (30 + 100 * CITY.care.by.barracks.rate * p * 2)) < 0.6, `Kaserne heilt (${a.hp})`);
+    assert.equal(far.hp, 30, 'außer Reichweite keine Heilung');
+    assert.equal(hit.hp, 30, 'kurz nach einem Treffer keine Heilung');
+    assert.ok(tank.hp > t0 + 1, 'Fabrikhalle repariert');
+    const used = ((tank.hp - t0) / tank.maxHp) * CITY.metalCost.tank * CITY.care.metalShare;
+    assert.ok(g.city[0].metal < 400 && g.city[0].metal > 400 - used - 1, 'Reparatur kostet Metall');
+    g.city[0].metal = 0;
+    const t1 = tank.hp;
+    run(g, 1);
+    assert.ok(tank.hp - t1 < 0.5, 'ohne Metall keine Reparatur');
+  } finally {
+    BALANCE.commander.heal = heal0;
+  }
+});
+
+test('Krankenhaus (v5.01): heilt Soldaten im Umkreis von 3 Feldern schneller', () => {
+  const heal0 = BALANCE.commander.heal;
+  BALANCE.commander.heal = 0;
+  try {
+    const g = new Game({ seed: 3, city: true, startMoney: 5000 });
+    clearStart(g); // ohne Kaserne in der Nähe
+    assert.equal(paint(g, 'road', 0, 1, 2, 1).ok, true);
+    assert.equal(paint(g, 'hospital', 1, 0, 1, 0).ok, true);
+    run(g, CITY.growTime + 1);
+    const c = g.city[0];
+    const i = at(g, 1, 0);
+    assert.equal(c.level[i], 1, 'Krankenhaus gebaut');
+    const e = c.ents.get(i);
+    assert.equal(e.def.name, 'Krankenhaus');
+    const [inR, outR] = g.units.filter((u) => u.alive && u.team === 0 && u.type === 'rifleman');
+    Object.assign(inR, { x: e.x + CITY.cell * 3, y: e.y, hp: 20, lastHitTime: -1e9 });
+    Object.assign(outR, { x: e.x + CITY.cell * 4.6, y: e.y, hp: 20, lastHitTime: -1e9 });
+    run(g, 1);
+    assert.ok(inR.hp > 20 + 100 * CITY.care.by.barracks.rate, `Krankenhaus heilt schneller als die Kaserne (${inR.hp})`);
+    assert.equal(outR.hp, 20, 'außerhalb von 3 Feldern keine Heilung');
+  } finally {
+    BALANCE.commander.heal = heal0;
+  }
 });
