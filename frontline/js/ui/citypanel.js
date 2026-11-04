@@ -25,6 +25,7 @@ export const CITY_TIP = {
   factory: `Großbau ${CITY.size.factory} × ${CITY.size.factory} Zellen: baut alle Fahrzeuge (LKW, Baufahrzeug, Schützen- und Kampfpanzer, Flak, SAM); bezahlt direkt aus der Stadt. Repariert Bodenfahrzeuge im Umkreis von ${CARE.factory.radius} Feldern (kostet Metall)`,
   heliport: `Baut Hubschrauber (Little Bird, Transporter, AH-64); bezahlt direkt aus der Stadt. Repariert Hubschrauber im Umkreis von ${CARE.heliport.radius} Feldern (kostet Metall)`,
   airport: `Großbau ${CITY.size.airport} × ${CITY.size.airport} Zellen mit zwei Start- und Landebahnen und Tower; baut F-16 (bezahlt direkt aus der Stadt) und bietet Platz für ${BALANCE.jets.capacity} Flugzeuge, die dort landen, tanken, nachladen und repariert werden`,
+  erase: 'Entfernt eigene Stadtzellen (ohne Erstattung) und fällt Bäume und Wald, damit dort gebaut werden kann (Fels, Wasser, Häuser bleiben)',
   hospital: `Heilt eigene Soldaten im Umkreis von ${CARE.hospital.radius} Feldern, schneller als die Kaserne (${Math.round(CARE.hospital.rate * 100)} % HP/s auf Stufe 1)`,
 };
 const GOOD_NAME = { bm: 'BM', mun: 'MUN', fuel: 'TS', metal: 'Metall' };
@@ -137,6 +138,7 @@ export class CityPanel {
     if (!res.ok) this.onMessage(res.reason);
     else if (res.broke) this.onMessage(this.tool === 'road' ? 'Zu wenig Baumaterial für alle Zellen' : 'Zu wenig Geld für alle Zellen');
     else if (res.occupied) this.onMessage('Belegte Zellen bleiben, wie sie sind: erst räumen');
+    else if (res.felled) this.onMessage(`Bäume gefällt: ${res.felled} ${res.felled === 1 ? 'Zelle' : 'Zellen'} frei zum Bauen`);
     else if (res.noRoad) this.onMessage('Gebäude wachsen nur mit Straße daneben (Wohnen/Gewerbe auch über eine Zelle gleicher Art)');
     this.update(true);
   }

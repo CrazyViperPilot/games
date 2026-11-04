@@ -5,6 +5,7 @@ import { Game } from '../js/game/game.js';
 import { CITY } from '../js/data/city.js';
 import { BALANCE } from '../js/data/balance.js';
 import { AI } from '../js/ai/ai.js';
+import { treeGone } from '../js/game/city.js';
 import { KINDS, canZone, cityNoise, freePop, aiCity, aiDefend, aiRaid, hasRoad, hasMarket, cityEntityAt, cityTrainers, KIND_ID, sizeOf, cellsOf, isPart, forEnemyCity, migrateCity, cityLevel } from '../js/game/city.js';
 import { snapshotGame, restoreGame } from '../js/game/savegame.js';
 
@@ -867,4 +868,56 @@ test('KI baut Werke als 2 × 2-Großbauten', () => {
   assert.ok(works.length >= 8, `KI hat Werke ausgewiesen (${works.length} Zellen)`);
   assert.ok(works.every((j) => c.part[j] > 0), 'alle als Großbau');
   assert.ok(works.every((j) => !c.deposit[j]), 'nicht auf Vorkommen');
+});
+
+test('Räumen fällt Bäume: Zelle wird bebaubar, Fels und Hauptstadt bleiben gesperrt (seit v5.13)', () => {
+  const g = new Game({ seed: 7, city: true });
+  const c = g.city[0];
+  const gr = g.grid;
+  const k = c.cell / gr.tile;
+  // Zelle, die genau ein Einzelbaum sperrt (Stamm-Kachel), und eine mit Wald
+  const cellOf = (x, y) => Math.floor(y / c.cell) * c.cols + Math.floor(x / c.cell);
+  const tree = g.map.trees.find((t) => c.blocked[cellOf(t.x, t.y)] && !g.city.some((o) => o.kind[cellOf(t.x, t.y)]));
+  assert.ok(tree, 'kein Baum auf der Karte');
+  const i = cellOf(tree.x, tree.y);
+  const col = i % c.cols;
+  const row = (i - col) / c.cols;
+  const res = g.issue(0, { type: 'city', kind: 'erase', c0: col, r0: row, c1: col, r1: row });
+  if (res.ok) {
+    assert.equal(res.felled, 1);
+    assert.equal(c.blocked[i], 0);
+    assert.equal(g.city[1].blocked[i], 0, 'Sperren gelten für beide Teams');
+    assert.equal(c.felled[i], 1);
+    assert.ok(treeGone(g, tree.x, tree.y));
+    for (let r = row * k; r < (row + 1) * k; r++) for (let q = col * k; q < (col + 1) * k; q++) assert.ok(gr.free(q, r));
+    assert.ok(canZone(g, c, i), 'nach dem Fällen darf man bauen');
+  } else assert.match(res.reason, /Nur Bäume/); // derselbe Baum steht neben Fels oder Wasser
+  // Ein ganzer Wald im Rechteck: mindestens eine Zelle wird frei
+  const forest = g.map.obstacles.find((o) => Math.round(o.r) % 2 === 0 && o.r >= 64);
+  assert.ok(forest, 'kein Wald auf der Karte');
+  const fc = Math.floor(forest.x / c.cell);
+  const fr = Math.floor(forest.y / c.cell);
+  const before = c.blocked.reduce((a, b) => a + b, 0);
+  const res2 = g.issue(0, { type: 'city', kind: 'erase', c0: fc - 1, r0: fr - 1, c1: fc + 1, r1: fr + 1 });
+  assert.ok(res2.ok && res2.felled > 0, 'Wald lässt sich fällen');
+  assert.equal(c.blocked.reduce((a, b) => a + b, 0), before - res2.felled);
+  // Fels bleibt gesperrt
+  const rock = g.map.obstacles.find((o) => Math.round(o.r) % 2 === 1 && o.r >= 40);
+  if (rock) {
+    const rc = Math.floor(rock.x / c.cell);
+    const rr = Math.floor(rock.y / c.cell);
+    const res3 = g.issue(0, { type: 'city', kind: 'erase', c0: rc, r0: rr, c1: rc, r1: rr });
+    assert.equal(res3.ok, false);
+    assert.equal(c.blocked[rr * c.cols + rc], 1);
+  }
+  // Hauptstadt: der Platz darum bleibt frei
+  const m = g.mainFob(0);
+  const mc = Math.floor(m.x / c.cell);
+  const mr = Math.floor(m.y / c.cell);
+  g.issue(0, { type: 'city', kind: 'erase', c0: mc, r0: mr, c1: mc, r1: mr });
+  assert.equal(c.blocked[mr * c.cols + mc], 1);
+  // Spielstand: gefällte Zellen bleiben gefällt, beide Teams teilen weiter dasselbe Feld
+  const { game: h } = restoreGame(JSON.parse(JSON.stringify(snapshotGame(g, null))));
+  assert.equal(h.city[0].felled, h.city[1].felled);
+  assert.deepEqual([...h.city[0].felled], [...c.felled]);
 });

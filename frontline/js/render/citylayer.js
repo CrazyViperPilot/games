@@ -106,6 +106,7 @@ export function drawCityGround(ren, ctx, team, known, inRect) {
     return;
   }
   drawDeposits(ren, ctx, known);
+  drawClearings(ren, ctx, known);
   for (const { c, k, lv, r, ruin, big, ctr } of cells(g, team, known)) {
     if (!inRect(ctr.x, ctr.y, big ? (sizeOf(k) * c.cell) / 2 + 32 : 64)) continue;
     if (ruin) {
@@ -534,6 +535,32 @@ function drawDeposits(ren, ctx, known) {
       ctx.fillStyle = DEP_GROUND[d];
       ctx.fill();
       for (const [fx, fy, fr] of DOTS) groundDot(ren, ctx, (q + fx) * S, (r + fy) * S, fr * S * 0.7, DEP_DOT[d]);
+    }
+  }
+}
+
+/** Baumstümpfe einer Lichtung (Lage in der Zelle 0..1, Radius in Zellen). */
+const STUMPS = [[0.28, 0.32, 0.07], [0.7, 0.4, 0.06], [0.42, 0.74, 0.08]];
+
+/** Gefällte Zellen (Räumen, seit v5.13; wo erkundet): Lichtung mit Baumstümpfen über dem Waldboden der Karte. */
+function drawClearings(ren, ctx, known) {
+  const g = ren.game;
+  const c = g.city[0];
+  if (!c.felled) return;
+  const V = ren.camera.visibleRect();
+  const S = c.cell;
+  for (let r = Math.max(0, Math.floor(V.y0 / S) - 1); r <= Math.min(c.rows - 1, Math.ceil(V.y1 / S) + 1); r++) {
+    for (let q = Math.max(0, Math.floor(V.x0 / S) - 1); q <= Math.min(c.cols - 1, Math.ceil(V.x1 / S) + 1); q++) {
+      const i = r * c.cols + q;
+      if (!c.felled[i] || c.blocked[i] || !known((q + 0.5) * S, (r + 0.5) * S)) continue;
+      groundRect(ren, ctx, q * S, r * S, (q + 1) * S, (r + 1) * S);
+      ctx.fillStyle = '#6b7442';
+      ctx.fill();
+      if (g.city.some((o) => o.kind[i])) continue; // Grundstück darüber: keine Stümpfe
+      for (const [fx, fy, fr] of STUMPS) {
+        groundDot(ren, ctx, (q + fx) * S, (r + fy) * S, fr * S, '#5a3d22');
+        groundDot(ren, ctx, (q + fx) * S, (r + fy) * S, fr * S * 0.6, '#b08a58');
+      }
     }
   }
 }

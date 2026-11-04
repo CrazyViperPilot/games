@@ -3,7 +3,7 @@
 import { BALANCE } from '../data/balance.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { CITY } from '../data/city.js';
-import { careOf } from '../game/city.js';
+import { careOf, treeGone } from '../game/city.js';
 import { buildTerrain } from './terrain.js';
 import { lacksAmmo } from '../game/entities.js';
 import {
@@ -537,9 +537,11 @@ export class Renderer {
     const town = g.map.town;
     for (const b of town?.buildings ?? []) if (inRect(b.x, b.y, PAD)) items.push({ k: cam.depth(b.x, b.y), t: 0, o: b });
     for (const b of cityBuildings(g, team, known, (x, y) => inRect(x, y, PAD))) items.push({ k: cam.depth(b.x, b.y), t: 0, o: b }); // Stadt
-    for (const t of town?.trees ?? []) if (inRect(t.x, t.y, PAD)) items.push({ k: cam.depth(t.x, t.y), t: 1, o: t });
-    for (const t of g.map.trees ?? []) if (inRect(t.x, t.y, PAD)) items.push({ k: cam.depth(t.x, t.y), t: 1, o: t });
-    for (const t of this.deco.trees) if (inRect(t.x, t.y, PAD)) items.push({ k: cam.depth(t.x, t.y), t: 1, o: t });
+    // Bäume und Büsche: nicht auf gefällten (Räumen) oder ausgewiesenen Stadtzellen (seit v5.13)
+    const gone = (x, y) => g.city && treeGone(g, x, y);
+    for (const t of town?.trees ?? []) if (inRect(t.x, t.y, PAD) && !gone(t.x, t.y)) items.push({ k: cam.depth(t.x, t.y), t: 1, o: t });
+    for (const t of g.map.trees ?? []) if (inRect(t.x, t.y, PAD) && !gone(t.x, t.y)) items.push({ k: cam.depth(t.x, t.y), t: 1, o: t });
+    for (const t of this.deco.trees) if (inRect(t.x, t.y, PAD) && !gone(t.x, t.y)) items.push({ k: cam.depth(t.x, t.y), t: 1, o: t });
     for (const c of town?.cars ?? []) if (inRect(c.x, c.y, 60)) items.push({ k: cam.depth(c.x, c.y), t: 6, o: c });
     for (const p of town?.parks ?? []) {
       if (!inRect(p.x, p.y, p.r + PAD)) continue;
@@ -548,7 +550,7 @@ export class Renderer {
       for (const b of d.benches) items.push({ k: cam.depth(b.x, b.y), t: 7, o: b });
     }
     for (const o of this.deco.rocks) if (inRect(o.x, o.y, PAD)) items.push({ k: cam.depth(o.x, o.y), t: 2, o });
-    for (const b of this.deco.bushes) if (inRect(b.x, b.y, 40)) items.push({ k: cam.depth(b.x, b.y), t: 13, o: b });
+    for (const b of this.deco.bushes) if (inRect(b.x, b.y, 40) && !gone(b.x, b.y)) items.push({ k: cam.depth(b.x, b.y), t: 13, o: b });
     for (const b of g.buildings) {
       if (!b.alive || (!g.alwaysVisible(team, b) && !known(b.x, b.y)) || !inRect(b.x, b.y, PAD)) continue;
       items.push({ k: cam.depth(b.x, b.y), t: 4, o: b });
