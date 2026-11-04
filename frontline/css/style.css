@@ -563,13 +563,68 @@ body.city-mode:not(.city-folded) .city-fab { display: none; }
   .mk-row .btn-sm { height: 36px; }
 }
 
-/* Großer Stadt-Knopf für Touch (ohne Tastatur), nur bei eingeschalteter Stadt */
-.city-fab { position: fixed; right: calc(10px + env(safe-area-inset-right, 0px)); top: 50px; z-index: 20; min-height: 44px; padding: 0 16px; border-radius: 10px; border: 2px solid var(--accent); background: #1d231df0; color: var(--text); font-size: 15px; font-weight: 700; cursor: pointer; pointer-events: auto; }
+/* Große Knöpfe rechts oben für Touch (ohne Tastatur), untereinander: Stadt (nur mit Stadt), Forschung (seit v4.97, nur mit
+   Forschung), Bauer (seit v4.95). Fehlt einer, rücken die anderen nach oben. */
+.fabs { position: fixed; right: calc(10px + env(safe-area-inset-right, 0px)); top: 50px; z-index: 20; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; pointer-events: none; }
+.city-fab { min-height: 44px; padding: 0 16px; border-radius: 10px; border: 2px solid var(--accent); background: #1d231df0; color: var(--text); font-size: 15px; font-weight: 700; cursor: pointer; pointer-events: auto; }
 .city-fab:active { background: #2e372e; }
-/* Baufahrzeug-Knopf (seit v4.95): unter dem Stadt-Knopf, ohne Stadt an dessen Stelle */
-.builder-fab { top: 104px; }
-.builder-fab.no-city { top: 50px; }
-body.city-mode:not(.city-folded) .builder-fab { top: 50px; }
+.research-fab.on { background: #2e372e; box-shadow: 0 0 0 2px #6fa8dc88; }
+body.research-open .research-fab { background: #2e372e; }
+
+/* Forschungsmenü (js/ui/researchpanel.js, seit v4.97): Fenster mit dem ganzen Baum, über den Knopf „Forschung“ unter „Stadt“ */
+.research { position: fixed; left: 50%; top: 50px; transform: translateX(-50%); z-index: 30; width: min(900px, calc(100% - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))); max-height: calc(100% - 58px); overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 8px 10px; border-radius: 10px; background: #141814f4; border: 1px solid #6fa8dc; box-shadow: 0 6px 24px #0008; pointer-events: auto; box-sizing: border-box; }
+.rs-head { display: flex; align-items: center; gap: 10px; font-size: 15px; }
+.rs-head > b { color: #6fa8dc; white-space: nowrap; }
+.rs-tiers { display: flex; align-items: center; gap: 4px; flex: 1; }
+.rs-tiers > i { color: var(--muted); font-style: normal; }
+.rs-tiers .rs-item { width: 120px; }
+.rs-money { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rs-close { min-width: 40px; height: 34px !important; font-size: 15px; }
+.rs-body { display: flex; gap: 10px; align-items: flex-start; }
+.rs-tree { flex: 1; display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 6px; }
+.rs-col { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.rs-col h4 { margin: 0 0 1px; font-size: 12px; color: var(--muted); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rs-item { position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: center; text-align: left; min-height: 36px; padding: 2px 7px; border-radius: 6px; border: 2px solid var(--line-2); background: var(--panel-2); color: var(--text); font: inherit; font-size: 12px; font-weight: 600; line-height: 1.2; cursor: pointer; box-sizing: border-box; }
+.rs-item > span, .rs-item > small { position: relative; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rs-item > small { color: var(--muted); font-weight: 500; font-size: 10px; }
+.rs-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: #6fa8dc44; }
+.rs-item.ok { border-color: #6fa8dc99; }
+.rs-item.done { border-color: #5c9a5c; background: #24352a; }
+.rs-item.done > small { color: #8fd18f; }
+.rs-item.cur { border-color: #6fa8dc; }
+.rs-item.cur > small { color: #a9cdee; }
+.rs-item.lock { opacity: .55; }
+.rs-item.poor > small { color: var(--bad); }
+.rs-item.pick { box-shadow: 0 0 0 2px var(--accent); }
+.rs-t1 { cursor: default; }
+.rs-side { width: 220px; flex: none; display: flex; flex-direction: column; gap: 8px; font-size: 12px; }
+.rs-cur, .rs-info { display: flex; flex-direction: column; gap: 4px; padding: 6px 8px; border-radius: 8px; background: var(--panel); border: 1px solid var(--line-2); }
+.rs-info b { font-size: 14px; }
+.rs-info p { margin: 0; line-height: 1.3; }
+.rs-bar { height: 6px; border-radius: 3px; background: var(--panel-2); overflow: hidden; }
+.rs-bar i { display: block; height: 100%; background: #6fa8dc; }
+.rs-muted { color: var(--muted); }
+.rs-warn { color: var(--bad); }
+.rs-ok { color: #8fd18f; font-weight: 700; padding: 6px 0 2px; }
+.rs-cur .btn-sm, .rs-go { min-height: 36px; font-weight: 700; }
+.rs-go { border-color: #6fa8dc !important; }
+.rs-go.off { opacity: .45; filter: saturate(.3); }
+@media (max-height: 520px) {
+  .research { top: 42px; max-height: calc(100% - 46px); gap: 5px; padding: 6px 8px; }
+  .rs-head { font-size: 14px; gap: 6px; }
+  .rs-tiers .rs-item { width: 104px; }
+  .rs-item { min-height: 33px; padding: 1px 6px; font-size: 11px; }
+  .rs-col { gap: 3px; }
+  .rs-side { width: 190px; gap: 5px; font-size: 11px; }
+  .rs-info b { font-size: 13px; }
+}
+@media (min-height: 700px) and (min-width: 1100px) {
+  .research { width: min(1000px, calc(100% - 340px)); top: 70px; padding: 12px 14px; gap: 10px; }
+  .rs-item { min-height: 44px; font-size: 13px; }
+  .rs-item > small { font-size: 11px; }
+  .rs-tiers .rs-item { width: 140px; }
+  .rs-side { width: 260px; font-size: 13px; }
+}
 
 /* Gespeicherte Partie im Startmenü (ui/saves.js) */
 .resume { margin: 8px 0 14px; padding: 10px 12px; border: 1px solid var(--muted); border-radius: 8px; text-align: center; font-size: 14px; }

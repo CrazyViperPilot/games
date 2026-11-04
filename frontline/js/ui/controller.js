@@ -11,7 +11,7 @@ import { canGarrison, canEnter } from '../game/garrison.js';
 import { canCarry } from '../game/crates.js';
 import { FORMATIONS, FORMATION_NAMES } from '../game/formation.js';
 import { hasCommander } from '../game/commander.js';
-import { researchBlock, researchEffect, unitLocked, lockReason, hasTech, RESEARCH_KEYS } from '../game/research.js';
+import { unitLocked, lockReason, hasTech } from '../game/research.js';
 import { deckDist } from '../game/river.js';
 import { unitLift, buildingHeight, TOWN_H } from '../render/iso.js';
 
@@ -37,9 +37,6 @@ const HOTKEY_ALIAS = { Y: 'Z' }; // Flugabwehr auch mit Y
 const RADIO_TIP = `. Zweite Siegbedingung: steht er fertig ${Math.round(BALANCE.radio.hold / 60)} min, gewinnst du. Der Gegner sieht ihn dann überall. Nur einer je Team.`;
 const CMD = BALANCE.commander;
 const COMMANDER_TIP = `. Einmalig, belegt keinen Platz. Aura ${CMD.aura} px: eigene Einheiten schießen ${Math.round((CMD.fireRate - 1) * 100)} % schneller, verletzte Infanterie heilt. Fällt er, bekommt der Gegner ${CMD.deathPoints} Punkte.`;
-// Forschungsmenü der Hauptstadt: Hauptkarte Q = nächste Stufe, W/E/R = Äste; im Ast Tasten in dieser Reihenfolge
-const BRANCH_BTN = [['veh', 'W'], ['wpn', 'E'], ['abl', 'R'], ['ai', 'T']]; // KI nur mit Stadt
-const ITEM_KEYS = ['Q', 'W', 'E', 'R', 'T', 'A', 'S'];
 const isCarrier = (u) => u.def.cargoCap > 0; // LKW und Transporthubschrauber
 // Ladungsart: Taste, Kurzname, Bezeichnung
 const PRESET_BTN = [
@@ -132,6 +129,7 @@ export class Controller {
     this.onMessage = null; // Callback für HUD-Meldungen (text)
     this.onMarket = null; // () => Marktmenü öffnen (main.js), Aktion „Handel“ eines gewählten Markts
     this.onCity = null; // () => Baumodus der Stadt an/aus (main.js)
+    this.onResearch = null; // () => Forschungsmenü auf/zu (main.js, seit v4.97 eigenes Fenster)
   }
 
   message(text) {
@@ -148,7 +146,6 @@ export class Controller {
 
   setMode(mode) {
     this.view.mode = mode;
-    this.view.branch = null; // Forschungsast (nur im Forschungsmenü)
     this.placeType = null;
     this.wall = null;
     this.view.placement = null;
@@ -426,10 +423,6 @@ export class Controller {
 
   /** Esc: laufenden Modus beenden, sonst Auswahl aufheben. */
   cancel() {
-    if (this.view.mode === 'research' && this.view.branch) {
-      this.view.branch = null;
-      return;
-    }
     if (this.view.mode !== 'normal') {
       this.setMode('normal');
       return;
@@ -510,7 +503,6 @@ export class Controller {
       case 'wall':
         return; // Mauerzug läuft über beginWall/endWall
       case 'build':
-      case 'research':
         this.setMode('normal');
         break;
       default:
@@ -1035,20 +1027,6 @@ export class Controller {
     }
   }
 
-  /** Forschungsmenü öffnen (Hauptstadt gewählt, Forschung eingeschaltet). */
-  startResearchMenu() {
-    if (!this.game.research) {
-      this.message('Forschung ist in dieser Partie ausgeschaltet');
-      return;
-    }
-    this.setMode('research');
-  }
-
-  /** Forschung in der Hauptstadt beginnen; danach wieder die Ausbildung im Blick. */
-  research(fob, key) {
-    if (this.issue({ type: 'research', buildingId: fob.id, key }).ok) this.setMode('normal');
-  }
-
   cancelTrain() {
     const bs = this.selected().filter((e) => e.kind === 'building' && e.queue.length > 0);
     if (!bs.length) {
@@ -1135,8 +1113,6 @@ export class Controller {
         return 'Mörser: Ziel auf der Karte anklicken (Kreis zeigt Reichweite) · Esc bricht ab';
       case 'dropoff':
         return 'Absetzen: Zielpunkt anklicken · Esc bricht ab';
-      case 'research':
-        return 'Forschung: Stufe oder Verbesserung wählen (eine zugleich, Geld beim Start) · Esc zurück';
       case 'storm':
         return 'Stürmen: gegnerisch besetztes Haus anklicken · Esc bricht ab';
       case 'board':
@@ -1153,69 +1129,11 @@ export class Controller {
       return [entry('Abbruch', 'Esc', { tip: 'Abbrechen (Esc)', action: () => this.cancel() })];
     }
     if (m === 'build') return this.buildCard();
-    if (m === 'research') return this.researchCard();
     const card = this.selectionCard();
     // Abwählen auch per Touch (Tippen auf den Boden schickt gewählte Einheiten sonst los)
     if (this.view.selection.size) {
       card.push(entry('Abwählen', 'Esc', { tip: 'Auswahl aufheben (Esc)', action: () => this.view.selection.clear() }));
     }
-    return card;
-  }
-
-  /** Forschungsmenü der Hauptstadt: nächste Stufe (Q), Verbesserungen (W, E, R), laufende Forschung abbrechen (C). */
-  researchCard() {
-    const g = this.game;
-    const fob = this.selected().find((e) => e.kind === 'building' && e.main && e.built);
-    if (!fob || !g.research) return this.selectionCard();
-    const tech = g.teams[this.team].tech;
-    const items = BALANCE.research.items;
-    const card = [];
-    const item = (key, hotkey, short) => {
-      const it = items[key];
-      const reason = researchBlock(g, this.team, key) || this.moneyReason({ money: it.money });
-      const eff = researchEffect(key);
-      card.push(
-        entry(short || it.short || it.name, hotkey, {
-          cost: costText({ money: it.money }),
-          tip: `${it.name}: ${it.money} Geld, ${it.time} s${it.needs > 1 ? `, ab Stufe ${it.needs}` : ''}. ${eff ? eff[0].toUpperCase() + eff.slice(1) + '.' : ''}`,
-          enabled: !reason,
-          reason,
-          active: tech.cur?.key === key || tech.done.includes(key),
-          action: () => this.research(fob, key),
-        }),
-      );
-    };
-    const br = this.view.branch;
-    if (!br) {
-      item(tech.tier < 2 ? 'tier2' : 'tier3', 'Q', '');
-      if (tech.tier >= 3) card[0].active = true;
-      for (const [id, hotkey] of BRANCH_BTN) {
-        if (id === 'ai' && !g.city) continue;
-        const keys = RESEARCH_KEYS.filter((k) => items[k].branch === id);
-        const done = keys.filter((k) => tech.done.includes(k)).length;
-        card.push(
-          entry({ veh: 'Fahrzeuge', wpn: 'Waffen', abl: 'Fähigk.', ai: 'KI' }[id], hotkey, {
-            cost: `${done}/${keys.length}`,
-            tip: `${BALANCE.research.branches[id]} (${hotkey}): ${done} von ${keys.length} erforscht`,
-            active: tech.cur && items[tech.cur.key].branch === id,
-            action: () => {
-              this.view.branch = id;
-            },
-          }),
-        );
-      }
-    } else {
-      RESEARCH_KEYS.filter((k) => items[k].branch === br).forEach((k, i) => item(k, ITEM_KEYS[i], ''));
-    }
-    card.push(
-      entry('Abbruch', 'C', {
-        tip: 'Laufende Forschung abbrechen (C): das Geld kommt ganz zurück',
-        enabled: !!tech.cur,
-        reason: 'Keine Forschung läuft',
-        action: () => this.issue({ type: 'cancelResearch' }),
-      }),
-      entry('Zurück', 'Esc', { tip: 'Zurück zur Ausbildung (Esc)', action: () => this.cancel() }),
-    );
     return card;
   }
 
@@ -1535,9 +1453,9 @@ export class Controller {
       const tech = this.game.teams[this.team].tech;
       card.push(
         entry('Forschung', 'U', {
-          tip: `Forschung (U): Stufe ${tech.tier} von 3. Stufen schalten Einheiten frei, Verbesserungen stärken alle Einheiten.`,
+          tip: `Forschungsmenü (U, auch Knopf „Forschung“ rechts oben): Stufe ${tech.tier} von 3. Stufen schalten Einheiten frei, Verbesserungen stärken alle Einheiten.`,
           active: !!tech.cur,
-          action: () => this.startResearchMenu(),
+          action: () => this.onResearch?.(),
         }),
       );
     }

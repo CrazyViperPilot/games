@@ -14,6 +14,7 @@ import { Controller } from './ui/controller.js';
 import { Input } from './ui/input.js';
 import { Hud } from './ui/hud.js';
 import { CityPanel, MarketPanel } from './ui/citypanel.js';
+import { ResearchPanel } from './ui/researchpanel.js';
 import { showStartMenu, showPause, showHelp, showEnd, hideOverlay } from './ui/menu.js';
 import { pickMood, MOOD_SETTINGS } from './render/mood.js';
 import { snapshotGame, restoreGame, SAVE_FORMAT } from './game/savegame.js';
@@ -110,6 +111,7 @@ function stopSession() {
   window.removeEventListener('resize', s.onResize);
   s.cityPanel?.destroy();
   s.market?.destroy();
+  s.research?.destroy();
   s.hud.destroy();
   clearCanvas();
 }
@@ -307,6 +309,19 @@ const app = {
     m.toggle(false);
     return true;
   },
+  /** Forschungsmenü auf/zu (Knopf „Forschung“ unter „Stadt“, Befehl „Forschung“ der Hauptstadt). */
+  toggleResearch() {
+    const s = session;
+    if (!s || s.ended || !s.research || !overlay.hidden) return;
+    s.research.toggle();
+  },
+  /** Esc: offenes Forschungsmenü schließen; true, wenn es offen war. */
+  closeResearch() {
+    const r = session?.research;
+    if (!r?.open) return false;
+    r.toggle(false);
+    return true;
+  },
   /** Baumodus der Stadt offen? Dann die Stadtleiste (Input zieht damit Rechtecke auf der Karte). */
   cityBuild: () => (session?.cityPanel?.open && !session.ended ? session.cityPanel : null),
   toggleSound() {
@@ -335,6 +350,7 @@ function frame(s) {
   s.input.update(dt);
   s.cityPanel?.update();
   s.market?.update();
+  s.research?.update();
   if (!s.loop.paused && !s.ended && now - s.lastSave > AUTOSAVE_MS) saveNow(s);
 
   for (const ev of s.game.drainEvents()) {
@@ -436,7 +452,9 @@ function buildSession(game, ai, opts, view) {
   const market = game.city ? new MarketPanel(hudRoot.parentElement ?? document.body, game, HUMAN, (t) => hud.pushMessage(t)) : null;
   controller.onMarket = () => app.toggleMarket();
   controller.onCity = () => app.toggleCity();
-  const s = { game, ai, camera, renderer, minimap, controller, hud, input, cityPanel, market, onResize, loop: null, ended: false, last: null, settings: opts, saving: false, lastSave: performance.now() };
+  const research = game.research ? new ResearchPanel(hudRoot.parentElement ?? document.body, game, HUMAN, (t) => hud.pushMessage(t)) : null;
+  controller.onResearch = () => app.toggleResearch();
+  const s = { game, ai, camera, renderer, minimap, controller, hud, input, cityPanel, market, research, onResize, loop: null, ended: false, last: null, settings: opts, saving: false, lastSave: performance.now() };
   s.loop = createLoop({
     tickRate: BALANCE.tickRate,
     update(dt) {

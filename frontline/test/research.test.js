@@ -7,7 +7,7 @@ import { createEmptyMap } from '../js/game/mapdata.js';
 import { BALANCE } from '../js/data/balance.js';
 import { AI } from '../js/ai/ai.js';
 import { hit } from '../js/game/combat.js';
-import { unitLocked, armorMul, opticsMul, researchEffect } from '../js/game/research.js';
+import { unitLocked, armorMul, opticsMul, researchEffect, researchBlock } from '../js/game/research.js';
 import { Controller } from '../js/ui/controller.js';
 import { setWeather } from '../js/game/weather.js';
 
@@ -162,10 +162,12 @@ test('Wärmebildoptik: Waffenreichweite +10 % (schießt ohne heranzufahren) und 
   assert.deepEqual([opticsMul(g, 0), opticsMul(g, 1)], [1, R.optics]);
 });
 
-test('Befehlskarte: Hauptstadt zeigt Forschung (U), gesperrte Einheiten mit Grund; Forschungsmenü startet und bricht ab', () => {
+test('Befehlskarte: Hauptstadt zeigt Forschung (U), gesperrte Einheiten mit Grund; U öffnet das Forschungsmenü (eigenes Fenster)', () => {
   const g = empty({ research: true });
   g.teams[0].res.money = 3000;
   const c = new Controller(g, 0, null);
+  let opened = 0;
+  c.onResearch = () => opened++;
   c.view.selection.add(mainOf(g, 0).id);
   const card = () => c.commandCard();
   const btn = (k) => card().find((e) => e.hotkey === k);
@@ -173,33 +175,19 @@ test('Befehlskarte: Hauptstadt zeigt Forschung (U), gesperrte Einheiten mit Grun
   assert.equal(btn('A').reason, 'Benötigt Stufe 2', 'Schützenpanzer gesperrt');
   assert.equal(btn('U').label, 'Forschung');
   c.handleHotkey('U');
-  assert.equal(c.view.mode, 'research');
-  assert.deepEqual(card().map((e) => e.hotkey), ['Q', 'W', 'E', 'R', 'C', 'Esc']);
-  assert.equal(btn('Q').label, 'Stufe 2');
-  assert.equal(btn('W').label, 'Fahrzeuge');
-  c.handleHotkey('E'); // Ast Waffen
-  assert.equal(c.view.branch, 'wpn');
-  assert.equal(btn('Q').label, 'Westen');
-  assert.equal(btn('Q').reason, 'Benötigt Stufe 2');
-  c.cancel();
-  assert.equal(c.view.branch, null, 'Esc: zurück zur Hauptkarte');
-  assert.equal(c.view.mode, 'research');
-  assert.equal(btn('C').enabled, false);
-  c.handleHotkey('Q');
-  assert.equal(g.teams[0].tech.cur.key, 'tier2');
-  assert.equal(c.view.mode, 'normal', 'zurück zur Ausbildung');
+  assert.equal(opened, 1, 'U öffnet das Forschungsfenster (seit v4.97)');
+  assert.equal(c.view.mode, 'normal', 'keine eigene Forschungskarte mehr');
+  assert.equal(btn('U').active, false);
+  const main = mainOf(g, 0);
+  assert.ok(g.issue(0, { type: 'research', buildingId: main.id, key: 'tier2' }).ok);
   assert.equal(btn('U').active, true, 'Forschung läuft');
-  c.handleHotkey('U');
-  assert.equal(btn('Q').reason, 'Wird gerade erforscht');
-  c.handleHotkey('C');
-  assert.equal(g.teams[0].tech.cur, null);
+  // Menü: Sperrgrund trotz laufender Forschung sichtbar (anyway), sonst „eine zugleich“
+  assert.equal(researchBlock(g, 0, 'vests'), 'Es läuft schon eine Forschung');
+  assert.equal(researchBlock(g, 0, 'vests', true), 'Benötigt Stufe 2');
+  assert.equal(researchBlock(g, 0, 'tier2', true), 'Wird gerade erforscht');
+  assert.equal(researchBlock(g, 0, 'tier3', true), 'Benötigt Stufe 2');
+  assert.ok(g.issue(0, { type: 'cancelResearch' }).ok);
   assert.equal(g.teams[0].res.money, 3000);
-  c.cancel();
-  assert.equal(c.view.mode, 'normal');
-  g.teams[0].tech.tier = 2;
-  g.teams[0].tech.done.push('tier2');
-  c.handleHotkey('U');
-  assert.equal(btn('Q').label, 'Stufe 3');
   // ohne Forschung: kein Eintrag
   const off = empty();
   const c2 = new Controller(off, 0, null);

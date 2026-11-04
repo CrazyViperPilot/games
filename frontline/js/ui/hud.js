@@ -99,6 +99,7 @@ export class Hud {
     this.pauseBtn = q('[data-act=pause]');
     this.soundBtn = q('[data-act=sound]');
     this.viewBtn = q('[data-act=view]');
+    this.researchBtn = q('[data-act=research]');
     this.res = {};
     for (const k of RES_KEYS) {
       this.res[k] = { box: q(`[data-res=${k}]`), val: q(`[data-res=${k}] .val`), rate: q(`[data-res=${k}] .rate`) };
@@ -133,8 +134,11 @@ export class Hud {
       )
       .join('');
     return `
-      <button type="button" class="city-fab builder-fab${g.city ? '' : ' no-city'}" data-act="builder" title="Nächstes Baufahrzeug (J)">🚧 Bauer</button>
-      ${g.city ? '<button type="button" class="city-fab" data-act="city" title="Stadt verwalten (Y)">🏙 Stadt</button>' : ''}
+      <div class="fabs">
+        ${g.city ? '<button type="button" class="city-fab" data-act="city" title="Stadt verwalten (Y)">🏙 Stadt</button>' : ''}
+        ${g.research ? '<button type="button" class="city-fab research-fab" data-act="research" title="Forschungsmenü: Stufen und Forschungsbaum (U bei gewählter Hauptstadt)">🔬 Forschung</button>' : ''}
+        <button type="button" class="city-fab builder-fab" data-act="builder" title="Nächstes Baufahrzeug (J)">🚧 Bauer</button>
+      </div>
       <header class="top">
         <div class="res-row">${res}</div>
         <div class="pts">${pts}</div>
@@ -191,6 +195,7 @@ export class Hud {
       else if (act.dataset.act === 'builder') this.app.nextBuilder?.();
       else if (act.dataset.act === 'city') this.app.toggleCity?.();
       else if (act.dataset.act === 'market') this.app.toggleMarket?.();
+      else if (act.dataset.act === 'research') this.app.toggleResearch?.();
       else if (act.dataset.act === 'sound') this.app.toggleSound?.();
       else if (act.dataset.act === 'view') this.app.toggleView?.();
       else if (act.dataset.act === 'rotl') this.app.rotateView?.(-1);
@@ -250,6 +255,8 @@ export class Hud {
     }
     // Geldanzeige als Knopf zum Marktmenü hervorheben, sobald ein Markt steht
     if (g.city) this.res.money.box.classList.toggle('mk-on', hasMarket(g, this.team));
+    // Forschungsknopf leuchtet, solange eine Forschung läuft
+    this.researchBtn?.classList.toggle('on', !!t.tech?.cur);
     for (let i = 0; i < 2; i++) {
       const tm = g.teams[i];
       const p = this.pts[i];

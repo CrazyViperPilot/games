@@ -388,6 +388,7 @@ export class Input {
       case 'Escape':
         e.preventDefault();
         if (app.closeMarket?.()) return; // Marktmenü zuerst schließen
+        if (app.closeResearch?.()) return; // dann das Forschungsmenü
         if (app.cityBuild?.()) app.toggleCity?.();
         else this.controller.cancel();
         return;

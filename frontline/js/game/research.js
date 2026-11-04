@@ -70,14 +70,15 @@ export const lockReason = (type) => `Benötigt Stufe ${unitTier(type)}`;
 /** Hat das Team diese Verbesserung erforscht? */
 export const hasTech = (game, team, key) => !!game.research && game.teams[team].tech.done.includes(key);
 
-/** Warum das Forschungsziel jetzt nicht begonnen werden kann (ohne Geld); '' = möglich. */
-export function researchBlock(game, team, key) {
+/** Warum das Forschungsziel jetzt nicht begonnen werden kann (ohne Geld); '' = möglich. anyway: laufende Forschung übergehen (Menü). */
+export function researchBlock(game, team, key, anyway = false) {
   if (!game.research) return 'Forschung ist in dieser Partie ausgeschaltet';
   const it = R.items[key];
   if (!it) return 'Unbekannte Forschung';
   const tech = game.teams[team].tech;
   if (tech.done.includes(key) || (it.tier && tech.tier >= it.tier)) return 'Bereits erforscht';
-  if (tech.cur) return tech.cur.key === key ? 'Wird gerade erforscht' : 'Es läuft schon eine Forschung';
+  if (tech.cur?.key === key) return 'Wird gerade erforscht';
+  if (tech.cur && !anyway) return 'Es läuft schon eine Forschung';
   if (it.req === 'branch') {
     const rest = RESEARCH_KEYS.filter((k) => R.items[k].branch === it.branch && k !== key && !R.items[k].tier);
     if (rest.some((k) => !tech.done.includes(k))) return `Benötigt alle anderen Forschungen im Ast ${R.branches[it.branch]}`;
