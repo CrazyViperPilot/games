@@ -298,12 +298,13 @@ function fireParallel(game, u, t) {
   let dry = false;
   for (const w of u.weapons) {
     if (w.cd > 0) continue;
-    const ok = (e) => !!e && isFoe(u.team, e) && dmgVs(w.spec.damage, e) > 0 && weaponReaches(game, u, w, e);
+    const hits = (e) => !!e && e.alive !== false && dmgVs(w.spec.damage, e) > 0 && weaponReaches(game, u, w, e);
     const own = w.targetId != null ? resolveTarget(game, w.targetId) : null;
+    const okT = hits(t); // Hauptziel: schon geprüft (Befehl: canAttack, z. B. auch Brücken; Zielsuche: isFoe)
     let aim = null;
-    if (ok(t) && prefers(w.spec, t)) aim = t;
-    else if (ok(own)) aim = own;
-    else if (ok(t)) aim = t;
+    if (okT && prefers(w.spec, t)) aim = t;
+    else if (isFoe(u.team, own) && hits(own)) aim = own;
+    else if (okT) aim = t;
     if (!aim) continue;
     if (w.rounds < 1) {
       dry = true;
