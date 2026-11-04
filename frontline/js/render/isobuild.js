@@ -6,6 +6,7 @@ import { drawUniversityIso } from './university.js';
 import { drawWorksIso, WORKS_KINDS } from './works.js';
 import { drawBigPart, VEH, VEH_COLOR } from './bigbuild.js';
 import { drawCityHallIso } from './cityhall.js';
+import { drawTownIso } from './townhouses.js';
 import { drawBox, drawRotBox, wallPoint, wallQuad, buildingHeight, TOWN_H, drawTree } from './iso.js';
 import { shade, tint, hexA } from './sprites.js';
 import { snowy } from './season.js';
@@ -282,6 +283,10 @@ export function drawTownBuilding(ctx, cam, b, season = 'summer') {
   }
   if (WORKS_KINDS.includes(b.kind)) {
     drawWorksIso(ctx, cam, b); // 2 × 2-Werke (seit v5.08), für jede Drehung dasselbe Bild (works.js)
+    return;
+  }
+  if (b.kind === 'town') {
+    drawTownIso(ctx, cam, b, season); // 1 × 1-Stadtgebäude (seit v5.14), je Art und Stufe eigenes Bild (townhouses.js)
     return;
   }
   if (spriteOverrides[b.kind]?.(ctx, cam, b)) return;

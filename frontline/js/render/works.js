@@ -3,6 +3,7 @@
 // (Drehung um 90° ergibt dasselbe Bild), darum zeichnet die Iso-Ansicht wie bei der Universität für jede Drehung der Karte dasselbe
 // Bild. Stufe 2 und 3 fügen Türme, Lager und Schornsteine hinzu. 2D: dieselbe Anlage von oben.
 // Nur Zeichnen (liest b = { x, y, kind, level, color, damage }; Mitte des Quadrats in Weltkoordinaten, es reicht bis ±64).
+// Grundformen (frustum, cyl, seam, coneRoof, cap, circle, ball) nutzen seit v5.14 auch die 1 × 1-Stadtgebäude (townhouses.js).
 import { iso, poly, box, lit, pyramid, FACE, OUTLINE, DETAIL } from './university.js';
 import { shade, tint } from './sprites.js';
 import { snowy } from './season.js';
@@ -56,7 +57,7 @@ export function worksLift(kind, level) {
 // ---------- Grundformen (isometrisch) ----------
 
 /** Kegelstumpf (r0 unten, r1 oben) mit Mitte (u, v) von h0 bis h1; r0 = r1 ergibt einen Zylinder. Licht von links. */
-function frustum(g, u, v, r0, r1, h0, h1, color, top = true) {
+export function frustum(g, u, v, r0, r1, h0, h1, color, top = true) {
   const { P, ctx, z } = g;
   const [cx, y0] = P(u, v, h0);
   const [, y1] = P(u, v, h1);
@@ -85,7 +86,7 @@ function frustum(g, u, v, r0, r1, h0, h1, color, top = true) {
   ctx.stroke();
 }
 
-const cyl = (g, u, v, r, h0, h1, color, top = true) => frustum(g, u, v, r, r, h0, h1, color, top);
+export const cyl = (g, u, v, r, h0, h1, color, top = true) => frustum(g, u, v, r, r, h0, h1, color, top);
 
 /** Farbiges Band rund um einen Zylinder (nur die vordere Hälfte), von h0 bis h1. */
 function band(g, u, v, r, h0, h1, color) {
@@ -108,7 +109,7 @@ function band(g, u, v, r, h0, h1, color) {
 }
 
 /** Feine Naht (vordere Hälfte eines Kreises) auf Höhe h. */
-function seam(g, u, v, r, h, color = 'rgba(60,60,70,0.35)') {
+export function seam(g, u, v, r, h, color = 'rgba(60,60,70,0.35)') {
   if (g.z < DETAIL) return;
   const { P, ctx, z } = g;
   const [cx, y] = P(u, v, h);
@@ -120,7 +121,7 @@ function seam(g, u, v, r, h, color = 'rgba(60,60,70,0.35)') {
 }
 
 /** Flaches Kegeldach über einem Zylinder (Öltank): Spitze rh über dem Rand. */
-function coneRoof(g, u, v, r, h, rh, color) {
+export function coneRoof(g, u, v, r, h, rh, color) {
   const { P, ctx, z } = g;
   const [cx, y] = P(u, v, h);
   const [, ty] = P(u, v, h + rh);
@@ -142,7 +143,7 @@ function coneRoof(g, u, v, r, h, rh, color) {
 }
 
 /** Halbkugel- oder Spitzhaube (Winderhitzer, Geschossspitze) mit Radius r auf Höhe h; tall = Höhe/Radius. */
-function cap(g, u, v, r, h, color, tall = 1) {
+export function cap(g, u, v, r, h, color, tall = 1) {
   const { P, ctx, z } = g;
   const [cx, cy] = P(u, v, h);
   const R = r * z;
@@ -669,14 +670,14 @@ function bmTop(ctx, x, y, L, color) {
 
 // ---------- 2D-Hilfen ----------
 
-function circle(ctx, x, y, r, fill) {
+export function circle(ctx, x, y, r, fill) {
   ctx.fillStyle = fill;
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fill();
 }
 /** Kreis mit Licht von links oben (Tank, Turm von oben). */
-function ball(ctx, x, y, r, color) {
+export function ball(ctx, x, y, r, color) {
   const grad = ctx.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.1, x, y, r);
   grad.addColorStop(0, tint(color, 0.25));
   grad.addColorStop(1, shade(color, 0.22));

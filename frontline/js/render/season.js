@@ -113,6 +113,8 @@ const roofCache = new Map();
 export function setRoofSnow(on) {
   roofSnow = !!on;
 }
+/** Liegt gerade Schnee (Iso-Stadt im Winter)? Für Rasen und Laub der Stadtgebäude (townhouses.js). */
+export const roofSnowOn = () => roofSnow;
 /** Dachfarbe unter Schnee (Hex-Farbe); ohne Schnee unverändert. */
 export function snowy(color) {
   if (!roofSnow || typeof color !== 'string' || color[0] !== '#' || color.length !== 7) return color;

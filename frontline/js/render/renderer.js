@@ -51,6 +51,7 @@ import { drawMood } from './mood.js';
 import { drawBridgeTop, drawBridgeIso, drawBridgeBar, bridgeBar, fordPosts, drawFordPostTop, drawFordPostIso } from './bridge.js';
 import { bridgeUnder } from '../game/river.js';
 import { drawCityGround, drawCityTop, cityBuildings, drawCityBadges } from './citylayer.js';
+import { beginTownFrame, townLift } from './townhouses.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
@@ -176,6 +177,7 @@ export class Renderer {
     const hover = v.hoverId ? g.getEntity(v.hoverId) : null;
 
     this.syncRelief();
+    beginTownFrame(dpr); // Stadtgebäude: Maßstab der Bilder, Zeitbudget fürs Nachmalen (townhouses.js, spritecache.js)
     if (cam.iso) {
       this.renderIso(v, now);
       return;
@@ -614,12 +616,13 @@ export class Renderer {
             // beschädigtes Stadtgebäude (Stadt-Teil): Rauch über dem Dach
             const p = cam.worldToScreen(it.o.x, it.o.y);
             const k = cam.zoom;
+            const up = it.o.kind === 'town' ? townLift(it.o.ck, it.o.level, it.o.dep) - 52 : 0; // 1 × 1: Rauch ab dem Dach (seit v5.14)
             ctx.save();
             ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
             ctx.fillStyle = `rgba(40,36,34,${Math.min(0.75, it.o.damage).toFixed(2)})`;
             for (const [dx, dy, r] of [[0, -46, 10], [6, -60, 13], [-4, -76, 16]]) {
               ctx.beginPath();
-              ctx.arc(p.x + dx * k, p.y + dy * k, r * k, 0, Math.PI * 2);
+              ctx.arc(p.x + dx * k, p.y + (dy - up) * k, r * k, 0, Math.PI * 2);
               ctx.fill();
             }
             ctx.restore();

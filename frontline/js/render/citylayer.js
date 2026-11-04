@@ -7,11 +7,10 @@ import { drawWorksTop, worksLift, WORKS_GROUND, WORKS_KINDS } from './works.js';
 import { CITY } from '../data/city.js';
 import { CITY_COLORS, CITY_ICON } from '../ui/citypanel.js';
 import { drawUniversityTop, UNI_LAWNS } from './university.js';
+import { drawTownTop, townLift } from './townhouses.js';
 
 // Grundstücke in der Farbe der Zellenart (wie die Werkzeugleiste): Wohnen grün, Gewerbe blau, Werke erdig, Markt gold, Militär oliv
 const LOT = CITY_COLORS;
-const ROOF = { res: '#8a4b3c', com: '#5f8fc8', bm: '#6e5a48', mun: '#5f6670', fuel: '#6a5a7e', steel: '#4f5862', mine: '#7a6440', market: '#c9952b', power: '#5a5a40', uni: '#7a3b30', dc: '#3a4a55', barracks: '#56603a', factory: '#5c6352', heliport: '#4a4f4a', hospital: '#e4e2dc' };
-const TOWN_KIND = { res: 'house', com: 'hall', bm: 'factory', mun: 'factory', fuel: 'factory', steel: 'factory', mine: 'hall', market: 'hall', power: 'factory', uni: 'hall', dc: 'hall', barracks: 'barracks', factory: 'vhall', heliport: 'heliport', hospital: 'clinic' };
 /** Hex-Farbe a mit b mischen (t = Anteil von a). */
 function mix(a, b, t) {
   const p = (h, i) => parseInt(h.slice(1 + i * 2, 3 + i * 2), 16);
@@ -23,7 +22,6 @@ const MINE_ICON = { wood: '🌲', stone: '⛰', ore: '⛏', oil: '🛢' };
 const MINE_COLOR = { wood: '#3f8a3f', stone: '#8f8f88', ore: '#c4612f', oil: '#34343a' };
 const SMALL = { res: 1, com: 1 };
 // Höhe des Schilds über dem Boden je Gebäudeform (Weltpixel, isometrisch)
-const BADGE_LIFT = { house: 50, hall: 56, factory: 74, barracks: 40, vhall: 52, heliport: 26, clinic: 62 };
 const BIG_LIFT = [0, 76, 98, 106]; // Universität je Stufe: über der Kuppel
 // Rohstoffvorkommen: Bodenfarbe und Farbe der Tupfen (Bäume, Steine, Erzbrocken, Öllachen)
 const DEP_GROUND = { wood: 'rgba(30,70,30,0.55)', stone: 'rgba(120,120,115,0.55)', ore: 'rgba(140,70,40,0.55)', oil: 'rgba(20,20,24,0.6)' };
@@ -50,10 +48,25 @@ function* cells(game, team, known) {
   }
 }
 
-/** Seitenlänge eines Gebäudes der Stufe lv in der Zelle r (px): lässt einen farbigen Rand des Grundstücks frei. */
-const footprint = (r, lv) => r.x1 - r.x0 - 26 + lv * 6;
+/** Farbvariante (0..2) eines 1 × 1-Gebäudes, fest je Zelle (townhouses.js). */
+const variantOf = (i) => ((Math.imul(i ^ 0x5bd1, 2654435761) >>> 16) % 3);
 
-/** Gebäude als Stadthaus-Objekte { x, y, w, h, kind } (Größe nach Ausbaustufe), für die Iso-Ansicht. */
+/** Angaben für townhouses.js: Zellenart, Stufe, Teamfarbe, Variante und bei Förderanlagen das Vorkommen. */
+const townObj = (c, k, lv, r, i, color, damage) => ({
+  x: r.x,
+  y: r.y,
+  w: 56,
+  h: 56,
+  kind: 'town',
+  ck: k,
+  level: lv,
+  color,
+  variant: variantOf(i),
+  dep: k === 'mine' ? DEPOSITS[c.deposit[i] - 1] ?? null : null,
+  damage,
+});
+
+/** Gebäude als Stadthaus-Objekte { x, y, w, h, kind, … } für die Iso-Ansicht (1 × 1: kind 'town', gezeichnet in townhouses.js). */
 export function cityBuildings(game, team, known, inRect) {
   const out = [];
   for (const { c, k, lv, r, i, big, ctr } of cells(game, team, known)) {
@@ -72,8 +85,7 @@ export function cityBuildings(game, team, known, inRect) {
       out.push({ x: ctr.x, y: ctr.y, w, h: w, kind: k, level: lv, color, damage });
       continue;
     }
-    const s = footprint(r, lv); // Stufe 1 kleiner, Stufe 3 füllt fast die Zelle (Rand zeigt die Farbe der Zone)
-    out.push({ x: r.x, y: r.y, w: s, h: k === 'res' ? s * 0.8 : s, kind: TOWN_KIND[k], color, damage: e ? 1 - e.hp / e.def.hp : 0 });
+    out.push(townObj(c, k, lv, r, i, color, damage)); // 1 × 1 (seit v5.14): eigenes Bild je Art und Stufe (townhouses.js)
   }
   return out;
 }
@@ -128,7 +140,6 @@ export function drawCityGround(ren, ctx, team, known, inRect) {
     ctx.strokeStyle = LOT[k];
     ctx.lineWidth = ren.draping() ? Math.max(2, 4 * ren.camera.zoom) : 5;
     ctx.stroke();
-    if (lv && k === 'heliport') drawPad(ren, ctx, r);
     if (!lv && k !== 'mine' && c.team === team) {
       // ausgewiesen, aber noch nicht gebaut: Fortschritt als Balken, rot ohne Straße daneben
       const col = Math.floor(r.x0 / c.cell);
@@ -203,20 +214,6 @@ function drawBigLot(ren, ctx, c, k, lv, r, team, m) {
   groundRect(ren, ctx, x0 + 16, m.y - 6, x0 + 16 + (2 * h - 32) * f, m.y + 6);
   ctx.fillStyle = linked ? '#e8e2a0' : '#e0553a';
   ctx.fill();
-}
-
-/** Landeplatz des Heliports: dunkler Kreis mit weißem Ring und „H“ auf dem Boden. */
-function drawPad(ren, ctx, r) {
-  const rad = (r.x1 - r.x0) * 0.36;
-  groundDot(ren, ctx, r.x, r.y, rad, '#3a3d3a');
-  groundDot(ren, ctx, r.x, r.y, rad * 0.86, '#e8e8e0');
-  groundDot(ren, ctx, r.x, r.y, rad * 0.76, '#3a3d3a');
-  const h = rad * 0.5;
-  ctx.beginPath();
-  for (const [x0, y0, x1, y1] of [[-0.6, -1, -0.6, 1], [0.6, -1, 0.6, 1], [-0.6, 0, 0.6, 0]]) groundLine(ren, ctx, r.x + x0 * h * 0.8, r.y + y0 * h, r.x + x1 * h * 0.8, r.y + y1 * h);
-  ctx.strokeStyle = '#f2f2ea';
-  ctx.lineWidth = ren.draping() ? Math.max(1.5, 4 * ren.camera.zoom) : 4;
-  ctx.stroke();
 }
 
 // Straßen (v4.97): je Zelle nach den Straßennachbarn Gerade, Kurve, Sackgasse, T-Stück oder Kreuzung. Gehweg an Seiten ohne
@@ -640,7 +637,7 @@ function drawTerritory(ren, ctx, team, known) {
   }
 }
 
-/** 2D von oben: Gebäude als Dachflächen mit Schatten. */
+/** 2D von oben: Gebäude als Dachflächen mit Schatten (1 × 1 seit v5.14 aus townhouses.js). */
 export function drawCityTop(ren, ctx, team, known, inRect) {
   const g = ren.game;
   if (!g.city) return;
@@ -658,35 +655,11 @@ export function drawCityTop(ren, ctx, team, known, inRect) {
       else drawUniversityTop(ctx, b);
       continue;
     }
-    if (k === 'heliport') {
-      // Landeplatz liegt am Boden; nur ein kleiner Turm in der Ecke
-      ctx.fillStyle = ROOF.heliport;
-      ctx.fillRect(r.x1 - 18, r.y0 + 6, 12, 12);
-      continue;
-    }
-    const s = footprint(r, lv);
-    const h = k === 'res' ? s * 0.8 : s;
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    ctx.fillRect(r.x - s / 2 + 4, r.y - h / 2 + 4, s, h);
-    ctx.fillStyle = ROOF[k];
-    ctx.fillRect(r.x - s / 2, r.y - h / 2, s, h);
-    ctx.fillStyle = 'rgba(255,255,255,0.18)';
-    ctx.fillRect(r.x - s / 2, r.y - h / 2, s, h / 2); // Dachfirst: Lichtseite
-    if (k === 'hospital') {
-      // Krankenhaus: weißes Dach mit rotem Kreuz
-      const a = s * 0.3;
-      const t = s * 0.09;
-      ctx.fillStyle = '#d23a3a';
-      ctx.fillRect(r.x - a, r.y - t, a * 2, t * 2);
-      ctx.fillRect(r.x - t, r.y - a, t * 2, a * 2);
-    }
-    if (k !== 'res' && k !== 'com' && !CITY.produces[k] && k !== 'market' && k !== 'hospital') {
-      ctx.fillStyle = '#3b3b3b'; // Schornstein der Werke
-      ctx.fillRect(r.x + s / 4, r.y - h / 4, 7, 7);
-    }
-    if (e && e.hp < e.def.hp) {
-      ctx.fillStyle = `rgba(20,10,5,${(0.6 * (1 - e.hp / e.def.hp)).toFixed(2)})`; // beschädigt: dunkler
-      ctx.fillRect(r.x - s / 2, r.y - h / 2, s, h);
+    const damage = e ? 1 - e.hp / e.def.hp : 0;
+    drawTownTop(ctx, townObj(c, k, lv, r, i, color, damage), ren.camera.zoom); // 1 × 1 (seit v5.14): eigenes Bild je Art und Stufe
+    if (damage > 0) {
+      ctx.fillStyle = `rgba(20,10,5,${(0.55 * damage).toFixed(2)})`; // beschädigt: dunkler
+      ctx.fillRect(r.x - 23, r.y - 23, 46, 46);
     }
   }
 }
@@ -765,7 +738,7 @@ export function drawCityBadges(ren, ctx, team, known, inRect, iso) {
     const px = sm ? small : big;
     if (iso) {
       const p = cam.worldToScreen(r.x, r.y);
-      const lift = whole ? (BIG_KINDS.has(k) ? Math.min(150, bigTop(k, lv) * 0.7) + 14 : WORKS_KINDS.includes(k) ? worksLift(k, lv) : BIG_LIFT[lv] ?? 110) : (BADGE_LIFT[TOWN_KIND[k]] ?? 50) * (0.75 + lv * 0.1);
+      const lift = whole ? (BIG_KINDS.has(k) ? Math.min(150, bigTop(k, lv) * 0.7) + 14 : WORKS_KINDS.includes(k) ? worksLift(k, lv) : BIG_LIFT[lv] ?? 110) : townLift(k, lv, d);
       ctx.drawImage(img, p.x - px / 2, p.y - lift * z - px, px, px);
     } else {
       const w = px / z;
