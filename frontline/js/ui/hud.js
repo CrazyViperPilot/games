@@ -33,6 +33,7 @@ const NEG_COLOR = '#e5484d'; // Verbrauch (negative Netto-Rate)
 const COLOR = { bm: '#a0703f', mun: '#7f93ad', fuel: '#9b7bc4', cargo: '#c9a227' };
 const PRESET_NAME = { mix: 'Gemischt', bm: 'Baumaterial', mun: 'Munition', fuel: 'Treibstoff' };
 const STORE_CAP = BALANCE.logistics.storeCap;
+const CAPITAL_CAP = BALANCE.logistics.capitalCap;
 const TRUCK_CAP = BALANCE.logistics.truckCapacity;
 const SITE_BM = BALANCE.construction.fobMaterial;
 
@@ -452,13 +453,14 @@ export class Hud {
       h += this.reinforceInfo(b);
       if (g.research) h += this.researchInfo(b.team);
     } else if (b.type === 'fob') {
+      const cap = b.main ? CAPITAL_CAP : STORE_CAP;
       h +=
         (b.main
           ? '<div class="muted small lagerhead">Lager der Hauptstadt (die Werke der Stadt füllen es) · Truppen bilden Kaserne, Fabrikhalle und Heliport aus</div>'
           : '<div class="muted small lagerhead">Lager dieser FOB (LKW füllen es aus der Hauptstadt)</div>') +
-        storeRow('BM', b.store.bm, STORE_CAP, COLOR.bm) +
-        storeRow('MUN', b.store.mun, STORE_CAP, COLOR.mun) +
-        storeRow('TS', b.store.fuel, STORE_CAP, COLOR.fuel);
+        storeRow('BM', b.store.bm, cap, COLOR.bm) +
+        storeRow('MUN', b.store.mun, cap, COLOR.mun) +
+        storeRow('TS', b.store.fuel, cap, COLOR.fuel);
     }
     if (b.def.weapon && b.def.weapon.shell && b.built) {
       const w = b.def.weapon;

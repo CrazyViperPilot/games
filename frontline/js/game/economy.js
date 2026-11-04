@@ -89,7 +89,7 @@ export function updateEconomy(game, dt) {
   // Hauptstadt: unendlicher Vorrat (das Lager wird immer wieder aufgefüllt; Laden und Nachfüllen haben ihre Raten)
   for (const b of game.buildings) {
     if (!b.alive || !b.infinite) continue;
-    for (const k of STOCK_KEYS) b.store[k] = BALANCE.logistics.storeCap;
+    for (const k of STOCK_KEYS) b.store[k] = BALANCE.logistics.capitalCap;
   }
   for (const team of game.teams) team.res.money += team.rate.money * dt;
 }

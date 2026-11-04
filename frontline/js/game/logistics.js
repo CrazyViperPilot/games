@@ -119,13 +119,16 @@ function loadStep(u, fob, dt) {
   return 'busy';
 }
 
-/** Ein Entladeschritt in das Lager der FOB (bis storeCap je Sorte). 'done', wenn nichts mehr abgeht. */
+/** Obergrenze je Sorte im Lager eines Gebäudes: Hauptstadt capitalCap, sonst storeCap. */
+export const storeCapOf = (b) => (b.main ? L.capitalCap : L.storeCap);
+
+/** Ein Entladeschritt in das Lager der FOB (bis storeCapOf je Sorte). 'done', wenn nichts mehr abgeht. */
 function unloadStep(u, fob, dt) {
   let budget = L.transferRate * dt;
   let moved = false;
   for (const k of CARGO) {
     if (budget <= EPS) break;
-    const room = L.storeCap - fob.store[k];
+    const room = storeCapOf(fob) - fob.store[k];
     const amt = Math.min(budget, u.cargo[k], room);
     if (amt <= EPS) continue;
     u.cargo[k] = Math.max(0, u.cargo[k] - amt);

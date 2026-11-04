@@ -30,7 +30,7 @@ test('BALANCE liest die Schnelleinstellungen', () => {
     unitLimit: BALANCE.slotCap, startMoney: BALANCE.startRes.money, walletMax: BALANCE.walletMax,
     moneyPerUnitZone: BALANCE.zone.unitIncome, moneyPerUnitHot: BALANCE.hot.unitIncome, moneyPerCrate: BALANCE.crates.income,
     winPoints: BALANCE.winPoints, pointEvery: BALANCE.pointInterval, radioHold: BALANCE.radio.hold, maxFobs: BALANCE.fob.max,
-    fobMaterial: BALANCE.construction.fobMaterial, storeCap: BALANCE.logistics.storeCap, truckLoad: BALANCE.logistics.truckCapacity,
+    fobMaterial: BALANCE.construction.fobMaterial, storeCap: BALANCE.logistics.storeCap, capitalCap: BALANCE.logistics.capitalCap, truckLoad: BALANCE.logistics.truckCapacity,
     trainSlots: BALANCE.trainSlots, queueMax: BALANCE.queueMax, reinforceEvery: BALANCE.reinforce.interval, startUnits: BALANCE.startUnits,
   };
   assert.deepEqual(Object.keys(links).sort(), Object.keys(QUICK).sort(), 'jeder QUICK-Wert braucht hier eine Zeile');

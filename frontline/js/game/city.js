@@ -939,7 +939,7 @@ export function updateCity(game, dt) {
 
     const main = game.mainFob(id);
     if (main && main.built) {
-      for (const k of ['bm', 'mun', 'fuel']) main.store[k] = Math.min(BALANCE.logistics.storeCap, main.store[k] + s[k] * dt);
+      for (const k of ['bm', 'mun', 'fuel']) main.store[k] = Math.min(BALANCE.logistics.capitalCap, main.store[k] + s[k] * dt);
     }
     team.res.money += s.money * dt;
     team.rate.money += s.money;
@@ -1074,7 +1074,7 @@ export function cmdTrade(game, team, cmd) {
   const main = game.mainFob(team);
   if (!main && cmd.good !== 'metal') return { ok: false, reason: 'Hauptstadt zerstört' };
   const M = CITY.market;
-  const cap = BALANCE.logistics.storeCap;
+  const cap = cmd.good === 'metal' ? BALANCE.logistics.storeCap : BALANCE.logistics.capitalCap; // Stadtlager bzw. Lager der Hauptstadt
   const t = game.teams[team];
   const have = cmd.good === 'metal' ? c.metal : main.store[cmd.good];
   const add = (v) => {

@@ -28,7 +28,8 @@ export const QUICK = {
   radioHold: 1800, // Sekunden, die ein fertiger Sendemast stehen muss, bis sein Team gewinnt (30 min)
   maxFobs: 10, // FOBs je Team, mit Hauptstadt
   fobMaterial: 400, // Baumaterial, das eine FOB-Baustelle im Lager braucht, bevor gebaut wird
-  storeCap: 3000, // Lager je Sorte (Baumaterial, Munition, Treibstoff) und FOB
+  storeCap: 3000, // Lager je Sorte (Baumaterial, Munition, Treibstoff) und vordere FOB
+  capitalCap: 100000, // Lager je Sorte der Hauptstadt (mit Stadt füllen es die Werke bis hierhin; ohne Stadt wird es immer wieder aufgefüllt)
   truckLoad: 400, // Ladung eines LKW (Summe aller Sorten)
   trainSlots: 2, // so viele Einheiten bildet die Hauptstadt gleichzeitig aus
   queueMax: 5, // Länge der Ausbildungs-Warteschlange
@@ -89,7 +90,8 @@ export const BALANCE = {
   leash: 300, // Idle-Einheiten verfolgen max. so weit vom Ankerpunkt
   // Logistik (§11.1–11.3)
   logistics: {
-    storeCap: QUICK.storeCap, // Obergrenze je Sorte und FOB-Lager (die Hauptstadt wird darauf immer wieder aufgefüllt)
+    storeCap: QUICK.storeCap, // Obergrenze je Sorte und Lager einer vorderen FOB
+    capitalCap: QUICK.capitalCap, // Obergrenze je Sorte im Lager der Hauptstadt (ohne Stadt wird sie darauf immer wieder aufgefüllt)
     truckCapacity: QUICK.truckLoad, // Ladung eines LKW (Summe)
     transferRate: 100, // Laden/Entladen je s
     transferReach: 140, // LKW muss so nah an der FOB-Mitte stehen

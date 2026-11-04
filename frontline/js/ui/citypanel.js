@@ -216,7 +216,7 @@ export class MarketPanel {
     }
     const g = this.game;
     const M = CITY.market;
-    const cap = BALANCE.logistics.storeCap;
+    const L = BALANCE.logistics;
     const money = g.teams[this.team].res.money;
     const main = g.mainFob(this.team);
     this.root.querySelector('[data-mk-money]').textContent = `Geld ${fmt(Math.floor(money))}`;
@@ -227,7 +227,7 @@ export class MarketPanel {
       const buy = this.root.querySelector(`[data-trade="${k}"][data-dir="buy"]`);
       // ausgegraut, aber antippbar: der Grund kommt dann als Meldung
       sell.classList.toggle('off', (!main && k !== 'metal') || have < M.lot);
-      buy.classList.toggle('off', (!main && k !== 'metal') || money < M.buy[k] || have + M.lot > cap);
+      buy.classList.toggle('off', (!main && k !== 'metal') || money < M.buy[k] || have + M.lot > (k === 'metal' ? L.storeCap : L.capitalCap));
     }
   }
 

@@ -69,7 +69,7 @@ test('Hauptstadt hat unendlich Vorrat: Laden entleert sie nicht, das Front-Lager
   assert.ok(truck.cargo.bm > 0 && truck.cargo.bm <= L.transferRate * 1.2, `Laderate begrenzt: ${truck.cargo.bm}`);
   run(g, 6);
   assert.equal(truck.cargo.bm, L.truckCapacity, 'LKW voll');
-  assert.equal(f.store.bm, L.storeCap, 'Lager der Hauptstadt wird immer aufgefüllt');
+  assert.equal(f.store.bm, L.capitalCap, 'Lager der Hauptstadt wird immer aufgefüllt');
   assert.equal(g.teams[0].res.bm, 0);
 });
 
@@ -204,16 +204,17 @@ test('LKW Preset „Gemischt“ teilt die Kapazität je Sorte, Rest füllt die v
   assert.equal(truck.cargo.fuel, 0, 'leere Sorte bleibt leer');
 });
 
-test('LKW entlädt in die FOB (bis storeCap) und in eine FOB-Baustelle', () => {
+test('LKW entlädt in die Hauptstadt (bis capitalCap) und in eine FOB-Baustelle', () => {
   const g = mk({ seed: 7 });
   const f = fobOf(g, 0);
+  assert.equal(f.main, true);
   silence(g, 0);
-  g.setStock(0, { bm: L.storeCap - 10, mun: 0, fuel: 0 });
+  g.setStock(0, { bm: L.capitalCap - 10, mun: 0, fuel: 0 });
   const truck = g.spawnUnit('truck', 0, f.x + 60, f.y);
   truck.cargo.bm = 400;
   assert.equal(g.issue(0, { type: 'unload', ids: [truck.id], fobId: f.id }).ok, true);
   run(g, 8);
-  assert.equal(f.store.bm, L.storeCap, 'bis storeCap, Rest bleibt');
+  assert.equal(f.store.bm, L.capitalCap, 'bis capitalCap, Rest bleibt');
   assert.equal(truck.cargo.bm, 400 - 10);
   assert.equal(truck.order.type, 'idle');
 
@@ -225,6 +226,22 @@ test('LKW entlädt in die FOB (bis storeCap) und in eine FOB-Baustelle', () => {
   run(g, 8);
   assert.equal(site.store.bm, 400, 'Baustelle hat ihr Material');
   assert.equal(t2.cargo.bm, 0);
+});
+
+test('Vordere FOB: Entladen nur bis storeCap, die Hauptstadt fasst capitalCap', () => {
+  const g = new Game({ seed: 7 });
+  const f = fobOf(g, 0);
+  assert.ok(L.capitalCap > L.storeCap);
+  assert.equal(f.store.bm, L.capitalCap, 'Hauptstadt voll bis capitalCap');
+  silence(g, 0);
+  const front = fobRing(g, 0, f.x, f.y);
+  front.store.bm = L.storeCap - 10;
+  const truck = g.spawnUnit('truck', 0, front.x + 60, front.y);
+  truck.cargo.bm = 400;
+  assert.equal(g.issue(0, { type: 'unload', ids: [truck.id], fobId: front.id }).ok, true);
+  run(g, 8);
+  assert.equal(front.store.bm, L.storeCap, 'vordere FOB bis storeCap');
+  assert.equal(truck.cargo.bm, 400 - 10);
 });
 
 test('Route pendelt mindestens zwei Runden zwischen zwei FOBs', () => {

@@ -69,7 +69,7 @@ Darunter listet ein Inhaltsverzeichnis alle weiteren Abschnitte.
 | Kostenloser Soldaten-Nachschub | balance.js | `QUICK.reinforceEvery`, weitere in `BALANCE.reinforce` |
 | Zahl der FOBs / Bauradius, Mindestabstände | balance.js | `QUICK.maxFobs` / `BALANCE.fob` |
 | Baumaterial für eine FOB-Baustelle / Bau- und Reparaturtempo | balance.js | `QUICK.fobMaterial` / `BALANCE.construction` |
-| Lagergröße, LKW-Ladung / Lade- und Nachfüllraten | balance.js | `QUICK.storeCap`, `QUICK.truckLoad` / `BALANCE.logistics` |
+| Lagergröße vordere FOB / Hauptstadt, LKW-Ladung / Lade- und Nachfüllraten | balance.js | `QUICK.storeCap` / `QUICK.capitalCap`, `QUICK.truckLoad` / `BALANCE.logistics` |
 | Gleichzeitige Ausbildungen / Länge der Warteschlange | balance.js | `QUICK.trainSlots` / `QUICK.queueMax` |
 | Preis, Ausbildungszeit, HP, Tempo, Sicht einer Einheit | units.js | `cost`, `buildTime`, `hp`, `speed`, `sight` |
 | Waffen einer Einheit (Reichweite, Kadenz, Schuss, Schaden) | units.js | `weapons[]`: `range`, `cooldown`, `rounds`, `munCost`, `damage`, `hits` |

@@ -15,7 +15,7 @@ import { updateMovement, nearestPassable, planPath, setIdle, separate, exitHouse
 import { updateCombat } from './combat.js';
 import { updateZone } from './zone.js';
 import { createHot, updateHot, cmdDrill } from './hotzone.js';
-import { updateLogistics, cmdLoad, cmdUnload, cmdRoute, cmdSetPreset, cmdBoard, cmdDropoff, cargoSum } from './logistics.js';
+import { updateLogistics, cmdLoad, cmdUnload, cmdRoute, cmdSetPreset, cmdBoard, cmdDropoff, cargoSum, storeCapOf } from './logistics.js';
 import { updateConstruction, canBuild, cmdRepair, orderBuild, orderBuildSeq } from './construction.js';
 import { cmdRoof, cmdFortify, updateTowers, ejectCrew } from './tower.js';
 import { createHouses, updateGarrison, cmdGarrison, cmdUngarrison, cmdStorm, cmdFortifyHouse, dropOccupant } from './garrison.js';
@@ -480,7 +480,7 @@ export class Game {
     for (const k of STOCK_KEYS) {
       const amt = (cost[k] || 0) * factor;
       if (!(amt > 0)) continue;
-      const room = target.kind === 'building' ? BALANCE.logistics.storeCap - stock[k] : BALANCE.logistics.truckCapacity - cargoSum(stock);
+      const room = target.kind === 'building' ? storeCapOf(target) - stock[k] : BALANCE.logistics.truckCapacity - cargoSum(stock);
       stock[k] += Math.max(0, Math.min(amt, room));
     }
   }
@@ -503,7 +503,7 @@ export class Game {
       b.main = true;
       b.infinite = true;
       b.produces = b.def.produces;
-      for (const k of STOCK_KEYS) b.store[k] = BALANCE.logistics.storeCap;
+      for (const k of STOCK_KEYS) b.store[k] = BALANCE.logistics.capitalCap;
     }
     b.payerId = payerId;
     if (built) {
