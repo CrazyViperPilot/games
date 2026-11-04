@@ -21,7 +21,8 @@ export const CITY = {
   cost: { road: 0, res: 20, com: 30, bm: 40, mun: 40, fuel: 40, steel: 50, mine: 30, market: 60, power: 80, uni: 400, dc: 250, barracks: 80, factory: 150, heliport: 200, hospital: 120, airport: 800 }, // Geld je Zelle, bei Großbauten (size) je Gebäude (Abriss kostenlos, keine Erstattung)
   // Großbauten (seit v5.00): Kantenlänge in Zellen (fehlt = 1; seit v5.03 auch gerade). Ein Großbau ist ein Gebäude: eine Stufe, ein
   // Ziel mit Trefferpunkten hp × Kantenlänge, Arbeitsplätze und Strom wie eine Zelle; Straße an irgendeiner Außenzelle reicht.
-  size: { uni: 3, power: 2, barracks: 4, factory: 8, airport: 10 },
+  // Seit v5.08 sind auch die Werke (BM-Werk, Munitionswerk, Raffinerie, Stahlwerk) 2 × 2 groß, mit eigenem Aussehen (render/works.js).
+  size: { uni: 3, power: 2, barracks: 4, factory: 8, airport: 10, bm: 2, mun: 2, fuel: 2, steel: 2 },
   costBm: { road: 10, barracks: 100, factory: 200, heliport: 150, hospital: 80, airport: 400 }, // Baumaterial je Zelle aus dem Lager der Hauptstadt (seit v4.83: Straßen kosten Baumaterial statt Geld)
 
   // ---- Ausbildung (seit v4.96, PRD §15) ----
@@ -59,7 +60,7 @@ export const CITY = {
   jobsMine: [0, 6, 12, 20], // Arbeitsplätze je Stufe einer Förderanlage
   // Verarbeitung: so viel Rohstoff braucht eine Einheit Produkt (BM aus Holz oder Stein, Metall aus Erz, Treibstoff aus Öl, Munition aus Metall)
   convert: { bm: 1, metal: 2, fuel: 1, mun: 0.5 },
-  // Ressourcenkette (seit v5.07) für die Flussanzeige (Knopf „Ressourcen“, js/game/flow.js, PRD §15 „Ressourcenanzeige“):
+  // Ressourcenkette (seit v5.08) für die Flussanzeige (Knopf „Ressourcen“, js/game/flow.js, PRD §15 „Ressourcenanzeige“):
   // Werk → aus welchen Rohstoffen (Vorkommen) oder Waren es was macht. Reihenfolge = Reihenfolge der Verarbeitung.
   // Bei jeder Änderung an Rohstoffen, Werken oder Waren hier und in updateCity (js/game/city.js) mitpflegen; test/flow.test.js prüft beides.
   chain: {
@@ -70,7 +71,8 @@ export const CITY = {
   },
   // Startviertel (seit v4.84): steht zu Beginn fertig (Stufe 1) neben der Hauptstadt, dazu eine Ölquelle auf dem nächsten Ölvorkommen
   // Seit v5.03: über der Straße die Großbauten Kaserne (4 × 4) und Fabrikhalle (8 × 8) nebeneinander, big = [Art, Spalte ab Straßenanfang]
-  startQuarter: { road: 12, row: ['res', 'fuel', 'res'], big: [['barracks', 0], ['factory', 4]] }, // Straßenlänge, die Zellen darunter, die Großbauten darüber
+  // Ein Großbau in row (seit v5.08 die 2 × 2-Raffinerie) beginnt an seiner Spalte und reicht nach rechts und unten (dort null).
+  startQuarter: { road: 12, row: ['res', 'fuel', null, 'res'], big: [['barracks', 0], ['factory', 4]] }, // Straßenlänge, die Zellen darunter, die Großbauten darüber
   startMetal: 400, // Metall im Hauptlager zu Beginn (Metall bleibt dort, LKW fahren es nicht)
   // Metall je ausgebildeter Einheit (zusätzlich zum Geld); fehlt die Sorte, kostet sie kein Metall
   metalCost: { truck: 20, engineer: 20, ifv: 60, tank: 120, flak: 60, sam: 80, littlebird: 60, transporter: 80, gunship: 120, f16: 160 },

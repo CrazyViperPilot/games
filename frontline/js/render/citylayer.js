@@ -3,6 +3,7 @@
 // über drawTownBuilding (renderer.js).
 import { KINDS, KIND_ID, DEPOSITS, cellRect, canZone, hasRoad, sizeOf, fitBig, bigCenter, bigSpan } from '../game/city.js';
 import { BIG_KINDS, bigPlan, drawBigGround, drawBigTop, partFoot, bigTop } from './bigbuild.js';
+import { drawWorksTop, worksLift, WORKS_GROUND, WORKS_KINDS } from './works.js';
 import { CITY } from '../data/city.js';
 import { CITY_COLORS, CITY_ICON } from '../ui/citypanel.js';
 import { drawUniversityTop, UNI_LAWNS } from './university.js';
@@ -66,7 +67,7 @@ export function cityBuildings(game, team, known, inRect) {
       continue;
     }
     if (big) {
-      // Großbau: ein Objekt über das ganze Quadrat (Universität: eigenes Bild, isobuild.js → university.js)
+      // Großbau: ein Objekt über das ganze Quadrat (eigenes Bild über isobuild.js: Universität university.js, Werke works.js seit v5.08)
       const w = sizeOf(k) * c.cell;
       out.push({ x: ctr.x, y: ctr.y, w, h: w, kind: k, level: lv, color, damage });
       continue;
@@ -177,11 +178,12 @@ function drawBigLot(ren, ctx, c, k, lv, r, team, m) {
     return;
   }
   groundRect(ren, ctx, x0 + 3, y0 + 3, m.x + h - 3, m.y + h - 3);
-  ctx.fillStyle = lv ? '#d3cbb6' : LOT[k] + '55';
+  ctx.fillStyle = lv ? WORKS_GROUND[k] ?? '#d3cbb6' : LOT[k] + '55'; // Werke (seit v5.08): Pflaster, Schotter oder Erde je Werk
   ctx.fill();
   ctx.strokeStyle = LOT[k];
   ctx.lineWidth = ren.draping() ? Math.max(2, 4 * ren.camera.zoom) : 5;
   ctx.stroke();
+  if (lv && k !== 'uni') return;
   if (lv) {
     for (const [u0, v0, u1, v1] of UNI_LAWNS) {
       groundRect(ren, ctx, r.x + u0, r.y + v0, r.x + u1, r.y + v1);
@@ -624,7 +626,9 @@ export function drawCityTop(ren, ctx, team, known, inRect) {
       continue;
     }
     if (big) {
-      drawUniversityTop(ctx, { x: ctr.x, y: ctr.y, level: lv, color, damage: e ? 1 - e.hp / e.def.hp : 0 });
+      const b = { x: ctr.x, y: ctr.y, kind: k, level: lv, color, damage: e ? 1 - e.hp / e.def.hp : 0 };
+      if (WORKS_KINDS.includes(k)) drawWorksTop(ctx, b); // 2 × 2-Werke (seit v5.08)
+      else drawUniversityTop(ctx, b);
       continue;
     }
     if (k === 'heliport') {
@@ -734,7 +738,7 @@ export function drawCityBadges(ren, ctx, team, known, inRect, iso) {
     const px = sm ? small : big;
     if (iso) {
       const p = cam.worldToScreen(r.x, r.y);
-      const lift = whole ? (BIG_KINDS.has(k) ? Math.min(150, bigTop(k, lv) * 0.7) + 14 : BIG_LIFT[lv] ?? 110) : (BADGE_LIFT[TOWN_KIND[k]] ?? 50) * (0.75 + lv * 0.1);
+      const lift = whole ? (BIG_KINDS.has(k) ? Math.min(150, bigTop(k, lv) * 0.7) + 14 : WORKS_KINDS.includes(k) ? worksLift(k, lv) : BIG_LIFT[lv] ?? 110) : (BADGE_LIFT[TOWN_KIND[k]] ?? 50) * (0.75 + lv * 0.1);
       ctx.drawImage(img, p.x - px / 2, p.y - lift * z - px, px, px);
     } else {
       const w = px / z;

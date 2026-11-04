@@ -4,7 +4,7 @@
 // Dazu das Marktmenü (MarketPanel, seit v4.94): Fenster zum Handeln, geöffnet über Geldanzeige, Markt-Auswahl oder „Handel“.
 import { CITY } from '../data/city.js';
 import { BALANCE } from '../data/balance.js';
-import { KINDS, KIND_NAME, GOODS, cellAt, hasMarket, sizeOf } from '../game/city.js';
+import { KINDS, KIND_NAME, GOODS, cellAt, hasMarket, sizeOf, bigAnchorAt } from '../game/city.js';
 
 // Farben je Zellenart (Werkzeug, Grundstück, Symbol auf der Karte): Wohnen grün (privat), Gewerbe blau (kommerziell), Werke erdig,
 // Markt gold, Militär (Kaserne, Fabrikhalle, Heliport) oliv. Symbole: Werkzeugleiste und Schilder über den Gebäuden (citylayer.js).
@@ -14,8 +14,9 @@ const ICON = CITY_ICON;
 const CARE = CITY.care.by;
 const SHORT = { road: 'Straße', res: 'Wohnen', com: 'Gewerbe', bm: 'BM-Werk', mun: 'Mun.-Werk', fuel: 'Raffinerie', steel: 'Stahlwerk', mine: 'Förderung', market: 'Markt', power: 'Kraftwerk', uni: 'Universität', dc: 'Rechenz.', barracks: 'Kaserne', factory: 'Fabrikhalle', heliport: 'Heliport', hospital: 'Krankenhaus', airport: 'Flughafen', erase: 'Räumen' };
 export const CITY_TIP = {
-  bm: 'Baumaterial aus Holz und Stein (Holzfäller, Steinbruch)', mun: 'Munition aus Metall', fuel: 'Treibstoff aus Öl (Ölquelle)',
-  steel: 'Metall aus Erz (Erzmine)', mine: 'Nur auf Rohstoffvorkommen: Holzfäller, Steinbruch, Erzmine oder Ölquelle; braucht keine Straße',
+  bm: 'Großbau 2 × 2 (Ziegelei mit Holzlager): Baumaterial aus Holz und Stein (Holzfäller, Steinbruch)', mun: 'Großbau 2 × 2 (Bunker mit Riesenpatrone): Munition aus Metall',
+  fuel: 'Großbau 2 × 2 (großer Öltank, Destillationstürme): Treibstoff aus Öl (Ölquelle)',
+  steel: 'Großbau 2 × 2 (Hochofen mit Winderhitzern): Metall aus Erz (Erzmine)', mine: 'Nur auf Rohstoffvorkommen: Holzfäller, Steinbruch, Erzmine oder Ölquelle; braucht keine Straße',
   market: 'Handel: Überschuss verkaufen, Knappes teuer kaufen (Knopf Handel, Markt antippen oder Geldanzeige oben)', road: 'Kostet Baumaterial aus dem Lager der Hauptstadt',
   power: `Großbau ${CITY.size.power} × ${CITY.size.power} Zellen: Strom für Werke, Förderung, Uni und Rechenzentrum (stadtweit); ohne genug Strom arbeiten sie langsamer`,
   uni: 'Großbau 3 × 3 Zellen (antippen, das Quadrat folgt dem Finger; Straße an einer Seite); ohne fertige Universität ruht jede Forschung (eine reicht)',
@@ -110,12 +111,17 @@ export class CityPanel {
   begin(wx, wy) {
     const [c, r] = this.cell(wx, wy);
     this.drag = { c0: c, r0: r, c1: c, r1: r };
+    if (sizeOf(this.tool) > 1) this.move(wx, wy);
   }
 
   move(wx, wy) {
     if (!this.drag) return;
     [this.drag.c1, this.drag.r1] = this.cell(wx, wy);
-    if (sizeOf(this.tool) > 1) [this.drag.c0, this.drag.r0] = [this.drag.c1, this.drag.r1]; // Großbau: das Quadrat folgt dem Finger
+    if (sizeOf(this.tool) > 1) {
+      // Großbau: das Quadrat folgt dem Finger (seit v5.08 mit der Mitte am Finger, auch bei gerader Kantenlänge)
+      [this.drag.c1, this.drag.r1] = bigAnchorAt(this.game.city[this.team], this.tool, wx, wy);
+      [this.drag.c0, this.drag.r0] = [this.drag.c1, this.drag.r1];
+    }
   }
 
   cancel() {

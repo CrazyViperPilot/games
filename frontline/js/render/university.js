@@ -2,7 +2,8 @@
 // vier Seiten gleich aussieht, zeichnet die Iso-Ansicht für jede Drehung der Karte dasselbe Bild (Daniels Idee): die Drehung der
 // Kamera wird hier bewusst nicht beachtet. Stufe 1: Kuppelbau mit vier Säulenportalen; Stufe 2: dazu vier Flügel (Kreuzform),
 // höhere Kuppel mit Laterne; Stufe 3: Ecktürme mit Fahnen in Teamfarbe, Bäume im Hof. 2D: dieselbe Anlage von oben.
-// Helfer (iso, poly, box, lit, FACE, DETAIL) nutzt auch das Rathaus der Hauptstadt (cityhall.js).
+// Helfer (iso, poly, box, lit, FACE, DETAIL) nutzt auch das Rathaus der Hauptstadt (cityhall.js), dazu pyramid und OUTLINE die
+// 2 × 2-Werke (works.js, seit v5.08).
 // Nur Zeichnen (liest b = { x, y, level, color, damage }; Rauch bei Schaden zeichnet renderer.js), keine Spielregeln. Boden (Pflaster, Rasen) zeichnet citylayer.js.
 import { ISO_K } from './camera.js';
 import { shade, tint } from './sprites.js';
@@ -17,7 +18,7 @@ const GLASS = '#34506d';
 const GOLD = '#e2b444';
 const DOME = ['#b5e2cf', '#64a58d', '#2c584b']; // Kupfer mit Patina: Licht, Mitte, Schatten
 const LEAF = ['#8fc46a', '#4f8a3c', '#2b5a26'];
-const OUTLINE = 'rgba(40,30,20,0.45)';
+export const OUTLINE = 'rgba(40,30,20,0.45)';
 export const DETAIL = 0.42; // darunter keine Fenster, Säulen und Rippen (Leistung, zu klein zum Sehen)
 
 /** Maße je Stufe in Weltpixeln ab der Mitte (das Quadrat reicht bis ±96). */
@@ -213,7 +214,7 @@ function dome(g, r, h0, colors = DOME) {
 }
 
 /** Pyramidendach (Turm) über dem Quadrat ±s um (cu, cv) ab Höhe h, Spitze rh höher; Rückseiten zuerst. */
-function pyramid(g, cu, cv, s, h, rh, color) {
+export function pyramid(g, cu, cv, s, h, rh, color) {
   const { P } = g;
   const top = P(cu, cv, h + rh);
   const C = snowy(color);
@@ -224,7 +225,7 @@ function pyramid(g, cu, cv, s, h, rh, color) {
   poly(g, [c[1], c[2], top], lit(C, rh, 0, s)); // nach +u
 }
 
-function tree(g, u, v, s = 1) {
+export function tree(g, u, v, s = 1) {
   const { P, ctx, z } = g;
   const [gx, gy] = P(u, v, 0);
   ctx.fillStyle = 'rgba(0,0,0,0.2)';

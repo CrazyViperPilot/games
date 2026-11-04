@@ -165,7 +165,7 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 | `camera.js` | Ausschnitt, Zoom, Welt ↔ Bildschirm, Iso-Umrechnung |
 | `sprites.js` | gemalte Einheiten, Gebäude, Effekte, Kisten, Wracks, Tiere (von oben) |
 | `iso.js`, `isobuild.js`, `isosprites.js`, `isodata.js` | Iso-Grundkörper, Iso-Gebäude, Bild-Sprites (Kenney, `assets/iso/`), Modelldaten |
-| `university.js`, `cityhall.js` | Gezeichnete Sonderbauten in 2D und Iso, vierfach symmetrisch (ein Bild für jede Drehung): Universität 3 × 3, Hauptstadt als modernes Rathaus (`b.main`, eingehängt in `renderer.js` und `isobuild.drawTeamBuilding`) |
+| `university.js`, `cityhall.js`, `works.js` | Gezeichnete Sonderbauten in 2D und Iso, vierfach symmetrisch (ein Bild für jede Drehung): Universität 3 × 3, Werke 2 × 2 (BM-Werk, Munitionswerk, Raffinerie, Stahlwerk), Hauptstadt als modernes Rathaus (`b.main`, eingehängt in `renderer.js` und `isobuild.drawTeamBuilding`) |
 | `bigbuild.js` | Großbauten der Stadt (seit v5.03): Kraftwerk, Kaserne, Fabrikhalle, Flughafen als Liste von Boden-Teilen und Körpern (Quader, Zylinder, Fahne) in Weltkoordinaten; 2D von oben, isometrisch jeder Körper als eigenes Objekt in der Tiefenordnung (`cityBuildings` → `drawTownBuilding` mit `kind: 'bigpart'`), richtig für jede Drehung |
 | `ground.js`, `reliefimg.js`, `terrain.js` | WebGL-Boden der Iso-Ansicht, Geländebild, Kartenbild |
 | `bridge.js`, `season.js`, `weatherfx.js` | Brücken, Jahreszeitenfarben, Regen/Schnee/Nebel |

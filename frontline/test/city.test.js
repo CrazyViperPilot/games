@@ -72,12 +72,12 @@ test('Bauen kostet Geld (Straßen Baumaterial), zu wenig stoppt, Abriss ist kost
   assert.ok(r.ok);
   assert.equal(g.teams[0].res.money, 100);
   assert.equal(m.store.bm, bm0 - 100);
-  const r2 = paint(g, 'bm', 0, 1, 4, 1); // 5 x 40 > 100 Geld: nur 2 Zellen
-  assert.equal(r2.placed, 2);
+  const r2 = paint(g, 'com', 0, 1, 4, 1); // 5 x 30 > 100 Geld: nur 3 Zellen
+  assert.equal(r2.placed, 3);
   assert.equal(r2.broke, true);
   assert.equal(paint(g, 'erase', 0, 1, 4, 1).ok, true);
-  assert.equal(g.teams[0].res.money, 20);
-  assert.equal(paint(g, 'com', 0, 1, 0, 1).ok, false); // zu wenig Geld (30 > 20)
+  assert.equal(g.teams[0].res.money, 10);
+  assert.equal(paint(g, 'res', 0, 1, 0, 1).ok, false); // zu wenig Geld (20 > 10)
   m.store.bm = 5;
   assert.match(paint(g, 'road', 0, 2, 0, 2).reason, /Baumaterial/);
 });
@@ -263,8 +263,8 @@ test('Metall: Erzmine + Stahlwerk liefern, Fahrzeuge kosten Metall, Abbruch erst
   const c = g.city[0];
   paint(g, 'road', 0, 0, 9, 0);
   paint(g, 'res', 0, 1, 9, 1);
-  paint(g, 'steel', 0, 2, 3, 2);
-  paint(g, 'road', 0, 3, 3, 3);
+  assert.ok(paint(g, 'steel', 0, 2, 1, 3).ok); // 2 × 2 (seit v5.08), Straße darunter
+  paint(g, 'road', 0, 4, 3, 4);
   c.deposit[at(g, 5, 3)] = 3; // Erz
   c.deposit[at(g, 6, 3)] = 3;
   paint(g, 'mine', 5, 3, 6, 3);
@@ -414,10 +414,9 @@ test('KI verteidigt beschossene Stadtgebäude und greift gegnerische Werke zuers
 // v4.88: Universität, Rechenzentrum, Strom, Zufriedenheit
 import { researchBlock, researchSpeed } from '../js/game/research.js';
 const setLevel = (g, kind, lv, team = 0) => {
-  const n = sizeOf(kind); // Großbau (Universität 3 × 3): Mitte des freien Quadrats
-  const h = (n - 1) / 2;
+  const n = sizeOf(kind); // Großbau (Universität 3 × 3, Werke 2 × 2 …): das ganze freie Quadrat als Rechteck
   const b = spot(g, n, n, team);
-  const res = raw(g, kind, b.c + h, b.r + h, b.c + h, b.r + h, team);
+  const res = raw(g, kind, b.c, b.r, b.c + n - 1, b.r + n - 1, team);
   const c = g.city[team];
   const i = res.anchor ?? b.r * c.cols + b.c;
   for (const j of cellsOf(c, i)) c.level[j] = lv;
@@ -551,7 +550,8 @@ test('Universität: 3 × 3 Zellen, ein Gebäude, wächst mit Straße, Räumen en
   const g = new Game({ seed: 3, city: true });
   g.teams[0].res.money = 5000;
   const c = g.city[0];
-  const b = spot(g, 3, 4); // Quadrat plus eine Zeile darunter für die Straße
+  const b0 = spot(g, 5, 6); // Quadrat plus eine Zeile darunter für die Straße, ringsum eine freie Zelle (keine Straße daneben)
+  const b = { c: b0.c + 1, r: b0.r + 1 };
   const money = g.teams[0].res.money;
   const r = raw(g, 'uni', b.c + 1, b.r + 1, b.c + 1, b.r + 1);
   assert.ok(r.ok, r.reason);
@@ -729,4 +729,112 @@ test('Krankenhaus (v5.01): heilt Soldaten im Umkreis von 3 Feldern schneller', (
   } finally {
     BALANCE.commander.heal = heal0;
   }
+});
+
+// v5.08: Werke (BM-Werk, Munitionswerk, Raffinerie, Stahlwerk) als 2 × 2-Großbauten
+test('Werke 2 × 2 (v5.08): ein Gebäude wie bisher eine Werkzelle, Mitte zwischen den Zellen, Räumen entfernt alles', () => {
+  const g = new Game({ seed: 3, city: true });
+  g.teams[0].res.money = 5000;
+  const c = g.city[0];
+  const b0 = spot(g, 4, 5);
+  const b = { c: b0.c + 1, r: b0.r + 1 }; // 2 × 2 plus Straßenzeile, ringsum frei
+  const money = g.teams[0].res.money;
+  const r = raw(g, 'fuel', b.c + 1, b.r + 1, b.c + 1, b.r + 1); // ein Tipp: dort der Anker, das Quadrat reicht nach rechts unten …
+  assert.ok(r.ok, r.reason);
+  assert.equal(r.anchor, (b.r + 1) * c.cols + b.c + 1);
+  assert.ok(raw(g, 'erase', b.c + 1, b.r + 1, b.c + 1, b.r + 1).ok);
+  const r2 = raw(g, 'fuel', b.c, b.r, b.c + 1, b.r + 1); // … ein 2 × 2-Rechteck: genau dort
+  assert.equal(r2.anchor, b.r * c.cols + b.c);
+  assert.equal(g.teams[0].res.money, money - 2 * CITY.cost.fuel, 'ein Preis je Gebäude');
+  const a = r2.anchor;
+  const cells = cellsOf(c, a);
+  assert.equal(cells.length, 4);
+  assert.ok(cells.every((j) => c.kind[j] === KIND_ID.fuel && c.part[j] === a + 1));
+  assert.ok(r2.noRoad);
+  run(g, 1);
+  const jobs0 = c.stats.jobs;
+  assert.ok(raw(g, 'road', b.c, b.r + 2, b.c + 1, b.r + 2).ok);
+  run(g, CITY.growTime + 1);
+  assert.ok(cells.every((j) => c.level[j] === 1), 'alle Zellen Stufe 1');
+  const e = c.ents.get(a);
+  assert.ok(e && e.alive);
+  assert.equal(e.w * g.grid.tile, 2 * c.cell);
+  assert.equal(e.def.hp, CITY.hp[1] * 2);
+  const corner = { x: c.x0 + (b.c + 1) * c.cell, y: c.y0 + (b.r + 1) * c.cell };
+  assert.ok(Math.abs(e.x - corner.x) < 1e-6 && Math.abs(e.y - corner.y) < 1e-6, 'Mitte = Ecke zwischen den vier Zellen');
+  assert.equal(cityEntityAt(g, e.x + c.cell / 2, e.y + c.cell / 2), e, 'Zelle rechts unten trifft dasselbe Gebäude');
+  run(g, 1);
+  assert.equal(c.stats.jobs - jobs0, CITY.jobs[1], 'Arbeitsplätze wie bisher eine Werkzelle');
+  assert.ok(raw(g, 'erase', b.c + 1, b.r + 1, b.c + 1, b.r + 1).ok, 'Räumen einer Zelle');
+  assert.ok(cells.every((j) => !c.kind[j] && !c.part[j]), 'ganzes Quadrat leer');
+  assert.ok(!e.alive);
+  // Startviertel: die Raffinerie ist ein fertiges 2 × 2-Werk
+  const f = c.list.find((j) => c.kind[j] === KIND_ID.fuel && c.part[j] - 1 === j);
+  assert.ok(f >= 0 && c.level[f] === 1 && cellsOf(c, f).length === 4, 'Startviertel mit 2 × 2-Raffinerie');
+});
+
+test('2 × 2-BM-Werk: Straßenanschluss auch über ein benachbartes BM-Werk an der Straße (v5.05 für Großbauten)', () => {
+  const g = new Game({ seed: 3, city: true });
+  g.teams[0].res.money = 5000;
+  const c = g.city[0];
+  const b0 = spot(g, 6, 5);
+  const b = { c: b0.c + 1, r: b0.r + 1 };
+  assert.ok(raw(g, 'road', b.c, b.r, b.c + 3, b.r).ok);
+  const near = raw(g, 'bm', b.c, b.r + 1, b.c + 1, b.r + 2).anchor;
+  const far = raw(g, 'bm', b.c, b.r + 3, b.c + 1, b.r + 4).anchor;
+  const mun = raw(g, 'mun', b.c + 2, b.r + 1, b.c + 3, b.r + 2).anchor;
+  const mun2 = raw(g, 'mun', b.c + 2, b.r + 3, b.c + 3, b.r + 4).anchor;
+  const at2 = (a) => [a % c.cols, Math.floor(a / c.cols)];
+  assert.ok(hasRoad(c, ...at2(near)), 'direkt an der Straße');
+  assert.ok(hasRoad(c, ...at2(far)), 'über das BM-Werk davor');
+  assert.ok(hasRoad(c, ...at2(mun)));
+  assert.ok(!hasRoad(c, ...at2(mun2)), 'andere Werke nur direkt');
+});
+
+test('Alte Spielstände (vor v5.08): Werkzellen werden je ein 2 × 2-Werk, ohne Platz bleiben sie klein', () => {
+  const g = new Game({ seed: 3, city: true });
+  const c = g.city[0];
+  const b = spot(g, 8, 6);
+  const at2 = (x, y) => (b.r + y) * c.cols + b.c + x;
+  const put = (x, y, kind, lv) => {
+    c.kind[at2(x, y)] = KIND_ID[kind];
+    c.level[at2(x, y)] = lv;
+  };
+  // eine BM-Zelle Stufe 2 mit Platz daneben, eine Munitionszelle ringsum von Straßen eingeschlossen
+  put(1, 1, 'bm', 2);
+  for (const [x, y] of [[4, 3], [6, 3], [5, 2], [5, 4], [4, 2], [6, 2], [4, 4], [6, 4]]) put(x, y, 'road', 0);
+  put(5, 3, 'mun', 1);
+  c.list = [];
+  for (let i = 0; i < c.kind.length; i++) if (c.kind[i]) c.list.push(i);
+  delete c.part;
+  const jobsBefore = CITY.jobs[2] + CITY.jobs[1];
+  const { game } = restoreGame(snapshotGame(g, null)); // Laden ruft migrateCity
+  const d = game.city[0];
+  const a = d.part[at2(1, 1)] - 1;
+  assert.ok(a >= 0, 'BM-Zelle ist jetzt ein Großbau');
+  assert.ok(cellsOf(d, a).length === 4 && cellsOf(d, a).every((j) => d.kind[j] === KIND_ID.bm && d.level[j] === 2), '2 × 2 mit ihrer Stufe');
+  assert.ok(d.ents.get(a)?.alive, 'ein Ziel');
+  assert.equal(d.kind[at2(5, 3)], KIND_ID.mun, 'Munition ohne Platz bleibt …');
+  assert.equal(d.part[at2(5, 3)], 0, '… eine kleine Zelle');
+  run(game, 1);
+  const t = d.list.filter((j) => !isPart(d, j) && [KIND_ID.bm, KIND_ID.mun].includes(d.kind[j]) && d.level[j]).reduce((s, j) => s + CITY.jobs[d.level[j]], 0);
+  assert.equal(t, jobsBefore, 'nichts geht verloren');
+  migrateCity(game); // zweimal laden ändert nichts
+  assert.equal(d.list.filter((j) => d.kind[j] === KIND_ID.bm).length, 4);
+});
+
+test('KI baut Werke als 2 × 2-Großbauten', () => {
+  const g = new Game({ seed: 5, city: true });
+  g.teams[1].res.money = 50000;
+  const c = g.city[1];
+  const isWork = (j) => ['bm', 'mun', 'steel'].includes(KINDS[c.kind[j] - 1]);
+  let works = [];
+  for (let k = 0; k < 90 && works.length < 8; k++) {
+    aiCity(g, 1, 'normal');
+    run(g, 1);
+    works = c.list.filter(isWork);
+  }
+  assert.ok(works.length >= 8, `KI hat Werke ausgewiesen (${works.length} Zellen)`);
+  assert.ok(works.every((j) => c.part[j] > 0), 'alle als Großbau');
+  assert.ok(works.every((j) => !c.deposit[j]), 'nicht auf Vorkommen');
 });

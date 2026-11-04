@@ -197,10 +197,18 @@ export function createCity(game, enabled) {
   }
 }
 
-/** Fertige Zelle setzen (Stufe 1) ohne Kosten und ohne Wartezeit: Startviertel. */
+/**
+ * Fertige Zelle setzen (Stufe 1) ohne Kosten und ohne Wartezeit: Startviertel. Großbau (seit v5.08 die 2 × 2-Raffinerie): ein Quadrat,
+ * das die Zelle enthält (am liebsten mit ihr als Anker, also nach rechts unten), nur auf leeren Zellen ohne Vorkommen.
+ */
 function placeBuilt(game, c, i, kind) {
   const col = i % c.cols;
   const row = (i - col) / c.cols;
+  if (sizeOf(kind) > 1) {
+    const a = fitBig(game, c, col, row, kind, (j) => !c.kind[j] && !c.deposit[j]);
+    if (a >= 0) placeBuiltBig(game, c, a, kind);
+    return;
+  }
   c.kind[i] = KIND_ID[kind];
   if (kind !== 'road') {
     if (!cellFree(game, c, col, row)) return;
@@ -245,6 +253,8 @@ function startQuarter(game, c) {
     for (let k = 0; k < n; k++) {
       if (!ok(r * c.cols + q + k)) return false;
       if (Q.row[k] && !ok((r + 1) * c.cols + q + k)) return false;
+      const sz = Q.row[k] ? sizeOf(Q.row[k]) : 1; // Großbau unter der Straße: ganzes Quadrat frei
+      if (sz > 1 && (q + k + sz > c.cols || r + 1 + sz > c.rows || !bigFits(game, c, anchorAt(Q.row[k], q + k, r + 1), sz, (j) => ok(j)))) return false;
     }
     for (const [kind, off] of big) {
       const sz = sizeOf(kind);
@@ -456,6 +466,18 @@ export function bigCenter(c, a, n) {
   return { x: c.x0 + q * c.cell + off, y: c.y0 + r * c.cell + off, half: (n * c.cell) / 2 };
 }
 
+/**
+ * Anker des n × n-Quadrats eines Großbaus der Art `kind`, dessen Mitte dem Weltpunkt (x, y) am nächsten liegt (seit v5.08, Bauvorschau:
+ * das Quadrat folgt dem Finger; bei gerader Kantenlänge liegt der Finger nahe der Mitte statt in der linken oberen Mittelzelle).
+ */
+export function bigAnchorAt(c, kind, x, y) {
+  const n = sizeOf(kind);
+  const [lo] = bigSpan(n);
+  const q = Math.round((x - c.x0) / c.cell - n / 2) + lo;
+  const r = Math.round((y - c.y0) / c.cell - n / 2) + lo;
+  return [Math.min(c.cols - 1, Math.max(0, q)), Math.min(c.rows - 1, Math.max(0, r))];
+}
+
 /** Zellen des n × n-Quadrats um den Anker a (ohne Prüfung der Kartengrenzen; bigFits prüft sie). */
 export function bigCells(c, a, n) {
   const [lo, hi] = bigSpan(n);
@@ -562,7 +584,8 @@ export function migrateCity(game) {
     if (c.mapRoads === undefined) c.mapRoads = game.roads?.kind ?? null; // vor v5.03: Stadtstraßen der Karte
     let changed = false;
     for (const kind of ['uni']) {
-      // nur die Universität (v5.00); Kraftwerke, Kasernen, Fabrikhallen und Flughäfen (v5.03) alter Stände bleiben kleine Zellen
+      // nur die Universität (v5.00); Kraftwerke, Kasernen, Fabrikhallen und Flughäfen (v5.03) alter Stände bleiben kleine Zellen,
+      // Werke (v5.08) siehe unten
       const n = sizeOf(kind);
       const id = KIND_ID[kind];
       if (n <= 1 || !id) continue;
@@ -631,6 +654,38 @@ export function migrateCity(game) {
           if (lv) occupyCell(game, c, q, (j - q) / c.cols);
         }
         if (lv) syncEntity(game, c, best);
+      }
+    }
+    // Werke (seit v5.08): jede alte Werkzelle wird ein eigenes 2 × 2-Werk gleicher Stufe, wenn daneben Platz ist (das Quadrat enthält
+    // die alte Zelle, die übrigen drei Zellen sind leer und ohne Vorkommen); sonst bleibt sie die alte kleine Zelle. Ein Werk bleibt
+    // ein Werk: gleiche Arbeitsplätze, gleicher Strom, nichts geht verloren.
+    for (const kind of WORKS) {
+      const n = sizeOf(kind);
+      const id = KIND_ID[kind];
+      if (n <= 1 || !id) continue;
+      for (const i of [...c.list]) {
+        if (c.kind[i] !== id || c.part[i] || c.timer[i] < 0) continue; // Ruinen wachsen später als alte Zelle nach
+        const q = i % c.cols;
+        const r = (i - q) / c.cols;
+        const a = fitBig(game, c, q, r, kind, (j) => j === i || (!c.kind[j] && !c.deposit[j]));
+        if (a < 0) continue;
+        changed = true;
+        const lv = c.level[i];
+        const t = c.timer[i];
+        if (lv) releaseCell(game, c, q, r);
+        dropEntity(game, c, i);
+        c.kind[i] = 0;
+        c.level[i] = 0;
+        for (const j of bigCells(c, a, n)) {
+          c.kind[j] = id;
+          c.part[j] = a + 1;
+          c.level[j] = lv;
+          c.timer[j] = 0;
+          c.flee[j] = 0;
+          if (lv) occupyCell(game, c, j % c.cols, Math.floor(j / c.cols));
+        }
+        c.timer[a] = t; // Wachstumszeit der alten Zelle zählt weiter
+        if (lv) syncEntity(game, c, a);
       }
     }
     if (changed) rebuildList(c); // sonst bleibt der Stand unverändert (Laden = durchgehend gespielt)
@@ -708,7 +763,27 @@ const CHAIN = new Set(['res', 'com', 'bm'].map((k) => KIND_ID[k]));
  *  (Wohnen-Wohnen-Straße ok, BM-Werk-BM-Werk-Straße ok, Wohnen-Gewerbe-Straße für Wohnen nicht); die Zelle dazwischen muss selbst
  *  direkt an der Straße liegen. */
 export function hasRoad(c, col, row) {
-  if (c.part?.[idx(c, col, row)]) return cellsOf(c, idx(c, col, row)).some((j) => roadNext(c, j % c.cols, Math.floor(j / c.cols))); // Großbau: irgendeine seiner Zellen
+  const i0 = idx(c, col, row);
+  if (c.part?.[i0]) {
+    // Großbau: irgendeine seiner Zellen an der Straße; das 2 × 2-BM-Werk (seit v5.08) auch über ein benachbartes BM-Werk, das selbst
+    // direkt an der Straße liegt (wie die Einzelzellen seit v5.05)
+    const all = cellsOf(c, i0);
+    const direct = (cs) => cs.some((j) => roadNext(c, j % c.cols, Math.floor(j / c.cols)));
+    if (direct(all)) return true;
+    const k = c.kind[i0];
+    if (!CHAIN.has(k)) return false;
+    const a = anchorOf(c, i0);
+    for (const j of all) {
+      const q = j % c.cols;
+      const r = (j - q) / c.cols;
+      for (const [x, y] of [[q - 1, r], [q + 1, r], [q, r - 1], [q, r + 1]]) {
+        if (x < 0 || y < 0 || x >= c.cols || y >= c.rows) continue;
+        const n = idx(c, x, y);
+        if (c.kind[n] === k && anchorOf(c, n) !== a && direct(cellsOf(c, n))) return true;
+      }
+    }
+    return false;
+  }
   if (roadNext(c, col, row)) return true;
   const k = c.kind[idx(c, col, row)];
   if (!CHAIN.has(k)) return false;
@@ -1148,7 +1223,12 @@ export function cmdCity(game, team, cmd) {
   const r0 = Math.max(0, Math.min(cmd.r0, cmd.r1) | 0);
   const r1 = Math.min(city.rows - 1, Math.max(cmd.r0, cmd.r1) | 0);
   if (!(c1 >= c0 && r1 >= r0)) return { ok: false, reason: 'Außerhalb der Karte' };
-  if (!erase && sizeOf(cmd.kind) > 1) return placeBig(game, team, city, cmd.kind, Math.round((c0 + c1) / 2), Math.round((r0 + r1) / 2)); // Großbau: ein Gebäude um die Mitte
+  if (!erase && sizeOf(cmd.kind) > 1) {
+    // Großbau: ein Gebäude mitten im Rechteck; bei gerader Kantenlänge liegt der Anker links oben der Mitte (seit v5.08; ein Tipp: dort
+    // der Anker, das Quadrat reicht nach rechts unten)
+    const off = sizeOf(cmd.kind) % 2 ? 0 : 0.5;
+    return placeBig(game, team, city, cmd.kind, Math.round((c0 + c1) / 2 - off), Math.round((r0 + r1) / 2 - off));
+  }
   const t = game.teams[team];
   const id = erase ? 0 : KIND_ID[cmd.kind];
   let placed = 0;
@@ -1248,17 +1328,18 @@ function aiNeed(game, c, add, skip = null) {
     steel: c.metal < A.lowMetal && s.raw.ore > s.metal + s.mun * CITY.convert.mun,
     com: game.teams[c.team].res.money < A.lowMoney,
   };
-  let best = 'bm';
+  let best = null;
   let lo = Infinity;
   for (const [k, w] of Object.entries(A.mix)) {
     if (k === 'market' && count.market >= 1) continue; // ein Markt reicht
+    if (skip?.has(k)) continue; // Großbau ohne Platz in diesem Takt (seit v5.08 auch die 2 × 2-Werke)
     const r = count[k] / (w * (low[k] ? A.boost : 1));
     if (r < lo) {
       lo = r;
       best = k;
     }
   }
-  return best;
+  return best ?? 'res';
 }
 
 /** Liegt die Zelle nahe einem frischen Treffer auf die eigene Stadt? */

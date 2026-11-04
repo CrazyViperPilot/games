@@ -3,6 +3,7 @@
 // spriteOverrides.house = (ctx, cam, b) => { …; return true; } ersetzt die gemalte Variante (Rückgabe true = erledigt).
 import { BALANCE } from '../data/balance.js';
 import { drawUniversityIso } from './university.js';
+import { drawWorksIso, WORKS_KINDS } from './works.js';
 import { drawBigPart } from './bigbuild.js';
 import { drawCityHallIso } from './cityhall.js';
 import { drawBox, drawRotBox, wallPoint, wallQuad, buildingHeight, TOWN_H } from './iso.js';
@@ -277,6 +278,10 @@ export function drawTownBuilding(ctx, cam, b) {
   }
   if (b.kind === 'uni') {
     drawUniversityIso(ctx, cam, b); // 3 × 3-Großbau, für jede Drehung dasselbe Bild (university.js)
+    return;
+  }
+  if (WORKS_KINDS.includes(b.kind)) {
+    drawWorksIso(ctx, cam, b); // 2 × 2-Werke (seit v5.08), für jede Drehung dasselbe Bild (works.js)
     return;
   }
   if (spriteOverrides[b.kind]?.(ctx, cam, b)) return;
