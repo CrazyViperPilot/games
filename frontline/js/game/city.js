@@ -46,7 +46,7 @@ export const GOODS = ['bm', 'mun', 'fuel', 'metal', 'kero'];
 /** Waren im Stadtlager (Obergrenze BALANCE.logistics.storeCap); die übrigen liegen im Lager der Hauptstadt. Stahl heißt intern metal. */
 export const CITY_STORE_GOODS = ['metal', 'kero'];
 
-const zeroStats = () => ({ powerSupply: 0, powerUse: 0, powerRatio: 1, happy: 1, pop: 0, housing: 0, jobs: 0, jobsCom: 0, workers: 0, drafted: 0, free: 0, fled: 0, bm: 0, mun: 0, fuel: 0, kero: 0, iron: 0, metal: 0, money: 0, lost: 0, jam: 1, raw: { wood: 0, stone: 0, ore: 0, oil: 0 }, cap: { bm: 0, iron: 0, fuel: 0, kero: 0, metal: 0, mun: 0 }, inp: { bm: 0, iron: 0, fuel: 0, kero: 0, metal: 0, mun: 0 }, gross: { bm: 0, iron: 0, fuel: 0, kero: 0, metal: 0, mun: 0 } });
+const zeroStats = () => ({ powerSupply: 0, powerUse: 0, powerRatio: 1, happy: 1, shop: 0, shopSupply: 1, shopBm: 0, pop: 0, housing: 0, jobs: 0, jobsCom: 0, workers: 0, drafted: 0, free: 0, fled: 0, bm: 0, mun: 0, fuel: 0, kero: 0, iron: 0, metal: 0, money: 0, lost: 0, jam: 1, raw: { wood: 0, stone: 0, ore: 0, oil: 0 }, cap: { bm: 0, iron: 0, fuel: 0, kero: 0, metal: 0, mun: 0 }, inp: { bm: 0, iron: 0, fuel: 0, kero: 0, metal: 0, mun: 0 }, gross: { bm: 0, iron: 0, fuel: 0, kero: 0, metal: 0, mun: 0 } });
 
 /**
  * Gesperrte Zellen (für beide Teams gleich): unter und um jede Hauptstadt oder auf Hindernissen (Bäume, Wasser, Häuser, Gebäude).
@@ -1203,7 +1203,8 @@ export function updateCity(game, dt) {
       const lv = c.level[i];
       if (lv >= CITY.maxLevel) continue;
       const need = lv === 0 ? CITY.growTime : CITY.upgradeTime;
-      const wanted = lv === 0 || (kind === 'res' ? jobs >= pool * CITY.demand : pool >= jobs * CITY.demand);
+      // Gewerbe (seit v5.19, AP3b): eine neue Stufe nur, solange seine Arbeitsplätze höchstens so viele sind wie Arbeitsfähige × CITY.shop.per
+      const wanted = lv === 0 || (kind === 'res' ? jobs >= pool * CITY.demand : kind === 'com' ? t.jobsCom <= pool * CITY.shop.per : pool >= jobs * CITY.demand);
       if (c.timer[i] < need) c.timer[i] += dt;
       if (c.timer[i] >= need && wanted) {
         const all = cellsOf(c, i);
@@ -1239,9 +1240,50 @@ export function updateCity(game, dt) {
     s.powerSupply = CITY.power.base + t.power * fill;
     s.powerUse = t.use;
     s.powerRatio = t.use > 0 ? Math.min(1, s.powerSupply / t.use) : 1;
-    // Zufriedenheit (Stufe 3): Läden, Sicherheit, Strom
+    // Gewerbe und Markt (seit v5.19, AP3b): Baumaterial aus dem Lager der Hauptstadt, über ihren Weg zum Lager (Last = Bedarf).
+    // Versorgung v je Gebäude: 0 ohne Weg oder Lager, anteilig, wenn das Lager nicht reicht, × Stau. Steuer und Anteil an der
+    // Zufriedenheit wirken mit base + (1 − base) × v. Läuft vor der Zufriedenheit und liest den Lagerstand am Anfang des Schritts.
+    const tr = transportOf(game, c);
+    const W = scratchOf(c);
+    const eff = W.eff;
+    const arr = W.arr; // Ankunft am Eingang je Gebäude (Rate je s), nur für Werke und Förderung gelesen
+    arr.fill(0);
+    beginLoads(tr);
+    const main = game.mainFob(id);
+    const credit = !!main?.built; // Lager der Hauptstadt steht (sonst gehen Waren zum Lager verloren)
+    const SP = CITY.shop;
+    let shopW = 0; // Arbeiter × Gewichtung (base + (1 − base) × v): Steuer und Zufriedenheit
+    let shopJ = 0; // Arbeiter in Gewerbe und Markt
+    let shopV = 0; // Arbeiter × v (Versorgung)
+    let shopTake = 0; // Baumaterial, das in diesem Schritt aus dem Lager geht
+    for (const i of c.list) {
+      const lv = c.level[i];
+      if (!lv || isPart(c, i)) continue;
+      const k = KINDS[c.kind[i] - 1];
+      if (k !== 'com' && k !== 'market') continue;
+      const workers = jobsOf(c, i, k, lv) * fill;
+      const want = SP.need * workers * dt; // Bedarf dieses Schritts (Baumaterial)
+      const p = tr.shop.get(i) ?? null;
+      let v = 0;
+      if (p && want > 0) {
+        addLoad(tr, p, SP.need * workers);
+        if (credit) {
+          const take = Math.min(want, Math.max(0, main.store.bm));
+          main.store.bm -= take;
+          shopTake += take;
+          v = (take / want) * pathEff(tr, p);
+        }
+      }
+      shopW += workers * (SP.base + (1 - SP.base) * v);
+      shopJ += workers;
+      shopV += workers * v;
+    }
+    s.shopBm = dt > 0 ? shopTake / dt : 0; // Baumaterial je s, das Gewerbe verbraucht
+    s.shopSupply = shopJ > 0 ? shopV / shopJ : 1; // gewichtete Versorgung 0 … 1 (ohne Gewerbe 1)
+    // Zufriedenheit (Stufe 3): Läden (Versorgung zählt, geteilt durch arbeitsfähige Einwohner), Sicherheit, Strom
     const H = CITY.happy;
-    const shop = pop > 0 ? Math.min(1, (t.jobsCom * fill) / (pop * H.shopPer)) : 1;
+    const shop = pool > 0 ? Math.min(1, shopW / (pool * H.shopPer)) : 0;
+    s.shop = shop;
     const hits = (c.hitLog ?? []).filter((h) => h.t > game.time - 60).length;
     const safe = 1 - Math.min(1, hits / H.hitsBad);
     s.happy = pop > 0 ? Math.min(1, H.base + H.shops * shop + H.safety * safe + H.power * s.powerRatio) : 1;
@@ -1251,12 +1293,6 @@ export function updateCity(game, dt) {
     s.dc = t.dc;
     // eff_b = Besetzung × Strom × Zufriedenheit × Pendlerwirkung des Gebäudes (kein Pendlerweg: 0)
     const base = fill * s.powerRatio * mood;
-    const tr = transportOf(game, c);
-    const W = scratchOf(c);
-    const eff = W.eff;
-    const arr = W.arr; // Ankunft am Eingang je Gebäude (Rate je s), nur für Werke und Förderung gelesen
-    arr.fill(0);
-    beginLoads(tr);
     for (const i of c.list) {
       const lv = c.level[i];
       if (!lv || isPart(c, i)) continue;
@@ -1289,8 +1325,6 @@ export function updateCity(game, dt) {
       else arr[r.to] += roh * pathEff(tr, p);
     }
     // Werke in Kettenfolge (Hütte → Stahlwerk, dann BM, Raffinerien): Ausstoß = min(Leistung, Eingang / Verbrauch), Fluss zum Ziel
-    const main = game.mainFob(id);
-    const credit = !!main?.built; // Lager der Hauptstadt steht (sonst gehen Waren zum Lager verloren)
     for (const k of WORK_ORDER) {
       const prod = CITY.chain[k].to;
       for (const i of c.list) {
@@ -1362,7 +1396,7 @@ export function updateCity(game, dt) {
     }
     s.jam = jam;
     settleLoads(tr, dt);
-    s.money = (pool * CITY.taxPop + t.jobsCom * fill * CITY.taxCom) * mood;
+    s.money = (pool * CITY.taxPop + shopW * CITY.taxCom) * mood; // Gewerbe-Steuer nur nach Versorgung (shopW)
     c.stats = s;
 
     team.res.money += s.money * dt;

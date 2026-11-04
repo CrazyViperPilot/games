@@ -15,7 +15,11 @@ export const CITY = {
   yield: { bm: 0.1, mun: 0.06, fuel: 0.05, metal: 0.05, iron: 0.06, kero: 0.04 }, // höchster Ertrag je Arbeiter und Sekunde in Werken (BM-Werk, Munitionswerk, Raffinerie, Kerosin-Raffinerie, Hütte, Stahlwerk), begrenzt durch Rohstoffe
   sight: 160, // Sichtradius (px) jedes fertigen Stadtgebäudes: hebt den Kriegsnebel um die eigene Stadt auf
   taxPop: 0.03, // Geld/s je Einwohner
-  taxCom: 0.15, // zusätzliches Geld/s je Arbeiter im Gewerbe
+  taxCom: 0.07, // Geld/s je Arbeiter im Gewerbe (seit v5.19 0,07, vorher 0,15); wirkt nur mit Versorgung, siehe CITY.shop
+  // Gewerbe und Markt (seit v5.19, AP3b): Sie brauchen Baumaterial aus dem Lager der Hauptstadt, über die Straße angeliefert.
+  // need: Baumaterial je Arbeiter und Sekunde; base: Anteil von Steuer und Zufriedenheit ohne Versorgung (mit voller Versorgung zählt alles);
+  // per: Gewerbe wächst (neue Stufe) nur, solange seine Arbeitsplätze höchstens so viele sind wie arbeitsfähige Einwohner × per.
+  shop: { need: 0.004, base: 0.3, per: 0.25 },
 
   // ---- Bau ----
   cost: { road: 0, res: 20, com: 30, bm: 40, mun: 40, fuel: 40, steel: 50, smelter: 50, kero: 50, mine: 30, market: 60, power: 80, uni: 400, dc: 250, barracks: 80, factory: 150, heliport: 200, hospital: 120, airport: 800 }, // Geld je Zelle, bei Großbauten (size) je Gebäude (Abriss kostenlos, keine Erstattung)

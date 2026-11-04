@@ -302,7 +302,12 @@ export function resourceFlow(game, team, rates = null) {
   const mood = s.mood ?? 1;
   if (s.jobs > 0 && fill < 0.95) issue(fill < 0.7 ? 3.5 - fill : 2.6 - fill, `Nur ${pct(fill)} der Arbeitsplätze besetzt: alle Werke arbeiten langsamer.`, 'Wohnen bauen.');
   if (power < 0.999) issue(power < 0.7 ? 3.4 - power : 2.5 - power, `Strom reicht nur für ${pct(power)}: Förderung und Werke laufen langsamer.`, 'Kraftwerk bauen oder ausbauen.');
-  if ((s.happy ?? 1) < 0.5) issue(0.9, `Zufriedenheit niedrig (${pct(s.happy)}): Erträge × ${mood.toFixed(2).replace('.', ',')}.`, 'Gewerbe bauen, Stadt schützen, Strom sichern.');
+  // Gewerbe bauen nur, wenn die Läden die Zufriedenheit kaum tragen (Läden-Anteil unter 50 %, seit v5.19)
+  const shopLow = (s.shop ?? 1) < 0.5;
+  if ((s.happy ?? 1) < 0.5) issue(0.9, `Zufriedenheit niedrig (${pct(s.happy)}): Erträge × ${mood.toFixed(2).replace('.', ',')}.`, shopLow ? 'Gewerbe bauen, Stadt schützen, Strom sichern.' : 'Stadt schützen, Strom sichern.');
+  // Gewerbe braucht Baumaterial, über die Straße vom Lager (seit v5.19, AP3b): wenig versorgt = Steuer und Zufriedenheit fallen
+  const sup = s.shopSupply ?? 1;
+  if (sup < 0.5 && (s.jobsCom ?? 0) > 0) issue(1 + (0.5 - sup), `Gewerbe ohne Waren (Straße zum Lager, Baumaterial): nur ${pct(sup)} versorgt.`, 'Gewerbe per Straße an das Lager der Hauptstadt anschließen und Baumaterial nachproduzieren.');
   issues.sort((a, b) => b.sev - a.sev);
 
   // Linien ohne Fluss bekommen trotzdem eine Ware (Farbe)
