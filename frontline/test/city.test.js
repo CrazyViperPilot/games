@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
 import { CITY } from '../js/data/city.js';
 import { AI } from '../js/ai/ai.js';
-import { canZone, cityNoise, freePop, aiCity, aiDefend, aiRaid, hasRoad, hasMarket, cityEntityAt, cityTrainers, KIND_ID } from '../js/game/city.js';
+import { canZone, cityNoise, freePop, aiCity, aiDefend, aiRaid, hasRoad, hasMarket, cityEntityAt, cityTrainers, KIND_ID, sizeOf, cellsOf, isPart, forEnemyCity, migrateCity, cityLevel } from '../js/game/city.js';
+import { snapshotGame, restoreGame } from '../js/game/savegame.js';
 
 const run = (g, s) => { for (let t = 0; t < s * 20; t++) g.update(0.05); };
 // Ursprung (c, r) eines w × h großen, ganz bebaubaren Rechtecks im Gebiet des Teams, nahe der Hauptstadt
@@ -407,11 +408,13 @@ test('KI verteidigt beschossene Stadtgebäude und greift gegnerische Werke zuers
 // v4.88: Universität, Rechenzentrum, Strom, Zufriedenheit
 import { researchBlock } from '../js/game/research.js';
 const setLevel = (g, kind, lv, team = 0) => {
-  const b = spot(g, 1, 1, team);
-  raw(g, kind, b.c, b.r, b.c, b.r, team);
+  const n = sizeOf(kind); // Großbau (Universität 3 × 3): Mitte des freien Quadrats
+  const h = (n - 1) / 2;
+  const b = spot(g, n, n, team);
+  const res = raw(g, kind, b.c + h, b.r + h, b.c + h, b.r + h, team);
   const c = g.city[team];
-  const i = b.r * c.cols + b.c;
-  c.level[i] = lv;
+  const i = res.anchor ?? b.r * c.cols + b.c;
+  for (const j of cellsOf(c, i)) c.level[j] = lv;
   return i;
 };
 
@@ -535,4 +538,129 @@ test('KI mit Stadt bildet in Kaserne und Fabrikhalle aus und baut einen Heliport
   const kinds = new Set(cityTrainers(g, 1).map((e) => e.def.name));
   assert.ok(kinds.has('Kaserne') && kinds.has('Fabrikhalle'), [...kinds].join(','));
   assert.ok(kinds.has('Heliport') || g.city[1].list.some((i) => g.city[1].kind[i] === KIND_ID.heliport), 'Heliport ausgewiesen');
+});
+
+// v5.00: Universität als 3 × 3-Großbau (ein Gebäude, ein Ziel, alte Spielstände werden umgebaut)
+test('Universität: 3 × 3 Zellen, ein Gebäude, wächst mit Straße, Räumen entfernt alles', () => {
+  const g = new Game({ seed: 3, city: true });
+  g.teams[0].res.money = 5000;
+  const c = g.city[0];
+  const b = spot(g, 3, 4); // Quadrat plus eine Zeile darunter für die Straße
+  const money = g.teams[0].res.money;
+  const r = raw(g, 'uni', b.c + 1, b.r + 1, b.c + 1, b.r + 1);
+  assert.ok(r.ok, r.reason);
+  assert.equal(g.teams[0].res.money, money - CITY.cost.uni, 'ein Preis je Gebäude');
+  const a = r.anchor;
+  const cells = cellsOf(c, a);
+  assert.equal(cells.length, 9);
+  assert.ok(cells.every((j) => c.kind[j] === KIND_ID.uni && c.part[j] === a + 1));
+  assert.equal(cells.filter((j) => isPart(c, j)).length, 8, 'Mitte ist der Anker');
+  assert.ok(r.noRoad, 'ohne Straße meldet der Befehl das');
+  assert.ok(raw(g, 'road', b.c, b.r + 3, b.c + 2, b.r + 3).ok);
+  run(g, CITY.growTime + 1);
+  assert.ok(cells.every((j) => c.level[j] === 1), 'alle Zellen Stufe 1');
+  assert.equal(cityLevel(g, 0, 'uni'), 1);
+  const e = c.ents.get(a);
+  assert.ok(e && e.alive);
+  assert.equal(e.w * g.grid.tile, 3 * c.cell, 'Ziel deckt das ganze Quadrat');
+  assert.equal(e.def.hp, CITY.hp[1] * 3);
+  assert.equal([...c.ents.values()].filter((x) => x.def.name === 'Universität').length, 1, 'ein Ziel');
+  assert.equal(cityEntityAt(g, e.x - c.cell, e.y - c.cell), e, 'Eckzelle trifft dasselbe Gebäude');
+  let seen = 0;
+  forEnemyCity(g, 1, e.x, e.y, 200, (x) => { if (x === e) seen++; });
+  assert.equal(seen, 1, 'Splash trifft den Großbau nur einmal');
+  // Uni-Plätze zählen einmal
+  run(g, 1);
+  const jobs0 = g.city[0].stats.jobs;
+  assert.ok(raw(g, 'erase', b.c + 2, b.r + 2, b.c + 2, b.r + 2).ok, 'Räumen einer Eckzelle');
+  assert.ok(cells.every((j) => !c.kind[j] && !c.part[j]), 'ganzes Quadrat leer');
+  assert.ok(!e.alive);
+  run(g, 1);
+  assert.equal(jobs0 - g.city[0].stats.jobs, CITY.jobsUni[1], 'Uni zählte einmal');
+  // kein Platz: abgelehnt, nichts bezahlt
+  const m = g.mainFob(0);
+  const [fc, fr] = [Math.floor(m.x / c.cell), Math.floor(m.y / c.cell)];
+  const before = g.teams[0].res.money;
+  assert.match(raw(g, 'uni', fc, fr, fc, fr).reason, /3 × 3/);
+  assert.equal(g.teams[0].res.money, before);
+});
+
+test('Universität: zerstört wird das ganze Quadrat Ruine und wächst neu', () => {
+  const g = new Game({ seed: 3, city: true });
+  g.teams[0].res.money = 5000;
+  const c = g.city[0];
+  const b = spot(g, 3, 4);
+  const a = raw(g, 'uni', b.c + 1, b.r + 1, b.c + 1, b.r + 1).anchor;
+  raw(g, 'road', b.c, b.r + 3, b.c + 2, b.r + 3);
+  run(g, CITY.growTime + 1);
+  const e = c.ents.get(a);
+  assert.ok(e && e.def.hp === CITY.hp[1] * 3);
+  e.hp = 0;
+  run(g, 0.1);
+  assert.ok(cellsOf(c, a).every((j) => c.level[j] === 0 && c.kind[j] === KIND_ID.uni));
+  assert.ok(c.timer[a] < 0, 'Ruine');
+  assert.equal(cityLevel(g, 0, 'uni'), 0);
+  run(g, CITY.ruinTime + CITY.growTime + 1);
+  assert.ok(cellsOf(c, a).every((j) => c.level[j] === 1), 'neu gewachsen');
+  assert.ok(c.ents.get(a)?.alive);
+});
+
+test('Alte Spielstände: einzelne Uni-Zellen werden ein 3 × 3-Großbau mit ihrer Stufe', () => {
+  const g = new Game({ seed: 3, city: true });
+  const c = g.city[0];
+  const b = spot(g, 5, 5);
+  // wie vor v5.00: zwei Uni-Zellen nebeneinander, Stufe 2 und 1, ohne Großbau-Angabe
+  const i0 = (b.r + 2) * c.cols + b.c + 2;
+  for (const [i, lv] of [[i0, 2], [i0 + 1, 1]]) {
+    c.kind[i] = KIND_ID.uni;
+    c.level[i] = lv;
+  }
+  c.list = [...c.list, i0, i0 + 1].sort((x, y) => x - y);
+  delete c.part;
+  const { game } = restoreGame(snapshotGame(g, null)); // Laden ruft migrateCity
+  const d = game.city[0];
+  const a = d.part[i0] - 1;
+  assert.ok(a >= 0, 'Großbau angelegt');
+  assert.equal(d.part[i0 + 1], a + 1, 'beide alten Zellen im Quadrat');
+  assert.ok(cellsOf(d, a).every((j) => d.level[j] === 2 && d.kind[j] === KIND_ID.uni));
+  assert.equal(d.ents.get(a).w * game.grid.tile, 3 * d.cell);
+  assert.equal(cityLevel(game, 0, 'uni'), 2);
+  migrateCity(game); // zweimal laden ändert nichts
+  assert.equal(d.list.filter((j) => d.kind[j] === KIND_ID.uni).length, 9);
+});
+
+test('Alte Uni ohne Platz für 3 × 3 bleibt klein und zählt weiter', () => {
+  const g = new Game({ seed: 3, city: true });
+  const c = g.city[0];
+  const b = spot(g, 5, 5);
+  const i0 = (b.r + 2) * c.cols + b.c + 2;
+  // die alte Uni in der Mitte, die Umgebung (5 × 5) voller Straßen: kein Quadrat passt
+  for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) c.kind[i0 + dy * c.cols + dx] = KIND_ID.road;
+  c.kind[i0] = KIND_ID.uni;
+  c.level[i0] = 1;
+  c.list = [];
+  for (let i = 0; i < c.kind.length; i++) if (c.kind[i]) c.list.push(i);
+  migrateCity(g);
+  assert.equal(c.part[i0], 0);
+  assert.equal(c.kind[i0], KIND_ID.uni);
+  assert.equal(cityLevel(g, 0, 'uni'), 1);
+});
+
+test('KI baut die Universität als 3 × 3-Großbau', () => {
+  const g = new Game({ seed: 5, city: true });
+  const ai = new AI(g, 1, 'normal');
+  g.teams[1].res.money = 50000;
+  let a = -1;
+  for (let k = 0; k < 120 && a < 0; k++) {
+    aiCity(g, 1, 'normal');
+    run(g, 1);
+    const c = g.city[1];
+    a = c.list.find((j) => c.kind[j] === KIND_ID.uni && c.part[j] - 1 === j) ?? -1;
+  }
+  assert.ok(a >= 0, 'KI hat eine Uni ausgewiesen');
+  const c = g.city[1];
+  assert.equal(cellsOf(c, a).length, 9);
+  assert.ok(cellsOf(c, a).every((j) => !c.deposit[j]), 'nicht auf Vorkommen');
+  assert.ok(hasRoad(c, a % c.cols, Math.floor(a / c.cols)), 'mit Straße');
+  void ai;
 });

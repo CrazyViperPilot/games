@@ -1,9 +1,10 @@
 // Stadt auf der Karte (PRD §15): Straßen, ausgewiesene Zonen, Gebäude, Gebietsgrenzen und im Baumodus das gezogene Rechteck.
 // Liest nur game.city (und ren.cityUi, die Stadtleiste). 2D: flach von oben; isometrisch: Boden hier, Gebäude als Stadthäuser
 // über drawTownBuilding (renderer.js).
-import { KINDS, KIND_ID, DEPOSITS, cellRect, canZone, hasRoad } from '../game/city.js';
+import { KINDS, KIND_ID, DEPOSITS, cellRect, canZone, hasRoad, sizeOf, fitBig } from '../game/city.js';
 import { CITY } from '../data/city.js';
 import { CITY_COLORS, CITY_ICON } from '../ui/citypanel.js';
+import { drawUniversityTop, UNI_LAWNS } from './university.js';
 
 // Grundstücke in der Farbe der Zellenart (wie die Werkzeugleiste): Wohnen grün, Gewerbe blau, Werke erdig, Markt gold, Militär oliv
 const LOT = CITY_COLORS;
@@ -21,6 +22,7 @@ const MINE_COLOR = { wood: '#3f8a3f', stone: '#8f8f88', ore: '#c4612f', oil: '#3
 const SMALL = { res: 1, com: 1 };
 // Höhe des Schilds über dem Boden je Gebäudeform (Weltpixel, isometrisch)
 const BADGE_LIFT = { house: 50, hall: 56, factory: 74, barracks: 40, vhall: 52, heliport: 26 };
+const BIG_LIFT = [0, 76, 98, 106]; // Universität je Stufe: über der Kuppel
 // Rohstoffvorkommen: Bodenfarbe und Farbe der Tupfen (Bäume, Steine, Erzbrocken, Öllachen)
 const DEP_GROUND = { wood: 'rgba(30,70,30,0.55)', stone: 'rgba(120,120,115,0.55)', ore: 'rgba(140,70,40,0.55)', oil: 'rgba(20,20,24,0.6)' };
 const DEP_DOT = { wood: '#1f5a24', stone: '#b9b9b0', ore: '#c4612f', oil: '#0b0b0e' };
@@ -36,7 +38,10 @@ function* cells(game, team, known) {
       const col = i % c.cols;
       const r = cellRect(c, col, (i - col) / c.cols);
       if (c.team !== team && !known(r.x, r.y)) continue;
-      yield { c, k, lv: c.level[i], r, i, ruin: !c.level[i] && c.timer[i] < 0 };
+      // Großbau (seit v5.00): big = 'anchor' für die Mitte, 'part' für die übrigen Zellen; Ruine nach dem Zeitgeber der Mitte
+      const p = c.part?.[i];
+      const a = p ? p - 1 : i;
+      yield { c, k, lv: c.level[i], r, i, big: p ? (a === i ? 'anchor' : 'part') : null, ruin: !c.level[i] && c.timer[a] < 0 };
     }
   }
 }
@@ -47,11 +52,18 @@ const footprint = (r, lv) => r.x1 - r.x0 - 26 + lv * 6;
 /** Gebäude als Stadthaus-Objekte { x, y, w, h, kind } (Größe nach Ausbaustufe), für die Iso-Ansicht. */
 export function cityBuildings(game, team, known, inRect) {
   const out = [];
-  for (const { c, k, lv, r, i } of cells(game, team, known)) {
-    if (k === 'road' || !lv || !inRect(r.x, r.y)) continue;
-    const s = footprint(r, lv); // Stufe 1 kleiner, Stufe 3 füllt fast die Zelle (Rand zeigt die Farbe der Zone)
+  for (const { c, k, lv, r, i, big } of cells(game, team, known)) {
+    if (k === 'road' || !lv || big === 'part' || !inRect(r.x, r.y, big ? 128 : 0)) continue;
     const e = c.ents.get(i);
-    out.push({ x: r.x, y: r.y, w: s, h: k === 'res' ? s * 0.8 : s, kind: TOWN_KIND[k], color: c.team < 2 ? game.teams[c.team].color : '#888', damage: e ? 1 - e.hp / e.def.hp : 0 });
+    const color = c.team < 2 ? game.teams[c.team].color : '#888';
+    if (big) {
+      // Großbau: ein Objekt über das ganze Quadrat (Universität: eigenes Bild, isobuild.js → university.js)
+      const w = sizeOf(k) * c.cell;
+      out.push({ x: r.x, y: r.y, w, h: w, kind: k, level: lv, color, damage: e ? 1 - e.hp / e.def.hp : 0 });
+      continue;
+    }
+    const s = footprint(r, lv); // Stufe 1 kleiner, Stufe 3 füllt fast die Zelle (Rand zeigt die Farbe der Zone)
+    out.push({ x: r.x, y: r.y, w: s, h: k === 'res' ? s * 0.8 : s, kind: TOWN_KIND[k], color, damage: e ? 1 - e.hp / e.def.hp : 0 });
   }
   return out;
 }
@@ -79,8 +91,8 @@ export function drawCityGround(ren, ctx, team, known, inRect) {
   ctx.save();
   if (ren.draping()) ctx.setTransform(ren.dpr, 0, 0, ren.dpr, 0, 0);
   drawDeposits(ren, ctx, known);
-  for (const { c, k, lv, r, ruin } of cells(g, team, known)) {
-    if (!inRect(r.x, r.y, 64)) continue;
+  for (const { c, k, lv, r, ruin, big } of cells(g, team, known)) {
+    if (!inRect(r.x, r.y, big ? 160 : 64)) continue;
     if (ruin) {
       // Ruine: Schutt, bis die Zelle neu wächst
       groundRect(ren, ctx, r.x0 + 4, r.y0 + 4, r.x1 - 4, r.y1 - 4);
@@ -89,7 +101,11 @@ export function drawCityGround(ren, ctx, team, known, inRect) {
       for (const [fx, fy, fr] of DOTS) groundDot(ren, ctx, r.x0 + fx * 64, r.y0 + fy * 64, fr * 40, '#2b2826');
       continue;
     }
-    if (k === 'road') continue; // Straßen danach in einem Zug (drawRoads)
+    if (k === 'road' || big === 'part') continue; // Straßen danach in einem Zug (drawRoads); Großbau zeichnet seine Mitte
+    if (big) {
+      drawBigLot(ren, ctx, c, k, lv, r, team);
+      continue;
+    }
     groundRect(ren, ctx, r.x0 + 3, r.y0 + 3, r.x1 - 3, r.y1 - 3);
     ctx.fillStyle = lv ? LOT_BUILT[k] : LOT[k] + '55';
     ctx.fill();
@@ -111,6 +127,37 @@ export function drawCityGround(ren, ctx, team, known, inRect) {
   drawRoads(ren, ctx, team, known);
   drawTerritory(ren, ctx, team, known);
   ctx.restore();
+}
+
+/** Grundstück eines Großbaus (Universität): ausgewiesen blass mit Fortschritt, gebaut Pflaster mit vier Rasenflächen. */
+function drawBigLot(ren, ctx, c, k, lv, r, team) {
+  const h = (sizeOf(k) * c.cell) / 2;
+  const x0 = r.x - h;
+  const y0 = r.y - h;
+  groundRect(ren, ctx, x0 + 3, y0 + 3, r.x + h - 3, r.y + h - 3);
+  ctx.fillStyle = lv ? '#d3cbb6' : LOT[k] + '55';
+  ctx.fill();
+  ctx.strokeStyle = LOT[k];
+  ctx.lineWidth = ren.draping() ? Math.max(2, 4 * ren.camera.zoom) : 5;
+  ctx.stroke();
+  if (lv) {
+    for (const [u0, v0, u1, v1] of UNI_LAWNS) {
+      groundRect(ren, ctx, r.x + u0, r.y + v0, r.x + u1, r.y + v1);
+      ctx.fillStyle = '#76a65a';
+      ctx.fill();
+      ctx.strokeStyle = '#9bbf7c';
+      ctx.lineWidth = ren.draping() ? Math.max(1, 2 * ren.camera.zoom) : 2;
+      ctx.stroke();
+    }
+    return;
+  }
+  if (c.team !== team) return;
+  const i = Math.floor(r.y0 / c.cell) * c.cols + Math.floor(r.x0 / c.cell);
+  const linked = hasRoad(c, i % c.cols, Math.floor(i / c.cols));
+  const f = linked ? Math.max(0, Math.min(1, c.timer[i] / CITY.growTime)) : 1;
+  groundRect(ren, ctx, x0 + 16, r.y - 6, x0 + 16 + (2 * h - 32) * f, r.y + 6);
+  ctx.fillStyle = linked ? '#e8e2a0' : '#e0553a';
+  ctx.fill();
 }
 
 /** Landeplatz des Heliports: dunkler Kreis mit weißem Ring und „H“ auf dem Boden. */
@@ -470,7 +517,23 @@ function drawTerritory(ren, ctx, team, known) {
     }
   }
   const d = ui?.drag;
-  if (d) {
+  if (d && sizeOf(ui.tool) > 1) {
+    // Großbau: Quadrat dort, wo der Befehl es hinsetzen würde (rot, wenn nichts passt)
+    const c = g.city[team];
+    const S = c.cell;
+    const n = sizeOf(ui.tool);
+    const a = fitBig(g, c, d.c1, d.r1, ui.tool);
+    const q = a >= 0 ? a % c.cols : d.c1;
+    const r = a >= 0 ? Math.floor(a / c.cols) : d.r1;
+    const h = (n - 1) / 2;
+    const col = a >= 0 ? CITY_COLORS[ui.tool] : '#e0553a';
+    groundRect(ren, ctx, (q - h) * S, (r - h) * S, (q + h + 1) * S, (r + h + 1) * S);
+    ctx.fillStyle = col + '88';
+    ctx.fill();
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 3 * z;
+    ctx.stroke();
+  } else if (d) {
     const c = g.city[team];
     const S = c.cell;
     const qa = Math.min(d.c0, d.c1);
@@ -490,9 +553,13 @@ function drawTerritory(ren, ctx, team, known) {
 export function drawCityTop(ren, ctx, team, known, inRect) {
   const g = ren.game;
   if (!g.city) return;
-  for (const { c, k, lv, r, i } of cells(g, team, known)) {
-    if (k === 'road' || !lv || !inRect(r.x, r.y, 64)) continue;
+  for (const { c, k, lv, r, i, big } of cells(g, team, known)) {
+    if (k === 'road' || !lv || big === 'part' || !inRect(r.x, r.y, big ? 160 : 64)) continue;
     const e = c.ents.get(i);
+    if (big) {
+      drawUniversityTop(ctx, { x: r.x, y: r.y, level: lv, color: c.team < 2 ? g.teams[c.team].color : '#888', damage: e ? 1 - e.hp / e.def.hp : 0 });
+      continue;
+    }
     if (k === 'heliport') {
       // Landeplatz liegt am Boden; nur ein kleiner Turm in der Ecke
       ctx.fillStyle = ROOF.heliport;
@@ -583,15 +650,15 @@ export function drawCityBadges(ren, ctx, team, known, inRect, iso) {
   const z = cam.zoom;
   const big = Math.max(18, Math.min(34, 30 * z));
   const small = Math.max(12, Math.min(22, 19 * z));
-  for (const { c, k, lv, r, i } of cells(g, team, known)) {
-    if (k === 'road' || !lv || !inRect(r.x, r.y, 64)) continue;
+  for (const { c, k, lv, r, i, big: whole } of cells(g, team, known)) {
+    if (k === 'road' || !lv || whole === 'part' || !inRect(r.x, r.y, 64)) continue;
     const sm = !!SMALL[k];
     const d = k === 'mine' ? DEPOSITS[c.deposit[i] - 1] : null;
     const img = badgeImage(sm ? k : d ? MINE_ICON[d] : CITY_ICON[k], d ? MINE_COLOR[d] : CITY_COLORS[k], sm);
     const px = sm ? small : big;
     if (iso) {
       const p = cam.worldToScreen(r.x, r.y);
-      const lift = (BADGE_LIFT[TOWN_KIND[k]] ?? 50) * (0.75 + lv * 0.1);
+      const lift = whole ? BIG_LIFT[lv] ?? 110 : (BADGE_LIFT[TOWN_KIND[k]] ?? 50) * (0.75 + lv * 0.1);
       ctx.drawImage(img, p.x - px / 2, p.y - lift * z - px, px, px);
     } else {
       const w = px / z;

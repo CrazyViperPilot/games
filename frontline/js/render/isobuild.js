@@ -2,6 +2,7 @@
 // Spätere Sprites (z. B. freies Grafikpaket oder eigene Entwürfe) lassen sich pro Gebäudeart einhängen:
 // spriteOverrides.house = (ctx, cam, b) => { …; return true; } ersetzt die gemalte Variante (Rückgabe true = erledigt).
 import { BALANCE } from '../data/balance.js';
+import { drawUniversityIso } from './university.js';
 import { drawBox, drawRotBox, wallPoint, wallQuad, buildingHeight, TOWN_H } from './iso.js';
 import { shade, tint, hexA } from './sprites.js';
 import { snowy } from './season.js';
@@ -268,6 +269,10 @@ export function drawBench(ctx, cam, b) {
 
 /** Gebäude der Stadt (Haus, Halle, Fabrik) mit Fenstern, Türen, Toren, Balkonen und Dachaufbauten. */
 export function drawTownBuilding(ctx, cam, b) {
+  if (b.kind === 'uni') {
+    drawUniversityIso(ctx, cam, b); // 3 × 3-Großbau, für jede Drehung dasselbe Bild (university.js)
+    return;
+  }
   if (spriteOverrides[b.kind]?.(ctx, cam, b)) return;
   const hw = b.w / 2;
   const hh = b.h / 2;

@@ -10,7 +10,7 @@ import { reliefOf } from './relief.js';
 import { createUnit, createBuilding, defineAmmo, isFoe, canAttack, inRange } from './entities.js';
 import { Fog } from './fog.js';
 import { updateEconomy, smoothIncome } from './economy.js';
-import { createCity, updateCity, cmdCity, cmdTrade, cityNoise, freePop, crewOf, payMetal, cityTrainers, trainerKind, KIND_NAME } from './city.js';
+import { createCity, updateCity, cmdCity, cmdTrade, cityNoise, freePop, crewOf, payMetal, cityTrainers, trainerKind, KIND_NAME, migrateCity } from './city.js';
 import { updateMovement, nearestPassable, planPath, setIdle, separate, exitHouse } from './movement.js';
 import { updateCombat } from './combat.js';
 import { updateZone } from './zone.js';
@@ -237,6 +237,7 @@ export class Game {
   restoreAccessors() {
     for (const team of this.teams) this.bindStocks(team);
     for (const u of this.units) defineAmmo(u, u.def);
+    migrateCity(this); // ältere Stände: Universität als 3 × 3-Großbau (seit v5.00)
   }
 
   newId() {

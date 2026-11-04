@@ -154,6 +154,7 @@ function createTeamCity(game, team, shared) {
     rows,
     kind: new Uint8Array(n), // Zellenart (KIND_ID), 0 leer
     level: new Uint8Array(n), // 0 = ausgewiesen, 1..maxLevel = Gebäude
+    part: new Int32Array(n), // Großbau (seit v5.00): Mittelzelle + 1 für jede seiner Zellen, 0 = Einzelzelle
     timer: new Float32Array(n), // Wachstumszeit der Zelle
     flee: new Float32Array(n), // > 0: Bewohner geflohen, Ruhezeit bis zur Rückkehr (s)
     claim: new Uint8Array(n), // 1 = eigenes Gebiet
@@ -268,7 +269,7 @@ export function updateClaim(game, c) {
     stamp(b.x, b.y, b.main ? TR.main : TR.fob);
   }
   for (const i of c.list) {
-    if (!c.level[i] || c.kind[i] === KIND_ID.road) continue;
+    if (!c.level[i] || c.kind[i] === KIND_ID.road || isPart(c, i)) continue;
     stamp((i % c.cols + 0.5) * c.cell + c.x0, (Math.floor(i / c.cols) + 0.5) * c.cell + c.y0, TR.building);
   }
   let changed = false;
@@ -335,6 +336,204 @@ export function cityNoise(game, x, y) {
 
 const idx = (c, col, row) => row * c.cols + col;
 
+// ---- Großbauten (seit v5.00, CITY.size): ein Gebäude über n × n Zellen, verwaltet über seine Mittelzelle (Anker) ----
+
+/** Kantenlänge (Zellen) eines Gebäudes dieser Art: CITY.size oder 1. */
+export function sizeOf(kind) {
+  return CITY.size[kind] ?? 1;
+}
+
+/** Mittelzelle des Großbaus, zu dem Zelle i gehört; bei Einzelzellen i selbst. */
+export function anchorOf(c, i) {
+  const p = c.part?.[i];
+  return p ? p - 1 : i;
+}
+
+/** Zelle i gehört zu einem Großbau, ist aber nicht seine Mitte (wächst, zählt und trifft nicht selbst). */
+export function isPart(c, i) {
+  const p = c.part?.[i];
+  return !!p && p - 1 !== i;
+}
+
+/** Zellen des n × n-Quadrats um die Mitte a (ohne Prüfung der Kartengrenzen; bigFits prüft sie). */
+export function bigCells(c, a, n) {
+  const h = (n - 1) / 2;
+  const q = a % c.cols;
+  const r = (a - q) / c.cols;
+  const out = [];
+  for (let y = r - h; y <= r + h; y++) for (let x = q - h; x <= q + h; x++) out.push(y * c.cols + x);
+  return out;
+}
+
+/** Alle Zellen des Gebäudes in Zelle i (Großbau: das ganze Quadrat, sonst nur i). */
+export function cellsOf(c, i) {
+  if (!c.part?.[i]) return [i];
+  const a = c.part[i] - 1;
+  return bigCells(c, a, sizeOf(KINDS[c.kind[a] - 1]));
+}
+
+/**
+ * Passt ein n × n-Großbau mit Mitte a? Alle Zellen auf der Karte, ausweisbar, ohne Hindernis oder fremdes Gebäude und `free(j)`
+ * (Standard: leer).
+ */
+export function bigFits(game, c, a, n, free = (j) => !c.kind[j]) {
+  const h = (n - 1) / 2;
+  const q = a % c.cols;
+  const r = (a - q) / c.cols;
+  if (q - h < 0 || r - h < 0 || q + h >= c.cols || r + h >= c.rows) return false;
+  for (let y = r - h; y <= r + h; y++) {
+    for (let x = q - h; x <= q + h; x++) {
+      const j = y * c.cols + x;
+      if (!canZone(game, c, j) || !free(j) || !cellFree(game, c, x, y)) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Mitte für einen Großbau der Art `kind`, der die Zelle (col, row) enthält: zuerst genau dort, sonst so weit verschoben,
+ * dass er passt (erst gerade, dann schräg). −1, wenn nichts passt.
+ */
+export function fitBig(game, c, col, row, kind, free) {
+  const n = sizeOf(kind);
+  const h = (n - 1) / 2;
+  const offs = [];
+  for (let dy = -h; dy <= h; dy++) for (let dx = -h; dx <= h; dx++) offs.push([dx, dy]);
+  offs.sort((p, o) => Math.abs(p[0]) + Math.abs(p[1]) - Math.abs(o[0]) - Math.abs(o[1]) || Math.max(Math.abs(p[0]), Math.abs(p[1])) - Math.max(Math.abs(o[0]), Math.abs(o[1])));
+  for (const [dx, dy] of offs) {
+    const x = col + dx;
+    const y = row + dy;
+    if (x < 0 || y < 0 || x >= c.cols || y >= c.rows) continue;
+    if (bigFits(game, c, y * c.cols + x, n, free)) return y * c.cols + x;
+  }
+  return -1;
+}
+
+/** Großbau mit Mitte a abreißen oder überbauen: alle Zellen leer, begehbar, Ziel weg, eigene Ausbildung zurück. */
+function clearBig(game, team, c, a) {
+  refundQueue(game, team, c.ents.get(a));
+  dropEntity(game, c, a);
+  for (const j of cellsOf(c, a)) {
+    if (c.part[j] !== a + 1) continue;
+    const q = j % c.cols;
+    if (c.level[j]) releaseCell(game, c, q, (j - q) / c.cols);
+    c.kind[j] = 0;
+    c.level[j] = 0;
+    c.timer[j] = 0;
+    c.part[j] = 0;
+  }
+}
+
+/** Großbau der Art `kind` mit Mitte nahe (col, row) ausweisen (ein Gebäude, Preis CITY.cost je Gebäude). */
+function placeBig(game, team, c, kind, col, row) {
+  const n = sizeOf(kind);
+  const a = fitBig(game, c, col, row, kind);
+  if (a < 0) return { ok: false, reason: `${KIND_NAME[kind]} braucht ${n} × ${n} freie Zellen` };
+  const t = game.teams[team];
+  const price = CITY.cost[kind];
+  const bm = CITY.costBm[kind] ?? 0;
+  const main = game.mainFob(team);
+  if (t.res.money < price) return { ok: false, reason: 'Zu wenig Geld' };
+  if (bm && (!main || main.store.bm < bm)) return { ok: false, reason: 'Zu wenig Baumaterial im Lager der Hauptstadt' };
+  t.res.money -= price;
+  if (bm) main.store.bm -= bm;
+  for (const j of bigCells(c, a, n)) {
+    c.kind[j] = KIND_ID[kind];
+    c.level[j] = 0;
+    c.timer[j] = 0;
+    c.flee[j] = 0;
+    c.part[j] = a + 1;
+  }
+  rebuildList(c);
+  const q = a % c.cols;
+  return { ok: true, placed: 1, broke: false, noRoad: !hasRoad(c, q, (a - q) / c.cols), anchor: a };
+}
+
+/**
+ * Alte Spielstände (vor v5.00): Universitäten waren einzelne Zellen. Jede zusammenhängende Gruppe alter Uni-Zellen wird ein
+ * 3 × 3-Großbau an der Stelle, die die meisten ihrer Zellen deckt (übrige Zellen der Gruppe gehen darin auf), mit der höchsten
+ * Stufe der Gruppe. Passt nirgends ein Quadrat hin, bleibt die alte kleine Uni, wie sie war (sie zählt weiter).
+ */
+export function migrateCity(game) {
+  if (!game.city) return;
+  for (const c of game.city) {
+    c.part ??= new Int32Array(c.kind.length);
+    let changed = false;
+    for (const kind of Object.keys(CITY.size)) {
+      const n = sizeOf(kind);
+      const id = KIND_ID[kind];
+      if (n <= 1 || !id) continue;
+      const done = new Set();
+      for (const i0 of [...c.list]) {
+        if (c.kind[i0] !== id || c.part[i0] || done.has(i0)) continue;
+        const group = [i0];
+        done.add(i0);
+        for (let k = 0; k < group.length; k++) {
+          const q = group[k] % c.cols;
+          const r = (group[k] - q) / c.cols;
+          for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const x = q + dx;
+            const y = r + dy;
+            const j = y * c.cols + x;
+            if (x < 0 || y < 0 || x >= c.cols || y >= c.rows || c.kind[j] !== id || c.part[j] || done.has(j)) continue;
+            done.add(j);
+            group.push(j);
+          }
+        }
+        const own = new Set(group);
+        const lv = Math.max(...group.map((i) => c.level[i]));
+        const mq = group.reduce((s, i) => s + (i % c.cols), 0) / group.length;
+        const mr = group.reduce((s, i) => s + Math.floor(i / c.cols), 0) / group.length;
+        let best = -1;
+        let bestN = 0;
+        let bestD = Infinity;
+        const tried = new Set();
+        const h = (n - 1) / 2;
+        for (const i of group) {
+          const q = i % c.cols;
+          const r = (i - q) / c.cols;
+          for (let dy = -h; dy <= h; dy++) {
+            for (let dx = -h; dx <= h; dx++) {
+              const a = (r + dy) * c.cols + q + dx;
+              if (q + dx < 0 || r + dy < 0 || q + dx >= c.cols || r + dy >= c.rows || tried.has(a)) continue;
+              tried.add(a);
+              if (!bigFits(game, c, a, n, (j) => !c.kind[j] || own.has(j))) continue;
+              const cover = bigCells(c, a, n).filter((j) => own.has(j)).length;
+              const d = Math.hypot(q + dx - mq, r + dy - mr);
+              if (cover > bestN || (cover === bestN && d < bestD)) {
+                best = a;
+                bestN = cover;
+                bestD = d;
+              }
+            }
+          }
+        }
+        if (best < 0) continue; // kein Platz: alte kleine Uni bleibt
+        changed = true;
+        for (const i of group) {
+          const q = i % c.cols;
+          if (c.level[i]) releaseCell(game, c, q, (i - q) / c.cols);
+          dropEntity(game, c, i);
+          c.kind[i] = 0;
+          c.level[i] = 0;
+          c.timer[i] = 0;
+        }
+        for (const j of bigCells(c, best, n)) {
+          const q = j % c.cols;
+          c.kind[j] = id;
+          c.part[j] = best + 1;
+          c.level[j] = lv;
+          c.timer[j] = 0;
+          c.flee[j] = 0;
+          if (lv) occupyCell(game, c, q, (j - q) / c.cols);
+        }
+        if (lv) syncEntity(game, c, best);
+      }
+    }
+    if (changed) rebuildList(c); // sonst bleibt der Stand unverändert (Laden = durchgehend gespielt)
+  }
+}
+
 /** Rechteck einer Stadtzelle auf der Karte (px). */
 export function cellRect(c, col, row) {
   const x = c.x0 + col * c.cell;
@@ -398,6 +597,7 @@ function roadNext(c, col, row) {
 /** Straßenanschluss: Nachbar ist Straße. Wohnen und Gewerbe reichen auch über genau eine Zelle gleicher Art
  *  (Wohnen-Wohnen-Straße ok, Wohnen-Gewerbe-Straße für Wohnen nicht); die Zelle dazwischen muss selbst direkt an der Straße liegen. */
 export function hasRoad(c, col, row) {
+  if (c.part?.[idx(c, col, row)]) return cellsOf(c, idx(c, col, row)).some((j) => roadNext(c, j % c.cols, Math.floor(j / c.cols))); // Großbau: irgendeine seiner Zellen
   if (roadNext(c, col, row)) return true;
   const k = c.kind[idx(c, col, row)];
   if (k !== KIND_ID.res && k !== KIND_ID.com) return false;
@@ -414,7 +614,7 @@ function totals(c) {
   const t = { housing: 0, fled: 0, jobsCom: 0, bm: 0, mun: 0, fuel: 0, steel: 0, mine: { wood: 0, stone: 0, ore: 0, oil: 0 }, market: 0, power: 0, powerJobs: 0, uni: 0, dc: 0, jobsOther: 0, use: 0 };
   for (const i of c.list) {
     const lv = c.level[i];
-    if (!lv) continue;
+    if (!lv || isPart(c, i)) continue; // ein Großbau zählt einmal (über seine Mitte)
     const k = KINDS[c.kind[i] - 1];
     t.use += (CITY.power.use[k] ?? 0) * lv; // Strombedarf
     if (k === 'power') {
@@ -452,13 +652,16 @@ function syncEntity(game, c, i) {
     if (e) dropEntity(game, c, i);
     return;
   }
-  const hp = CITY.hp[lv];
+  const n = c.part?.[i] ? sizeOf(k) : 1; // Großbau: ein Ziel über das ganze Quadrat
+  const hp = CITY.hp[lv] * n;
   const name = k === 'mine' ? MINE_NAME[DEPOSITS[c.deposit[i] - 1]] ?? KIND_NAME.mine : KIND_NAME[k];
   if (!e) {
     const col = i % c.cols;
     const r = cellRect(c, col, (i - col) / c.cols);
-    const w = c.cell / game.grid.tile;
-    e = { id: game.newId(), kind: 'building', type: 'city', cityCell: i, team: c.team, x: r.x, y: r.y, cx: r.x0 / game.grid.tile, cy: r.y0 / game.grid.tile, w, h: w, hp, alive: true, built: true, lastHitTime: -1e9, def: { name, hp, armor: 'struct', cost: { bm: CITY.bountyBm * lv } } };
+    const w = (c.cell * n) / game.grid.tile;
+    const x0 = r.x - (c.cell * n) / 2;
+    const y0 = r.y - (c.cell * n) / 2;
+    e = { id: game.newId(), kind: 'building', type: 'city', cityCell: i, team: c.team, x: r.x, y: r.y, cx: x0 / game.grid.tile, cy: y0 / game.grid.tile, w, h: w, hp, alive: true, built: true, lastHitTime: -1e9, def: { name, hp, armor: 'struct', cost: { bm: CITY.bountyBm * lv } } };
     if (CITY.produces[k]) {
       // Ausbildungsgebäude (seit v4.96): Warteschlange wie die Hauptstadt früher, Sammelpunkt eine Zelle Richtung Konfliktzone
       const z = game.zone ?? { x: r.x, y: r.y };
@@ -521,12 +724,14 @@ export function updateCity(game, dt) {
     // Zerstörte Gebäude werden Ruinen: Zelle frei, nach CITY.ruinTime wächst sie neu (Wiederaufbau)
     for (const [i, e] of c.ents) {
       if (e.alive && e.hp > 0) continue;
-      const col = i % c.cols;
-      const row = (i - col) / c.cols;
       dropEntity(game, c, i);
-      releaseCell(game, c, col, row);
-      c.level[i] = 0;
-      c.timer[i] = -CITY.ruinTime;
+      for (const j of cellsOf(c, i)) {
+        const col = j % c.cols;
+        releaseCell(game, c, col, (j - col) / c.cols);
+        c.level[j] = 0;
+        c.timer[j] = 0;
+      }
+      c.timer[i] = -CITY.ruinTime; // Großbau: die Mitte zählt die Zeit für alle Zellen
       c.ver++;
       game.addEffect('explosion', e.x, e.y, 1 - id, e.x, e.y, 'building');
       game.message(id, `${e.def.name} in der Stadt zerstört`, e.x, e.y);
@@ -558,6 +763,7 @@ export function updateCity(game, dt) {
     // Wachstum der Zellen: Gebäude entstehen nur mit Straßenanschluss (Förderanlagen ohne), Ausbau nur bei Bedarf
     let built = false;
     for (const i of c.list) {
+      if (isPart(c, i)) continue; // Großbau wächst über seine Mitte
       const kind = KINDS[c.kind[i] - 1];
       const col = i % c.cols;
       const row = (i - col) / c.cols;
@@ -568,12 +774,13 @@ export function updateCity(game, dt) {
       const wanted = lv === 0 || (kind === 'res' ? jobs >= pool * CITY.demand : pool >= jobs * CITY.demand);
       if (c.timer[i] < need) c.timer[i] += dt;
       if (c.timer[i] >= need && wanted) {
+        const all = cellsOf(c, i);
         if (lv === 0) {
-          if (!cellFree(game, c, col, row)) continue; // ein Gebäude oder Hindernis steht im Weg: warten
-          occupyCell(game, c, col, row);
+          if (!all.every((j) => cellFree(game, c, j % c.cols, Math.floor(j / c.cols)))) continue; // ein Gebäude oder Hindernis steht im Weg: warten
+          for (const j of all) occupyCell(game, c, j % c.cols, Math.floor(j / c.cols));
           built = true;
         }
-        c.level[i] = lv + 1;
+        for (const j of all) c.level[j] = lv + 1;
         c.timer[i] = 0;
         c.ver++;
         syncEntity(game, c, i);
@@ -648,7 +855,7 @@ export function cityEntityAt(game, x, y) {
   for (const c of game.city ?? []) {
     const [q, r] = cellAt(c, x, y);
     if (q < 0 || r < 0 || q >= c.cols || r >= c.rows) continue;
-    const e = c.ents.get(r * c.cols + q);
+    const e = c.ents.get(anchorOf(c, r * c.cols + q));
     if (e && e.alive) return e;
   }
   return null;
@@ -665,13 +872,25 @@ export function forEnemyCity(game, team, x, y, radius, fn) {
     const r0 = Math.max(0, Math.floor((y - radius) / S));
     const r1 = Math.min(c.rows - 1, Math.floor((y + radius) / S));
     if ((q1 - q0 + 1) * (r1 - r0 + 1) > c.ents.size * 4) {
-      for (const e of c.ents.values()) if (e.alive && Math.abs(e.x - x) <= radius + S && Math.abs(e.y - y) <= radius + S) fn(e);
+      for (const e of c.ents.values()) {
+        const m = radius + S / 2 + (e.w * game.grid.tile) / 2; // halbe Gebäudebreite (Großbau größer)
+        if (e.alive && Math.abs(e.x - x) <= m && Math.abs(e.y - y) <= m) fn(e);
+      }
       continue;
     }
+    let seen = null; // Großbau nur einmal melden, auch wenn mehrere seiner Zellen im Quadrat liegen
     for (let r = r0; r <= r1; r++) {
       for (let q = q0; q <= q1; q++) {
-        const e = c.ents.get(r * c.cols + q);
-        if (e && e.alive) fn(e);
+        const i = r * c.cols + q;
+        const a = anchorOf(c, i);
+        const e = c.ents.get(a);
+        if (!e || !e.alive) continue;
+        if (c.part?.[i]) {
+          seen ??= new Set();
+          if (seen.has(a)) continue;
+          seen.add(a);
+        }
+        fn(e);
       }
     }
   }
@@ -749,6 +968,7 @@ export function cmdCity(game, team, cmd) {
   const r0 = Math.max(0, Math.min(cmd.r0, cmd.r1) | 0);
   const r1 = Math.min(city.rows - 1, Math.max(cmd.r0, cmd.r1) | 0);
   if (!(c1 >= c0 && r1 >= r0)) return { ok: false, reason: 'Außerhalb der Karte' };
+  if (!erase && sizeOf(cmd.kind) > 1) return placeBig(game, team, city, cmd.kind, Math.round((c0 + c1) / 2), Math.round((r0 + r1) / 2)); // Großbau: ein Gebäude um die Mitte
   const t = game.teams[team];
   const id = erase ? 0 : KIND_ID[cmd.kind];
   let placed = 0;
@@ -778,6 +998,7 @@ export function cmdCity(game, team, cmd) {
         t.res.money -= price;
         if (bm) main.store.bm -= bm;
       }
+      if (city.part[i]) clearBig(game, team, city, anchorOf(city, i)); // Großbau ganz weg (alle Zellen)
       if (city.level[i]) releaseCell(game, city, col, row);
       refundQueue(game, team, city.ents.get(i)); // eigene Ausbildung zurück
       dropEntity(game, city, i);
@@ -812,7 +1033,7 @@ function aiRoad(col, row, ac, ar) {
  * Welche Zone braucht die Stadt als Nächstes? (freie Planung seit v4.85) Wohnen, wenn Wohnraum oder freie Einwohner fehlen,
  * sonst die Arbeitsstätte mit dem größten Rückstand zum Mix; knappe Sorten (Lager, Metall, Geld) zählen CITY.ai.boost-fach.
  */
-function aiNeed(game, c, add) {
+function aiNeed(game, c, add, skip = null) {
   const t = totals(c);
   const A = CITY.ai;
   const count = { res: 0, com: 0, bm: 0, mun: 0, fuel: 0, steel: 0, market: 0, power: 0, uni: 0, dc: 0, barracks: 0, factory: 0, heliport: 0 };
@@ -832,7 +1053,7 @@ function aiNeed(game, c, add) {
     if (k === 'heliport' && (unitLocked(game, c.team, 'littlebird') || !work)) continue;
     if (count[k] < n + (k === 'heliport' ? 0 : more)) return k;
   }
-  if (!count.uni && work >= A.uniFrom) return 'uni';
+  if (!count.uni && work >= A.uniFrom && !skip?.has('uni')) return 'uni';
   if (!count.dc && count.uni && work >= A.dcFrom) return 'dc';
   if (count.res < work * 1.2 || (t.housing + t.fled < c.drafted + 20 && count.res <= work * 2) || (free < A.lowFree && count.res <= work * 2)) return 'res';
   const main = game.mainFob(c.team);
@@ -909,16 +1130,30 @@ export function aiCity(game, team, difficulty) {
   }
   if (!anchor) return;
   const add = {};
+  const skip = new Set(); // Großbauten, für die in diesem Takt kein Platz war
   for (const cand of aiCandidates(game, city, anchor.x, anchor.y, rad)) {
     if (cand.deposit) continue; // Vorkommen bleiben für Förderanlagen frei
     let kind = 'road';
+    let col = cand.col;
+    let row = cand.row;
     if (!cand.road) {
       // nur neben einer (geplanten) Straße
       if (!hasRoad(city, cand.col, cand.row)) continue;
-      kind = aiNeed(game, city, add);
+      kind = aiNeed(game, city, add, skip);
+      if (sizeOf(kind) > 1) {
+        // Großbau (Universität): Quadrat mit dieser Zelle am Rand, ohne Vorkommen und Gefahr; sonst in diesem Takt etwas anderes
+        const a = fitBig(game, city, cand.col, cand.row, kind, (j) => !city.kind[j] && !city.deposit[j] && !inDanger(city, j % city.cols, Math.floor(j / city.cols), game.time));
+        if (a < 0) {
+          skip.add(kind);
+          kind = aiNeed(game, city, add, skip);
+        } else {
+          col = a % city.cols;
+          row = Math.floor(a / city.cols);
+        }
+      }
     }
     if (money() < CITY.cost[kind] + reserve) return;
-    const r = game.issue(team, { type: 'city', kind, c0: cand.col, r0: cand.row, c1: cand.col, r1: cand.row });
+    const r = game.issue(team, { type: 'city', kind, c0: col, r0: row, c1: col, r1: row });
     if (!r.ok) continue;
     if (kind !== 'road') add[kind] = (add[kind] ?? 0) + 1;
     if (++n >= CITY.ai.perStep) return;

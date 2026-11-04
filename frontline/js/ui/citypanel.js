@@ -4,7 +4,7 @@
 // Dazu das Marktmenü (MarketPanel, seit v4.94): Fenster zum Handeln, geöffnet über Geldanzeige, Markt-Auswahl oder „Handel“.
 import { CITY } from '../data/city.js';
 import { BALANCE } from '../data/balance.js';
-import { KINDS, KIND_NAME, GOODS, cellAt, hasMarket } from '../game/city.js';
+import { KINDS, KIND_NAME, GOODS, cellAt, hasMarket, sizeOf } from '../game/city.js';
 
 // Farben je Zellenart (Werkzeug, Grundstück, Symbol auf der Karte): Wohnen grün (privat), Gewerbe blau (kommerziell), Werke erdig,
 // Markt gold, Militär (Kaserne, Fabrikhalle, Heliport) oliv. Symbole: Werkzeugleiste und Schilder über den Gebäuden (citylayer.js).
@@ -17,7 +17,7 @@ export const CITY_TIP = {
   steel: 'Metall aus Erz (Erzmine)', mine: 'Nur auf Rohstoffvorkommen: Holzfäller, Steinbruch, Erzmine oder Ölquelle; braucht keine Straße',
   market: 'Handel: Überschuss verkaufen, Knappes teuer kaufen (Knopf Handel, Markt antippen oder Geldanzeige oben)', road: 'Kostet Baumaterial aus dem Lager der Hauptstadt',
   power: 'Strom für Werke, Förderung, Uni und Rechenzentrum (stadtweit); ohne genug Strom arbeiten sie langsamer',
-  uni: 'Ohne Universität nur Forschungsstufe 1; Stufe 1 der Uni schaltet Forschungsstufe 2 frei, Stufe 3 die Forschungsstufe 3; höhere Stufen forschen schneller',
+  uni: 'Großbau 3 × 3 Zellen (antippen, das Quadrat folgt dem Finger; Straße an einer Seite); ohne Universität nur Forschungsstufe 1; Stufe 1 der Uni schaltet Forschungsstufe 2 frei, Stufe 3 die Forschungsstufe 3; höhere Stufen forschen schneller',
   dc: 'Schaltet den Forschungsast KI frei (Drohnen, KI-Zielerfassung, Autonome Türme, Störsender)',
   barracks: 'Bildet Soldaten aus (Schützen, Panzerabwehr, Scharfschützen, Kommandeur); bezahlt direkt aus der Stadt',
   factory: 'Baut alle Fahrzeuge (LKW, Baufahrzeug, Schützen- und Kampfpanzer, Flak, SAM); bezahlt direkt aus der Stadt',
@@ -46,7 +46,8 @@ export class CityPanel {
     root.hidden = true;
     root.innerHTML = `
       <div class="city-tools">${TOOLS.map((k) => {
-        const price = k === 'erase' ? 'gratis' : [CITY.cost[k] ? `${CITY.cost[k]} G` : '', CITY.costBm[k] ? `${CITY.costBm[k]} BM` : ''].filter(Boolean).join(' + ');
+        const n = k === 'erase' ? 1 : sizeOf(k);
+        const price = k === 'erase' ? 'gratis' : [CITY.cost[k] ? `${CITY.cost[k]} G` : '', CITY.costBm[k] ? `${CITY.costBm[k]} BM` : '', n > 1 ? `${n}×${n}` : ''].filter(Boolean).join(' + ').replace(/ \+ (\d+×)/, ' · $1');
         const name = k === 'erase' ? 'Räumen' : KIND_NAME[k];
         return `<button type="button" class="ctool" data-tool="${k}" title="${name}${CITY_TIP[k] ? `: ${CITY_TIP[k]}` : ''}" style="--c:${CITY_COLORS[k]}"><i>${ICON[k]}</i><span>${SHORT[k]}</span><small>${price}</small></button>`;
       }).join('')}</div>
@@ -111,6 +112,7 @@ export class CityPanel {
   move(wx, wy) {
     if (!this.drag) return;
     [this.drag.c1, this.drag.r1] = this.cell(wx, wy);
+    if (sizeOf(this.tool) > 1) [this.drag.c0, this.drag.r0] = [this.drag.c1, this.drag.r1]; // Großbau: das Quadrat folgt dem Finger
   }
 
   cancel() {
