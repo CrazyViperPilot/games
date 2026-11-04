@@ -9,7 +9,7 @@ import { makeRng } from '../core/rng.js';
 import { blockers } from './mapdata.js';
 import { RELIEF } from './relief.js';
 import { bridgeUnder } from './river.js';
-import { transportOf, pathEff, addLoad, beginLoads, settleLoads } from './transport.js';
+import { transportOf, transportInfo, pathEff, addLoad, beginLoads, settleLoads, mainAccess } from './transport.js';
 
 /** Zellenarten (Code im Raster): 0 leer. Neue Arten nur hinten anhängen (Code = Index + 1). */
 export const KINDS = ['road', 'res', 'com', 'bm', 'mun', 'fuel', 'steel', 'mine', 'market', 'power', 'uni', 'dc', 'barracks', 'factory', 'heliport', 'hospital', 'airport', 'smelter', 'kero'];
@@ -513,6 +513,10 @@ function startQuarter(game, c) {
     }
   }
   if (oil >= 0) placeBuilt(game, c, oil, 'mine');
+  rebuildList(c);
+  // Anschluss ans Lager (seit v5.19, AP4): erst die Raffinerie, dann die Ölquelle an deren Netz (ein Weg zur Raffinerie); ohne Kosten
+  for (const i of [...c.list]) if (!isPart(c, i) && c.level[i] && KINDS[c.kind[i] - 1] === 'fuel') connectRoad(game, c, i, false);
+  if (oil >= 0 && c.kind[oil]) connectRoad(game, c, oil, false, goalOf(c, oil, 'mine'));
   rebuildList(c);
 }
 
@@ -1716,6 +1720,165 @@ export function cmdCity(game, team, cmd) {
   return { ok: true, placed, broke: !!broke, noRoad, occupied, felled, razed, manned, kept };
 }
 
+/** Die 4er-Nachbarzellen von Zelle i (Kartenrand beachtet). */
+function nbrsOf(c, i) {
+  const col = i % c.cols;
+  const row = (i - col) / c.cols;
+  const out = [];
+  if (col > 0) out.push(i - 1);
+  if (col < c.cols - 1) out.push(i + 1);
+  if (row > 0) out.push(i - c.cols);
+  if (row < c.rows - 1) out.push(i + c.cols);
+  return out;
+}
+
+/**
+ * Straßenzellen, die über Straßen von den Startzellen `starts` aus erreichbar sind (seit v5.19, AP4): Breitensuche, höchstens
+ * CITY.transport.maxDist Schritte (wie der Lieferweg). Liefert ein Uint8Array je Zelle, 1 = erreichbar.
+ */
+function roadReach(c, starts) {
+  const n = c.cols * c.rows;
+  const reach = new Uint8Array(n);
+  const dist = new Int32Array(n).fill(-1);
+  const queue = new Int32Array(n);
+  let head = 0;
+  let tail = 0;
+  for (const i of starts) {
+    if (dist[i] >= 0) continue;
+    dist[i] = 0;
+    reach[i] = 1;
+    queue[tail++] = i;
+  }
+  const maxDist = CITY.transport.maxDist;
+  while (head < tail) {
+    const i = queue[head++];
+    if (dist[i] >= maxDist) continue;
+    for (const j of nbrsOf(c, i)) {
+      if (dist[j] >= 0 || !roadAt(c, j)) continue;
+      dist[j] = dist[i] + 1;
+      reach[j] = 1;
+      queue[tail++] = j;
+    }
+  }
+  return reach;
+}
+
+/** Straßen zum Lager der Hauptstadt (roadReach ab mainAccess). */
+function mainRoadReach(game, c) {
+  return roadReach(c, mainAccess(game, c));
+}
+
+/** Zellen, deren Rechteck die Zone des Lagers schneidet (wie mainAccess, aber für alle Zellen, nicht nur Straßen; seit v5.19, AP4). */
+function mainZone(game, c) {
+  const n = c.cols * c.rows;
+  const zone = new Uint8Array(n);
+  const m = game.mainFob(c.team);
+  if (!m) return zone;
+  const T = game.grid.tile;
+  const e = CITY.fobMargin + c.cell;
+  const x0 = m.cx * T - e;
+  const x1 = (m.cx + m.w) * T + e;
+  const y0 = m.cy * T - e;
+  const y1 = (m.cy + m.h) * T + e;
+  for (let i = 0; i < n; i++) {
+    const r = cellRect(c, i % c.cols, Math.floor(i / c.cols));
+    if (r.x0 < x1 && r.x1 > x0 && r.y0 < y1 && r.y1 > y0) zone[i] = 1;
+  }
+  return zone;
+}
+
+/** Zellen höchstens `d` Schritte (4er-Nachbarschaft, alle Zellen) von einer Zelle aus `reach`, Uint8Array 1 = nah (seit v5.19, AP4). */
+function nearCells(c, reach, d) {
+  const n = c.cols * c.rows;
+  const near = new Uint8Array(n);
+  const dist = new Int32Array(n).fill(-1);
+  const queue = new Int32Array(n);
+  let head = 0;
+  let tail = 0;
+  for (let i = 0; i < n; i++) {
+    if (!reach[i]) continue;
+    dist[i] = 0;
+    near[i] = 1;
+    queue[tail++] = i;
+  }
+  while (head < tail) {
+    const i = queue[head++];
+    if (dist[i] >= d) continue;
+    for (const j of nbrsOf(c, i)) {
+      if (dist[j] >= 0) continue;
+      dist[j] = dist[i] + 1;
+      near[j] = 1;
+      queue[tail++] = j;
+    }
+  }
+  return near;
+}
+
+/**
+ * Straßenanschluss für das Gebäude mit Anker a (seit v5.19, AP4): legt Straßen von seinen freien Nachbarzellen bis zur nächsten
+ * Straßenzelle, die mit dem Lager verbunden ist. Nur ausweisbare, leere, freie Zellen ohne Vorkommen; höchstens
+ * CITY.transport.connectMax neue Zellen. Mit `pay` über game.issue (kostet Baumaterial je Zelle), sonst direkt wie beim Startviertel.
+ * Optional `goal` (Uint8Array wie roadReach): Ziel statt des Lagers, z. B. das Netz eines Stahlwerks für eine Erzmine (Ausbau der KI).
+ * Rückgabe: Zahl der gelegten Zellen; 0, wenn der Anschluss schon besteht; −1, wenn es keinen Weg gibt oder das Baumaterial fehlt.
+ */
+export function connectRoad(game, c, a, pay, goal = null) {
+  const anchor = anchorOf(c, a);
+  const reach = goal ?? mainRoadReach(game, c);
+  // Ohne Ziel (Lager): auch eine freie Zelle in der Zone des Lagers ist Anschluss, sie wird Straße dort
+  const zone = goal ? null : mainZone(game, c);
+  const atEnd = (i) => !!zone?.[i] || nbrsOf(c, i).some((j) => reach[j]);
+  if (accessCells(c, anchor).some((j) => reach[j])) return 0;
+  const max = CITY.transport.connectMax;
+  const n = c.cols * c.rows;
+  const ok = (j) => canZone(game, c, j) && !c.kind[j] && !c.deposit[j] && cellFree(game, c, j % c.cols, Math.floor(j / c.cols));
+  const prev = new Int32Array(n).fill(-1);
+  const seen = new Uint8Array(n);
+  const cells = cellsOf(c, anchor);
+  let frontier = [];
+  for (const i of cells) {
+    for (const j of nbrsOf(c, i)) {
+      if (seen[j] || !ok(j)) continue;
+      seen[j] = 1;
+      frontier.push(j);
+    }
+  }
+  // Breitensuche in Schichten: Schicht d hat Wege mit d neuen Zellen; Ende, sobald eine Zelle an eine verbundene Straße grenzt
+  let end = -1;
+  for (let d = 1; d <= max && frontier.length && end < 0; d++) {
+    const next = [];
+    for (const i of frontier) {
+      if (atEnd(i)) {
+        end = i;
+        break;
+      }
+      if (d === max) continue;
+      for (const j of nbrsOf(c, i)) {
+        if (seen[j] || !ok(j)) continue;
+        seen[j] = 1;
+        prev[j] = i;
+        next.push(j);
+      }
+    }
+    frontier = next;
+  }
+  if (end < 0) return -1;
+  const path = [];
+  for (let i = end; i >= 0; i = prev[i]) path.push(i);
+  if (pay) {
+    const main = game.mainFob(c.team);
+    if (!main || main.store.bm < CITY.costBm.road * path.length || game.teams[c.team].res.money < CITY.cost.road * path.length) return -1;
+    for (const i of path) {
+      const col = i % c.cols;
+      const row = (i - col) / c.cols;
+      game.issue(c.team, { type: 'city', kind: 'road', c0: col, r0: row, c1: col, r1: row });
+    }
+  } else {
+    for (const i of path) placeBuilt(game, c, i, 'road');
+    rebuildList(c);
+  }
+  return path.length;
+}
+
 // ---- KI: baut in Ringen um die Hauptstadt nach außen, dazu kleine Viertel an vorderen FOBs (seit v4.82),
 // Förderanlagen auf Vorkommen im Gebiet, Markt und Angriffe auf die gegnerische Stadt (seit v4.83) ----
 
@@ -1732,14 +1895,14 @@ function aiRoad(col, row, ac, ar) {
 function aiNeed(game, c, add, skip = null) {
   const t = totals(c);
   const A = CITY.ai;
-  const count = { res: 0, com: 0, bm: 0, mun: 0, fuel: 0, steel: 0, market: 0, power: 0, uni: 0, dc: 0, barracks: 0, factory: 0, heliport: 0, hospital: 0, airport: 0 };
+  const count = { res: 0, com: 0, bm: 0, mun: 0, fuel: 0, steel: 0, smelter: 0, kero: 0, market: 0, power: 0, uni: 0, dc: 0, barracks: 0, factory: 0, heliport: 0, hospital: 0, airport: 0 };
   for (const k in add) count[k] += add[k];
   for (const i of c.list) {
     if (isPart(c, i)) continue; // Großbau zählt einmal
     const k = KINDS[c.kind[i] - 1];
     if (k in count) count[k]++;
   }
-  const work = count.com + count.bm + count.mun + count.fuel + count.steel + count.market;
+  const work = count.com + count.bm + count.mun + count.fuel + count.steel + count.smelter + count.kero + count.market;
   const free = c.stats.free ?? 0;
   // Strom, Universität, Rechenzentrum (seit v4.88) nach Bedarf
   const st = c.stats;
@@ -1761,7 +1924,9 @@ function aiNeed(game, c, add, skip = null) {
     bm: main && main.store.bm < A.lowStock && s.raw.wood + s.raw.stone > s.bm, // Rohstoff da, Werk fehlt
     mun: main && main.store.mun < A.lowStock && c.metal > 50,
     fuel: main && main.store.fuel < A.lowStock && s.raw.oil > s.fuel,
-    steel: c.metal < A.lowMetal && s.raw.ore > s.metal + s.mun * CITY.convert.mun,
+    kero: c.kero < A.lowKero && s.raw.oil > 0, // Kerosin knapp, Öl wird gefördert (seit v5.19)
+    smelter: c.metal < A.lowMetal && s.raw.ore > s.gross.iron * CITY.convert.iron, // Erz bleibt ungenutzt: es fehlt eine Hütte
+    steel: c.metal < A.lowMetal && s.gross.iron > s.gross.metal * CITY.convert.metal, // Roheisen bleibt ungenutzt: es fehlt ein Stahlwerk
     com: game.teams[c.team].res.money < A.lowMoney,
   };
   let best = null;
@@ -1769,6 +1934,9 @@ function aiNeed(game, c, add, skip = null) {
   for (const [k, w] of Object.entries(A.mix)) {
     if (k === 'market' && count.market >= 1) continue; // ein Markt reicht
     if (skip?.has(k)) continue; // Großbau ohne Platz in diesem Takt (seit v5.08 auch die 2 × 2-Werke)
+    // Hütte und Stahlwerk als Paar (seit v5.19): je Hütte ein Stahlwerk, das danach kommt; ein Stahlwerk nie ohne Hütte davor
+    if (k === 'steel' && count.steel >= count.smelter) continue;
+    if (k === 'smelter' && count.smelter > count.steel) continue;
     const r = count[k] / (w * (low[k] ? A.boost : 1));
     if (r < lo) {
       lo = r;
@@ -1789,14 +1957,16 @@ function inDanger(c, col, row, now) {
 }
 
 /** Freie Zellen um den Anker (Weltpunkt), nach Abstand sortiert (Ringe), bis zum Radius in Zellen. */
-function aiCandidates(game, c, x, y, rad) {
+function aiCandidates(game, c, x, y, rad, reach) {
   const [ac, ar] = cellAt(c, x, y);
   const out = [];
   for (let row = Math.max(0, ar - rad); row <= Math.min(c.rows - 1, ar + rad); row++) {
     for (let col = Math.max(0, ac - rad); col <= Math.min(c.cols - 1, ac + rad); col++) {
       const i = idx(c, col, row);
       if (c.kind[i] || !canZone(game, c, i) || inDanger(c, col, row, game.time) || !cellFree(game, c, col, row)) continue; // Fels, Wasser oder Gebäude: dort wüchse nie etwas
-      const d = Math.max(Math.abs(col - ac), Math.abs(row - ar)) * 100 + Math.abs(col - ac) + Math.abs(row - ar);
+      // seit v5.19 (AP4): Zellen neben einer Straße zum Lager zählen einen Ring näher (Werke und Großbauten zuerst dort)
+      const far = reach && !touchesRoad(c, i, reach) ? CITY.ai.connectRing * 100 : 0;
+      const d = Math.max(Math.abs(col - ac), Math.abs(row - ar)) * 100 + Math.abs(col - ac) + Math.abs(row - ar) + far;
       out.push({ i, col, row, d, road: aiRoad(col, row, ac, ar), deposit: c.deposit[i] });
     }
   }
@@ -1815,7 +1985,7 @@ export function aiCity(game, team, difficulty) {
   let n = 0;
   // Förderanlagen zuerst: jedes Vorkommen im Gebiet nutzen
   for (const i of city.list.length < 4 ? [] : depositCells(game, city)) {
-    if (money() < CITY.cost.mine + reserve) return;
+    if (money() < CITY.cost.mine + reserve) break; // Geldmangel stoppt nur die Förderung, nicht den übrigen Ausbau (seit v5.19)
     const col = i % city.cols;
     const row = (i - col) / city.cols;
     if (game.issue(team, { type: 'city', kind: 'mine', c0: col, r0: row, c1: col, r1: row }).ok && ++n >= CITY.ai.perStep) return;
@@ -1830,17 +2000,55 @@ export function aiCity(game, team, difficulty) {
   }
   if (!anchor) return;
   if (aiAirport(game, city, main, reserve)) n++;
+  if (n < CITY.ai.perStep && aiConnect(game, city)) n++;
   const add = {};
   const skip = new Set(); // Großbauten, für die in diesem Takt kein Platz war
-  for (const cand of aiCandidates(game, city, anchor.x, anchor.y, rad)) {
-    if (cand.deposit) continue; // Vorkommen bleiben für Förderanlagen frei
+  // Ausbau: Zellen an Straßen, die mit dem Lager verbunden sind, kommen vor (aiCandidates, seit v5.19 AP4)
+  const reach = mainRoadReach(game, city);
+  const cands = aiCandidates(game, city, anchor.x, anchor.y, rad, reach);
+  const near = nearCells(city, reach, CITY.ai.connectNear);
+  const free = (j) => !city.kind[j] && !city.deposit[j] && !inDanger(city, j % city.cols, Math.floor(j / city.cols), game.time);
+  // Werk (2 × 2, seit v5.19 AP4): zuerst ein Quadrat an einer Straße zum Lager, sonst an einer beliebigen Straße in Reichweite
+  // (aiConnect verbindet es danach, Baumaterial vorausgesetzt)
+  const workSpot = (kind) => {
+    for (const pass of [true, false]) {
+      for (const c2 of cands) {
+        if (pass ? !touchesRoad(city, c2.i, reach) : !(near[c2.i] && hasRoad(city, c2.col, c2.row))) continue;
+        const a = fitBig(game, city, c2.col, c2.row, kind, free);
+        if (a >= 0) return a;
+      }
+    }
+    return -1;
+  };
+  const place = (cand) => {
+    if (cand.deposit) return; // Vorkommen bleiben für Förderanlagen frei
     let kind = 'road';
     let col = cand.col;
     let row = cand.row;
     if (!cand.road) {
       // nur neben einer (geplanten) Straße
-      if (!hasRoad(city, cand.col, cand.row)) continue;
+      if (!hasRoad(city, cand.col, cand.row)) return;
       kind = aiNeed(game, city, add, skip);
+      if (WORKS.includes(kind)) {
+        const a = workSpot(kind);
+        if (a < 0) {
+          skip.add(kind);
+          return;
+        }
+        col = a % city.cols;
+        row = Math.floor(a / city.cols);
+        if (money() < CITY.cost[kind] + reserve) {
+          n = -Infinity;
+          return;
+        }
+        const r = game.issue(team, { type: 'city', kind, c0: col, r0: row, c1: col, r1: row });
+        if (!r.ok) skip.add(kind);
+        else {
+          add[kind] = (add[kind] ?? 0) + 1;
+          n++;
+        }
+        return;
+      }
       // Großbau (Universität, Kraftwerk, Kaserne, Fabrikhalle, Flughafen): Quadrat mit dieser Zelle am Rand, ohne Vorkommen und
       // Gefahr; passt er hier nicht, gilt er für diesen Takt als ohne Platz und es kommt das Nächste (auch ein anderer Großbau)
       for (let tries = 0; sizeOf(kind) > 1 && tries < 8; tries++) {
@@ -1853,17 +2061,68 @@ export function aiCity(game, team, difficulty) {
         skip.add(kind);
         kind = aiNeed(game, city, add, skip);
       }
-      if (sizeOf(kind) > 1 && col === cand.col && row === cand.row && fitBig(game, city, cand.col, cand.row, kind) < 0) continue;
+      if (sizeOf(kind) > 1 && col === cand.col && row === cand.row && fitBig(game, city, cand.col, cand.row, kind) < 0) return;
+      // Großbauten nur an einer Straße zum Lager (seit v5.19, AP4): an unverbundenen Straßen bliebe die Ware liegen
+      if (sizeOf(kind) > 1 && !touchesRoad(city, cand.i, reach)) return;
     }
-    if (money() < CITY.cost[kind] + reserve) return;
+    if (money() < CITY.cost[kind] + reserve) {
+      n = -Infinity; // Geld reicht nicht: Schluss für diesen Takt
+      return;
+    }
     const r = game.issue(team, { type: 'city', kind, c0: col, r0: row, c1: col, r1: row });
     if (!r.ok) {
       if (kind !== 'road') skip.add(kind); // z. B. zu wenig Baumaterial: in diesem Takt etwas anderes (seit v5.03)
-      continue;
+      return;
     }
     if (kind !== 'road') add[kind] = (add[kind] ?? 0) + 1;
-    if (++n >= CITY.ai.perStep) return;
+    n++;
+  };
+  for (const cand of cands) {
+    if (n >= CITY.ai.perStep) return;
+    place(cand);
+    if (!Number.isFinite(n)) return;
   }
+}
+
+/** Liegt eine verbundene Straße (mit dem Lager) neben Zelle i? */
+function touchesRoad(c, i, reach) {
+  return nbrsOf(c, i).some((j) => reach[j] && roadAt(c, j));
+}
+
+/**
+ * Ziel des Anschlusses einer Förderanlage oder eines Werks mit Lieferweg (seit v5.19, AP4): das Straßennetz der Werke, an die es liefert
+ * (Erz → Hütte, Holz und Stein → BM-Werk, Öl → Raffinerie, Roheisen → Stahlwerk). Gibt es keines, null (das Lager gilt).
+ */
+function goalOf(c, a, k) {
+  const want = k === 'mine' ? { wood: ['bm'], stone: ['bm'], ore: ['smelter'], oil: ['fuel', 'kero'] }[DEPOSITS[c.deposit[a] - 1]] : k === 'smelter' ? ['steel'] : null;
+  if (!want) return null;
+  const starts = [];
+  for (const i of c.list) {
+    if (isPart(c, i) || !c.level[i] || !want.includes(KINDS[c.kind[i] - 1])) continue;
+    for (const j of accessCells(c, i)) starts.push(j);
+  }
+  return starts.length ? roadReach(c, starts) : null;
+}
+
+/**
+ * Straßenanschluss der KI (seit v5.19, AP4): höchstens ein Gebäude je Takt, dem der Weg fehlt (Förderanlage ohne Lieferweg zum
+ * Werk, Werk ohne Lieferweg zum Lager, Arbeitsstätte ohne Pendlerweg). Prüft höchstens CITY.ai.roadTries Gebäude. true, wenn gebaut.
+ */
+function aiConnect(game, c) {
+  let tried = 0;
+  const list = c.list;
+  const off = c.aiTurn ?? 0; // der Anfang wandert mit jedem Takt, damit auch hintere Gebäude drankommen
+  for (let s = 0; s < list.length && tried < CITY.ai.roadTries; s++) {
+    const i = list[(s + off) % list.length];
+    if (isPart(c, i) || !c.kind[i]) continue;
+    const k = KINDS[c.kind[i] - 1];
+    const info = transportInfo(game, c, i);
+    const supplier = ['mine', 'bm', 'smelter', 'steel', 'fuel', 'kero', 'mun'].includes(k) && info.to === null;
+    if (!supplier && !info.noHome) continue;
+    tried++;
+    if (connectRoad(game, c, i, true, supplier ? goalOf(c, i, k) : null) > 0) return true;
+  }
+  return false;
 }
 
 /**
@@ -1913,9 +2172,20 @@ function aiAirport(game, c, main, reserve) {
 
 /** Freie Vorkommen im eigenen Gebiet (Zellindizes). */
 function depositCells(game, c) {
+  // Förderanlage nur, wenn das Werk für ihren Rohstoff schon steht oder ansteht (seit v5.19, AP4): sonst fließt die Ware ins Leere
+  const works = { wood: 'bm', stone: 'bm', ore: 'smelter', oil: null };
+  const have = { bm: 0, smelter: 0, fuel: 0, kero: 0 };
+  for (const i of c.list) {
+    if (isPart(c, i)) continue;
+    const k = KINDS[c.kind[i] - 1];
+    if (k in have) have[k]++;
+  }
   const out = [];
   for (let i = 0; i < c.deposit.length; i++) {
     if (!c.deposit[i] || !c.claim[i] || c.kind[i] || !canZone(game, c, i)) continue;
+    const d = DEPOSITS[c.deposit[i] - 1];
+    const target = works[d];
+    if (target ? !have[target] : !have.fuel && !have.kero) continue;
     const q = i % c.cols;
     if (!inDanger(c, q, (i - q) / c.cols, game.time)) out.push(i);
   }
@@ -1940,6 +2210,10 @@ function aiMarket(game, team, reserve) {
   if (c.metal > CITY.ai.sellAbove) game.issue(team, { type: 'trade', good: 'metal', dir: 'sell' });
   if (c.metal < CITY.ai.buyMetalBelow && game.teams[team].res.money > reserve + CITY.market.buy.metal) {
     game.issue(team, { type: 'trade', good: 'metal', dir: 'buy' });
+  }
+  // Baumaterial fehlt (seit v5.19, AP4): Straßen und Anschlüsse kosten es, ohne BM bleiben Werke unangebunden
+  if (main.store.bm < CITY.ai.buyBmBelow && game.teams[team].res.money > CITY.market.buy.bm) {
+    game.issue(team, { type: 'trade', good: 'bm', dir: 'buy' });
   }
 }
 

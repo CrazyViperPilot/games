@@ -6,8 +6,8 @@ import { CITY } from '../js/data/city.js';
 import { BALANCE } from '../js/data/balance.js';
 import { AI } from '../js/ai/ai.js';
 import { treeGone } from '../js/game/city.js';
-import { KINDS, canZone, cityNoise, freePop, aiCity, aiDefend, aiRaid, hasRoad, hasMarket, cityEntityAt, cityTrainers, KIND_ID, sizeOf, cellsOf, isPart, forEnemyCity, migrateCity, cityLevel, accessCells, roadAt, cellRect } from '../js/game/city.js';
-import { transportOf } from '../js/game/transport.js';
+import { KINDS, canZone, cityNoise, freePop, aiCity, aiDefend, aiRaid, hasRoad, hasMarket, cityEntityAt, cityTrainers, KIND_ID, sizeOf, cellsOf, isPart, forEnemyCity, migrateCity, cityLevel, accessCells, roadAt, cellRect, connectRoad, DEPOSITS, cellAt } from '../js/game/city.js';
+import { transportOf, transportInfo } from '../js/game/transport.js';
 import { snapshotGame, restoreGame } from '../js/game/savegame.js';
 import { RELIEF } from '../js/game/relief.js';
 import { bridgeUnder } from '../js/game/river.js';
@@ -1052,4 +1052,75 @@ test('Räumen fällt Bäume: Zelle wird bebaubar, Fels und Hauptstadt bleiben ge
   const { game: h } = restoreGame(JSON.parse(JSON.stringify(snapshotGame(g, null))));
   assert.equal(h.city[0].felled, h.city[1].felled);
   assert.deepEqual([...h.city[0].felled], [...c.felled]);
+});
+
+test('connectRoad (AP4): Förderanlage an das Lager anschließen, Baumaterial je Zelle, 0 wenn verbunden, −1 ohne Weg', () => {
+  const g = new Game({ seed: 3, city: true });
+  const c = g.city[0];
+  const m = g.mainFob(0);
+  const wood = DEPOSITS.indexOf('wood') + 1;
+  // Holzvorkommen im Gebiet ohne Straße daneben, möglichst weit von der Hauptstadt
+  const [fc, fr] = cellAt(c, m.x, m.y);
+  const far = [];
+  for (let i = 0; i < c.deposit.length; i++) {
+    if (c.deposit[i] !== wood || !c.claim[i] || c.kind[i] || !canZone(g, c, i) || accessCells(c, i).length) continue;
+    far.push({ i, d: Math.abs((i % c.cols) - fc) + Math.abs(Math.floor(i / c.cols) - fr) });
+  }
+  far.sort((p, o) => p.d - o.d);
+  const i = far.find((f) => f.d >= 3).i; // nicht direkt an der Hauptstadt
+  const col = i % c.cols;
+  const row = (i - col) / c.cols;
+  assert.ok(g.issue(0, { type: 'city', kind: 'mine', c0: col, r0: row, c1: col, r1: row }).ok);
+  const bm0 = m.store.bm;
+  CITY.transport.connectMax = 0;
+  assert.equal(connectRoad(g, c, i, true), -1, 'ohne erlaubte Länge kein Weg');
+  CITY.transport.connectMax = 30;
+  const n = connectRoad(g, c, i, true);
+  assert.ok(n > 0 && n <= 30, `gelegte Zellen ${n}`);
+  assert.equal(m.store.bm, bm0 - n * CITY.costBm.road, 'jede Straßenzelle kostet Baumaterial');
+  assert.ok(accessCells(c, i).some((j) => roadAt(c, j)), 'Förderanlage hat jetzt eine Straße');
+  assert.equal(connectRoad(g, c, i, true), 0, 'schon verbunden: nichts mehr');
+  // neue Straßen nie auf Vorkommen
+  for (let j = 0; j < c.kind.length; j++) if (c.kind[j] === KIND_ID.road && c.deposit[j]) assert.fail(`Straße auf Vorkommen ${j}`);
+});
+
+test('Startviertel (AP4): Raffinerie hat einen Weg ins Lager, Ölquelle einen Weg zur Raffinerie', () => {
+  for (const team of [0, 1]) {
+    const g = new Game({ seed: 3, city: true });
+    const c = g.city[team];
+    const fuel = c.list.find((i) => !isPart(c, i) && c.level[i] && c.kind[i] === KIND_ID.fuel);
+    const oil = c.list.find((i) => c.kind[i] === KIND_ID.mine && c.level[i] && DEPOSITS[c.deposit[i] - 1] === 'oil');
+    assert.ok(fuel !== undefined && oil !== undefined, `Team ${team}: Raffinerie und Ölquelle fertig`);
+    assert.equal(transportInfo(g, c, fuel).to, 'Lager', `Team ${team}: Raffinerie → Lager`);
+    assert.equal(transportInfo(g, c, oil).to, 'Raffinerie', `Team ${team}: Ölquelle → Raffinerie`);
+  }
+});
+
+test('KI-Stadt produziert (AP4): KI gegen KI, Seed 3, 12 min: Förderung, Baumaterial nicht dauerhaft 0, Munition und Stahl', () => {
+  const g = new Game({ seed: 3, city: true });
+  const ais = [new AI(g, 0, 'normal'), new AI(g, 1, 'normal')];
+  const raw = [0, 0];
+  const bmZero = [0, 0];
+  let samples = 0;
+  const steps = Math.round((12 * 60) / 0.1);
+  for (let k = 0; k < steps; k++) {
+    ais[0].update(0.1);
+    ais[1].update(0.1);
+    g.update(0.1);
+    if (k % 10 !== 0) continue;
+    samples++;
+    for (let t = 0; t < 2; t++) {
+      const s = g.city[t].stats;
+      raw[t] += s.raw.wood + s.raw.stone + s.raw.ore + s.raw.oil;
+      if (g.mainFob(t).store.bm <= 0) bmZero[t]++;
+    }
+  }
+  for (let t = 0; t < 2; t++) {
+    const made = g.city[t].made;
+    assert.ok(raw[t] > 0, `Team ${t}: Förderung ${raw[t].toFixed(0)}`);
+    assert.ok(bmZero[t] / samples < 0.5, `Team ${t}: Baumaterial im Lager 0 in ${(100 * bmZero[t] / samples).toFixed(0)} % der Zeit`);
+    assert.ok(made.mun > 0, `Team ${t}: Munition ${made.mun.toFixed(0)}`);
+  }
+  // Stahl: Hütte und Stahlwerk laufen (in dieser Partie in Team 1; Team 0 baut noch kein Stahlwerk mit Weg, siehe Bericht AP4)
+  assert.ok(g.city[0].made.metal + g.city[1].made.metal > 0, 'Stahl wird erzeugt');
 });

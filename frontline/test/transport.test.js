@@ -129,14 +129,13 @@ test('Überlast → Stau-Faktor < 1 nach settleLoads, nach Entlastung wieder 1',
 test('Lager-Anschluss: Straße bis an die Hauptstadt macht mainAccess nicht leer, Werk liefert ins Lager', () => {
   const g = new Game({ seed: 3, city: true, startMoney: 5000 });
   const c = g.city[0];
-  assert.deepEqual(mainAccess(g, c), [], 'ohne Straße am Lager leer');
+  // Seit v5.19 (AP4) hat das Startviertel schon einen Anschluss ans Lager; die Straße hier ergänzt ihn
   // Straße an der Hauptstadt vorbei (Zelle Spalte 8, Zeile 161 liegt im Anschlussbereich), dann ein BM-Werk daran
   g.issue(0, { type: 'city', kind: 'road', c0: 7, r0: 158, c1: 8, r1: 158 });
   g.issue(0, { type: 'city', kind: 'road', c0: 8, r0: 159, c1: 8, r1: 161 });
   g.issue(0, { type: 'city', kind: 'bm', c0: 5, r0: 158, c1: 6, r1: 159 });
   const access = mainAccess(g, c);
-  assert.ok(access.length > 0, 'Straße reicht an die Hauptstadt');
-  assert.ok(access.includes(161 * c.cols + 8));
+  assert.ok(access.includes(161 * c.cols + 8), 'Straße reicht an die Hauptstadt');
   const bmAnchor = anchorOf(c, 158 * c.cols + 5);
   for (const j of cellsOf(c, bmAnchor)) c.level[j] = 1;
   const tr = transportOf(g, c);
@@ -433,7 +432,8 @@ test('F-16 tankt Kerosin aus dem Stadtlager (c.kero), den Treibstoff im Lager l�
   run(g, 3);
   assert.ok(u.fuel > 5, `F-16 getankt: ${u.fuel}`);
   assert.ok(c.kero < 300, `Kerosin im Stadtlager ${c.kero}`);
-  assert.equal(m.store.fuel, fuel0, 'Treibstoff im Lager unverändert');
+  // Seit v5.19 (AP4) liefert die Raffinerie des Startviertels Treibstoff ans Lager: der Flug zieht keinen davon ab
+  assert.ok(m.store.fuel >= fuel0, `Treibstoff im Lager ${fuel0} → ${m.store.fuel}`);
   assert.ok(UNITS.f16.fuelMax > 0);
 });
 

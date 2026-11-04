@@ -94,7 +94,8 @@ export const CITY = {
   // ---- Straßentransport (seit v5.19, Werte für AP2/AP3; PRD §15 „Straßentransport“) ----
   // cap: Einheiten je s, die eine eigene Straßenzelle trägt; mapCap: Stadtstraßen der Karte. commute: Last je Arbeiter zum Wohnen (je s).
   // maxDist: längster Weg in Zellen (weiter = kein Ziel); reroute: s zwischen den Wegeberechnungen; smooth: s, bis der Stau-Faktor folgt.
-  transport: { cap: 12, mapCap: 20, commute: 0.05, maxDist: 160, reroute: 3, smooth: 2 },
+  // connectMax (seit v5.19, AP4): längster neuer Anschluss an die Straße zum Lager in Zellen (Startviertel und KI, connectRoad in city.js).
+  transport: { cap: 12, mapCap: 20, commute: 0.05, maxDist: 160, reroute: 3, smooth: 2, connectMax: 30 },
 
   // ---- Wissen (seit v4.88, Stufe 5) ----
   // Seit v5.04: ohne fertige Universität ruht jede Forschung (eine reicht, ihre Stufe zählt nicht). Rechenzentren beschleunigen sie:
@@ -146,6 +147,7 @@ export const CITY = {
     dcFrom: 16, // … ein Rechenzentrum (nach der Uni)
     sellAbove: 2700, // verkauft am Markt, wenn eine Sorte im Hauptlager darüber liegt
     buyMetalBelow: 150, // kauft Metall am Markt, wenn weniger da ist und genug Geld (reserve + Preis) bleibt
+    buyBmBelow: 120, // kauft Baumaterial am Markt, wenn das Lager der Hauptstadt darunter liegt und genug Geld (reserve + Preis) bleibt (seit v5.19, AP4)
     raidEvery: { easy: 0, normal: 240, hard: 150 }, // s zwischen Angriffen auf die gegnerische Stadt (0 = nie)
     raidSize: 4, // so viele Fahrzeuge greifen an
     // Freie Planung (seit v4.85): Engpässe heben das Gewicht einer Zone im Mix
@@ -170,5 +172,8 @@ export const CITY = {
     airportReach: 60, // so viele Zellen um die Hauptstadt sucht sie einen freien Platz für ihn
     jets: { easy: 2, normal: 4, hard: 6 }, // so viele F-16 hält sie (seit v5.03)
     jetReserve: 400, // Geld, das nach dem Kauf einer F-16 übrig bleiben muss
+    roadTries: 4, // seit v5.19 (AP4): so viele Gebäude ohne Lieferweg oder Pendlerweg prüft die KI je Takt auf einen Straßenanschluss
+    connectNear: 5, // seit v5.19 (AP4): Werke ohne Straße zum Lager nur an Straßen höchstens so viele Zellen vom Lagernetz entfernt (sonst wird der Anschluss zu weit)
+    connectRing: 1, // seit v5.19 (AP4): Zellen neben einer Straße zum Lager zählen so viele Ringe näher (Großbauten und Werke bevorzugt dort)
   },
 };
