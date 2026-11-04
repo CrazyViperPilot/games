@@ -41,7 +41,7 @@ Die Reihenfolge ist Absicht; ein neues System kommt an die Stelle, deren Ergebni
 | 2 | `updateResearch` | `research.js` | Forschungsfortschritt |
 | 2b | `updateAbilities` | `abilities.js` | Rauch, Minen, Feldwerkstatt |
 | 3 | `updateEconomy` | `economy.js` | `team.rate` zurücksetzen, Ausbildung, Soldaten-Nachschub |
-| 3a | `updateCity` | `city.js` | nur mit Stadt: Einwohner, Wachstum, Erträge ins Lager der Hauptstadt, Steuern |
+| 3a | `updateCity` | `city.js` | nur mit Stadt: Einwohner, Wachstum, Steuern und Gewerbe-Absatz; Ketten (Förderung → Hütte → Stahlwerk/BM/Raffinerien/Kerosin → Lager, Munitionswerk holt Stahl) und Pendler laufen über die Straßenwege aus `transport.js`: `beginLoads` (Last auf 0), Flüsse und Pendler eintragen (`addLoad`), Gutschrift mit der Wirkung des Weges (`pathEff`), `settleLoads` (Stau glätten, wirkt im nächsten Schritt). Wege werden nur neu gerechnet, wenn sich die Stadt ändert oder `CITY.transport.reroute` s vergangen sind |
 | 4 | `updateGarrison`, `updateTowers` | `garrison.js`, `tower.js` | Ein- und Aussteigen in Stadthäuser und Gefechtstürme; Dachaufbauten werden fertig |
 | 5 | `updateFormations` | `formation.js` | Tempo geschlossener Gruppen |
 | 6 | `updateMovement` | `movement.js` | Wege planen und fahren, Verfolgen (ohne Jets) |
@@ -90,6 +90,9 @@ targetId, weapons [{ spec, rounds, cd }], ammo (Getter), fuel, cargo { bm, mun, 
 **Gebäude** (`kind: 'building'`): `id, type, team, def (= BUILDINGS[type]), x, y, cx, cy, w, h, hp, maxHp, alive, built, progress,
 queue [{ unit, payerId }], queueTimes, rallyX/Y, main (Hauptstadt), store { bm, mun, fuel }, drill, fireTarget`.
 
+**Stadt** (`game.city[team]`, nur mit Stadt, `js/game/city.js`): Raster `cols, rows, cell`, je Zelle `kind[]` (Index in `KINDS`), `level[]`, `deposit[]`, `flee[]`, `blocked[]`, `felled`, `list` (belegte Zellen), `ver` (Zähler: steigt bei jeder Änderung an Zellen, Wege werden dann neu gerechnet), `hitLog`, `mapRoads` (Stadtstraßen der Karte). Vorräte im Stadtlager: `metal` (Stahl, Schlüssel bleibt `metal`), `kero` (Kerosin, seit v5.19; `migrateCity` setzt alten Ständen 0). `stats` ist nur Anzeige: je Schritt neu gesetzt (Ausbeute `raw`, `cap`, `inp`, `gross`, `n`, Gewerbe-Versorgung `shopSupply`, `lost` = Waren ohne Weg je s, `jam` = kleinster Stau-Faktor).
+**Straßentransport** (`transportOf(game, c)` in `js/game/transport.js`, seit v5.19): Zustand je Stadtobjekt in einer `WeakMap` (`STATE`). Er enthält `routes` (Lieferweg je Förderung und Werk: Ziel, Weg, Länge), `commute` (Pendlerweg je Arbeitsstätte, `null` = keine Wohnung), `mun` und `shop` (Wege Munitionswerk bzw. Gewerbe und Markt zum Lager), `load`, `factor`, `cap` je Stadtzelle und `list` (Straßenzellen). Der Zustand liegt nicht im Objektgraphen und damit nicht im Spielstand; nach dem Laden wird er beim ersten Zugriff neu berechnet.
+
 **Effekt** (nur Darstellung, `game.effects`): `{ type, x, y, x2, y2, team, t, life }`, angelegt mit `game.addEffect`.
 
 **Ereignis** (`game.events`): `{ type: 'message', team (−1 = alle), text, x, y }`.
@@ -101,7 +104,7 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 
 | `cmd.type` | Felder | Handler (`js/game/`) | Wirkung |
 |---|---|---|---|
-| `city` | `kind` (Zellenart aus `KINDS` in `city.js`, z. B. `road`, `res`, `com`, `market`, `barracks`, `factory`, `heliport`, oder `erase`), `c0, r0, c1, r1` | `city.js` `cmdCity` | Stadtzellen im Rechteck ausweisen oder räumen (nur mit Stadt) |
+| `city` | `kind` (Zellenart aus `KINDS` in `city.js`, z. B. `road`, `res`, `com`, `market`, `barracks`, `factory`, `heliport`, `smelter`, `kero`, oder `erase`), `c0, r0, c1, r1`, bei `erase` optional `demolish: true` | `city.js` `cmdCity` | Stadtzellen im Rechteck ausweisen oder räumen (nur mit Stadt). `erase` lässt Rohstoffvorkommen und Förderanlagen stehen (seit v5.19); nur mit `demolish: true` (Abreißen eines gewählten Gebäudes) entfernt es eine Förderanlage |
 | `move`, `attackMove` | `ids, x, y, formation?` | `game.js` `cmdMove` | Marsch bzw. Angriffsmarsch, optional in Formation |
 | `attack` | `ids, targetId` | `game.js` `cmdAttack` | Ziel angreifen (auch Brücken) |
 | `stop` | `ids` | `game.js` | Anhalten |
@@ -146,7 +149,8 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 | `movement.js`, `pathfinding.js`, `grid.js`, `formation.js` | Bewegung, A*-Wegsuche, Zellenraster, Formationen |
 | `combat.js` | Zielsuche, Direktfeuer, Mörser, Flugabwehr, Schaden |
 | `logistics.js`, `construction.js` | LKW, Nachfüllen, Transport; Bauen und Reparieren |
-| `city.js` (Daten `js/data/city.js`, UI `js/ui/citypanel.js`, Karte `js/render/citylayer.js`) | Zonenstadt um die Hauptstadt (PRD §15), Befehl `city`; Stadtgebäude belegen `grid.struct` mit `city.gridId`; fertige Gebäude haben seit v4.83 eine Ziel-Entity (`kind: 'building'`, `type: 'city'`, nicht in `game.buildings`), die der Spieler seit v4.94 wählen kann |
+| `city.js` (Daten `js/data/city.js`, UI `js/ui/citypanel.js`, Karte `js/render/citylayer.js`) | Zonenstadt um die Hauptstadt (PRD §15), Befehl `city`; Stadtgebäude belegen `grid.struct` mit `city.gridId`; fertige Gebäude haben seit v4.83 eine Ziel-Entity (`kind: 'building'`, `type: 'city'`, nicht in `game.buildings`), die der Spieler seit v4.94 wählen kann. Seit v5.19: `accessCells` (Straßenzellen am Gebäude, mit Kette), `connectRoad` (Anschluss an das Lagernetz oder ein Ziel, für Startviertel und KI), `updateCity` rechnet die Ketten über `transport.js` |
+| `transport.js` | Straßentransport (seit v5.19, kein DOM): Breitensuche über Straßenzellen (`nearestField`, mehrere Ziele gleichzeitig), Wege je Gebäude (`pathFrom`, `pathEff`), Last und Stau (`addLoad`, `beginLoads`, `settleLoads`), Lager am Straßennetz (`mainAccess`), Anzeige der Lieferung und des Pendlers (`transportInfo`, liest nur). Zustand: `transportOf` in einer WeakMap je Stadt |
 | `garrison.js`, `tower.js`, `crates.js`, `commander.js`, `radio.js` | Häuserkampf, Festung (Gefechtsturm, Dachaufbau, Ausbau-Befehl), Versorgungskisten, Kommandeur, Sendemast |
 | `flow.js` (UI `js/ui/flowpanel.js`) | Ressourcenanzeige: Graph der Kette aus `CITY.chain` und `c.stats`, Verbrauchsmessung, Engpässe (liest nur) |
 | `weather.js`, `research.js`, `river.js` | Wetter und Jahreszeit, Forschungsbaum (seit v5.04: `team.tech = { tier, done, cur, queue }`, Wirkung je Gruppe über `modOf(game, e, stat)`, Daten `js/data/research.js`), Fluss mit Brücken und Furten |

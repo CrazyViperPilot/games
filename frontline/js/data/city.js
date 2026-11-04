@@ -63,7 +63,7 @@ export const CITY = {
   // ---- Rohstoffe (seit v4.83, PRD §15) ----
   // Vorkommen auf der Karte: je Team eine Gruppe jeder Sorte nahe der Hauptstadt, dazu umkämpfte Gruppen zwischen Basis und Zone.
   deposits: { home: { dist: [5, 9], size: 4 }, neutral: { count: 8, size: 5, ring: [6, 22] }, shore: 16 }, // Abstand in Zellen, Zellen je Gruppe; ring = Zellen außerhalb der Konfliktzone; shore = px Abstand zu Wasser und Furten (nie auf Wasser, Brücken, Straßen, seit v5.15)
-  // Förderanlage (Holzfäller, Steinbruch, Erzmine, Ölquelle je nach Vorkommen): Rohstoff je Arbeiter und Sekunde; braucht keine Straße
+  // Förderanlage (Holzfäller, Steinbruch, Erzmine, Ölquelle je nach Vorkommen): Rohstoff je Arbeiter und Sekunde; braucht seit v5.19 eine Straße (Lieferweg zum Werk, Pendler)
   extract: { wood: 0.3, stone: 0.3, ore: 0.25, oil: 0.3 },
   jobsMine: [0, 6, 12, 20], // Arbeitsplätze je Stufe einer Förderanlage
   // Verarbeitung: so viel Rohstoff braucht eine Einheit Produkt (BM aus Holz oder Stein, Roheisen aus Erz, Stahl aus Roheisen, Treibstoff
