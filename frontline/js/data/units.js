@@ -292,7 +292,7 @@ export const UNITS = {
     buildTime: 40,
     producedAt: 'airport',
     fuelPerSec: 1,
-    fuelMax: 45,
+    fuelMax: 55, // seit v5.14 55 statt 45: die Zone liegt auf der größeren Karte weiter vom Flughafen, die Zeit über ihr bleibt gleich
     hotkey: 'K', // V, J und H sind feste Tasten (Ansicht, Bauer, Hauptstadt)
   },
   // Flugabwehrpanzer (Flak): Schnellfeuer-Flak gegen Hubschrauber, Munition je Schuss 20. hitChance × speedRef: schnelle Ziele trifft sie selten

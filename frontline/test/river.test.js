@@ -127,6 +127,33 @@ test('Flusskarte: 6 Brücken und 4 Furten punktsymmetrisch; ohne sie trennt der 
   grid.terrain.set(saved);
 });
 
+test('Flusskarte (seit v5.14, Karte 11072 px): Fluss doppelt so weit von der Hauptstadt, Zone unverändert', () => {
+  // vorher (9024 px) begann das Wasser 1300–1450 px vor der Hauptstadt, jetzt 2500–2800 px; die Zone bleibt 3300 px groß in der Mitte
+  for (const seed of [3, 11, 42]) {
+    const m = generateMap(seed, { river: true });
+    const relief = Relief.decode(m.relief);
+    const T = BALANCE.map.tile;
+    const n = m.width / T;
+    const s = m.spawns[0];
+    let water = Infinity;
+    let toZone = Infinity; // Abstand Flusswasser – Zonenrand
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        if (relief.cellHeight(c, r) >= RELIEF.water) continue;
+        const x = (c + 0.5) * T;
+        const y = (r + 0.5) * T;
+        const dz = Math.hypot(x - m.zone.x, y - m.zone.y) - m.zone.r;
+        if (dz <= 0) continue;
+        water = Math.min(water, Math.hypot(x - s.x, y - s.y));
+        if (Math.hypot(x - s.x, y - s.y) < 4000) toZone = Math.min(toZone, dz);
+      }
+    }
+    assert.deepEqual(m.zone, { x: m.width / 2, y: m.height / 2, r: 3300 }, `Seed ${seed}: Zone`);
+    assert.ok(water > 2300, `Seed ${seed}: Wasser erst ${Math.round(water)} px vor der Hauptstadt (${(water / 64).toFixed(1)} Stadtzellen)`);
+    assert.ok(toZone > 150 && toZone < 1200, `Seed ${seed}: Fluss liegt nah an der Zone wie vorher (${Math.round(toZone)} px)`);
+  }
+});
+
 test('Brücke trägt Einheiten über den Fluss (Fahrbahnhöhe); zerstört ist der Weg zu', () => {
   const g = riverGame();
   const b = g.bridges[0];

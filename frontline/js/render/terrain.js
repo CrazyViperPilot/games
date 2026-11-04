@@ -1,5 +1,6 @@
 // Geländebild der Karte in 1/4 Maßstab (docs/verlauf.md §5 render/terrain.js). Einmal pro Karte erzeugt, zwischengespeichert.
 import { makeRng } from '../core/rng.js';
+import { BALANCE } from '../data/balance.js';
 import { reliefOf } from '../game/relief.js';
 import { reliefLayers } from './reliefimg.js';
 
@@ -76,7 +77,8 @@ export function buildTerrain(map, mode = '2d') {
   ctx.fillStyle = '#56603f';
   ctx.fillRect(0, 0, w, h);
   const patches = ['#5e6a46', '#4b5737', '#687249', '#4f5b3a', '#616c4a'];
-  for (let i = 0; i < 900; i++) {
+  const per = (w * h) / (2256 * 2256); // Flecken und Körnung je Fläche wie auf der alten Karte (9024 px, Bild 2256 px)
+  for (let i = 0; i < Math.round(900 * per); i++) {
     const x = rng.next() * w;
     const y = rng.next() * h;
     const r = 6 + rng.next() * 22;
@@ -88,7 +90,7 @@ export function buildTerrain(map, mode = '2d') {
   }
   // Feinkörnung
   ctx.globalAlpha = 1;
-  for (let i = 0; i < 7000; i++) {
+  for (let i = 0; i < Math.round(7000 * per); i++) {
     ctx.fillStyle = rng.next() < 0.5 ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,220,0.08)';
     ctx.fillRect(rng.next() * w, rng.next() * h, 1, 1);
   }
@@ -366,7 +368,7 @@ function drawRoads(ctx, map, S, paved = true) {
 /** Gleise einer Karte: neue Form `rails` (freie Strecken) oder die ältere `rail` (eine Linie quer über die Karte). */
 export function railList(town) {
   const list = (town?.rails ?? []).slice();
-  if (town?.rail && Number.isFinite(town.rail.y)) list.push({ x1: 0, y1: town.rail.y, x2: (town.rail.x2 ?? 9024), y2: town.rail.y });
+  if (town?.rail && Number.isFinite(town.rail.y)) list.push({ x1: 0, y1: town.rail.y, x2: (town.rail.x2 ?? BALANCE.map.width), y2: town.rail.y });
   return list;
 }
 

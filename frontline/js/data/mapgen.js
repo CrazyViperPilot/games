@@ -8,16 +8,17 @@ export const MAPGEN = {
     minRoutes: 3, // so viele getrennte Wege führen mindestens von jedem Start in die Konfliktzone
     zoneSlope: 0.25, // in der Stadt ist kein Hang steiler (alle Wege gut befahrbar)
     crossRegion: 1500, // so viele Zellen erreicht man von jedem Ufer einer Querung mindestens (sonst liegt sie in einer Tasche)
-    buildLand: 1300, // Bauland (seit v5.03): so weit um jeden Startpunkt keine Felsen, Wälder, Bäume, Gehöfte oder Einzelhäuser (Platz für die Stadt und ihre Großbauten)
+    spawnEdge: 700, // Startpunkte (Hauptstadt) so weit vom linken und unteren bzw. rechten und oberen Kartenrand (auch leere Editor-Karte)
+    buildLand: 2000, // Bauland (seit v5.03, seit v5.14 2000 statt 1300 bis nahe an den Fluss): so weit um jeden Startpunkt keine Felsen, Wälder, Bäume, Gehöfte oder Einzelhäuser (Platz für die Stadt und ihre Großbauten)
   },
   // Gelände der Zufallskarte (landscape.js)
   terrain: {
-    hills: 7, // Hügelpaare außerhalb der Stadt (passierbar)
+    hills: 10, // Hügelpaare außerhalb der Stadt (passierbar; seit v5.14 mit der größeren Karte 10 statt 7)
     zoneHills: 2, // sanfte Hügelpaare in der Stadt
-    ridges: 4, // Bergrücken-Paare (steile Flanken = Fels, unpassierbar)
-    lakes: 2, // Seepaare
-    spawnFlat: 950, // ebene Fläche um die Startpunkte, danach weicher Übergang bis SPAWN_BLEND (seit v5.03 größer: Bauland)
-    spawnBlend: 1250, // Ende des weichen Übergangs um die Startpunkte
+    ridges: 6, // Bergrücken-Paare (steile Flanken = Fels, unpassierbar; seit v5.14 6 statt 4)
+    lakes: 3, // Seepaare (seit v5.14 3 statt 2)
+    spawnFlat: 1400, // ebene Fläche um die Startpunkte, danach weicher Übergang bis SPAWN_BLEND (seit v5.03 größer: Bauland; seit v5.14 1400 statt 950)
+    spawnBlend: 1800, // Ende des weichen Übergangs um die Startpunkte (seit v5.14 1800 statt 1250)
     baseLevel: 36, // mittlere Höhe des Grundes über dem Wasserspiegel-Bezug 0
   },
   // Fluss mit Brücken und Furten (landscape.js, river.js; nur wenn „Fluss“ an ist)
@@ -25,7 +26,7 @@ export const MAPGEN = {
     halfW: 92, // halbe Breite des Flusses
     bank: 330,
     depth: 40,
-    r: [2280, 2520], // Abstand der Flussmitte von der Kartenecke
+    r: [3728, 3968], // Abstand der Flussmitte von der Kartenecke (seit v5.14 mit der größeren Karte 1448 px weiter: gleich weit von der Zone, doppelt so weit von der Hauptstadt)
     bridges: [16, 45, 74],
     fords: [30.5, 59.5],
     shift: 4,
@@ -36,8 +37,8 @@ export const MAPGEN = {
   },
   // Hindernisse und Bewuchs
   scatter: {
-    obstaclePairs: 32, // Felsen- und Waldpaare
-    scatterPairs: 350, // verstreute Bäume und Büsche (Paare)
+    obstaclePairs: 48, // Felsen- und Waldpaare (seit v5.14 mit der größeren Karte 48 statt 32)
+    scatterPairs: 520, // verstreute Bäume und Büsche (Paare; seit v5.14 520 statt 350)
   },
   // Stadt in der Konfliktzone (Straßenraster, Bahn, Wachtürme)
   town: {
@@ -49,9 +50,9 @@ export const MAPGEN = {
   },
   // Gebäude außerhalb der Zone
   outposts: {
-    houses: 22, // Einzelhäuser außerhalb der Zone (Paare)
-    halls: 6, // freistehende Hallen (Paare)
-    factories: 7, // Fabrikgelände mit Mauer (Paare)
+    houses: 32, // Einzelhäuser außerhalb der Zone (Paare; seit v5.14 32 statt 22)
+    halls: 9, // freistehende Hallen (Paare; seit v5.14 9 statt 6)
+    factories: 10, // Fabrikgelände mit Mauer (Paare; seit v5.14 10 statt 7)
     wallT: 16, // Mauerstärke
     wallMargin: 80, // Abstand der Mauer zur Fabrik (Platz zum Umfahren)
     wallGap: 130, // Lücke in der Mauer (zwei gegenüberliegende Seiten)
@@ -60,14 +61,14 @@ export const MAPGEN = {
   crates: {
     clear: 40, // so weit ringsum ist der Boden um eine Kiste frei und erreichbar
     zoneGap: 350, // Abstand zur Zonenkante
-    spawnGap: 1300, // Abstand zu den Startpunkten
+    spawnGap: 2000, // Abstand zu den Startpunkten (seit v5.14 2000 statt 1300: außerhalb des Baulands)
     gap: 900, // Abstand der Kisten untereinander
   },
   // Gehöfte und Felder
   farms: {
     chance: 0.75, // so viele Einzelhäuser außerhalb der Zone werden Gehöfte mit Feldern
     tries: 8, // Anordnungen je Gehöft (die mit der meisten Feldfläche gewinnt)
-    fieldBlocks: 8, // freie Flure (Paare): zwei Feldreihen beiderseits eines Feldwegs, ohne Haus
+    fieldBlocks: 12, // freie Flure (Paare): zwei Feldreihen beiderseits eines Feldwegs, ohne Haus (seit v5.14 12 statt 8)
     fieldGap: 24, // Feldrain zwischen zwei Feldern
     fieldYard: 54, // Abstand Haus–Feldreihe (darin läuft der Feldweg entlang)
     trackW: 26, // Feldweg

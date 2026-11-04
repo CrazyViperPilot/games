@@ -98,8 +98,10 @@ function heuristic(c, r, tc, tr) {
  * Ergebnis: Wegpunkte {x, y} ohne Start. Letzter Punkt = exaktes Ziel, wenn das Ziel erreicht wurde.
  * Ist das Ziel unerreichbar (oder nicht passierbar), endet der Weg an der erreichbaren Zelle nahe dem Ziel.
  * [] wenn Start- und Zielzelle gleich sind oder nichts erreichbar ist.
+ * maxNodes: höchstens so viele untersuchte Zellen; Standard 20000, auf großen Rastern ein Viertel der Zellen (seit v5.14: die Grenze
+ * wächst mit der Karte mit, 346 × 346 Kacheln → 29929, damit lange Umwege über Brücken weiter gefunden werden).
  */
-export function findPath(grid, sx, sy, tx, ty, team, maxNodes = 20000) {
+export function findPath(grid, sx, sy, tx, ty, team, maxNodes = Math.max(20000, Math.ceil((grid.cols * grid.rows) / 4))) {
   const cols = grid.cols;
   const rows = grid.rows;
   const clampC = (v) => Math.min(Math.max(v, 0), cols - 1);

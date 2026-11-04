@@ -16,8 +16,8 @@ export const RELIEF = {
   q: 2,
 };
 
-export const COARSE_N = W / RELIEF.res + 1; // 142 Punkte je Achse (0 … 9024)
-export const FINE_N = W / RELIEF.step + 1; // 283
+export const COARSE_N = W / RELIEF.res + 1; // 174 Punkte je Achse (0 … 11072)
+export const FINE_N = W / RELIEF.step + 1; // 347
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 // Catmull-Rom-Mitte zwischen p1 und p2
@@ -128,26 +128,60 @@ export class Relief {
 
   /** Grobraster als Text (Base64, 1 Byte je Punkt). */
   encode() {
-    const C = this.coarse;
-    let s = '';
-    for (let i = 0; i < C.length; i++) s += String.fromCharCode(clamp(Math.round((C[i] - RELIEF.min) / RELIEF.q), 0, 255));
-    return btoa(s);
+    return encodeCoarse(this.coarse);
   }
 
   /** Aus encode() zurück; null bei falscher Länge oder kaputtem Text. */
   static decode(text) {
-    if (typeof text !== 'string') return null;
-    let s;
-    try {
-      s = atob(text);
-    } catch {
-      return null;
-    }
-    if (s.length !== COARSE_N * COARSE_N) return null;
-    const C = new Float32Array(s.length);
-    for (let i = 0; i < s.length; i++) C[i] = s.charCodeAt(i) * RELIEF.q + RELIEF.min;
-    return new Relief(C);
+    const C = decodeCoarse(text);
+    return C && C.length === COARSE_N * COARSE_N ? new Relief(C) : null;
   }
+}
+
+function encodeCoarse(C) {
+  let s = '';
+  for (let i = 0; i < C.length; i++) s += String.fromCharCode(clamp(Math.round((C[i] - RELIEF.min) / RELIEF.q), 0, 255));
+  return btoa(s);
+}
+
+/** Grobraster aus dem Text von encode(), beliebige quadratische Größe (auch ältere, kleinere Karten); null bei kaputtem Text. */
+function decodeCoarse(text) {
+  if (typeof text !== 'string') return null;
+  let s;
+  try {
+    s = atob(text);
+  } catch {
+    return null;
+  }
+  const n = Math.round(Math.sqrt(s.length));
+  if (n < 2 || n * n !== s.length) return null;
+  const C = new Float32Array(s.length);
+  for (let i = 0; i < s.length; i++) C[i] = s.charCodeAt(i) * RELIEF.q + RELIEF.min;
+  return C;
+}
+
+/** Kantenlänge (px) der Karte, zu der ein gespeichertes Höhengelände gehört, oder null bei kaputtem Text. */
+export function reliefSize(text) {
+  const C = decodeCoarse(text);
+  return C ? (Math.round(Math.sqrt(C.length)) - 1) * RELIEF.res : null;
+}
+
+/**
+ * Höhengelände einer älteren Karte anderer Größe (seit v5.14, Karte 9024 → 11072 px) auf die heutige Größe bringen: um
+ * (dx, dy) px verschoben, außen mit der Höhe des alten Randes fortgesetzt (Flüsse laufen bis zum neuen Rand weiter).
+ * Liefert den Text für map.relief oder null.
+ */
+export function shiftRelief(text, dx, dy) {
+  const C = decodeCoarse(text);
+  if (!C) return null;
+  const n0 = Math.round(Math.sqrt(C.length));
+  const n = COARSE_N;
+  const out = new Float32Array(n * n);
+  for (let j = 0; j < n; j++) {
+    const j0 = clamp(Math.round(j - dy / RELIEF.res), 0, n0 - 1);
+    for (let i = 0; i < n; i++) out[j * n + i] = C[j0 * n0 + clamp(Math.round(i - dx / RELIEF.res), 0, n0 - 1)];
+  }
+  return encodeCoarse(out);
 }
 
 const cache = new WeakMap(); // Karte → { src, relief }

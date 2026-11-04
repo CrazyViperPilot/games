@@ -40,7 +40,11 @@ export const QUICK = {
 };
 
 export const BALANCE = {
-  map: { width: 9024, height: 9024, tile: 32 },
+  // Kartengröße (px). Seit v5.14 11072 statt 9024: die Konfliktzone (zone.r) bleibt gleich groß und sitzt in der Mitte, rundum
+  // kommen 1024 px (16 Stadtzellen) dazu, so liegt der Fluss doppelt so weit von der Hauptstadt (Platz für die Stadt).
+  // Bedingungen: Vielfaches von 128 plus 64 (Kartenmitte auf einer Stadtzellenmitte, Zonenstraßen genau auf Zellreihen) und von
+  // RELIEF.res (64, Höhenraster). Ältere gespeicherte Karten mit kleinerer Größe werden beim Laden mittig eingesetzt (mapdata.js).
+  map: { width: 11072, height: 11072, tile: 32 },
   tickRate: 20, // Simulationsschritte/s
   winPoints: QUICK.winPoints,
   // Geld für Abschüsse und Bauten (Anteil am Geldpreis der Einheit bzw. am Baumaterialpreis des Gebäudes)
@@ -230,7 +234,7 @@ export const BALANCE = {
   // (deer Tiere je Rudel) und Wildschweine (boar). Sie grasen und ziehen langsam (walk px/s) weiter; kommt eine Einheit näher als
   // scare (je Art: Infanterie, Fahrzeug, Hubschrauber) oder knallt es in boom px, flieht das ganze Rudel (run px/s) flee px weit.
   animals: {
-    pairs: 4,
+    pairs: 6, // seit v5.14 mit der größeren Karte 6 statt 4
     deer: [3, 5],
     boar: [2, 4],
     walk: 26,

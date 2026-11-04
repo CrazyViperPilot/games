@@ -38,8 +38,8 @@ test('Hindernisse sind punktsymmetrisch', () => {
 test('Spawns liegen auf der Karte und sind punktsymmetrisch', () => {
   const map = generateMap(4);
   assert.deepStrictEqual(map.spawns, [
-    { x: 700, y: 8324 },
-    { x: 8324, y: 700 },
+    { x: 700, y: 10372 }, // seit v5.14 (Karte 11072 px) 700 px von den Rändern
+    { x: 10372, y: 700 },
   ]);
   assert.deepStrictEqual(map.zone, { x: W / 2, y: H / 2, r: BALANCE.zone.r });
 });

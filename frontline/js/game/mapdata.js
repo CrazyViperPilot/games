@@ -1,8 +1,9 @@
 // Kartendaten für Karteneditor und gespeicherte Karten: Format, Prüfung, Speicher (localStorage). Kein DOM-Zugriff außer localStorage.
 import { BALANCE } from '../data/balance.js';
+import { MAPGEN } from '../data/mapgen.js';
 import { Grid } from './grid.js';
 import { findPath } from './pathfinding.js';
-import { Relief, reliefOf } from './relief.js';
+import { Relief, reliefOf, reliefSize, shiftRelief } from './relief.js';
 import { countRoutes } from './landscape.js';
 import { openBridges } from './river.js';
 
@@ -28,8 +29,8 @@ export function createEmptyMap(name = 'Neue Karte') {
     town: { roads: [], buildings: [], parks: [], cars: [], trees: [], rails: [], fields: [] },
     trees: [],
     spawns: [
-      { x: 700, y: H - 700 },
-      { x: W - 700, y: 700 },
+      { x: MAPGEN.general.spawnEdge, y: H - MAPGEN.general.spawnEdge },
+      { x: W - MAPGEN.general.spawnEdge, y: MAPGEN.general.spawnEdge },
     ],
     zone: { x: W / 2, y: H / 2, r: BALANCE.zone.r },
     crates: [],
@@ -39,9 +40,64 @@ export function createEmptyMap(name = 'Neue Karte') {
 const num = (v, d) => (Number.isFinite(v) ? v : d);
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
+/**
+ * Ältere Karte anderer Größe (bis v5.11 waren alle Karten 9024 × 9024 px) mittig in die heutige Karte setzen: alle Punkte um
+ * den halben Größenunterschied verschoben, Zone und Startpunkte behalten ihren Abstand, außen kommt freies Land dazu. Gleise und
+ * Wege, die am alten Rand endeten, laufen bis zum neuen Rand weiter; das Gelände setzt den alten Rand fort. Die Größe steht in
+ * `width`/`height` (fehlt sie, zählt die Größe des Höhengeländes, sonst die heutige). Karten heutiger Größe bleiben unverändert.
+ */
+function fitSize(src) {
+  const fromRelief = typeof src.relief === 'string' ? reliefSize(src.relief) : null;
+  const w0 = Number.isFinite(src.width) && src.width > 0 ? src.width : (fromRelief ?? W);
+  const h0 = Number.isFinite(src.height) && src.height > 0 ? src.height : w0;
+  if (w0 === W && h0 === H) return src;
+  const dx = Math.round((W - w0) / 2);
+  const dy = Math.round((H - h0) / 2);
+  const mx = (x) => (Number.isFinite(x) ? x + dx : x);
+  const my = (y) => (Number.isFinite(y) ? y + dy : y);
+  // Endpunkt einer Strecke: am alten Rand → am neuen Rand
+  const ex = (x) => (!Number.isFinite(x) ? x : x <= 0 ? 0 : x >= w0 ? W : x + dx);
+  const ey = (y) => (!Number.isFinite(y) ? y : y <= 0 ? 0 : y >= h0 ? H : y + dy);
+  const arr = (a) => (Array.isArray(a) ? a : []);
+  const pts = (a) => arr(a).map((o) => (o && typeof o === 'object' ? { ...o, x: mx(o.x), y: my(o.y) } : o));
+  const segs = (a, edge) => arr(a).map((o) => (o && typeof o === 'object' ? { ...o, x1: (edge ? ex : mx)(o.x1), y1: (edge ? ey : my)(o.y1), x2: (edge ? ex : mx)(o.x2), y2: (edge ? ey : my)(o.y2) } : o));
+  const town = src.town ?? {};
+  const rail = town.rail && Number.isFinite(town.rail.y) ? { x1: 0, y1: town.rail.y, x2: town.rail.x2 ?? w0, y2: town.rail.y } : null;
+  const out = {
+    ...src,
+    width: W,
+    height: H,
+    obstacles: pts(src.obstacles),
+    trees: pts(src.trees),
+    spawns: pts(src.spawns),
+    zone: src.zone && typeof src.zone === 'object' ? { ...src.zone, x: mx(src.zone.x), y: my(src.zone.y) } : { x: w0 / 2 + dx, y: h0 / 2 + dy, r: BALANCE.zone.r },
+    crates: pts(src.crates),
+    town: {
+      ...town,
+      roads: segs(town.roads, true),
+      buildings: pts(town.buildings),
+      parks: pts(town.parks),
+      cars: pts(town.cars),
+      trees: pts(town.trees),
+      rails: segs([...arr(town.rails), ...(rail ? [rail] : [])], true),
+      fields: pts(town.fields),
+    },
+    ...(src.fords ? { fords: pts(src.fords) } : {}),
+    ...(src.bridges ? { bridges: segs(src.bridges, false) } : {}),
+  };
+  delete out.town.rail;
+  if (typeof src.relief === 'string') {
+    const relief = shiftRelief(src.relief, dx, dy);
+    if (relief) out.relief = relief;
+    else delete out.relief;
+  }
+  return out;
+}
+
 /** Beliebiges Kartenobjekt (generiert oder aus JSON) → vollständige, bereinigte Karte. Wirft bei unbrauchbaren Daten. */
-export function normalizeMap(src) {
-  if (!src || typeof src !== 'object') throw new Error('Keine Karte');
+export function normalizeMap(raw) {
+  if (!raw || typeof raw !== 'object') throw new Error('Keine Karte');
+  const src = fitSize(raw);
   const town = src.town ?? {};
   const pt = (o) => ({ x: clamp(num(o.x, 0), 0, W), y: clamp(num(o.y, 0), 0, H) });
   const circ = (o, lo, hi) => ({ ...pt(o), r: clamp(num(o.r, lo), lo, hi) });

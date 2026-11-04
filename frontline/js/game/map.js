@@ -14,9 +14,10 @@ const TILE = BALANCE.map.tile;
 const CX = W / 2;
 const CY = H / 2;
 const ZONE_R = BALANCE.zone.r;
+const SPAWN_EDGE = MAPGEN.general.spawnEdge;
 const SPAWNS = [
-  { x: 700, y: 8324 },
-  { x: 8324, y: 700 },
+  { x: SPAWN_EDGE, y: H - SPAWN_EDGE },
+  { x: W - SPAWN_EDGE, y: SPAWN_EDGE },
 ];
 const MAX_ATTEMPTS = MAPGEN.general.attempts;
 const OBSTACLE_PAIRS = MAPGEN.scatter.obstaclePairs;
