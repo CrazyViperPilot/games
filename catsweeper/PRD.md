@@ -1,6 +1,6 @@
 # Catsweeper – PRD
 
-Stand: v2 (2026-10-25). Dieses Dokument bei jeder Regel- oder Funktionsänderung aktuell halten.
+Stand: v3 (2026-11-04). Dieses Dokument bei jeder Regel- oder Funktionsänderung aktuell halten.
 
 ## Idee
 Minesweeper (Minensucher) mit Katzen statt Minen. Name und Regeln orientieren sich am Katzen-Minesweeper „Catsweeper“
@@ -13,11 +13,13 @@ Minesweeper (Minensucher) mit Katzen statt Minen. Name und Regeln orientieren si
 - Service Worker: network-first, Cache nur Offline-Fallback. Bei Dateiänderungen `CACHE_NAME` in `sw.js` erhöhen.
 
 ## Regeln
-- Auf dem Feld sitzen versteckt Katzen. Feld antippen = aufdecken. Katze erwischt = verloren („Miau!“).
+- Auf dem Feld sitzen versteckt Katzen. Feld aufdecken (siehe Bedienung unten). Katze erwischt = verloren („Miau!“).
 - Zahl auf einem offenen Feld = Anzahl Katzen auf den bis zu 8 Nachbarfeldern. Bei 0 werden Nachbarn automatisch aufgedeckt.
 - Gewonnen, wenn alle Felder ohne Katze offen sind.
 - Der erste Zug ist immer sicher (Feld + Nachbarn katzenfrei, Katzen werden erst dann verteilt).
-- Fisch-Markierung (statt Flagge): **Maus: Rechtsklick** (Linksklick deckt auf). **Touch: lang drücken** oder Modus-Knopf „Aufdecken/Fisch“ (Tipp = aufdecken). Zähler oben = Katzen minus Fische.
+- Touch (Standard-Modus „🐟→👆 2× Tipp“, seit v3 auf Daniels Wunsch): **1. Tipp** auf verdecktes Feld legt einen Fisch (Markierung), **2. Tipp** auf den Fisch deckt das Feld auf. **Lang drücken** = Fisch an/aus (zum Wegnehmen ohne Aufdecken).
+- Modus-Knopf oben schaltet auf „👆 Direkt“ (Tipp deckt sofort auf, lang drücken = Fisch); Wahl wird gespeichert (`catsweeper-mode`).
+- **Maus:** Linksklick deckt auf, Rechtsklick = Fisch an/aus (unabhängig vom Modus). Zähler oben = Katzen minus Fische.
 - Tipp auf eine Zahl, deren Fisch-Anzahl stimmt (Chord): restliche Nachbarn werden aufgedeckt (falscher Fisch = verloren).
 
 ## Stufen

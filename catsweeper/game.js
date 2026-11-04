@@ -1,13 +1,13 @@
 // Catsweeper – Darstellung und Eingabe (Canvas 2D). Logik: logic.js
 (function () {
   const L = CatLogic;
-  const K = { save: 'catsweeper-save', best: 'catsweeper-best', sound: 'catsweeper-sound' };
+  const K = { save: 'catsweeper-save', best: 'catsweeper-best', sound: 'catsweeper-sound', mode: 'catsweeper-mode' };
   const $ = (id) => document.getElementById(id);
   const cv = $('board'), ctx = cv.getContext('2d');
   const NUM = ['', '#4aa3ff', '#4cc46a', '#ff5d5d', '#a47cff', '#ff9a3c', '#2ec4c4', '#e8e8e8', '#9aa0a6'];
   const FUR = ['#f29b3d', '#8d8d99', '#3b3b46', '#f2e6d0', '#c7803a', '#b9a6d6'];
 
-  let g = null, mode = 'reveal', soundOn = true, geo = null, hintCell = null, hintUntil = 0, timer = null;
+  let g = null, mode = 'two', soundOn = true, geo = null, hintCell = null, hintUntil = 0, timer = null;
   const get = (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } };
   const set = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* ignorieren */ } };
 
@@ -126,8 +126,9 @@
   function updateBar() {
     $('left').textContent = g ? L.flagsLeft(g) : 0;
     $('time').textContent = fmt(g ? g.time : 0);
-    $('btn-mode').textContent = mode === 'reveal' ? '👆 Aufdecken' : '🐟 Fisch';
-    $('btn-mode').classList.toggle('on', mode === 'flag');
+    // 'two' = 1. Tipp Fisch, 2. Tipp aufdecken; 'reveal' = Tipp deckt direkt auf.
+    $('btn-mode').textContent = mode === 'two' ? '🐟→👆 2× Tipp' : '👆 Direkt';
+    $('btn-mode').classList.toggle('on', mode === 'two');
     $('btn-sound').textContent = soundOn ? '🔊' : '🔇';
   }
   function persist() { if (g && g.state === 'play') set(K.save, g); else try { localStorage.removeItem(K.save); } catch (e) { /* ignorieren */ } }
@@ -162,13 +163,17 @@
     }, 900);
   }
 
-  function act(i, alt) {
+  // kind: 'tap' (Touch-Tipp), 'reveal' (Linksklick), 'flag' (lang drücken / Rechtsklick = Fisch an/aus).
+  function act(i, kind) {
     if (!g || g.state !== 'play') return;
-    const flagging = (mode === 'flag') !== !!alt;
-    if (g.open[i]) { L.chord(g, i); }
-    else if (flagging) { L.toggleFlag(g, i); }
-    else { L.reveal(g, i); }
-    after(flagging && !g.open[i] ? g.flag[i] : undefined);
+    if (g.open[i]) { L.chord(g, i); after(); return; }
+    let flagging = kind === 'flag';
+    if (kind === 'tap' && mode === 'two') {
+      if (!g.flag[i]) flagging = true; // 1. Tipp: Fisch hinlegen
+      else g.flag[i] = 0;               // 2. Tipp auf Fisch: aufdecken
+    }
+    if (flagging) { L.toggleFlag(g, i); after(g.flag[i]); }
+    else { L.reveal(g, i); after(); }
   }
 
   function cellAt(e) {
@@ -183,17 +188,17 @@
     const i = cellAt(e); if (i < 0) return;
     if (e.pointerType === 'mouse') {
       // Maus: Linksklick deckt auf (beim Loslassen), Rechtsklick markiert sofort mit Fisch.
-      if (e.button === 2) { act(i, true); press = null; } else if (e.button === 0) press = { i, mouse: true };
+      if (e.button === 2) { act(i, 'flag'); press = null; } else if (e.button === 0) press = { i, mouse: true };
       return;
     }
     press = { i, x: e.clientX, y: e.clientY, long: false };
-    press.t = setTimeout(() => { if (press) { press.long = true; if (navigator.vibrate) navigator.vibrate(25); act(i, true); } }, 380);
+    press.t = setTimeout(() => { if (press) { press.long = true; if (navigator.vibrate) navigator.vibrate(25); act(i, 'flag'); } }, 380);
   });
   cv.addEventListener('pointermove', (e) => { if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 12) { clearTimeout(press.t); press = null; } });
   cv.addEventListener('pointerup', (e) => {
     if (!press) return; clearTimeout(press.t);
     const p = press; press = null;
-    if (e.button === 0 && !p.long && cellAt(e) === p.i) act(p.i, false);
+    if (e.button === 0 && !p.long && cellAt(e) === p.i) act(p.i, p.mouse ? 'reveal' : 'tap');
   });
   cv.addEventListener('pointercancel', () => { if (press) clearTimeout(press.t); press = null; });
   cv.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -213,7 +218,7 @@
   $('btn-menu').onclick = openMenu;
   $('btn-resume').onclick = () => show('menu', false);
   $('btn-new').onclick = () => g && start(g.level);
-  $('btn-mode').onclick = () => { mode = mode === 'reveal' ? 'flag' : 'reveal'; updateBar(); };
+  $('btn-mode').onclick = () => { mode = mode === 'two' ? 'reveal' : 'two'; set(K.mode, mode); updateBar(); };
   $('btn-sound').onclick = () => { soundOn = !soundOn; set(K.sound, soundOn); updateBar(); };
   $('btn-hint').onclick = () => {
     if (!g || g.state !== 'play') return;
@@ -226,6 +231,7 @@
 
   // ---- Start ----
   soundOn = get(K.sound, true);
+  mode = get(K.mode, 'two') === 'reveal' ? 'reveal' : 'two';
   const saved = get(K.save, null);
   if (saved && saved.state === 'play' && saved.cat && L.LEVELS[saved.level]) g = saved;
   resize(); updateBar(); startTimer(); openMenu();
