@@ -101,7 +101,8 @@ test('Wohnen + Werk + Straße: Einwohner arbeiten, Lager und Geld wachsen', () =
   const c = g.city[0];
   c.deposit[at(g, 0, 4)] = 1; // Wald direkt an der Stadt (Test)
   c.deposit[at(g, 1, 4)] = 2; // Fels
-  assert.match(paint(g, 'mine', 2, 4, 2, 4).reason, /vorkommen/);
+  assert.match(paint(g, 'mine', 5, 4, 5, 4).reason, /vorkommen/);
+  assert.match(paint(g, 'mine', 2, 4, 2, 4).reason, /räumen/, 'BM-Werk steht dort: nicht überbauen');
   assert.ok(paint(g, 'mine', 0, 4, 1, 4).ok);
   const m = g.mainFob(0);
   m.store.bm = 0;
@@ -116,6 +117,35 @@ test('Wohnen + Werk + Straße: Einwohner arbeiten, Lager und Geld wachsen', () =
   assert.ok(g.teams[0].res.money > money0);
   assert.ok(m.store.bm <= 3000);
   assert.ok(g.city[1].stats.pop <= g.city[1].stats.housing, 'andere Stadt eigenständig');
+});
+
+test('Nichts überbauen: belegte Zellen bleiben, erst räumen, dann neu ausweisen', () => {
+  const g = new Game({ seed: 3, city: true, startMoney: 3000 });
+  clearStart(g);
+  const c = g.city[0];
+  assert.ok(paint(g, 'road', 0, 2, 3, 2).ok);
+  assert.ok(paint(g, 'res', 0, 1, 1, 1).ok);
+  const road = c.kind[at(g, 0, 2)];
+  const res = c.kind[at(g, 0, 1)];
+  const money0 = g.teams[0].res.money;
+  const r = paint(g, 'com', 0, 1, 1, 1);
+  assert.equal(r.ok, false, 'nur Belegtes im Rechteck');
+  assert.match(r.reason, /räumen/);
+  assert.equal(g.teams[0].res.money, money0, 'nichts bezahlt');
+  assert.equal(c.kind[at(g, 0, 1)], res, 'Wohnen bleibt');
+  // gemischtes Rechteck: nur die leeren Zellen werden Gewerbe, Straße und Wohnen bleiben
+  const r2 = paint(g, 'com', 0, 0, 1, 2);
+  assert.equal(r2.ok, true);
+  assert.equal(r2.placed, 2);
+  assert.equal(r2.occupied, true);
+  assert.equal(c.kind[at(g, 0, 2)], road, 'Straße bleibt');
+  assert.equal(c.kind[at(g, 1, 1)], res, 'Wohnen bleibt');
+  // Großbau auf belegten Zellen: abgelehnt
+  assert.equal(paint(g, 'uni', 0, 1, 0, 1).ok, false);
+  // erst räumen, dann geht es
+  assert.ok(paint(g, 'erase', 0, 1, 0, 1).ok);
+  assert.ok(paint(g, 'com', 0, 1, 0, 1).ok);
+  assert.notEqual(c.kind[at(g, 0, 1)], res, 'nach dem Räumen neu ausgewiesen');
 });
 
 test('Ausbau nur bei Bedarf: Wohnen ohne Arbeit bleibt Stufe 1', () => {

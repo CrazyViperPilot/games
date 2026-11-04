@@ -1211,7 +1211,7 @@ export function canZone(game, c, i) {
 /**
  * Befehl `{ type: 'city', kind: 'road'|'res'|'com'|'bm'|'mun'|'fuel'|'erase', c0, r0, c1, r1 }`:
  * Rechteck (Spalten c0..c1, Zeilen r0..r1 im Kartenraster) ausweisen oder räumen. Überall, wo nichts gesperrt ist (seit v4.87).
- * Kostet Geld je Zelle, bis das Geld ausgeht.
+ * Kostet Geld je Zelle, bis das Geld ausgeht. Seit v5.10 nur auf leeren Zellen: Belegte Zellen werden nicht überbaut (erst räumen).
  */
 export function cmdCity(game, team, cmd) {
   const city = game.city?.[team];
@@ -1235,11 +1235,16 @@ export function cmdCity(game, team, cmd) {
   let broke = false;
   let outside = false;
   let noDeposit = false;
+  let occupied = false;
   const main = game.mainFob(team);
   for (let row = r0; row <= r1; row++) {
     for (let col = c0; col <= c1; col++) {
       const i = idx(city, col, row);
       if (city.kind[i] === id) continue;
+      if (!erase && city.kind[i]) {
+        occupied = true; // nichts überbauen (seit v5.10): erst räumen
+        continue;
+      }
       if (!erase && !canZone(game, city, i)) {
         if (!city.blocked[i] && !city.claim[i]) outside = true;
         continue;
@@ -1258,7 +1263,7 @@ export function cmdCity(game, team, cmd) {
         t.res.money -= price;
         if (bm) main.store.bm -= bm;
       }
-      if (city.part[i]) clearBig(game, team, city, anchorOf(city, i)); // Großbau ganz weg (alle Zellen)
+      if (city.part[i]) clearBig(game, team, city, anchorOf(city, i)); // Räumen: Großbau ganz weg (alle Zellen)
       if (city.level[i]) releaseCell(game, city, col, row);
       refundQueue(game, team, city.ents.get(i)); // eigene Ausbildung zurück
       dropEntity(game, city, i);
@@ -1270,14 +1275,17 @@ export function cmdCity(game, team, cmd) {
     }
   }
   const poor = broke === 'bm' ? 'Zu wenig Baumaterial im Lager der Hauptstadt' : 'Zu wenig Geld';
-  if (!placed) return { ok: false, reason: broke ? poor : noDeposit ? 'Förderanlagen nur auf Rohstoffvorkommen' : outside ? 'Nur im eigenen Gebiet bauen' : 'Nichts zu ändern' };
+  if (!placed) {
+    const reason = broke ? poor : occupied ? 'Dort steht schon etwas: erst räumen' : noDeposit ? 'Förderanlagen nur auf Rohstoffvorkommen' : outside ? 'Nur im eigenen Gebiet bauen' : 'Nichts zu ändern';
+    return { ok: false, reason };
+  }
   rebuildList(city);
   // Zonen ohne Straße daneben wachsen nicht (Förderanlagen schon): melden
   let noRoad = false;
   if (!erase && cmd.kind !== 'road' && cmd.kind !== 'mine') {
     for (let row = r0; row <= r1 && !noRoad; row++) for (let col = c0; col <= c1; col++) if (city.kind[idx(city, col, row)] === id && !hasRoad(city, col, row)) noRoad = true;
   }
-  return { ok: true, placed, broke: !!broke, noRoad };
+  return { ok: true, placed, broke: !!broke, noRoad, occupied };
 }
 
 // ---- KI: baut in Ringen um die Hauptstadt nach außen, dazu kleine Viertel an vorderen FOBs (seit v4.82),
