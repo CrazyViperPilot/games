@@ -723,10 +723,15 @@ export function hasRoad(c, col, row) {
 /** Summen (Wohnplätze, Arbeitsplätze je Art) aus den gebauten Zellen; geflohene Wohnzellen zählen nicht. */
 function totals(c) {
   const t = { housing: 0, fled: 0, jobsCom: 0, bm: 0, mun: 0, fuel: 0, steel: 0, mine: { wood: 0, stone: 0, ore: 0, oil: 0 }, market: 0, power: 0, powerJobs: 0, uni: 0, dc: 0, jobsOther: 0, use: 0 };
+  t.n = { bm: 0, mun: 0, fuel: 0, steel: 0, mine: { wood: 0, stone: 0, ore: 0, oil: 0 } }; // fertige Gebäude je Art (Flussanzeige)
   for (const i of c.list) {
     const lv = c.level[i];
     if (!lv || isPart(c, i)) continue; // ein Großbau zählt einmal (über seine Mitte)
     const k = KINDS[c.kind[i] - 1];
+    if (k === 'mine') {
+      const d = DEPOSITS[c.deposit[i] - 1];
+      if (d) t.n.mine[d]++;
+    } else if (k in t.n) t.n[k]++;
     t.use += (CITY.power.use[k] ?? 0) * lv; // Strombedarf
     if (k === 'power') {
       t.power += CITY.power.supply[lv];
@@ -933,13 +938,27 @@ export function updateCity(game, dt) {
     const metalIn = Math.min(t.steel * eff * Y.metal, s.raw.ore / K.metal);
     s.mun = Math.min(t.mun * eff * Y.mun, (c.metal / Math.max(dt, 1e-6) + metalIn) / K.mun); // Munition braucht Metall
     s.metal = metalIn - s.mun * K.mun;
+    // Für die Flussanzeige (js/game/flow.js, CITY.chain): je Produkt Leistung der Werke (cap), was die Rohstoffe hergeben (inp), Erzeugung (gross)
+    s.cap = { bm: t.bm * eff * Y.bm, fuel: t.fuel * eff * Y.fuel, metal: t.steel * eff * Y.metal, mun: t.mun * eff * Y.mun };
+    s.inp = { bm: (s.raw.wood + s.raw.stone) / K.bm, fuel: s.raw.oil / K.fuel, metal: s.raw.ore / K.metal, mun: (c.metal / Math.max(dt, 1e-6) + metalIn) / K.mun };
+    s.gross = { bm: s.bm, fuel: s.fuel, metal: metalIn, mun: s.mun };
+    s.n = t.n;
+    s.fill = fill;
+    s.mood = mood;
+    const made = (c.made ??= { bm: 0, mun: 0, fuel: 0, metal: 0 }); // Summe, die wirklich ins Lager kam (Flussanzeige misst damit den Verbrauch)
+    const metal0 = c.metal;
     c.metal = Math.max(0, Math.min(BALANCE.logistics.storeCap, c.metal + s.metal * dt));
+    made.metal += Math.max(0, c.metal - metal0 + s.mun * K.mun * dt); // was das Stahlwerk ins Stadtlager bringt (das Munitionswerk zählt als Verbrauch)
     s.money = (pool * CITY.taxPop + t.jobsCom * fill * CITY.taxCom) * mood;
     c.stats = s;
 
     const main = game.mainFob(id);
     if (main && main.built) {
-      for (const k of ['bm', 'mun', 'fuel']) main.store[k] = Math.min(BALANCE.logistics.capitalCap, main.store[k] + s[k] * dt);
+      for (const k of ['bm', 'mun', 'fuel']) {
+        const v0 = main.store[k];
+        main.store[k] = Math.min(BALANCE.logistics.capitalCap, v0 + s[k] * dt);
+        made[k] += Math.max(0, main.store[k] - v0);
+      }
     }
     team.res.money += s.money * dt;
     team.rate.money += s.money;
@@ -1080,6 +1099,8 @@ export function cmdTrade(game, team, cmd) {
   const add = (v) => {
     if (cmd.good === 'metal') c.metal = Math.min(cap, c.metal + v);
     else main.store[cmd.good] = Math.min(cap, main.store[cmd.good] + v);
+    c.traded ??= { bm: 0, mun: 0, fuel: 0, metal: 0 }; // Summe der Käufe minus Verkäufe (Flussanzeige: zählt nicht als Verbrauch)
+    c.traded[cmd.good] += v;
   };
   if (cmd.dir === 'sell') {
     if (have < M.lot) return { ok: false, reason: 'Zu wenig zum Verkaufen' };

@@ -139,6 +139,7 @@ export class Hud {
       <div class="fabs">
         ${g.city ? '<button type="button" class="city-fab" data-act="city" title="Stadt verwalten (Y)">🏙 Stadt</button>' : ''}
         ${g.research ? '<button type="button" class="city-fab research-fab" data-act="research" title="Forschungsmenü: Stufen und Forschungsbaum (U bei gewählter Hauptstadt)">🔬 Forschung</button>' : ''}
+        ${g.city ? '<button type="button" class="city-fab flow-fab" data-act="flow" title="Ressourcen: Förderung, Werke, Lager und Engpässe">📊 Ressourcen</button>' : ''}
         <button type="button" class="city-fab builder-fab" data-act="builder" title="Nächstes Baufahrzeug (J)">🚧 Bauer</button>
       </div>
       <header class="top">
@@ -198,6 +199,7 @@ export class Hud {
       else if (act.dataset.act === 'city') this.app.toggleCity?.();
       else if (act.dataset.act === 'market') this.app.toggleMarket?.();
       else if (act.dataset.act === 'research') this.app.toggleResearch?.();
+      else if (act.dataset.act === 'flow') this.app.toggleFlow?.();
       else if (act.dataset.act === 'sound') this.app.toggleSound?.();
       else if (act.dataset.act === 'view') this.app.toggleView?.();
       else if (act.dataset.act === 'rotl') this.app.rotateView?.(-1);

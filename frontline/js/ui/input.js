@@ -389,6 +389,7 @@ export class Input {
         e.preventDefault();
         if (app.closeMarket?.()) return; // Marktmenü zuerst schließen
         if (app.closeResearch?.()) return; // dann das Forschungsmenü
+        if (app.closeFlow?.()) return; // oder die Ressourcenanzeige
         if (app.cityBuild?.()) app.toggleCity?.();
         else this.controller.cancel();
         return;

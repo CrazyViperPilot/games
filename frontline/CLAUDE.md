@@ -25,6 +25,9 @@ die genannten Dateien.
 9. Startmenü-Schalter (Sendemast, Wetter, Forschung, Fluss, Stadt) sind im Menü standardmäßig an, in `new Game()` ohne Angabe aus. Tests verlassen sich darauf.
 10. Texte im Spiel, Kommentare und Doku auf Deutsch, Bezeichner im Code englisch. Nach jeder Änderung in `js/data/`: `npm run docs`
     (erzeugt die Wertetabellen in PRD §6) und `npm run test:quick`. Vor dem Push `npm test` (alle grün).
+11. Ressourcen der Stadt (Rohstoffe, Werke, Waren, Förder- und Verarbeitungsformeln) ändern: die **Ressourcenanzeige** mitpflegen
+    (PRD §15 „Ressourcenanzeige“): Kette `CITY.chain` in `js/data/city.js`, Felder `cap`/`inp`/`gross`/`n` in `updateCity`
+    (`js/game/city.js`), neue Sorten mit Namen und Farbe in `js/game/flow.js` und `js/ui/flowpanel.js`. `test/flow.test.js` prüft das.
 
 ## Starten und testen
 
@@ -81,6 +84,7 @@ Darunter listet ein Inhaltsverzeichnis alle weiteren Abschnitte.
 | Höhenvorteil, Tempo am Hang, Weitsicht von oben | balance.js | `BALANCE.height`, `BALANCE.slope`, `BALANCE.sightHeight` |
 | Festung (Mauerring, Zahl der Türme, Höhenvorteil, Fallschaden) / Turm (Plätze, Dachaufbauten, Preise) | balance.js / buildings.js | `BALANCE.fortress` / `BUILDINGS.tower` |
 | Stadt: Ausbildungsgebäude (`produces`, `trainSlots`), Heilen/Reparieren und Krankenhaus (`care`), Zellgröße, Gebiet, Einwohner je Einheit (`crew`), Flucht, Vorkommen, Förderung, Verarbeitung, Metall je Einheit, Markt, Trefferpunkte, Ruinen, Startlager, Erträge, Steuern, Kosten, Wachstum, KI | js/data/city.js | `CITY` |
+| Ressourcenkette der Flussanzeige (welches Werk macht aus was was) | js/data/city.js | `CITY.chain` (Regel 11) |
 | Wetter, Häuserkampf, Kisten, Kommandeur, Formationen, Fluss, Tiere, Wracks, Tarnung, Flugabwehr | balance.js | `weather`, `garrison`, `crates`, `commander`, `formation`, `river`, `animals`, `scars`, `stealth`, `airFire` |
 | Kartengröße | balance.js | `BALANCE.map` (Vorsicht: ändert alle Karten und Tests) |
 | Aufbau der Zufallskarte (Hügel, Seen, Fluss, Stadt, Häuser, Felder, Kisten-Abstände) | js/data/mapgen.js | `MAPGEN.<abschnitt>` (ändert alle Zufallskarten) |
@@ -125,6 +129,7 @@ Wo jedes Feature liegt. „KI“ = Konstanten-Präfix in `js/data/ai.js`, Logik 
 | Stadtstraßen der Karte (Zonenstraßen, Brückenfahrbahnen; für beide Teams) | §7, §15 | `MAPGEN.town.block` | `roads.js` (`game.roads`, in der Stadt `c.mapRoads`, `roadAt`) | – | `citylayer.js` (`roadView`), `bridge.js` (Fahrbahn) | `city.test.js` |
 | Großbauten mit gerader Kante (Kraftwerk 2 × 2, Kaserne 4 × 4, Fabrikhalle 8 × 8, Flughafen 10 × 10) | §15 | `CITY.size` | `city.js` (`bigSpan`, `bigCenter`, `bigCells`, `fitBig`, Startviertel `startQuarter`) | `aiNeed` in `city.js` | `bigbuild.js` (Boden, 2D, Iso je Körper), `citylayer.js` | `city.test.js` |
 | Flughafen und F-16 (Start, Kreisen, Rückkehr, Landung, Tanken, Hangar) | §6, §15 | `BALANCE.jets`, `UNITS.f16` | `aircraft.js` (`AIRPORT`, `updateAircraft`, `parkNew`, `trainCheck`), Ausbildung `economy.js` | `jets()` in `ai.js`, `JET_*`, `CITY.ai.airportFrom`/`jets` | `sprites.js` (`drawJet`), `controller.js` (Staffel), `hud.js` | `aircraft.test.js` |
+| Ressourcenanzeige (Fluss Förderung → Werke → Lager, Verbrauch, Engpässe) | §15 „Ressourcenanzeige“ | `CITY.chain` | `flow.js` (`resourceFlow`, `flowLayout`, `FlowMeter`, `teamStock`), Zahlen aus `updateCity` in `city.js` (`c.stats.cap/inp/gross/n`, `c.made`, `c.traded`) | – | `js/ui/flowpanel.js` (Fenster, Knopf „Ressourcen“ in `hud.js`, `main.js` `toggleFlow`) | `flow.test.js` |
 | Wracks und Krater (nur Optik) | §9 | `scars` | `scars.js` | – | `sprites.js` (`drawWreck`, `drawCrater`) | `scars.test.js` |
 | Tiere (nur Optik) | §9 | `animals` | `animals.js` | – | `sprites.js` (`drawAnimal*`) | `animals.test.js` |
 | KI allgemein | §10 | `difficulty` | – | `js/ai/ai.js` | – | `ai.test.js` |

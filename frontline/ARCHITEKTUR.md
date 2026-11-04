@@ -147,6 +147,7 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 | `logistics.js`, `construction.js` | LKW, Nachfüllen, Transport; Bauen und Reparieren |
 | `city.js` (Daten `js/data/city.js`, UI `js/ui/citypanel.js`, Karte `js/render/citylayer.js`) | Zonenstadt um die Hauptstadt (PRD §15), Befehl `city`; Stadtgebäude belegen `grid.struct` mit `city.gridId`; fertige Gebäude haben seit v4.83 eine Ziel-Entity (`kind: 'building'`, `type: 'city'`, nicht in `game.buildings`), die der Spieler seit v4.94 wählen kann |
 | `garrison.js`, `tower.js`, `crates.js`, `commander.js`, `radio.js` | Häuserkampf, Festung (Gefechtsturm, Dachaufbau, Ausbau-Befehl), Versorgungskisten, Kommandeur, Sendemast |
+| `flow.js` (UI `js/ui/flowpanel.js`) | Ressourcenanzeige: Graph der Kette aus `CITY.chain` und `c.stats`, Verbrauchsmessung, Engpässe (liest nur) |
 | `weather.js`, `research.js`, `river.js` | Wetter und Jahreszeit, Forschungsbaum (seit v5.04: `team.tech = { tier, done, cur, queue }`, Wirkung je Gruppe über `modOf(game, e, stat)`, Daten `js/data/research.js`), Fluss mit Brücken und Furten |
 | `roads.js` | Stadtstraßen der Karte (seit v5.03): Zonenstraßen und Brückenfahrbahnen als Zellen im Stadtraster (`game.roads.kind`: 1 Straße, 2 Brücke), für beide Teams Straßenanschluss (`city.roadAt`), nicht ausweisbar (`canZone`) |
 | `aircraft.js` | Flughafen und Kampfflugzeuge (seit v5.03): Anlage `AIRPORT` (Bahnen, Stellplätze; auch fürs Bild), `u.jet = { home, slot, ready, rtb }`, `u.parked` (im Hangar: `isFoe` falsch, schießt nicht), Ausbildungsprüfung `trainCheck` |

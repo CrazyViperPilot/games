@@ -59,6 +59,15 @@ export const CITY = {
   jobsMine: [0, 6, 12, 20], // Arbeitsplätze je Stufe einer Förderanlage
   // Verarbeitung: so viel Rohstoff braucht eine Einheit Produkt (BM aus Holz oder Stein, Metall aus Erz, Treibstoff aus Öl, Munition aus Metall)
   convert: { bm: 1, metal: 2, fuel: 1, mun: 0.5 },
+  // Ressourcenkette (seit v5.07) für die Flussanzeige (Knopf „Ressourcen“, js/game/flow.js, PRD §15 „Ressourcenanzeige“):
+  // Werk → aus welchen Rohstoffen (Vorkommen) oder Waren es was macht. Reihenfolge = Reihenfolge der Verarbeitung.
+  // Bei jeder Änderung an Rohstoffen, Werken oder Waren hier und in updateCity (js/game/city.js) mitpflegen; test/flow.test.js prüft beides.
+  chain: {
+    bm: { from: ['wood', 'stone'], to: 'bm' }, // Baumaterial-Werk: Holz oder Stein → Baumaterial
+    steel: { from: ['ore'], to: 'metal' }, // Stahlwerk: Erz → Metall (bleibt im Stadtlager)
+    fuel: { from: ['oil'], to: 'fuel' }, // Raffinerie: Öl → Treibstoff
+    mun: { from: ['metal'], to: 'mun' }, // Munitionswerk: Metall → Munition
+  },
   // Startviertel (seit v4.84): steht zu Beginn fertig (Stufe 1) neben der Hauptstadt, dazu eine Ölquelle auf dem nächsten Ölvorkommen
   // Seit v5.03: über der Straße die Großbauten Kaserne (4 × 4) und Fabrikhalle (8 × 8) nebeneinander, big = [Art, Spalte ab Straßenanfang]
   startQuarter: { road: 12, row: ['res', 'fuel', 'res'], big: [['barracks', 0], ['factory', 4]] }, // Straßenlänge, die Zellen darunter, die Großbauten darüber

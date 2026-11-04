@@ -564,7 +564,7 @@ body.city-mode:not(.city-folded) .city-fab { display: none; }
 }
 
 /* Große Knöpfe rechts oben für Touch (ohne Tastatur), untereinander: Stadt (nur mit Stadt), Forschung (seit v4.98, nur mit
-   Forschung), Bauer (seit v4.95). Fehlt einer, rücken die anderen nach oben. */
+   Forschung), Ressourcen (seit v5.07, nur mit Stadt), Bauer (seit v4.95). Fehlt einer, rücken die anderen nach oben. */
 .fabs { position: fixed; right: calc(10px + env(safe-area-inset-right, 0px)); top: 50px; z-index: 20; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; pointer-events: none; }
 .city-fab { min-height: 44px; padding: 0 16px; border-radius: 10px; border: 2px solid var(--accent); background: #1d231df0; color: var(--text); font-size: 15px; font-weight: 700; cursor: pointer; pointer-events: auto; }
 .city-fab:active { background: #2e372e; }
@@ -638,6 +638,52 @@ body.research-open .research-fab { background: #2e372e; }
   .rs-node { font-size: 12px; }
   .rs-node > small { font-size: 11px; }
   .rs-side { width: 270px; font-size: 13px; }
+}
+
+/* Ressourcenanzeige (js/ui/flowpanel.js, seit v5.07): Fluss der Rohstoffe, über den Knopf „Ressourcen“ unter „Forschung“ */
+body.flow-open .flow-fab { background: #2e372e; }
+.flow { position: fixed; left: 50%; top: 50px; transform: translateX(-50%); z-index: 30; width: min(900px, calc(100% - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))); max-height: calc(100% - 58px); overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: 10px; background: #141814f4; border: 1px solid #b58248; box-shadow: 0 6px 24px #0008; pointer-events: auto; box-sizing: border-box; }
+.fl-head { display: flex; align-items: center; gap: 10px; font-size: 15px; }
+.fl-head > b { color: #d9a865; white-space: nowrap; }
+.fl-chips { flex: 1; display: flex; flex-wrap: wrap; gap: 4px 6px; font-size: 12px; }
+.fl-chip { padding: 2px 7px; border-radius: 6px; background: var(--panel-2); border: 1px solid var(--line-2); color: var(--muted); white-space: nowrap; }
+.fl-chip b { color: var(--text); font-variant-numeric: tabular-nums; }
+.fl-chip.bad { border-color: var(--bad); }
+.fl-chip.bad b { color: var(--bad); }
+.fl-close { min-width: 40px; height: 34px !important; font-size: 15px; }
+.fl-graph { display: block; width: 100%; height: auto; max-height: calc(100vh - 150px); font-family: inherit; }
+.fl-col { fill: var(--muted); font-size: 11px; font-weight: 700; text-anchor: middle; }
+.fl-link { fill: none; stroke-linecap: round; opacity: .8; }
+.fl-link.off { opacity: .3; stroke-dasharray: 3 4; }
+.fl-rate { fill: var(--text); font-size: 10px; font-variant-numeric: tabular-nums; paint-order: stroke; stroke: #141814; stroke-width: 3px; stroke-linejoin: round; }
+.fl-box { fill: var(--panel); stroke: #5c9a5c; stroke-width: 1.5; }
+.fl-t1 { fill: var(--text); font-size: 12px; font-weight: 700; }
+.fl-where { fill: var(--muted); font-size: 10px; font-weight: 500; }
+.fl-t2 { fill: var(--text); font-size: 11px; font-variant-numeric: tabular-nums; }
+.fl-t3 { fill: #8fd18f; font-size: 10px; }
+.fl-bar { fill: #8fd18f; }
+.fl-node.warn .fl-box { stroke: #d6b84a; }
+.fl-node.warn .fl-t3, .fl-node.warn .fl-bar { fill: #e2c65a; }
+.fl-node.bad .fl-box { stroke: var(--bad); stroke-width: 2.5; fill: #2a1c1c; }
+.fl-node.bad .fl-t3, .fl-node.bad .fl-bar { fill: var(--bad); font-weight: 700; }
+.fl-node.off { opacity: .45; }
+.fl-node.off .fl-box { stroke: var(--line-2); stroke-dasharray: 4 3; }
+.fl-node.off .fl-t3 { fill: var(--muted); }
+.fl-issues { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font-size: 12px; }
+.fl-issues li { padding: 3px 8px; border-radius: 6px; background: var(--panel); border-left: 3px solid #d6b84a; line-height: 1.3; }
+.fl-issues li.bad { border-left-color: var(--bad); }
+.fl-issues li.ok { border-left-color: #5c9a5c; color: #8fd18f; }
+.fl-issues small { color: var(--muted); }
+@media (max-height: 520px) {
+  .flow { top: 42px; max-height: calc(100% - 46px); gap: 4px; padding: 6px 8px; }
+  .fl-head { font-size: 14px; gap: 6px; }
+  .fl-chips { font-size: 11px; }
+  .fl-graph { max-height: none; }
+  .fl-issues { font-size: 11px; }
+}
+@media (min-height: 700px) and (min-width: 1100px) {
+  .flow { width: min(1000px, calc(100% - 340px)); top: 70px; padding: 12px 14px; gap: 8px; }
+  .fl-issues { font-size: 13px; }
 }
 
 /* Gespeicherte Partie im Startmenü (ui/saves.js) */
