@@ -234,7 +234,7 @@ export class Renderer {
     for (const air of [false, true]) {
       // Hubschrauber zuletzt: sie fliegen über allem
       for (const u of g.units) {
-        if (!u.alive || u.house || !!u.def.air !== air || !shown(u) || !inRect(u.x, u.y, 30)) continue;
+        if (!u.alive || u.house || (!!u.def.air && !u.parked) !== air || !shown(u) || !inRect(u.x, u.y, 30)) continue; // abgestellte Jets am Boden
         let aim = null;
         if (u.targetId && u.def.range > 0) {
           const t = g.getEntity(u.targetId);
@@ -565,7 +565,7 @@ export class Renderer {
     const air = [];
     for (const u of g.units) {
       if (!u.alive || u.house || !shown(u) || !inRect(u.x, u.y, PAD)) continue;
-      if (u.def.air) air.push(u);
+      if (u.def.air && !u.parked) air.push(u); // abgestellte Jets stehen am Boden
       else items.push({ k: cam.depth(u.x, u.y), t: 5, o: u });
     }
     items.sort((a, b) => a.k - b.k);
@@ -994,7 +994,7 @@ export class Renderer {
       const care = b && b.team === this.team ? careOf(g, b) : null;
       if (care) {
         // Stadtgebäude, das heilt oder repariert (seit v5.01): Umkreis in Grün
-        this.groundArc(ctx, b.x, b.y, (care.radius + 0.5) * CITY.cell);
+        this.groundArc(ctx, b.x, b.y, care.radius * CITY.cell + (b.w * TILE) / 2); // ab dem Gebäuderand (Großbau größer)
         ctx.fillStyle = 'rgba(63,212,106,0.07)';
         ctx.fill();
         ctx.strokeStyle = 'rgba(63,212,106,0.85)';

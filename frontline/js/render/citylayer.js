@@ -1,7 +1,8 @@
 // Stadt auf der Karte (PRD §15): Straßen, ausgewiesene Zonen, Gebäude, Gebietsgrenzen und im Baumodus das gezogene Rechteck.
 // Liest nur game.city (und ren.cityUi, die Stadtleiste). 2D: flach von oben; isometrisch: Boden hier, Gebäude als Stadthäuser
 // über drawTownBuilding (renderer.js).
-import { KINDS, KIND_ID, DEPOSITS, cellRect, canZone, hasRoad, sizeOf, fitBig } from '../game/city.js';
+import { KINDS, KIND_ID, DEPOSITS, cellRect, canZone, hasRoad, sizeOf, fitBig, bigCenter, bigSpan } from '../game/city.js';
+import { BIG_KINDS, bigPlan, drawBigGround, drawBigTop, partFoot, bigTop } from './bigbuild.js';
 import { CITY } from '../data/city.js';
 import { CITY_COLORS, CITY_ICON } from '../ui/citypanel.js';
 import { drawUniversityTop, UNI_LAWNS } from './university.js';
@@ -41,7 +42,9 @@ function* cells(game, team, known) {
       // Großbau (seit v5.00): big = 'anchor' für die Mitte, 'part' für die übrigen Zellen; Ruine nach dem Zeitgeber der Mitte
       const p = c.part?.[i];
       const a = p ? p - 1 : i;
-      yield { c, k, lv: c.level[i], r, i, big: p ? (a === i ? 'anchor' : 'part') : null, ruin: !c.level[i] && c.timer[a] < 0 };
+      const big = p ? (a === i ? 'anchor' : 'part') : null;
+      // ctr: Mitte des ganzen Gebäudes (Großbau mit gerader Kantenlänge: zwischen den Zellen, seit v5.03)
+      yield { c, k, lv: c.level[i], r, i, big, ctr: big === 'anchor' ? bigCenter(c, i, sizeOf(k)) : r, ruin: !c.level[i] && c.timer[a] < 0 };
     }
   }
 }
@@ -52,14 +55,20 @@ const footprint = (r, lv) => r.x1 - r.x0 - 26 + lv * 6;
 /** Gebäude als Stadthaus-Objekte { x, y, w, h, kind } (Größe nach Ausbaustufe), für die Iso-Ansicht. */
 export function cityBuildings(game, team, known, inRect) {
   const out = [];
-  for (const { c, k, lv, r, i, big } of cells(game, team, known)) {
-    if (k === 'road' || !lv || big === 'part' || !inRect(r.x, r.y, big ? 128 : 0)) continue;
+  for (const { c, k, lv, r, i, big, ctr } of cells(game, team, known)) {
+    if (k === 'road' || !lv || big === 'part' || !inRect(ctr.x, ctr.y, big ? (sizeOf(k) * c.cell) / 2 : 0)) continue;
     const e = c.ents.get(i);
     const color = c.team < 2 ? game.teams[c.team].color : '#888';
+    const damage = e ? 1 - e.hp / e.def.hp : 0;
+    if (big && BIG_KINDS.has(k)) {
+      // Großbau (seit v5.03): jeder Körper ein eigenes Objekt, damit die Tiefenordnung auch große Anlagen richtig zeigt (bigbuild.js)
+      bigPlan(k, lv, ctr.x, ctr.y, sizeOf(k) * c.cell).bodies.forEach((p, n) => out.push({ ...partFoot(p), kind: 'bigpart', part: p, color, damage: n ? 0 : damage }));
+      continue;
+    }
     if (big) {
       // Großbau: ein Objekt über das ganze Quadrat (Universität: eigenes Bild, isobuild.js → university.js)
       const w = sizeOf(k) * c.cell;
-      out.push({ x: r.x, y: r.y, w, h: w, kind: k, level: lv, color, damage: e ? 1 - e.hp / e.def.hp : 0 });
+      out.push({ x: ctr.x, y: ctr.y, w, h: w, kind: k, level: lv, color, damage });
       continue;
     }
     const s = footprint(r, lv); // Stufe 1 kleiner, Stufe 3 füllt fast die Zelle (Rand zeigt die Farbe der Zone)
@@ -87,12 +96,17 @@ function groundRect(ren, ctx, x0, y0, x1, y1) {
 /** Boden der Stadt: Straßen, Grundstücke (blass = nur ausgewiesen) und Pflaster unter Gebäuden. */
 export function drawCityGround(ren, ctx, team, known, inRect) {
   const g = ren.game;
-  if (!g.city) return;
+  if (!g.city && !g.roads) return;
   ctx.save();
   if (ren.draping()) ctx.setTransform(ren.dpr, 0, 0, ren.dpr, 0, 0);
+  if (!g.city) {
+    drawRoads(ren, ctx, team, known); // ohne Stadt: nur die Stadtstraßen der Karte (Zone)
+    ctx.restore();
+    return;
+  }
   drawDeposits(ren, ctx, known);
-  for (const { c, k, lv, r, ruin, big } of cells(g, team, known)) {
-    if (!inRect(r.x, r.y, big ? 160 : 64)) continue;
+  for (const { c, k, lv, r, ruin, big, ctr } of cells(g, team, known)) {
+    if (!inRect(ctr.x, ctr.y, big ? (sizeOf(k) * c.cell) / 2 + 32 : 64)) continue;
     if (ruin) {
       // Ruine: Schutt, bis die Zelle neu wächst
       groundRect(ren, ctx, r.x0 + 4, r.y0 + 4, r.x1 - 4, r.y1 - 4);
@@ -103,7 +117,7 @@ export function drawCityGround(ren, ctx, team, known, inRect) {
     }
     if (k === 'road' || big === 'part') continue; // Straßen danach in einem Zug (drawRoads); Großbau zeichnet seine Mitte
     if (big) {
-      drawBigLot(ren, ctx, c, k, lv, r, team);
+      drawBigLot(ren, ctx, c, k, lv, r, team, ctr);
       continue;
     }
     groundRect(ren, ctx, r.x0 + 3, r.y0 + 3, r.x1 - 3, r.y1 - 3);
@@ -129,12 +143,40 @@ export function drawCityGround(ren, ctx, team, known, inRect) {
   ctx.restore();
 }
 
-/** Grundstück eines Großbaus (Universität): ausgewiesen blass mit Fortschritt, gebaut Pflaster mit vier Rasenflächen. */
-function drawBigLot(ren, ctx, c, k, lv, r, team) {
+/**
+ * Grundstück eines Großbaus: ausgewiesen blass mit Fortschritt; gebaut die Universität als Pflaster mit vier Rasenflächen, die
+ * anderen (Kraftwerk, Kaserne, Fabrikhalle, Flughafen) mit ihrem Boden aus bigbuild.js (Bahnen, Höfe, Plätze). r: Ankerzelle, m: Mitte.
+ */
+function drawBigLot(ren, ctx, c, k, lv, r, team, m) {
   const h = (sizeOf(k) * c.cell) / 2;
-  const x0 = r.x - h;
-  const y0 = r.y - h;
-  groundRect(ren, ctx, x0 + 3, y0 + 3, r.x + h - 3, r.y + h - 3);
+  const x0 = m.x - h;
+  const y0 = m.y - h;
+  if (lv && BIG_KINDS.has(k)) {
+    const zl = ren.draping() ? ren.camera.zoom : 1;
+    drawBigGround(
+      {
+        rect: (a, b, c2, d, color) => {
+          groundRect(ren, ctx, a, b, c2, d);
+          ctx.fillStyle = color;
+          ctx.fill();
+        },
+        line: (a, b, c2, d, color, w) => {
+          ctx.beginPath();
+          groundLine(ren, ctx, a, b, c2, d);
+          ctx.strokeStyle = color;
+          ctx.lineWidth = Math.max(0.8, w * zl);
+          ctx.stroke();
+        },
+      },
+      bigPlan(k, lv, m.x, m.y, 2 * h),
+    );
+    groundRect(ren, ctx, x0 + 3, y0 + 3, m.x + h - 3, m.y + h - 3);
+    ctx.strokeStyle = LOT[k];
+    ctx.lineWidth = ren.draping() ? Math.max(2, 4 * ren.camera.zoom) : 5;
+    ctx.stroke();
+    return;
+  }
+  groundRect(ren, ctx, x0 + 3, y0 + 3, m.x + h - 3, m.y + h - 3);
   ctx.fillStyle = lv ? '#d3cbb6' : LOT[k] + '55';
   ctx.fill();
   ctx.strokeStyle = LOT[k];
@@ -155,7 +197,7 @@ function drawBigLot(ren, ctx, c, k, lv, r, team) {
   const i = Math.floor(r.y0 / c.cell) * c.cols + Math.floor(r.x0 / c.cell);
   const linked = hasRoad(c, i % c.cols, Math.floor(i / c.cols));
   const f = linked ? Math.max(0, Math.min(1, c.timer[i] / CITY.growTime)) : 1;
-  groundRect(ren, ctx, x0 + 16, r.y - 6, x0 + 16 + (2 * h - 32) * f, r.y + 6);
+  groundRect(ren, ctx, x0 + 16, m.y - 6, x0 + 16 + (2 * h - 32) * f, m.y + 6);
   ctx.fillStyle = linked ? '#e8e2a0' : '#e0553a';
   ctx.fill();
 }
@@ -178,38 +220,39 @@ function drawPad(ren, ctx, r) {
 // Anschluss, an Kurven als Bogen; weiße Mittellinie (gestrichelt, in Kurven gebogen); Kreuzungen und T-Stücke frei, davor
 // Zebrastreifen. Alles als Flächen in Zellkoordinaten; die drei Pfade (Asphalt, Gehweg, Markierung) für alle Straßen werden
 // nur neu gebaut, wenn sich Straßen, Sicht, Drehung oder Gelände ändern, sonst je Bild nur drei Füllungen.
-const ROAD = { asphalt: '#4e514b', walk: '#9b9a90', mark: 'rgba(240,238,226,0.88)', kerb: 7, line: 2.6 };
+export const ROAD = { asphalt: '#4e514b', walk: '#9b9a90', mark: 'rgba(240,238,226,0.88)', kerb: 7, line: 2.6 }; // auch die Brücken (bridge.js)
 const RN = 1, RE = 2, RS = 4, RW = 8; // Straßennachbarn
 const DNE = 16, DSE = 32, DSW = 64, DNW = 128; // Straße auch diagonal (dann keine Gehwegecke)
 const ZN = 256, ZE = 512, ZS = 1024, ZW = 2048; // Zebrastreifen an dieser Seite (Nachbar ist Kreuzung oder T-Stück)
 
-function isRoad(c, col, row) {
-  return col >= 0 && row >= 0 && col < c.cols && row < c.rows && c.kind[row * c.cols + col] === KIND_ID.road;
+// Straßenbild v: { cols, rows, kind } mit kind[i] ≠ 0 für jede sichtbare Straße (eigene, erkundete fremde, Stadtstraßen der Karte)
+function isRoad(v, col, row) {
+  return col >= 0 && row >= 0 && col < v.cols && row < v.rows && v.kind[row * v.cols + col] !== 0;
 }
 
 /** Zahl der Straßennachbarn (4er-Nachbarschaft). */
-function degree(c, col, row) {
-  return +isRoad(c, col, row - 1) + +isRoad(c, col + 1, row) + +isRoad(c, col, row + 1) + +isRoad(c, col - 1, row);
+function degree(v, col, row) {
+  return +isRoad(v, col, row - 1) + +isRoad(v, col + 1, row) + +isRoad(v, col, row + 1) + +isRoad(v, col - 1, row);
 }
 
-/** Bitmaske einer Straßenzelle: Nachbarn (RN, RE, RS, RW), Diagonalen (DNE …) und Zebrastreifen (ZN …). */
-export function roadMask(c, col, row) {
+/** Bitmaske einer Straßenzelle im Straßenbild v: Nachbarn (RN, RE, RS, RW), Diagonalen (DNE …) und Zebrastreifen (ZN …). */
+export function roadMask(v, col, row) {
   let m = 0;
-  if (isRoad(c, col, row - 1)) m |= RN;
-  if (isRoad(c, col + 1, row)) m |= RE;
-  if (isRoad(c, col, row + 1)) m |= RS;
-  if (isRoad(c, col - 1, row)) m |= RW;
-  if (isRoad(c, col + 1, row - 1)) m |= DNE;
-  if (isRoad(c, col + 1, row + 1)) m |= DSE;
-  if (isRoad(c, col - 1, row + 1)) m |= DSW;
-  if (isRoad(c, col - 1, row - 1)) m |= DNW;
+  if (isRoad(v, col, row - 1)) m |= RN;
+  if (isRoad(v, col + 1, row)) m |= RE;
+  if (isRoad(v, col, row + 1)) m |= RS;
+  if (isRoad(v, col - 1, row)) m |= RW;
+  if (isRoad(v, col + 1, row - 1)) m |= DNE;
+  if (isRoad(v, col + 1, row + 1)) m |= DSE;
+  if (isRoad(v, col - 1, row + 1)) m |= DSW;
+  if (isRoad(v, col - 1, row - 1)) m |= DNW;
   const n = m & 15;
   if (n === (RN | RS)) {
-    if (degree(c, col, row - 1) >= 3) m |= ZN;
-    if (degree(c, col, row + 1) >= 3) m |= ZS;
+    if (degree(v, col, row - 1) >= 3) m |= ZN;
+    if (degree(v, col, row + 1) >= 3) m |= ZS;
   } else if (n === (RE | RW)) {
-    if (degree(c, col + 1, row) >= 3) m |= ZE;
-    if (degree(c, col - 1, row) >= 3) m |= ZW;
+    if (degree(v, col + 1, row) >= 3) m |= ZE;
+    if (degree(v, col - 1, row) >= 3) m |= ZW;
   }
   return m;
 }
@@ -376,10 +419,10 @@ function drawRoads(ren, ctx, team, known) {
     u2x = (e2.x - o.x) / (1000 * z);
     u2y = (e2.y - o.y) / (1000 * z);
   }
-  // Fingerabdruck: alle Straßenzellen mit Sichtbarkeit, dazu die Ansicht
+  // Fingerabdruck: alle Straßenzellen der Städte mit Sichtbarkeit, dazu die Ansicht (Stadtstraßen der Karte ändern sich nicht)
   let h = 0;
-  let n = 0;
-  for (const c of g.city) {
+  let n = g.roads ? 1 : 0;
+  for (const c of g.city ?? []) {
     for (const i of c.list) {
       if (c.kind[i] !== KIND_ID.road) continue;
       const col = i % c.cols;
@@ -395,7 +438,7 @@ function drawRoads(ren, ctx, team, known) {
     cache.key = key;
     cache.game = g;
     cache.relief = drape ? cam.relief : null;
-    cache.paths = buildRoads(g, team, known, drape ? cam.relief : null, u1x, u1y, u2x, u2y);
+    cache.paths = buildRoads(g, roadView(g, team, known), drape ? cam.relief : null, u1x, u1y, u2x, u2y);
   }
   ctx.save();
   if (drape) ctx.setTransform(ren.dpr * z, 0, 0, ren.dpr * z, ren.dpr * ax, ren.dpr * ay);
@@ -409,36 +452,55 @@ function drawRoads(ren, ctx, team, known) {
   ctx.restore();
 }
 
-/** Die drei Straßenpfade neu bauen (relief gesetzt: Pfadkoordinaten mit Gelände, siehe drawRoads). */
-function buildRoads(g, team, known, relief, u1x, u1y, u2x, u2y) {
+/**
+ * Straßenbild für den Betrachter `team`: Stadtstraßen der Karte (1 Zone, 2 Brücke), eigene Straßen und fremde, wo erkundet (3).
+ * Eine Zelle, die mehrere Arten trägt, zählt einmal.
+ */
+function roadView(g, team, known) {
+  const R = g.roads;
+  const S = R?.cell ?? CITY.cell;
+  const c0 = g.city?.[0];
+  const cols = R?.cols ?? c0.cols;
+  const rows = R?.rows ?? c0.rows;
+  const kind = R ? R.kind.slice() : new Uint8Array(cols * rows);
+  for (const c of g.city ?? []) {
+    for (const i of c.list) {
+      if (c.kind[i] !== KIND_ID.road || kind[i]) continue;
+      const col = i % c.cols;
+      if (c.team !== team && !known((col + 0.5) * S, ((i - col) / c.cols + 0.5) * S)) continue;
+      kind[i] = 3;
+    }
+  }
+  return { cols, rows, cell: S, kind };
+}
+
+/** Die drei Straßenpfade neu bauen (relief gesetzt: Pfadkoordinaten mit Gelände, siehe drawRoads). Brücken zeichnet bridge.js. */
+function buildRoads(g, v, relief, u1x, u1y, u2x, u2y) {
   const paths = [new Path2D(), new Path2D(), new Path2D()];
   qDrape = !!relief;
-  for (const c of g.city) {
-    const S = c.cell;
-    for (const i of c.list) {
-      if (c.kind[i] !== KIND_ID.road) continue;
-      const col = i % c.cols;
-      const row = (i - col) / c.cols;
-      const x0 = c.x0 + col * S;
-      const y0 = c.y0 + row * S;
-      if (c.team !== team && !known(x0 + S / 2, y0 + S / 2)) continue;
-      qx = x0;
-      qy = y0;
-      qS = S;
-      if (relief) {
-        const pts = [x0, y0, x0 + S, y0, x0 + S, y0 + S, x0, y0 + S];
-        for (let k = 0; k < 8; k += 2) {
-          const x = pts[k];
-          const y = pts[k + 1];
-          Q[k] = x * u1x + y * u2x;
-          Q[k + 1] = x * u1y + y * u2y - relief.displayAt(x, y);
-        }
+  const S = v.cell;
+  for (let i = 0; i < v.kind.length; i++) {
+    if (!v.kind[i] || v.kind[i] === 2) continue;
+    const col = i % v.cols;
+    const row = (i - col) / v.cols;
+    const x0 = col * S;
+    const y0 = row * S;
+    qx = x0;
+    qy = y0;
+    qS = S;
+    if (relief) {
+      const pts = [x0, y0, x0 + S, y0, x0 + S, y0 + S, x0, y0 + S];
+      for (let k = 0; k < 8; k += 2) {
+        const x = pts[k];
+        const y = pts[k + 1];
+        Q[k] = x * u1x + y * u2x;
+        Q[k + 1] = x * u1y + y * u2y - relief.displayAt(x, y);
       }
-      const m = roadMask(c, col, row);
-      rectUV(paths[0], 0, 0, S, S);
-      roadWalk(paths[1], m, S);
-      roadMarks(paths[2], m, S);
     }
+    const m = roadMask(v, col, row);
+    rectUV(paths[0], 0, 0, S, S);
+    roadWalk(paths[1], m, S);
+    roadMarks(paths[2], m, S);
   }
   return paths;
 }
@@ -508,7 +570,7 @@ function drawTerritory(ren, ctx, team, known) {
       for (let r = r0; r <= r1; r++) {
         for (let q = q0; q <= q1; q++) {
           const i = r * c.cols + q;
-          if (c.kind[i] || canZone(g, c, i)) continue;
+          if (c.kind[i] || c.mapRoads?.[i] || canZone(g, c, i)) continue; // Stadtstraßen der Karte bleiben hell
           groundRect(ren, ctx, q * S + 1, r * S + 1, (q + 1) * S - 1, (r + 1) * S - 1);
           ctx.fillStyle = 'rgba(0,0,0,0.35)';
           ctx.fill();
@@ -525,9 +587,9 @@ function drawTerritory(ren, ctx, team, known) {
     const a = fitBig(g, c, d.c1, d.r1, ui.tool);
     const q = a >= 0 ? a % c.cols : d.c1;
     const r = a >= 0 ? Math.floor(a / c.cols) : d.r1;
-    const h = (n - 1) / 2;
+    const [lo, hi] = bigSpan(n);
     const col = a >= 0 ? CITY_COLORS[ui.tool] : '#e0553a';
-    groundRect(ren, ctx, (q - h) * S, (r - h) * S, (q + h + 1) * S, (r + h + 1) * S);
+    groundRect(ren, ctx, (q - lo) * S, (r - lo) * S, (q + hi + 1) * S, (r + hi + 1) * S);
     ctx.fillStyle = col + '88';
     ctx.fill();
     ctx.strokeStyle = col;
@@ -553,11 +615,16 @@ function drawTerritory(ren, ctx, team, known) {
 export function drawCityTop(ren, ctx, team, known, inRect) {
   const g = ren.game;
   if (!g.city) return;
-  for (const { c, k, lv, r, i, big } of cells(g, team, known)) {
-    if (k === 'road' || !lv || big === 'part' || !inRect(r.x, r.y, big ? 160 : 64)) continue;
+  for (const { c, k, lv, r, i, big, ctr } of cells(g, team, known)) {
+    if (k === 'road' || !lv || big === 'part' || !inRect(ctr.x, ctr.y, big ? (sizeOf(k) * c.cell) / 2 + 32 : 64)) continue;
     const e = c.ents.get(i);
+    const color = c.team < 2 ? g.teams[c.team].color : '#888';
+    if (big && BIG_KINDS.has(k)) {
+      drawBigTop(ctx, bigPlan(k, lv, ctr.x, ctr.y, sizeOf(k) * c.cell), color, e ? 1 - e.hp / e.def.hp : 0);
+      continue;
+    }
     if (big) {
-      drawUniversityTop(ctx, { x: r.x, y: r.y, level: lv, color: c.team < 2 ? g.teams[c.team].color : '#888', damage: e ? 1 - e.hp / e.def.hp : 0 });
+      drawUniversityTop(ctx, { x: ctr.x, y: ctr.y, level: lv, color, damage: e ? 1 - e.hp / e.def.hp : 0 });
       continue;
     }
     if (k === 'heliport') {
@@ -658,7 +725,8 @@ export function drawCityBadges(ren, ctx, team, known, inRect, iso) {
   const z = cam.zoom;
   const big = Math.max(18, Math.min(34, 30 * z));
   const small = Math.max(12, Math.min(22, 19 * z));
-  for (const { c, k, lv, r, i, big: whole } of cells(g, team, known)) {
+  for (const { c, k, lv, r: cell, i, big: whole, ctr } of cells(g, team, known)) {
+    const r = whole ? ctr : cell; // Großbau: Schild über der Mitte
     if (k === 'road' || !lv || whole === 'part' || !inRect(r.x, r.y, 64)) continue;
     const sm = !!SMALL[k];
     const d = k === 'mine' ? DEPOSITS[c.deposit[i] - 1] : null;
@@ -666,7 +734,7 @@ export function drawCityBadges(ren, ctx, team, known, inRect, iso) {
     const px = sm ? small : big;
     if (iso) {
       const p = cam.worldToScreen(r.x, r.y);
-      const lift = whole ? BIG_LIFT[lv] ?? 110 : (BADGE_LIFT[TOWN_KIND[k]] ?? 50) * (0.75 + lv * 0.1);
+      const lift = whole ? (BIG_KINDS.has(k) ? Math.min(150, bigTop(k, lv) * 0.7) + 14 : BIG_LIFT[lv] ?? 110) : (BADGE_LIFT[TOWN_KIND[k]] ?? 50) * (0.75 + lv * 0.1);
       ctx.drawImage(img, p.x - px / 2, p.y - lift * z - px, px, px);
     } else {
       const w = px / z;

@@ -26,7 +26,9 @@ export const BUILD_H = {
 /** Flughöhe der Hubschrauber und Hebung normaler Einheiten über dem Boden (Bildschirm-Pixel bei Zoom 1). */
 export const AIR_LIFT = 46;
 export const GROUND_LIFT = 4;
-export const unitLift = (u) => (u.def.air ? AIR_LIFT : GROUND_LIFT);
+export const JET_LIFT = BALANCE.jets.lift; // Flughöhe der Jets (höher als Hubschrauber)
+/** Höhe einer Einheit über dem Boden: abgestellte Jets am Boden, fliegende Jets am höchsten, dann Hubschrauber. */
+export const unitLift = (u) => (u.parked ? GROUND_LIFT : u.def.jet ? JET_LIFT : u.def.air ? AIR_LIFT : GROUND_LIFT);
 /** Hauptstadt (Rathaus, cityhall.js): Höhe bis zum Turmdach. */
 export const CAPITAL_H = 107;
 export const buildingHeight = (b) => (b.main ? CAPITAL_H : BUILD_H[b.type] ?? 40);

@@ -422,7 +422,7 @@ export function updateMovement(game, dt) {
     if (dt > 0) u.speedNow = Math.hypot(u.x - u.prevX, u.y - u.prevY) / dt;
     u.prevX = u.x;
     u.prevY = u.y;
-    if (u.house || OWN_DRIVERS.has(u.order.type)) continue; // Besatzer eines Hauses bewegen sich nicht
+    if (u.house || u.def.jet || OWN_DRIVERS.has(u.order.type)) continue; // Besatzer eines Hauses bewegen sich nicht; Jets fliegt aircraft.js
     stepUnit(game, u, dt);
   }
 }

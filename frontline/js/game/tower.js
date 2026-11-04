@@ -87,7 +87,25 @@ export function cmdFortify(game, team, cmd) {
     if (r.ok) count += r.count ?? 1;
     else reason = r.reason;
   };
-  for (const t of plan.towers) run({ type: 'build', building: 'tower', x: t.x, y: t.y, ids: eng });
+  // Turm: an der Ecke; steht dort schon etwas (Mauer, Mörser …), bis zu F.towerShift Zellen nach innen zur FOB hin (seit v5.03)
+  const T = game.grid.tile;
+  const towerAt = (t) => {
+    const sx = Math.sign(f.x - t.x) || 1;
+    const sy = Math.sign(f.y - t.y) || 1;
+    for (let k = 0; k <= F.towerShift; k++) {
+      for (const [dx, dy] of k ? [[k, k], [k, 0], [0, k]] : [[0, 0]]) {
+        const p = { x: t.x + sx * dx * T, y: t.y + sy * dy * T };
+        if (game.canPlace(team, 'tower', p.x, p.y).ok) return p;
+      }
+    }
+    return t;
+  };
+  for (const t0 of plan.towers) {
+    // steht an dieser Ecke schon ein eigener Turm (auch verschoben oder im Bau), bleibt es dabei
+    if (game.buildings.some((b) => b.alive && b.team === team && b.type === 'tower' && Math.hypot(b.x - t0.x, b.y - t0.y) <= (F.towerShift + 2) * T)) continue;
+    const t = towerAt(t0);
+    run({ type: 'build', building: 'tower', x: t.x, y: t.y, ids: eng });
+  }
   for (const q of plan.gates) run({ type: 'buildWall', building: 'gate', ids: fort, x1: q.x, y1: q.y, x2: q.x, y2: q.y });
   for (const w of plan.walls) run({ type: 'buildWall', building: 'wall', ids: fort, ...w });
   return count ? { ok: true, count } : fail(reason);

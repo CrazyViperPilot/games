@@ -5,12 +5,25 @@ import { RELIEF } from '../game/relief.js';
 import { makeRng } from '../core/rng.js';
 import { drawRotBox } from './iso.js';
 import { hpColor } from './sprites.js';
+import { ROAD } from './citylayer.js';
 
 const DECK = BALANCE.river.deck;
 const HALF = DECK / 2;
 const SLAB = 6; // Stärke der Fahrbahnplatte (Höheneinheiten = Bildschirm-px bei Zoom 1)
 const RAIL_H = 6; // Geländerhöhe
 const STUB = 18; // so weit ragt ein zerstörter Brückenkopf übers Wasser
+// Fahrbahn wie eine Stadtstraße (seit v5.03): eine Stadtzelle breit, Gehweg an beiden Seiten, gestrichelte Mittellinie im selben
+// Takt wie die Straßenzellen (Striche bei 10–22 und 42–54 je 64 px ab dem Brückenende, das auf einer Zellkante liegt)
+const LANE = 32; // halbe Fahrbahnbreite (eine halbe Stadtzelle)
+const DASHES = (u0, u1) => {
+  const out = [];
+  for (let a = Math.floor(u0 / 32) * 32; a < u1; a += 32) {
+    const s0 = Math.max(u0, a + 10);
+    const s1 = Math.min(u1, a + 22);
+    if (s1 > s0) out.push([s0, s1]);
+  }
+  return out;
+};
 const COL = {
   concrete: '#8f8a7f',
   edge: '#6b665c',
@@ -62,16 +75,13 @@ const progressOf = (b) => (b.broken && b.rebuild ? Math.min(1, b.rebuild.progres
 function deckRect(ctx, u0, u1) {
   ctx.fillStyle = COL.concrete;
   ctx.fillRect(u0, -HALF, u1 - u0, DECK);
-  ctx.fillStyle = COL.road;
-  ctx.fillRect(u0, -HALF + 8, u1 - u0, DECK - 16);
-  ctx.strokeStyle = COL.curb;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  for (const s of [-1, 1]) {
-    ctx.moveTo(u0, s * (HALF - 5));
-    ctx.lineTo(u1, s * (HALF - 5));
-  }
-  ctx.stroke();
+  ctx.fillStyle = ROAD.asphalt;
+  ctx.fillRect(u0, -LANE, u1 - u0, LANE * 2);
+  ctx.fillStyle = ROAD.walk; // Gehwege
+  ctx.fillRect(u0, -LANE, u1 - u0, ROAD.kerb);
+  ctx.fillRect(u0, LANE - ROAD.kerb, u1 - u0, ROAD.kerb);
+  ctx.fillStyle = ROAD.mark; // Mittellinie
+  for (const [a, b] of DASHES(u0, u1)) ctx.fillRect(a, -ROAD.line / 2, b - a, ROAD.line);
   // Geländer: Pfosten und Handlauf
   ctx.fillStyle = COL.rail;
   for (let u = u0 + 6; u < u1 - 3; u += 18) for (const s of [-1, 1]) ctx.fillRect(u - 1.5, s * (HALF - 1.5) - 1.5, 3, 3);
@@ -243,19 +253,31 @@ export function drawBridgeIso(ctx, cam, dpr, b) {
     const c = at((u0 + u1) / 2, 0);
     ctx.save();
     ctx.globalAlpha = alpha;
-    drawRotBox(ctx, cam, c.x, c.y, u1 - u0, DECK, b.angle, SLAB, COL.concrete, { base: lift - SLAB, roof: COL.road, noShadow: true, wallS: '#7a756b', wallE: '#625e55' });
+    drawRotBox(ctx, cam, c.x, c.y, u1 - u0, DECK, b.angle, SLAB, COL.concrete, { base: lift - SLAB, roof: COL.concrete, noShadow: true, wallS: '#7a756b', wallE: '#625e55' });
     ctx.restore();
-    // Bordsteine und Geländer auf der Platte
+    // Fahrbahn wie eine Stadtstraße: Asphalt, Gehwege, Mittellinie
+    const quad = (v0, v1, a = u0, b = u1) => {
+      ctx.beginPath();
+      for (const [u, v] of [[a, v0], [b, v0], [b, v1], [a, v1]]) {
+        const q = scr(u, v, lift);
+        ctx.lineTo(q.x, q.y);
+      }
+      ctx.closePath();
+      ctx.fill();
+    };
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = ROAD.asphalt;
+    quad(-LANE, LANE);
+    ctx.fillStyle = ROAD.walk;
+    quad(-LANE, -LANE + ROAD.kerb);
+    quad(LANE - ROAD.kerb, LANE);
+    ctx.fillStyle = ROAD.mark;
+    for (const [a, b] of DASHES(u0, u1)) quad(-ROAD.line / 2, ROAD.line / 2, a, b);
+    ctx.restore();
+    // Geländer auf der Platte
     ctx.lineCap = 'round';
     for (const s of [-1, 1]) {
-      const a0 = scr(u0, s * (HALF - 5), lift);
-      const a1 = scr(u1, s * (HALF - 5), lift);
-      ctx.strokeStyle = COL.curb;
-      ctx.lineWidth = Math.max(1, 3 * z);
-      ctx.beginPath();
-      ctx.moveTo(a0.x, a0.y);
-      ctx.lineTo(a1.x, a1.y);
-      ctx.stroke();
       ctx.strokeStyle = 'rgba(40,36,30,0.8)';
       ctx.lineWidth = Math.max(1, 1.6 * z);
       ctx.beginPath();

@@ -8,21 +8,22 @@ import { KINDS, KIND_NAME, GOODS, cellAt, hasMarket, sizeOf } from '../game/city
 
 // Farben je Zellenart (Werkzeug, Grundstück, Symbol auf der Karte): Wohnen grün (privat), Gewerbe blau (kommerziell), Werke erdig,
 // Markt gold, Militär (Kaserne, Fabrikhalle, Heliport) oliv. Symbole: Werkzeugleiste und Schilder über den Gebäuden (citylayer.js).
-export const CITY_COLORS = { road: '#8a8f86', res: '#4f9a5a', com: '#3f7fd0', bm: '#b0743c', mun: '#8b96a8', fuel: '#9b7bc4', steel: '#7f8c99', mine: '#c9a14a', market: '#e6b422', power: '#e0c040', uni: '#6fa8dc', dc: '#4fc3c7', barracks: '#7d8f45', factory: '#7d8f45', heliport: '#7d8f45', hospital: '#e8707e', erase: '#d05050' };
-export const CITY_ICON = { road: '▬', res: '⌂', com: '▣', bm: '⚒', mun: '✸', fuel: '⛽', steel: '⛓', mine: '⛏', market: '⚖', power: '⚡', uni: '🎓', dc: '🖥', barracks: '⚔', factory: '🔧', heliport: '🚁', hospital: '✚', erase: '✕' };
+export const CITY_COLORS = { road: '#8a8f86', res: '#4f9a5a', com: '#3f7fd0', bm: '#b0743c', mun: '#8b96a8', fuel: '#9b7bc4', steel: '#7f8c99', mine: '#c9a14a', market: '#e6b422', power: '#e0c040', uni: '#6fa8dc', dc: '#4fc3c7', barracks: '#7d8f45', factory: '#7d8f45', heliport: '#7d8f45', hospital: '#e8707e', airport: '#7d8f45', erase: '#d05050' };
+export const CITY_ICON = { road: '▬', res: '⌂', com: '▣', bm: '⚒', mun: '✸', fuel: '⛽', steel: '⛓', mine: '⛏', market: '⚖', power: '⚡', uni: '🎓', dc: '🖥', barracks: '⚔', factory: '🔧', heliport: '🚁', hospital: '✚', airport: '✈', erase: '✕' };
 const ICON = CITY_ICON;
 const CARE = CITY.care.by;
-const SHORT = { road: 'Straße', res: 'Wohnen', com: 'Gewerbe', bm: 'BM-Werk', mun: 'Mun.-Werk', fuel: 'Raffinerie', steel: 'Stahlwerk', mine: 'Förderung', market: 'Markt', power: 'Kraftwerk', uni: 'Universität', dc: 'Rechenz.', barracks: 'Kaserne', factory: 'Fabrikhalle', heliport: 'Heliport', hospital: 'Krankenhaus', erase: 'Räumen' };
+const SHORT = { road: 'Straße', res: 'Wohnen', com: 'Gewerbe', bm: 'BM-Werk', mun: 'Mun.-Werk', fuel: 'Raffinerie', steel: 'Stahlwerk', mine: 'Förderung', market: 'Markt', power: 'Kraftwerk', uni: 'Universität', dc: 'Rechenz.', barracks: 'Kaserne', factory: 'Fabrikhalle', heliport: 'Heliport', hospital: 'Krankenhaus', airport: 'Flughafen', erase: 'Räumen' };
 export const CITY_TIP = {
   bm: 'Baumaterial aus Holz und Stein (Holzfäller, Steinbruch)', mun: 'Munition aus Metall', fuel: 'Treibstoff aus Öl (Ölquelle)',
   steel: 'Metall aus Erz (Erzmine)', mine: 'Nur auf Rohstoffvorkommen: Holzfäller, Steinbruch, Erzmine oder Ölquelle; braucht keine Straße',
   market: 'Handel: Überschuss verkaufen, Knappes teuer kaufen (Knopf Handel, Markt antippen oder Geldanzeige oben)', road: 'Kostet Baumaterial aus dem Lager der Hauptstadt',
-  power: 'Strom für Werke, Förderung, Uni und Rechenzentrum (stadtweit); ohne genug Strom arbeiten sie langsamer',
+  power: `Großbau ${CITY.size.power} × ${CITY.size.power} Zellen: Strom für Werke, Förderung, Uni und Rechenzentrum (stadtweit); ohne genug Strom arbeiten sie langsamer`,
   uni: 'Großbau 3 × 3 Zellen (antippen, das Quadrat folgt dem Finger; Straße an einer Seite); ohne Universität nur Forschungsstufe 1; Stufe 1 der Uni schaltet Forschungsstufe 2 frei, Stufe 3 die Forschungsstufe 3; höhere Stufen forschen schneller',
   dc: 'Schaltet den Forschungsast KI frei (Drohnen, KI-Zielerfassung, Autonome Türme, Störsender)',
-  barracks: `Bildet Soldaten aus (Schützen, Panzerabwehr, Scharfschützen, Kommandeur); bezahlt direkt aus der Stadt. Heilt Soldaten im Umkreis von ${CARE.barracks.radius} Feldern`,
-  factory: `Baut alle Fahrzeuge (LKW, Baufahrzeug, Schützen- und Kampfpanzer, Flak, SAM); bezahlt direkt aus der Stadt. Repariert Bodenfahrzeuge im Umkreis von ${CARE.factory.radius} Feldern (kostet Metall)`,
+  barracks: `Großbau ${CITY.size.barracks} × ${CITY.size.barracks} Zellen: bildet Soldaten aus (Schützen, Panzerabwehr, Scharfschützen, Kommandeur); bezahlt direkt aus der Stadt. Heilt Soldaten im Umkreis von ${CARE.barracks.radius} Feldern`,
+  factory: `Großbau ${CITY.size.factory} × ${CITY.size.factory} Zellen: baut alle Fahrzeuge (LKW, Baufahrzeug, Schützen- und Kampfpanzer, Flak, SAM); bezahlt direkt aus der Stadt. Repariert Bodenfahrzeuge im Umkreis von ${CARE.factory.radius} Feldern (kostet Metall)`,
   heliport: `Baut Hubschrauber (Little Bird, Transporter, AH-64); bezahlt direkt aus der Stadt. Repariert Hubschrauber im Umkreis von ${CARE.heliport.radius} Feldern (kostet Metall)`,
+  airport: `Großbau ${CITY.size.airport} × ${CITY.size.airport} Zellen mit zwei Start- und Landebahnen und Tower; baut F-16 (bezahlt direkt aus der Stadt) und bietet Platz für ${BALANCE.jets.capacity} Flugzeuge, die dort landen, tanken, nachladen und repariert werden`,
   hospital: `Heilt eigene Soldaten im Umkreis von ${CARE.hospital.radius} Feldern, schneller als die Kaserne (${Math.round(CARE.hospital.rate * 100)} % HP/s auf Stufe 1)`,
 };
 const GOOD_NAME = { bm: 'BM', mun: 'MUN', fuel: 'TS', metal: 'Metall' };

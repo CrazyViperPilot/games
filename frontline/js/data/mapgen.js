@@ -8,6 +8,7 @@ export const MAPGEN = {
     minRoutes: 3, // so viele getrennte Wege führen mindestens von jedem Start in die Konfliktzone
     zoneSlope: 0.25, // in der Stadt ist kein Hang steiler (alle Wege gut befahrbar)
     crossRegion: 1500, // so viele Zellen erreicht man von jedem Ufer einer Querung mindestens (sonst liegt sie in einer Tasche)
+    buildLand: 1300, // Bauland (seit v5.03): so weit um jeden Startpunkt keine Felsen, Wälder, Bäume, Gehöfte oder Einzelhäuser (Platz für die Stadt und ihre Großbauten)
   },
   // Gelände der Zufallskarte (landscape.js)
   terrain: {
@@ -15,8 +16,8 @@ export const MAPGEN = {
     zoneHills: 2, // sanfte Hügelpaare in der Stadt
     ridges: 4, // Bergrücken-Paare (steile Flanken = Fels, unpassierbar)
     lakes: 2, // Seepaare
-    spawnFlat: 650, // ebene Fläche um die Startpunkte, danach weicher Übergang bis SPAWN_BLEND
-    spawnBlend: 1050, // Ende des weichen Übergangs um die Startpunkte
+    spawnFlat: 950, // ebene Fläche um die Startpunkte, danach weicher Übergang bis SPAWN_BLEND (seit v5.03 größer: Bauland)
+    spawnBlend: 1250, // Ende des weichen Übergangs um die Startpunkte
     baseLevel: 36, // mittlere Höhe des Grundes über dem Wasserspiegel-Bezug 0
   },
   // Fluss mit Brücken und Furten (landscape.js, river.js; nur wenn „Fluss“ an ist)
@@ -41,9 +42,9 @@ export const MAPGEN = {
   // Stadt in der Konfliktzone (Straßenraster, Bahn, Wachtürme)
   town: {
     railHalf: 40, // halbe Breite des Bahnkorridors, Gebäude, Bäume und Felsen bleiben davon frei
-    block: 400, // Häuserblock (Straßenraster)
-    roadW: 64, // Straßenbreite
-    avenueW: 92, // die zwei Straßen am Zentrumsplatz
+    block: 384, // Häuserblock (Straßenraster); seit v5.03 ein Vielfaches von 2 Stadtzellen (128 px), damit jede Straße genau auf einer Zellreihe liegt
+    roadW: 64, // Straßenbreite (= eine Stadtzelle; die Straßen der Zone sind Stadtstraßen, js/game/roads.js)
+    avenueW: 64, // die zwei Straßen am Zentrumsplatz (seit v5.03 so breit wie alle anderen)
     towerSize: 80, // Grundfläche eines Wachturms
   },
   // Gebäude außerhalb der Zone

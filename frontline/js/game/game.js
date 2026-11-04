@@ -29,6 +29,8 @@ import { createWeather, updateWeather } from './weather.js';
 import { updateAbilities, cmdAbility } from './abilities.js';
 import { createResearch, updateResearch, cmdResearch, cmdCancelResearch, unitLocked, lockReason, opticsMul } from './research.js';
 import { createBridges, updateBridges, cmdRepairBridge, bridgeUnder } from './river.js';
+import { createRoads } from './roads.js';
+import { updateAircraft, trainCheck } from './aircraft.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
@@ -169,6 +171,7 @@ export class Game {
     this.projectiles = [];
     this.effects = [];
     createBridges(this); // Brücken über die Flüsse (Fahrbahn offen, zerstörbar)
+    createRoads(this); // Stadtstraßen der Karte: Zonenstraßen und Brückenfahrbahnen im Stadtraster (seit v5.03)
     createScars(this); // Wracks und Krater (sichtbarer Schaden)
     this.formations = new Map(); // Formation → { id, speed, ids } (formation.js)
     this.formationSeq = 0;
@@ -237,6 +240,7 @@ export class Game {
   restoreAccessors() {
     for (const team of this.teams) this.bindStocks(team);
     for (const u of this.units) defineAmmo(u, u.def);
+    if (!this.roads) createRoads(this); // ältere Stände (vor v5.03): Stadtstraßen der Karte nachträglich
     migrateCity(this); // ältere Stände: Universität als 3 × 3-Großbau (seit v5.00)
   }
 
@@ -906,6 +910,8 @@ export class Game {
       return fail(k ? `${UNITS[cmd.unit]?.name ?? 'Einheit'}: nur in der ${KIND_NAME[k]} der Stadt` : 'Nur die Hauptstadt bildet Einheiten aus');
     }
     if (unitLocked(this, team, cmd.unit)) return fail(lockReason(cmd.unit));
+    const jetNo = trainCheck(this, b, cmd.unit); // Flughafen: Platz für das Flugzeug
+    if (jetNo) return fail(jetNo);
     if (b.queue.length >= BALANCE.queueMax) return fail('Warteschlange ist voll');
     if (this.slotsUsed(team) + (UNITS[cmd.unit].slots ?? 1) > BALANCE.slotCap) return fail('Einheitenlimit erreicht');
     if (UNITS[cmd.unit].hero && hasCommander(this, team)) return fail(ONE_COMMANDER);
@@ -1109,6 +1115,7 @@ export class Game {
     updateTowers(this, dt);
     updateFormations(this);
     updateMovement(this, dt);
+    updateAircraft(this, dt); // Jets: Flug, Rückkehr, Landung, Tanken am Flughafen (seit v5.03)
     updateCrates(this, dt);
     updateLogistics(this, dt);
     updateConstruction(this, dt);

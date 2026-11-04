@@ -5,7 +5,7 @@ import { Game } from '../js/game/game.js';
 import { CITY } from '../js/data/city.js';
 import { BALANCE } from '../js/data/balance.js';
 import { AI } from '../js/ai/ai.js';
-import { canZone, cityNoise, freePop, aiCity, aiDefend, aiRaid, hasRoad, hasMarket, cityEntityAt, cityTrainers, KIND_ID, sizeOf, cellsOf, isPart, forEnemyCity, migrateCity, cityLevel } from '../js/game/city.js';
+import { KINDS, canZone, cityNoise, freePop, aiCity, aiDefend, aiRaid, hasRoad, hasMarket, cityEntityAt, cityTrainers, KIND_ID, sizeOf, cellsOf, isPart, forEnemyCity, migrateCity, cityLevel } from '../js/game/city.js';
 import { snapshotGame, restoreGame } from '../js/game/savegame.js';
 
 const run = (g, s) => { for (let t = 0; t < s * 20; t++) g.update(0.05); };
@@ -216,7 +216,7 @@ test('Flucht: Schüsse in der Konfliktzone leeren Wohnzellen, nach Ruhe kehren s
   // freie Zellen in der Zone suchen und als Gebiet freigeben (vordere FOB simuliert)
   let s = null;
   for (let r = zr - 10; !s && r < zr + 10; r++) for (let q = zc - 10; !s && q < zc + 10; q++) {
-    const ok = [0, 1, 2].every((k) => !c.blocked[(r + k) * c.cols + q] && c.inZone[(r + k) * c.cols + q]);
+    const ok = [0, 1, 2].every((k) => !c.blocked[(r + k) * c.cols + q] && !c.mapRoads?.[(r + k) * c.cols + q] && c.inZone[(r + k) * c.cols + q]); // nicht auf einer Stadtstraße der Karte
     if (ok) s = { q, r };
   }
   assert.ok(s, 'freie Zellen in der Zone');
@@ -400,10 +400,15 @@ test('KI verteidigt beschossene Stadtgebäude und greift gegnerische Werke zuers
   own.raidTimer = 0;
   c.raidTimer = 1e9;
   aiRaid(g, 1, 'normal', 1);
-  const ref = [...own.ents.values()].find((x) => own.kind[x.cityCell] === KIND_ID.fuel);
   const raiders = g.units.filter((u) => u.team === 1 && u.order.type === 'attackMove');
   assert.ok(raiders.length > 0, 'Angreifer unterwegs');
-  assert.ok(raiders.every((u) => Math.hypot(u.order.x - ref.x, u.order.y - ref.y) < 200), 'Ziel ist die Raffinerie');
+  // Ziel ist ein wertvolles Gebäude (Werk, Kraftwerk, Fabrikhalle; seit v5.03 Großbauten mit eigener Mitte), kein Wohnhaus
+  // (die Plätze der Angreifer liegen um das Ziel herum, bei Großbauten außerhalb des Quadrats)
+  const mx = raiders.reduce((a, u) => a + u.order.x, 0) / raiders.length;
+  const my = raiders.reduce((a, u) => a + u.order.y, 0) / raiders.length;
+  const hit = [...own.ents.values()].sort((a, b) => Math.hypot(mx - a.x, my - a.y) - Math.hypot(mx - b.x, my - b.y))[0];
+  assert.ok(Math.hypot(mx - hit.x, my - hit.y) < (hit.w * BALANCE.map.tile) / 2 + 200, 'Angreifer am Ziel');
+  assert.ok((CITY.ai.targetValue[KINDS[own.kind[hit.cityCell] - 1]] ?? 1) >= 3, `Ziel ist ein Werk (${KINDS[own.kind[hit.cityCell] - 1]})`);
 });
 
 // v4.88: Universität, Rechenzentrum, Strom, Zufriedenheit

@@ -3,6 +3,7 @@
 // spriteOverrides.house = (ctx, cam, b) => { …; return true; } ersetzt die gemalte Variante (Rückgabe true = erledigt).
 import { BALANCE } from '../data/balance.js';
 import { drawUniversityIso } from './university.js';
+import { drawBigPart } from './bigbuild.js';
 import { drawCityHallIso } from './cityhall.js';
 import { drawBox, drawRotBox, wallPoint, wallQuad, buildingHeight, TOWN_H } from './iso.js';
 import { shade, tint, hexA } from './sprites.js';
@@ -270,6 +271,10 @@ export function drawBench(ctx, cam, b) {
 
 /** Gebäude der Stadt (Haus, Halle, Fabrik) mit Fenstern, Türen, Toren, Balkonen und Dachaufbauten. */
 export function drawTownBuilding(ctx, cam, b) {
+  if (b.kind === 'bigpart') {
+    drawBigPart(ctx, cam, b.part, b.color); // Körper eines Großbaus (Kraftwerk, Kaserne, Fabrikhalle, Flughafen; bigbuild.js)
+    return;
+  }
   if (b.kind === 'uni') {
     drawUniversityIso(ctx, cam, b); // 3 × 3-Großbau, für jede Drehung dasselbe Bild (university.js)
     return;

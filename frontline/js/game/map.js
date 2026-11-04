@@ -21,6 +21,7 @@ const SPAWNS = [
 const MAX_ATTEMPTS = MAPGEN.general.attempts;
 const OBSTACLE_PAIRS = MAPGEN.scatter.obstaclePairs;
 const MIN_ROUTES = MAPGEN.general.minRoutes;
+const BUILD_LAND = MAPGEN.general.buildLand; // Bauland um die Startpunkte (seit v5.03)
 const ZONE_SLOPE = MAPGEN.general.zoneSlope;
 const TWO_PI = Math.PI * 2;
 
@@ -58,7 +59,7 @@ function tryBuild(seed, river = false) {
       const y = Math.round(rng.range(r, H - r));
       if (dist(x, y, CX, CY) < ZONE_R + r + 40) continue; // Stadt bleibt frei von Felsen/Wald
       if (inRail(y, r)) continue; // Bahnlinie bleibt frei
-      if (SPAWNS.some((s) => dist(x, y, s.x, s.y) < 600 + r)) continue;
+      if (SPAWNS.some((s) => dist(x, y, s.x, s.y) < BUILD_LAND + r)) continue;
       if (!groundOk(relief, x, y, r) || !groundOk(relief, W - x, H - y, r)) continue;
       if (cleared(x, y, r)) continue; // die Zufahrten sind punktsymmetrisch: das Spiegelbild ist damit auch frei
       ob = { x, y, r };
@@ -346,8 +347,10 @@ function buildTown(rng) {
         const col = CAR_COLORS[rng.int(0, CAR_COLORS.length - 1)];
         const side = rng.next() < 0.5 ? -1 : 1;
         const t = rng.range(-130, 130);
-        if (rng.next() < 0.5) addCar(Math.round(bx + t), Math.round(by + side * 150), false, col);
-        else addCar(Math.round(bx + side * 150), Math.round(by + t), true, col);
+        // am Rand der Straße (Straßenmitte BLOCK / 2, Fahrbahn eine Stadtzelle breit)
+        const edge = BLOCK / 2 - 18;
+        if (rng.next() < 0.5) addCar(Math.round(bx + t), Math.round(by + side * edge), false, col);
+        else addCar(Math.round(bx + side * edge), Math.round(by + t), true, col);
       }
     }
   }
@@ -400,7 +403,7 @@ function buildOutposts(rng, obstacles, relief = null, clearings = []) {
         py < H - r - 300 &&
         !inRail(py, r) &&
         dist(px, py, CX, CY) > ZONE_R + r + 150 &&
-        SPAWNS.every((sp) => dist(px, py, sp.x, sp.y) > 700 + r) &&
+        SPAWNS.every((sp) => dist(px, py, sp.x, sp.y) > BUILD_LAND + r) &&
         obstacles.every((o) => dist(px, py, o.x, o.y) > o.r + r + 40) &&
         areas.every((a) => dist(px, py, a.x, a.y) > a.r + r + 60) &&
         groundOk(relief, px, py, r, 0.22)
@@ -468,7 +471,7 @@ function scatterTrees(rng, obstacles, keepOut = [], relief = null) {
     y < H - 40 &&
     !inRail(y, 20) &&
     dist(x, y, CX, CY) > ZONE_R + 30 &&
-    SPAWNS.every((s) => dist(x, y, s.x, s.y) > 420) &&
+    SPAWNS.every((s) => dist(x, y, s.x, s.y) > BUILD_LAND) &&
     obstacles.every((o) => dist(x, y, o.x, o.y) > o.r + 25) &&
     keepOut.every((a) => dist(x, y, a.x, a.y) > a.r + 25) &&
     groundOk(relief, x, y);
@@ -625,7 +628,7 @@ function placeFarms(seed, town, outpostBuildings, obstacles, trees, relief) {
           px > 150 && py > 150 && px < W - 150 && py < H - 150 &&
           !inRail(py, 30) &&
           dist(px, py, CX, CY) > ZONE_R + 120 &&
-          SPAWNS.every((sp) => dist(px, py, sp.x, sp.y) > 650) &&
+          SPAWNS.every((sp) => dist(px, py, sp.x, sp.y) > BUILD_LAND) &&
           obs.every((o) => dist(px, py, o.x, o.y) > o.r + 15) &&
           bld.every((b) => !inBox(b, px, py, 20)) &&
           fld.every((o) => !inBox(o, px, py, FIELD_GAP / 2)) &&

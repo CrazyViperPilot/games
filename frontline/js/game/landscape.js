@@ -3,9 +3,12 @@
 // getrennte Wege in die Konfliktzone führen. Kein DOM.
 import { BALANCE } from '../data/balance.js';
 import { MAPGEN } from '../data/mapgen.js';
+import { CITY } from '../data/city.js';
 import { makeRng } from '../core/rng.js';
 import { Relief, RELIEF, COARSE_N } from './relief.js';
 import { findPath } from './pathfinding.js';
+
+const CITY_CELL = CITY.cell; // Stadtzelle (px): Raster der Brücken (seit v5.03)
 
 const W = BALANCE.map.width;
 const H = BALANCE.map.height;
@@ -383,8 +386,21 @@ function carveRivers(coarse, seed, keep) {
     const l = Math.hypot(nx, ny) || 1;
     return { x: c.x, y: c.y, nx: nx / l, ny: ny / l };
   };
+  // Brücken (seit v5.03) liegen genau waagrecht oder senkrecht auf einer Reihe von Stadtzellen (CITY.cell): ihre Fahrbahn ist eine
+  // Stadtstraße, an die man eigene Straßen anschließen kann. Mitte auf die nächste Zellmitte, Richtung auf die nähere Achse;
+  // cross = Kosinus zwischen Brücke und Flussnormale (schräge Querung: längere Brücke), off = Abstand der Mitte von der Flussmitte.
+  const snapBridge = (q) => {
+    const S = CITY_CELL;
+    const x = (Math.floor(q.x / S) + 0.5) * S;
+    const y = (Math.floor(q.y / S) + 0.5) * S;
+    const flat = Math.abs(q.nx) >= Math.abs(q.ny) - 1e-9;
+    const nx = flat ? (q.nx < 0 ? -1 : 1) : 0;
+    const ny = flat ? 0 : q.ny < 0 ? -1 : 1;
+    const cross = Math.max(0.5, Math.abs(nx * q.nx + ny * q.ny));
+    return { x, y, nx, ny, cross, off: Math.abs((x - q.x) * q.nx + (y - q.y) * q.ny) };
+  };
   const sites = [
-    ...RIVER.bridges.map((d) => ({ ...site(d, d === 45), kind: 'bridge' })),
+    ...RIVER.bridges.map((d) => ({ ...snapBridge(site(d, d === 45)), kind: 'bridge' })),
     ...RIVER.fords.map((d) => ({ ...site(d, false), kind: 'ford' })),
   ];
   const all = [...sites, ...sites.map((q) => ({ ...q, ...mirror(q), nx: -q.nx, ny: -q.ny }))];
@@ -417,7 +433,8 @@ function carveRivers(coarse, seed, keep) {
       for (const q of all) {
         const e = dist(x, y, q.x, q.y);
         if (e > 900) continue;
-        const along = Math.sqrt(Math.max(0, e * e - d * d));
+        // Brücken: Abstand zur Brückenachse (die Zufahrt folgt der Brücke, auch bei schräger Querung); Furten: entlang des Flusses
+        const along = q.kind === 'bridge' ? Math.abs((x - q.x) * q.ny - (y - q.y) * q.nx) : Math.sqrt(Math.max(0, e * e - d * d));
         const w = (1 - smooth(130, 250, along)) * (1 - smooth(RW + 450, RW + 650, d));
         if (w <= 0) continue;
         const ford = q.kind === 'ford';
@@ -432,22 +449,31 @@ function carveRivers(coarse, seed, keep) {
   }
   const fords = all.filter((q) => q.kind === 'ford').map((q) => ({ x: Math.round(q.x), y: Math.round(q.y), r: RIVER.fordR }));
   const span = RW + RIVER.deckOver;
+  // Halbe Länge einer Brücke: schräg zum Fluss länger, Enden auf Zellkanten (ganze Zahl Stadtzellen, Mitte auf einer Zellmitte)
+  const halfOf = (q) => {
+    const need = (span + (q.off ?? 0)) / (q.cross ?? 1);
+    return (Math.ceil((need - CITY_CELL / 2) / CITY_CELL) + 0.5) * CITY_CELL;
+  };
   const bridges = all
     .filter((q) => q.kind === 'bridge')
-    .map((q) => ({
-      x1: Math.round(q.x - q.nx * span),
-      y1: Math.round(q.y - q.ny * span),
-      x2: Math.round(q.x + q.nx * span),
-      y2: Math.round(q.y + q.ny * span),
-    }));
+    .map((q) => {
+      const h = halfOf(q);
+      return {
+        x1: Math.round(q.x - q.nx * h),
+        y1: Math.round(q.y - q.ny * h),
+        x2: Math.round(q.x + q.nx * h),
+        y2: Math.round(q.y + q.ny * h),
+      };
+    });
   const clearings = [];
   for (const q of all) {
     if (q.kind === 'ford') {
       for (const s of [-1, 1]) clearings.push({ x: q.x + q.nx * s * (RW + 180), y: q.y + q.ny * s * (RW + 180), r: 260 });
       clearings.push({ x: q.x, y: q.y, r: 220 });
     } else {
-      for (const s of [-1, 1]) clearings.push({ x: q.x + q.nx * s * (span + 90), y: q.y + q.ny * s * (span + 90), r: 200 });
-      clearings.push({ x: q.x, y: q.y, r: span });
+      const h = halfOf(q);
+      for (const s of [-1, 1]) clearings.push({ x: q.x + q.nx * s * (h + 90), y: q.y + q.ny * s * (h + 90), r: 200 });
+      clearings.push({ x: q.x, y: q.y, r: h });
     }
   }
   const crossings = all.map((q) => ({ kind: q.kind, x: q.x, y: q.y, nx: q.nx, ny: q.ny }));

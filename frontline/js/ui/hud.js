@@ -11,6 +11,7 @@ import { SEASON_NAMES, WEATHER_NAMES, weatherEffect } from '../game/weather.js';
 import { RESEARCH_KEYS } from '../game/research.js';
 import { CITY } from '../data/city.js';
 import { KINDS, DEPOSITS, DEPOSIT_NAME, hasMarket, hasRoad, careOf } from '../game/city.js';
+import { jetsAt } from '../game/aircraft.js';
 import { CITY_TIP } from './citypanel.js';
 
 // Wettersymbole (16 × 16, Strichfarbe = currentColor)
@@ -521,6 +522,12 @@ export class Hud {
     else if (k === 'dc') h += line(`Arbeitsplätze ${CITY.jobsDc[lv]}`);
     else if (b.produces) {
       h += line(`Bildet aus: ${b.produces.map((u) => UNITS[u].short || UNITS[u].name).join(', ')} · ${b.trainSlots} gleichzeitig (Stufe ${lv})`);
+      if (k === 'airport') {
+        // Flughafen (seit v5.03): belegte Plätze, Flugzeuge am Boden und davon startbereit
+        const jets = g.units.filter((u) => u.alive && u.jet?.home === b.id);
+        const down = jets.filter((u) => u.parked);
+        h += line(`Plätze ${jetsAt(g, b)} / ${BALANCE.jets.capacity} · am Boden ${down.length}, startbereit ${down.filter((u) => u.jet.ready).length} · in der Luft ${jets.length - down.length}`);
+      }
       h += '<div class="muted small">Zahlt direkt aus der Stadt: Geld, Metall, Einwohner</div>';
     }
     const care = careOf(g, b);

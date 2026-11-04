@@ -4,6 +4,7 @@ import { crewOf, cityTrainers } from './city.js';
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { planPath, setIdle } from './movement.js';
+import { parkNew } from './aircraft.js';
 
 const STOCK_KEYS = ['bm', 'mun', 'fuel'];
 const INCOME_TAU = 2; // Glättungszeitkonstante des angezeigten Einkommens (s)
@@ -70,6 +71,11 @@ export function updateEconomy(game, dt) {
       b.queueTimes.splice(i, 1);
       const u = game.spawnUnit(type, b.team, spot.x, spot.y);
       if (game.city) u.crew = crewOf(type); // Stadt: die Einheit belegt Einwohner, solange sie lebt
+      if (u.def.jet) {
+        parkNew(game, u, b); // Flugzeug: steht im Hangar seines Flughafens (aircraft.js)
+        game.message(b.team, `${ut.name} bereit`, u.x, u.y);
+        continue;
+      }
       u.order = { type: 'move', x: b.rallyX, y: b.rallyY, targetId: null };
       planPath(game, u, b.rallyX, b.rallyY);
       if (u.path.length === 0) setIdle(u);

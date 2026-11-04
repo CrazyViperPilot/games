@@ -44,7 +44,8 @@ Die Reihenfolge ist Absicht; ein neues System kommt an die Stelle, deren Ergebni
 | 3a | `updateCity` | `city.js` | nur mit Stadt: Einwohner, Wachstum, Erträge ins Lager der Hauptstadt, Steuern |
 | 4 | `updateGarrison`, `updateTowers` | `garrison.js`, `tower.js` | Ein- und Aussteigen in Stadthäuser und Gefechtstürme; Dachaufbauten werden fertig |
 | 5 | `updateFormations` | `formation.js` | Tempo geschlossener Gruppen |
-| 6 | `updateMovement` | `movement.js` | Wege planen und fahren, Verfolgen |
+| 6 | `updateMovement` | `movement.js` | Wege planen und fahren, Verfolgen (ohne Jets) |
+| 6a | `updateAircraft` | `aircraft.js` | Jets: fliegen, kreisen, Rückkehr, Landung, Tanken und Nachladen am Flughafen, Absturz ohne Treibstoff (seit v5.03) |
 | 7 | `updateCrates` | `crates.js` | Kisten aufheben, tragen, einlagern, Kistengeld |
 | 8 | `updateLogistics` | `logistics.js` | LKW laden, entladen, pendeln; Nachfüllen der Einheiten |
 | 9 | `updateConstruction` | `construction.js` | Baufortschritt, Reparatur, automatische Bauzuweisung |
@@ -60,7 +61,7 @@ Die Reihenfolge ist Absicht; ein neues System kommt an die Stelle, deren Ergebni
 | 19 | `updateAnimals`, `ageEffects`, `cleanup`, `updateScars` | `animals.js`, `game.js`, `scars.js` | Tiere, Effekte altern, Tote entfernen (Wracks, Ereignisse), Narben |
 | 20 | `checkElimination` | `game.js` | Sieg durch Eliminierung |
 
-Startzustand im Konstruktor von `Game`: Karte (`generateMap` oder gespeicherte Karte), Raster, Höhengelände, Brücken, Teams,
+Startzustand im Konstruktor von `Game`: Karte (`generateMap` oder gespeicherte Karte), Raster, Höhengelände, Brücken, Stadtstraßen der Karte (`createRoads`, `game.roads`), Teams,
 Forschung, Zone, Hot Zone, Nebel, Hauptstädte und Startarmee, Häuser, Kisten, Tiere, Wetter. Jedes System hat dafür ein `create…(game)`.
 
 ## 4. Koordinaten
@@ -147,6 +148,8 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 | `city.js` (Daten `js/data/city.js`, UI `js/ui/citypanel.js`, Karte `js/render/citylayer.js`) | Zonenstadt um die Hauptstadt (PRD §15), Befehl `city`; Stadtgebäude belegen `grid.struct` mit `city.gridId`; fertige Gebäude haben seit v4.83 eine Ziel-Entity (`kind: 'building'`, `type: 'city'`, nicht in `game.buildings`), die der Spieler seit v4.94 wählen kann |
 | `garrison.js`, `tower.js`, `crates.js`, `commander.js`, `radio.js` | Häuserkampf, Festung (Gefechtsturm, Dachaufbau, Ausbau-Befehl), Versorgungskisten, Kommandeur, Sendemast |
 | `weather.js`, `research.js`, `river.js` | Wetter und Jahreszeit, Forschungsstufen, Fluss mit Brücken und Furten |
+| `roads.js` | Stadtstraßen der Karte (seit v5.03): Zonenstraßen und Brückenfahrbahnen als Zellen im Stadtraster (`game.roads.kind`: 1 Straße, 2 Brücke), für beide Teams Straßenanschluss (`city.roadAt`), nicht ausweisbar (`canZone`) |
+| `aircraft.js` | Flughafen und Kampfflugzeuge (seit v5.03): Anlage `AIRPORT` (Bahnen, Stellplätze; auch fürs Bild), `u.jet = { home, slot, ready, rtb }`, `u.parked` (im Hangar: `isFoe` falsch, schießt nicht), Ausbildungsprüfung `trainCheck` |
 | `fog.js` | Nebel des Krieges je Team, Sicht im Gelände |
 | `map.js`, `landscape.js`, `relief.js`, `mapdata.js` | Zufallskarte (Stadt, Gehöfte, Kisten), Höhengelände, Höhenraster, Kartenformat für Editor und Speicher |
 | `scars.js`, `animals.js` | Wracks und Krater, Tiere (nur Optik, aber Teil der Simulation) |
@@ -162,6 +165,7 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 | `sprites.js` | gemalte Einheiten, Gebäude, Effekte, Kisten, Wracks, Tiere (von oben) |
 | `iso.js`, `isobuild.js`, `isosprites.js`, `isodata.js` | Iso-Grundkörper, Iso-Gebäude, Bild-Sprites (Kenney, `assets/iso/`), Modelldaten |
 | `university.js`, `cityhall.js` | Gezeichnete Sonderbauten in 2D und Iso, vierfach symmetrisch (ein Bild für jede Drehung): Universität 3 × 3, Hauptstadt als modernes Rathaus (`b.main`, eingehängt in `renderer.js` und `isobuild.drawTeamBuilding`) |
+| `bigbuild.js` | Großbauten der Stadt (seit v5.03): Kraftwerk, Kaserne, Fabrikhalle, Flughafen als Liste von Boden-Teilen und Körpern (Quader, Zylinder, Fahne) in Weltkoordinaten; 2D von oben, isometrisch jeder Körper als eigenes Objekt in der Tiefenordnung (`cityBuildings` → `drawTownBuilding` mit `kind: 'bigpart'`), richtig für jede Drehung |
 | `ground.js`, `reliefimg.js`, `terrain.js` | WebGL-Boden der Iso-Ansicht, Geländebild, Kartenbild |
 | `bridge.js`, `season.js`, `weatherfx.js` | Brücken, Jahreszeitenfarben, Regen/Schnee/Nebel |
 | `minimap.js` | Minimap |

@@ -309,7 +309,7 @@ function impact(game, p) {
     if (d < R) hit(game, b, (p.damage.struct || 0) * houseMult(p.damage) * (1 - d / R));
   }
   const splash = (e) => {
-    if (!e.alive || e.team === p.team || e.house) return;
+    if (!e.alive || e.team === p.team || e.house || e.parked) return; // abgestellte Jets: im Hangar
     const d = Math.max(0, Math.hypot(e.x - p.tx, e.y - p.ty) - radiusOf(e));
     if (d >= R) return;
     const dmg = (p.damage[dmgKey(e)] || 0) * (1 - d / R);
@@ -354,7 +354,7 @@ export function updateCombat(game, dt) {
   const optics = [opticsMul(game, 0), opticsMul(game, 1)]; // Wärmebildoptik verlängert sie
 
   for (const u of units) {
-    if (!u.alive || !u.weapons.length || u.crate) continue; // Kistenträger haben die Hände voll
+    if (!u.alive || !u.weapons.length || u.crate || u.parked) continue; // Kistenträger haben die Hände voll, abgestellte Jets stehen im Hangar
     const o = u.order.type;
     if (NO_FIRE.has(o)) continue;
     if (o === 'attack') {

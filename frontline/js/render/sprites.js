@@ -148,6 +148,8 @@ export function drawUnit(ctx, u, color, zoom = 1, aim = null, now = 0, iso = fal
     ctx.arc(0, 0, 5, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
+  } else if (u.def && u.def.jet) {
+    drawJet(ctx, u, color, dark, light, hull, iso);
   } else if (u.def && u.def.air) {
     drawHeli(ctx, u, color, dark, light, hull, turret, now, z, iso);
   } else if (u.type === 'truck') {
@@ -204,6 +206,55 @@ export function drawUnit(ctx, u, color, zoom = 1, aim = null, now = 0, iso = fal
     ctx.arc(0, 0, u.def ? u.def.radius : 6, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** Umriss einer F-16 von oben (Nase bei +x): Rumpf, Deltaflügel, Höhenleitwerk. */
+const JET_BODY = [[17, 0], [11, -2], [3, -3], [-1, -13], [-5, -13], [-6, -3], [-11, -3], [-15, -8], [-17, -8], [-16, -2], [-18, -2], [-18, 2], [-16, 2], [-17, 8], [-15, 8], [-11, 3], [-6, 3], [-5, 13], [-1, 13], [3, 3], [11, 2]];
+
+/** Kampfflugzeug von oben: Schatten (in der Luft weit versetzt, abgestellt dicht darunter), Umriss in Teamfarbe, Kanzel, Düse. */
+function drawJet(ctx, u, color, dark, light, hull, iso = false) {
+  const path = () => {
+    ctx.beginPath();
+    JET_BODY.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    ctx.closePath();
+  };
+  if (!iso) {
+    ctx.save();
+    const off = u.parked ? 3 : 16;
+    ctx.translate(off, off * 1.2);
+    ctx.rotate(hull);
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    path();
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.save();
+  ctx.rotate(hull);
+  ctx.fillStyle = color;
+  path();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = dark;
+  ctx.fillRect(-18, -1.2, 4, 2.4); // Düse
+  ctx.fillRect(-14, -0.6, 22, 1.2); // Rumpfrücken
+  ctx.fillStyle = light;
+  ctx.beginPath();
+  ctx.ellipse(8, 0, 3.6, 1.5, 0, 0, Math.PI * 2); // Kanzel
+  ctx.fill();
+  ctx.fillStyle = '#d8d8d0'; // Raketen unter den Flügelspitzen
+  for (const w of u.weapons ?? []) {
+    if (w.rounds >= 1) ctx.fillRect(-4, -13.5, 7, 1.4);
+    if (w.rounds >= 2) ctx.fillRect(-4, 12.1, 7, 1.4);
+  }
+  if (!u.parked) {
+    ctx.fillStyle = 'rgba(255,170,60,0.85)'; // Nachbrenner
+    ctx.beginPath();
+    ctx.moveTo(-18, -1.4);
+    ctx.lineTo(-25, 0);
+    ctx.lineTo(-18, 1.4);
+    ctx.fill();
   }
   ctx.restore();
 }

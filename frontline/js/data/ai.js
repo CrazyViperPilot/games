@@ -70,3 +70,6 @@ export const FORT_CREW_RANGE = 800; // ein freier Schütze geht nur in einen Tur
 export const FORT_ROOFS = ['mortar', 'sam', 'flak']; // Reihenfolge der Dachaufbauten je Festung (mit gegnerischen Luftzielen zuerst SAM)
 export const FORT_WANT = { bm: 150, mun: 150 }; // zusätzlicher Soll-Lagerstand einer ausgebauten FOB (Nachschub für Mörser, Flak, Reparatur)
 export const HELI_MIN_MONEY = 300; // Geld, das nach dem Transporthubschrauber übrig bleiben soll (er wird erst bei einer Festung gekauft)
+export const JET_GROUP = 2; // so viele startbereite F-16 fliegen zusammen los (seit v5.03; Zahl der Jets und Reserve: CITY.ai.jets/jetReserve)
+export const JET_EVERY = 6; // s zwischen zwei Startbefehlen an die Jets
+export const JET_QUEUE = 2; // so viele F-16 höchstens in der Warteschlange eines Flughafens

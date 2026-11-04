@@ -8,7 +8,7 @@
 //   FOB und Bauen    fob, construction, demolishRefund
 //   Logistik         logistics, shortageWarn, baseAttackWarn
 //   KI-Schwierigkeit difficulty (weitere KI-Werte: ai.js)
-//   Kampf, Gelände   height, slope, airFire, sightHeight, fogInterval, stealth, garrison, fortress, commander, formation
+//   Kampf, Gelände   height, slope, airFire, sightHeight, fogInterval, stealth, garrison, fortress, commander, formation, jets
 //   Wetter, Technik  weather, research, river
 //   Nur Optik        scars, animals
 //   Startmenü        menuDefaults
@@ -176,7 +176,7 @@ export const BALANCE = {
   // Festung (§5a): Befehl 'fortify' an einer FOB baut einen Mauerring mit je einem Tor in der Mitte jeder Seite und `towers` Gefechtstürme
   // an den Ecken, die zum Gegner zeigen. ring = Abstand der Mauer von der FOB-Mitte (Zellen); floor = Höhenvorteil der Turmbesatzung (px);
   // ejectDamage = Schaden (Anteil der vollen HP) an der Besatzung, wenn der Turm fällt
-  fortress: { ring: 4, towers: 2, floor: 40, ejectDamage: 0.35 },
+  fortress: { ring: 4, towers: 2, floor: 40, ejectDamage: 0.35, towerShift: 3 }, // towerShift: so viele Zellen darf ein Turm nach innen ausweichen, wenn seine Ecke belegt ist (seit v5.03)
   // Tarnung (Scharfschütze): Gegner sehen die Einheit nur nahe an eigenen Einheiten/Gebäuden oder kurz nach einem Schuss
   stealth: { detectRange: 160, revealTime: 4 },
   // Versorgungskisten (§3, nach den Reliquien aus Age of Empires II): liegen abseits der Zone (pairs Paare, punktsymmetrisch).
@@ -259,7 +259,7 @@ export const BALANCE = {
     // Einsatzfähigkeiten (Tasten V und M): Rauch senkt den Schaden eigener Einheiten darin, Minen treffen Bodeneinheiten des Gegners
     smoke: { r: 110, life: 14, cd: 45, taken: 0.5 },
     mine: { trigger: 30, blast: 55, damage: 150, cd: 12, max: 8 },
-    unitTier: { sniper: 2, ifv: 2, littlebird: 2, transporter: 2, flak: 2, tank: 3, gunship: 3, sam: 3 },
+    unitTier: { sniper: 2, ifv: 2, littlebird: 2, transporter: 2, flak: 2, tank: 3, gunship: 3, sam: 3, f16: 3 },
     vests: 0.85,
     composite: 0.85,
     optics: 1.1,
@@ -270,6 +270,11 @@ export const BALANCE = {
   // schwere Waffen mehr, Handwaffen weniger). Zerstört sperren sie; ein Baufahrzeug baut sie für rebuildCost Geld in rebuild s wieder
   // auf (mehrere schneller, höchstens construction.maxBuilders), es arbeitet bis reach px vom Brückenkopf.
   river: { ford: 0.5, fordCost: 30, fordDepth: 12, deck: 80, bridgeHp: 2400, rebuildCost: 200, rebuild: 30, reach: 90 },
+  // Kampfflugzeuge (seit v5.03, PRD §6 „F-16“, §15 „Flughafen“): ein Flughafen bietet capacity Plätze. In der Luft dreht ein Jet
+  // höchstens turn rad/s und kreist im Abstand orbit (px) um seinen Befehlspunkt. Er fliegt zurück, wenn der Treibstoff für den
+  // Heimweg × reserve plus margin s nicht mehr reicht oder keine Rakete mehr da ist; landet in landReach (px) um die Landebahn.
+  // Am Boden in rearm s voll betankt und munitioniert (aus dem Lager der Hauptstadt) und repair × maxHp je s repariert.
+  jets: { capacity: 20, turn: 2.4, orbit: 280, reserve: 1.3, margin: 4, landReach: 150, rearm: 25, repair: 0.04, lift: 92 },
   // Tiere (rein optisch, nach den Jagdtieren aus Age of Empires II): `pairs` Rudelpaare (punktsymmetrisch) außerhalb der Zone, Rehe
   // (deer Tiere je Rudel) und Wildschweine (boar). Sie grasen und ziehen langsam (walk px/s) weiter; kommt eine Einheit näher als
   // scare (je Art: Infanterie, Fahrzeug, Hubschrauber) oder knallt es in boom px, flieht das ganze Rudel (run px/s) flee px weit.

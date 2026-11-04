@@ -247,6 +247,31 @@ export const UNITS = {
     fuelMax: 70,
     hotkey: 'G',
   },
+  // Kampfflugzeug (seit v5.03, PRD §6 „F-16“): nur mit Stadt, im Flughafen ausgebildet und dort stationiert (jet). Fliegt immer (kann
+  // nicht schweben), kreist um seinen Befehlspunkt und greift mit zwei Lenkraketen zwei Ziele an, auch Hubschrauber und Flugzeuge.
+  // fuelMax = Sekunden Flug (fuelPerSec 1, auch beim Kreisen): Reichweite ≈ speed × fuelMax. Leer an Raketen oder knapp an Treibstoff
+  // fliegt es allein zum Flughafen zurück, landet, tankt, lädt nach und wird repariert (BALANCE.jets); ohne Flughafen stürzt es leer ab.
+  f16: {
+    name: 'F-16',
+    short: 'F-16', // Kurzname in der Befehlskarte
+    slots: 3,
+    armor: 'air',
+    air: true,
+    jet: true,
+    hp: 450,
+    speed: 420,
+    radius: 14,
+    sight: 560,
+    weapons: [
+      { id: 'aim', name: 'Lenkrakete', range: 640, cooldown: 2.5, rounds: 2, munCost: 150, hitChance: 0.92, damage: { inf: 160, light: 650, heavy: 1150, struct: 700, air: 700 } },
+    ],
+    cost: { money: 1400 },
+    buildTime: 40,
+    producedAt: 'airport',
+    fuelPerSec: 1,
+    fuelMax: 45,
+    hotkey: 'K', // V, J und H sind feste Tasten (Ansicht, Bauer, Hauptstadt)
+  },
   // Flugabwehrpanzer (Flak): Schnellfeuer-Flak gegen Hubschrauber, Munition je Schuss 20. hitChance × speedRef: schnelle Ziele trifft sie selten
   // (Tempo-Faktor speedRef/(speedRef + Zielgeschwindigkeit), siehe BALANCE.airFire). Schießt nur auf Luftziele.
   flak: {

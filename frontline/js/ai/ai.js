@@ -3,6 +3,7 @@
 // Forschung, Produktion (nur Hauptstadt), Verteidigungsgebäude und Mauer, Brücken, Baufahrzeuge, LKW (Lieferant/Pendler/Versorger), Sammelpunkte, Armee.
 import { CITY } from '../data/city.js';
 import { aiCity, aiRaid, aiDefend, cityTrainers } from '../game/city.js';
+import { airportsOf, freeSpace } from '../game/aircraft.js';
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
@@ -12,6 +13,9 @@ import { radioEta } from '../game/radio.js';
 import { weatherSight } from '../game/weather.js';
 import { unitLocked, researchBlock } from '../game/research.js';
 import {
+  JET_GROUP,
+  JET_EVERY,
+  JET_QUEUE,
   MAX_PLACE,
   THREAT_RANGE,
   THREAT_DANGER,
@@ -171,6 +175,7 @@ export class AI {
     this.replaceCommander(s);
     this.research(s); // vor produce: die nächste Stufe bekommt das Geld zuerst
     this.produce(s);
+    this.jets(s); // Flughafen: F-16 kaufen und losschicken (seit v5.03)
     this.buildDefense(s);
     this.buildWall(s);
     this.fortify(s);
@@ -202,7 +207,7 @@ export class AI {
     const enemies = g.units.filter((u) => u.alive && u.team !== t && g.sees(t, u));
     this.corridor = home ? { x: home.x, y: home.y, dx: dir.x, dy: dir.y } : null;
 
-    const combat = units.filter((u) => u.def.range > 0 && !u.crate && !u.def.hero); // Kistenträger kämpfen nicht, der Kommandeur bleibt hinten
+    const combat = units.filter((u) => u.def.range > 0 && !u.crate && !u.def.hero && !u.def.jet); // Kistenträger kämpfen nicht, der Kommandeur bleibt hinten, Jets führt jets()
     // Ausbildende Gebäude: Hauptstadt, mit Stadt (seit v4.96) Kaserne, Fabrikhalle und Heliport
     const producers = own.filter((b) => b.produces.length).concat(cityTrainers(g, t));
     const queuedCombat = producers.reduce((n, b) => n + b.queue.filter((e) => UNITS[e.unit ?? e].range > 0).length, 0);
@@ -238,6 +243,37 @@ export class AI {
       needMat,
       alarm,
     };
+  }
+
+  /**
+   * Kampfflugzeuge (seit v5.03): hält CITY.ai.jets[Schwierigkeit] F-16 an ihren Flughäfen (Geld über jetReserve) und schickt alle
+   * startbereiten paarweise los: zuerst gegen gesehene Hubschrauber und Flugzeuge, sonst gegen gepanzerte Fahrzeuge in der
+   * Konfliktzone oder nahe der eigenen Basis, sonst auf Patrouille über die Zone. Rückkehr, Tanken und Nachladen regelt aircraft.js.
+   */
+  jets(s) {
+    const g = this.game;
+    const t = this.team;
+    const ports = airportsOf(g, t);
+    if (!ports.length || unitLocked(g, t, 'f16')) return;
+    const jets = s.units.filter((u) => u.def.jet);
+    const want = CITY.ai.jets[this.difficulty] ?? CITY.ai.jets.normal;
+    const queued = ports.reduce((n, b) => n + b.queue.length, 0);
+    if (jets.length + queued < want && g.teams[t].res.money >= UNITS.f16.cost.money + CITY.ai.jetReserve) {
+      const b = ports.filter((p) => p.queue.length < JET_QUEUE && freeSpace(g, p) > 0).sort((p, q) => p.queue.length - q.queue.length || p.id - q.id)[0];
+      if (b) g.issue(t, { type: 'train', buildingId: b.id, unit: 'f16' });
+    }
+    const ready = jets.filter((u) => u.parked && u.jet?.ready && u.order.type === 'idle').sort((a, b) => a.id - b.id);
+    if (!ready.length || !this.once('jets', JET_EVERY)) return;
+    const air = s.enemies.filter((e) => e.def.air && !e.parked);
+    const armor = s.enemies.filter((e) => (e.def.armor === 'heavy' || e.def.armor === 'light') && (dist(e.x, e.y, s.zone.x, s.zone.y) <= s.zone.r || dist(e.x, e.y, s.ax, s.ay) <= DEF_RANGE * 2));
+    const near = (list) => list.slice().sort((a, b) => dist(a.x, a.y, s.ax, s.ay) - dist(b.x, b.y, s.ax, s.ay) || a.id - b.id);
+    const targets = [...near(air), ...near(armor)];
+    for (let k = 0; k < ready.length; k += JET_GROUP) {
+      const ids = ready.slice(k, k + JET_GROUP).map((u) => u.id);
+      const tg = targets[(k / JET_GROUP) % Math.max(1, targets.length)];
+      if (tg) g.issue(t, { type: 'attack', ids, targetId: tg.id });
+      else g.issue(t, { type: 'attackMove', ids, x: s.zone.x, y: s.zone.y });
+    }
   }
 
   /** Eingereihte Einheiten eines Typs in den Warteschlangen. */

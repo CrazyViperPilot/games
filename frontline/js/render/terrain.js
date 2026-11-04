@@ -101,7 +101,7 @@ export function buildTerrain(map, mode = '2d') {
     ctx.drawImage(layers.mat, 0, 0, w, h);
   }
 
-  drawMapObjects(ctx, map, S, iso, rng);
+  drawMapObjects(ctx, map, S, iso, rng, false); // Straßen der Zone zeichnet das Spiel als Stadtstraßen (citylayer.js, seit v5.03)
 
   // Dezentes Raster alle 4 Zellen (128 px)
   ctx.strokeStyle = 'rgba(0,0,0,0.07)';
@@ -128,10 +128,13 @@ export function buildTerrain(map, mode = '2d') {
   return canvas;
 }
 
-/** Straßen, Bahn, Stadt, Bäume und Hindernisse einer Karte auf ein Canvas (Maßstab S). Auch der Karteneditor nutzt das. */
-export function drawMapObjects(ctx, map, S, iso, rng) {
+/**
+ * Straßen, Bahn, Stadt, Bäume und Hindernisse einer Karte auf ein Canvas (Maßstab S). Auch der Karteneditor nutzt das.
+ * paved = false: nur Feldwege (im Spiel sind die Straßen der Zone Stadtstraßen, citylayer.js).
+ */
+export function drawMapObjects(ctx, map, S, iso, rng, paved = true) {
   drawFields(ctx, map, S);
-  drawRoads(ctx, map, S);
+  drawRoads(ctx, map, S, paved);
   drawRail(ctx, map, S);
   drawTown(ctx, map, S, iso);
   if (!iso) for (const t of map.trees ?? []) tree(ctx, t.x * S, t.y * S, t.r * S);
@@ -325,8 +328,8 @@ export function roadJunctions(roads) {
 }
 
 /** Straßen der Stadt und Feldwege (Asphalt mit Mittellinie bzw. Erdweg); an Kreuzungen und Einmündungen eine durchgehende Fläche. */
-function drawRoads(ctx, map, S) {
-  const roads = map.town?.roads;
+function drawRoads(ctx, map, S, paved = true) {
+  const roads = paved ? map.town?.roads : map.town?.roads?.filter((r) => r.dirt);
   if (!roads) return;
   ctx.lineCap = 'butt';
   for (const r of roads) {

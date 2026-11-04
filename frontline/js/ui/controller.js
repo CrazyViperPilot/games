@@ -1,6 +1,7 @@
 // Spieler-Steuerung (docs/verlauf.md §5 ui/controller.js, §11.3–11.8): Auswahl, Modi, Befehle und Befehlskarte. Kein DOM.
 // Hält den Ansichtszustand `view`, den renderer.render(view) liest. Befehle laufen nur über game.issue.
 import { cityEntityAt, freePop, crewOf, KINDS as CITY_KINDS } from '../game/city.js';
+import { trainCheck } from '../game/aircraft.js';
 import { CITY } from '../data/city.js';
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
@@ -1335,6 +1336,21 @@ export class Controller {
     const col = i % c.cols;
     const row = (i - col) / c.cols;
     const card = b.produces ? this.trainEntries([b]) : []; // Kaserne, Fabrikhalle, Heliport (seit v4.96)
+    if (CITY_KINDS[c.kind[i] - 1] === 'airport') {
+      // Flughafen (seit v5.03): alle Flugzeuge dieses Flughafens wählen (am Boden und in der Luft)
+      const jets = this.game.units.filter((u) => u.alive && u.jet?.home === b.id);
+      card.push(
+        entry('Staffel', 'W', {
+          tip: `Alle ${jets.length} Flugzeuge dieses Flughafens wählen (W); Befehl = Start, sobald betankt; Rechtsklick auf den eigenen Flughafen = landen`,
+          enabled: jets.length > 0,
+          reason: 'Keine Flugzeuge stationiert',
+          action: () => {
+            this.view.selection.clear();
+            for (const u of jets) this.view.selection.add(u.id);
+          },
+        }),
+      );
+    }
     if (CITY_KINDS[c.kind[i] - 1] === 'market') {
       card.push(entry('Handel', 'T', { tip: 'Marktmenü: Waren kaufen und verkaufen (T, auch über die Geldanzeige oben)', action: () => this.onMarket?.() }));
     }
@@ -1380,7 +1396,7 @@ export class Controller {
       else if (def.hero && hasCommander(this.game, ready.team)) reason = 'Nur ein Kommandeur je Team';
       else if (this.game.city && freePop(this.game, ready.team) < crewOf(u)) reason = 'Zu wenig freie Einwohner (Stadt: Wohnen ausbauen)';
       else if (this.game.city && this.game.city[ready.team].metal < (CITY.metalCost[u] ?? 0)) reason = 'Zu wenig Metall (Stadt: Erzmine und Stahlwerk oder Markt)';
-      else reason = this.trainReason(ready, def.cost);
+      else reason = trainCheck(this.game, ready, u) ?? this.trainReason(ready, def.cost); // Flughafen: Platz für Flugzeuge
       card.push(
         entry(def.short || def.name, def.hotkey, {
           cost: costText(def.cost),
