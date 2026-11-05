@@ -8,6 +8,22 @@
 import { airportGround, airportBodies, drawAirportIso, drawAirportTop } from './airport.js';
 import { drawBox } from './iso.js';
 import { shade, tint } from './sprites.js';
+import { drawUnitTop, drawUnitIso, SHOWROOM } from './unitpaint.js';
+import { UNITS } from '../data/units.js';
+import { CITY } from '../data/city.js';
+
+/** Ausstellungsstück (seit v5.40): echtes Einheitenmodell in Ausstellungslackierung, als Scheineinheit für unitpaint.js. */
+const showUnit = (p) => ({ id: 0, type: p.unit, team: SHOWROOM, x: p.x, y: p.y, angle: p.angle, def: UNITS[p.unit], weapons: [], parked: true });
+
+/** Ausstellungsstück von oben (2D). */
+export function drawShowTop(ctx, p, zoom) {
+  drawUnitTop(ctx, showUnit(p), zoom);
+}
+
+/** Ausstellungsstück isometrisch (Bildschirmpunkt aus der Kamera). */
+export function drawShowIso(ctx, cam, p) {
+  drawUnitIso(ctx, cam, showUnit(p), cam.worldToScreen(p.x, p.y));
+}
 
 /** Großbauten, die hier gezeichnet werden (die Universität hat ihr eigenes Bild, university.js). */
 export const BIG_KINDS = new Set(['barracks', 'factory', 'airport', 'stand', 'atc', 'ktank', 'mdepot']); // seit v5.35 auch der Fliegerhorst (2 × 2)
@@ -52,7 +68,8 @@ function groundOf(k, lv, half) {
     // Fabrikhalle (seit v5.11, seit v5.33 als 5 × 5-Großbau, ±160): Betonhof, Fahrzeughof mit Stellplätzen zur Straße, Rasen vor der Verwaltung
     rect(-half + 3, -half + 3, half - 3, half - 3, '#a9a69c');
     rect(-150, 96, 150, 152, '#8c8a82'); // Fahrzeughof
-    for (let x = -126; x <= 126; x += 42) line(x, 104, x, 146, '#e3d46a', 1.6); // Stellplätze
+    const bays = CITY.produces.factory.length;
+    for (let n = 0; n <= bays; n++) line(-148 + (296 / bays) * n, 104, -148 + (296 / bays) * n, 146, '#e3d46a', 1.6); // Stellplätze je Ausstellungsstück
     line(-half + 8, 90, half - 8, 90, '#e3d46a', 2.4);
     rect(66, -30, 152, -8, '#86a05e'); // Rasen vor der Verwaltung
     rect(102, -34, 114, -8, '#c9c4b4'); // Weg zum Eingang
@@ -91,6 +108,7 @@ function bodiesOf(k, lv, half) {
   const box = (x0, y0, x1, y1, h, c, roof, base = 0, deco = null) => b.push({ t: 'box', x0, y0, x1, y1, h, base, c, roof, ...deco });
   const veh = (v, x, y, ax) => b.push({ t: 'veh', v, x, y, ax, h: VEH[v].h }); // Fahrzeug, Front nach +ax
   const cyl = (x, y, r, h, c, o = {}) => b.push({ t: 'cyl', x, y, r, r1: o.r1 ?? r, h, base: o.base ?? 0, c, band: o.band ?? null });
+  const show = (unit, x, y, angle) => UNITS[unit] && b.push({ t: 'unit', unit, x, y, angle, h: 10 }); // Ausstellungsstück (seit v5.40)
   if (k === 'barracks') {
     // Kaserne (seit v5.11): zwei Unterkünfte mit Ziegeldach, Fahrzeugschuppen mit Toren, Wache mit Schranke, Fahrzeuge, Bäume;
     // Stufe 2: Stabsgebäude und Schützenpanzer; Stufe 3: Wachtürme in den Ecken und ein Panzer auf dem Exerzierplatz.
@@ -105,19 +123,20 @@ function bodiesOf(k, lv, half) {
     box(34, 103.5, 66, 106.5, 2.5, '#e8e4d4', '#d23a3a', 7); // Schranke
     box(63, 102, 67, 108, 9, '#d23a3a', '#e8e4d4'); // Pfosten der Schranke
     b.push({ t: 'flag', x: 0, y: -10, h: 64 });
-    veh('truck', -20, 92, 'y');
-    veh('jeep', 22, 96, 'y');
+    show('truck', -20, 92, Math.PI / 2); // Ausstellungsstücke statt der Kastenfahrzeuge (seit v5.40)
+    // Soldaten der Kaserne angetreten an der Antrittslinie, je Art einer
+    CITY.produces.barracks.forEach((u, n, all) => show(u, (n - (all.length - 1) / 2) * 18, 30, -Math.PI / 2));
     for (const [x, y] of [[96, -100], [114, -74], [-62, 52], [-28, 46]]) b.push({ t: 'tree', x, y, r: 9 });
     if (lv >= 2) {
       box(82, -56, 120, 32, 30, '#e4dcc4', '#8a4434', 0, { gable: 10, win: [[5, 11], [15, 21], [23, 28]], wg: 12, ww: 5, door: [3] }); // Stabsgebäude
-      veh('apc', 0, 94, 'y');
+      show('ifv', 14, 94, Math.PI / 2);
     }
     if (lv >= 3) {
       for (const [x, y] of [[-116, -116], [116, -116], [116, 116], [-116, 116]]) {
         box(x - 5, y - 5, x + 5, y + 5, 34, '#6b5a44', '#6b5a44'); // Wachturm: Gerüst
         box(x - 9, y - 9, x + 9, y + 9, 9, '#7b8058', '#56603a', 34, { win: [[3, 7]], wg: 8, ww: 6 }); // Kanzel
       }
-      veh('tank', -32, -30, 'x');
+      show('tank', -32, -30, 0);
     }
   } else if (k === 'factory') {
     // Fabrikhalle (seit v5.11; seit v5.33 kompakt für 5 × 5 Zellen, ±160): Montagehalle mit Sheddach und Toren, Verwaltung mit
@@ -132,9 +151,10 @@ function bodiesOf(k, lv, half) {
     cyl(78, 10, 11, 22, '#dfe3e6'); // Tanklager
     cyl(106, 10, 11, 22, '#dfe3e6');
     b.push({ t: 'tree', x: 140, y: -14, r: 8 });
-    const yard = lv >= 3 ? 7 : lv >= 2 ? 5 : 3;
-    const kinds = ['tank', 'truck', 'apc', 'tank', 'jeep', 'apc', 'truck'];
-    for (let i = 0; i < yard; i++) veh(kinds[i], -126 + 42 * i, 124, 'y');
+    // Fahrzeughof (seit v5.40): von jeder Einheit der Fabrikhalle ein Ausstellungsstück, Front zur Straße
+    const yard = CITY.produces.factory;
+    const gap = 296 / yard.length;
+    yard.forEach((u, n) => show(u, -148 + gap * (n + 0.5), 124, Math.PI / 2));
     if (lv >= 2) {
       box(66, -150, 150, -92, 28, '#c9c6bc', '#8a8f92', 0, { gates: { e: [2], n: 1, w: 30, h: 20 }, win: [[21, 25]], wg: 14, ww: 9 }); // Lackiererei
       for (const x of [86, 108, 130]) box(x - 6, -130, x + 6, -118, 6, '#8d9296', '#6d7276', 28); // Abluft
@@ -308,6 +328,7 @@ export function drawBigTop(ctx, plan, color, damage = 0, zoom = 1, over = false)
       ctx.fillStyle = color;
       ctx.fillRect(p.x + 1.5, p.y - 1.5, 14, 9);
     } else if (p.t === 'veh') vehTop(ctx, p);
+    else if (p.t === 'unit') drawShowTop(ctx, p, zoom);
     else if (p.t === 'tree') {
       ctx.fillStyle = '#2f5a2a';
       ctx.beginPath();
@@ -505,6 +526,7 @@ export function partFoot(p) {
     return { x: p.x, y: p.y, w: hx * 2, h: hy * 2 };
   }
   if (p.t === 'box') return { x: (p.x0 + p.x1) / 2, y: (p.y0 + p.y1) / 2, w: p.x1 - p.x0, h: p.y1 - p.y0 };
+  if (p.t === 'unit') return { x: p.x, y: p.y, w: 24, h: 24 };
   const r = p.r ?? 4;
   return { x: p.x, y: p.y, w: r * 2, h: r * 2 };
 }

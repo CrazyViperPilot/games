@@ -4,7 +4,7 @@
 import { BALANCE } from '../data/balance.js';
 import { drawUniversityIso } from './university.js';
 import { drawWorksIso, WORKS_KINDS } from './works.js';
-import { drawBigPart, VEH, VEH_COLOR } from './bigbuild.js';
+import { drawBigPart, drawShowIso, VEH, VEH_COLOR } from './bigbuild.js';
 import { drawCityHallIso } from './cityhall.js';
 import { drawTownIso } from './townhouses.js';
 import { drawMilIso } from './milbuild.js';
@@ -434,6 +434,10 @@ function drawBigBody(ctx, cam, b, season) {
   }
   if (p.t === 'veh') {
     drawYardVehicle(ctx, cam, p);
+    return;
+  }
+  if (p.t === 'unit') {
+    drawShowIso(ctx, cam, p); // Ausstellungsstück: echtes Einheitenmodell (seit v5.40)
     return;
   }
   if (p.t !== 'box' || !p.fine) {

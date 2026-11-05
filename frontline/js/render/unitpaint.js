@@ -30,6 +30,10 @@ const TEAM_PAINT = [
   { body: '#566f8f', dark: '#3b4c63', light: '#7690b0', camo: '#475a5c', mark: '#3d8bfd', vest: '#3a6fc0', air: '#62778f' },
   { body: '#8f5a4a', dark: '#603a30', light: '#ad7966', camo: '#665041', mark: '#e5484d', vest: '#b8443a', air: '#8e665b' },
 ];
+// Ausstellungsstücke auf den Höfen der Ausbildungsgebäude (seit v5.40, bigbuild.js): sandfarbene Grundierung ohne Teamfarbe,
+// damit man sie nicht für echte Einheiten hält (Team-Index SHOWROOM)
+const DISPLAY = { body: '#bdb08c', dark: '#8f8568', light: '#d9cfae', camo: '#a99f80', mark: '#f1ede0', vest: '#a89c7a', air: '#c2bdaf' };
+export const SHOWROOM = 3;
 const NEUTRAL = { body: '#6f7469', dark: '#4b4f47', light: '#8e9387', camo: '#585c50', mark: '#c9c9c0', vest: '#6f7469', air: '#7a7f78' };
 const TRACK = '#2a2c2e';
 const WHEEL = '#2b2d2f';
@@ -840,9 +844,9 @@ function soldier(P, o) {
 
 const MODELS = { tank, ifv, flak, sam, gepard, pzh, truck, fobTruck, engineer, excavator, littlebird, gunship, transporter, f16 };
 const INFANTRY = { rifleman: 'rifleman', at: 'at', sniper: 'sniper', commander: 'commander' };
-const TEAM_KEYS = ['b', 'r', 'n'];
+const TEAM_KEYS = ['b', 'r', 'n', 'd'];
 
-const paintOf = (team) => TEAM_PAINT[team] ?? NEUTRAL;
+const paintOf = (team) => (team === SHOWROOM ? DISPLAY : TEAM_PAINT[team] ?? NEUTRAL);
 const SIZE = { tank: 1.12, pzh: 1.08 }; // schwere Fahrzeuge etwas größer, damit sie sich vom Schützenpanzer abheben
 
 /** Modell um k vergrößern (Körper, Turmdrehpunkt, Grundfläche). */
