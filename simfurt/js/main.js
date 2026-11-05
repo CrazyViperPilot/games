@@ -4,7 +4,7 @@ import {
   newCity, tick, refresh, applyTool, toolCost, placeBuilding, canPlace, unlocked, unlockNeed, tileInfo, takeLoan, repayLoan, inb, idx, roadAt, dateStr, say,
 } from './sim.js';
 import { Renderer } from './render.js';
-import { saveSlot, loadSlot, listSlots, deleteSlot, SLOTS } from './save.js';
+import { saveSlot, loadSlot, listSlots, deleteSlot, flushPending, persistStorage, SLOTS } from './save.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.round(n).toLocaleString('de-DE');
@@ -325,7 +325,7 @@ function slotRow(info) {
   const m = info.local, r = info.remote;
   const best = m && r ? (r.savedAt > m.savedAt ? r : m) : m || r;
   const when = (x) => new Date(x.savedAt).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
-  const state = r === undefined ? '' : r ? (m && m.savedAt >= r.savedAt ? ' ☁ gesichert' : ' ☁ neuer online') : ' (nicht online)';
+  const state = r === undefined ? '' : !r ? ' ⚠ nicht online gesichert' : !m || r.savedAt > m.savedAt ? ' ☁ neuer online' : m.savedAt === r.savedAt ? ' ☁ gesichert' : ' ⚠ neuester Stand nur auf dem Gerät';
   return `<div class="slot"><h3>Platz ${info.slot}${best ? ' – ' + best.name : ''}</h3>
     <p>${best ? `${MONTHS[best.month]} ${best.year} · 👥 ${fmt(best.pop)} · ${eur(best.money)}<br>${when(best)}${state}` : 'Leer'}</p>
     <div class="acts">${best ? `<button class="btn" data-load="${info.slot}">Laden</button>` : ''}<button class="btn pri" data-new="${info.slot}">Neue Stadt</button>${best ? `<button class="btn dng" data-del="${info.slot}">✕</button>` : ''}</div></div>`;
@@ -431,6 +431,11 @@ function fit() { R.resize(); layoutFab(); needDraw = true; }
 window.addEventListener('resize', fit);
 document.addEventListener('visibilitychange', () => { if (document.hidden) saveNow(false); });
 window.addEventListener('pagehide', () => saveNow(false));
+// Zusätzlich regelmäßig speichern (vorher nur einmal pro Spieljahr) und Ausstehendes nachschicken.
+setInterval(() => { if (S && slot && $('sheet').hidden) saveNow(false); }, 30000);
+setInterval(() => { flushPending(); }, 60000);
+window.addEventListener('online', () => flushPending());
+persistStorage();
 
 // ---------------------------------------------------------------- Start
 fit();

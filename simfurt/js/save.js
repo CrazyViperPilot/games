@@ -112,11 +112,28 @@ export async function loadSlot(slot) {
   let remoteRec = null;
   try { remoteRec = await pullRemote(slot); } catch { /* offline */ }
   let pick = local, source = 'lokal';
-  if (remoteRec && (!local || remoteRec.meta.savedAt > local.meta.savedAt)) { pick = remoteRec; source = 'Webspace'; await writeLocal(slot, remoteRec).catch(() => {}); }
+  if (remoteRec && (!local || remoteRec.meta.savedAt > local.meta.savedAt)) {
+    pick = remoteRec; source = 'Webspace';
+    if (local) await idb('readwrite', (st) => st.put(local, 'slot' + slot + '-bak')).catch(() => {}); // alten Gerätestand aufheben
+    await writeLocal(slot, remoteRec).catch(() => {});
+  }
   else if (local && isPending(slot) && local.bytes) pushRemote(slot, local).then(() => setPending(slot, false)).catch(() => {});
   if (!pick) return null;
   return { state: await recToState(pick), source };
 }
+
+/** Schickt alle noch nicht hochgeladenen Stände an den Webspace. */
+export async function flushPending() {
+  for (const slot of SLOTS) {
+    if (!isPending(slot)) continue;
+    const local = await readLocal(slot);
+    if (!local || !local.bytes) { setPending(slot, false); continue; }
+    try { await pushRemote(slot, local); setPending(slot, false); } catch { /* später nochmal */ }
+  }
+}
+
+/** Bittet den Browser, die lokalen Daten nicht automatisch zu löschen. */
+export function persistStorage() { try { navigator.storage?.persist?.(); } catch { /* egal */ } }
 
 /** Übersicht der drei Plätze: {slot, local, remote}. */
 export async function listSlots(withRemote = true) {
