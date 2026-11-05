@@ -1,6 +1,8 @@
 // Straßentransport (PRD §15 „Straßentransport“, seit v5.19, AP2): Wege über Straßenzellen von Förderung und Werken zu ihren Zielen
 // (Werke, Lager der Hauptstadt), Pendlerwege zur nächsten bewohnten Wohnzelle und Stau je Straßenzelle. Dieses Modul rechnet nur Wege
-// und Stau, es ändert nichts am Spiel. Kein DOM. Der Zustand liegt in einer WeakMap je Stadt und wird nicht gespeichert.
+// und Stau, es ändert nichts am Spiel. Kein DOM. Wege, Lasten und Puffer liegen in einer WeakMap je Stadt und werden nicht gespeichert
+// (sie folgen allein aus dem Stand der Stadt); gespeichert wird nur der geglättete Stau-Faktor je Zelle (c.congestion), damit ein
+// geladener Spielstand genau so weiterläuft wie das Spiel ohne Unterbrechung.
 import { CITY } from '../data/city.js';
 import { KINDS, KIND_ID, KIND_NAME, DEPOSITS, isPart, roadAt, accessCells, cellRect } from './city.js';
 
@@ -20,6 +22,9 @@ let QUEUE = new Int32Array(0);
 
 /** Zustand je Stadt (WeakMap), nicht im Spielstand. */
 const STATE = new WeakMap();
+
+/** Abstand zu 1, ab dem ein Stau-Faktor ohne Last als frei gilt (Rechengenauigkeit, kein Spielwert). */
+const FREE_EPS = 1e-4;
 
 /** Gruppen der Breitensuche-Felder, die transportOf anlegt. */
 const GROUPS = ['bm', 'smelter', 'steel', 'oil', 'res', 'main'];
@@ -104,16 +109,38 @@ export function pathEff(tr, path) {
   return m;
 }
 
-/** Last `amount` (Einheiten je s) auf alle Zellen des Weges legen. Kein Weg (null): nichts. */
+/** Last `amount` (Einheiten je s) auf alle Zellen des Weges legen. Kein Weg (null): nichts. Merkt die Zellen in der Liste `active`. */
 export function addLoad(tr, path, amount) {
   if (!path) return;
-  for (let k = 0; k < path.length; k++) tr.load[path[k]] += amount;
+  const { load, on, active } = tr;
+  for (let k = 0; k < path.length; k++) {
+    const i = path[k];
+    if (!on[i]) {
+      on[i] = 1;
+      active[tr.nActive++] = i;
+    }
+    load[i] += amount;
+  }
 }
 
-/** Last aller Straßenzellen auf 0 setzen (zu Beginn jedes Schritts). */
+/**
+ * Last auf 0 setzen (zu Beginn jedes Schritts). Nur die Zellen der Liste `active` (mit Last oder Stau) tragen etwas, so läuft der
+ * Schritt nicht über alle Straßen der Karte.
+ */
 export function beginLoads(tr) {
-  const list = tr.list;
-  for (let k = 0; k < list.length; k++) tr.load[list[k]] = 0;
+  const { load, active } = tr;
+  for (let k = 0; k < tr.nActive; k++) load[active[k]] = 0;
+}
+
+/** Kleinster Stau-Faktor der Zellen, die in diesem Schritt Last tragen (1 ohne Last). */
+export function minFactor(tr) {
+  const { load, factor, active } = tr;
+  let m = 1;
+  for (let k = 0; k < tr.nActive; k++) {
+    const i = active[k];
+    if (load[i] > 0 && factor[i] < m) m = factor[i];
+  }
+  return m;
 }
 
 /**
@@ -123,14 +150,21 @@ export function beginLoads(tr) {
 export function settleLoads(tr, dt) {
   const smooth = CITY.transport.smooth;
   const k = smooth > 0 ? Math.min(1, dt / smooth) : 1;
-  const list = tr.list;
-  for (let m = 0; m < list.length; m++) {
-    const i = list[m];
-    const L = tr.load[i];
+  const { load, factor, active, on } = tr;
+  let w = 0;
+  for (let m = 0; m < tr.nActive; m++) {
+    const i = active[m];
+    const L = load[i];
     const cap = tr.cap[i];
     const target = L > cap ? cap / L : 1;
-    tr.factor[i] += (target - tr.factor[i]) * k;
+    let f = factor[i] + (target - factor[i]) * k;
+    // ohne Last und fast frei: ganz frei und aus der Liste (sonst bliebe der Wert in Float32 knapp unter 1 hängen)
+    if (L === 0 && f > 1 - FREE_EPS) f = 1;
+    factor[i] = f;
+    if (L === 0 && f === 1) on[i] = 0;
+    else active[w++] = i;
   }
+  tr.nActive = w;
 }
 
 /**
@@ -147,11 +181,18 @@ export function mainAccess(game, c) {
   const y0 = m.cy * T - e;
   const y1 = (m.cy + m.h) * T + e;
   const out = [];
-  const n = c.cols * c.rows;
-  for (let i = 0; i < n; i++) {
-    if (!roadAt(c, i)) continue;
-    const r = cellRect(c, i % c.cols, Math.floor(i / c.cols));
-    if (r.x0 < x1 && r.x1 > x0 && r.y0 < y1 && r.y1 > y0) out.push(i);
+  // nur der Zellbereich um das Rechteck (die genaue Prüfung folgt je Zelle)
+  const q0 = Math.max(0, Math.floor((x0 - c.x0) / c.cell) - 1);
+  const q1 = Math.min(c.cols - 1, Math.floor((x1 - c.x0) / c.cell) + 1);
+  const r0 = Math.max(0, Math.floor((y0 - c.y0) / c.cell) - 1);
+  const r1 = Math.min(c.rows - 1, Math.floor((y1 - c.y0) / c.cell) + 1);
+  for (let row = r0; row <= r1; row++) {
+    for (let col = q0; col <= q1; col++) {
+      const i = row * c.cols + col;
+      if (!roadAt(c, i)) continue;
+      const r = cellRect(c, col, row);
+      if (r.x0 < x1 && r.x1 > x0 && r.y0 < y1 && r.y1 > y0) out.push(i);
+    }
   }
   return out;
 }
@@ -159,6 +200,8 @@ export function mainAccess(game, c) {
 /** Neuen Zustand anlegen: Typed Arrays je Zelle, einmal (Feld-Puffer und Last/Stau werden wiederverwendet). */
 function newTransport(c) {
   const n = c.cols * c.rows;
+  // Stau-Faktor je Zelle: liegt in der Stadt (gespeichert, createTeamCity/migrateCity); fehlt er (Teststädte), eigener Puffer
+  const factor = c.congestion?.length === n ? c.congestion : new Float32Array(n).fill(1);
   const fields = {};
   for (const g of GROUPS) fields[g] = { dist: new Int32Array(n), prev: new Int32Array(n), owner: new Int32Array(n) };
   return {
@@ -167,9 +210,12 @@ function newTransport(c) {
     mun: new Map(),
     shop: new Map(),
     load: new Float32Array(n),
-    factor: new Float32Array(n).fill(1),
+    factor,
     cap: new Float32Array(n),
     list: new Int32Array(0), // Straßenzellen mit Kapazität
+    active: new Int32Array(n), // Straßenzellen mit Last oder Stau (die ersten nActive), nur sie rechnet der Schritt
+    nActive: 0,
+    on: new Uint8Array(n), // 1 = Zelle steht in active
     fields,
   };
 }
@@ -196,11 +242,22 @@ function build(game, c, tr) {
   const capRoad = CITY.transport.cap;
   const capMap = CITY.transport.mapCap;
   let count = 0;
+  tr.nActive = 0;
   for (let i = 0; i < n; i++) {
     const own = c.kind[i] === KIND_ID.road;
     tr.cap[i] = own ? capRoad : c.mapRoads?.[i] ? capMap : 0;
-    if (tr.cap[i] > 0) count++;
-    else tr.factor[i] = 1;
+    if (tr.cap[i] > 0) {
+      count++;
+      // Liste der Zellen mit Last oder Stau neu (auch nach dem Laden eines Spielstands: Stau-Faktor < 1)
+      if (tr.on[i] || tr.factor[i] < 1) {
+        tr.on[i] = 1;
+        tr.active[tr.nActive++] = i;
+      }
+    } else {
+      tr.factor[i] = 1; // keine Straße (mehr): frei
+      tr.load[i] = 0;
+      tr.on[i] = 0;
+    }
   }
   tr.list = new Int32Array(count);
   let m = 0;
@@ -240,32 +297,32 @@ function build(game, c, tr) {
 }
 
 /**
- * Transportzustand der Stadt eines Teams (lazy, je Stadt eine WeakMap). Neu berechnet, wenn sich c.ver, die Hauptstadt oder
- * c.mapRoads ändern oder seit der letzten Berechnung mindestens CITY.transport.reroute s vergangen sind (Zeit: game.time).
- * Liefert { routes, commute, mun, shop, load, factor, cap, list }:
+ * Transportzustand der Stadt eines Teams (lazy, je Stadt eine WeakMap). Neu berechnet nur, wenn sich c.ver (Bau, Abriss, Wachstum,
+ * Ruinen, seit v5.19 auch Flucht und Rückkehr der Bewohner), die Hauptstadt oder c.mapRoads ändern. Die Wege hängen nur vom Stand der
+ * Stadt ab: ein geladener Spielstand ergibt dieselben Wege, und Aufrufe der Anzeige ändern nichts am Spiel.
+ * Liefert { routes, commute, mun, shop, load, factor, cap, list, active, nActive }:
  *   routes:  Map<Anker, { to: Anker | 'main' | null, path: Int32Array | null, dist }>  Lieferweg je Förderung und Werk
  *   commute: Map<Anker, Int32Array | null>  Pendlerweg je Arbeitsstätte (null = kein Wohnen erreichbar)
  *   mun:     Map<Anker, Int32Array | null>  Weg Munitionswerk → Lager
  *   shop:    Map<Anker, Int32Array | null>  Weg Gewerbe/Markt → Lager
- *   load, factor, cap: Float32Array je Stadtzelle; list: Int32Array der Straßenzellen
+ *   load, factor, cap: Float32Array je Stadtzelle (factor = c.congestion); list: Int32Array der Straßenzellen;
+ *   active (die ersten nActive): Straßenzellen mit Last oder Stau
  * `dist` = Anzahl der Straßenzellen auf dem Weg (0, wenn es kein Ziel gibt).
  */
 export function transportOf(game, c) {
   const main = game.mainFob(c.team);
-  const now = game.time;
   let st = STATE.get(c);
   if (!st) {
-    st = { tr: newTransport(c), built: false, ver: -1, main: null, mapRoads: undefined, time: 0 };
+    st = { tr: newTransport(c), built: false, ver: -1, main: null, mapRoads: undefined };
     STATE.set(c, st);
   }
-  const fresh = st.built && st.ver === c.ver && st.main === main && st.mapRoads === c.mapRoads && now >= st.time && now - st.time < CITY.transport.reroute;
+  const fresh = st.built && st.ver === c.ver && st.main === main && st.mapRoads === c.mapRoads;
   if (!fresh) {
     build(game, c, st.tr);
     st.built = true;
     st.ver = c.ver;
     st.main = main;
     st.mapRoads = c.mapRoads;
-    st.time = now;
   }
   return st.tr;
 }

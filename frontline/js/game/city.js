@@ -9,7 +9,7 @@ import { makeRng } from '../core/rng.js';
 import { blockers } from './mapdata.js';
 import { RELIEF } from './relief.js';
 import { bridgeUnder } from './river.js';
-import { transportOf, transportInfo, pathEff, addLoad, beginLoads, settleLoads, mainAccess } from './transport.js';
+import { transportOf, transportInfo, pathEff, addLoad, beginLoads, settleLoads, minFactor, mainAccess } from './transport.js';
 
 /** Zellenarten (Code im Raster): 0 leer. Neue Arten nur hinten anhängen (Code = Index + 1). */
 export const KINDS = ['road', 'res', 'com', 'bm', 'mun', 'fuel', 'steel', 'mine', 'market', 'power', 'uni', 'dc', 'barracks', 'factory', 'heliport', 'hospital', 'airport', 'smelter', 'kero'];
@@ -340,6 +340,7 @@ function createTeamCity(game, team, shared) {
     part: new Int32Array(n), // Großbau (seit v5.00): Mittelzelle + 1 für jede seiner Zellen, 0 = Einzelzelle
     timer: new Float32Array(n), // Wachstumszeit der Zelle
     flee: new Float32Array(n), // > 0: Bewohner geflohen, Ruhezeit bis zur Rückkehr (s)
+    congestion: new Float32Array(n).fill(1), // Stau-Faktor je Straßenzelle (seit v5.19, transport.js): 1 frei, geglättet, wird gespeichert
     claim: new Uint8Array(n), // 1 = eigenes Gebiet
     claimVer: 0, // zählt hoch, wenn sich das Gebiet ändert (Darstellung)
     claimTimer: 0,
@@ -601,7 +602,9 @@ export function cityNoise(game, x, y) {
       for (let q = cc - R; q <= cc + R; q++) {
         if (q < 0 || q >= c.cols) continue;
         const i = r * c.cols + q;
-        if (c.inZone[i] && c.kind[i] === KIND_ID.res && c.level[i]) c.flee[i] = CITY.flee.calm;
+        if (!c.inZone[i] || c.kind[i] !== KIND_ID.res || !c.level[i]) continue;
+        if (c.flee[i] === 0) c.ver++; // Bewohner fliehen: Pendlerziele ändern sich (transport.js rechnet die Wege neu, seit v5.19)
+        c.flee[i] = CITY.flee.calm;
       }
     }
   }
@@ -760,7 +763,8 @@ function placeBig(game, team, c, kind, col, row) {
 export function migrateCity(game) {
   if (!game.city) return;
   for (const c of game.city) {
-    c.kero ??= 0; // Kerosin im Stadtlager (seit v5.19)
+    c.kero ??= CITY.startKero; // Kerosin im Stadtlager (seit v5.19): alte Stände bekommen den Startvorrat, F-16 tanken jetzt Kerosin
+    c.congestion ??= new Float32Array(c.kind.length).fill(1); // Stau-Faktor je Zelle (seit v5.19)
     c.part ??= new Int32Array(c.kind.length);
     if (c.mapRoads === undefined) c.mapRoads = game.roads?.kind ?? null; // vor v5.03: Stadtstraßen der Karte
     let changed = false;
@@ -1119,13 +1123,13 @@ function dropEntity(game, c, i) {
   trainersOf(c).delete(e);
 }
 
-/** Arbeitsspeicher je Stadt (einmal angelegt, kein Allokieren im Schritt): Eingang je Gebäude und Wirkung je Gebäude. */
+/** Arbeitsspeicher je Stadt (einmal angelegt, kein Allokieren im Schritt): Eingang und Wirkung je Gebäude, Liste der fertigen Gebäude. */
 const SCRATCH = new WeakMap();
 function scratchOf(c) {
   let w = SCRATCH.get(c);
   if (!w) {
     const n = c.cols * c.rows;
-    w = { arr: new Float64Array(n), eff: new Float64Array(n) };
+    w = { arr: new Float64Array(n), eff: new Float64Array(n), anchors: new Int32Array(n) };
     SCRATCH.set(c, w);
   }
   return w;
@@ -1155,7 +1159,11 @@ export function updateCity(game, dt) {
       c.claimTimer = 0;
       updateClaim(game, c);
     }
-    for (const i of c.list) if (c.flee[i] > 0) c.flee[i] = Math.max(0, c.flee[i] - dt);
+    for (const i of c.list) {
+      if (!(c.flee[i] > 0)) continue;
+      c.flee[i] = Math.max(0, c.flee[i] - dt);
+      if (c.flee[i] === 0) c.ver++; // Bewohner zurück: wieder Pendlerziel (seit v5.19)
+    }
 
     // Zerstörte Gebäude werden Ruinen: Zelle frei, nach CITY.ruinTime wächst sie neu (Wiederaufbau)
     for (const [i, e] of c.ents) {
@@ -1251,7 +1259,14 @@ export function updateCity(game, dt) {
     const W = scratchOf(c);
     const eff = W.eff;
     const arr = W.arr; // Ankunft am Eingang je Gebäude (Rate je s), nur für Werke und Förderung gelesen
-    arr.fill(0);
+    // Fertige Gebäude (Anker, ohne Straßen und Teile von Großbauten) einmal sammeln; nur sie rechnen die Schleifen unten
+    const anchors = W.anchors;
+    let nA = 0;
+    for (const i of c.list) {
+      if (!c.level[i] || isPart(c, i) || c.kind[i] === KIND_ID.road) continue;
+      anchors[nA++] = i;
+      arr[i] = 0; // Lieferziele sind fertige Gebäude (Anker)
+    }
     beginLoads(tr);
     const main = game.mainFob(id);
     const credit = !!main?.built; // Lager der Hauptstadt steht (sonst gehen Waren zum Lager verloren)
@@ -1260,9 +1275,9 @@ export function updateCity(game, dt) {
     let shopJ = 0; // Arbeiter in Gewerbe und Markt
     let shopV = 0; // Arbeiter × v (Versorgung)
     let shopTake = 0; // Baumaterial, das in diesem Schritt aus dem Lager geht
-    for (const i of c.list) {
+    for (let m = 0; m < nA; m++) {
+      const i = anchors[m];
       const lv = c.level[i];
-      if (!lv || isPart(c, i)) continue;
       const k = KINDS[c.kind[i] - 1];
       if (k !== 'com' && k !== 'market') continue;
       const workers = jobsOf(c, i, k, lv) * fill;
@@ -1297,11 +1312,10 @@ export function updateCity(game, dt) {
     s.dc = t.dc;
     // eff_b = Besetzung × Strom × Zufriedenheit × Pendlerwirkung des Gebäudes (kein Pendlerweg: 0)
     const base = fill * s.powerRatio * mood;
-    for (const i of c.list) {
+    for (let m = 0; m < nA; m++) {
+      const i = anchors[m];
       const lv = c.level[i];
-      if (!lv || isPart(c, i)) continue;
       const k = KINDS[c.kind[i] - 1];
-      if (k === 'road') continue;
       let pend = 1;
       if (tr.commute.has(i)) {
         // Arbeitsstätte: Pendler laufen über den Pendlerweg zur nächsten Wohnung (Last), die Arbeit wirkt mit dessen Stau
@@ -1315,9 +1329,11 @@ export function updateCity(game, dt) {
     const Y = CITY.yield;
     const K = CITY.convert;
     // Förderung: Rohstoff je Förderanlage, Fluss zum nächsten Ziel (Werk); ohne Weg geht er verloren
-    for (const i of c.list) {
+    const MINE = KIND_ID.mine;
+    for (let m = 0; m < nA; m++) {
+      const i = anchors[m];
+      if (c.kind[i] !== MINE) continue;
       const lv = c.level[i];
-      if (!lv || isPart(c, i) || KINDS[c.kind[i] - 1] !== 'mine') continue;
       const d = DEPOSITS[c.deposit[i] - 1];
       if (!d) continue;
       const roh = CITY.jobsMine[lv] * eff[i] * CITY.extract[d];
@@ -1331,9 +1347,11 @@ export function updateCity(game, dt) {
     // Werke in Kettenfolge (Hütte → Stahlwerk, dann BM, Raffinerien): Ausstoß = min(Leistung, Eingang / Verbrauch), Fluss zum Ziel
     for (const k of WORK_ORDER) {
       const prod = CITY.chain[k].to;
-      for (const i of c.list) {
+      const kid = KIND_ID[k];
+      for (let m = 0; m < nA; m++) {
+        const i = anchors[m];
+        if (c.kind[i] !== kid) continue;
         const lv = c.level[i];
-        if (!lv || isPart(c, i) || KINDS[c.kind[i] - 1] !== k) continue;
         const cap = CITY.jobs[lv] * eff[i] * Y[prod]; // Leistung je s
         const inp = arr[i] / K[prod]; // Produkt je s, das der Eingang hergibt
         const out = Math.min(cap, inp);
@@ -1368,13 +1386,15 @@ export function updateCity(game, dt) {
     const stock = c.metal / Math.max(dt, 1e-6); // Stahl je s im Stadtlager
     s.inp.mun = stock / K.mun;
     let drawn = 0; // Stahl je s, den die Munitionswerke ziehen
-    for (const i of c.list) {
+    const MUN = KIND_ID.mun;
+    for (let m = 0; m < nA; m++) {
+      const i = anchors[m];
+      if (c.kind[i] !== MUN) continue;
       const lv = c.level[i];
-      if (!lv || isPart(c, i) || KINDS[c.kind[i] - 1] !== 'mun') continue;
       const cap = CITY.jobs[lv] * eff[i] * Y.mun; // Munition je s
       s.cap.mun += cap;
       const p = tr.mun.get(i) ?? null;
-      if (!p) continue; // ohne Weg zum Lager: kein Stahl, keine Munition
+      if (!p || !credit) continue; // ohne Weg zum Lager (oder ohne fertiges Lager): kein Stahl, keine Munition
       const bed = Math.min(cap * K.mun, Math.max(0, stock - drawn));
       const w = pathEff(tr, p);
       addLoad(tr, p, bed);
@@ -1393,12 +1413,7 @@ export function updateCity(game, dt) {
       made.mun += Math.max(0, main.store.mun - v0);
     }
     // Stau: kleinster Stau-Faktor auf den in diesem Schritt benutzten Straßen (1 ohne Stau), dann Glättung für den nächsten Schritt
-    let jam = 1;
-    for (let m = 0; m < tr.list.length; m++) {
-      const j = tr.list[m];
-      if (tr.load[j] > 0 && tr.factor[j] < jam) jam = tr.factor[j];
-    }
-    s.jam = jam;
+    s.jam = minFactor(tr);
     settleLoads(tr, dt);
     s.money = (pool * CITY.taxPop + shopW * CITY.taxCom) * mood; // Gewerbe-Steuer nur nach Versorgung (shopW)
     c.stats = s;
@@ -1906,7 +1921,11 @@ function aiNeed(game, c, add, skip = null) {
   const free = c.stats.free ?? 0;
   // Strom, Universität, Rechenzentrum (seit v4.88) nach Bedarf
   const st = c.stats;
-  if (st.powerSupply + (add.power ?? 0) * CITY.power.supply[1] < st.powerUse * A.powerMargin + 10 && (add.power ?? 0) < 1 && !skip?.has('power')) return 'power';
+  // Seit v5.19: Angebot bei voller Besetzung (fehlen nur Arbeiter, hilft ein weiteres Kraftwerk nicht, es braucht selbst welche)
+  const supplyFull = CITY.power.base + t.power;
+  if (supplyFull + (add.power ?? 0) * CITY.power.supply[1] < st.powerUse * A.powerMargin + 10 && (add.power ?? 0) < 1 && !skip?.has('power')) return 'power';
+  // Wohnen zuerst (seit v5.19), wenn Arbeitsstätten keine Wohnung über die Straße erreichen (Pendler) oder Arbeiter fehlen
+  if (!skip?.has('res') && count.res <= work * 2 && ((st.fill ?? 1) < A.lowFill || homeless(game, c))) return 'res';
   // Ausbildungsgebäude (seit v4.96): ohne sie keine Truppen; Heliport erst mit einer Arbeitsstätte
   const more = work >= A.moreFrom ? 1 : 0;
   for (const [k, n] of Object.entries(A.producers)) {
@@ -1914,6 +1933,16 @@ function aiNeed(game, c, add, skip = null) {
     if (skip?.has(k)) continue; // Großbau ohne Platz in diesem Takt (seit v5.03 auch Kaserne und Fabrikhalle)
     if (count[k] < n + (k === 'heliport' ? 0 : more)) return k;
   }
+  // Grundketten zuerst (seit v5.19), vor Krankenhaus und Universität (sonst spart die KI minutenlang für diese und kauft solange teuer
+  // am Markt): ein BM-Werk, wenn Holz oder Stein im Gebiet liegt; Hütte und Stahlwerk, wenn Stahl knapp ist und Erz im Gebiet liegt.
+  // Förderanlagen entstehen erst mit ihrem Werk (depositCells).
+  if (count.bm === 0 && !skip?.has('bm') && (depositInClaim(c, 'wood') || depositInClaim(c, 'stone'))) return 'bm';
+  if (c.metal < A.lowMetal && depositInClaim(c, 'ore')) {
+    if (count.smelter === 0 && !skip?.has('smelter')) return 'smelter';
+    if (count.steel < count.smelter && !skip?.has('steel')) return 'steel';
+  }
+  // … und ein Munitionswerk, sobald Stahl entsteht (Kette Erz → Stahl → Munition)
+  if (count.steel > 0 && count.mun === 0 && !skip?.has('mun')) return 'mun';
   if (!count.hospital && work >= A.hospitalFrom && !skip?.has('hospital')) return 'hospital';
   if (!count.uni && work >= A.uniFrom && !skip?.has('uni')) return 'uni';
   if (!count.dc && count.uni && work >= A.dcFrom && !skip?.has('dc')) return 'dc';
@@ -1937,6 +1966,9 @@ function aiNeed(game, c, add, skip = null) {
     // Hütte und Stahlwerk als Paar (seit v5.19): je Hütte ein Stahlwerk, das danach kommt; ein Stahlwerk nie ohne Hütte davor
     if (k === 'steel' && count.steel >= count.smelter) continue;
     if (k === 'smelter' && count.smelter > count.steel) continue;
+    // Kerosin-Raffinerie nur, wenn Kerosin knapp wird (seit v5.19): Öl fährt zur nächsten Raffinerie, eine Kerosin-Raffinerie auf Vorrat
+    // nähme der Treibstoff-Raffinerie das Öl weg
+    if (k === 'kero' && !low.kero) continue;
     const r = count[k] / (w * (low[k] ? A.boost : 1));
     if (r < lo) {
       lo = r;
@@ -1944,6 +1976,25 @@ function aiNeed(game, c, add, skip = null) {
     }
   }
   return best ?? 'res';
+}
+
+/** Hat eine fertige Arbeitsstätte keinen Pendlerweg zu einer Wohnung (transport.js)? */
+function homeless(game, c) {
+  for (const p of transportOf(game, c).commute.values()) if (p === null) return true;
+  return false;
+}
+
+/** Liegt ein Vorkommen der Sorte d (DEPOSITS) im eigenen Gebiet? Zwischengespeichert je Stand des Gebiets (c.claimVer), nicht im Spielstand. */
+const DEPOSIT_CACHE = new WeakMap();
+function depositInClaim(c, d) {
+  let hit = DEPOSIT_CACHE.get(c);
+  if (!hit || hit.ver !== c.claimVer) {
+    const has = new Uint8Array(DEPOSITS.length + 1);
+    for (let i = 0; i < c.deposit.length; i++) if (c.deposit[i] && c.claim[i]) has[c.deposit[i]] = 1;
+    hit = { ver: c.claimVer, has };
+    DEPOSIT_CACHE.set(c, hit);
+  }
+  return !!hit.has[DEPOSITS.indexOf(d) + 1];
 }
 
 /** Liegt die Zelle nahe einem frischen Treffer auf die eigene Stadt? */
@@ -2029,41 +2080,21 @@ export function aiCity(game, team, difficulty) {
       // nur neben einer (geplanten) Straße
       if (!hasRoad(city, cand.col, cand.row)) return;
       kind = aiNeed(game, city, add, skip);
-      if (WORKS.includes(kind)) {
-        const a = workSpot(kind);
-        if (a < 0) {
-          skip.add(kind);
-          return;
-        }
-        col = a % city.cols;
-        row = Math.floor(a / city.cols);
-        if (money() < CITY.cost[kind] + reserve) {
-          n = -Infinity;
-          return;
-        }
-        const r = game.issue(team, { type: 'city', kind, c0: col, r0: row, c1: col, r1: row });
-        if (!r.ok) skip.add(kind);
-        else {
-          add[kind] = (add[kind] ?? 0) + 1;
-          n++;
-        }
-        return;
-      }
-      // Großbau (Universität, Kraftwerk, Kaserne, Fabrikhalle, Flughafen): Quadrat mit dieser Zelle am Rand, ohne Vorkommen und
-      // Gefahr; passt er hier nicht, gilt er für diesen Takt als ohne Platz und es kommt das Nächste (auch ein anderer Großbau)
+      // Großbau (Werke 2 × 2, Kraftwerk, Universität, Kaserne, Fabrikhalle, Krankenhaus …, seit v5.19 AP4): Platz über workSpot, zuerst
+      // an einer Straße zum Lager; ohne Platz gilt die Art für diesen Takt als ohne Platz und es kommt die nächste (bis zu 8 Versuche).
+      // Vorher blieb ein Großbau ohne Platz an dieser Zelle stehen, und jede weitere Zelle des Takts wählte ihn erneut.
+      let spot = -1;
       for (let tries = 0; sizeOf(kind) > 1 && tries < 8; tries++) {
-        const a = fitBig(game, city, cand.col, cand.row, kind, (j) => !city.kind[j] && !city.deposit[j] && !inDanger(city, j % city.cols, Math.floor(j / city.cols), game.time));
-        if (a >= 0) {
-          col = a % city.cols;
-          row = Math.floor(a / city.cols);
-          break;
-        }
+        spot = workSpot(kind);
+        if (spot >= 0) break;
         skip.add(kind);
         kind = aiNeed(game, city, add, skip);
       }
-      if (sizeOf(kind) > 1 && col === cand.col && row === cand.row && fitBig(game, city, cand.col, cand.row, kind) < 0) return;
-      // Großbauten nur an einer Straße zum Lager (seit v5.19, AP4): an unverbundenen Straßen bliebe die Ware liegen
-      if (sizeOf(kind) > 1 && !touchesRoad(city, cand.i, reach)) return;
+      if (sizeOf(kind) > 1) {
+        if (spot < 0) return;
+        col = spot % city.cols;
+        row = Math.floor(spot / city.cols);
+      }
     }
     if (money() < CITY.cost[kind] + reserve) {
       n = -Infinity; // Geld reicht nicht: Schluss für diesen Takt

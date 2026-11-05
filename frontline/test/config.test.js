@@ -125,5 +125,5 @@ test('Stadt (v5.19): Zellenarten stabil, Hütte und Kerosin-Raffinerie vollstän
   for (const g of GOODS) assert.ok(CITY.market.sell[g] > 0 && CITY.market.buy[g] > 0, `Markt: Preis für ${g} fehlt`);
   assert.ok(CITY.ai.lowKero > 0, 'ai.lowKero');
   const t = CITY.transport;
-  for (const f of ['cap', 'mapCap', 'commute', 'maxDist', 'reroute', 'smooth']) assert.ok(positive(t[f]), `CITY.transport.${f}`);
+  for (const f of ['cap', 'mapCap', 'commute', 'maxDist', 'smooth']) assert.ok(positive(t[f]), `CITY.transport.${f}`);
 });

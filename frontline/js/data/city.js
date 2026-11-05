@@ -93,9 +93,10 @@ export const CITY = {
 
   // ---- Straßentransport (seit v5.19, Werte für AP2/AP3; PRD §15 „Straßentransport“) ----
   // cap: Einheiten je s, die eine eigene Straßenzelle trägt; mapCap: Stadtstraßen der Karte. commute: Last je Arbeiter zum Wohnen (je s).
-  // maxDist: längster Weg in Zellen (weiter = kein Ziel); reroute: s zwischen den Wegeberechnungen; smooth: s, bis der Stau-Faktor folgt.
+  // maxDist: längster Weg in Zellen (weiter = kein Ziel); smooth: s, bis der Stau-Faktor folgt. Die Wege werden neu gerechnet, sobald sich
+  // die Stadt ändert (Bau, Abriss, Wachstum, Ruinen, Flucht der Bewohner), nicht nach Zeit (seit dem Review von v5.19, vorher reroute 3 s).
   // connectMax (seit v5.19, AP4): längster neuer Anschluss an die Straße zum Lager in Zellen (Startviertel und KI, connectRoad in city.js).
-  transport: { cap: 12, mapCap: 20, commute: 0.05, maxDist: 160, reroute: 3, smooth: 2, connectMax: 30 },
+  transport: { cap: 12, mapCap: 20, commute: 0.05, maxDist: 160, smooth: 2, connectMax: 30 },
 
   // ---- Wissen (seit v4.88, Stufe 5) ----
   // Seit v5.04: ohne fertige Universität ruht jede Forschung (eine reicht, ihre Stufe zählt nicht). Rechenzentren beschleunigen sie:
@@ -155,6 +156,7 @@ export const CITY = {
     lowMetal: 300, // Stahl darunter = knapp
     lowKero: 200, // Kerosin im Stadtlager darunter = knapp (seit v5.19)
     lowFree: 8, // freie Einwohner darunter = Wohnen knapp
+    lowFill: 0.8, // seit v5.19: Anteil besetzter Arbeitsplätze darunter = Wohnen zuerst (auch, wenn eine Arbeitsstätte keine Wohnung über die Straße erreicht)
     lowMoney: 400, // Geld darunter = Gewerbe knapp
     boost: 4, // so viel stärker zählt eine knappe Zone
     dangerTime: 90, // s, so lange meidet sie Zellen nahe einem Treffer auf ihre Stadt

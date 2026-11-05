@@ -85,7 +85,7 @@ Darunter listet ein Inhaltsverzeichnis alle weiteren Abschnitte.
 | Festung (Mauerring, Zahl der Türme, Höhenvorteil, Fallschaden) / Turm (Plätze, Dachaufbauten, Preise) | balance.js / buildings.js | `BALANCE.fortress` / `BUILDINGS.tower` |
 | Stadt: Ausbildungsgebäude (`produces`, `trainSlots`), Heilen/Reparieren und Krankenhaus (`care`), Zellgröße, Gebiet, Einwohner je Einheit (`crew`), Flucht, Vorkommen, Förderung, Verarbeitung (Hütte, Stahlwerk, Kerosin-Raffinerie), Stahl je Einheit, Markt, Straßentransport (`transport`, `shop`), Trefferpunkte, Ruinen, Startlager, Erträge, Steuern, Kosten, Wachstum, KI | js/data/city.js | `CITY` |
 | Ressourcenkette der Flussanzeige (welches Werk macht aus was was) | js/data/city.js | `CITY.chain` (Regel 11) |
-| Straßentransport: Kapazität je Straßenzelle, Pendler, Stau-Glättung, längster Lieferweg, Neuberechnung der Wege, Anschlusslänge der KI | js/data/city.js | `CITY.transport` (`cap`, `mapCap`, `commute`, `maxDist`, `reroute`, `smooth`, `connectMax`) |
+| Straßentransport: Kapazität je Straßenzelle, Pendler, Stau-Glättung, längster Lieferweg, Anschlusslänge der KI | js/data/city.js | `CITY.transport` (`cap`, `mapCap`, `commute`, `maxDist`, `smooth`, `connectMax`) |
 | Gewerbe-Absatz: Steuer je Arbeiter, Baumaterial-Bedarf, Anteil ohne Versorgung, eigene Nachfrage | js/data/city.js | `CITY.taxCom`, `CITY.shop` (`need`, `base`, `per`) |
 | Kerosin: Startvorrat im Stadtlager, Markt, Tanken der Hubschrauber am Heliport | js/data/city.js | `CITY.startKero`, `CITY.market`, `CITY.care.refuel` |
 | Hütte und Kerosin-Raffinerie: Größe, Preis, Strom, Ausbeute, Umwandlung | js/data/city.js | `CITY.size`, `CITY.cost`, `CITY.power.use`, `CITY.yield`, `CITY.convert` |

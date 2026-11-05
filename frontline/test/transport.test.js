@@ -144,7 +144,7 @@ test('Lager-Anschluss: Straße bis an die Hauptstadt macht mainAccess nicht leer
   assert.equal(transportInfo(g, c, bmAnchor).to, 'Lager');
 });
 
-test('Cache: nach Bau wird neu berechnet, sonst bleibt der Stand bis reroute s', () => {
+test('Cache: nach Bau wird neu berechnet, ohne Änderung bleibt der Stand (auch nach Zeit), Rückkehr Geflohener rechnet neu', () => {
   const g = new Game({ seed: 3, city: true, startMoney: 5000 });
   put(g, 'road', 0, 0, 1, 0); // Straße nur bis Spalte 1
   put(g, 'smelter', 0, 1, 1, 2);
@@ -162,9 +162,20 @@ test('Cache: nach Bau wird neu berechnet, sonst bleibt der Stand bis reroute s',
   // ohne Änderung und ohne Zeitablauf: derselbe Stand
   const routes2 = tr2.routes;
   assert.equal(transportOf(g, c).routes, routes2);
-  // nach mindestens reroute s: neu berechnet
-  run(g, CITY.transport.reroute + 0.5);
-  assert.notEqual(transportOf(g, c).routes, routes2, 'nach reroute s neu berechnet');
+  // Zeit allein rechnet nicht neu (seit dem Review von v5.19): die Wege hängen nur vom Stand der Stadt ab
+  g.time += 100;
+  assert.equal(transportOf(g, c).routes, routes2, 'ohne Änderung derselbe Stand');
+  // Wohnung an der Straße, deren Bewohner geflohen sind: kein Pendlerziel; kehren sie zurück (c.ver), ist sie wieder eins
+  put(g, 'res', 4, 1, 4, 1);
+  const home = finish(g, 4, 1);
+  c.flee[home] = 0.01;
+  c.ver++; // wie cityNoise beim Beginn der Flucht
+  assert.equal(transportInfo(g, c, hut).noHome, true, 'geflohen: keine Wohnung erreichbar');
+  const routes3 = transportOf(g, c).routes;
+  g.update(0.05); // Ruhezeit läuft ab: Bewohner zurück
+  assert.equal(c.flee[home], 0);
+  assert.notEqual(transportOf(g, c).routes, routes3, 'nach der Rückkehr neu berechnet');
+  assert.equal(transportInfo(g, c, hut).noHome, false, 'Wohnung wieder Pendlerziel');
 });
 
 // ---- Rechnung je Gebäude (seit v5.19, AP3, PLAN 1.4): Straßen zum Lager, Pendler, Stau, Kerosin ----
