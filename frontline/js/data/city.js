@@ -125,7 +125,7 @@ export const CITY = {
   // ---- Fliegerhorst (seit v5.35, PRD §15 „Fliegerhorst“; Logik js/game/aircraft.js) ----
   // Start-/Landebahn: Zellen wie Straßen (sofort fertig); in jeder Gruppe Bahnzellen ist der längste gerade Streifen runwayWidth breit die
   // Bahn, wenn er mindestens runwayMin lang ist (waagrecht oder senkrecht), der Rest Rollfeld (seit v5.37; dazu Werkzeug „Rollfeld“ taxi). Jeder Start und jede Landung sperrt die Bahn sep s, mit Tower im Umkreis atcRadius Zellen sepAtc s.
-  // Stellplatz (2 × 2): je ein Flugzeug, bildet es aus; Schaden an einem abgestellten Flugzeug × shelter[Stufe] (1 offen, 2 Wälle,
+  // Stellplatz (2 × 2): je ein Flugzeug, bildet es aus; Schaden an einem abgestellten Flugzeug × shelter[Stufe] (1 offen, 2 Überdachung,
   // 3 Stahlbeton). Kerosintank und Munitionslager (2 × 2) werden über die Straße aus dem Stadtlager bzw. dem Lager der Hauptstadt
   // befüllt (fill je s, Stufe × Rate), Flugzeuge auf Stellplätzen im Umkreis supplyRadius Zellen tanken und laden daraus (rate je s).
   air: {
@@ -137,6 +137,12 @@ export const CITY = {
     atcSight: 520, // Sicht (px) des Towers (Radar)
     supplyRadius: 12,
     shelter: [1, 1, 0.5, 0.15],
+    // Ausbau der Stellplätze (seit v5.39, Daniels Wunsch): nicht mehr von selbst, nur über „Ausbauen“ am gewählten Stellplatz.
+    // Stufe 2 Überdachung (Stahldach auf Stützen), Stufe 3 Stahlbeton-Shelter (Hardened Aircraft Shelter); Kosten je Stufe
+    // (Geld, Baumaterial aus dem Lager der Hauptstadt, Stahl aus dem Stadtlager). Die KI baut aus, wenn danach aiReserve Geld bleibt.
+    upgrade: { 2: { money: 300, bm: 150, steel: 0 }, 3: { money: 700, bm: 300, steel: 150 } },
+    upgradeAiReserve: 1200,
+    standName: ['', 'Offener Stellplatz', 'Überdachter Stellplatz', 'Stahlbeton-Shelter'],
     tank: { cap: [0, 300, 600, 1000], rate: [0, 3, 6, 10], fill: [0, 6, 12, 20] }, // Kerosin: Lager, Tanken je s, Befüllen je s
     depot: { cap: [0, 400, 800, 1400], rate: [0, 6, 12, 20], fill: [0, 10, 20, 32] }, // Munition: Lager, Nachladen je s, Befüllen je s
   },

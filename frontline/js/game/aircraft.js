@@ -71,7 +71,7 @@ export const freeSpace = (game, e) => 1 - jetsAt(game, e);
 /** Stufe einer Stadt-Entity (0, wenn weg). */
 const levelOf = (game, e) => (e && game.city?.[e.team] ? game.city[e.team].level[e.cityCell] : 0);
 
-/** Schadensfaktor für einen abgestellten Jet auf seinem Stellplatz (1 offen, Wälle, Stahlbeton; CITY.air.shelter). */
+/** Schadensfaktor für einen abgestellten Jet auf seinem Stellplatz (1 offen, Überdachung, Stahlbeton-Shelter; CITY.air.shelter). */
 export function parkedArmor(game, u) {
   if (!u.parked || !u.def?.jet) return 1;
   return AIR.shelter[levelOf(game, game.getEntity(u.jet?.home))] ?? 1;

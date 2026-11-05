@@ -1422,6 +1422,28 @@ export class Controller {
         }),
       );
     }
+    if (CITY_KINDS[c.kind[i] - 1] === 'stand') {
+      // Ausbau (seit v5.39): nur auf Befehl, Stufe 2 Überdachung, Stufe 3 Stahlbeton-Shelter
+      const lv = c.level[i];
+      const up = CITY.air.upgrade[lv + 1];
+      const main = this.game.mainFob(this.team);
+      let reason = '';
+      if (!up) reason = 'Schon voll ausgebaut (Stahlbeton-Shelter)';
+      else if (this.game.teams[this.team].res.money < up.money) reason = `Zu wenig Geld (${up.money} nötig)`;
+      else if (up.bm && (!main || main.store.bm < up.bm)) reason = `Zu wenig Baumaterial (${up.bm} nötig)`;
+      else if (up.steel && c.metal < up.steel) reason = `Zu wenig Stahl (${up.steel} nötig)`;
+      card.push(
+        entry('Ausbauen', 'U', {
+          cost: up ? `${up.money} G` : '',
+          tip: up
+            ? `Ausbauen (U) zu ${CITY.air.standName[lv + 1]}: ${up.money} Geld, ${up.bm} Baumaterial${up.steel ? `, ${up.steel} Stahl` : ''}. Schaden am abgestellten Flugzeug dann ${Math.round(CITY.air.shelter[lv + 1] * 100)} % statt ${Math.round(CITY.air.shelter[lv] * 100)} %`
+            : 'Stahlbeton-Shelter: höchste Stufe',
+          enabled: !reason,
+          reason,
+          action: () => this.issue({ type: 'cityUpgrade', buildingId: b.id }),
+        }),
+      );
+    }
     if (CITY_KINDS[c.kind[i] - 1] === 'market') {
       card.push(entry('Handel', 'T', { tip: 'Marktmenü: Waren kaufen und verkaufen (T, auch über die Geldanzeige oben)', action: () => this.onMarket?.() }));
     }

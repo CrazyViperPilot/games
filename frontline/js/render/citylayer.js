@@ -1161,6 +1161,18 @@ function drawTerritory(ren, ctx, team, known) {
   }
 }
 
+/** 2D von oben, nach den Bodeneinheiten (seit v5.39): Dächer der ausgebauten Stellplätze halb durchsichtig über den Flugzeugen. */
+export function drawCityRoofs(ren, ctx, team, known, inRect) {
+  const g = ren.game;
+  if (!g.city) return;
+  for (const { c, k, lv, i, big, ctr } of cells(g, team, known)) {
+    if (k !== 'stand' || lv < 2 || big !== 'anchor' || !inRect(ctr.x, ctr.y, c.cell + 32)) continue;
+    const e = c.ents.get(i);
+    const color = c.team < 2 ? g.teams[c.team].color : '#888';
+    drawBigTop(ctx, bigPlan(k, lv, ctr.x, ctr.y, sizeOf(k) * c.cell), color, e ? 1 - e.hp / e.def.hp : 0, ren.camera.zoom, true);
+  }
+}
+
 /** 2D von oben: Gebäude als Dachflächen mit Schatten (1 × 1 seit v5.14 aus townhouses.js). */
 export function drawCityTop(ren, ctx, team, known, inRect) {
   const g = ren.game;

@@ -151,19 +151,27 @@ function bodiesOf(k, lv, half) {
       box(118, 50, 130, 61, 4, '#55585b', '#6d7174', 49); // Laufkatze
     }
   } else if (k === 'stand') {
-    // Stellplatz (seit v5.35): Stufe 1 offen (Bremsklötze, Leitkegel), Stufe 2 Splitterschutzwälle aus Erde an drei Seiten,
-    // Stufe 3 Stahlbeton-Shelter (gewölbter Bunker, vorn offen)
+    // Stellplatz (seit v5.35; Stufen seit v5.39 nur per „Ausbauen“): Stufe 1 offen (Bremsklötze, Leitkegel), Stufe 2 Überdachung
+    // (Stahldach auf Stützen, halb durchsichtig gezeichnet), Stufe 3 Stahlbeton-Shelter nach dem Vorbild der Hardened Aircraft
+    // Shelter (gewölbte Betonröhre, Front nach Norden wie die Nase des Jets, seitlich aufgeschobene Tore, Abgasöffnung hinten, Erdanschüttung an den
+    // Seiten). Teile mit over liegen über dem abgestellten Flugzeug: 2D nach den Einheiten, Iso hinter ihm in der Tiefe, je mit alpha.
     box(-40, 44, -32, 50, 2, '#d8d4c8', '#e8e4d8'); // Bremsklötze
     box(32, 44, 40, 50, 2, '#d8d4c8', '#e8e4d8');
     if (lv === 2) {
-      const E = '#7f7550';
-      box(-60, -60, 60, -46, 14, E, '#8f8a5a', 0, { gable: 6 }); // Wall hinten
-      box(-60, -46, -46, 52, 14, E, '#8f8a5a', 0, { gable: 6 }); // Wall links
-      box(46, -46, 60, 52, 14, E, '#8f8a5a', 0, { gable: 6 }); // Wall rechts
+      const STEEL = '#8d969c';
+      for (const [x, y] of [[-54, -54], [54, -54], [-54, 0], [54, 0], [-54, 46], [54, 46]]) box(x - 2.5, y - 2.5, x + 2.5, y + 2.5, 26, '#6d7479', '#7d858a'); // Stützen
+      box(-58, -50, -54, 44, 12, '#7d858a', '#8d969c'); // Windschutz seitlich (halbhoch)
+      box(54, -50, 58, 44, 12, '#7d858a', '#8d969c');
+      b.push({ t: 'box', x0: -60, y0: -60, x1: 60, y1: 52, h: 4, base: 26, c: '#7b8388', roof: STEEL, ribs: true, fine: true, over: true, alpha: 0.5 }); // Stahldach
     } else if (lv >= 3) {
-      box(-58, -58, 58, 40, 24, '#b9b6ad', '#a8a59c', 0, { gable: 16, ribs: true, gates: { e: [2], n: 1, w: 90, h: 22 } }); // Shelter
-      box(-62, 40, -54, 52, 20, '#a8a59c', '#b9b6ad'); // Torpfeiler
-      box(54, 40, 62, 52, 20, '#a8a59c', '#b9b6ad');
+      const CON = '#a9a69c';
+      box(-62, -54, -50, 44, 10, '#7f7a58', '#8f8a5a', 0, { gable: 4 }); // Erdanschüttung links
+      box(50, -54, 62, 44, 10, '#7f7a58', '#8f8a5a', 0, { gable: 4 });
+      box(-48, 46, 48, 54, 22, '#9d9a90', '#8e8b82'); // Rückwand (Süden; die Nase des Jets zeigt nach Norden zum Tor)
+      box(-10, 54, 10, 58, 12, '#55585b', '#6d7174', 6); // Abgasöffnung
+      box(-62, -60, -48, -54, 30, '#8e8b82', '#a29f95'); // Tor links (aufgeschoben)
+      box(48, -60, 62, -54, 30, '#8e8b82', '#a29f95'); // Tor rechts
+      b.push({ t: 'box', x0: -50, y0: -54, x1: 50, y1: 48, h: 14, base: 0, c: CON, roof: shade(CON, 0.08), gable: 20, ribs: true, fine: true, over: true, alpha: 0.6 }); // Betonröhre
     } else {
       for (const [x, y] of [[-48, 54], [48, 54], [-48, -50], [48, -50]]) cyl(x, y, 3, 7, '#e8742c', { r1: 0.5 }); // Leitkegel
     }
@@ -261,8 +269,10 @@ export function drawBigGround(g, plan, detail = true, winter = false) {
  * Körper von oben: Schatten nach rechts unten (länger, je höher), Dach, Lichtseite; Zylinder als Kreis. Team = Fahne und Streifen.
  * Gemalte Teile des Flughafens (t 'ap') bringen ihren Schatten mit (airport.js, zoom für die Bildgröße).
  */
-export function drawBigTop(ctx, plan, color, damage = 0, zoom = 1) {
-  for (const p of plan.bodies) {
+export function drawBigTop(ctx, plan, color, damage = 0, zoom = 1, over = false) {
+  const bodies = plan.bodies.filter((p) => !!p.over === over); // over: Dächer über abgestellten Flugzeugen (eigener Durchgang)
+  if (!bodies.length) return;
+  for (const p of bodies) {
     if (p.t === 'ap') continue;
     const s = Math.min(40, ((p.base ?? 0) + (p.h ?? 0) + (p.gable ?? 0)) * 0.22);
     ctx.fillStyle = 'rgba(0,0,0,0.26)';
@@ -276,7 +286,8 @@ export function drawBigTop(ctx, plan, color, damage = 0, zoom = 1) {
       ctx.fillRect(p.x - hx + 3, p.y - hy + 3, hx * 2, hy * 2);
     }
   }
-  for (const p of plan.bodies) {
+  for (const p of bodies) {
+    if (p.alpha) ctx.globalAlpha = p.alpha;
     if (p.t === 'ap') drawAirportTop(ctx, p, color, zoom);
     else if (p.t === 'box') boxTop(ctx, p, color);
     else if (p.t === 'cyl') {
@@ -307,10 +318,11 @@ export function drawBigTop(ctx, plan, color, damage = 0, zoom = 1) {
       ctx.arc(p.x - p.r * 0.25, p.y - p.r * 0.25, p.r * 0.6, 0, Math.PI * 2);
       ctx.fill();
     }
+    ctx.globalAlpha = 1;
   }
   if (damage > 0.05) {
     ctx.fillStyle = `rgba(20,10,5,${(0.5 * damage).toFixed(2)})`;
-    for (const p of plan.bodies) {
+    for (const p of bodies) {
       if (p.t === 'box') ctx.fillRect(p.x0, p.y0, p.x1 - p.x0, p.y1 - p.y0);
       else if (p.t === 'ap' && p.fw > 20) ctx.fillRect(p.x - p.fw / 2, p.y - p.fh / 2, p.fw, p.fh);
     }

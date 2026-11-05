@@ -10,7 +10,7 @@ import { reliefOf } from './relief.js';
 import { createUnit, createBuilding, defineAmmo, isFoe, canAttack, inRange } from './entities.js';
 import { Fog } from './fog.js';
 import { updateEconomy, smoothIncome } from './economy.js';
-import { createCity, updateCity, cmdCity, cmdTrade, cityNoise, freePop, crewOf, payMetal, cityTrainers, trainerKind, KIND_NAME, migrateCity } from './city.js';
+import { createCity, updateCity, cmdCity, cmdCityUpgrade, cmdTrade, cityNoise, freePop, crewOf, payMetal, cityTrainers, trainerKind, KIND_NAME, migrateCity } from './city.js';
 import { updateMovement, nearestPassable, planPath, setIdle, separate, exitHouse } from './movement.js';
 import { updateCombat } from './combat.js';
 import { updateZone } from './zone.js';
@@ -672,6 +672,8 @@ export class Game {
         return cmdDig(this, team, cmd);
       case 'city':
         return cmdCity(this, team, cmd);
+      case 'cityUpgrade':
+        return cmdCityUpgrade(this, team, cmd);
       case 'trade':
         return cmdTrade(this, team, cmd);
       case 'train':

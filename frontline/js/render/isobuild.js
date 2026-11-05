@@ -440,6 +440,14 @@ function drawBigBody(ctx, cam, b, season) {
     drawBigPart(ctx, cam, p, b.color);
     return;
   }
+  if (p.alpha) {
+    // halb durchsichtiges Dach über einem abgestellten Flugzeug (Stellplatz, seit v5.39)
+    ctx.save();
+    ctx.globalAlpha = p.alpha;
+    drawBigBody(ctx, cam, { ...b, part: { ...p, alpha: 0 } }, season);
+    ctx.restore();
+    return;
+  }
   const base = p.base ?? 0;
   const top = drawBox(ctx, cam, p.x0, p.y0, p.x1, p.y1, p.h, p.c, { base, roof: p.roof, noShadow: base > 0, noTop: !!p.gable, wallS: shade(p.c, 0.12), wallE: shade(p.c, 0.34) });
   const detail = cam.zoom >= DETAIL_ZOOM;

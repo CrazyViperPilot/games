@@ -322,3 +322,33 @@ test('Breite Bahnfläche: längster Streifen 2 breit ist die Bahn, der Rest Roll
   assert.ok(route && route.rw.key === rw.key, 'Weg über Rollfeld zur Bahn');
   assert.ok(route.cells.some((i) => c.kind[i] === KIND_ID.taxi), 'über das Rollfeld');
 });
+
+test('Stellplatz: Ausbau nur per Befehl, Stufe 2 Geld + BM, Stufe 3 auch Stahl; wächst nicht von selbst', () => {
+  const g = new Game({ seed: 3, city: true });
+  const { c, m, stands } = airbase(g);
+  const [s] = stands;
+  const i = s.cityCell;
+  run(g, CITY.upgradeTime * 2 + 5);
+  assert.equal(c.level[i], 1, 'bleibt offen ohne Ausbau');
+  const U = CITY.air.upgrade;
+  g.teams[0].res.money = U[2].money - 1;
+  assert.equal(g.issue(0, { type: 'cityUpgrade', buildingId: s.id }).ok, false, 'zu wenig Geld');
+  g.teams[0].res.money = 1e5;
+  const bm = m.store.bm;
+  assert.ok(g.issue(0, { type: 'cityUpgrade', buildingId: s.id }).ok);
+  assert.equal(c.level[i], 2);
+  assert.equal(g.teams[0].res.money, 1e5 - U[2].money);
+  assert.ok(m.store.bm <= bm - U[2].bm + 1e-6, 'Baumaterial aus dem Lager');
+  c.metal = U[3].steel - 1;
+  const r = g.issue(0, { type: 'cityUpgrade', buildingId: s.id });
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /Stahl/);
+  c.metal = 1000;
+  assert.ok(g.issue(0, { type: 'cityUpgrade', buildingId: s.id }).ok);
+  assert.equal(c.level[i], 3);
+  assert.equal(c.metal, 1000 - U[3].steel);
+  assert.equal(g.issue(0, { type: 'cityUpgrade', buildingId: s.id }).ok, false, 'höchste Stufe');
+  // andere Stadtgebäude lassen sich so nicht ausbauen
+  const other = [...c.ents.values()].find((e) => e.alive && KINDS[c.kind[e.cityCell] - 1] === 'atc');
+  assert.equal(g.issue(0, { type: 'cityUpgrade', buildingId: other.id }).ok, false);
+});

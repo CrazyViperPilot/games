@@ -529,8 +529,10 @@ export class Hud {
       if (k === 'stand') {
         // Stellplatz (seit v5.35): Schutz, Flugzeug, Weg zur Bahn, Kerosin und Munition in der Nähe
         const jet = g.units.find((u) => u.alive && u.jet?.home === b.id);
-        const prot = ['', 'offener Stellplatz', 'Splitterschutzwälle', 'Stahlbeton-Shelter'][lv];
+        const prot = CITY.air.standName[lv] ?? '';
         h += line(`${prot} · Schaden am Flugzeug ${Math.round(CITY.air.shelter[lv] * 100)} %`);
+        const up = CITY.air.upgrade[lv + 1];
+        if (up) h += line(`Ausbauen (U) zu ${CITY.air.standName[lv + 1]}: ${up.money} Geld, ${up.bm} BM${up.steel ? `, ${up.steel} Stahl` : ''} · dann Schaden ${Math.round(CITY.air.shelter[lv + 1] * 100)} %`);
         h += line(jet ? `${jet.def.name}: ${jet.parked ? (jet.jet.ready ? 'startbereit' : 'wird betankt und munitioniert') : 'unterwegs'}` : `Frei${b.queue?.length ? ' · Flugzeug in Bau' : ''}`);
         const r = standRoute(g, b);
         h += r ? line(`Bahn ${r.rw.len} Felder lang${r.rw.atc ? ' · mit Tower' : ''} · ${r.cells.length} Felder Rollweg`) : '<div class="warn small">Kein Weg über Straße oder Rollfeld zu einer gültigen Start-/Landebahn</div>';

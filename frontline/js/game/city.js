@@ -1306,6 +1306,7 @@ export function updateCity(game, dt) {
       if (isFlat(c.kind[i]) || !hasRoad(c, col, row)) continue; // seit v5.20 auch Förderanlagen: ohne Straße wachsen sie nicht
       const lv = c.level[i];
       if (lv >= CITY.maxLevel) continue;
+      if (lv >= 1 && kind === 'stand') continue; // Stellplatz: Ausbau nur über den Befehl cityUpgrade (seit v5.39)
       const need = lv === 0 ? CITY.growTime : CITY.upgradeTime;
       // Gewerbe (seit v5.20, AP3b): eine neue Stufe nur, solange seine Arbeitsplätze höchstens so viele sind wie Arbeitsfähige × CITY.shop.per
       const wanted = lv === 0 || (kind === 'res' ? jobs >= pool * CITY.demand : kind === 'com' ? t.jobsCom <= pool * CITY.shop.per : pool >= jobs * CITY.demand);
@@ -1721,6 +1722,36 @@ export function payMetal(game, team, unit, factor = 1) {
   if (factor > 0 && c.metal < need) return false;
   c.metal = Math.min(BALANCE.logistics.storeCap, c.metal - need);
   return true;
+}
+
+/**
+ * Befehl `{ type: 'cityUpgrade', buildingId }` (seit v5.39): fertigen eigenen Stellplatz eine Stufe ausbauen (2 Überdachung,
+ * 3 Stahlbeton-Shelter) gegen Geld, Baumaterial (Lager der Hauptstadt) und Stahl (Stadtlager), CITY.air.upgrade. Sofort fertig.
+ */
+export function cmdCityUpgrade(game, team, cmd) {
+  const c = game.city?.[team];
+  const e = game.getEntity(cmd.buildingId);
+  if (!c || !e || !e.alive || e.team !== team || e.cityCell == null) return { ok: false, reason: 'Eigenen Stellplatz wählen' };
+  const i = e.cityCell;
+  if (KINDS[c.kind[i] - 1] !== 'stand') return { ok: false, reason: 'Nur Stellplätze lassen sich so ausbauen' };
+  const lv = c.level[i];
+  if (!lv) return { ok: false, reason: 'Der Stellplatz ist noch nicht fertig' };
+  const cost = CITY.air.upgrade[lv + 1];
+  if (!cost) return { ok: false, reason: 'Schon voll ausgebaut (Stahlbeton-Shelter)' };
+  const money = game.teams[team].res.money;
+  const main = game.mainFob(team);
+  if (money < cost.money) return { ok: false, reason: `Zu wenig Geld (${cost.money} nötig)` };
+  if (cost.bm && (!main || main.store.bm < cost.bm)) return { ok: false, reason: `Zu wenig Baumaterial im Lager der Hauptstadt (${cost.bm} nötig)` };
+  if (cost.steel && c.metal < cost.steel) return { ok: false, reason: `Zu wenig Stahl (${cost.steel} nötig)` };
+  game.teams[team].res.money -= cost.money;
+  if (cost.bm) main.store.bm -= cost.bm;
+  if (cost.steel) c.metal -= cost.steel;
+  for (const j of cellsOf(c, i)) c.level[j] = lv + 1;
+  c.timer[i] = 0;
+  c.ver++;
+  syncEntity(game, c, i);
+  game.message?.(team, `${CITY.air.standName[lv + 1]} fertig`, e.x, e.y);
+  return { ok: true, level: lv + 1 };
 }
 
 /** Darf `team` die Zelle i ausweisen? Nicht gesperrt, nicht vom Gegner belegt (überall auf der Karte). */
@@ -2294,6 +2325,13 @@ export function aiAirport(game, c, main, reserve, want = 2) {
   const free = (j) => !c.kind[j] && !c.deposit[j] && !c.mapRoads?.[j] && canZone(game, c, j) && cellFree(game, c, j % c.cols, Math.floor(j / c.cols)) && !inDanger(c, j % c.cols, Math.floor(j / c.cols), game.time);
   const put = (kind, q, r) => game.issue(c.team, { type: 'city', kind, c0: q, r0: r, c1: q, r1: r }).ok;
   if (hasRunway) {
+    // Stellplätze ausbauen (seit v5.39 nur per Befehl): den ersten fertigen unter Stufe 3, wenn genug übrig bleibt
+    const up = stands.length >= want ? stands.find((i) => c.level[i] && c.level[i] < CITY.maxLevel) : null; // erst genug Stellplätze
+    const cost = up != null ? CITY.air.upgrade[c.level[up] + 1] : null;
+    if (cost && money >= cost.money + Math.max(reserve, CITY.air.upgradeAiReserve) && main.store.bm >= cost.bm + 200 && c.metal >= (cost.steel ?? 0) + 200) {
+      const e = c.ents.get(up);
+      if (e && cmdCityUpgrade(game, c.team, { buildingId: e.id }).ok) return true;
+    }
     // weitere Stellplätze an der Bahn (beide Längsseiten)
     if (stands.length >= want || money < CITY.cost.stand + reserve || main.store.bm < CITY.costBm.stand + 100) return false;
     const rw = c.list.filter((i) => c.kind[i] === KIND_ID.runway);

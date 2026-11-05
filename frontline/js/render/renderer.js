@@ -49,7 +49,7 @@ import { bridgeUnder } from '../game/river.js';
 import { setMapTown, drawMapTown2D, drawMapCars2D, drawPark } from './maptown.js';
 import { drawUnitTop, drawUnitShadowIso, drawWreckTop } from './unitpaint.js';
 import { drawShell, drawShellIso, drawShellTarget, drawEffect, drawEffectUp, drawCrater, drawWreck, drawWreckRubble, drawSmoke, drawSmokeScreen, drawFire, drawMine } from './fx.js';
-import { drawCityGround, drawCityTop, cityBuildings, drawCityBadges } from './citylayer.js';
+import { drawCityGround, drawCityTop, drawCityRoofs, cityBuildings, drawCityBadges } from './citylayer.js';
 import { drawWays } from './ways.js';
 import { beginTownFrame, townLift } from './townhouses.js';
 
@@ -236,6 +236,7 @@ export class Renderer {
 
     for (const air of [false, true]) {
       // Hubschrauber zuletzt: sie fliegen über allem
+      if (air) drawCityRoofs(this, ctx, team, known, inRect); // Dächer der Stellplätze über den abgestellten Flugzeugen (seit v5.39)
       for (const u of g.units) {
         if (!u.alive || u.house || flying(u) !== air || !shown(u) || !inRect(u.x, u.y, 30)) continue; // Jets am Boden mit den Bodeneinheiten
         let aim = null;
@@ -597,7 +598,12 @@ export class Renderer {
     const items = [];
     const town = g.map.town;
     for (const b of town?.buildings ?? []) if (inRect(b.x, b.y, PAD)) items.push({ k: cam.depth(b.x, b.y), t: 0, o: b });
-    for (const b of cityBuildings(g, team, known, (x, y) => inRect(x, y, PAD))) items.push({ k: cam.depth(b.x, b.y), t: 0, o: b }); // Stadt
+    for (const b of cityBuildings(g, team, known, (x, y) => inRect(x, y, PAD))) {
+      // Dach über einem abgestellten Flugzeug (Stellplatz, seit v5.39): hinter allem darunter, nach der vordersten Ecke einsortiert
+      const p = b.part;
+      const k = p?.over ? Math.max(cam.depth(p.x0, p.y0), cam.depth(p.x1, p.y0), cam.depth(p.x1, p.y1), cam.depth(p.x0, p.y1)) : cam.depth(b.x, b.y);
+      items.push({ k, t: 0, o: b }); // Stadt
+    }
     // Bäume und Büsche: nicht auf gefällten (Räumen) oder ausgewiesenen Stadtzellen (seit v5.13)
     const gone = (x, y) => g.city && treeGone(g, x, y);
     for (const t of town?.trees ?? []) if (inRect(t.x, t.y, PAD) && !gone(t.x, t.y)) items.push({ k: cam.depth(t.x, t.y), t: 1, o: t });
