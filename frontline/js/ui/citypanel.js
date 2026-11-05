@@ -36,7 +36,24 @@ export const CITY_TIP = {
 };
 const GOOD_NAME = { bm: 'BM', mun: 'MUN', fuel: 'TS', metal: 'Stahl', kero: 'Kerosin' };
 const GOOD_LONG = { bm: 'Baumaterial', mun: 'Munition', fuel: 'Treibstoff', metal: 'Stahl', kero: 'Kerosin' };
-const TOOLS = [...KINDS.filter((k) => !CITY.retired?.includes(k)), 'erase']; // ohne alte, nicht mehr baubare Arten (Flughafen)
+/**
+ * Werkzeuge in Gruppen (seit v5.36, Daniels Wunsch „Baumenü strukturieren“): Straße und Räumen, Wohnen und Gewerbe, Förderung,
+ * Werke (Ressourcen), Einheiten, Stadtdienste, Fliegerhorst. Alte, nicht mehr baubare Arten (Flughafen) fehlen; eine neue Art ohne
+ * Gruppe landet unter „Weitere“, damit sie nicht verloren geht.
+ */
+const GROUPS = [
+  ['Grundlagen', ['road', 'erase']],
+  ['Wohnen & Gewerbe', ['res', 'com', 'market']],
+  ['Förderung', ['mine']],
+  ['Ressourcen', ['bm', 'smelter', 'steel', 'mun', 'fuel', 'kero', 'power']],
+  ['Einheiten', ['barracks', 'factory', 'heliport']],
+  ['Stadt', ['uni', 'dc', 'hospital']],
+  ['Fliegerhorst', ['runway', 'stand', 'atc', 'ktank', 'mdepot']],
+];
+const GROUPED = new Set(GROUPS.flatMap(([, ks]) => ks));
+const REST = KINDS.filter((k) => !GROUPED.has(k) && !CITY.retired?.includes(k));
+if (REST.length) GROUPS.push(['Weitere', REST]);
+export const TOOL_GROUPS = GROUPS.map(([name, ks]) => [name, ks.filter((k) => k === 'erase' || (KINDS.includes(k) && !CITY.retired?.includes(k)))]);
 const fmt = (v, d = 0) => v.toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d });
 
 export class CityPanel {
@@ -56,12 +73,12 @@ export class CityPanel {
     root.className = 'city-bar';
     root.hidden = true;
     root.innerHTML = `
-      <div class="city-tools">${TOOLS.map((k) => {
+      <div class="city-tools">${TOOL_GROUPS.map(([group, tools]) => `<div class="ctool-head">${group}</div>${tools.map((k) => {
         const n = k === 'erase' ? 1 : sizeOf(k);
         const price = k === 'erase' ? 'gratis' : [CITY.cost[k] ? `${CITY.cost[k]} G` : '', CITY.costBm[k] ? `${CITY.costBm[k]} BM` : '', n > 1 ? `${n}×${n}` : ''].filter(Boolean).join(' + ').replace(/ \+ (\d+×)/, ' · $1');
         const name = k === 'erase' ? 'Räumen' : KIND_NAME[k];
         return `<button type="button" class="ctool" data-tool="${k}" title="${name}${CITY_TIP[k] ? `: ${CITY_TIP[k]}` : ''}" style="--c:${CITY_COLORS[k]}"><i>${ICON[k]}</i><span>${SHORT[k]}</span><small>${price}</small></button>`;
-      }).join('')}</div>
+      }).join('')}`).join('')}</div>
       <div class="city-acts"><button type="button" class="btn-sm city-fold" data-fold title="Menü einklappen (Stadt-Knopf klappt es wieder auf)">▴ Einklappen</button><button type="button" class="btn-sm" data-tradeview title="Marktmenü: kaufen und verkaufen (braucht einen fertigen Markt)">Handel</button><button type="button" class="btn-sm" data-show>Zur Stadt</button><button type="button" class="btn-sm city-done" data-close>Fertig (Y)</button></div>`;
     parent.appendChild(strip);
     parent.appendChild(root);
