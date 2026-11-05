@@ -703,6 +703,34 @@ export function drawCityTop(ren, ctx, team, known, inRect) {
 
 /** Schild (Kreis oder kleines Quadrat mit Symbol) als Bild, je Symbol und Farbe einmal gezeichnet. */
 const badgeCache = new Map();
+/** Warnzeichen „kein Weg“ (seit v5.20): großes, fettes rotes X mit weißem Rand, gezeichnet (kein Schriftzeichen, sieht überall gleich aus). */
+let warnCache = null;
+function warnImage() {
+  if (warnCache) return warnCache;
+  const S = 64;
+  const img = document.createElement('canvas');
+  img.width = S;
+  img.height = S;
+  const g = img.getContext('2d');
+  g.lineCap = 'round';
+  const cross = () => {
+    g.beginPath();
+    g.moveTo(12, 12);
+    g.lineTo(S - 12, S - 12);
+    g.moveTo(S - 12, 12);
+    g.lineTo(12, S - 12);
+    g.stroke();
+  };
+  g.strokeStyle = '#ffffff'; // weißer Rand
+  g.lineWidth = 20;
+  cross();
+  g.strokeStyle = '#e01b1b'; // rotes X
+  g.lineWidth = 12;
+  cross();
+  warnCache = img;
+  return img;
+}
+
 function badgeImage(icon, color, small) {
   const key = `${icon}|${color}|${small ? 1 : 0}`;
   let img = badgeCache.get(key);
@@ -766,9 +794,9 @@ export function drawCityBadges(ren, ctx, team, known, inRect, iso) {
   const z = cam.zoom;
   const big = Math.max(18, Math.min(34, 30 * z));
   const small = Math.max(12, Math.min(22, 19 * z));
-  // Baumodus: Warnzeichen (🚫) an Gebäuden ohne Lieferweg oder Pendlerweg der eigenen Stadt
+  // Baumodus: Warnzeichen (rotes X) an Gebäuden ohne Lieferweg oder Pendlerweg der eigenen Stadt
   const tr = ren.cityUi?.open && g.city[team] ? transportOf(g, g.city[team]) : null;
-  const warnImg = tr ? badgeImage('🚫', '#d02a2a', false) : null;
+  const warnImg = tr ? warnImage() : null;
   for (const { c, k, lv, r: cell, i, big: whole, ctr } of cells(g, team, known)) {
     const r = whole ? ctr : cell; // Großbau: Schild über der Mitte
     if (k === 'road' || !lv || whole === 'part' || !inRect(r.x, r.y, 64)) continue;
@@ -793,8 +821,8 @@ export function drawCityBadges(ren, ctx, team, known, inRect, iso) {
     ctx.drawImage(img, bx, by, bw, bw);
     // Baumodus (seit v5.20, AP5): rotes Warnzeichen oben rechts, wenn ein Lieferweg oder Pendlerweg fehlt
     if (tr && c.team === team && transportWarn(tr, k, i)) {
-      const ws = bw * 0.6;
-      ctx.drawImage(warnImg, bx + bw - ws * 0.6, by - ws * 0.4, ws, ws);
+      const ws = bw * 0.9; // groß: fast so groß wie das Schild
+      ctx.drawImage(warnImg, bx + bw - ws * 0.55, by - ws * 0.45, ws, ws);
     }
   }
 }
