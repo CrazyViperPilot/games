@@ -10,13 +10,14 @@ const STEP = Math.log(2) / 4; // Abstand zweier Maßstäbe (natürlicher Logarit
 const MIN_SCALE = 0.25; // Gerätepixel je Einheit, kleiner/größer wird nicht gemalt
 const MAX_SCALE = 6;
 const BUDGET_MS = 6; // Zeit je Bild für neue Zeichnungen
-const MAX_PIXELS = 10e6; // Obergrenze aller Bilder zusammen (Bildpunkte, ≈ 40 MB); darüber fallen die ältesten heraus
+const MAX_PIXELS = 10e6; // Obergrenze aller Bilder zusammen (Bildpunkte, ≈ 40 MB); darüber fallen die ältesten heraus (weich, siehe trim)
 const IDLE_MS = 30000; // so lange nicht gebraucht: Bild fällt heraus
 
 const store = new Map(); // Schlüssel → Map(Maßstabsstufe → Eintrag)
 let pixels = 0;
 let spent = 0;
 let now = 0;
+let prev = 0; // Zeitpunkt des vorigen Bilds
 let lastSweep = 0;
 
 const clock = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
@@ -40,6 +41,7 @@ export const spriteDpr = () => ratio;
 /** Zu Beginn jedes Bilds aufrufen (Renderer): merkt die Gerätepixel, setzt das Zeitbudget zurück und räumt alte Bilder weg. */
 export function spriteFrame(r = 1) {
   ratio = r || 1;
+  prev = now;
   now = clock();
   spent = 0;
   if (now - lastSweep < 2000) return;
@@ -54,14 +56,19 @@ export function spriteFrame(r = 1) {
   }
 }
 
-/** Über der Obergrenze: die am längsten nicht gebrauchten Bilder entfernen, bis 70 % frei sind. */
+/**
+ * Über der Obergrenze: die am längsten nicht gebrauchten Bilder entfernen, bis 70 % frei sind. Was in diesem oder dem vorigen Bild
+ * gebraucht wurde, bleibt (seit v5.29): sonst fiele in sehr vollen Ansichten (größter Zoom auf dem Handy, Wald neben der
+ * Kartenstadt) ein Teil des gerade Sichtbaren heraus und würde Bild für Bild neu gemalt (Ruckeln, flache Ersatzbäume). Die Grenze
+ * ist damit weich: der Speicher wächst höchstens auf das, was eine Ansicht wirklich braucht.
+ */
 function trim() {
   const all = [];
   for (const [key, levels] of store) for (const [k, e] of levels) all.push({ key, k, e });
   all.sort((a, b) => a.e.used - b.e.used);
   for (const { key, k, e } of all) {
     if (pixels <= MAX_PIXELS * 0.7) break;
-    if (e.used === now) continue; // in diesem Bild gebraucht
+    if (e.used >= prev) break; // ab hier alles in diesem oder dem vorigen Bild gebraucht (sortiert)
     const levels = store.get(key);
     levels.delete(k);
     if (!levels.size) store.delete(key);
