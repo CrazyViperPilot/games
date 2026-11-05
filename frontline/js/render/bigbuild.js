@@ -1,11 +1,13 @@
 // Großbauten der Stadt ohne eigenes Bild (seit v5.03, PRD §15; das Kraftwerk zeichnet seit v5.18 works.js): Kaserne (4 × 4,
 // Unterkünfte mit Ziegeldach um einen Exerzierplatz, Wache, Fahrzeuge; seit v5.11 mit Fenstern, Toren und Bäumen), Fabrikhalle
 // (5 × 5 seit v5.33, vorher 8 × 8; Montagehalle mit Sheddach, Verwaltung, Lackiererei, Schornsteine, Fahrzeughof mit fertigen Fahrzeugen, Portalkran) und
-// Flughafen (10 × 10; Boden und gemalte Bauten seit v5.22 aus airport.js). Jede Anlage ist eine Liste von Teilen in Weltkoordinaten:
+// Flughafen (10 × 10; Boden und gemalte Bauten seit v5.22 aus airport.js; nicht mehr baubar). Den Fliegerhorst aus Bausteinen
+// (Stellplatz, Tower, Kerosintank, Munitionslager, je 2 × 2) malt seit v5.42 airbase.js. Jede Anlage ist eine Liste von Teilen in Weltkoordinaten:
 // Boden (Flächen, Linien, Vielecke) und Körper (Quader, Zylinder, Fahnen, gemalte Teile des Flughafens). Die 2D-Ansicht zeichnet sie
 // von oben, die Iso-Ansicht jeden Körper einzeln in der Tiefenordnung (so stehen Einheiten richtig davor oder dahinter) und für jede
 // Drehung der Karte richtig. Nur Zeichnen, keine Spielregeln.
 import { airportGround, airportBodies, drawAirportIso, drawAirportTop } from './airport.js';
+import { airbaseGround, airbaseBodies, drawAirbaseIso, drawAirbaseTop } from './airbase.js';
 import { drawBox } from './iso.js';
 import { shade, tint } from './sprites.js';
 import { drawUnitTop, drawUnitIso, SHOWROOM } from './unitpaint.js';
@@ -29,6 +31,8 @@ export function drawShowIso(ctx, cam, p) {
 export const BIG_KINDS = new Set(['barracks', 'factory', 'airport', 'stand', 'atc', 'ktank', 'mdepot']); // seit v5.35 auch der Fliegerhorst (2 × 2)
 
 const CONCRETE = '#b3afa4';
+/** Bausteine des Fliegerhorsts (seit v5.42 gemalt, airbase.js). */
+const AIRBASE = new Set(['stand', 'atc', 'ktank', 'mdepot']);
 /** Fahrzeuge auf Höfen (seit v5.11): Länge, Breite, Höhe der Wanne (Weltpixel). */
 export const VEH = { tank: { l: 32, w: 17, h: 7 }, apc: { l: 28, w: 15, h: 10 }, truck: { l: 30, w: 13, h: 15 }, jeep: { l: 19, w: 11, h: 9 } };
 export const VEH_COLOR = '#5f6b3e';
@@ -76,22 +80,8 @@ function groundOf(k, lv, half) {
     rect(-148, -26, 52, -8, '#9b988f'); // Vorplatz der Montagehalle
     for (let x = -126; x <= 30; x += 52) line(x, -24, x, -10, '#e3d46a', 1.4);
     if (lv >= 2) rect(96, 26, 152, 84, '#96938a'); // Containerlager
-  } else if (k === 'stand') {
-    // Stellplatz (seit v5.35): Betonfläche mit gelber Führungslinie und Haltekreuz
-    rect(-half + 3, -half + 3, half - 3, half - 3, '#a8a69e');
-    line(0, half - 6, 0, -18, '#e3c43a', 2);
-    line(-10, -18, 10, -18, '#e3c43a', 2);
-    for (const [x0, y0, x1, y1] of [[-half + 8, -half + 8, half - 8, -half + 8], [half - 8, -half + 8, half - 8, half - 8], [-half + 8, half - 8, -half + 8, -half + 8]]) line(x0, y0, x1, y1, '#f2f0e6', 1.4);
-  } else if (k === 'atc') {
-    rect(-half + 3, -half + 3, half - 3, half - 3, '#9a988f');
-    rect(-46, 20, 46, 54, '#86a05e'); // Rasen
-  } else if (k === 'ktank') {
-    rect(-half + 3, -half + 3, half - 3, half - 3, '#8f9398');
-    rect(-54, -54, 54, 54, '#7d8186'); // Auffangwanne
-  } else if (k === 'mdepot') {
-    rect(-half + 3, -half + 3, half - 3, half - 3, '#8b9273');
-    const f = half - 6;
-    for (const [x0, y0, x1, y1] of [[-f, -f, f, -f], [f, -f, f, f], [f, f, -f, f], [-f, f, -f, -f]]) line(x0, y0, x1, y1, '#4a4a42', 2); // Zaun
+  } else if (AIRBASE.has(k)) {
+    return airbaseGround(k, lv, half); // seit v5.42: Beton mit Fugen, Führungslinie, Parkplatz … (airbase.js)
   } else if (k === 'airport') return airportGround(lv); // seit v5.22: Markierungen, Befeuerung, Rollgassen (airport.js)
   return g;
 }
@@ -170,55 +160,8 @@ function bodiesOf(k, lv, half) {
       box(95, 52, 153, 59, 5, '#d9a21b', '#e8b52c', 44); // Brücke
       box(118, 50, 130, 61, 4, '#55585b', '#6d7174', 49); // Laufkatze
     }
-  } else if (k === 'stand') {
-    // Stellplatz (seit v5.35; Stufen seit v5.39 nur per „Ausbauen“): Stufe 1 offen (Bremsklötze, Leitkegel), Stufe 2 Überdachung
-    // (Stahldach auf Stützen, halb durchsichtig gezeichnet), Stufe 3 Stahlbeton-Shelter nach dem Vorbild der Hardened Aircraft
-    // Shelter (gewölbte Betonröhre, Front nach Norden wie die Nase des Jets, seitlich aufgeschobene Tore, Abgasöffnung hinten, Erdanschüttung an den
-    // Seiten). Teile mit over liegen über dem abgestellten Flugzeug: 2D nach den Einheiten, Iso hinter ihm in der Tiefe, je mit alpha.
-    box(-40, 44, -32, 50, 2, '#d8d4c8', '#e8e4d8'); // Bremsklötze
-    box(32, 44, 40, 50, 2, '#d8d4c8', '#e8e4d8');
-    if (lv === 2) {
-      const STEEL = '#8d969c';
-      for (const [x, y] of [[-54, -54], [54, -54], [-54, 0], [54, 0], [-54, 46], [54, 46]]) box(x - 2.5, y - 2.5, x + 2.5, y + 2.5, 26, '#6d7479', '#7d858a'); // Stützen
-      box(-58, -50, -54, 44, 12, '#7d858a', '#8d969c'); // Windschutz seitlich (halbhoch)
-      box(54, -50, 58, 44, 12, '#7d858a', '#8d969c');
-      b.push({ t: 'box', x0: -60, y0: -60, x1: 60, y1: 52, h: 4, base: 26, c: '#7b8388', roof: STEEL, ribs: true, fine: true, over: true, alpha: 0.5 }); // Stahldach
-    } else if (lv >= 3) {
-      const CON = '#a9a69c';
-      box(-62, -54, -50, 44, 10, '#7f7a58', '#8f8a5a', 0, { gable: 4 }); // Erdanschüttung links
-      box(50, -54, 62, 44, 10, '#7f7a58', '#8f8a5a', 0, { gable: 4 });
-      box(-48, 46, 48, 54, 22, '#9d9a90', '#8e8b82'); // Rückwand (Süden; die Nase des Jets zeigt nach Norden zum Tor)
-      box(-10, 54, 10, 58, 12, '#55585b', '#6d7174', 6); // Abgasöffnung
-      box(-62, -60, -48, -54, 30, '#8e8b82', '#a29f95'); // Tor links (aufgeschoben)
-      box(48, -60, 62, -54, 30, '#8e8b82', '#a29f95'); // Tor rechts
-      b.push({ t: 'box', x0: -50, y0: -54, x1: 50, y1: 48, h: 14, base: 0, c: CON, roof: shade(CON, 0.08), gable: 20, ribs: true, fine: true, over: true, alpha: 0.6 }); // Betonröhre
-    } else {
-      for (const [x, y] of [[-48, 54], [48, 54], [-48, -50], [48, -50]]) cyl(x, y, 3, 7, '#e8742c', { r1: 0.5 }); // Leitkegel
-    }
-  } else if (k === 'atc') {
-    // Tower (seit v5.35): Betriebsgebäude, Schaft, verglaste Kanzel, Radar
-    box(-50, -10, 20, 26, 18, '#e4e0d4', '#8a8f92', 0, { win: [[7, 13]], wg: 9, ww: 6, stripe: true, door: [2] });
-    cyl(34, -24, 11, 58, '#dcd8cc');
-    box(20, -38, 48, -10, 14, '#6f93ad', '#55585b', 58, { win: [[2, 12]], wg: 6, ww: 5 }); // Kanzel
-    box(30, -28, 38, -20, 6, '#55585b', '#6d7174', 72); // Antenne
-    cyl(-30, -36, 9, 4, '#9a9fa3', { base: 18 }); // Radar
-    b.push({ t: 'flag', x: -44, y: 30, h: 34 });
-    if (lv >= 2) cyl(-30, -36, 3, 10, '#dfe3e6', { base: 22 });
-  } else if (k === 'ktank') {
-    // Kerosintank (seit v5.35): Rundtanks mit blauen Ringen, Pumpenhaus; mehr Tanks je Stufe
-    const BLUE = '#2f7fd1';
-    const tanks = lv >= 3 ? [[-26, -26], [26, -26], [-26, 26], [26, 26]] : lv >= 2 ? [[-26, -20], [26, -20], [0, 30]] : [[-22, 0], [24, 0]];
-    for (const [x, y] of tanks) cyl(x, y, 18, 22, '#e9ecef', { band: BLUE });
-    box(-8, 40, 18, 54, 9, '#c9c6bc', '#8a8f92');
-  } else if (k === 'mdepot') {
-    // Munitionslager (seit v5.35): erdbedeckte Bunker mit Betonstirn, Kisten; mehr Bunker je Stufe
-    const n = lv >= 3 ? 3 : lv >= 2 ? 2 : 1;
-    for (let j = 0; j < n; j++) {
-      const x = -40 + j * 40;
-      box(x - 15, -44, x + 15, 20, 14, '#6f7a4a', '#7f8a55', 0, { gable: 10 }); // Bunker
-      box(x - 15, 20, x + 15, 26, 16, '#b9b6ad', '#a8a59c', 0, { gates: { e: [2], n: 1, w: 16, h: 11 } }); // Stirnwand mit Tor
-    }
-    for (const [x, y] of [[-36, 42], [-14, 42], [8, 42]]) box(x, y, x + 16, y + 10, 8, '#7b6a44', '#8a7a52'); // Kisten
+  } else if (AIRBASE.has(k)) {
+    return airbaseBodies(k, lv); // seit v5.42: gemalte Überdachung, Shelter, Tower, Tanks, Bunker (airbase.js)
   } else if (k === 'airport') return airportBodies(lv); // seit v5.22: gemalte Hangars, Tower, Tanklager … (airport.js)
   return b;
 }
@@ -293,7 +236,7 @@ export function drawBigTop(ctx, plan, color, damage = 0, zoom = 1, over = false)
   const bodies = plan.bodies.filter((p) => !!p.over === over); // over: Dächer über abgestellten Flugzeugen (eigener Durchgang)
   if (!bodies.length) return;
   for (const p of bodies) {
-    if (p.t === 'ap') continue;
+    if (p.t === 'ap' || p.t === 'ab') continue;
     const s = Math.min(40, ((p.base ?? 0) + (p.h ?? 0) + (p.gable ?? 0)) * 0.22);
     ctx.fillStyle = 'rgba(0,0,0,0.26)';
     if (p.t === 'box') ctx.fillRect(p.x0 + s, p.y0 + s, p.x1 - p.x0, p.y1 - p.y0);
@@ -309,6 +252,7 @@ export function drawBigTop(ctx, plan, color, damage = 0, zoom = 1, over = false)
   for (const p of bodies) {
     if (p.alpha) ctx.globalAlpha = p.alpha;
     if (p.t === 'ap') drawAirportTop(ctx, p, color, zoom);
+    else if (p.t === 'ab') drawAirbaseTop(ctx, p, color, zoom);
     else if (p.t === 'box') boxTop(ctx, p, color);
     else if (p.t === 'cyl') {
       ctx.beginPath();
@@ -345,7 +289,7 @@ export function drawBigTop(ctx, plan, color, damage = 0, zoom = 1, over = false)
     ctx.fillStyle = `rgba(20,10,5,${(0.5 * damage).toFixed(2)})`;
     for (const p of bodies) {
       if (p.t === 'box') ctx.fillRect(p.x0, p.y0, p.x1 - p.x0, p.y1 - p.y0);
-      else if (p.t === 'ap' && p.fw > 20) ctx.fillRect(p.x - p.fw / 2, p.y - p.fh / 2, p.fw, p.fh);
+      else if ((p.t === 'ap' || p.t === 'ab') && p.fw > 20) ctx.fillRect(p.x - p.fw / 2, p.y - p.fh / 2, p.fw, p.fh);
     }
   }
 }
@@ -452,6 +396,10 @@ export function drawBigPart(ctx, cam, p, color) {
     drawAirportIso(ctx, cam, p, color); // gemalter Teil des Flughafens (seit v5.22)
     return;
   }
+  if (p.t === 'ab') {
+    drawAirbaseIso(ctx, cam, p, color); // gemalter Teil des Fliegerhorsts (seit v5.42)
+    return;
+  }
   if (p.t === 'box') {
     drawBox(ctx, cam, p.x0, p.y0, p.x1, p.y1, p.h, p.c, { base: p.base, roof: p.roof, noShadow: p.base > 0 });
     return;
@@ -520,7 +468,7 @@ export function drawBigPart(ctx, cam, p, color) {
 
 /** Mittelpunkt und Fußabdruck eines Körpers (für Tiefenordnung und Geländehöhe im Renderer). */
 export function partFoot(p) {
-  if (p.t === 'ap') return { x: p.x, y: p.y, w: p.fw, h: p.fh };
+  if (p.t === 'ap' || p.t === 'ab') return { x: p.x, y: p.y, w: p.fw, h: p.fh };
   if (p.t === 'veh') {
     const [hx, hy] = vehHalf(p);
     return { x: p.x, y: p.y, w: hx * 2, h: hy * 2 };
