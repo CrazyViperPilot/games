@@ -12,7 +12,6 @@ export const BUILD_ABBR = { fob: 'FOB', depot: 'FZ-HALLE', extractor: 'FÖR', mo
 export const NODE_COLOR = { bm: '#8b5a2b', mun: '#d9b600', fuel: '#3b2350' };
 export const NODE_LABEL = { bm: 'BM', mun: 'MUN', fuel: 'TS' };
 const WALL_GREY = '#8c9089';
-const GATE_GREY = '#7d827b';
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
@@ -393,9 +392,10 @@ function drawHeli(ctx, u, color, dark, light, hull, turret, now, z, iso = false)
 /**
  * Gebäude: fertig (Team-Plate mit Kürzel), im Bau (gestrichelt, Gerüst, Fortschrittsbalken),
  * Mauer (grauer Block), Tor (grauer Block mit Teamstreifen). Dunkelt sich mit Schaden ab,
- * Fertigungsbalken unter dem Gebäude.
+ * Fertigungsbalken unter dem Gebäude. pic = das Gebäude ist schon als Bild gemalt (milbuild.js, seit v5.21):
+ * dann nur die Anzeigen darüber (Baufortschritt, Besatzung des Turms, Bohrer, Fertigung).
  */
-export function drawBuilding(ctx, b, color, zoom = 1) {
+export function drawBuilding(ctx, b, color, zoom = 1, pic = false) {
   const z = zoom || 1;
   const x0 = b.cx * TILE;
   const y0 = b.cy * TILE;
@@ -406,7 +406,19 @@ export function drawBuilding(ctx, b, color, zoom = 1) {
   ctx.strokeStyle = OUTLINE;
   ctx.lineWidth = 1.5 / z;
 
-  if (!b.built) {
+  if (!b.built && pic) {
+    // Baustelle als Bild: nur Fortschritt und Kürzel
+    const bh = Math.max(3, 4 / z);
+    const by = y0 + h - bh - 2 / z;
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(x0 + 2, by, w - 4, bh);
+    ctx.fillStyle = color;
+    ctx.fillRect(x0 + 2, by, (w - 4) * clamp(b.progress || 0, 0, 1), bh);
+    if (!isWall) {
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      fitText(ctx, BUILD_ABBR[b.type] || '', x0 + w / 2, y0 + 8, 9, z, w * 0.9);
+    }
+  } else if (!b.built) {
     // Baustelle: gestrichelter Rahmen, Gerüst, Fortschritt
     const base = isWall ? WALL_GREY : color;
     ctx.fillStyle = hexA(base, 0.22);
@@ -434,25 +446,8 @@ export function drawBuilding(ctx, b, color, zoom = 1) {
       ctx.fillStyle = 'rgba(255,255,255,0.75)';
       fitText(ctx, (b.main ? 'HAUPTSTADT' : BUILD_ABBR[b.type]) || '', x0 + w / 2, y0 + h / 2 - bh, 10, z, w * 0.9);
     }
-  } else if (b.type === 'wall') {
-    ctx.fillStyle = WALL_GREY;
-    ctx.fillRect(x0 + 1, y0 + 1, w - 2, h - 2);
-    ctx.fillStyle = '#b3b7b0';
-    ctx.fillRect(x0 + 2, y0 + 2, w - 4, Math.max(2, h * 0.14));
-    ctx.fillStyle = '#5d615b';
-    ctx.fillRect(x0 + 2, y0 + h - 2 - Math.max(2, h * 0.14), w - 4, Math.max(2, h * 0.14));
-    ctx.strokeRect(x0 + 1, y0 + 1, w - 2, h - 2);
-  } else if (b.type === 'radio') {
-    drawRadioTop(ctx, b, color, x0, y0, w, h, z);
-  } else if (b.type === 'gate') {
-    ctx.fillStyle = GATE_GREY;
-    ctx.fillRect(x0 + 1, y0 + 1, w - 2, h - 2);
-    ctx.fillStyle = color;
-    ctx.fillRect(x0 + 2, y0 + h / 2 - h * 0.14, w - 4, h * 0.28);
-    ctx.fillStyle = '#5d615b';
-    ctx.fillRect(x0 + 2, y0 + 2, 3, h - 4);
-    ctx.fillRect(x0 + w - 5, y0 + 2, 3, h - 4);
-    ctx.strokeRect(x0 + 1, y0 + 1, w - 2, h - 2);
+  } else if (pic) {
+    drawOverlays(ctx, b, x0, y0, w, h, z, true);
   } else {
     ctx.fillStyle = shade(color, 0.5);
     ctx.fillRect(x0 + 1, y0 + 1, w - 2, h - 2);
@@ -467,48 +462,58 @@ export function drawBuilding(ctx, b, color, zoom = 1) {
       ctx.fillStyle = `rgba(0,0,0,${(1 - b.hp / b.maxHp) * 0.45})`;
       ctx.fillRect(x0 + 1, y0 + 1, w - 2, h - 2);
     }
-    if (b.type === 'tower') {
-      // Gefechtsturm: Besatzung als Punkte, Dachaufbau als Kürzel
-      const cap = b.def.cap;
-      for (let i = 0; i < cap; i++) {
-        ctx.fillStyle = i < b.occupants.length ? '#f4f1d0' : 'rgba(0,0,0,0.55)';
-        ctx.beginPath();
-        ctx.arc(x0 + w / 2 + (i - (cap - 1) / 2) * 12, y0 + h - 9, 3.5, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      const roof = b.roof ?? b.roofJob?.kind;
-      if (roof) {
-        ctx.fillStyle = b.roof ? '#ffd45a' : 'rgba(255,255,255,0.6)';
-        fitText(ctx, BUILDINGS.tower.roofs[roof].short, x0 + w / 2, y0 + 11, 9, z, w * 0.8);
-      }
-    }
-    if (b.drill) {
-      // Bohrer: Phase als Balken über dem Gebäude (aktiv grün und leerlaufend, bereit gelb, sonst grau und füllend)
-      const d = b.drill;
-      const frac = d.frac;
-      const col = d.state === 'active' ? '#7fd36a' : d.state === 'ready' ? '#e8c43a' : '#8a8f88';
-      const bh = Math.max(3, 4 / z);
-      ctx.fillStyle = 'rgba(0,0,0,0.7)';
-      ctx.fillRect(x0, y0 - bh - 3 / z, w, bh);
-      ctx.fillStyle = col;
-      ctx.fillRect(x0, y0 - bh - 3 / z, w * clamp(frac, 0, 1), bh);
-    }
-    // Fertigungsfortschritt der laufenden Aufträge (je Ausbildungsplatz eine Leiste)
-    if (b.queue && b.queue.length) {
-      const bh = Math.max(3, 4 / z);
-      const slots = Math.min(BALANCE.trainSlots, b.queue.length);
-      for (let i = 0; i < slots; i++) {
-        const bt = UNITS[b.queue[i].unit].buildTime;
-        const frac = clamp(b.queueTimes[i] / bt, 0, 1);
-        const by = y0 + h + 3 / z + i * (bh + 1 / z);
-        ctx.fillStyle = 'rgba(0,0,0,0.7)';
-        ctx.fillRect(x0, by, w, bh);
-        ctx.fillStyle = '#7fd36a';
-        ctx.fillRect(x0, by, w * frac, bh);
-      }
-    }
+    drawOverlays(ctx, b, x0, y0, w, h, z, false);
   }
   ctx.restore();
+}
+
+/** Anzeigen über einem fertigen Gebäude: Besatzung und Dachaufbau des Turms, Phase des Bohrers, Fertigungsbalken. */
+function drawOverlays(ctx, b, x0, y0, w, h, z, pic) {
+  if (b.type === 'tower') {
+    // Gefechtsturm: Besatzung als Punkte, Dachaufbau als Kürzel (mit Bild nur, solange er gebaut wird)
+    const cap = b.def.cap;
+    for (let i = 0; i < cap; i++) {
+      ctx.fillStyle = i < b.occupants.length ? '#f4f1d0' : 'rgba(0,0,0,0.55)';
+      ctx.beginPath();
+      ctx.arc(x0 + w / 2 + (i - (cap - 1) / 2) * 12, y0 + h - 9, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+      if (pic) {
+        ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+        ctx.lineWidth = 1 / z;
+        ctx.stroke();
+      }
+    }
+    const roof = pic ? (b.roof ? null : b.roofJob?.kind) : (b.roof ?? b.roofJob?.kind);
+    if (roof) {
+      ctx.fillStyle = b.roof ? '#ffd45a' : 'rgba(255,255,255,0.6)';
+      fitText(ctx, BUILDINGS.tower.roofs[roof].short, x0 + w / 2, y0 + 11, 9, z, w * 0.8);
+    }
+  }
+  if (b.drill) {
+    // Bohrer: Phase als Balken über dem Gebäude (aktiv grün und leerlaufend, bereit gelb, sonst grau und füllend)
+    const d = b.drill;
+    const frac = d.frac;
+    const col = d.state === 'active' ? '#7fd36a' : d.state === 'ready' ? '#e8c43a' : '#8a8f88';
+    const bh = Math.max(3, 4 / z);
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillRect(x0, y0 - bh - 3 / z, w, bh);
+    ctx.fillStyle = col;
+    ctx.fillRect(x0, y0 - bh - 3 / z, w * clamp(frac, 0, 1), bh);
+  }
+  // Fertigungsfortschritt der laufenden Aufträge (je Ausbildungsplatz eine Leiste)
+  if (b.queue && b.queue.length) {
+    const bh = Math.max(3, 4 / z);
+    const slots = Math.min(BALANCE.trainSlots, b.queue.length);
+    for (let i = 0; i < slots; i++) {
+      const bt = UNITS[b.queue[i].unit].buildTime;
+      const frac = clamp(b.queueTimes[i] / bt, 0, 1);
+      const by = y0 + h + 3 / z + i * (bh + 1 / z);
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillRect(x0, by, w, bh);
+      ctx.fillStyle = '#7fd36a';
+      ctx.fillRect(x0, by, w * frac, bh);
+    }
+  }
 }
 
 /** Vorkommen: farbige Kuppe mit Kürzel; besetzt (Förderanlage) abgeblendet. */
@@ -580,53 +585,6 @@ export function drawCrate(ctx, x, y, s = 16, zoom = 1, glow = 0) {
   ctx.restore();
 }
 
-/** Mörsergranate in der Luft: Spur vom Abschuss, Kopf, Markierung am Ziel. */
-/** Sendemast von oben: Betonsockel mit Teamrand, Gittermast (Quadrate mit Kreuzstreben), Abspannseile, blinkendes rotes Licht. */
-function drawRadioTop(ctx, b, color, x0, y0, w, h, z) {
-  const cx = x0 + w / 2;
-  const cy = y0 + h / 2;
-  ctx.fillStyle = '#8d918a';
-  ctx.fillRect(x0 + 2, y0 + 2, w - 4, h - 4);
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2.5 / z;
-  ctx.strokeRect(x0 + 2, y0 + 2, w - 4, h - 4);
-  // Abspannseile zu Ankern außerhalb des Sockels
-  ctx.strokeStyle = 'rgba(230,232,226,0.7)';
-  ctx.lineWidth = 1 / z;
-  ctx.beginPath();
-  for (const [dx, dy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + dx * w * 0.85, cy + dy * h * 0.85);
-  }
-  ctx.stroke();
-  ctx.fillStyle = '#5d615b';
-  for (const [dx, dy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) ctx.fillRect(cx + dx * w * 0.85 - 2 / z, cy + dy * h * 0.85 - 2 / z, 4 / z, 4 / z);
-  // Gittermast: drei Ebenen, nach oben schmaler
-  ctx.strokeStyle = '#d23a32';
-  ctx.lineWidth = 1.6 / z;
-  for (const k of [0.32, 0.22, 0.12]) {
-    const s = w * k;
-    ctx.strokeRect(cx - s, cy - s, 2 * s, 2 * s);
-  }
-  ctx.beginPath();
-  ctx.moveTo(cx - w * 0.32, cy - h * 0.32);
-  ctx.lineTo(cx + w * 0.32, cy + h * 0.32);
-  ctx.moveTo(cx + w * 0.32, cy - h * 0.32);
-  ctx.lineTo(cx - w * 0.32, cy + h * 0.32);
-  ctx.stroke();
-  // Licht an der Spitze (blinkt)
-  const t = typeof performance !== 'undefined' ? performance.now() : 0;
-  const on = Math.floor(t / 600) % 2 === 0;
-  ctx.fillStyle = on ? '#ff4a3a' : '#7a1f1a';
-  ctx.beginPath();
-  ctx.arc(cx, cy, (on ? 4 : 3) / z, 0, Math.PI * 2);
-  ctx.fill();
-  if (b.hp < b.maxHp) {
-    ctx.fillStyle = `rgba(0,0,0,${(1 - b.hp / b.maxHp) * 0.45})`;
-    ctx.fillRect(x0 + 1, y0 + 1, w - 2, h - 2);
-  }
-}
-
 /** Goldener Stern (Kommandeur) mit Mittelpunkt (x, y), Radius r (Welt-Maße). */
 export function drawStar(ctx, x, y, r, zoom = 1) {
   ctx.save();
@@ -645,6 +603,7 @@ export function drawStar(ctx, x, y, r, zoom = 1) {
   ctx.restore();
 }
 
+/** Mörsergranate in der Luft: Spur vom Abschuss, Kopf, Markierung am Ziel. */
 export function drawShell(ctx, s, zoom = 1) {
   const z = zoom || 1;
   const head = Math.max(3, 3.5 / z);

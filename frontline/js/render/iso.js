@@ -11,17 +11,18 @@ const OUTLINE = 'rgba(0,0,0,0.55)';
 /** Höhe (Bildschirm-Pixel bei Zoom 1) der Stadtgebäude und der Spielgebäude je Typ. */
 export const TOWN_H = { house: 46, hall: 60, tower: 118, factory: 92, station: 54, platform: 8, barracks: 26, vhall: 40, heliport: 18, clinic: 50 };
 export const BUILD_H = {
-  fob: 58,
-  radio: 14, // Sockel des Sendemasts (der Mast selbst ist höher, isobuild.drawRadioMast)
+  // Militärgebäude: Höhe des Hauptkörpers der Bilder aus milbuild.js (seit v5.21), für Lebensbalken, Rauch und Antippen
+  fob: 40,
+  radio: 14, // Sockel des Sendemasts (der Mast selbst ist viel höher und dünn)
   depot: 50,
   helipad: 5,
   extractor: 36,
-  drill: 54,
-  mortar: 30,
-  tower: 74, // Gefechtsturm (Festung)
-  aa: 38,
-  phalanx: 24, // flacher Sockel, die Kuppel sitzt obendrauf
-  wall: 30,
+  drill: 66,
+  mortar: 20,
+  tower: 70, // Gefechtsturm (Festung)
+  aa: 26,
+  phalanx: 27,
+  wall: 22,
   gate: 24,
 };
 /** Flughöhe der Hubschrauber und Hebung normaler Einheiten über dem Boden (Bildschirm-Pixel bei Zoom 1). */

@@ -42,7 +42,8 @@ import {
 import { drawCityHallTop } from './cityhall.js';
 import { drawTownBuilding, drawTeamBuilding, drawCar, drawBench, drawRubble, drawCrate, drawWreckBox } from './isobuild.js';
 import { parkDeco } from './terrain.js';
-import { drawTreeSprite, drawRockSprite, drawBushSprite, drawCarSprite, drawUnitSprite, drawWreckSprite, setTeamBuildings } from './isosprites.js';
+import { drawTreeSprite, drawRockSprite, drawBushSprite, drawCarSprite, drawUnitSprite, drawWreckSprite } from './isosprites.js';
+import { drawMilTop, setMilWalls } from './milbuild.js';
 import { scarAlpha } from '../game/scars.js';
 import { reliefOf, RELIEF } from '../game/relief.js';
 import { getGround, LIGHT_ELEV } from './ground.js';
@@ -179,6 +180,7 @@ export class Renderer {
 
     this.syncRelief();
     beginTownFrame(dpr); // Stadtgebäude: Maßstab der Bilder, Zeitbudget fürs Nachmalen (townhouses.js, spritecache.js)
+    setMilWalls(g.buildings); // Mauern und Tore: Verbindungen zu den Nachbarn (milbuild.js)
     if (cam.iso) {
       this.renderIso(v, now);
       return;
@@ -215,7 +217,7 @@ export class Renderer {
       if (!b.alive || (!g.alwaysVisible(team, b) && !known(b.x, b.y))) continue;
       if (!inRect(b.x, b.y, (Math.max(b.w, b.h) * TILE) / 2)) continue;
       if (b.main && b.built && b.type === 'fob') drawCityHallTop(ctx, b, g.teams[b.team].color); // Hauptstadt: Rathaus (cityhall.js)
-      else drawBuilding(ctx, b, g.teams[b.team].color, z);
+      else drawBuilding(ctx, b, g.teams[b.team].color, z, drawMilTop(ctx, b, g.teams[b.team].color, z)); // Bild aus milbuild.js, darüber Anzeigen
       if (!b.built && b.team === team) this.drawSiteMarks(ctx, b, z);
     }
     const glow = 0.6 + 0.4 * Math.sin(now / 350);
@@ -535,7 +537,6 @@ export class Renderer {
       if (b && b.kind === 'building' && b.team === team) this.drawRally(ctx, b, z);
     }
 
-    setTeamBuildings(g.buildings);
     // Objekte mit Höhe, nach Tiefe (x + y) sortiert
     const items = [];
     const town = g.map.town;
@@ -652,7 +653,9 @@ export class Renderer {
       }
       else if (it.t === 4) {
         const b = it.o;
+        setRoofSnow(this.season === 'winter'); // Winter: Schnee auf Dächern und Wällen (milbuild.js)
         drawTeamBuilding(ctx, cam, b, g.teams[b.team].color);
+        setRoofSnow(false);
         if (!b.built && b.team === team) {
           const p = cam.worldToScreen(b.x, b.y);
           setUprightAt(ctx, cam, dpr, p.x, p.y, b.x, b.y);

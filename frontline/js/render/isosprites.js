@@ -4,7 +4,7 @@
 import { ISO_K } from './camera.js';
 import { spriteOverrides } from './isobuild.js';
 import { seasonal } from './season.js';
-import { BUILDING_SPRITES, TRAIN_SPRITES, TEAM_SPRITES, INFANTRY_SPRITES, TEAM_PPU, UNIT_PPU, MODEL_PPU } from './isodata.js';
+import { BUILDING_SPRITES, TRAIN_SPRITES, INFANTRY_SPRITES, UNIT_PPU, MODEL_PPU } from './isodata.js';
 
 const ENABLED = typeof Image !== 'undefined' && typeof location !== 'undefined' && new URLSearchParams(location.search).get('sprites') !== '0';
 const url = (p) => new URL(`../../assets/iso/${p}`, import.meta.url).href;
@@ -27,15 +27,14 @@ const TRAIN = {};
 for (const [part, list] of Object.entries(TRAIN_SPRITES)) {
   TRAIN[part] = list.map(([file, ax, ay, w, d]) => ({ img: load(`train/${file}`), ax, ay, w, d }));
 }
-// Wachturm (eigenes Modell, assets/iso/README.md): je Drehung der Ansicht ein Bild, 1 Modelleinheit = 1 Kachel
+// Wachturm der Karte (eigenes Modell, assets/iso/README.md): je Drehung der Ansicht ein Bild, 1 Modelleinheit = 1 Kachel.
+// Die eigenen Militärgebäude (Zentrale, Mörser, Flak, Mauer, Tor, Gefechtsturm …) sind seit v5.21 gemalt (milbuild.js).
 const TOWER = [0, 1, 2, 3].map((r) => load(`buildings/tower-r${r}.png`));
 const TOWER_VIEW = { ax: 119, ay: 222, ppu: 64, footprint: 78.4 }; // Bodenmitte im Bild, Pixel je Modelleinheit, Kabinenbreite in Welt-Pixeln
-const TEAM_IMG = {};
-for (const [key, [file, ax, ay]] of Object.entries(TEAM_SPRITES)) TEAM_IMG[key] = { img: load(`team/${file}`), ax, ay };
+const TILE_W = 32; // Weltpixel je Kachel (1 Modelleinheit des Turmbilds)
 const INF_IMG = {};
 for (const [key, [file, ax, ay]] of Object.entries(INFANTRY_SPRITES)) INF_IMG[key] = { img: load(`units/${file}`), ax, ay };
 const TEAM_NAME = ['blue', 'red'];
-const TILE_W = 32; // Weltpixel je Kachel (1 Modelleinheit der Gebäudebilder)
 const INFANTRY_UNIT = 9; // Weltpixel je Modelleinheit der Soldaten
 const TREE = load('trees/tree.png'); // Ersatz, solange die gemalten Bäume laden: blockiger Baum
 // Gemalte Bäume (tools/gen-trees.mjs), drei Laubbäume und eine Fichte, je Baum fest nach Position
@@ -104,37 +103,6 @@ if (ENABLED) {
     ctx.drawImage(m.img, p.x - m.ax * sc, p.y - m.ay * sc, m.img.naturalWidth * sc, m.img.naturalHeight * sc);
     return true;
   };
-}
-
-/** Eigene Gebäude: Zentrale, Mörser, Flak als Bild je Team und Drehung; Mauer und Tor nach Nachbarn ausgerichtet. */
-let teamBuildings = new Map(); // "cx,cy" → Gebäude (Mauer/Tor), vom Renderer je Bild gesetzt
-export function setTeamBuildings(list) {
-  teamBuildings = new Map();
-  for (const b of list) if (b.alive && (b.type === 'wall' || b.type === 'gate')) teamBuildings.set(`${b.cx},${b.cy}`, b);
-}
-function drawTeamImage(ctx, cam, key, x, y) {
-  const m = TEAM_IMG[key];
-  if (!ready(m?.img)) return false;
-  const sc = (TILE_W * cam.zoom) / TEAM_PPU;
-  const p = cam.worldToScreen(x, y);
-  ctx.drawImage(m.img, p.x - m.ax * sc, p.y - m.ay * sc, m.img.naturalWidth * sc, m.img.naturalHeight * sc);
-  return true;
-}
-if (ENABLED) {
-  for (const type of ['fob', 'mortar', 'aa']) {
-    spriteOverrides[type] = (ctx, cam, b) => b.team < 2 && drawTeamImage(ctx, cam, `${type}-${TEAM_NAME[b.team]}-r${cam.rot}`, b.x, b.y);
-  }
-  const wallPiece = (kind) => (ctx, cam, b) => {
-    const has = (dx, dy) => teamBuildings.has(`${b.cx + dx},${b.cy + dy}`);
-    const alongX = has(-1, 0) || has(1, 0);
-    const alongY = has(0, -1) || has(0, 1);
-    const main = kind === 'gate' ? (alongY && !alongX ? 'y' : 'x') : alongX || !alongY ? 'x' : 'y';
-    const ok = drawTeamImage(ctx, cam, `${kind}-${main}-r${cam.rot}`, b.x, b.y);
-    if (ok && kind === 'wall' && alongX && alongY) drawTeamImage(ctx, cam, `wall-y-r${cam.rot}`, b.x, b.y);
-    return ok;
-  };
-  spriteOverrides.wall = wallPiece('wall');
-  spriteOverrides.gate = wallPiece('gate');
 }
 
 /** Baum (aufrecht, Fuß am Weltpunkt). Liefert false, wenn das Bild fehlt. */

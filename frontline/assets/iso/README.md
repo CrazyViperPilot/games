@@ -4,7 +4,7 @@ Quelle: Kenney (kenney.nl), Pakete „City Kit (Commercial)“ und „City Kit (
 Vorgerenderte Gebäude liegen in buildings/, Baum und Fahrzeuge sind unveränderte Einzelbilder; Dateinamen der Fahrzeuge nach Bildschirmrichtung (e, se, s, sw, w, nw, n, ne).
 Eigene Entwürfe lassen sich austauschen: gleiche Dateinamen ersetzen oder die Listen in js/render/isosprites.js anpassen.
 
-Soldaten (units/): Kenney „Blocky Characters“ (Figur) mit Helm, Weste in Teamfarbe und Waffe (Gewehr aus dem „Blaster Kit“, RPG aus einfachen Formen) zusammengesetzt und in 8 Richtungen vorgerendert. Eigene Gebäude (team/): Zentrale aus „City Kit (Industrial)“ mit Teamflagge, Mörser und Flak aus dem „Tower Defense Kit“, Mauer und Tor aus dem „Castle Kit“, je Teamfarbe und Drehung der Ansicht vorgerendert (1 Modelleinheit = 1 Kachel). Drehen: js/render/isodata.js.
+Soldaten (units/): Kenney „Blocky Characters“ (Figur) mit Helm, Weste in Teamfarbe und Waffe (Gewehr aus dem „Blaster Kit“, RPG aus einfachen Formen) zusammengesetzt und in 8 Richtungen vorgerendert. Die eigenen Militärgebäude (früher team/: Zentrale, Mörser, Flak, Mauer, Tor aus Kenney-Kits) sind seit v5.21 gemalt (js/render/milbuild.js), die Bilder entfallen.
 
 Kampfhubschrauber (vehicles/apache-*): 3D-Modell „Attack Chopper“ von Cheese Animal Productions / Geibu3D (**CC BY 4.0**, OpenGameArt; Namensnennung siehe assets/LICENSES/Attack-Chopper-CC-BY-4.0.txt), mit three.js isometrisch (30° Höhe) in 8 Richtungen und Teamfarben gerendert. Je Modell sind alle 16 Bilder gleich zugeschnitten; Größe und Bodenpunkt stehen in `MODEL_VIEW` (js/render/isosprites.js). Neue Modelle: dieselben Dateinamen `<modell>-<blue|red>-<e|se|s|sw|w|nw|n|ne>.png` liefern und in `UNIT_MODEL`/`MODEL_VIEW` eintragen.
 
