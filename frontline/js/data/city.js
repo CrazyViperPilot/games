@@ -174,6 +174,9 @@ export const CITY = {
     airportReach: 60, // so viele Zellen um die Hauptstadt sucht sie einen freien Platz für ihn
     jets: { easy: 2, normal: 4, hard: 6 }, // so viele F-16 hält sie (seit v5.03)
     jetReserve: 400, // Geld, das nach dem Kauf einer F-16 übrig bleiben muss
+    // seit v5.19 (Review): höchstens so viele Förderanlagen je Werk, das ihren Rohstoff nimmt (Holz und Stein zusammen je BM-Werk, Erz je
+    // Hütte, Öl je Raffinerie oder Kerosin-Raffinerie; aufgerundet). Mehr Förderung, als die Werke verarbeiten, verstopft nur die Straßen.
+    minesPer: { bm: 1, smelter: 1, oil: 0.5 },
     roadTries: 4, // seit v5.19 (AP4): so viele Gebäude ohne Lieferweg oder Pendlerweg prüft die KI je Takt auf einen Straßenanschluss
     connectNear: 5, // seit v5.19 (AP4): Werke ohne Straße zum Lager nur an Straßen höchstens so viele Zellen vom Lagernetz entfernt (sonst wird der Anschluss zu weit)
     connectRing: 1, // seit v5.19 (AP4): Zellen neben einer Straße zum Lager zählen so viele Ringe näher (Großbauten und Werke bevorzugt dort)

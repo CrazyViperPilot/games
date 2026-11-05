@@ -31,3 +31,23 @@ test('Laden und Weiterspielen ist identisch zum durchgehenden Spiel', async () =
   assert.deepEqual(snapshotGame(g2, a2), snapshotGame(g1, a1));
   console.log('Spielstand gz-Bytes:', bytes.length);
 });
+
+test('Stadt mit Stau (v5.19): Stau-Faktor c.congestion wird gespeichert, Laden und Weiterspielen bleibt identisch', async () => {
+  const g1 = new Game({ seed: 11, city: true, startMoney: 3000 });
+  const a1 = new AI(g1, 1, 'normal');
+  let k = 0;
+  while (!g1.city[1].congestion.some((f) => f < 1) && k < 6000) {
+    run(g1, a1, 1);
+    k++;
+  }
+  run(g1, a1, 40); // mitten im Stau speichern
+  const jam = Array.from(g1.city[1].congestion).filter((f) => f < 1).length;
+  assert.ok(jam > 0, 'Straßen mit Stau vor dem Speichern');
+  const { game: g2, ai: a2 } = restoreGame(await unpack(await pack(snapshotGame(g1, a1))));
+  assert.ok(g2.city[1].congestion instanceof Float32Array, 'Typed Array bleibt Float32Array');
+  assert.deepEqual(Array.from(g2.city[1].congestion), Array.from(g1.city[1].congestion));
+  run(g1, a1, 400);
+  run(g2, a2, 400);
+  assert.deepEqual(Array.from(g2.city[1].congestion), Array.from(g1.city[1].congestion));
+  assert.deepEqual(snapshotGame(g2, a2), snapshotGame(g1, a1));
+});

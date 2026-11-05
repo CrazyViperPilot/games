@@ -463,4 +463,12 @@ test('Heliport tankt Hubschrauber im Umkreis aus c.kero (CITY.care.refuel je s)'
   const want = Math.min(UNITS.littlebird.fuelMax - 1, UNITS.littlebird.fuelMax * CITY.care.refuel * 0.05);
   assert.ok(Math.abs((kero0 - c.kero) - want) < 1e-6, `Kerosin verbraucht ${kero0 - c.kero} ≈ ${want}`);
   assert.ok(u.fuel > 1, 'Hubschrauber getankt');
+  // leeres Stadtlager: kein Kerosin, aber eine Mangelmeldung (seit dem Review von v5.19)
+  c.kero = 0;
+  u.fuel = 1;
+  g.drainEvents();
+  g.teams[0].warnAt = {};
+  stepN(g, 1);
+  assert.equal(c.kero, 0, 'Stadtlager bleibt leer (Tanken an FOBs mit Treibstoff bleibt davon unberührt)');
+  assert.ok(g.drainEvents().some((e) => e.type === 'message' && e.team === 0 && e.text === 'Fahrzeuge ohne Treibstoff'), 'Mangelmeldung bei leerem Stadtlager');
 });

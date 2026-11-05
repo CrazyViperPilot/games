@@ -1438,8 +1438,8 @@ function updateCare(game, c, dt) {
   if (!givers.length) return;
   const power = c.stats.powerRatio ?? 1;
   // Tanken (seit v5.19): Hubschrauber im Umkreis eines Heliports tanken Kerosin aus dem Stadtlager (1 Einheit je Treibstoffeinheit).
-  // Kampfflugzeuge tanken am Flughafen (aircraft.js), nicht hier.
-  if (c.kero > 0 && givers.some((g) => g.heli)) {
+  // Kampfflugzeuge tanken am Flughafen (aircraft.js), nicht hier. Auch bei leerem Stadtlager prüfen (Mangelmeldung, seit dem Review).
+  if (givers.some((g) => g.heli)) {
     for (const u of game.units) {
       if (!u.alive || u.team !== c.team || !u.def.fuelMax || u.def.jet || u.fuel >= u.def.fuelMax || careClass(u) !== 'air') continue;
       let near = false;
@@ -2204,19 +2204,24 @@ function aiAirport(game, c, main, reserve) {
 /** Freie Vorkommen im eigenen Gebiet (Zellindizes). */
 function depositCells(game, c) {
   // Förderanlage nur, wenn das Werk für ihren Rohstoff schon steht oder ansteht (seit v5.19, AP4): sonst fließt die Ware ins Leere
-  const works = { wood: 'bm', stone: 'bm', ore: 'smelter', oil: null };
-  const have = { bm: 0, smelter: 0, fuel: 0, kero: 0 };
+  // Seit dem Review von v5.19 auch nur so viele, wie die Werke verarbeiten (CITY.ai.minesPer): Überschuss stünde als Last auf den Straßen
+  const group = { wood: 'bm', stone: 'bm', ore: 'smelter', oil: 'oil' };
+  const works = { bm: 0, smelter: 0, oil: 0 };
+  const mines = { bm: 0, smelter: 0, oil: 0 };
   for (const i of c.list) {
     if (isPart(c, i)) continue;
     const k = KINDS[c.kind[i] - 1];
-    if (k in have) have[k]++;
+    if (k === 'mine') {
+      const g = group[DEPOSITS[c.deposit[i] - 1]];
+      if (g) mines[g]++;
+    } else if (k === 'bm' || k === 'smelter') works[k]++;
+    else if (k === 'fuel' || k === 'kero') works.oil++;
   }
   const out = [];
   for (let i = 0; i < c.deposit.length; i++) {
     if (!c.deposit[i] || !c.claim[i] || c.kind[i] || !canZone(game, c, i)) continue;
-    const d = DEPOSITS[c.deposit[i] - 1];
-    const target = works[d];
-    if (target ? !have[target] : !have.fuel && !have.kero) continue;
+    const g = group[DEPOSITS[c.deposit[i] - 1]];
+    if (!g || mines[g] >= Math.ceil(works[g] * CITY.ai.minesPer[g])) continue;
     const q = i % c.cols;
     if (!inDanger(c, q, (i - q) / c.cols, game.time)) out.push(i);
   }
@@ -2229,7 +2234,10 @@ function depositCells(game, c) {
     return 1;
   };
   out.sort((a, b) => want(a) - want(b) || a - b);
-  return out;
+  // je Gruppe nur so viele Zellen, wie noch Förderanlagen fehlen (ein Takt baut sonst mehrere auf einmal)
+  const left = {};
+  for (const g in works) left[g] = Math.ceil(works[g] * CITY.ai.minesPer[g]) - mines[g];
+  return out.filter((i) => left[group[DEPOSITS[c.deposit[i] - 1]]]-- > 0);
 }
 
 /** Markt der KI: Überschuss verkaufen, Metall zukaufen, wenn es knapp ist. */
