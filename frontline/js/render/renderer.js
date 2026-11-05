@@ -10,18 +10,11 @@ import { lacksAmmo } from '../game/entities.js';
 import {
   drawUnit,
   drawBuilding,
-  drawShell,
-  drawEffect,
   drawBar,
   drawCrate as drawCrateTop,
   fitText,
   hpColor,
   hexA,
-  drawCrater,
-  drawWreck,
-  drawWreckRubble,
-  drawSmoke,
-  drawFire,
   drawAnimalTop,
   drawAnimalSide,
   drawStar,
@@ -54,7 +47,8 @@ import { drawMood } from './mood.js';
 import { drawBridgeTop, drawBridgeIso, drawBridgeBar, bridgeBar, fordPosts, drawFordPostTop, drawFordPostIso } from './bridge.js';
 import { bridgeUnder } from '../game/river.js';
 import { setMapTown, drawMapTown2D, drawMapCars2D, drawPark } from './maptown.js';
-import { drawUnitTop, drawUnitShadowIso } from './unitpaint.js';
+import { drawUnitTop, drawUnitShadowIso, drawWreckTop } from './unitpaint.js';
+import { drawShell, drawShellIso, drawShellTarget, drawEffect, drawEffectUp, drawCrater, drawWreck, drawWreckRubble, drawSmoke, drawSmokeScreen, drawFire, drawMine } from './fx.js';
 import { drawCityGround, drawCityTop, cityBuildings, drawCityBadges } from './citylayer.js';
 import { drawWays } from './ways.js';
 import { beginTownFrame, townLift } from './townhouses.js';
@@ -110,18 +104,6 @@ export function updateFogLayer(layer, fog, reveal) {
   layer.ctx.putImageData(layer.image, 0, 0);
 }
 
-/** Eigene Mine: dunkle Scheibe mit rotem Punkt (der Gegner sieht sie nicht). */
-function drawMine(ctx, x, y, z) {
-  ctx.fillStyle = 'rgba(30,30,30,0.85)';
-  ctx.beginPath();
-  ctx.ellipse(x, y, 9 * z, 6 * z, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#e04030';
-  ctx.beginPath();
-  ctx.arc(x, y, 2 * z, 0, Math.PI * 2);
-  ctx.fill();
-}
-
 export class Renderer {
   constructor(canvas, game, camera, team) {
     this.canvas = canvas;
@@ -139,7 +121,6 @@ export class Renderer {
     this.fogBytes = null; // Nebel je Zelle (0 frei … 255 schwarz) für den WebGL-Nebel
     this.deco = null; // Bäume und Felsen der Hindernisse (isometrisch)
     this.fogLayer = makeFogLayer(game.fog[team]);
-    this.rubble = new Map(); // Trümmer je eingestürztem Haus (2D), einmal erzeugt
     this.dpr = 1;
     this.cssW = 0;
     this.cssH = 0;
@@ -286,6 +267,10 @@ export class Renderer {
         drawMine(ctx, q.x, q.y, 1);
         continue;
       }
+      if (q.screen) {
+        drawSmokeScreen(ctx, q.x, q.y, q.s, q.k, t, q.seed);
+        continue;
+      }
       if (q.fire) drawFire(ctx, q.x, q.y, q.s * 0.7, t, q.seed);
       drawSmoke(ctx, q.x, q.y, q.s, q.k, t, q.seed);
     }
@@ -401,6 +386,17 @@ export class Renderer {
     else cam.pinAt(x, y);
     setIsoGround(ctx, cam, this.dpr);
     cam.unpin();
+  }
+
+  /** Iso: Bildschirmpunkt des Bodens am Weltpunkt (Gelände, auf einer Brücke ihre Fahrbahn). */
+  screenAt(x, y) {
+    const cam = this.camera;
+    const br = this.game.bridges?.length ? bridgeUnder(this.game, x, y) : null;
+    if (!br) return cam.worldToScreen(x, y);
+    cam.pin(br.deckH);
+    const p = cam.worldToScreen(x, y);
+    cam.unpin();
+    return p;
   }
 
   /** Lichtrichtung (Welt, z nach oben) für den WebGL-Boden: kommt von rechts oben im Bild, wie die Schatten der Gebäude. */
@@ -747,34 +743,42 @@ export class Renderer {
     drawCityBadges(this, ctx, team, known, inRect, true); // Stadt: Schilder über den Dächern (über allen Gebäuden)
     for (const u of air) drawU(u);
 
-    // Geschosse fliegen im Bogen, Effekte am Boden
+    // Effekte (seit v5.34, fx.js): Zielringe, Lichtschein und Druckringe in der Bodenebene, danach aufrecht Granaten im Bogen,
+    // Feuerbälle, Leuchtspuren und Mündungsfeuer
+    const at = (x, y) => this.screenAt(x, y);
+    const shells = [];
+    setIsoGround(ctx, cam, dpr);
     for (const p of g.projectiles) {
       if (!p.alive || !shown(p)) continue;
       if (!inRect(p.x, p.y, 80) && !inRect(p.tx, p.ty, 80)) continue;
-      const sp = cam.worldToScreen(p.x, p.y);
-      const f = Math.min(1, p.t / p.duration);
-      setUprightAt(ctx, cam, dpr, sp.x, sp.y - (14 + 90 * Math.sin(Math.PI * f)) * z, p.x, p.y);
-      drawShell(ctx, p, z);
+      if (relief) this.groundAt(ctx, p.tx, p.ty);
+      drawShellTarget(ctx, p, z);
+      shells.push(p);
     }
-    setIsoGround(ctx, cam, dpr);
+    const ups = [];
     for (const e of g.effects) {
       if (!inRect(e.x, e.y, 120) && !inRect(e.x2 ?? e.x, e.y2 ?? e.y, 120)) continue;
       if (e.team !== -1 && e.team !== team && !seen(e.x, e.y) && !seen(e.x2 ?? e.x, e.y2 ?? e.y)) continue;
-      if (relief) {
-        // Strecken (Leuchtspur) auf der mittleren Höhe beider Enden
-        cam.pin(e.x2 === undefined ? relief.displayAt(e.x, e.y) : (relief.displayAt(e.x, e.y) + relief.displayAt(e.x2, e.y2)) / 2);
-        setIsoGround(ctx, cam, dpr);
-        cam.unpin();
+      if (e.type === 'explosion' || e.type === 'muzzle') {
+        if (relief) this.groundAt(ctx, e.x, e.y);
+        else setIsoGround(ctx, cam, dpr);
+        drawEffect(ctx, e, z, true);
       }
-      drawEffect(ctx, e, z);
+      ups.push(e);
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    for (const p of shells) drawShellIso(ctx, cam, p, at);
+    for (const e of ups) drawEffectUp(ctx, e, cam, at);
     const t = now / 1000;
     for (const q of this.smokeSources(seen, shown, inRect, PAD)) {
       const p = cam.worldToScreen(q.x, q.y);
       const y = p.y - q.lift * z;
       if (q.mine) {
         drawMine(ctx, p.x, y, z * 0.6);
+        continue;
+      }
+      if (q.screen) {
+        drawSmokeScreen(ctx, p.x, y, q.s * z, q.k, t, q.seed);
         continue;
       }
       if (q.fire) drawFire(ctx, p.x, y, q.s * 0.7 * z, t, q.seed);
@@ -869,17 +873,6 @@ export class Renderer {
       else if (c.state === 'ground' && this.revealAll) out.push({ x: c.x, y: c.y, ground: true });
     }
     if (!this.revealAll) for (const m of g.crateSeen?.[this.team]?.values() ?? []) if (known(m.x, m.y)) out.push({ x: m.x, y: m.y, ground: true });
-    for (const s of g.smokes ?? []) {
-      if (!inRect(s.x, s.y, pad + s.r) || !(s.team === this.team || seen(s.x, s.y))) continue;
-      const k = Math.min(1, (s.until - g.time) / 3, (g.time - s.t0) / 1 + 0.2); // Auf- und Abklingen
-      for (let i = 0; i < 6; i++) {
-        const a = (i / 6) * Math.PI * 2 + s.t0;
-        out.push({ x: s.x + Math.cos(a) * s.r * 0.55, y: s.y + Math.sin(a) * s.r * 0.55, lift: 8, s: s.r * 0.55, k: Math.max(0.15, k) * 0.8, fire: false, seed: Math.round(s.t0 * 7) + i * 31 });
-      }
-    }
-    for (const m of g.mines ?? []) {
-      if (m.team === this.team && inRect(m.x, m.y, pad)) out.push({ x: m.x, y: m.y, lift: 0, s: 3, k: 0.5, fire: false, seed: 1, mine: true });
-    }
     return out;
   }
 
@@ -898,7 +891,7 @@ export class Renderer {
       if (!this.scarShown(w) || !inRect(w.x, w.y, 60)) continue;
       const a = scarAlpha(w, g.time, SC.wreckLife, SC.wreckFade);
       if (w.kind === 'building') drawWreckRubble(ctx, w, a);
-      else drawWreck(ctx, w, z, a);
+      else if (!drawWreckTop(ctx, w, z, a)) drawWreck(ctx, w, z, a); // verkohltes Modell (seit v5.34), sonst einfache Form
     }
   }
 
@@ -931,6 +924,18 @@ export class Renderer {
       if (age >= WRECK_SMOKE || w.small || !inRect(w.x, w.y, pad) || !seen(w.x, w.y)) continue;
       const big = w.kind === 'building';
       out.push({ x: w.x, y: w.y, lift: big ? 12 : 6, s: big ? 8 + Math.max(w.w, w.h) / 14 : 6, k: 1 - age / WRECK_SMOKE, fire: age < WRECK_FIRE, seed: w.id * 29 });
+    }
+    // Nebelwand und eigene Minen (Fähigkeiten, abilities.js); bis v5.33 versehentlich in crateMarks (ohne inRect: Fehler beim Zeichnen)
+    for (const s of g.smokes ?? []) {
+      if (!inRect(s.x, s.y, pad + s.r) || !(s.team === this.team || seen(s.x, s.y))) continue;
+      const k = Math.min(1, (s.until - g.time) / 3, (g.time - s.t0) / 1 + 0.2); // Auf- und Abklingen
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2 + s.t0;
+        out.push({ x: s.x + Math.cos(a) * s.r * 0.55, y: s.y + Math.sin(a) * s.r * 0.55, lift: 8, s: s.r * 0.55, k: Math.max(0.15, k) * 0.8, fire: false, seed: Math.round(s.t0 * 7) + i * 31, screen: true });
+      }
+    }
+    for (const m of g.mines ?? []) {
+      if (m.team === this.team && inRect(m.x, m.y, pad)) out.push({ x: m.x, y: m.y, lift: 0, s: 3, k: 0.5, fire: false, seed: 1, mine: true });
     }
     return out;
   }
@@ -1146,34 +1151,14 @@ export class Renderer {
     return out;
   }
 
-  /** 2D: Ruinen eingestürzter Stadthäuser über dem Bodenbild (das die Häuser fest enthält): Schutt und Brocken. */
+  /** 2D: Ruinen eingestürzter Stadthäuser über dem Bodenbild (das die Häuser fest enthält): Schutthügel, Mauerecke, Balken (fx.js). */
   drawRuins(ctx, R, known) {
     for (const h of this.game.houses ?? []) {
       if (!h.ruined || !known(h.x, h.y)) continue;
       const x0 = h.x - h.pw / 2;
       const y0 = h.y - h.ph / 2;
       if (x0 > R.x1 || y0 > R.y1 || x0 + h.pw < R.x0 || y0 + h.ph < R.y0) continue;
-      let bits = this.rubble.get(h.id);
-      if (!bits) {
-        const rng = makeRng(((h.x * 73856093) ^ (h.y * 19349663)) >>> 0);
-        const cols = ['#8d877c', '#79736a', '#9a9387', '#5f5a53'];
-        bits = [];
-        const n = Math.max(8, Math.min(40, Math.round((h.pw * h.ph) / 400)));
-        for (let i = 0; i < n; i++) {
-          const s = 4 + rng.next() * 11;
-          bits.push({ x: x0 + 3 + rng.next() * (h.pw - 6 - s), y: y0 + 3 + rng.next() * (h.ph - 6 - s), w: s, h: s * (0.5 + rng.next()), c: cols[i % cols.length] });
-        }
-        this.rubble.set(h.id, bits);
-      }
-      ctx.fillStyle = '#6f6a62';
-      ctx.fillRect(x0, y0, h.pw, h.ph);
-      for (const b of bits) {
-        ctx.fillStyle = b.c;
-        ctx.fillRect(b.x, b.y, b.w, b.h);
-      }
-      ctx.strokeStyle = 'rgba(0,0,0,0.35)';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x0, y0, h.pw, h.ph);
+      drawWreckRubble(ctx, { id: h.id, x: h.x, y: h.y, w: h.pw, h: h.ph, small: false, ruin: true, wall: '#c9bfae' });
     }
   }
 
