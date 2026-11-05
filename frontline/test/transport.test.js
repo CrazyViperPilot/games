@@ -20,7 +20,7 @@ function spot(g, w, h) {
     for (let q = 0; q <= c.cols - w; q++) {
       let ok = true;
       for (let y = r; ok && y < r + h; y++) for (let x = q; ok && x < q + w; x++) ok = canZone(g, c, y * c.cols + x) && !c.kind[y * c.cols + x];
-      // Rand von einer Zelle ohne Straße und ohne Gebäude: die Fläche hängt nicht am Startviertel (seit v5.32, kleinere Fabrikhalle)
+      // Rand von einer Zelle ohne Straße und ohne Gebäude: die Fläche hängt nicht am Startviertel (seit v5.33, kleinere Fabrikhalle)
       for (let y = r - 1; ok && y <= r + h; y++) {
         for (let x = q - 1; ok && x <= q + w; x++) {
           if (y < 0 || x < 0 || y >= c.rows || x >= c.cols) continue;
@@ -137,7 +137,7 @@ test('Überlast → Stau-Faktor < 1 nach settleLoads, nach Entlastung wieder 1',
 test('Lager-Anschluss: Straße bis an die Hauptstadt macht mainAccess nicht leer, Werk liefert ins Lager', () => {
   const g = new Game({ seed: 3, city: true, startMoney: 5000 });
   const c = g.city[0];
-  // Seit v5.20 (AP4) hat das Startviertel schon einen Anschluss ans Lager; die Straße hier ergänzt ihn. Seit v5.32 sucht der Test
+  // Seit v5.20 (AP4) hat das Startviertel schon einen Anschluss ans Lager; die Straße hier ergänzt ihn. Seit v5.33 sucht der Test
   // die Zellen selbst: eine freie Zelle p im Anschlussbereich der Hauptstadt (eine Straße dort zählt zu mainAccess) und daneben ein
   // freies 2 × 2-Quadrat für das BM-Werk
   const m = g.mainFob(0);

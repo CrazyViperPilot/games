@@ -102,7 +102,7 @@ test('Zonenstraßen und Brücken sind Stadtstraßen für beide Teams', () => {
   assert.equal(R.kind[i], 1);
 });
 
-test('Großbauten mit gerader Kante: Kraftwerk 2 × 2, Kaserne 4 × 4, Fabrikhalle 5 × 5 (seit v5.32); Startviertel', () => {
+test('Großbauten mit gerader Kante: Kraftwerk 2 × 2, Kaserne 4 × 4, Fabrikhalle 5 × 5 (seit v5.33); Startviertel', () => {
   assert.deepEqual([sizeOf('power'), sizeOf('barracks'), sizeOf('factory'), sizeOf('airport')], [2, 4, 5, 10]);
   const g = new Game({ seed: 3, city: true });
   for (const c of g.city) {

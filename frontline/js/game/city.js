@@ -873,13 +873,13 @@ export function migrateCity(game) {
         if (lv) syncEntity(game, c, a);
       }
     }
-    if (shrinkBig(game, c)) changed = true; // Großbauten, die kleiner geworden sind (seit v5.32: Fabrikhalle 8 × 8 → 5 × 5)
+    if (shrinkBig(game, c)) changed = true; // Großbauten, die kleiner geworden sind (seit v5.33: Fabrikhalle 8 × 8 → 5 × 5)
     if (changed) rebuildList(c); // sonst bleibt der Stand unverändert (Laden = durchgehend gespielt)
   }
 }
 
 /**
- * Alte Stände (seit v5.32): ein Großbau, der mehr Zellen belegt, als seine Art heute groß ist (CITY.size, z. B. die Fabrikhalle 8 × 8
+ * Alte Stände (seit v5.33): ein Großbau, der mehr Zellen belegt, als seine Art heute groß ist (CITY.size, z. B. die Fabrikhalle 8 × 8
  * → 5 × 5), behält ein n × n-Quadrat seiner alten Fläche: bevorzugt eines mit Straße daneben, sonst das um den alten Anker. Die übrigen
  * Zellen werden frei. Das Ziel (Trefferpunkte anteilig, Warteschlange, Sammelpunkt) bleibt dasselbe Objekt.
  */

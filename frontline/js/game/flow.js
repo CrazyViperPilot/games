@@ -220,7 +220,7 @@ export function resourceFlow(game, team, rates = null) {
       issue(1 + (1 - n.util), `${n.name} nur ${pct(n.util)} ausgelastet: zu wenig ${what}.`, mines ? `${mines} bauen oder ausbauen.` : `Mehr ${what} erzeugen.`);
     } else if (n.cap < n.inp * 0.85 && rawIns.length) {
       n.status = 'bad';
-      n.note = 'Engpass · voll ausgelastet';
+      n.note = 'Engpass · voll'; // kurz, damit es auf den Knoten passt (v5.32)
     } else {
       n.note = `Auslastung ${pct(n.util)}`;
     }

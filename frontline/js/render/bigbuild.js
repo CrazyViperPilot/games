@@ -1,6 +1,6 @@
 // Großbauten der Stadt ohne eigenes Bild (seit v5.03, PRD §15; das Kraftwerk zeichnet seit v5.18 works.js): Kaserne (4 × 4,
 // Unterkünfte mit Ziegeldach um einen Exerzierplatz, Wache, Fahrzeuge; seit v5.11 mit Fenstern, Toren und Bäumen), Fabrikhalle
-// (5 × 5 seit v5.32, vorher 8 × 8; Montagehalle mit Sheddach, Verwaltung, Lackiererei, Schornsteine, Fahrzeughof mit fertigen Fahrzeugen, Portalkran) und
+// (5 × 5 seit v5.33, vorher 8 × 8; Montagehalle mit Sheddach, Verwaltung, Lackiererei, Schornsteine, Fahrzeughof mit fertigen Fahrzeugen, Portalkran) und
 // Flughafen (10 × 10; Boden und gemalte Bauten seit v5.22 aus airport.js). Jede Anlage ist eine Liste von Teilen in Weltkoordinaten:
 // Boden (Flächen, Linien, Vielecke) und Körper (Quader, Zylinder, Fahnen, gemalte Teile des Flughafens). Die 2D-Ansicht zeichnet sie
 // von oben, die Iso-Ansicht jeden Körper einzeln in der Tiefenordnung (so stehen Einheiten richtig davor oder dahinter) und für jede
@@ -49,7 +49,7 @@ function groundOf(k, lv, half) {
     const f = half - 6;
     for (const [x0, y0, x1, y1] of [[-f, -f, f, -f], [f, -f, f, f], [f, f, 66, f], [32, f, -f, f], [-f, f, -f, -f]]) line(x0, y0, x1, y1, '#4a4a42', 2.5); // Zaun (Lücke an der Zufahrt)
   } else if (k === 'factory') {
-    // Fabrikhalle (seit v5.11, seit v5.32 als 5 × 5-Großbau, ±160): Betonhof, Fahrzeughof mit Stellplätzen zur Straße, Rasen vor der Verwaltung
+    // Fabrikhalle (seit v5.11, seit v5.33 als 5 × 5-Großbau, ±160): Betonhof, Fahrzeughof mit Stellplätzen zur Straße, Rasen vor der Verwaltung
     rect(-half + 3, -half + 3, half - 3, half - 3, '#a9a69c');
     rect(-150, 96, 150, 152, '#8c8a82'); // Fahrzeughof
     for (let x = -126; x <= 126; x += 42) line(x, 104, x, 146, '#e3d46a', 1.6); // Stellplätze
@@ -104,7 +104,7 @@ function bodiesOf(k, lv, half) {
       veh('tank', -32, -30, 'x');
     }
   } else if (k === 'factory') {
-    // Fabrikhalle (seit v5.11; seit v5.32 kompakt für 5 × 5 Zellen, ±160): Montagehalle mit Sheddach und Toren, Verwaltung mit
+    // Fabrikhalle (seit v5.11; seit v5.33 kompakt für 5 × 5 Zellen, ±160): Montagehalle mit Sheddach und Toren, Verwaltung mit
     // Fensterbändern und Streifen in Teamfarbe, Schornstein, Tanklager, fertige Fahrzeuge auf dem Hof; Stufe 2: Lackiererei, zweite
     // Halle, Containerlager; Stufe 3: dritte Halle, zweiter Schornstein, Portalkran über den Containern, mehr Fahrzeuge.
     const HALL = '#bcc1bd';

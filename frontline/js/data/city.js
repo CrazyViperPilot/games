@@ -81,7 +81,7 @@ export const CITY = {
     mun: { from: ['metal'], to: 'mun' }, // Munitionswerk: Stahl → Munition
   },
   // Startviertel (seit v4.84): steht zu Beginn fertig (Stufe 1) neben der Hauptstadt, dazu eine Ölquelle auf dem nächsten Ölvorkommen
-  // Seit v5.03: über der Straße die Großbauten Kaserne (4 × 4) und Fabrikhalle (seit v5.32 5 × 5, vorher 8 × 8) nebeneinander, big = [Art, Spalte ab Straßenanfang]
+  // Seit v5.03: über der Straße die Großbauten Kaserne (4 × 4) und Fabrikhalle (seit v5.33 5 × 5, vorher 8 × 8) nebeneinander, big = [Art, Spalte ab Straßenanfang]
   // Ein Großbau in row (seit v5.08 die 2 × 2-Raffinerie) beginnt an seiner Spalte und reicht nach rechts und unten (dort null).
   startQuarter: { road: 12, row: ['res', 'fuel', null, 'res'], big: [['barracks', 0], ['factory', 4]] }, // Straßenlänge, die Zellen darunter, die Großbauten darüber
   startMetal: 400, // Stahl im Hauptlager zu Beginn (Stahl bleibt dort, LKW fahren es nicht; Schlüssel metal)
