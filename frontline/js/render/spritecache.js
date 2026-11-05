@@ -123,6 +123,24 @@ export function sprite(key, scale, bounds, paint) {
   return e;
 }
 
+/** Vorhandenes Bild der Variante `key` (Maßstab am nächsten an `scale`), ohne neu zu malen; sonst null (Ersatz, seit v5.27). */
+export function peek(key, scale) {
+  const levels = store.get(key);
+  if (!levels?.size) return null;
+  const k = Math.log(Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale))) / STEP;
+  let best = null;
+  let bd = Infinity;
+  for (const [kk, e] of levels) {
+    const d = Math.abs(kk - k);
+    if (d < bd) {
+      bd = d;
+      best = e;
+    }
+  }
+  best.used = now;
+  return best;
+}
+
 /** Eintrag e so zeichnen, dass sein Ankerpunkt bei (x, y) liegt; f = Zeichenkoordinaten je Einheit (Iso: Zoom, 2D: 1). */
 export function blit(ctx, e, x, y, f) {
   ctx.drawImage(e.img, x + e.x0 * f, y + e.y0 * f, e.w * f, e.h * f);

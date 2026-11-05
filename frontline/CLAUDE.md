@@ -116,8 +116,8 @@ Wo jedes Feature liegt. „KI“ = Konstanten-Präfix in `js/data/ai.js`, Logik 
 | Bewegung, Wegsuche, Raster | – | `slope.pathCost`, `leash` | `movement.js`, `pathfinding.js`, `grid.js` | – | – | `path.test.js` |
 | Formationen | §8 | `formation` | `formation.js` | Keil bei Angriffswellen | `controller.js` (Taste F) | `formation.test.js` |
 | Kampf, Waffen, Schaden, Treffer | §6 „Waffen“, „Treffer“ | `UNITS.*.weapons`, `BUILDINGS.*.weapon`, `height` | `combat.js`, `entities.js` | `FALLBACK_*`, `RAID_*` | `sprites.js` (Effekte) | `hits.test.js`, `game.test.js` |
-| Flugabwehr (Flak, SAM, Flugabwehrstellung, Phalanx) | §5, §6 | `airFire`, `UNITS.flak`, `UNITS.sam`, `BUILDINGS.aa`, `BUILDINGS.phalanx` (`moneyPerShot`) | `combat.js` | baut Flak/SAM noch nicht | `sprites.js`, `isosprites.js`, `milbuild.js` (Flugabwehr, Phalanx) | `airdefense.test.js` |
-| Flakpanzer Gepard, Panzerhaubitze (Artillerie: Granaten mit Streuung, Mindestreichweite, Feuer auf Punkt) | §6 | `UNITS.gepard`, `UNITS.pzh` (`indirect`, `shell`, `spread`, `shellSpeed`), Forschungsast `art` | `combat.js` (`fireUnitShell`, `unitFireAtGround`), `game.js` (`cmdMortarTarget`) | `GEPARD_*`, `AIR_MEMORY`, `ART_*` (`counterMix`, `artillery`) | `sprites.js`, `isosprites.js`, `renderer.js` (`drawMortarRange`), `controller.js` | `artillery.test.js`, `aiart.test.js` |
+| Flugabwehr (Flak, SAM, Flugabwehrstellung, Phalanx) | §5, §6 | `airFire`, `UNITS.flak`, `UNITS.sam`, `BUILDINGS.aa`, `BUILDINGS.phalanx` (`moneyPerShot`) | `combat.js` | baut Flak/SAM noch nicht | `unitpaint.js` (Flak, SAM), `milbuild.js` (Flugabwehr, Phalanx) | `airdefense.test.js` |
+| Flakpanzer Gepard, Panzerhaubitze (Artillerie: Granaten mit Streuung, Mindestreichweite, Feuer auf Punkt) | §6 | `UNITS.gepard`, `UNITS.pzh` (`indirect`, `shell`, `spread`, `shellSpeed`), Forschungsast `art` | `combat.js` (`fireUnitShell`, `unitFireAtGround`), `game.js` (`cmdMortarTarget`) | `GEPARD_*`, `AIR_MEMORY`, `ART_*` (`counterMix`, `artillery`) | `unitpaint.js`, `renderer.js` (`drawMortarRange`), `controller.js` | `artillery.test.js`, `aiart.test.js` |
 | Scharfschütze, Tarnung | §6 | `stealth`, `UNITS.sniper` | `game.js` (`sees`), `combat.js` | baut ihn nicht | – | `sniper.test.js` |
 | Nebel und Sicht | §7, §9 | `fogInterval`, `sightHeight` | `fog.js` | – | `renderer.js`, `minimap.js` | `terrain.test.js` |
 | Gelände: Höhe, Hänge, Seen | §7 „Gelände“ | `height`, `slope`, `sightHeight` | `relief.js`, `landscape.js` | – | `ground.js` (WebGL), `reliefimg.js` | `relief.test.js`, `terrain.test.js` |
@@ -157,7 +157,7 @@ Wo jedes Feature liegt. „KI“ = Konstanten-Präfix in `js/data/ai.js`, Logik 
 2. `js/data/buildings.js`: Schlüssel in `fob.produces` eintragen, für Partien mit Stadt auch in `CITY.produces` (`js/data/city.js`: Kaserne, Fabrikhalle oder Heliport).
 3. `js/data/balance.js`: Stufe in `research.unitTier` (fehlt = sofort verfügbar).
 4. (entfällt: der Kurzname steht als `short` in units.js)
-5. Aussehen: 2D in `js/render/sprites.js` (`drawUnit`); Iso optional in `js/render/isosprites.js` (`UNIT_MODEL` / `INFANTRY_NAME`, sonst gemalt).
+5. Aussehen: Modell in `js/render/unitpaint.js` (Funktion in `MODELS` bzw. `INFANTRY`, gilt für 2D und Iso; `test/unitpaint.test.js` prüft, dass jede Einheit eines hat). Ohne Modell zeichnen `js/render/sprites.js` (`drawUnit`) und der Renderer eine einfache Form.
 6. KI: Soll sie die Einheit bauen? Dann `MIX` in `js/data/ai.js` und die Ausbildung in `js/ai/ai.js` ergänzen, sonst im PRD §10 vermerken, dass sie es nicht tut.
 7. Test in `test/` (Ausbildung über `game.issue(team, { type: 'train', … })`), Hilfe in `js/ui/menu.js`, `npm run docs` (Tabellen), PRD §6 (Rolle) und Änderungsverlauf, `CACHE_VERSION`.
 

@@ -3,7 +3,7 @@
 // Austausch: Dateien in assets/iso/ ersetzen oder die Listen unten anpassen.
 import { spriteOverrides } from './isobuild.js';
 import { seasonal } from './season.js';
-import { INFANTRY_SPRITES, UNIT_PPU } from './isodata.js';
+import { drawUnitIso, drawWreckIso } from './unitpaint.js';
 
 const ENABLED = typeof Image !== 'undefined' && typeof location !== 'undefined' && new URLSearchParams(location.search).get('sprites') !== '0';
 const url = (p) => new URL(`../../assets/iso/${p}`, import.meta.url).href;
@@ -22,10 +22,6 @@ const hash = (x, y = 0) => (Math.imul(Math.round(x) | 0, 73856093) ^ Math.imul(M
 const TOWER = [0, 1, 2, 3].map((r) => load(`buildings/tower-r${r}.png`));
 const TOWER_VIEW = { ax: 119, ay: 222, ppu: 64, footprint: 78.4 }; // Bodenmitte im Bild, Pixel je Modelleinheit, Kabinenbreite in Welt-Pixeln
 const TILE_W = 32; // Weltpixel je Kachel (1 Modelleinheit des Turmbilds)
-const INF_IMG = {};
-for (const [key, [file, ax, ay]] of Object.entries(INFANTRY_SPRITES)) INF_IMG[key] = { img: load(`units/${file}`), ax, ay };
-const TEAM_NAME = ['blue', 'red'];
-const INFANTRY_UNIT = 9; // Weltpixel je Modelleinheit der Soldaten
 const TREE = load('trees/tree.png'); // Ersatz, solange die gemalten Bäume laden: blockiger Baum
 // Gemalte Bäume (tools/gen-trees.mjs), drei Laubbäume und eine Fichte, je Baum fest nach Position
 const TREES_NATURAL = ['a', 'b', 'c', 'd'].map((n) => load(`trees/tree-${n}.png`));
@@ -40,16 +36,7 @@ const CAR_CELL = { w: 96, h: 80, ax: 48, ay: 56, ppu: 2 }; // Zellgröße, Wagen
 const ROCK_VIEW = { ax: 64, ay: 92, w: 128, h: 104 };
 const BUSH_VIEW = { ax: 36, ay: 50, w: 72 };
 
-// Fahrzeuge: je Modell und Team (0 = Blau, 1 = Rot) acht Bilder nach Bildschirmrichtung
-const SECTORS = ['e', 'se', 's', 'sw', 'w', 'nw', 'n', 'ne']; // 0° = rechts, im Uhrzeigersinn
-const TEAM_COLOR = ['blue', 'red'];
-const UNIT_MODEL = { truck: 'truck', fobTruck: 'truck', engineer: 'pickup', tank: 'tank', gunship: 'apache', littlebird: 'littlebird', ifv: 'ifv', flak: 'flak', sam: 'sam', transporter: 'transporter', gepard: 'flak', pzh: 'tank' }; // Gepard und Panzerhaubitze (seit v5.19): ähnliche gemalte Modelle
-// Gemalte Fahrzeugmodelle (tools/gen-troops.mjs), siehe assets/iso/README.md: span = Bildbreite in Einheitenradien, ax/ay = Bodenpunkt im Bild
-const MODEL_VIEW = { truck: { span: 7, ax: 72, ay: 86 }, pickup: { span: 6.4, ax: 72, ay: 86 }, tank: { span: 6.5, ax: 72, ay: 82 }, apache: { span: 6.2, ax: 72, ay: 90 }, littlebird: { span: 6.8, ax: 72, ay: 90 }, ifv: { span: 5.6, ax: 72, ay: 82 }, flak: { span: 6.1, ax: 72, ay: 86 }, sam: { span: 6.1, ax: 72, ay: 86 }, transporter: { span: 7.2, ax: 72, ay: 90 } };
-const VEHICLES = {};
-for (const model of new Set(Object.values(UNIT_MODEL))) {
-  VEHICLES[model] = TEAM_COLOR.map((c) => SECTORS.map((s) => load(`vehicles/${model}-${c}-${s}.png`)));
-}
+// Soldaten, Fahrzeuge, Hubschrauber und F-16 sind seit v5.27 gemalt (unitpaint.js); die Bilder aus tools/gen-troops.mjs sind entfernt.
 
 if (ENABLED) {
   spriteOverrides.tower = (ctx, cam, b) => {
@@ -147,99 +134,12 @@ export function drawBushSprite(ctx, cam, b, season = 'summer') {
   return true;
 }
 
-const INFANTRY_NAME = { rifleman: 'rifleman', at: 'at', sniper: 'sniper', commander: 'rifleman' }; // Kommandeur: Schützen-Bild, Stern vom Renderer
-/** Bildschirmrichtung einer Weltrichtung als Sektor 0–7 (0 = rechts, im Uhrzeigersinn). */
-function headingSector(cam, angle) {
-  const [a, b, c, d] = cam.isoMatrix(1);
-  const cx = Math.cos(angle);
-  const cy = Math.sin(angle);
-  return (Math.round(Math.atan2(b * cx + d * cy, a * cx + c * cy) / (Math.PI / 4)) + 8) % 8;
-}
-function drawInfantry(ctx, cam, u, p, type, aim) {
-  const m = INF_IMG[`${type}-${TEAM_NAME[u.team]}-${SECTORS[headingSector(cam, aim ?? u.angle ?? 0)]}`];
-  if (!ready(m?.img)) return false;
-  const sc = (INFANTRY_UNIT * cam.zoom) / UNIT_PPU;
-  ctx.drawImage(m.img, p.x - m.ax * sc, p.y - m.ay * sc, m.img.naturalWidth * sc, m.img.naturalHeight * sc);
-  return true;
-}
-
-/** Fahrzeug-Sprite je Einheit (aufrecht, Blickrichtung nach Bewegungsrichtung). Liefert false, wenn es keins gibt. */
-export function drawUnitSprite(ctx, cam, u, p, aim = null, lift = 0) {
-  const inf = INFANTRY_NAME[u.type];
-  if (inf && u.team < 2) return drawInfantry(ctx, cam, u, p, inf, aim);
-  if (!drawModel(ctx, cam, u.type, u.team, u.angle, u.def.radius, p, lift)) return false;
-  if (u.def.deploys) drawDeployMast(ctx, cam.zoom, u.def.radius, p, lift);
-  return true;
-}
-
-/** FOB-Fahrzeug (LKW-Modell, größer): Antennenmast mit gelbem Wimpel darüber, damit es sich vom LKW abhebt. */
-function drawDeployMast(ctx, z, radius, p, lift) {
-  const x = p.x;
-  const y0 = p.y - lift * z - radius * 1.2 * z;
-  const y1 = y0 - radius * 1.6 * z;
-  ctx.save();
-  ctx.strokeStyle = '#2b2f2b';
-  ctx.lineWidth = Math.max(1, 1.4 * z);
-  ctx.beginPath();
-  ctx.moveTo(x, y0);
-  ctx.lineTo(x, y1);
-  ctx.stroke();
-  ctx.fillStyle = '#c9a227';
-  ctx.beginPath();
-  ctx.moveTo(x, y1);
-  ctx.lineTo(x + radius * 0.9 * z, y1 + radius * 0.3 * z);
-  ctx.lineTo(x, y1 + radius * 0.6 * z);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
-
-/** Fahrzeugmodell in der Blickrichtung `angle`; look(img) kann das Bild ersetzen (Wrack). false = Modell fehlt oder lädt noch. */
-function drawModel(ctx, cam, type, team, angle, radius, p, lift, look = null) {
-  const model = UNIT_MODEL[type];
-  const imgs = model && VEHICLES[model][team];
-  if (!imgs) return false;
-  const [a, b, c, d] = cam.isoMatrix(1);
-  const cx = Math.cos(angle || 0);
-  const cy = Math.sin(angle || 0);
-  const sector = (Math.round(Math.atan2(b * cx + d * cy, a * cx + c * cy) / (Math.PI / 4)) + 8) % 8;
-  const img = imgs[sector];
-  if (!ready(img)) return false;
-  const src = look ? look(img) : img;
-  if (!src) return false;
-  const z = cam.zoom;
-  const view = MODEL_VIEW[model];
-  if (view) {
-    const k = (radius * view.span * z) / img.naturalWidth;
-    ctx.drawImage(src, p.x - view.ax * k, p.y - lift * z - view.ay * k, img.naturalWidth * k, img.naturalHeight * k);
-    return true;
-  }
-  const s = (radius * 3.6 * z) / 33;
-  ctx.drawImage(src, p.x - (img.naturalWidth * s) / 2, p.y - img.naturalHeight * s + 4 * s, img.naturalWidth * s, img.naturalHeight * s);
-  return true;
-}
-
-const CHARRED = new Map(); // Modellbild → verkohlte Kopie (Wracks), einmal je Bild erzeugt
-
-function charred(img) {
-  let c = CHARRED.get(img);
-  if (c !== undefined) return c;
-  c = null;
-  if (typeof document !== 'undefined') {
-    c = document.createElement('canvas');
-    c.width = img.naturalWidth;
-    c.height = img.naturalHeight;
-    const x = c.getContext('2d');
-    x.drawImage(img, 0, 0);
-    x.globalCompositeOperation = 'source-atop'; // nur das Modell einfärben, nicht den Hintergrund
-    x.fillStyle = 'rgba(30,26,22,0.8)';
-    x.fillRect(0, 0, c.width, c.height);
-  }
-  CHARRED.set(img, c);
-  return c;
+/** Einheit in Iso (gemalt, unitpaint.js): Soldaten blicken zum Ziel, Türme folgen dem Ziel. false = noch kein Bild (Ersatz im Renderer). */
+export function drawUnitSprite(ctx, cam, u, p, aim = null, lift = 0, now = 0) {
+  return drawUnitIso(ctx, cam, u, p, aim, lift, now);
 }
 
 /** Wrack als verkohltes Fahrzeugmodell am Boden (auch abgeschossene Hubschrauber). false = kein Modell, der Renderer zeichnet Kästen. */
 export function drawWreckSprite(ctx, cam, w, p) {
-  return drawModel(ctx, cam, w.type, 0, w.angle, w.r, p, 0, charred);
+  return drawWreckIso(ctx, cam, w, p);
 }

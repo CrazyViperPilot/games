@@ -1,6 +1,6 @@
 # Modelle → Iso-Sprites
 
-Rendert 3D-Modelle (FBX/OBJ) mit three.js in Chromium (Playwright) in 8 Blickrichtungen und Teamfarben (Blau/Rot) nach `assets/iso/vehicles/`.
+Rendert 3D-Modelle (FBX/OBJ) mit three.js in Chromium (Playwright) in 8 Blickrichtungen und Teamfarben (Blau/Rot). Im Spiel wird davon nur noch der Wachturm (`assets/iso/buildings/tower-r0…r3.png`, `prodtw.mjs`) genutzt; die Fahrzeuge und Soldaten malt das Spiel seit v5.27 selbst (`js/render/unitpaint.js`), die übrigen Skripte sind nur noch Archiv.
 
 1. `npm install three@0.160.0` in einem Arbeitsordner; `view.html`, `prod.mjs` dorthin kopieren, Modelle unter `models/` ablegen, Pfade in `prod.mjs` (`MODELS`, `root`) anpassen.
 2. `node prod.mjs` schreibt `raw/<modell>-<team>-<richtung>.png` (192 × 192, transparent).

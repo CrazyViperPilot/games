@@ -53,6 +53,7 @@ import { drawMood } from './mood.js';
 import { drawBridgeTop, drawBridgeIso, drawBridgeBar, bridgeBar, fordPosts, drawFordPostTop, drawFordPostIso } from './bridge.js';
 import { bridgeUnder } from '../game/river.js';
 import { setMapTown, drawMapTown2D, drawMapCars2D, drawPark } from './maptown.js';
+import { drawUnitTop, drawUnitShadowIso } from './unitpaint.js';
 import { drawCityGround, drawCityTop, cityBuildings, drawCityBadges } from './citylayer.js';
 import { beginTownFrame, townLift } from './townhouses.js';
 
@@ -256,7 +257,7 @@ export class Renderer {
           const t = g.getEntity(u.targetId);
           if (t) aim = Math.atan2(t.y - u.y, t.x - u.x);
         }
-        drawUnit(ctx, u, g.teams[u.team].color, z, aim, now);
+        if (!drawUnitTop(ctx, u, z, aim, now)) drawUnit(ctx, u, g.teams[u.team].color, z, aim, now); // gemalt (seit v5.27), sonst einfache Form
         if (u.crate) drawCrateTop(ctx, u.x + 4, u.y - 6, 10, z); // Kiste auf dem Rücken
       }
     }
@@ -602,18 +603,20 @@ export class Renderer {
       const p = cam.worldToScreen(u.x, u.y);
       const lift = unitLift(u);
       const sc = 1.35;
-      // Schatten am Boden
+      // Schatten am Boden: Umriss des Modells (seit v5.27, unitpaint.js), sonst Ellipse
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.fillStyle = 'rgba(0,0,0,0.28)';
-      ctx.beginPath();
-      ctx.ellipse(p.x, p.y + 1, u.def.radius * z * (u.def.air ? 1.5 : 1.2), u.def.radius * z * (u.def.air ? 0.7 : 0.5), 0, 0, Math.PI * 2);
-      ctx.fill();
+      if (!drawUnitShadowIso(ctx, cam, u, p, dpr, now)) {
+        ctx.fillStyle = 'rgba(0,0,0,0.28)';
+        ctx.beginPath();
+        ctx.ellipse(p.x, p.y + 1, u.def.radius * z * (u.def.air ? 1.5 : 1.2), u.def.radius * z * (u.def.air ? 0.7 : 0.5), 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
       let aim0 = null;
       if (u.targetId && u.def.range > 0) {
         const t0 = g.getEntity(u.targetId);
         if (t0) aim0 = Math.atan2(t0.y - u.y, t0.x - u.x);
       }
-      if (drawUnitSprite(ctx, cam, u, { x: p.x, y: p.y }, aim0, lift)) return;
+      if (drawUnitSprite(ctx, cam, u, { x: p.x, y: p.y }, aim0, lift, now)) return;
       setIsoAt(ctx, cam, dpr, p.x, p.y - lift * z, u.x, u.y, sc);
       let aim = null;
       if (u.targetId && u.def.range > 0) {
