@@ -5,7 +5,7 @@ import { Game } from '../js/game/game.js';
 import { CITY } from '../js/data/city.js';
 import { BALANCE } from '../js/data/balance.js';
 import { UNITS } from '../js/data/units.js';
-import { canZone, hasRoad, bigFits, bigCells, bigCenter, sizeOf, KIND_ID } from '../js/game/city.js';
+import { canZone, hasRoad, bigFits, bigCells, bigCenter, sizeOf, KIND_ID, migrateCity } from '../js/game/city.js';
 import { isFoe } from '../js/game/entities.js';
 import { airportsOf, freeSpace, AIRPORT, jetGrounded } from '../js/game/aircraft.js';
 
@@ -102,15 +102,15 @@ test('Zonenstraßen und Brücken sind Stadtstraßen für beide Teams', () => {
   assert.equal(R.kind[i], 1);
 });
 
-test('Großbauten mit gerader Kante: Kraftwerk 2 × 2, Kaserne 4 × 4, Fabrikhalle 8 × 8; Startviertel', () => {
-  assert.deepEqual([sizeOf('power'), sizeOf('barracks'), sizeOf('factory'), sizeOf('airport')], [2, 4, 8, 10]);
+test('Großbauten mit gerader Kante: Kraftwerk 2 × 2, Kaserne 4 × 4, Fabrikhalle 5 × 5 (seit v5.32); Startviertel', () => {
+  assert.deepEqual([sizeOf('power'), sizeOf('barracks'), sizeOf('factory'), sizeOf('airport')], [2, 4, 5, 10]);
   const g = new Game({ seed: 3, city: true });
   for (const c of g.city) {
     const big = [...c.ents.values()].filter((e) => ['barracks', 'factory'].includes(Object.keys(KIND_ID).find((k) => KIND_ID[k] === c.kind[e.cityCell])));
     assert.equal(big.length, 2, 'Kaserne und Fabrikhalle im Startviertel');
     for (const e of big) {
       const n = (e.w * BALANCE.map.tile) / CITY.cell;
-      assert.ok(n === 4 || n === 8);
+      assert.ok(n === 4 || n === 5);
       assert.equal(bigCells(c, e.cityCell, n).filter((j) => c.part[j] === e.cityCell + 1).length, n * n, 'alle Zellen gehören dazu');
       const p = bigCenter(c, e.cityCell, n);
       assert.deepEqual([e.x, e.y], [p.x, p.y], 'Mitte zwischen den Zellen');
@@ -246,4 +246,30 @@ test('Zwei F-16 starten nacheinander (Startbahn frei abwarten), keine schießt a
   }
   assert.equal(both, false, 'nie zwei zugleich im Startlauf');
   assert.ok(jets.every((u) => u.jet.phase === 'air'), 'beide gestartet');
+});
+
+test('Alte Stände: eine Fabrikhalle über 8 × 8 Zellen wird beim Laden 5 × 5 (Straße bleibt dran, Rest frei, Ziel bleibt)', () => {
+  CITY.size.factory = 8; // so wurde sie bis v5.30 gebaut
+  let g;
+  try {
+    g = new Game({ seed: 3, city: true });
+  } finally {
+    CITY.size.factory = 5;
+  }
+  const c = g.city[0];
+  const anchorOld = [...c.ents.keys()].find((i) => c.kind[i] === KIND_ID.factory);
+  const e = c.ents.get(anchorOld);
+  const before = [...c.part].filter((p) => p === anchorOld + 1).length;
+  assert.equal(before, 64, 'alte Halle 8 × 8');
+  const queue = e.queue;
+  migrateCity(g);
+  const a = e.cityCell;
+  assert.equal(c.ents.get(a), e, 'dasselbe Ziel (Warteschlange bleibt)');
+  assert.equal(e.queue, queue);
+  const cells = [...c.part].map((p, j) => (p === a + 1 ? j : -1)).filter((j) => j >= 0);
+  assert.equal(cells.length, 25, 'jetzt 5 × 5');
+  assert.equal([...c.part].filter((p, j) => c.kind[j] === KIND_ID.factory && p !== a + 1).length, 0, 'keine Reste');
+  assert.equal(e.w, (5 * CITY.cell) / BALANCE.map.tile);
+  assert.ok(hasRoad(c, a % c.cols, Math.floor(a / c.cols)), 'Straße bleibt dran');
+  for (let i = 0; i < 20; i++) g.update(0.05); // läuft weiter
 });

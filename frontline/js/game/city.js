@@ -873,8 +873,81 @@ export function migrateCity(game) {
         if (lv) syncEntity(game, c, a);
       }
     }
+    if (shrinkBig(game, c)) changed = true; // Großbauten, die kleiner geworden sind (seit v5.32: Fabrikhalle 8 × 8 → 5 × 5)
     if (changed) rebuildList(c); // sonst bleibt der Stand unverändert (Laden = durchgehend gespielt)
   }
+}
+
+/**
+ * Alte Stände (seit v5.32): ein Großbau, der mehr Zellen belegt, als seine Art heute groß ist (CITY.size, z. B. die Fabrikhalle 8 × 8
+ * → 5 × 5), behält ein n × n-Quadrat seiner alten Fläche: bevorzugt eines mit Straße daneben, sonst das um den alten Anker. Die übrigen
+ * Zellen werden frei. Das Ziel (Trefferpunkte anteilig, Warteschlange, Sammelpunkt) bleibt dasselbe Objekt.
+ */
+function shrinkBig(game, c) {
+  const groups = new Map(); // Anker → alte Zellen
+  for (let j = 0; j < c.part.length; j++) {
+    if (!c.part[j]) continue;
+    const a = c.part[j] - 1;
+    if (!groups.has(a)) groups.set(a, []);
+    groups.get(a).push(j);
+  }
+  let changed = false;
+  for (const [a, old] of groups) {
+    const k = KINDS[c.kind[a] - 1];
+    const n = sizeOf(k);
+    if (n <= 1 || old.length === n * n) continue;
+    const own = new Set(old);
+    const roadBy = (cells) => cells.some((j) => roadNext(c, j % c.cols, Math.floor(j / c.cols)));
+    let best = -1;
+    let bestScore = -Infinity;
+    for (const cand of old) {
+      const cells = bigCells(c, cand, n);
+      if (!cells.every((j) => own.has(j))) continue;
+      const score = (roadBy(cells) ? 10 : 0) + (cand === a ? 1 : 0);
+      if (score > bestScore) {
+        best = cand;
+        bestScore = score;
+      }
+    }
+    if (best < 0) continue; // passt nicht (sollte nicht vorkommen): unverändert lassen
+    const keep = new Set(bigCells(c, best, n));
+    const lv = c.level[a];
+    const timer = c.timer[a];
+    for (const j of old) {
+      if (keep.has(j)) {
+        c.part[j] = best + 1;
+        continue;
+      }
+      const q = j % c.cols;
+      if (c.level[j]) releaseCell(game, c, q, (j - q) / c.cols);
+      c.kind[j] = 0;
+      c.level[j] = 0;
+      c.part[j] = 0;
+      c.timer[j] = 0;
+    }
+    c.timer[best] = timer;
+    const e = c.ents.get(a);
+    if (e) {
+      c.ents.delete(a);
+      const r = bigCenter(c, best, n);
+      const w = (c.cell * n) / game.grid.tile;
+      const hp = CITY.hp[lv] * n;
+      Object.assign(e, { cityCell: best, x: r.x, y: r.y, cx: (r.x - (c.cell * n) / 2) / game.grid.tile, cy: (r.y - (c.cell * n) / 2) / game.grid.tile, w, h: w });
+      e.hp = Math.max(1, Math.min(hp, (e.hp / (e.def.hp || hp)) * hp)); // Schaden anteilig
+      e.def = { ...e.def, hp };
+      if (e.produces) {
+        const z = game.zone ?? { x: r.x, y: r.y };
+        const d = Math.hypot(z.x - r.x, z.y - r.y) || 1;
+        e.rallyX = r.x + ((z.x - r.x) / d) * ((c.cell * n) / 2 + c.cell);
+        e.rallyY = r.y + ((z.y - r.y) / d) * ((c.cell * n) / 2 + c.cell);
+      }
+      delete e.fogKey; // Sichtfeld neu (fog.js)
+      c.ents.set(best, e);
+    }
+    changed = true;
+    c.ver++;
+  }
+  return changed;
 }
 
 /** Rechteck einer Stadtzelle auf der Karte (px). */

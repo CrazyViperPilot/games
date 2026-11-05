@@ -1,6 +1,6 @@
 // Großbauten der Stadt ohne eigenes Bild (seit v5.03, PRD §15; das Kraftwerk zeichnet seit v5.18 works.js): Kaserne (4 × 4,
 // Unterkünfte mit Ziegeldach um einen Exerzierplatz, Wache, Fahrzeuge; seit v5.11 mit Fenstern, Toren und Bäumen), Fabrikhalle
-// (8 × 8, Montagehalle mit Sheddach, Verwaltung, Lackiererei, Schornsteine, Fahrzeughof mit fertigen Fahrzeugen, Portalkran) und
+// (5 × 5 seit v5.32, vorher 8 × 8; Montagehalle mit Sheddach, Verwaltung, Lackiererei, Schornsteine, Fahrzeughof mit fertigen Fahrzeugen, Portalkran) und
 // Flughafen (10 × 10; Boden und gemalte Bauten seit v5.22 aus airport.js). Jede Anlage ist eine Liste von Teilen in Weltkoordinaten:
 // Boden (Flächen, Linien, Vielecke) und Körper (Quader, Zylinder, Fahnen, gemalte Teile des Flughafens). Die 2D-Ansicht zeichnet sie
 // von oben, die Iso-Ansicht jeden Körper einzeln in der Tiefenordnung (so stehen Einheiten richtig davor oder dahinter) und für jede
@@ -49,16 +49,16 @@ function groundOf(k, lv, half) {
     const f = half - 6;
     for (const [x0, y0, x1, y1] of [[-f, -f, f, -f], [f, -f, f, f], [f, f, 66, f], [32, f, -f, f], [-f, f, -f, -f]]) line(x0, y0, x1, y1, '#4a4a42', 2.5); // Zaun (Lücke an der Zufahrt)
   } else if (k === 'factory') {
-    // Fabrikhalle (seit v5.11): Betonhof, Fahrzeughof mit Stellplätzen zur Straße, Rasen vor der Verwaltung
+    // Fabrikhalle (seit v5.11, seit v5.32 als 5 × 5-Großbau, ±160): Betonhof, Fahrzeughof mit Stellplätzen zur Straße, Rasen vor der Verwaltung
     rect(-half + 3, -half + 3, half - 3, half - 3, '#a9a69c');
-    rect(-244, 128, 244, 246, '#8c8a82'); // Fahrzeughof
-    for (let x = -216; x <= 216; x += 48) line(x, 140, x, 232, '#e3d46a', 2); // Stellplätze
-    line(-half + 10, 120, half - 10, 120, '#e3d46a', 3);
-    rect(108, -32, 248, -6, '#86a05e'); // Rasen vor der Verwaltung
-    rect(170, -36, 186, -6, '#c9c4b4'); // Weg zum Eingang
-    rect(-236, -40, 96, -12, '#9b988f'); // Vorplatz der Montagehalle
-    for (let x = -200; x <= 60; x += 72) line(x, -38, x, -14, '#e3d46a', 1.6);
-    if (lv >= 2) rect(184, 46, 248, 118, '#96938a'); // Containerlager
+    rect(-150, 96, 150, 152, '#8c8a82'); // Fahrzeughof
+    for (let x = -126; x <= 126; x += 42) line(x, 104, x, 146, '#e3d46a', 1.6); // Stellplätze
+    line(-half + 8, 90, half - 8, 90, '#e3d46a', 2.4);
+    rect(66, -30, 152, -8, '#86a05e'); // Rasen vor der Verwaltung
+    rect(102, -34, 114, -8, '#c9c4b4'); // Weg zum Eingang
+    rect(-148, -26, 52, -8, '#9b988f'); // Vorplatz der Montagehalle
+    for (let x = -126; x <= 30; x += 52) line(x, -24, x, -10, '#e3d46a', 1.4);
+    if (lv >= 2) rect(96, 26, 152, 84, '#96938a'); // Containerlager
   } else if (k === 'airport') return airportGround(lv); // seit v5.22: Markierungen, Befeuerung, Rollgassen (airport.js)
   return g;
 }
@@ -104,35 +104,35 @@ function bodiesOf(k, lv, half) {
       veh('tank', -32, -30, 'x');
     }
   } else if (k === 'factory') {
-    // Fabrikhalle (seit v5.11): Montagehalle mit Sheddach und Toren, Verwaltung mit Fensterbändern und Streifen in Teamfarbe,
-    // Schornstein, Tanklager, fertige Fahrzeuge auf dem Hof; Stufe 2: Lackiererei, zweite Halle, Containerlager; Stufe 3: dritte
-    // Halle, zweiter Schornstein, Portalkran über den Containern, mehr Fahrzeuge.
+    // Fabrikhalle (seit v5.11; seit v5.32 kompakt für 5 × 5 Zellen, ±160): Montagehalle mit Sheddach und Toren, Verwaltung mit
+    // Fensterbändern und Streifen in Teamfarbe, Schornstein, Tanklager, fertige Fahrzeuge auf dem Hof; Stufe 2: Lackiererei, zweite
+    // Halle, Containerlager; Stufe 3: dritte Halle, zweiter Schornstein, Portalkran über den Containern, mehr Fahrzeuge.
     const HALL = '#bcc1bd';
-    box(-236, -236, 96, -44, 44, HALL, '#8e959a', 0, { saw: { n: 8, rh: 14 }, gates: { e: [2], n: 3, w: 46, h: 32 }, win: [[34, 40]], wg: 22, ww: 14, ribs: true }); // Montagehalle
-    box(120, -100, 236, -40, 36, '#e4e0d4', '#7b7f82', 0, { win: [[6, 12], [17, 23], [27, 32]], wg: 10, ww: 7, stripe: true, door: [2] }); // Verwaltung
-    box(168, -40, 188, -28, 1.5, '#55585b', '#6d7174', 13); // Vordach am Eingang
-    for (const [x, y] of [[142, -80], [210, -62]]) box(x - 6, y - 5, x + 6, y + 5, 5, '#9a9fa3', '#b9bec1', 36); // Klimageräte
-    cyl(60, -26, 9, 104, '#9a948a', { r1: 7, band: '#c0392b' }); // Schornstein
-    cyl(146, 30, 15, 28, '#dfe3e6'); // Tanklager
-    cyl(184, 30, 15, 28, '#dfe3e6');
-    for (const [x, y] of [[124, -18], [232, -18]]) b.push({ t: 'tree', x, y, r: 9 });
-    const yard = lv >= 3 ? 9 : lv >= 2 ? 6 : 4;
-    const kinds = ['tank', 'truck', 'apc', 'tank', 'truck', 'apc', 'tank', 'jeep', 'apc'];
-    for (let i = 0; i < yard; i++) veh(kinds[i], -192 + 48 * i, 186, 'y');
+    box(-148, -148, 52, -30, 38, HALL, '#8e959a', 0, { saw: { n: 6, rh: 12 }, gates: { e: [2], n: 3, w: 34, h: 26 }, win: [[29, 34]], wg: 18, ww: 12, ribs: true }); // Montagehalle
+    box(66, -78, 150, -34, 30, '#e4e0d4', '#7b7f82', 0, { win: [[5, 10], [14, 19], [22, 27]], wg: 9, ww: 6, stripe: true, door: [2] }); // Verwaltung
+    box(98, -34, 118, -24, 1.5, '#55585b', '#6d7174', 11); // Vordach am Eingang
+    for (const [x, y] of [[84, -62], [134, -50]]) box(x - 5, y - 4, x + 5, y + 4, 4, '#9a9fa3', '#b9bec1', 30); // Klimageräte
+    cyl(34, -14, 8, 86, '#9a948a', { r1: 6, band: '#c0392b' }); // Schornstein
+    cyl(78, 10, 11, 22, '#dfe3e6'); // Tanklager
+    cyl(106, 10, 11, 22, '#dfe3e6');
+    b.push({ t: 'tree', x: 140, y: -14, r: 8 });
+    const yard = lv >= 3 ? 7 : lv >= 2 ? 5 : 3;
+    const kinds = ['tank', 'truck', 'apc', 'tank', 'jeep', 'apc', 'truck'];
+    for (let i = 0; i < yard; i++) veh(kinds[i], -126 + 42 * i, 124, 'y');
     if (lv >= 2) {
-      box(120, -236, 236, -124, 34, '#c9c6bc', '#8a8f92', 0, { gates: { e: [2], n: 1, w: 40, h: 24 }, win: [[26, 31]], wg: 16, ww: 10 }); // Lackiererei
-      for (const x of [140, 178, 216]) box(x - 7, -190, x + 7, -176, 7, '#8d9296', '#6d7276', 34); // Abluft
-      box(-236, -6, -64, 100, 34, HALL, '#7d858b', 0, { gable: 16, gates: { e: [2], n: 3, w: 32, h: 24 }, win: [[27, 32]], wg: 20, ww: 12, ribs: true }); // zweite Halle
+      box(66, -150, 150, -92, 28, '#c9c6bc', '#8a8f92', 0, { gates: { e: [2], n: 1, w: 30, h: 20 }, win: [[21, 25]], wg: 14, ww: 9 }); // Lackiererei
+      for (const x of [86, 108, 130]) box(x - 6, -130, x + 6, -118, 6, '#8d9296', '#6d7276', 28); // Abluft
+      box(-148, -6, -56, 70, 28, HALL, '#7d858b', 0, { gable: 12, gates: { e: [2], n: 2, w: 26, h: 20 }, win: [[22, 26]], wg: 16, ww: 10, ribs: true }); // zweite Halle
       const CT = ['#b5523b', '#3c6e9e', '#c9a13a', '#5f7f4f'];
-      [[190, 52, 0], [190, 70, 0], [190, 88, 0], [190, 52, 14], [190, 106, 0], [190, 70, 14]].forEach(([x, y, z], n) => box(x, y, x + 44, y + 15, 14, CT[n % 4], shade(CT[n % 4], 0.1), z)); // Container
+      [[104, 32, 0], [104, 48, 0], [104, 64, 0], [104, 32, 12], [104, 48, 12]].forEach(([x, y, z], n) => box(x, y, x + 40, y + 13, 12, CT[n % 4], shade(CT[n % 4], 0.1), z)); // Container
     }
     if (lv >= 3) {
-      box(-40, -6, 96, 100, 32, HALL, '#7d858b', 0, { gable: 14, gates: { e: [2], n: 2, w: 32, h: 22 }, ribs: true }); // dritte Halle
-      cyl(100, -26, 8, 92, '#9a948a', { r1: 6, band: '#c0392b' });
-      for (const [x, y] of [[182, 44], [182, 118], [240, 44], [240, 118]]) box(x - 3, y - 3, x + 3, y + 3, 46, '#d9a21b', '#d9a21b'); // Portalkran: Stützen
-      for (const x of [182, 240]) box(x - 3, 41, x + 3, 121, 5, '#d9a21b', '#e8b52c', 46); // Kranbahn
-      box(179, 78, 243, 86, 6, '#d9a21b', '#e8b52c', 51); // Brücke
-      box(204, 76, 216, 88, 5, '#55585b', '#6d7174', 57); // Laufkatze
+      box(-44, -6, 52, 70, 26, HALL, '#7d858b', 0, { gable: 11, gates: { e: [2], n: 2, w: 24, h: 18 }, ribs: true }); // dritte Halle
+      cyl(58, -14, 7, 76, '#9a948a', { r1: 5, band: '#c0392b' });
+      for (const [x, y] of [[98, 28], [98, 82], [150, 28], [150, 82]]) box(x - 3, y - 3, x + 3, y + 3, 40, '#d9a21b', '#d9a21b'); // Portalkran: Stützen
+      for (const x of [98, 150]) box(x - 3, 25, x + 3, 85, 4, '#d9a21b', '#e8b52c', 40); // Kranbahn
+      box(95, 52, 153, 59, 5, '#d9a21b', '#e8b52c', 44); // Brücke
+      box(118, 50, 130, 61, 4, '#55585b', '#6d7174', 49); // Laufkatze
     }
   } else if (k === 'airport') return airportBodies(lv); // seit v5.22: gemalte Hangars, Tower, Tanklager … (airport.js)
   return b;

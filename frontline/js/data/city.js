@@ -26,7 +26,7 @@ export const CITY = {
   // Großbauten (seit v5.00): Kantenlänge in Zellen (fehlt = 1; seit v5.03 auch gerade). Ein Großbau ist ein Gebäude: eine Stufe, ein
   // Ziel mit Trefferpunkten hp × Kantenlänge, Arbeitsplätze und Strom wie eine Zelle; Straße an irgendeiner Außenzelle reicht.
   // Seit v5.08 sind auch die Werke (BM-Werk, Munitionswerk, Raffinerie, Stahlwerk) 2 × 2 groß, mit eigenem Aussehen (render/works.js).
-  size: { uni: 3, power: 2, barracks: 4, factory: 8, airport: 10, bm: 2, mun: 2, fuel: 2, steel: 2, smelter: 2, kero: 2 },
+  size: { uni: 3, power: 2, barracks: 4, factory: 5, airport: 10, bm: 2, mun: 2, fuel: 2, steel: 2, smelter: 2, kero: 2 },
   // Räumen reißt seit v5.16 auch diese Gebäude der Karte ab (Häuser, Hallen, Fabriken der Zonenstadt und außerhalb), kostenlos wie das
   // übrige Räumen; besetzte Häuser nicht. Wachtürme, Zug, Mauern, Fels und Wasser bleiben.
   clearable: ['house', 'hall', 'factory'],
@@ -81,7 +81,7 @@ export const CITY = {
     mun: { from: ['metal'], to: 'mun' }, // Munitionswerk: Stahl → Munition
   },
   // Startviertel (seit v4.84): steht zu Beginn fertig (Stufe 1) neben der Hauptstadt, dazu eine Ölquelle auf dem nächsten Ölvorkommen
-  // Seit v5.03: über der Straße die Großbauten Kaserne (4 × 4) und Fabrikhalle (8 × 8) nebeneinander, big = [Art, Spalte ab Straßenanfang]
+  // Seit v5.03: über der Straße die Großbauten Kaserne (4 × 4) und Fabrikhalle (seit v5.32 5 × 5, vorher 8 × 8) nebeneinander, big = [Art, Spalte ab Straßenanfang]
   // Ein Großbau in row (seit v5.08 die 2 × 2-Raffinerie) beginnt an seiner Spalte und reicht nach rechts und unten (dort null).
   startQuarter: { road: 12, row: ['res', 'fuel', null, 'res'], big: [['barracks', 0], ['factory', 4]] }, // Straßenlänge, die Zellen darunter, die Großbauten darüber
   startMetal: 400, // Stahl im Hauptlager zu Beginn (Stahl bleibt dort, LKW fahren es nicht; Schlüssel metal)

@@ -153,7 +153,7 @@ export class Fog {
       if (sight > 0) this.markEntity(relief, b, sight);
     }
     // eigene Stadtgebäude (Wohnen, Gewerbe, Förderung, Werke …) lichten den Nebel wie andere Gebäude. Seit v5.25 zählt die Sicht ab
-    // dem Rand: Großbauten (Fabrikhalle 8 × 8, Flughafen 10 × 10, Kaserne …) bekommen ihre halbe Diagonale dazu, sonst blieben sie im Nebel
+    // dem Rand: Großbauten (Fabrikhalle 5 × 5, Flughafen 10 × 10, Kaserne …) bekommen ihre halbe Diagonale dazu, sonst blieben sie im Nebel
     const cc = game.city?.[team];
     if (cc) {
       for (const e of cc.ents.values()) {
