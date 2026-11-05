@@ -1,11 +1,11 @@
 // Großbauten der Stadt ohne eigenes Bild (seit v5.03, PRD §15; das Kraftwerk zeichnet seit v5.18 works.js): Kaserne (4 × 4,
 // Unterkünfte mit Ziegeldach um einen Exerzierplatz, Wache, Fahrzeuge; seit v5.11 mit Fenstern, Toren und Bäumen), Fabrikhalle
 // (8 × 8, Montagehalle mit Sheddach, Verwaltung, Lackiererei, Schornsteine, Fahrzeughof mit fertigen Fahrzeugen, Portalkran) und
-// Flughafen (10 × 10, zwei Start- und Landebahnen, Rollweg, Vorfeld mit 20 Stellplätzen, Hangars und Tower). Jede Anlage ist eine
-// Liste von Teilen in Weltkoordinaten: Boden (Flächen, Linien) und Körper (Quader, Zylinder, Fahnen). Die 2D-Ansicht zeichnet sie
+// Flughafen (10 × 10; Boden und gemalte Bauten seit v5.22 aus airport.js). Jede Anlage ist eine Liste von Teilen in Weltkoordinaten:
+// Boden (Flächen, Linien, Vielecke) und Körper (Quader, Zylinder, Fahnen, gemalte Teile des Flughafens). Die 2D-Ansicht zeichnet sie
 // von oben, die Iso-Ansicht jeden Körper einzeln in der Tiefenordnung (so stehen Einheiten richtig davor oder dahinter) und für jede
-// Drehung der Karte richtig. Nur Zeichnen, keine Spielregeln; die Maße des Flughafens kommen aus game/aircraft.js (AIRPORT).
-import { AIRPORT } from '../game/aircraft.js';
+// Drehung der Karte richtig. Nur Zeichnen, keine Spielregeln.
+import { airportGround, airportBodies, drawAirportIso, drawAirportTop } from './airport.js';
 import { drawBox } from './iso.js';
 import { shade, tint } from './sprites.js';
 
@@ -59,28 +59,7 @@ function groundOf(k, lv, half) {
     rect(-236, -40, 96, -12, '#9b988f'); // Vorplatz der Montagehalle
     for (let x = -200; x <= 60; x += 72) line(x, -38, x, -14, '#e3d46a', 1.6);
     if (lv >= 2) rect(184, 46, 248, 118, '#96938a'); // Containerlager
-  } else if (k === 'airport') {
-    const A = AIRPORT;
-    rect(-half + 3, -half + 3, half - 3, half - 3, '#6f8a52'); // Gras
-    rect(A.apron.x0, A.apron.y0, A.apron.x1, A.apron.y1, '#a7a69e'); // Vorfeld
-    rect(110, -70, 300, 210, '#a7a69e'); // vor den Hangars
-    const t = A.taxi;
-    rect(t.x0, t.y - t.w / 2, t.x1, t.y + t.w / 2, '#4b4d49'); // Rollweg
-    for (const x of [t.x0, t.x1]) rect(x - t.w / 2, A.runways[0].y, x + t.w / 2, t.y + t.w / 2, '#4b4d49'); // Verbindungen zu den Bahnen
-    rect(-40 - t.w / 2, t.y, -40 + t.w / 2, A.apron.y0, '#4b4d49'); // zum Vorfeld
-    line(t.x0, t.y, t.x1, t.y, '#e3c63a', 1.6);
-    for (const r of A.runways) {
-      rect(r.x0, r.y - r.w / 2, r.x1, r.y + r.w / 2, '#3e403d');
-      line(r.x0 + 4, r.y - r.w / 2 + 3, r.x1 - 4, r.y - r.w / 2 + 3, '#ecebe4', 1.6);
-      line(r.x0 + 4, r.y + r.w / 2 - 3, r.x1 - 4, r.y + r.w / 2 - 3, '#ecebe4', 1.6);
-      for (let x = r.x0 + 60; x < r.x1 - 60; x += 40) line(x, r.y, x + 20, r.y, '#ecebe4', 2); // Mittellinie
-      for (const [xa, s] of [[r.x0 + 10, 1], [r.x1 - 10, -1]]) for (let k2 = -3; k2 <= 3; k2++) if (k2) line(xa, r.y + k2 * 4.2, xa + s * 26, r.y + k2 * 4.2, '#ecebe4', 2.4); // Schwellen
-    }
-    for (const p of A.slots) {
-      line(p.x, p.y - 26, p.x, p.y + 24, '#e3c63a', 1.4); // Stellplatz: Leitlinie und Haltebalken
-      line(p.x - 14, p.y - 26, p.x + 14, p.y - 26, '#e3c63a', 1.4);
-    }
-  }
+  } else if (k === 'airport') return airportGround(lv); // seit v5.22: Markierungen, Befeuerung, Rollgassen (airport.js)
   return g;
 }
 
@@ -155,54 +134,80 @@ function bodiesOf(k, lv, half) {
       box(179, 78, 243, 86, 6, '#d9a21b', '#e8b52c', 51); // Brücke
       box(204, 76, 216, 88, 5, '#55585b', '#6d7174', 57); // Laufkatze
     }
-  } else if (k === 'airport') {
-    AIRPORT.hangars.slice(0, Math.max(1, lv)).forEach((h) => box(h.x - h.w / 2, h.y - h.h / 2, h.x + h.w / 2, h.y + h.h / 2, 34, '#c4c8c8', '#9aa3a8'));
-    const T = AIRPORT.tower;
-    box(T.x - 20, T.y - 20, T.x + 20, T.y + 20, 18, '#d4d1c8', '#9da1a3'); // Sockel
-    cyl(T.x, T.y, 7, 58, '#e6e3da', { base: 18 }); // Schaft
-    cyl(T.x, T.y, 15, 13, GLASS, { base: 76, r1: 16 }); // Kanzel
-    cyl(T.x, T.y, 17, 3, '#55595c', { base: 89 }); // Dach
-    if (lv >= 2) box(96, 220, 176, 300, 22, '#d9d4c6', '#7b7f82'); // Abfertigung
-    for (const y of [240, 286]) cyl(296, y, 13, 18, '#e3e0d6'); // Tanklager
-  }
+  } else if (k === 'airport') return airportBodies(lv); // seit v5.22: gemalte Hangars, Tower, Tanklager … (airport.js)
   return b;
 }
 
-/** Größe, Stufe und Mitte → Anlage { ground, bodies } in Weltkoordinaten (Mitte cx, cy). */
+const plans = new Map(); // Anlagen je Art, Stufe und Lage (seit v5.22; der Flughafen hat viele Teile, nicht jedes Bild neu bauen)
+
+/** Größe, Stufe und Mitte → Anlage { ground, bodies } in Weltkoordinaten (Mitte cx, cy). Nicht verändern (Zwischenspeicher). */
 export function bigPlan(k, lv, cx, cy, size) {
+  const key = `${k}|${lv}|${cx}|${cy}|${size}`;
+  const hit = plans.get(key);
+  if (hit) return hit;
   const half = size / 2;
   const mv = (o) => {
     const p = { ...o };
     for (const key of ['x', 'x0', 'x1']) if (key in p) p[key] += cx;
     for (const key of ['y', 'y0', 'y1']) if (key in p) p[key] += cy;
+    if (p.pts) p.pts = p.pts.map(([x, y]) => [x + cx, y + cy]);
     return p;
   };
   const bodies = bodiesOf(k, Math.max(1, lv), half).map(mv);
   if (k === 'barracks' || k === 'factory') for (const p of bodies) p.fine = true; // seit v5.11: weichere Wände und Schmuck (isobuild.js)
-  return { ground: groundOf(k, Math.max(1, lv), half).map(mv), bodies };
+  const plan = { ground: groundOf(k, Math.max(1, lv), half).map(mv), bodies };
+  if (plans.size > 48) plans.clear();
+  plans.set(key, plan);
+  return plan;
 }
 
 /** Höchster Punkt einer Anlage (Weltpixel): Schild darüber. */
 export function bigTop(k, lv) {
-  return Math.max(30, ...bodiesOf(k, Math.max(1, lv), 0).map((p) => (p.base ?? 0) + p.h + (p.gable ?? p.saw?.rh ?? 0)));
+  return Math.max(30, ...bodiesOf(k, Math.max(1, lv), 0).map((p) => (p.base ?? 0) + (p.h ?? 0) + (p.gable ?? p.saw?.rh ?? 0)));
 }
 
 // ---- Boden (citylayer.js stellt die Zeichenhilfen: Fläche, Linie, Kreis auf dem Gelände) ----
 
-/** Boden einer gebauten Anlage über die Hilfen `g` = { rect(x0, y0, x1, y1, color), line(x0, y0, x1, y1, color, width) }. */
-export function drawBigGround(g, plan) {
-  for (const p of plan.ground) {
-    if (p.t === 'rect') g.rect(p.x0, p.y0, p.x1, p.y1, p.c);
-    else if (p.t === 'line') g.line(p.x0, p.y0, p.x1, p.y1, p.c, p.w);
+/**
+ * Boden einer gebauten Anlage über die Hilfen `g` = { begin(), rect(x0, y0, x1, y1), line(x0, y0, x1, y1), poly(pts), fill(color),
+ * stroke(color, width) }: aufeinanderfolgende Teile gleicher Art, Farbe und Breite in einem Pfad (seit v5.22). detail = false lässt
+ * feine Teile (fine) weg, winter = Schneefarbe für Rasen (grass).
+ */
+export function drawBigGround(g, plan, detail = true, winter = false) {
+  const L = plan.ground;
+  const kind = (p) => (p.t === 'line' ? 'l' : 'f');
+  const col = (p) => (winter && p.grass ? p.grass : p.c);
+  for (let i = 0; i < L.length; ) {
+    const p = L[i];
+    let j = i;
+    g.begin();
+    let any = false;
+    while (j < L.length && kind(L[j]) === kind(p) && col(L[j]) === col(p) && (L[j].w ?? 0) === (p.w ?? 0)) {
+      const q = L[j++];
+      if (q.fine && !detail) continue;
+      any = true;
+      if (q.t === 'rect') g.rect(q.x0, q.y0, q.x1, q.y1);
+      else if (q.t === 'line') g.line(q.x0, q.y0, q.x1, q.y1);
+      else if (q.t === 'poly') g.poly(q.pts);
+    }
+    if (any) {
+      if (kind(p) === 'l') g.stroke(col(p), p.w);
+      else g.fill(col(p));
+    }
+    i = j;
   }
 }
 
 // ---- 2D von oben ----
 
-/** Körper von oben: Schatten nach rechts unten (länger, je höher), Dach, Lichtseite; Zylinder als Kreis. Team = Fahne und Streifen. */
-export function drawBigTop(ctx, plan, color, damage = 0) {
+/**
+ * Körper von oben: Schatten nach rechts unten (länger, je höher), Dach, Lichtseite; Zylinder als Kreis. Team = Fahne und Streifen.
+ * Gemalte Teile des Flughafens (t 'ap') bringen ihren Schatten mit (airport.js, zoom für die Bildgröße).
+ */
+export function drawBigTop(ctx, plan, color, damage = 0, zoom = 1) {
   for (const p of plan.bodies) {
-    const s = Math.min(40, ((p.base ?? 0) + p.h + (p.gable ?? 0)) * 0.22);
+    if (p.t === 'ap') continue;
+    const s = Math.min(40, ((p.base ?? 0) + (p.h ?? 0) + (p.gable ?? 0)) * 0.22);
     ctx.fillStyle = 'rgba(0,0,0,0.26)';
     if (p.t === 'box') ctx.fillRect(p.x0 + s, p.y0 + s, p.x1 - p.x0, p.y1 - p.y0);
     else if (p.t === 'cyl' || p.t === 'tree') {
@@ -215,7 +220,8 @@ export function drawBigTop(ctx, plan, color, damage = 0) {
     }
   }
   for (const p of plan.bodies) {
-    if (p.t === 'box') boxTop(ctx, p, color);
+    if (p.t === 'ap') drawAirportTop(ctx, p, color, zoom);
+    else if (p.t === 'box') boxTop(ctx, p, color);
     else if (p.t === 'cyl') {
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
@@ -247,7 +253,10 @@ export function drawBigTop(ctx, plan, color, damage = 0) {
   }
   if (damage > 0.05) {
     ctx.fillStyle = `rgba(20,10,5,${(0.5 * damage).toFixed(2)})`;
-    for (const p of plan.bodies) if (p.t === 'box') ctx.fillRect(p.x0, p.y0, p.x1 - p.x0, p.y1 - p.y0);
+    for (const p of plan.bodies) {
+      if (p.t === 'box') ctx.fillRect(p.x0, p.y0, p.x1 - p.x0, p.y1 - p.y0);
+      else if (p.t === 'ap' && p.fw > 20) ctx.fillRect(p.x - p.fw / 2, p.y - p.fh / 2, p.fw, p.fh);
+    }
   }
 }
 
@@ -349,6 +358,10 @@ function vehTop(ctx, p) {
 
 /** Ein Körper einer Anlage isometrisch (Transformation: Bildschirm, dpr gesetzt; Höhe: cam.pin vom Renderer). */
 export function drawBigPart(ctx, cam, p, color) {
+  if (p.t === 'ap') {
+    drawAirportIso(ctx, cam, p, color); // gemalter Teil des Flughafens (seit v5.22)
+    return;
+  }
   if (p.t === 'box') {
     drawBox(ctx, cam, p.x0, p.y0, p.x1, p.y1, p.h, p.c, { base: p.base, roof: p.roof, noShadow: p.base > 0 });
     return;
@@ -417,6 +430,7 @@ export function drawBigPart(ctx, cam, p, color) {
 
 /** Mittelpunkt und Fußabdruck eines Körpers (für Tiefenordnung und Geländehöhe im Renderer). */
 export function partFoot(p) {
+  if (p.t === 'ap') return { x: p.x, y: p.y, w: p.fw, h: p.fh };
   if (p.t === 'veh') {
     const [hx, hy] = vehHalf(p);
     return { x: p.x, y: p.y, w: hx * 2, h: hy * 2 };

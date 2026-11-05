@@ -94,12 +94,18 @@ export function cityBuildings(game, team, known, inRect) {
 /** Viereck auf dem Boden als Pfad (mit Gelände in Bildschirmkoordinaten, sonst in Weltkoordinaten). */
 function groundRect(ren, ctx, x0, y0, x1, y1) {
   ctx.beginPath();
+  groundPoly(ren, ctx, [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]);
+}
+
+/** Vieleck auf dem Boden an den laufenden Pfad anhängen (ohne beginPath). */
+function groundPoly(ren, ctx, pts) {
   if (!ren.draping()) {
-    ctx.rect(x0, y0, x1 - x0, y1 - y0);
+    pts.forEach(([x, y], n) => (n ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    ctx.closePath();
     return;
   }
   const cam = ren.camera;
-  [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].forEach(([x, y], n) => {
+  pts.forEach(([x, y], n) => {
     const p = cam.worldToScreen(x, y);
     if (n) ctx.lineTo(p.x, p.y);
     else ctx.moveTo(p.x, p.y);
@@ -196,20 +202,23 @@ function drawBigLot(ren, ctx, c, k, lv, r, team, m) {
     const zl = ren.draping() ? ren.camera.zoom : 1;
     drawBigGround(
       {
-        rect: (a, b, c2, d, color) => {
-          groundRect(ren, ctx, a, b, c2, d);
+        begin: () => ctx.beginPath(),
+        rect: (a, b, c2, d) => groundPoly(ren, ctx, [[a, b], [c2, b], [c2, d], [a, d]]),
+        poly: (pts) => groundPoly(ren, ctx, pts),
+        line: (a, b, c2, d) => groundLine(ren, ctx, a, b, c2, d),
+        fill: (color) => {
           ctx.fillStyle = color;
           ctx.fill();
         },
-        line: (a, b, c2, d, color, w) => {
-          ctx.beginPath();
-          groundLine(ren, ctx, a, b, c2, d);
+        stroke: (color, w) => {
           ctx.strokeStyle = color;
           ctx.lineWidth = Math.max(0.8, w * zl);
           ctx.stroke();
         },
       },
       bigPlan(k, lv, m.x, m.y, 2 * h),
+      ren.camera.zoom >= 0.55, // feine Markierungen und Lichter erst ab mittlerem Zoom
+      ren.season === 'winter',
     );
     groundRect(ren, ctx, x0 + 3, y0 + 3, m.x + h - 3, m.y + h - 3);
     ctx.strokeStyle = LOT[k];
@@ -674,7 +683,7 @@ export function drawCityTop(ren, ctx, team, known, inRect) {
     const e = c.ents.get(i);
     const color = c.team < 2 ? g.teams[c.team].color : '#888';
     if (big && BIG_KINDS.has(k)) {
-      drawBigTop(ctx, bigPlan(k, lv, ctr.x, ctr.y, sizeOf(k) * c.cell), color, e ? 1 - e.hp / e.def.hp : 0);
+      drawBigTop(ctx, bigPlan(k, lv, ctr.x, ctr.y, sizeOf(k) * c.cell), color, e ? 1 - e.hp / e.def.hp : 0, ren.camera.zoom);
       continue;
     }
     if (big) {

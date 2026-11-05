@@ -19,8 +19,9 @@ const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 
 /**
  * Anlage des Flughafens relativ zu seiner Mitte (px, das Quadrat reicht bis ±320): zwei Start- und Landebahnen (waagrecht), Rollweg,
- * Vorfeld mit capacity Stellplätzen (5 Spalten × 4 Reihen), Hangars und Tower. Spiel (Start, Landung, Stellplätze) und Bild
- * (render/bigbuild.js) nutzen dieselben Maße.
+ * Vorfeld mit capacity Stellplätzen (5 Spalten × 4 Reihen). Spiel (Start, Landung, Stellplätze) und Bild (render/airport.js) nutzen
+ * dieselben Maße; das Vorfeld reicht seit v5.22 bis an den Rollweg und über die fünfte Rollgasse. Hangars, Tower und die übrigen
+ * Bauten sind nur Bild (render/airport.js).
  */
 export const AIRPORT = {
   runways: [
@@ -28,14 +29,8 @@ export const AIRPORT = {
     { y: -176, x0: -296, x1: 296, w: 36 },
   ],
   taxi: { y: -104, x0: -280, x1: 280, w: 18 },
-  apron: { x0: -304, x1: 72, y0: -70, y1: 300 },
+  apron: { x0: -304, x1: 100, y0: -95, y1: 300 },
   slots: Array.from({ length: 20 }, (_, k) => ({ x: -262 + (k % 5) * 76, y: -22 + Math.floor(k / 5) * 82 })),
-  hangars: [
-    { x: 196, y: -26, w: 196, h: 76 },
-    { x: 196, y: 64, w: 196, h: 76 },
-    { x: 196, y: 154, w: 196, h: 76 },
-  ],
-  tower: { x: 236, y: 256 },
   landing: { x: 0, y: -176 }, // Mitte von Bahn 2 (Landebahn; Heimweg-Rechnung)
 };
 
@@ -94,8 +89,8 @@ export const jetGrounded = (u) => !!u.def?.jet && (!!u.parked || GROUND.has(u.je
 /** Flughöhe 0 (Boden) … 1 (Reiseflughöhe) für die Darstellung. */
 export const jetAlt = (u) => (u.parked ? 0 : (u.jet?.alt ?? 1));
 
-const LANE = 38; // Rollgasse rechts neben jeder Spalte der Stellplätze (halber Abstand der Spalten)
-const ROW_GAP = 41; // Gasse zwischen zwei Reihen der Stellplätze (halber Abstand der Reihen)
+export const LANE = 38; // Rollgasse rechts neben jeder Spalte der Stellplätze (halber Abstand der Spalten)
+export const ROW_GAP = 41; // Gasse zwischen zwei Reihen der Stellplätze (halber Abstand der Reihen)
 
 /** Freier Stellplatz des Flughafens e (abgestellte und hereinrollende Jets belegen ihren Platz). */
 function freeSlot(game, u, e) {

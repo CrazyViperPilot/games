@@ -46,7 +46,7 @@ const ground = (g, color) => flat(g, -E, E, -E, E, color);
 const grass = (g, u0, u1, v0, v1) => flat(g, u0, u1, v0, v1, snowy(GRASS));
 
 /** Schatten eines runden Bauteils nach links unten (wie shadow() für Quader, nach +v verlängert). */
-function shadowRound(g, u, v, r, h, a = 0.2) {
+export function shadowRound(g, u, v, r, h, a = 0.2) {
   const { P, ctx, z } = g;
   const L = Math.min(16, h * 0.28);
   ctx.beginPath();
@@ -60,7 +60,7 @@ function shadowRound(g, u, v, r, h, a = 0.2) {
 }
 
 /** Rolltor mit Rahmen und Lamellen in einer Wand (Mitte a, Breite w, Höhe h). */
-function gate(g, face, plane, a, w, h, col = '#8e979d') {
+export function gate(g, face, plane, a, w, h, col = '#8e979d') {
   const pt = onFace(g, face, plane);
   poly(g, [pt(a - w / 2 - 0.6, 0), pt(a + w / 2 + 0.6, 0), pt(a + w / 2 + 0.6, h + 0.6), pt(a - w / 2 - 0.6, h + 0.6)], lit('#4d5358', ...FACE[face]), null);
   poly(g, [pt(a - w / 2, 0), pt(a + w / 2, 0), pt(a + w / 2, h), pt(a - w / 2, h)], lit(col, ...FACE[face]), OUTLINE);
@@ -68,7 +68,7 @@ function gate(g, face, plane, a, w, h, col = '#8e979d') {
 }
 
 /** Durchgehendes Fensterband mit Pfosten (a0…a1, Höhe h0…h1); glow = warm beleuchtet (Glut der Gießhalle). */
-function strip(g, face, plane, a0, a1, h0, h1, step = 3, glow = false) {
+export function strip(g, face, plane, a0, a1, h0, h1, step = 3, glow = false) {
   const pt = onFace(g, face, plane);
   poly(g, [pt(a0 - 0.4, h0 - 0.5), pt(a1 + 0.4, h0 - 0.5), pt(a1 + 0.4, h1 + 0.4), pt(a0 - 0.4, h1 + 0.4)], lit(SILL, ...FACE[face]), null);
   poly(g, [pt(a0, h0), pt(a1, h0), pt(a1, h1), pt(a0, h1)], glow ? (face === 's' ? '#f6a640' : '#e08a2c') : lit(GLASS, ...FACE[face]), null);
@@ -78,7 +78,7 @@ function strip(g, face, plane, a0, a1, h0, h1, step = 3, glow = false) {
 }
 
 /** Wände einer Halle mit Schatten und Sockel (o.ribs: Wellblech, o.band: Band unter der Traufe); Dach, Tore, Fenster danach. */
-function walls(g, u0, u1, v0, v1, H, wall, o = {}) {
+export function walls(g, u0, u1, v0, v1, H, wall, o = {}) {
   shadow(g, u0, u1, v0, v1, H + (o.roofH ?? 0));
   box(g, u0, u1, v0, v1, 0, H, wall);
   plinth(g, u0, u1, v0, v1, wall);
@@ -282,7 +282,7 @@ function pile(g, u0, u1, v0, v1, h, color) {
 }
 
 /** Lagertank: Mantel mit Nähten, Band in Teamfarbe, Treppe außen, Kegeldach oder (float) Schwimmdach. */
-function tank(g, u, v, r, H, o = {}) {
+export function tank(g, u, v, r, H, o = {}) {
   const col = o.color ?? TANK;
   shadowRound(g, u, v, r, H);
   cyl(g, u, v, r, 0, H, col, false);
@@ -327,7 +327,7 @@ function tank(g, u, v, r, H, o = {}) {
 }
 
 /** Auffangwanne (niedrige Betonmauer) um [u0,u1]×[v0,v1]: part 'back' hintere Seiten, 'front' vordere Seiten. */
-function bund(g, u0, u1, v0, v1, part, h = 2.2) {
+export function bund(g, u0, u1, v0, v1, part, h = 2.2) {
   if (part === 'back') {
     box(g, u0, u0 + 1, v0, v1, 0, h, CONCRETE);
     box(g, u0, u1, v0, v0 + 1, 0, h, CONCRETE);
@@ -404,7 +404,7 @@ function column(g, u, v, r, H, o = {}) {
 }
 
 /** Rohr als Linienzug durch Punkte [u, v, h] mit Glanzlinie (d = Durchmesser). */
-function pipe(g, pts, d, col = PIPE) {
+export function pipe(g, pts, d, col = PIPE) {
   const S = pts.map(([u, v, h]) => g.P(u, v, h));
   stroke(g, S, shade(col, 0.28), d);
   stroke(g, S.map(([x, y]) => [x, y - d * g.z * 0.22]), tint(col, 0.3), d * 0.32);
@@ -512,7 +512,7 @@ function bunker(g, u0, u1, v0, v1, H) {
 }
 
 /** LKW entlang u oder v (Fahrerhaus vorn bei +u bzw. +v); load: 'bricks', 'tank', 'tarp', 'coal', 'ore', 'logs'. */
-function lorry(g, u, v, along, cabCol, load, o = {}) {
+export function lorry(g, u, v, along, cabCol, load, o = {}) {
   const U = along === 'u';
   const L = 7;
   const W = 2.3;
@@ -1340,7 +1340,7 @@ function kero(g, lv, o) {
 // ---------- 2D von oben ----------
 // x = u, y = v; Licht von links oben, Schatten nach rechts unten (wie isokit.js). Dieselbe Anlage wie im Iso-Bild.
 
-function ringTop(c, x, y, r, color, w) {
+export function ringTop(c, x, y, r, color, w) {
   c.beginPath();
   c.arc(x, y, r, 0, Math.PI * 2);
   c.strokeStyle = color;
@@ -1349,7 +1349,7 @@ function ringTop(c, x, y, r, color, w) {
 }
 
 /** Schatten eines runden Baus der Höhe h: Scheibe r, nach rechts unten gezogen. */
-function roundShadow(c, x, y, r, h, a = 0.24) {
+export function roundShadow(c, x, y, r, h, a = 0.24) {
   const s = Math.min(16, h * 0.22);
   c.save();
   c.strokeStyle = `rgba(0,0,0,${a})`;
@@ -1363,7 +1363,7 @@ function roundShadow(c, x, y, r, h, a = 0.24) {
 }
 
 /** Runde Scheibe mit Lichtverlauf und dünnem Rand. */
-function discTop(c, x, y, r, color, edge = 'rgba(0,0,0,0.35)') {
+export function discTop(c, x, y, r, color, edge = 'rgba(0,0,0,0.35)') {
   const grad = c.createRadialGradient(x - r * 0.4, y - r * 0.4, r * 0.1, x, y, r);
   grad.addColorStop(0, tint(color, 0.2));
   grad.addColorStop(1, shade(color, 0.22));
@@ -1372,7 +1372,7 @@ function discTop(c, x, y, r, color, edge = 'rgba(0,0,0,0.35)') {
 }
 
 /** Gebäude mit Flachdach: Schatten, Attika, Dachfläche. */
-function blockTop(c, x0, y0, x1, y1, H, wall, deck = DECK) {
+export function blockTop(c, x0, y0, x1, y1, H, wall, deck = DECK) {
   shadowTop(c, x0, y0, x1, y1, H);
   flatTop(c, x0, y0, x1, y1, wall, deck);
 }
@@ -1458,7 +1458,7 @@ function columnTop(c, x, y, r, H) {
 }
 
 /** Rohr von oben (Linienzug) mit Schatten und Glanzlinie. */
-function pipeTop(c, pts, w, col = PIPE) {
+export function pipeTop(c, pts, w, col = PIPE) {
   lineT(c, pts.map(([x, y]) => [x + w * 0.5, y + w * 0.5]), 'rgba(0,0,0,0.2)', w);
   lineT(c, pts, shade(col, 0.2), w);
   lineT(c, pts.map(([x, y]) => [x - w * 0.15, y - w * 0.15]), tint(col, 0.35), w * 0.35);
@@ -1528,7 +1528,7 @@ function palletTop(c, x, y, s, col = BRICKS) {
 }
 
 /** LKW von oben (Fahrerhaus bei +x bzw. +y). */
-function lorryTop(c, x, y, along, cabCol, load, o = {}) {
+export function lorryTop(c, x, y, along, cabCol, load, o = {}) {
   const U = along === 'u';
   const R = (a0, a1, b0, b1, fill, line = 'rgba(0,0,0,0.4)') =>
     U ? rectS(c, x + a0, y + b0, x + a1, y + b1, fill, line, 0.3) : rectS(c, x + b0, y + a0, x + b1, y + a1, fill, line, 0.3);
