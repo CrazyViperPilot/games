@@ -56,6 +56,7 @@ import { bridgeUnder } from '../game/river.js';
 import { setMapTown, drawMapTown2D, drawMapCars2D, drawPark } from './maptown.js';
 import { drawUnitTop, drawUnitShadowIso } from './unitpaint.js';
 import { drawCityGround, drawCityTop, cityBuildings, drawCityBadges } from './citylayer.js';
+import { drawWays } from './ways.js';
 import { beginTownFrame, townLift } from './townhouses.js';
 
 const TILE = BALANCE.map.tile;
@@ -204,6 +205,7 @@ export class Renderer {
     ctx.imageSmoothingEnabled = true;
 
     this.drawTerrain(ctx, R);
+    drawWays(this, ctx, this.season); // Feldwege und Gleise scharf über dem Geländebild (seit v5.31, ways.js)
     // Kartenstadt (seit v5.23 gemalt, nicht mehr im Geländebild): Parks, Gebäude, Bänke, Stadtbäume, Autos (maptown.js)
     setRoofSnow(this.season === 'winter');
     const ruined = (b) => {
@@ -212,7 +214,7 @@ export class Renderer {
     };
     drawMapTown2D(ctx, g.map.town, inRect, z, this.season, (x, y) => g.city && treeGone(g, x, y), ruined);
     setRoofSnow(false);
-    for (const b of g.bridges ?? []) if (inRect(b.x, b.y, b.len / 2 + 40)) drawBridgeTop(ctx, b); // über dem Fluss, unter allem anderen
+    for (const b of g.bridges ?? []) if (inRect(b.x, b.y, b.len / 2 + 40)) drawBridgeTop(ctx, b, this.season); // über dem Fluss, unter allem anderen
     for (const p of fordPosts(g.map, reliefOf(g.map))) if (inRect(p.x, p.y, 10)) drawFordPostTop(ctx, p); // Furtstangen
     this.drawRuins(ctx, R, known);
     this.drawScars(ctx, inRect, z);
@@ -562,13 +564,15 @@ export class Renderer {
         drawPark(ctx, p, z, this.season, rails);
       }
     }
+    setIsoGround(ctx, cam, dpr);
+    drawWays(this, ctx, this.season); // Feldwege und Gleise scharf auf dem Boden (seit v5.31, ways.js)
     for (const c of g.craters ?? []) {
       if (!this.scarShown(c) || !inRect(c.x, c.y, c.r + 10)) continue;
       if (relief) this.groundAt(ctx, c.x, c.y);
       else setIsoGround(ctx, cam, dpr);
       drawCrater(ctx, c, scarAlpha(c, g.time, SC.craterLife, SC.craterFade));
     }
-    for (const b of g.bridges ?? []) if (inRect(b.x, b.y, b.len / 2 + PAD)) drawBridgeIso(ctx, cam, dpr, b); // Einheiten fahren darüber
+    for (const b of g.bridges ?? []) if (inRect(b.x, b.y, b.len / 2 + PAD)) drawBridgeIso(ctx, cam, dpr, b, this.season); // Einheiten fahren darüber
     setIsoGround(ctx, cam, dpr);
     drawCityGround(this, ctx, team, known, inRect); // Stadt: Straßen und Grundstücke
     setIsoGround(ctx, cam, dpr);

@@ -20,6 +20,14 @@ function spot(g, w, h) {
     for (let q = 0; q <= c.cols - w; q++) {
       let ok = true;
       for (let y = r; ok && y < r + h; y++) for (let x = q; ok && x < q + w; x++) ok = canZone(g, c, y * c.cols + x) && !c.kind[y * c.cols + x];
+      // Rand von einer Zelle ohne Straße und ohne Gebäude: die Fläche hängt nicht am Startviertel (seit v5.32, kleinere Fabrikhalle)
+      for (let y = r - 1; ok && y <= r + h; y++) {
+        for (let x = q - 1; ok && x <= q + w; x++) {
+          if (y < 0 || x < 0 || y >= c.rows || x >= c.cols) continue;
+          const j = y * c.cols + x;
+          ok = !c.kind[j] && !roadAt(c, j);
+        }
+      }
       if (!ok) continue;
       const d = Math.abs(q - fc) + Math.abs(r - fr);
       if (!best || d < best.d) best = { c: q, r, d };
@@ -129,14 +137,39 @@ test('Überlast → Stau-Faktor < 1 nach settleLoads, nach Entlastung wieder 1',
 test('Lager-Anschluss: Straße bis an die Hauptstadt macht mainAccess nicht leer, Werk liefert ins Lager', () => {
   const g = new Game({ seed: 3, city: true, startMoney: 5000 });
   const c = g.city[0];
-  // Seit v5.20 (AP4) hat das Startviertel schon einen Anschluss ans Lager; die Straße hier ergänzt ihn
-  // Straße an der Hauptstadt vorbei (Zelle Spalte 8, Zeile 161 liegt im Anschlussbereich), dann ein BM-Werk daran
-  g.issue(0, { type: 'city', kind: 'road', c0: 7, r0: 158, c1: 8, r1: 158 });
-  g.issue(0, { type: 'city', kind: 'road', c0: 8, r0: 159, c1: 8, r1: 161 });
-  g.issue(0, { type: 'city', kind: 'bm', c0: 5, r0: 158, c1: 6, r1: 159 });
-  const access = mainAccess(g, c);
-  assert.ok(access.includes(161 * c.cols + 8), 'Straße reicht an die Hauptstadt');
-  const bmAnchor = anchorOf(c, 158 * c.cols + 5);
+  // Seit v5.20 (AP4) hat das Startviertel schon einen Anschluss ans Lager; die Straße hier ergänzt ihn. Seit v5.32 sucht der Test
+  // die Zellen selbst: eine freie Zelle p im Anschlussbereich der Hauptstadt (eine Straße dort zählt zu mainAccess) und daneben ein
+  // freies 2 × 2-Quadrat für das BM-Werk
+  const m = g.mainFob(0);
+  const mc = Math.floor(m.x / c.cell);
+  const mr = Math.floor(m.y / c.cell);
+  const free = (q, r) => q >= 0 && r >= 0 && q < c.cols && r < c.rows && !c.kind[r * c.cols + q] && canZone(g, c, r * c.cols + q);
+  let found = null;
+  for (let rad = 1; rad <= 6 && !found; rad++) {
+    for (let r = mr - rad; r <= mr + rad && !found; r++) {
+      for (let q = mc - rad; q <= mc + rad && !found; q++) {
+        if (Math.max(Math.abs(q - mc), Math.abs(r - mr)) !== rad || !free(q, r)) continue;
+        const before = mainAccess(g, c).length;
+        // Werk 2 × 2 links oben daneben (die Zelle p bleibt Straße)
+        for (const [dq, dr] of [[-2, 0], [1, 0], [0, -2], [0, 1], [-2, -1], [1, -1]]) {
+          const ok = [[0, 0], [1, 0], [0, 1], [1, 1]].every(([x, y]) => free(q + dq + x, r + dr + y));
+          if (!ok) continue;
+          const res = g.issue(0, { type: 'city', kind: 'road', c0: q, r0: r, c1: q, r1: r });
+          if (!res.ok) break;
+          if (!mainAccess(g, c).includes(r * c.cols + q)) {
+            g.issue(0, { type: 'city', kind: 'erase', c0: q, r0: r, c1: q, r1: r });
+            break;
+          }
+          assert.ok(mainAccess(g, c).length > before);
+          found = { q, r, bq: q + dq, br: r + dr };
+          break;
+        }
+      }
+    }
+  }
+  assert.ok(found, 'Straße reicht an die Hauptstadt');
+  g.issue(0, { type: 'city', kind: 'bm', c0: found.bq, r0: found.br, c1: found.bq + 1, r1: found.br + 1 });
+  const bmAnchor = anchorOf(c, found.br * c.cols + found.bq);
   for (const j of cellsOf(c, bmAnchor)) c.level[j] = 1;
   const tr = transportOf(g, c);
   const r = tr.routes.get(bmAnchor);

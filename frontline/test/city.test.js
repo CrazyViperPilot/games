@@ -214,7 +214,7 @@ test('Großbauten der Stadt (Fabrikhalle, Kaserne) lichten den Nebel über ihrer
       }
     }
   }
-  assert.ok(n >= 4 * 80, 'Fabrikhalle und Kaserne im Startviertel geprüft');
+  assert.ok(n >= 4 * (25 + 16), 'Fabrikhalle (5 × 5) und Kaserne (4 × 4) im Startviertel geprüft');
 });
 
 test('Räumen lässt Rohstoffvorkommen und Förderanlagen stehen; nur Abreißen (demolish) entfernt eine Förderanlage', () => {
