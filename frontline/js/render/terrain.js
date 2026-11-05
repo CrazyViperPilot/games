@@ -103,7 +103,8 @@ export function buildTerrain(map, mode = '2d') {
     ctx.drawImage(layers.mat, 0, 0, w, h);
   }
 
-  drawMapObjects(ctx, map, S, iso, rng, false, false); // Straßen der Zone: Stadtstraßen (citylayer.js, seit v5.03); Kartenstadt: maptown.js (seit v5.23)
+  // Straßen der Zone: Stadtstraßen (citylayer.js, seit v5.03); Kartenstadt: maptown.js (seit v5.23); Bäume und Felsen: nature.js (seit v5.28)
+  drawMapObjects(ctx, map, S, iso, rng, false, false, false);
 
   // Dezentes Raster alle 4 Zellen (128 px)
   ctx.strokeStyle = 'rgba(0,0,0,0.07)';
@@ -132,14 +133,15 @@ export function buildTerrain(map, mode = '2d') {
 
 /**
  * Straßen, Bahn, Stadt, Bäume und Hindernisse einer Karte auf ein Canvas (Maßstab S). Auch der Karteneditor nutzt das.
- * paved = false: nur Feldwege (im Spiel sind die Straßen der Zone Stadtstraßen, citylayer.js).
+ * paved = false: nur Feldwege (im Spiel sind die Straßen der Zone Stadtstraßen, citylayer.js). nature = false (Spiel, seit v5.28):
+ * Wälder nur als Waldboden, Felsen als Geröll, keine Bäume; die malt nature.js scharf darüber.
  */
-export function drawMapObjects(ctx, map, S, iso, rng, paved = true, town = true) {
+export function drawMapObjects(ctx, map, S, iso, rng, paved = true, town = true, nature = true) {
   drawFields(ctx, map, S);
   drawRoads(ctx, map, S, paved);
   drawRail(ctx, map, S);
   if (town) drawTown(ctx, map, S, iso); // im Spiel malt die Kartenstadt seit v5.23 maptown.js (scharf, je Bild)
-  if (!iso) for (const t of map.trees ?? []) tree(ctx, t.x * S, t.y * S, t.r * S);
+  if (!iso && nature) for (const t of map.trees ?? []) tree(ctx, t.x * S, t.y * S, t.r * S);
 
   // Hindernisse: Wald (Kreis aus Baumkronen) bzw. Fels (grauer Block mit Schatten).
   // Die Art richtet sich nach dem Radius, damit die punktsymmetrischen Partner gleich aussehen.
@@ -148,6 +150,11 @@ export function drawMapObjects(ctx, map, S, iso, rng, paved = true, town = true)
     const cy = o.y * S;
     const rr = o.r * S;
     const forest = Math.round(o.r) % 2 === 0;
+    if (!nature) {
+      if (forest) forestFloor(ctx, cx, cy, rr, rng);
+      else scree(ctx, cx, cy, rr);
+      continue;
+    }
     if (forest) {
       ctx.fillStyle = 'rgba(15,28,14,0.55)';
       ctx.beginPath();
@@ -186,6 +193,51 @@ export function drawMapObjects(ctx, map, S, iso, rng, paved = true, town = true)
       ctx.fill();
     }
   }
+}
+
+/** Waldboden unter den gemalten Bäumen (seit v5.28): weicher, gelappter Rand, Moos, Nadelstreu und Laub. */
+function forestFloor(ctx, cx, cy, rr, rng) {
+  const halo = ctx.createRadialGradient(cx, cy, rr * 0.75, cx, cy, rr * 1.2);
+  halo.addColorStop(0, 'rgba(36,50,27,0.6)');
+  halo.addColorStop(1, 'rgba(36,50,27,0)');
+  ctx.fillStyle = halo;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rr * 1.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#34462a';
+  ctx.beginPath();
+  ctx.arc(cx, cy, rr * 0.8, 0, Math.PI * 2);
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2 + rng.next() * 0.4;
+    const d = rr * (0.7 + rng.next() * 0.14);
+    const k = rr * (0.17 + rng.next() * 0.12);
+    ctx.moveTo(cx + Math.cos(a) * d + k, cy + Math.sin(a) * d);
+    ctx.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, k, 0, Math.PI * 2);
+  }
+  ctx.fill();
+  const spots = ['#40562f', '#2a3a22', '#4b4630', '#3a3424', '#46582f'];
+  for (let i = 0; i < Math.max(8, Math.round(rr * 0.9)); i++) {
+    const a = rng.next() * Math.PI * 2;
+    const d = Math.sqrt(rng.next()) * rr * 0.85;
+    const k = Math.max(0.6, rr * (0.04 + rng.next() * 0.07));
+    ctx.globalAlpha = 0.45 + rng.next() * 0.35;
+    ctx.fillStyle = spots[i % spots.length];
+    ctx.beginPath();
+    ctx.ellipse(cx + Math.cos(a) * d, cy + Math.sin(a) * d, k, k * (0.6 + rng.next() * 0.4), rng.next() * Math.PI, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+/** Geröll unter einem gemalten Fels (Editor-Karten, seit v5.28): weicher grauer Fleck. */
+function scree(ctx, cx, cy, rr) {
+  const g = ctx.createRadialGradient(cx, cy, rr * 0.2, cx, cy, rr * 1.15);
+  g.addColorStop(0, 'rgba(118,116,106,0.75)');
+  g.addColorStop(1, 'rgba(118,116,106,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rr * 1.15, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 const TRAIN_COLOR = { loco: '#b3423a', container: '#3f8a5e', tank: '#7c8190' };

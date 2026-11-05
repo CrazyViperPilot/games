@@ -9,6 +9,8 @@ import { CITY_COLORS, CITY_ICON } from '../ui/citypanel.js';
 import { drawUniversityTop, UNI_LAWNS } from './university.js';
 import { drawTownTop, townLift } from './townhouses.js';
 import { transportOf } from '../game/transport.js';
+import { depositSprite } from './nature.js';
+import { blit, spriteDpr } from './spritecache.js';
 
 // Grundstücke in der Farbe der Zellenart (wie die Werkzeugleiste): Wohnen grün, Gewerbe blau, Werke erdig, Markt gold, Militär oliv
 const LOT = CITY_COLORS;
@@ -553,18 +555,45 @@ function groundDot(ren, ctx, x, y, rad, color) {
   ctx.fill();
 }
 
-/** Rohstoffvorkommen (Kartenmerkmal, wo erkundet): getönter Boden mit Tupfen; Zellen mit Förderanlage zeigt die Stadt. */
+/**
+ * Rohstoffvorkommen (Kartenmerkmal, wo erkundet): seit v5.28 ein gemaltes Bodenbild je Zelle (nature.js: Stümpfe und Holzstapel,
+ * Steinblöcke, rostiges Erz, Ölpfützen), mit Gelände an die Zellecken angepasst; fehlt das Bild noch, getönter Boden mit Tupfen.
+ * Zellen mit Förderanlage zeigt die Stadt.
+ */
 function drawDeposits(ren, ctx, known) {
   const g = ren.game;
   const c = g.city[0];
-  const V = ren.camera.visibleRect();
+  const cam = ren.camera;
+  const V = cam.visibleRect();
   const S = c.cell;
+  const drape = ren.draping();
+  const dpr = ren.dpr;
+  const scale = cam.zoom * spriteDpr();
   for (let r = Math.max(0, Math.floor(V.y0 / S) - 1); r <= Math.min(c.rows - 1, Math.ceil(V.y1 / S) + 1); r++) {
     for (let q = Math.max(0, Math.floor(V.x0 / S) - 1); q <= Math.min(c.cols - 1, Math.ceil(V.x1 / S) + 1); q++) {
       const i = r * c.cols + q;
       const d = DEPOSITS[c.deposit[i] - 1];
       if (!d || !known((q + 0.5) * S, (r + 0.5) * S)) continue;
       if (g.city.some((o) => o.level[i])) continue;
+      const e = depositSprite(d, (Math.imul(q + 7, 73856093) ^ Math.imul(r + 3, 19349663)) >>> 0 & 3, ren.season, scale * (S / 64));
+      if (e) {
+        if (drape) {
+          // Bild auf die Zelle legen: Ecken mit Gelände (drei Ecken bestimmen die Lage, die vierte folgt)
+          const A = cam.worldToScreen(q * S, r * S);
+          const B = cam.worldToScreen((q + 1) * S, r * S);
+          const C = cam.worldToScreen(q * S, (r + 1) * S);
+          ctx.setTransform((dpr * (B.x - A.x)) / 64, (dpr * (B.y - A.y)) / 64, (dpr * (C.x - A.x)) / 64, (dpr * (C.y - A.y)) / 64, dpr * A.x, dpr * A.y);
+          blit(ctx, e, 0, 0, 1);
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        } else {
+          ctx.save();
+          ctx.translate(q * S, r * S);
+          ctx.scale(S / 64, S / 64);
+          blit(ctx, e, 0, 0, 1);
+          ctx.restore();
+        }
+        continue;
+      }
       groundRect(ren, ctx, q * S, r * S, (q + 1) * S, (r + 1) * S);
       ctx.fillStyle = DEP_GROUND[d];
       ctx.fill();

@@ -206,9 +206,10 @@ function paintSolids(ctx, solids, yaw, view) {
     let col = so.col;
     if (view.charred) col = mix(col, CHAR, 0.78);
     const rgb = rgbOf(col);
+    const top = so.top && !view.charred ? (so._top ??= rgbOf(so.top.col)) : null; // Oberseiten (Schnee, Moos, seit v5.28)
     const c = so._c;
-    for (const f of so.faces) {
-      const pts = f.map(rot);
+    for (let fi = 0; fi < so.faces.length; fi++) {
+      const pts = so.faces[fi].map(rot);
       // Normale nach Newell, nach außen (weg von der Körpermitte)
       let nx = 0;
       let ny = 0;
@@ -255,12 +256,18 @@ function paintSolids(ctx, solids, yaw, view) {
       }
       const d = Math.max(0, nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2]);
       const ao = fz < 7 ? 0.8 + (0.2 * Math.max(0, fz)) / 7 : 1; // bodennahe Flächen etwas dunkler (Umgebungsverdeckung)
-      const k = (0.56 + 0.44 * d) * ao;
-      ctx.fillStyle = `rgb(${Math.min(255, rgb[0] * k) | 0},${Math.min(255, rgb[1] * k) | 0},${Math.min(255, rgb[2] * k) | 0})`;
+      let k = (0.56 + 0.44 * d) * ao;
+      if (so.vary) k *= 1 + so.vary * (((Math.imul(fi + 1, 2654435761) >>> 0) % 1000) / 1000 - 0.5); // Flächen leicht verschieden (Fels)
+      let fc = rgb;
+      if (top && nz > so.top.at) {
+        const t = Math.min(1, (nz - so.top.at) / 0.18);
+        fc = [rgb[0] + (top[0] - rgb[0]) * t, rgb[1] + (top[1] - rgb[1]) * t, rgb[2] + (top[2] - rgb[2]) * t];
+      }
+      ctx.fillStyle = `rgb(${Math.min(255, fc[0] * k) | 0},${Math.min(255, fc[1] * k) | 0},${Math.min(255, fc[2] * k) | 0})`;
       ctx.fill();
       if (!so.noLine) {
         const e = so.smooth ? k : k * 0.68; // runde Körper ohne dunkle Kanten (sonst Netzmuster), nur Nähte geschlossen
-        ctx.strokeStyle = `rgb(${(rgb[0] * e) | 0},${(rgb[1] * e) | 0},${(rgb[2] * e) | 0})`;
+        ctx.strokeStyle = `rgb(${(fc[0] * e) | 0},${(fc[1] * e) | 0},${(fc[2] * e) | 0})`;
         ctx.stroke();
       }
     }
@@ -1152,3 +1159,6 @@ export function unitModelTypes() {
   return [...Object.keys(MODELS), ...Object.keys(INFANTRY)];
 }
 export { modelOf as unitModel };
+
+/** Malwerkzeug für andere gemalte Modelle (Tiere und Felsen in nature.js, seit v5.28): Körper, Renderer, Bildgrenzen, Richtungen. */
+export const PAINT = { solid, box, cyl, ball, loft, prZ, on, fine, paintSolids, boundsOf, getSprite, viewAngle, nearKeys, sectorOf, mix };

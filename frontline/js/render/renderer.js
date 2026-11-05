@@ -42,7 +42,8 @@ import {
 import { drawCityHallTop } from './cityhall.js';
 import { drawTownBuilding, drawTeamBuilding, drawCar, drawBench, drawRubble, drawCrate, drawWreckBox } from './isobuild.js';
 import { parkDeco } from './terrain.js';
-import { drawTreeSprite, drawRockSprite, drawBushSprite, drawCarSprite, drawUnitSprite, drawWreckSprite } from './isosprites.js';
+import { drawCarSprite, drawUnitSprite, drawWreckSprite } from './isosprites.js';
+import { drawTreeIso, drawTreeTop, drawBushIso, drawBushTop, drawRockIso, drawRockTop, natureShadowIso, drawAnimalIso, drawAnimalTopP, forestKind, forestSpecies } from './nature.js';
 import { drawMilTop, setMilWalls } from './milbuild.js';
 import { scarAlpha } from '../game/scars.js';
 import { reliefOf, RELIEF } from '../game/relief.js';
@@ -184,6 +185,7 @@ export class Renderer {
     beginTownFrame(dpr); // Stadtgebäude: Maßstab der Bilder, Zeitbudget fürs Nachmalen (townhouses.js, spritecache.js)
     setMapTown(g.map); // Kartenstadt: Felder für die Gehöfte (maptown.js)
     setMilWalls(g.buildings); // Mauern und Tore: Verbindungen zu den Nachbarn (milbuild.js)
+    if (!this.deco) this.deco = this.buildDeco();
     if (cam.iso) {
       this.renderIso(v, now);
       return;
@@ -217,6 +219,7 @@ export class Renderer {
     drawCityGround(this, ctx, team, known, inRect); // Stadt: Straßen und Grundstücke
     drawMapCars2D(ctx, g.map.town, inRect); // Autos der Karte auf den Straßen (seit v5.23 sichtbar)
     drawCityTop(this, ctx, team, known, inRect); // Stadt: Dächer
+    this.drawNatureTop(ctx, inRect, z); // Felsen, Büsche und Bäume von oben (seit v5.28 gemalt, nicht mehr im Geländebild)
     drawCityBadges(this, ctx, team, known, inRect, false); // Stadt: Schilder (Funktion, privat/kommerziell)
     this.drawZone(ctx, z);
     this.drawHot(ctx, z, now);
@@ -236,7 +239,7 @@ export class Renderer {
     for (const m of this.crateMarks(seen, known)) {
       if (inRect(m.x, m.y, 30)) drawCrateTop(ctx, m.x, m.y, m.ground ? 16 : 13, z, m.ground ? glow : 0);
     }
-    for (const a of g.animals ?? []) if (inRect(a.x, a.y, 20) && seen(a.x, a.y)) drawAnimalTop(ctx, a, z); // nur in Sicht
+    for (const a of g.animals ?? []) if (inRect(a.x, a.y, 20) && seen(a.x, a.y) && !drawAnimalTopP(ctx, a, z, now)) drawAnimalTop(ctx, a, z); // nur in Sicht
 
     // Auswahl und Hover (unter den Einheiten); Besatzer eines Hauses: Rahmen ums Haus
     for (const e of this.ringed(sel)) if (shown(e)) this.drawSelectRing(ctx, e, '#f2f5f2', z, false);
@@ -424,6 +427,24 @@ export class Renderer {
   }
 
   /** Bäume und Felsen für Wald- und Felshindernisse (deterministisch aus der Karte). */
+  /** 2D: Felsen, Büsche und Bäume von oben (gemalt, nature.js); fehlt ein Bild noch, eine einfache Krone. Gefällte Zellen frei. */
+  drawNatureTop(ctx, inRect, z) {
+    const g = this.game;
+    const season = this.season;
+    const gone = (x, y) => g.city && treeGone(g, x, y);
+    for (const o of this.deco.rocks) if (inRect(o.x, o.y, o.r + 30)) drawRockTop(ctx, o, season, z);
+    for (const b of this.deco.bushes) if (inRect(b.x, b.y, 24) && !gone(b.x, b.y)) drawBushTop(ctx, b, season, z);
+    for (const list of [g.map.trees ?? [], this.deco.trees]) {
+      for (const t of list) {
+        if (!inRect(t.x, t.y, 40) || gone(t.x, t.y) || drawTreeTop(ctx, t, season, z)) continue;
+        ctx.fillStyle = season === 'winter' ? '#6d6259' : '#355a2c';
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, t.r * 1.1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
   buildDeco() {
     const trees = [];
     const rocks = [];
@@ -431,14 +452,26 @@ export class Renderer {
     for (const o of this.game.map.obstacles) {
       if (Math.round(o.r) % 2 === 0) {
         const rng = makeRng((o.x * 31 + o.y * 17 + o.r) >>> 0);
-        const n = Math.max(5, Math.round(o.r / 7));
+        // Seit v5.28 dichter (Kronen schließen sich) und nach Waldart gemischt (Laub-, Nadel- oder Mischwald, nature.js);
+        // gleichmäßig verteilt (Spirale mit Zufall), damit keine großen Lücken entstehen
+        const kind = forestKind(o);
+        const n = Math.max(6, Math.round((o.r * o.r) / 430));
         for (let i = 0; i < n; i++) {
+          const a = i * 2.39996 + rng.next() * 0.6;
+          const d = Math.min(o.r * 0.88, Math.sqrt((i + 0.5) / n) * o.r * 0.86 + (rng.next() - 0.5) * 7);
+          // inner: Schatten fällt auf den Waldboden und wird nicht eigens gezeichnet (Leistung)
+          trees.push({ x: o.x + Math.cos(a) * d, y: o.y + Math.sin(a) * d, r: 12 + rng.next() * 8, sp: forestSpecies(kind, rng.next()), inner: d < o.r * 0.6 });
+        }
+        // Unterholz zwischen den Stämmen: Farne und junge Fichten (nur Optik)
+        const under = Math.round(n * 0.25);
+        for (let i = 0; i < under; i++) {
           const a = rng.next() * Math.PI * 2;
-          const d = Math.sqrt(rng.next()) * o.r * 0.85;
-          trees.push({ x: o.x + Math.cos(a) * d, y: o.y + Math.sin(a) * d, r: 12 + rng.next() * 8 });
+          const d = Math.sqrt(rng.next()) * o.r * 0.8;
+          const k = rng.next() < (kind === 'laub' ? 0.8 : 0.45) ? 'fern' : 'sapling';
+          bushes.push({ x: o.x + Math.cos(a) * d, y: o.y + Math.sin(a) * d, r: 6 + rng.next() * 3, k, under: true });
         }
         // Büsche am Waldrand (nur Optik, blockieren nicht)
-        const edge = Math.max(2, Math.round(o.r / 16));
+        const edge = Math.max(3, Math.round(o.r / 12));
         for (let i = 0; i < edge; i++) {
           const a = rng.next() * Math.PI * 2;
           const d = o.r * (0.95 + rng.next() * 0.2);
@@ -578,7 +611,8 @@ export class Renderer {
       for (const b of d.benches) items.push({ k: cam.depth(b.x, b.y), t: 7, o: b });
     }
     for (const o of this.deco.rocks) if (inRect(o.x, o.y, PAD)) items.push({ k: cam.depth(o.x, o.y), t: 2, o });
-    for (const b of this.deco.bushes) if (inRect(b.x, b.y, 40) && !gone(b.x, b.y)) items.push({ k: cam.depth(b.x, b.y), t: 13, o: b });
+    const small = z < 0.6; // weit herausgezoomt: Unterholz im Wald weglassen (winzig, unter den Kronen)
+    for (const b of this.deco.bushes) if (inRect(b.x, b.y, 40) && !(small && b.under) && !gone(b.x, b.y)) items.push({ k: cam.depth(b.x, b.y), t: 13, o: b });
     for (const b of g.buildings) {
       if (!b.alive || (!g.alwaysVisible(team, b) && !known(b.x, b.y)) || !inRect(b.x, b.y, PAD)) continue;
       items.push({ k: cam.depth(b.x, b.y), t: 4, o: b });
@@ -627,7 +661,17 @@ export class Renderer {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
 
+    // Schatten der Bäume, Büsche und Felsen in einem Zug auf den Boden (seit v5.28): fallen nie über andere Dinge
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.beginPath();
+    for (const it of items) {
+      if ((it.t !== 1 && it.t !== 2 && it.t !== 13) || it.o.inner || it.o.under) continue;
+      if (relief) cam.pin(this.baseHeight(it));
+      natureShadowIso(ctx, cam, it.o, it.t);
+      cam.unpin();
+    }
+    ctx.fillStyle = 'rgba(10,18,8,0.24)';
+    ctx.fill();
     for (const it of items) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       // Jedes Objekt steht eben auf seiner Geländehöhe (Gebäude auf der tiefsten Ecke, damit nichts schwebt)
@@ -637,7 +681,7 @@ export class Renderer {
         if (hs && hs.ruined && known(hs.x, hs.y)) drawRubble(ctx, cam, it.o);
         else {
           setRoofSnow(this.season === 'winter'); // Winter: Schnee auf den Dächern der Stadt
-          if (it.o.part?.t !== 'tree' || !drawTreeSprite(ctx, cam, it.o.part, this.season)) drawTownBuilding(ctx, cam, it.o, this.season); // Bäume der Großbauten als Bild
+          if (it.o.part?.t !== 'tree' || !drawTreeIso(ctx, cam, it.o.part, this.season)) drawTownBuilding(ctx, cam, it.o, this.season); // Bäume der Großbauten gemalt (nature.js)
           setRoofSnow(false);
           if (it.o.damage > 0.25) {
             // beschädigtes Stadtgebäude (Stadt-Teil): Rauch über dem Dach
@@ -657,10 +701,10 @@ export class Renderer {
         }
       }
       else if (it.t === 1) {
-        if (!drawTreeSprite(ctx, cam, it.o, this.season)) drawTree(ctx, cam, it.o, this.season);
+        if (!drawTreeIso(ctx, cam, it.o, this.season)) drawTree(ctx, cam, it.o, this.season); // gemalt (nature.js), sonst Ersatz
       }
-      else if (it.t === 2) { if (!drawRockSprite(ctx, cam, it.o, this.season)) drawRock(ctx, cam, it.o); }
-      else if (it.t === 13) drawBushSprite(ctx, cam, it.o, this.season);
+      else if (it.t === 2) { if (!drawRockIso(ctx, cam, it.o, this.season)) drawRock(ctx, cam, it.o); }
+      else if (it.t === 13) drawBushIso(ctx, cam, it.o, this.season);
       else if (it.t === 6) { if (!drawCarSprite(ctx, cam, it.o)) drawCar(ctx, cam, it.o); }
       else if (it.t === 7) drawBench(ctx, cam, it.o);
       else if (it.t === 8) drawCrate(ctx, cam, it.o.x, it.o.y, it.o.ground ? 16 : 13, 0, it.o.ground ? glow : 0);
@@ -668,7 +712,7 @@ export class Renderer {
       else if (it.t === 11) {
         const a = it.o;
         const p = cam.worldToScreen(a.x, a.y);
-        drawAnimalSide(ctx, a, p.x, p.y, z * 1.1, ia * Math.cos(a.angle) + ic * Math.sin(a.angle) >= 0);
+        if (!drawAnimalIso(ctx, cam, a, p, now)) drawAnimalSide(ctx, a, p.x, p.y, z * 1.1, ia * Math.cos(a.angle) + ic * Math.sin(a.angle) >= 0);
       } else if (it.t === 9 || it.t === 10) {
         const w = it.o;
         ctx.globalAlpha = scarAlpha(w, g.time, SC.wreckLife, SC.wreckFade);

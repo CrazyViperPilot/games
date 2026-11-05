@@ -9,6 +9,7 @@
 // nächstkleinere Maß im 8-px-Raster (weniger Bilder), Hallen, Fabriken, Mauern und Zug ihr genaues Maß.
 // Örtliche Koordinaten: Weltpixel ab der Mitte des Grundrisses; a = Längsachse, b = Querachse (iso u oder v, siehe frameOf).
 // Nur Zeichnen: liest die Gebäude der Karte ({x, y, w, h, kind, part, angle}), die Felder (Gehöft) und die Gleise (Parks).
+import { drawTreeTop } from './nature.js';
 import { BALANCE } from '../data/balance.js';
 import { ISO_K } from './camera.js';
 import { sprite, blit, spriteDpr } from './spritecache.js';
@@ -1362,9 +1363,9 @@ export function drawMapTown2D(ctx, town, inRect, zoom, season, gone, ruined) {
     if (!inRect(p.x, p.y, p.r)) continue;
     const d = parkDecoOf(p);
     for (const b of d.benches) benchTop(ctx, b);
-    for (const t of d.trees) townTree(ctx, t, season);
+    for (const t of d.trees) if (!drawTreeTop(ctx, t, season, zoom)) townTree(ctx, t, season); // gemalt (nature.js, seit v5.28)
   }
-  for (const t of town.trees ?? []) if (inRect(t.x, t.y, t.r) && !gone(t.x, t.y)) townTree(ctx, t, season);
+  for (const t of town.trees ?? []) if (inRect(t.x, t.y, t.r) && !gone(t.x, t.y) && !drawTreeTop(ctx, t, season, zoom)) townTree(ctx, t, season);
 }
 
 /** 2D: parkende Autos der Karte, nach den Straßen der Stadt (sonst lägen sie darunter, wie bis v5.22). */

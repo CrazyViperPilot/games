@@ -1,6 +1,6 @@
 // Frontline Service Worker: network-first (immer die neueste Version), Cache nur als Offline-Fallback.
 // Bei Änderungen an Dateien CACHE_VERSION erhöhen, damit Clients die neue Version laden.
-const CACHE_VERSION = 'frontline-v141';
+const CACHE_VERSION = 'frontline-v142';
 const CACHE_PREFIX = 'frontline-';
 const CACHE_NAME = CACHE_VERSION;
 
@@ -75,6 +75,7 @@ const ASSETS = [
   './js/render/townhouses.js',
   './js/render/spritecache.js',
   './js/render/unitpaint.js',
+  './js/render/nature.js',
   './js/render/isokit.js',
   './js/render/milbuild.js',
   './js/render/airport.js',
@@ -95,19 +96,7 @@ const ASSETS = [
   './assets/iso/buildings/tower-r1.png',
   './assets/iso/buildings/tower-r2.png',
   './assets/iso/buildings/tower-r3.png',
-  './assets/iso/trees/tree.png',
-  './assets/iso/trees/tree-a.png',
-  './assets/iso/trees/tree-b.png',
-  './assets/iso/trees/tree-c.png',
-  './assets/iso/trees/tree-d.png',
   './assets/iso/cars/cars.png',
-  './assets/iso/rocks/rock-a.png',
-  './assets/iso/rocks/rock-b.png',
-  './assets/iso/rocks/rock-c.png',
-  './assets/iso/rocks/rock-d.png',
-  './assets/iso/bushes/bush-a.png',
-  './assets/iso/bushes/bush-b.png',
-  './assets/iso/bushes/bush-c.png',
   './js/render/minimap.js',
   './js/ui/controller.js',
   './js/ui/input.js',
