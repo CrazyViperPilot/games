@@ -8,6 +8,7 @@ import { drawBigPart, VEH, VEH_COLOR } from './bigbuild.js';
 import { drawCityHallIso } from './cityhall.js';
 import { drawTownIso } from './townhouses.js';
 import { drawMilIso } from './milbuild.js';
+import { drawMapIso } from './maptown.js';
 import { drawBox, drawRotBox, wallPoint, wallQuad, buildingHeight, TOWN_H, drawTree } from './iso.js';
 import { shade, tint, hexA } from './sprites.js';
 import { snowy } from './season.js';
@@ -266,10 +267,37 @@ export function drawCar(ctx, cam, c) {
   drawBox(ctx, cam, c.x - cx, c.y - cy, c.x + cx, c.y + cy, 7, '#34495e', { base: 9, noShadow: true, roof: shade(c.color, 0.85), wallS: '#2b3b4b', wallE: '#22303d' });
 }
 
-/** Parkbank: Sitz und Lehne, ausgerichtet entlang des Rundwegs (b.a), Lehne nach außen (b.rx, b.ry). */
+/**
+ * Parkbank (seit v5.23 aus Latten): drei Sitz- und zwei Lehnenlatten auf gusseisernen Wangen, ausgerichtet entlang des
+ * Rundwegs (b.a), Lehne nach außen (b.rx, b.ry). Liegt die Lehne hinten, kommt sie zuerst, sonst zuletzt.
+ */
 export function drawBench(ctx, cam, b) {
-  drawRotBox(ctx, cam, b.x, b.y, 18, 6, b.a, 5, '#8a6a45', { noShadow: true });
-  drawRotBox(ctx, cam, b.x + b.rx * 3.5, b.y + b.ry * 3.5, 18, 2, b.a, 11, '#6b4f33', { noShadow: true });
+  const IRON = '#33373a';
+  const WOOD = '#a27849';
+  const ca = Math.cos(b.a);
+  const sa = Math.sin(b.a);
+  const z = cam.zoom;
+  const pos = (al, out) => [b.x + ca * al + b.rx * out, b.y + sa * al + b.ry * out];
+  const shadow = [[-9.6, -3.2], [9.6, -3.2], [9.6, 4], [-9.6, 4]].map(([al, out]) => {
+    const p = cam.worldToScreen(...pos(al, out));
+    return { x: p.x - 2.4 * z, y: p.y + 1.2 * z };
+  });
+  ctx.beginPath();
+  shadow.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  ctx.fill();
+  const part = (al, out, len, wid, h, base, color) => {
+    const [x, y] = pos(al, out);
+    return { x, y, len, wid, h, base, color, d: cam.depth(x, y) };
+  };
+  const legs = [part(-7.4, -0.2, 1.3, 5.4, 4.4, 0, IRON), part(7.4, -0.2, 1.3, 5.4, 4.4, 0, IRON)];
+  const seat = [-1.8, 0, 1.8].map((out) => part(0, out, 18, 1.5, 0.8, 4.4, WOOD));
+  const back = [part(-7.4, 2.7, 1.3, 1.2, 10.4, 0, IRON), part(7.4, 2.7, 1.3, 1.2, 10.4, 0, IRON), part(0, 3, 18, 0.8, 1.4, 6.4, WOOD), part(0, 3, 18, 0.8, 1.4, 8.6, WOOD)];
+  const byDepth = (list) => list.sort((p, q) => p.d - q.d || p.base - q.base);
+  const front = [...byDepth(legs), ...byDepth(seat)];
+  const order = cam.depth(...pos(0, 3)) < cam.depth(b.x, b.y) ? [...byDepth(back), ...front] : [...front, ...byDepth(back)];
+  for (const p of order) drawRotBox(ctx, cam, p.x, p.y, p.len, p.wid, b.a, p.h, p.color, { noShadow: true, base: p.base, line: 0.5 });
 }
 
 /** Gebäude der Stadt (Haus, Halle, Fabrik) mit Fenstern, Türen, Toren, Balkonen und Dachaufbauten. */
@@ -290,6 +318,7 @@ export function drawTownBuilding(ctx, cam, b, season = 'summer') {
     drawTownIso(ctx, cam, b, season); // 1 × 1-Stadtgebäude (seit v5.14), je Art und Stufe eigenes Bild (townhouses.js)
     return;
   }
+  if (drawMapIso(ctx, cam, b)) return; // Gebäude der Karte, gemalt (seit v5.23, maptown.js)
   if (spriteOverrides[b.kind]?.(ctx, cam, b)) return;
   const hw = b.w / 2;
   const hh = b.h / 2;

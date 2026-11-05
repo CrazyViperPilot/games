@@ -1,10 +1,9 @@
 // Bild-Sprites für die isometrische Ansicht (freies Paket von Kenney, CC0, siehe assets/iso/README.md).
 // Alles hier ist optional: fehlt ein Bild oder ist ?sprites=0 gesetzt, bleibt die gemalte Variante.
 // Austausch: Dateien in assets/iso/ ersetzen oder die Listen unten anpassen.
-import { ISO_K } from './camera.js';
 import { spriteOverrides } from './isobuild.js';
 import { seasonal } from './season.js';
-import { BUILDING_SPRITES, TRAIN_SPRITES, INFANTRY_SPRITES, UNIT_PPU, MODEL_PPU } from './isodata.js';
+import { INFANTRY_SPRITES, UNIT_PPU } from './isodata.js';
 
 const ENABLED = typeof Image !== 'undefined' && typeof location !== 'undefined' && new URLSearchParams(location.search).get('sprites') !== '0';
 const url = (p) => new URL(`../../assets/iso/${p}`, import.meta.url).href;
@@ -17,16 +16,7 @@ const load = (p) => {
 const ready = (img) => !!img && img.complete && img.naturalWidth > 0;
 const hash = (x, y = 0) => (Math.imul(Math.round(x) | 0, 73856093) ^ Math.imul(Math.round(y) | 0, 19349663)) >>> 0;
 
-// Stadtgebäude: vorgerenderte Modelle aus Kenney City Kit (Commercial = Häuser, Industrial = Hallen und Fabriken), siehe isodata.js
-const MAX_H = { house: 100, hall: 100, factory: 130 }; // größte Höhe (Welt-Pixel), damit hohe Modelle nicht alles verdecken
-const BUILDINGS = {};
-for (const [kind, list] of Object.entries(BUILDING_SPRITES)) {
-  BUILDINGS[kind] = list.map(([file, ax, ay, w, d, h]) => ({ img: load(`buildings/${file}`), ax, ay, w, d, h }));
-}
-const TRAIN = {};
-for (const [part, list] of Object.entries(TRAIN_SPRITES)) {
-  TRAIN[part] = list.map(([file, ax, ay, w, d]) => ({ img: load(`train/${file}`), ax, ay, w, d }));
-}
+// Häuser, Hallen, Fabriken und der Zug der Karte sind seit v5.23 gemalt (maptown.js); die Kenney-Bilder dafür sind entfernt.
 // Wachturm der Karte (eigenes Modell, assets/iso/README.md): je Drehung der Ansicht ein Bild, 1 Modelleinheit = 1 Kachel.
 // Die eigenen Militärgebäude (Zentrale, Mörser, Flak, Mauer, Tor, Gefechtsturm …) sind seit v5.21 gemalt (milbuild.js).
 const TOWER = [0, 1, 2, 3].map((r) => load(`buildings/tower-r${r}.png`));
@@ -61,27 +51,6 @@ for (const model of new Set(Object.values(UNIT_MODEL))) {
   VEHICLES[model] = TEAM_COLOR.map((c) => SECTORS.map((s) => load(`vehicles/${model}-${c}-${s}.png`)));
 }
 
-/** Gebäude: Modell mit dem passendsten Seitenverhältnis, so skaliert, dass es das Rechteck ausfüllt. */
-function drawBuildingSprite(kind) {
-  return (ctx, cam, b) => {
-    const list = BUILDINGS[kind];
-    if (!list.every((m) => ready(m.img))) return false;
-    const odd = cam.rot % 2 === 1; // das Bild ist fest für Drehung 0 gerendert: bei 90° Breite und Tiefe tauschen
-    const bw = odd ? b.h : b.w;
-    const bh = odd ? b.w : b.h;
-    const seed = hash(b.x, b.y);
-    const want = Math.log(bw / bh);
-    const ranked = list.map((m, i) => ({ m, i, e: Math.abs(Math.log(m.w / m.d) - want) })).sort((p, q) => p.e - q.e || p.i - q.i);
-    const m = ranked[seed % Math.min(3, ranked.length)].m;
-    const f = Math.min(bw / m.w, bh / m.d, MAX_H[kind] / m.h);
-    const sc = (f * cam.zoom) / MODEL_PPU;
-    const p = cam.worldToScreen(b.x, b.y);
-    ctx.drawImage(m.img, p.x - m.ax * sc, p.y - m.ay * sc, m.img.naturalWidth * sc, m.img.naturalHeight * sc);
-    return true;
-  };
-}
-for (const kind of Object.keys(BUILDINGS)) if (ENABLED) spriteOverrides[kind] = drawBuildingSprite(kind);
-
 if (ENABLED) {
   spriteOverrides.tower = (ctx, cam, b) => {
     const img = TOWER[cam.rot];
@@ -89,18 +58,6 @@ if (ENABLED) {
     const sc = ((b.w / TOWER_VIEW.footprint) * (TILE_W * cam.zoom)) / TOWER_VIEW.ppu;
     const p = cam.worldToScreen(b.x, b.y);
     ctx.drawImage(img, p.x - TOWER_VIEW.ax * sc, p.y - TOWER_VIEW.ay * sc, img.naturalWidth * sc, img.naturalHeight * sc);
-    return true;
-  };
-}
-
-/** Zugteil (Lok, Wagen): je Drehung der Ansicht ein eigenes Bild, auf die Länge des Rechtecks skaliert. */
-if (ENABLED) {
-  spriteOverrides.train = (ctx, cam, b) => {
-    const m = TRAIN[b.part]?.[cam.rot];
-    if (!ready(m?.img)) return false;
-    const sc = ((b.w / Math.max(m.w, m.d)) * cam.zoom) / MODEL_PPU;
-    const p = cam.worldToScreen(b.x, b.y);
-    ctx.drawImage(m.img, p.x - m.ax * sc, p.y - m.ay * sc, m.img.naturalWidth * sc, m.img.naturalHeight * sc);
     return true;
   };
 }

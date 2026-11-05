@@ -103,7 +103,7 @@ export function buildTerrain(map, mode = '2d') {
     ctx.drawImage(layers.mat, 0, 0, w, h);
   }
 
-  drawMapObjects(ctx, map, S, iso, rng, false); // Straßen der Zone zeichnet das Spiel als Stadtstraßen (citylayer.js, seit v5.03)
+  drawMapObjects(ctx, map, S, iso, rng, false, false); // Straßen der Zone: Stadtstraßen (citylayer.js, seit v5.03); Kartenstadt: maptown.js (seit v5.23)
 
   // Dezentes Raster alle 4 Zellen (128 px)
   ctx.strokeStyle = 'rgba(0,0,0,0.07)';
@@ -134,11 +134,11 @@ export function buildTerrain(map, mode = '2d') {
  * Straßen, Bahn, Stadt, Bäume und Hindernisse einer Karte auf ein Canvas (Maßstab S). Auch der Karteneditor nutzt das.
  * paved = false: nur Feldwege (im Spiel sind die Straßen der Zone Stadtstraßen, citylayer.js).
  */
-export function drawMapObjects(ctx, map, S, iso, rng, paved = true) {
+export function drawMapObjects(ctx, map, S, iso, rng, paved = true, town = true) {
   drawFields(ctx, map, S);
   drawRoads(ctx, map, S, paved);
   drawRail(ctx, map, S);
-  drawTown(ctx, map, S, iso);
+  if (town) drawTown(ctx, map, S, iso); // im Spiel malt die Kartenstadt seit v5.23 maptown.js (scharf, je Bild)
   if (!iso) for (const t of map.trees ?? []) tree(ctx, t.x * S, t.y * S, t.r * S);
 
   // Hindernisse: Wald (Kreis aus Baumkronen) bzw. Fels (grauer Block mit Schatten).

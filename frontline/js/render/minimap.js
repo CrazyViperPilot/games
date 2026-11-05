@@ -2,6 +2,7 @@
 // Zeichnet in Weltkoordinaten (Transformation Welt → Canvas) und nutzt dieselben Sichtregeln wie der Hauptrenderer.
 import { BALANCE } from '../data/balance.js';
 import { buildTerrain } from './terrain.js';
+import { drawMapTownMini } from './maptown.js';
 import { seasonal } from './season.js';
 import { makeFogLayer, updateFogLayer } from './renderer.js';
 import { hexA, CRATE_MARK } from './sprites.js';
@@ -65,6 +66,7 @@ export class Minimap {
     ctx.fillRect(0, 0, W, H);
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(this.terrain, 0, 0, this.terrain.width, this.terrain.height, 0, 0, W, H);
+    drawMapTownMini(ctx, g.map.town, g.weather?.season); // Parks und Gebäude der Karte (seit v5.23 nicht mehr im Geländebild)
 
     // Zone
     const zn = g.zone;

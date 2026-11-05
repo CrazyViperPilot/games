@@ -5,7 +5,7 @@ import { BUILDINGS } from '../data/buildings.js';
 import { CITY } from '../data/city.js';
 import { careOf, treeGone } from '../game/city.js';
 import { rangeMul } from '../game/research.js';
-import { buildTerrain } from './terrain.js';
+import { buildTerrain, railList } from './terrain.js';
 import { lacksAmmo } from '../game/entities.js';
 import {
   drawUnit,
@@ -52,6 +52,7 @@ import { drawWeather } from './weatherfx.js';
 import { drawMood } from './mood.js';
 import { drawBridgeTop, drawBridgeIso, drawBridgeBar, bridgeBar, fordPosts, drawFordPostTop, drawFordPostIso } from './bridge.js';
 import { bridgeUnder } from '../game/river.js';
+import { setMapTown, drawMapTown2D, drawMapCars2D, drawPark } from './maptown.js';
 import { drawCityGround, drawCityTop, cityBuildings, drawCityBadges } from './citylayer.js';
 import { beginTownFrame, townLift } from './townhouses.js';
 
@@ -180,6 +181,7 @@ export class Renderer {
 
     this.syncRelief();
     beginTownFrame(dpr); // Stadtgebäude: Maßstab der Bilder, Zeitbudget fürs Nachmalen (townhouses.js, spritecache.js)
+    setMapTown(g.map); // Kartenstadt: Felder für die Gehöfte (maptown.js)
     setMilWalls(g.buildings); // Mauern und Tore: Verbindungen zu den Nachbarn (milbuild.js)
     if (cam.iso) {
       this.renderIso(v, now);
@@ -199,11 +201,20 @@ export class Renderer {
     ctx.imageSmoothingEnabled = true;
 
     this.drawTerrain(ctx, R);
+    // Kartenstadt (seit v5.23 gemalt, nicht mehr im Geländebild): Parks, Gebäude, Bänke, Stadtbäume, Autos (maptown.js)
+    setRoofSnow(this.season === 'winter');
+    const ruined = (b) => {
+      const h = g.houseBySrc?.get(b);
+      return !!h?.ruined && known(h.x, h.y);
+    };
+    drawMapTown2D(ctx, g.map.town, inRect, z, this.season, (x, y) => g.city && treeGone(g, x, y), ruined);
+    setRoofSnow(false);
     for (const b of g.bridges ?? []) if (inRect(b.x, b.y, b.len / 2 + 40)) drawBridgeTop(ctx, b); // über dem Fluss, unter allem anderen
     for (const p of fordPosts(g.map, reliefOf(g.map))) if (inRect(p.x, p.y, 10)) drawFordPostTop(ctx, p); // Furtstangen
     this.drawRuins(ctx, R, known);
     this.drawScars(ctx, inRect, z);
     drawCityGround(this, ctx, team, known, inRect); // Stadt: Straßen und Grundstücke
+    drawMapCars2D(ctx, g.map.town, inRect); // Autos der Karte auf den Straßen (seit v5.23 sichtbar)
     drawCityTop(this, ctx, team, known, inRect); // Stadt: Dächer
     drawCityBadges(this, ctx, team, known, inRect, false); // Stadt: Schilder (Funktion, privat/kommerziell)
     this.drawZone(ctx, z);
@@ -504,6 +515,17 @@ export class Renderer {
       const y1 = Math.min(H, R.y1);
       if (x1 > x0 && y1 > y0) {
         ctx.drawImage(this.terrainIso, x0 * S, y0 * S, (x1 - x0) * S, (y1 - y0) * S, x0, y0, x1 - x0, y1 - y0);
+      }
+    }
+    // Parks der Kartenstadt als Bodenbild (seit v5.23, maptown.js), vor Kratern und Stadtstraßen
+    const parks = g.map.town?.parks ?? [];
+    if (parks.length) {
+      const rails = railList(g.map.town);
+      for (const p of parks) {
+        if (!inRect(p.x, p.y, p.r)) continue;
+        if (relief) this.groundAt(ctx, p.x, p.y);
+        else setIsoGround(ctx, cam, dpr);
+        drawPark(ctx, p, z, this.season, rails);
       }
     }
     for (const c of g.craters ?? []) {

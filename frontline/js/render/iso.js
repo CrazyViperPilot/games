@@ -144,7 +144,7 @@ export function drawRotBox(ctx, cam, cx, cy, len, wid, ang, h, color, opts = {})
   const up = (p) => ({ x: p.x, y: p.y - H });
   ctx.save();
   ctx.lineJoin = 'round';
-  ctx.lineWidth = 1;
+  ctx.lineWidth = opts.line ?? 1; // dünnere Kante für kleine Teile (Parkbank)
   ctx.strokeStyle = OUTLINE;
   if (!opts.noShadow && H > 2 && !BASE) {
     const sh = H * 0.35;

@@ -2,6 +2,7 @@
 
 Quelle: Kenney (kenney.nl), Pakete „City Kit (Commercial)“ und „City Kit (Industrial)“ (3D-Modelle, vorgerendert isometrisch 2:1 mit three.js, Licht von links oben; Daten in js/render/isodata.js), „Train Kit“ (stehender Zug, vorgerendert in train/), „Isometric City“ (Baum) und „Isometric Vehicles“, Lizenz CC0 (Lizenztexte in assets/LICENSES).
 Vorgerenderte Gebäude liegen in buildings/, Baum und Fahrzeuge sind unveränderte Einzelbilder; Dateinamen der Fahrzeuge nach Bildschirmrichtung (e, se, s, sw, w, nw, n, ne).
+Seit v5.23 sind die Häuser, Hallen und Fabriken der Karte sowie der Zug gemalt (js/render/maptown.js); die Bilder der City Kits (buildings/com_…, ind_…) und des Train Kit (train/) entfallen, in buildings/ bleibt nur der Wachturm.
 Eigene Entwürfe lassen sich austauschen: gleiche Dateinamen ersetzen oder die Listen in js/render/isosprites.js anpassen.
 
 Soldaten (units/): Kenney „Blocky Characters“ (Figur) mit Helm, Weste in Teamfarbe und Waffe (Gewehr aus dem „Blaster Kit“, RPG aus einfachen Formen) zusammengesetzt und in 8 Richtungen vorgerendert. Die eigenen Militärgebäude (früher team/: Zentrale, Mörser, Flak, Mauer, Tor aus Kenney-Kits) sind seit v5.21 gemalt (js/render/milbuild.js), die Bilder entfallen.
