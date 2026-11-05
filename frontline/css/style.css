@@ -682,7 +682,7 @@ body.flow-open .flow-fab { background: #2e372e; }
   .fl-issues { font-size: 11px; }
 }
 @media (min-height: 700px) and (min-width: 1100px) {
-  .flow { width: min(1000px, calc(100% - 340px)); top: 70px; padding: 12px 14px; gap: 8px; }
+  .flow { width: min(1320px, calc(100% - 220px)); top: 70px; padding: 12px 14px; gap: 8px; } /* seit v5.30 breiter: die Kette hat bis zu 7 Spalten */
   .fl-issues { font-size: 13px; }
 }
 

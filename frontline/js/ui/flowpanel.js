@@ -4,15 +4,22 @@
 // Unten die Engpässe in Worten. Der Graph kommt aus js/game/flow.js (CITY.chain), hier wird er nur gezeichnet. Das Spiel läuft weiter.
 import { resourceFlow, FlowMeter, fmtFlow } from '../game/flow.js';
 
-const NW = 140; // Breite eines Knotens (SVG-Einheiten)
+const NW = 158; // Breite eines Knotens (SVG-Einheiten; seit v5.30 158 statt 140, damit Namen und Mengen ganz hineinpassen)
 const NH = 56; // Höhe
 const PITCH = 66; // Abstand der Reihen
-const W = 860; // Breite des Graphen
+const GAP = 40; // Mindestabstand zwischen zwei Spalten (Platz für die Linien und ihre Zahlen); die Breite des Graphen folgt aus der Spaltenzahl
+const MIN_W = 860; // kleinste Breite des Graphen (wenige Spalten: weiter auseinander)
 const TOP = 18; // Platz für die Spaltenköpfe
 const COLOR = { wood: '#7fa650', stone: '#a3a8ad', ore: '#c0714f', oil: '#7d6aa8', bm: '#b58248', iron: '#b9a48a', metal: '#8fb3c9', fuel: '#9b7bc4', kero: '#56b3e6', mun: '#d9b600' };
 const UNIT = { bm: 'BM', iron: 'Roheisen', metal: 'Stahl', fuel: 'TS', kero: 'Kerosin', mun: 'MUN' };
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const int = (v) => Math.floor(v).toLocaleString('de-DE');
+/** Text auf die Breite eines Knotens kürzen (… am Ende), damit nichts über den Rand läuft; size = Schriftgröße. */
+const fit = (t, size, px = NW - 16) => {
+  const max = Math.floor(px / (size * 0.56));
+  const s = String(t);
+  return s.length > max ? `${s.slice(0, Math.max(1, max - 1)).trimEnd()}…` : s;
+};
 
 export class FlowPanel {
   constructor(parent, game, team) {
@@ -71,6 +78,7 @@ export class FlowPanel {
   /** Graph als SVG: Spaltenköpfe, Linien (Breite = Menge je s), Knoten. */
   draw(f) {
     const H = TOP + (f.rows - 1) * PITCH + NH + 4;
+    const W = Math.max(MIN_W, f.cols * NW + (f.cols - 1) * GAP); // seit v5.30: so breit, dass sich keine Knoten überlappen
     this.svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     const step = f.cols > 1 ? (W - NW) / (f.cols - 1) : 0;
     const nodes = Object.values(f.nodes);
@@ -109,28 +117,30 @@ export class FlowPanel {
     // Knoten
     for (const n of nodes) {
       const { x, y } = pos(n);
-      let t1 = esc(n.name);
+      let t1 = n.name;
+      let where = '';
       let t2 = '';
       let bar = '';
       if (n.type === 'raw') {
         t1 += ` ×${n.count}`;
-        t2 = `${fmtFlow(n.rate)} ${esc(n.unit)}/s`;
+        t2 = `${fmtFlow(n.rate)} ${n.unit}/s`;
       } else if (n.type === 'works') {
         t1 += ` ×${n.count}`;
         t2 = `${fmtFlow(n.out)} / ${fmtFlow(n.cap)} ${UNIT[n.good] ?? n.good}/s`;
         if (n.count > 0) bar = `<rect class="fl-bar" x="10" y="${NH - 6}" width="${((NW - 20) * Math.min(1, n.util ?? 0)).toFixed(1)}" height="3" rx="1.5"/>`;
       } else if (n.type === 'mid') {
         // Zwischenprodukt (Roheisen): kein Lager, nur Menge je s
-        t2 = `${fmtFlow(n.rate)} ${esc(n.unit)}/s · ohne Lager`;
+        t2 = `${fmtFlow(n.rate)} ${n.unit}/s`; // „ohne Lager“ steht in der Hinweiszeile
       } else {
-        t1 += `<tspan class="fl-where"> ${esc(n.where)}</tspan>`;
+        where = n.where;
         t2 = n.made === null ? int(n.stock) : `${int(n.stock)} · +${fmtFlow(n.made)} −${fmtFlow(n.use)}/s`;
       }
       h +=
         `<g class="fl-node ${n.status}" transform="translate(${x.toFixed(1)} ${y})"><rect class="fl-box" width="${NW}" height="${NH}" rx="7"/>` +
         `<rect x="0" y="0" width="5" height="${NH}" rx="2" fill="${COLOR[n.type === 'works' ? n.good : n.key] ?? '#9aa596'}"/>` +
-        `<text class="fl-t1" x="11" y="17">${t1}</text><text class="fl-t2" x="11" y="33">${t2}</text>` +
-        `<text class="fl-t3" x="11" y="47">${esc(n.note)}</text>${bar}</g>`;
+        `<text class="fl-t1" x="11" y="17">${esc(fit(t1, 12, NW - 16 - (where ? Math.min(60, where.length * 5.6 + 4) : 0)))}${where ? `<tspan class="fl-where"> ${esc(where)}</tspan>` : ''}</text>` +
+        `<text class="fl-t2" x="11" y="33">${esc(fit(t2, 11))}</text>` +
+        `<text class="fl-t3" x="11" y="47">${esc(fit(n.note ?? '', 10))}<title>${esc(n.note ?? '')}</title></text>${bar}</g>`;
     }
     return h + labels;
   }
