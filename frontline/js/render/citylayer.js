@@ -158,7 +158,7 @@ export function drawCityGround(ren, ctx, team, known, inRect) {
   ctx.restore();
 }
 
-// Auslastung der Straßen im Baumodus (seit v5.19, AP5): Last / Kapazität je Straßenzelle, grün unter 60 %, gelb bis 100 %, darüber rot.
+// Auslastung der Straßen im Baumodus (seit v5.19, AP5): Last / Kapazität je Straßenzelle, grün unter 60 %, gelb unter 100 %, rot ab 100 %.
 const LOAD_TINT = ['rgba(70,180,90,0.42)', 'rgba(235,195,40,0.5)', 'rgba(225,60,40,0.58)'];
 /**
  * Straßen der eigenen Stadt (Eigenstraßen und Stadtstraßen der Karte) nach Auslastung tönen; nur Zellen mit Last. Die Last kommt aus
