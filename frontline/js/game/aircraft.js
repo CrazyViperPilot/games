@@ -256,7 +256,7 @@ function stepParked(game, u, dt) {
       if (main && !main.infinite) main.store.fuel -= got;
     }
     u.fuel += got;
-    if (got < want - 1e-9) game.shortage(u.team, 'fuel');
+    if (got < want - 1e-9) game.shortage(u.team, city ? 'kero' : 'fuel'); // mit Stadt fehlt Kerosin (eigene Meldung, seit dem Review)
   }
   if (u.ammo < u.def.ammoMax) {
     const want = Math.min(u.def.ammoMax - u.ammo, u.def.ammoMax * f);

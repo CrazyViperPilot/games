@@ -384,13 +384,17 @@ test('Überlast auf dem Lieferweg senkt die Lieferung (Stau-Faktor wirkt im Schr
   assert.ok(Math.abs(c.stats.jam - 0.5) < 1e-6, `kleinster Stau ${c.stats.jam}`);
 });
 
-test('Keine Ware aus dem Nichts: Lager-Zuwachs je Schritt ≤ Förderung über die Kette', () => {
+test('Keine Ware aus dem Nichts: Lager-Zuwachs je Schritt ≤ Förderung über die Kette (auch Munition, Stahl-Netto, Gewerbe-BM)', () => {
   const g = new Game({ seed: 3, city: true, startMoney: 5000 });
   const c = netBase(g);
   const m = g.mainFob(0);
+  const K = CITY.convert;
   put(g, 'bm', 3, 1, 4, 2);
   put(g, 'smelter', 5, 1, 6, 2);
   put(g, 'steel', 7, 1, 8, 2);
+  put(g, 'com', 9, 1, 9, 1); // Gewerbe holt Baumaterial aus dem Lager (seit dem Review geprüft)
+  put(g, 'mun', 0, 3, 1, 4); // Munitionswerk zieht Stahl aus dem Stadtlager
+  linkRoad(g, c.list.find((i) => c.kind[i] === KIND_ID.mun));
   c.deposit[at(g, 3, 4)] = 1; // Holz
   c.deposit[at(g, 5, 4)] = 3; // Erz
   put(g, 'mine', 3, 4, 3, 4);
@@ -398,15 +402,28 @@ test('Keine Ware aus dem Nichts: Lager-Zuwachs je Schritt ≤ Förderung über d
   linkRoad(g, at(g, 3, 4));
   linkRoad(g, at(g, 5, 4));
   let bad = 0;
+  let mun = 0;
+  let take = 0;
+  const dt = 0.05;
   for (let t = 0; t < 1200; t++) {
     const metal0 = c.metal;
     const bm0 = m.store.bm;
-    g.update(0.05);
+    const mun0 = m.store.mun;
+    g.update(dt);
     const s = c.stats;
-    if (c.metal - metal0 > (s.raw.ore * 0.05) / 2 + 1e-9) bad++; // Stahl ≤ Erz / 2 (Erz → Roheisen 2:1, Roheisen → Stahl 1:1)
-    if (m.store.bm - bm0 > ((s.raw.wood + s.raw.stone) * 0.05) + 1e-9) bad++; // BM ≤ Holz / 1
+    const dMetal = c.metal - metal0;
+    const dMun = m.store.mun - mun0;
+    // Stahl im Lager plus Stahl in der Munition ≤ Erz / (Erz je Roheisen × Roheisen je Stahl): Munition entsteht nur aus Stahl
+    if (dMetal + dMun * K.mun > (s.raw.ore * dt) / (K.iron * K.metal) + 1e-9) bad++;
+    // Baumaterial im Lager plus, was das Gewerbe nahm ≤ Holz und Stein / BM-Verbrauch
+    if (m.store.bm - bm0 + s.shopBm * dt > ((s.raw.wood + s.raw.stone) * dt) / K.bm + 1e-9) bad++;
+    if (c.metal < 0 || m.store.bm < 0 || !Number.isFinite(c.metal) || !Number.isFinite(m.store.mun)) bad++;
+    mun += Math.max(0, dMun);
+    take += s.shopBm * dt;
   }
   assert.equal(bad, 0, 'nie mehr im Lager als gefördert');
+  assert.ok(mun > 0, 'Munition entsteht (die Prüfung greift)');
+  assert.ok(take > 0, 'Gewerbe nimmt Baumaterial (die Prüfung greift)');
 });
 
 test('F-16 tankt Kerosin aus dem Stadtlager (c.kero), den Treibstoff im Lager lässt es unberührt', () => {
@@ -446,6 +463,16 @@ test('F-16 tankt Kerosin aus dem Stadtlager (c.kero), den Treibstoff im Lager l�
   // Seit v5.19 (AP4) liefert die Raffinerie des Startviertels Treibstoff ans Lager: der Flug zieht keinen davon ab
   assert.ok(m.store.fuel >= fuel0, `Treibstoff im Lager ${fuel0} → ${m.store.fuel}`);
   assert.ok(UNITS.f16.fuelMax > 0);
+  // leeres Stadtlager: kein Tanken, Meldung „ohne Kerosin“, Treibstoff im Lager bleibt unberührt (seit dem Review)
+  c.kero = 0;
+  u.fuel = 5;
+  g.drainEvents();
+  g.teams[0].warnAt = {};
+  const fuel1 = m.store.fuel;
+  stepN(g, 5);
+  assert.equal(u.fuel, 5, 'ohne Kerosin kein Tanken');
+  assert.ok(m.store.fuel >= fuel1, 'kein Treibstoff aus dem Lager als Ersatz');
+  assert.ok(g.drainEvents().some((e) => e.type === 'message' && e.team === 0 && /Kerosin/.test(e.text)), 'Mangelmeldung Kerosin');
 });
 
 test('Heliport tankt Hubschrauber im Umkreis aus c.kero (CITY.care.refuel je s)', () => {
@@ -470,5 +497,34 @@ test('Heliport tankt Hubschrauber im Umkreis aus c.kero (CITY.care.refuel je s)'
   g.teams[0].warnAt = {};
   stepN(g, 1);
   assert.equal(c.kero, 0, 'Stadtlager bleibt leer (Tanken an FOBs mit Treibstoff bleibt davon unberührt)');
-  assert.ok(g.drainEvents().some((e) => e.type === 'message' && e.team === 0 && e.text === 'Fahrzeuge ohne Treibstoff'), 'Mangelmeldung bei leerem Stadtlager');
+  assert.ok(g.drainEvents().some((e) => e.type === 'message' && e.team === 0 && /Kerosin/.test(e.text)), 'Mangelmeldung (Kerosin) bei leerem Stadtlager');
+});
+
+test('Ohne Hauptstadt (zerstört): Werke liefern nichts ins Lager, Munitionswerk steht, Gewerbe unversorgt, keine ungültigen Zahlen', () => {
+  const g = new Game({ seed: 3, city: true, startMoney: 5000 });
+  const c = netBase(g);
+  put(g, 'smelter', 5, 1, 6, 2);
+  put(g, 'steel', 7, 1, 8, 2);
+  put(g, 'com', 9, 1, 9, 1);
+  put(g, 'mun', 0, 3, 1, 4);
+  linkRoad(g, c.list.find((i) => c.kind[i] === KIND_ID.mun));
+  c.deposit[at(g, 5, 4)] = 3; // Erz
+  put(g, 'mine', 5, 4, 5, 4);
+  linkRoad(g, at(g, 5, 4));
+  run(g, CITY.growTime + 20);
+  assert.ok(c.stats.gross.metal > 0 && c.stats.gross.mun > 0, 'vorher: Stahl und Munition');
+  const m = g.mainFob(0);
+  m.alive = false; // Hauptstadt zerstört
+  m.hp = 0;
+  const metal0 = c.metal;
+  stepN(g, 40);
+  const s = c.stats;
+  assert.equal(g.mainFob(0), null);
+  assert.ok(s.raw.ore > 0 && s.gross.iron > 0, 'Förderung und Hütte arbeiten weiter (Ziel ist ein Werk)');
+  assert.equal(s.metal, 0, 'kein Stahl ins Stadtlager');
+  assert.equal(s.mun, 0, 'keine Munition');
+  assert.equal(s.gross.mun, 0, 'Munitionswerk steht');
+  assert.equal(c.metal, metal0, 'Stadtlager unverändert');
+  assert.equal(s.shopSupply, 0, 'Gewerbe ohne Waren');
+  for (const v of [s.money, s.jam, s.lost, s.shop, s.happy]) assert.ok(Number.isFinite(v), `Zahl ${v}`);
 });

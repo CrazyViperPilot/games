@@ -1457,7 +1457,7 @@ function updateCare(game, c, dt) {
       const got = Math.min(want, c.kero);
       u.fuel += got;
       c.kero -= got;
-      if (got < want - 1e-9) game.shortage(c.team, 'fuel');
+      if (got < want - 1e-9) game.shortage(c.team, 'kero'); // Kerosin fehlt (eigene Meldung, seit dem Review)
     }
   }
   for (const u of game.units) {
