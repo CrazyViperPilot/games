@@ -300,3 +300,25 @@ test('KI baut einen Fliegerhorst mit gültiger Bahn, Stellplätzen, Tower, Keros
   for (const k of ['stand', 'atc', 'ktank', 'mdepot']) assert.ok(kinds.has(k), `KI baut ${k}`);
   assert.ok(standsOf(g, 1).some((s) => standRoute(g, s)), 'Stellplatz mit Weg zur Bahn');
 });
+
+test('Breite Bahnfläche: längster Streifen 2 breit ist die Bahn, der Rest Rollfeld; Stellplatz über Rollfeld-Kette angebunden', () => {
+  const g = new Game({ seed: 3, city: true });
+  const { c, m } = rich(g);
+  const a = freeArea(g, c, m, 12, 10);
+  const { q, r } = a;
+  // Bahnfläche 10 × 4 (wie von Hand gemalt): eine gültige Bahn, 20 Zellen Rollfeld
+  assert.ok(g.issue(0, { type: 'city', kind: 'runway', c0: q, r0: r, c1: q + 9, r1: r + 3 }).ok);
+  const [rw] = runwaysOf(g, 0);
+  assert.ok(rw.valid, rw.reason);
+  assert.equal(rw.cells.length, 2 * 10);
+  assert.equal(rw.apron.length, 20);
+  // Stellplatz zwei Felder unter der Fläche, dazwischen eine Reihe Rollfeld
+  assert.ok(g.issue(0, { type: 'city', kind: 'taxi', c0: q, r0: r + 4, c1: q + 3, r1: r + 4 }).ok);
+  assert.ok(g.issue(0, { type: 'city', kind: 'stand', c0: q, r0: r + 5, c1: q, r1: r + 5 }).ok);
+  run(g, CITY.growTime + 1);
+  const s = standsOf(g, 0)[0];
+  assert.ok(s, 'Stellplatz wächst am Rollfeld');
+  const route = standRoute(g, s);
+  assert.ok(route && route.rw.key === rw.key, 'Weg über Rollfeld zur Bahn');
+  assert.ok(route.cells.some((i) => c.kind[i] === KIND_ID.taxi), 'über das Rollfeld');
+});

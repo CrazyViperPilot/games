@@ -22,7 +22,7 @@ export const CITY = {
   shop: { need: 0.004, base: 0.3, per: 0.25 },
 
   // ---- Bau ----
-  cost: { road: 0, res: 20, com: 30, bm: 40, mun: 40, fuel: 40, steel: 50, smelter: 50, kero: 50, mine: 30, market: 60, power: 80, uni: 400, dc: 250, barracks: 80, factory: 150, heliport: 200, hospital: 120, airport: 800, runway: 10, stand: 120, atc: 150, ktank: 60, mdepot: 60 }, // Geld je Zelle, bei Großbauten (size) je Gebäude (Abriss kostenlos, keine Erstattung)
+  cost: { road: 0, res: 20, com: 30, bm: 40, mun: 40, fuel: 40, steel: 50, smelter: 50, kero: 50, mine: 30, market: 60, power: 80, uni: 400, dc: 250, barracks: 80, factory: 150, heliport: 200, hospital: 120, airport: 800, runway: 10, stand: 120, atc: 150, ktank: 60, mdepot: 60, taxi: 5 }, // Geld je Zelle, bei Großbauten (size) je Gebäude (Abriss kostenlos, keine Erstattung)
   // Großbauten (seit v5.00): Kantenlänge in Zellen (fehlt = 1; seit v5.03 auch gerade). Ein Großbau ist ein Gebäude: eine Stufe, ein
   // Ziel mit Trefferpunkten hp × Kantenlänge, Arbeitsplätze und Strom wie eine Zelle; Straße an irgendeiner Außenzelle reicht.
   // Seit v5.08 sind auch die Werke (BM-Werk, Munitionswerk, Raffinerie, Stahlwerk) 2 × 2 groß, mit eigenem Aussehen (render/works.js).
@@ -33,7 +33,7 @@ export const CITY = {
   // Räumen reißt seit v5.16 auch diese Gebäude der Karte ab (Häuser, Hallen, Fabriken der Zonenstadt und außerhalb), kostenlos wie das
   // übrige Räumen; besetzte Häuser nicht. Wachtürme, Zug, Mauern, Fels und Wasser bleiben.
   clearable: ['house', 'hall', 'factory'],
-  costBm: { road: 10, barracks: 100, factory: 200, heliport: 150, hospital: 80, airport: 400, runway: 15, stand: 80, atc: 60, ktank: 40, mdepot: 60 }, // Baumaterial je Zelle aus dem Lager der Hauptstadt (seit v4.83: Straßen kosten Baumaterial statt Geld)
+  costBm: { road: 10, barracks: 100, factory: 200, heliport: 150, hospital: 80, airport: 400, runway: 15, stand: 80, atc: 60, ktank: 40, mdepot: 60, taxi: 8 }, // Baumaterial je Zelle aus dem Lager der Hauptstadt (seit v4.83: Straßen kosten Baumaterial statt Geld)
 
   // ---- Ausbildung (seit v4.96, PRD §15) ----
   // Mit Stadt bilden nur diese Stadtgebäude Truppen aus (die Hauptstadt nicht mehr). Sie bezahlen direkt aus der Stadt:
@@ -122,8 +122,8 @@ export const CITY = {
   happy: { base: 0.2, shops: 0.35, shopPer: 0.1, safety: 0.25, hitsBad: 10, power: 0.2, lo: 0.7, span: 0.4 },
 
   // ---- Fliegerhorst (seit v5.35, PRD §15 „Fliegerhorst“; Logik js/game/aircraft.js) ----
-  // Start-/Landebahn: Zellen wie Straßen (sofort fertig); eine Bahn ist ein volles Rechteck runwayWidth breit und mindestens runwayMin
-  // lang (waagrecht oder senkrecht). Jeder Start und jede Landung sperrt die Bahn sep s, mit Tower im Umkreis atcRadius Zellen sepAtc s.
+  // Start-/Landebahn: Zellen wie Straßen (sofort fertig); in jeder Gruppe Bahnzellen ist der längste gerade Streifen runwayWidth breit die
+  // Bahn, wenn er mindestens runwayMin lang ist (waagrecht oder senkrecht), der Rest Rollfeld (seit v5.37; dazu Werkzeug „Rollfeld“ taxi). Jeder Start und jede Landung sperrt die Bahn sep s, mit Tower im Umkreis atcRadius Zellen sepAtc s.
   // Stellplatz (2 × 2): je ein Flugzeug, bildet es aus; Schaden an einem abgestellten Flugzeug × shelter[Stufe] (1 offen, 2 Wälle,
   // 3 Stahlbeton). Kerosintank und Munitionslager (2 × 2) werden über die Straße aus dem Stadtlager bzw. dem Lager der Hauptstadt
   // befüllt (fill je s, Stufe × Rate), Flugzeuge auf Stellplätzen im Umkreis supplyRadius Zellen tanken und laden daraus (rate je s).

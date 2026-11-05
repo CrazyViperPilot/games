@@ -92,47 +92,91 @@ export function airOf(game, c) {
   return st;
 }
 
-/** Bahnen aus den Bahnzellen: zusammenhängende Gruppen; gültig als volles Rechteck runwayWidth × (≥ runwayMin). */
+/**
+ * Längster gerader Streifen runwayWidth breit in einer Gruppe Bahnzellen (seit v5.37): waagrecht oder senkrecht, beide Reihen
+ * durchgehend Bahn. { q0, q1, r0, r1, len, axis } oder null. Gleich lange: waagrecht vor senkrecht, oben/links zuerst.
+ */
+function bestStrip(c, inG, q0, q1, r0, r1) {
+  const W = AIR.runwayWidth;
+  let best = null;
+  const take = (cand) => {
+    if (!best || cand.len > best.len) best = cand;
+  };
+  for (let r = r0; r + W - 1 <= r1; r++) {
+    let run = 0;
+    for (let q = q0; q <= q1 + 1; q++) {
+      let ok = q <= q1;
+      for (let k = 0; ok && k < W; k++) ok = inG((r + k) * c.cols + q);
+      if (ok) run++;
+      else {
+        if (run) take({ q0: q - run, q1: q - 1, r0: r, r1: r + W - 1, len: run, axis: 'x' });
+        run = 0;
+      }
+    }
+  }
+  for (let q = q0; q + W - 1 <= q1; q++) {
+    let run = 0;
+    for (let r = r0; r <= r1 + 1; r++) {
+      let ok = r <= r1;
+      for (let k = 0; ok && k < W; k++) ok = inG(r * c.cols + q + k);
+      if (ok) run++;
+      else {
+        if (run) take({ q0: q, q1: q + W - 1, r0: r - run, r1: r - 1, len: run, axis: 'y' });
+        run = 0;
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * Bahnen aus den Bahnzellen: zusammenhängende Gruppen. Seit v5.37 ist eine Gruppe gültig, sobald sie einen geraden Streifen
+ * runwayWidth × (≥ runwayMin) enthält (der längste ist die Bahn); die übrigen Zellen der Gruppe sind Rollfeld (apron) wie die
+ * Zellen des Werkzeugs „Rollfeld“. Vorher musste die ganze Gruppe ein Rechteck genau runwayWidth breit sein.
+ */
 function buildAir(game, c) {
   const RW = KIND_ID.runway;
   const n = c.cols * c.rows;
   const seen = new Uint8Array(n);
-  const byCell = new Int32Array(n); // Index + 1 der Bahn je Zelle (nur gültige)
+  const byCell = new Int32Array(n); // Index + 1 der Bahn je Zelle (nur der Streifen gültiger Bahnen)
   const runways = [];
   const S = c.cell;
   for (const i0 of c.list) {
     if (c.kind[i0] !== RW || seen[i0]) continue;
-    const cells = [i0];
+    const group = [i0];
     seen[i0] = 1;
-    for (let k = 0; k < cells.length; k++) {
-      const q = cells[k] % c.cols;
-      const r = (cells[k] - q) / c.cols;
+    for (let k = 0; k < group.length; k++) {
+      const q = group[k] % c.cols;
+      const r = (group[k] - q) / c.cols;
       for (const [x, y] of [[q - 1, r], [q + 1, r], [q, r - 1], [q, r + 1]]) {
         if (x < 0 || y < 0 || x >= c.cols || y >= c.rows) continue;
         const j = y * c.cols + x;
         if (c.kind[j] !== RW || seen[j]) continue;
         seen[j] = 1;
-        cells.push(j);
+        group.push(j);
       }
     }
     let q0 = Infinity, q1 = -1, r0 = Infinity, r1 = -1;
-    for (const i of cells) {
+    for (const i of group) {
       const q = i % c.cols;
       const r = (i - q) / c.cols;
       q0 = Math.min(q0, q); q1 = Math.max(q1, q); r0 = Math.min(r0, r); r1 = Math.max(r1, r);
     }
-    const w = q1 - q0 + 1;
-    const h = r1 - r0 + 1;
-    const valid = cells.length === w * h && Math.min(w, h) === AIR.runwayWidth && Math.max(w, h) >= AIR.runwayMin;
-    const axis = w >= h ? 'x' : 'y';
-    const rw = { key: Math.min(...cells), cells, q0, q1, r0, r1, axis, valid, len: Math.max(w, h), reason: valid ? '' : Math.min(w, h) !== AIR.runwayWidth || cells.length !== w * h ? `muss ein volles Rechteck ${AIR.runwayWidth} Zellen breit sein` : `zu kurz (mindestens ${AIR.runwayMin} Zellen)` };
+    const inGroup = new Set(group);
+    const strip = bestStrip(c, (j) => inGroup.has(j), q0, q1, r0, r1);
+    const valid = !!strip && strip.len >= AIR.runwayMin;
+    const box = valid ? strip : { q0, q1, r0, r1, len: Math.max(q1 - q0 + 1, r1 - r0 + 1), axis: q1 - q0 >= r1 - r0 ? 'x' : 'y' };
+    const cells = [];
+    if (valid) for (let r = box.r0; r <= box.r1; r++) for (let q = box.q0; q <= box.q1; q++) cells.push(r * c.cols + q);
+    const reason = valid ? '' : strip ? `zu kurz (mindestens ${AIR.runwayMin} Zellen am Stück)` : `braucht einen geraden Streifen ${AIR.runwayWidth} Zellen breit`;
+    const rw = { key: Math.min(...group), group, cells: valid ? cells : group, apron: valid ? group.filter((j) => !cells.includes(j)) : [], q0: box.q0, q1: box.q1, r0: box.r0, r1: box.r1, gq0: q0, gq1: q1, gr0: r0, gr1: r1, axis: box.axis, valid, len: box.len, reason };
     // Mittellinie und Enden in Weltkoordinaten
-    if (axis === 'x') {
-      const y = c.y0 + ((r0 + r1 + 1) / 2) * S;
-      rw.ends = [{ x: c.x0 + q0 * S, y }, { x: c.x0 + (q1 + 1) * S, y }];
+    if (rw.axis === 'x') {
+      const y = c.y0 + ((rw.r0 + rw.r1 + 1) / 2) * S;
+      rw.ends = [{ x: c.x0 + rw.q0 * S, y }, { x: c.x0 + (rw.q1 + 1) * S, y }];
     } else {
-      const x = c.x0 + ((q0 + q1 + 1) / 2) * S;
-      rw.ends = [{ x, y: c.y0 + r0 * S }, { x, y: c.y0 + (r1 + 1) * S }];
+      const x = c.x0 + ((rw.q0 + rw.q1 + 1) / 2) * S;
+      rw.ends = [{ x, y: c.y0 + rw.r0 * S }, { x, y: c.y0 + (rw.r1 + 1) * S }];
     }
     rw.cx = (rw.ends[0].x + rw.ends[1].x) / 2;
     rw.cy = (rw.ends[0].y + rw.ends[1].y) / 2;

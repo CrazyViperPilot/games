@@ -141,13 +141,7 @@ export function drawCityGround(ren, ctx, team, known, inRect) {
       for (const [fx, fy, fr] of DOTS) groundDot(ren, ctx, r.x0 + fx * 64, r.y0 + fy * 64, fr * 40, '#2b2826');
       continue;
     }
-    if (k === 'runway') {
-      // Start-/Landebahn (seit v5.35): Asphalt je Zelle, Markierungen danach je Bahn (drawRunways)
-      groundRect(ren, ctx, r.x0, r.y0, r.x1, r.y1);
-      ctx.fillStyle = '#45494d';
-      ctx.fill();
-      continue;
-    }
+    if (k === 'runway' || k === 'taxi') continue; // Bahn und Rollfeld danach in einem Zug (drawAirfield, seit v5.37)
     if (k === 'road' || big === 'part') continue; // Straßen danach in einem Zug (drawRoads); Großbau zeichnet seine Mitte
     if (big) {
       drawBigLot(ren, ctx, c, k, lv, r, team, ctr);
@@ -170,57 +164,196 @@ export function drawCityGround(ren, ctx, team, known, inRect) {
       ctx.fill();
     }
   }
-  drawRunways(ren, ctx, known);
+  drawAirfield(ren, ctx, team, known, inRect);
   drawRoads(ren, ctx, team, known);
   if (ren.cityUi?.open) drawLoads(ren, ctx, team, known, inRect); // Baumodus: Auslastung der Straßen
   drawTerritory(ren, ctx, team, known);
   ctx.restore();
 }
 
+// ---- Fliegerhorst am Boden (seit v5.37, Farben und Markierungen wie beim alten Flughafen, airport.js) ----
+const AF = {
+  asph: '#3d3f3c', // Bahn
+  conc: '#a9a89f', // Rollfeld (Beton)
+  rubber2: 'rgba(22,22,22,0.1)',
+  rubber: 'rgba(22,22,22,0.22)',
+  joint: 'rgba(60,58,50,0.2)',
+  white: '#ecebe4',
+  yel: '#e3c63a',
+  blue: '#4f86ff',
+  light: '#fff3c4',
+  green: '#57e37f',
+  red: '#e0553a',
+};
+// Ziffern als Striche (x 0…1, y 0…2, y nach unten), wie airport.js
+const SEG = { a: [0, 0, 1, 0], b: [1, 0, 1, 1], c: [1, 1, 1, 2], d: [0, 2, 1, 2], e: [0, 1, 0, 2], f: [0, 0, 0, 1], g: [0, 1, 1, 1] };
+const DIGIT = { 0: 'abcdef', 1: 'bc', 2: 'abged', 3: 'abgcd', 4: 'fgbc', 5: 'afgcd', 6: 'afgedc', 7: 'abc', 8: 'abcdefg', 9: 'abcdfg' };
+
 /**
- * Markierungen der Start-/Landebahnen (seit v5.35): Randlinien, Mittellinie (gestrichelt), Schwellen mit Balken an beiden Enden,
- * Aufsetzmarken; eine ungültige Bahn (zu kurz, nicht 2 breit) rot umrandet. Bahnen beider Teams, wo erkundet.
+ * Start-/Landebahnen und Rollfeld (seit v5.37; vorher nur Asphalt mit wenigen Strichen): Bahn in dunklem Asphalt mit Schwellen,
+ * Kennziffern (09/27 waagrecht, 18/36 senkrecht), Zielpunkt- und Aufsetzzonenmarken, Gummiabrieb, Rand- und Mittellinie,
+ * Randfeuern und grünen Schwellenfeuern; Rollfeld (Werkzeug „Rollfeld“ und Bahnzellen neben dem Bahnstreifen) in Beton mit Fugen,
+ * gelber Mittellinie zu den Nachbarfeldern, Haltelinie vor der Bahn, gelbem Rand und blauen Randfeuern. Eine Bahngruppe ohne gültigen
+ * Streifen ist rot umrandet. Gleiche Farben in einem Pfad; feine Teile erst ab Zoom 0,55.
  */
-function drawRunways(ren, ctx, known) {
+function drawAirfield(ren, ctx, team, known, inRect) {
   const g = ren.game;
-  const W = '#f2f0e6';
+  const fine = ren.camera.zoom >= 0.55;
+  const buckets = new Map(Object.values(AF).map((c) => [c, []]));
+  const R = (x0, y0, x1, y1, col) => buckets.get(col).push(Math.min(x0, x1), Math.min(y0, y1), Math.max(x0, x1), Math.max(y0, y1));
+  const RW = KIND_ID.runway;
+  const TX = KIND_ID.taxi;
   for (const c of g.city) {
-    for (const rw of runwaysOf(g, c.team)) {
-      if (!known(rw.cx, rw.cy)) continue;
-      const S = c.cell;
-      const x0 = c.x0 + rw.q0 * S;
-      const y0 = c.y0 + rw.r0 * S;
-      const x1 = c.x0 + (rw.q1 + 1) * S;
-      const y1 = c.y0 + (rw.r1 + 1) * S;
-      if (!rw.valid) {
-        groundRect(ren, ctx, x0 + 3, y0 + 3, x1 - 3, y1 - 3);
-        ctx.strokeStyle = '#e0553a';
-        ctx.lineWidth = ren.draping() ? Math.max(2, 3 * ren.camera.zoom) : 4;
-        ctx.stroke();
+    const S = c.cell;
+    const rws = runwaysOf(g, c.team);
+    const strip = new Set();
+    for (const rw of rws) if (rw.valid) for (const i of rw.cells) strip.add(i);
+    const pave = (j) => c.kind[j] === RW || c.kind[j] === TX;
+    const ST = KIND_ID.stand;
+    // Rollfeld-Nachbarn je Zelle: Mittellinien nur in Rollwegen (höchstens 2 Nachbarn), nicht kreuz und quer über breite Vorfelder
+    const nb = (q, r) => {
+      let n = 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const x = q + dx;
+        const y = r + dy;
+        if (x >= 0 && y >= 0 && x < c.cols && y < c.rows && pave(y * c.cols + x)) n++;
+      }
+      return n;
+    };
+    for (const i of c.list) {
+      if (!pave(i)) continue;
+      const q = i % c.cols;
+      const r = (i - q) / c.cols;
+      const x0 = c.x0 + q * S;
+      const y0 = c.y0 + r * S;
+      const x = x0 + S / 2;
+      const y = y0 + S / 2;
+      if (!inRect(x, y, S) || (c.team !== team && !known(x, y))) continue; // eigene Stadt immer, fremde nur erkundet
+      if (strip.has(i)) {
+        R(x0, y0, x0 + S, y0 + S, AF.asph);
         continue;
       }
-      const X = rw.axis === 'x';
-      // lokale Rechtecke (Länge a, Quer b) in Welt umrechnen
-      const rect = (a0, a1, b0, b1) => {
-        if (X) groundRect(ren, ctx, x0 + a0, rw.cy + b0, x0 + a1, rw.cy + b1);
-        else groundRect(ren, ctx, rw.cx + b0, y0 + a0, rw.cx + b1, y0 + a1);
-        ctx.fillStyle = W;
-        ctx.fill();
-      };
-      const L = rw.len * S;
-      const half = S - 6;
-      rect(0, L, -half - 2, -half + 1); // Randlinien
-      rect(0, L, half - 1, half + 2);
-      for (let a = 70; a < L - 80; a += 48) rect(a, a + 26, -1.5, 1.5); // Mittellinie
-      for (const e of [0, 1]) {
-        const a = e ? L - 34 : 8;
-        for (let k = -4; k <= 4; k++) if (k) rect(a, a + 26, k * 12 - 3, k * 12 + 3); // Schwelle
-        const t = e ? L - 120 : 94;
-        rect(t, t + 30, -24, -14); // Aufsetzmarken
-        rect(t, t + 30, 14, 24);
+      R(x0, y0, x0 + S, y0 + S, AF.conc);
+      if (fine) {
+        R(x - 0.5, y0, x + 0.5, y0 + S, AF.joint);
+        R(x0, y - 0.5, x0 + S, y + 0.5, AF.joint);
+      }
+      // Nachbarn: Mittellinie hin (vor der Bahn mit Haltelinie), sonst gelber Rand mit blauen Feuern
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nq = q + dx;
+        const nr = r + dy;
+        const inside = nq >= 0 && nr >= 0 && nq < c.cols && nr < c.rows;
+        const j = nr * c.cols + nq;
+        const ex = x + (dx * S) / 2; // Mitte der Kante
+        const ey = y + (dy * S) / 2;
+        if (inside && pave(j)) {
+          const lane = nb(q, r) <= 2 || (!strip.has(j) && nb(nq, nr) <= 2);
+          if (lane) {
+            if (dx) R(x, y - 1.2, ex, y + 1.2, AF.yel);
+            else R(x - 1.2, y, x + 1.2, ey, AF.yel);
+          }
+          if (strip.has(j) && fine) {
+            // Haltelinie: zwei durchgezogene und zwei gestrichelte Linien quer zur Rollrichtung
+            for (const [o, dash] of [[6, false], [9, false], [14, true], [17, true]]) {
+              for (let t = -S / 2 + 4; t < S / 2 - 4; t += dash ? 9 : S) {
+                const t1 = dash ? t + 5 : S / 2 - 4;
+                if (dx) R(ex - dx * o - 0.8, y + t, ex - dx * o + 0.8, y + t1, AF.yel);
+                else R(x + t, ey - dy * o - 0.8, x + t1, ey - dy * o + 0.8, AF.yel);
+              }
+            }
+          }
+        } else if (inside && c.kind[j] === ST) {
+          // Zufahrt zum Stellplatz: Mittellinie bis zur Kante
+          if (dx) R(x, y - 1.2, ex, y + 1.2, AF.yel);
+          else R(x - 1.2, y, x + 1.2, ey, AF.yel);
+        } else {
+          if (dx) R(ex - dx * 4 - 0.8, y0, ex - dx * 4 + 0.8, y0 + S, AF.yel);
+          else R(x0, ey - dy * 4 - 0.8, x0 + S, ey - dy * 4 + 0.8, AF.yel);
+          if (fine) for (const t of [-S / 4, S / 4]) {
+            if (dx) R(ex - dx * 2 - 1.2, y + t - 1.2, ex - dx * 2 + 1.2, y + t + 1.2, AF.blue);
+            else R(x + t - 1.2, ey - dy * 2 - 1.2, x + t + 1.2, ey - dy * 2 + 1.2, AF.blue);
+          }
+        }
       }
     }
+    for (const rw of rws) {
+      if (c.team !== team && !known(rw.cx, rw.cy)) continue;
+      if (!inRect(rw.cx, rw.cy, (rw.len * S) / 2 + S)) continue;
+      if (!rw.valid) {
+        // ungültig: Umriss der Gruppe rot
+        const x0 = c.x0 + rw.gq0 * S + 3;
+        const y0 = c.y0 + rw.gr0 * S + 3;
+        const x1 = c.x0 + (rw.gq1 + 1) * S - 3;
+        const y1 = c.y0 + (rw.gr1 + 1) * S - 3;
+        R(x0, y0, x1, y0 + 4, AF.red);
+        R(x0, y1 - 4, x1, y1, AF.red);
+        R(x0, y0, x0 + 4, y1, AF.red);
+        R(x1 - 4, y0, x1, y1, AF.red);
+        continue;
+      }
+      runwayMarks(rw, c, R, fine);
+    }
   }
+  for (const [col, rs] of buckets) {
+    if (!rs.length) continue;
+    ctx.beginPath();
+    for (let k = 0; k < rs.length; k += 4) groundPoly(ren, ctx, [[rs[k], rs[k + 1]], [rs[k + 2], rs[k + 1]], [rs[k + 2], rs[k + 3]], [rs[k], rs[k + 3]]]);
+    ctx.fillStyle = col;
+    ctx.fill();
+  }
+}
+
+/** Markierungen einer gültigen Bahn (örtlich: a längs ab dem Ende, b quer; Maße wie airport.js, längs × 2, quer × 3,4). */
+function runwayMarks(rw, c, R, fine) {
+  const S = c.cell;
+  const X = rw.axis === 'x';
+  const L = rw.len * S;
+  const x0 = c.x0 + rw.q0 * S;
+  const y0 = c.y0 + rw.r0 * S;
+  const A = 2;
+  const B = 3.4;
+  // örtliches Rechteck (a0…a1 längs vom Ende d, b0…b1 quer, Seite × d) in Welt
+  const put = (d, a0, a1, b0, b1, col) => {
+    const p0 = d > 0 ? a0 : L - a0;
+    const p1 = d > 0 ? a1 : L - a1;
+    const q0 = b0 * d;
+    const q1 = b1 * d;
+    if (X) R(x0 + p0, rw.cy + q0, x0 + p1, rw.cy + q1, col);
+    else R(rw.cx - q0, y0 + p0, rw.cx - q1, y0 + p1, col);
+  };
+  for (const d of [1, -1]) {
+    put(d, 36 * A, 230 * A, -10 * B, 10 * B, AF.rubber2); // Gummiabrieb
+    put(d, 46 * A, 170 * A, -6 * B, 6 * B, AF.rubber);
+  }
+  for (const s of [-1, 1]) put(1, 4, L - 4, s * 15.5 * B - 1.9, s * 15.5 * B + 1.9, AF.white); // Randlinien
+  for (let a = 116; a < L - 116 - 30; a += 56) put(1, a, a + 30, -2.6, 2.6, AF.white); // Mittellinie
+  for (const d of [1, -1]) {
+    for (const k of [-12.5, -9.5, -6.5, -3.5, 3.5, 6.5, 9.5, 12.5]) put(d, 8, 40, k * B - 3.4, k * B + 3.4, AF.white); // Schwelle
+    if (L >= 2 * 160 + 40) for (const k of [-7, 7]) put(d, 116, 160, k * B - 5, k * B + 5, AF.white); // Zielpunkt
+    if (fine && L >= 2 * 292) {
+      [[184, [4.5, 7.5, 10.5]], [228, [4.5, 7.5]], [272, [4.5]]].forEach(([a, ks]) => {
+        for (const k of ks) for (const s of [-1, 1]) put(d, a, a + 20, s * k * B - 3, s * k * B + 3, AF.white); // Aufsetzzone
+      });
+    }
+    // Kennziffern (Landerichtung), Fuß zur Schwelle
+    const num = X ? (d > 0 ? '09' : '27') : d > 0 ? '18' : '36';
+    const SZ = 6 * A;
+    const W = 7 * B;
+    [...num].forEach((ch, n) => {
+      const off = (n ? 5.5 : -5.5) * B;
+      for (const sk of DIGIT[ch]) {
+        const [gx0, gy0, gx1, gy1] = SEG[sk];
+        const a0 = 48 + (2 - gy0) * SZ;
+        const a1 = 48 + (2 - gy1) * SZ;
+        const b0 = off + (gx0 - 0.5) * W;
+        const b1 = off + (gx1 - 0.5) * W;
+        const h = 2.2;
+        put(d, Math.min(a0, a1) - h, Math.max(a0, a1) + h, Math.min(b0, b1) - h, Math.max(b0, b1) + h, AF.white);
+      }
+    });
+    if (fine) for (let k = -16; k <= 16; k += 4) put(d, 1, 4, k * B - 1.6, k * B + 1.6, AF.green); // Schwellenfeuer
+  }
+  if (fine) for (let a = 12; a <= L - 12; a += 48) for (const s of [-1, 1]) put(1, a - 1.6, a + 1.6, s * 17.4 * B - 1.6, s * 17.4 * B + 1.6, AF.light); // Randfeuer
 }
 
 // Auslastung der Straßen im Baumodus (seit v5.20, AP5): Last / Kapazität je Straßenzelle, grün unter 60 %, gelb unter 100 %, rot ab 100 %.

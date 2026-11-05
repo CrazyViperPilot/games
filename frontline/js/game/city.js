@@ -12,17 +12,17 @@ import { bridgeUnder } from './river.js';
 import { transportOf, transportInfo, pathEff, addLoad, beginLoads, settleLoads, minFactor, mainAccess } from './transport.js';
 
 /** Zellenarten (Code im Raster): 0 leer. Neue Arten nur hinten anhängen (Code = Index + 1). */
-export const KINDS = ['road', 'res', 'com', 'bm', 'mun', 'fuel', 'steel', 'mine', 'market', 'power', 'uni', 'dc', 'barracks', 'factory', 'heliport', 'hospital', 'airport', 'smelter', 'kero', 'runway', 'stand', 'atc', 'ktank', 'mdepot'];
+export const KINDS = ['road', 'res', 'com', 'bm', 'mun', 'fuel', 'steel', 'mine', 'market', 'power', 'uni', 'dc', 'barracks', 'factory', 'heliport', 'hospital', 'airport', 'smelter', 'kero', 'runway', 'stand', 'atc', 'ktank', 'mdepot', 'taxi'];
 export const KIND_ID = Object.fromEntries(KINDS.map((k, i) => [k, i + 1]));
 export const KIND_NAME = {
   road: 'Straße', res: 'Wohnen', com: 'Gewerbe', bm: 'Baumaterial-Werk', mun: 'Munitionswerk', fuel: 'Raffinerie',
   steel: 'Stahlwerk', mine: 'Förderanlage', market: 'Markt', power: 'Kraftwerk', uni: 'Universität', dc: 'Rechenzentrum',
   barracks: 'Kaserne', factory: 'Fabrikhalle', heliport: 'Heliport', hospital: 'Krankenhaus', airport: 'Flughafen',
   smelter: 'Hütte', kero: 'Kerosin-Raffinerie',
-  runway: 'Start-/Landebahn', stand: 'Stellplatz', atc: 'Tower', ktank: 'Kerosintank', mdepot: 'Munitionslager',
+  runway: 'Start-/Landebahn', stand: 'Stellplatz', atc: 'Tower', ktank: 'Kerosintank', mdepot: 'Munitionslager', taxi: 'Rollfeld',
 };
 /** Flache Zellen (seit v5.35): Straße und Start-/Landebahn wachsen nicht, haben kein Gebäude und zählen als Straßenanschluss. */
-export const isFlat = (id) => id === KIND_ID.road || id === KIND_ID.runway;
+export const isFlat = (id) => id === KIND_ID.road || id === KIND_ID.runway || id === KIND_ID.taxi; // Straße, Bahn, Rollfeld (seit v5.37)
 /** Ausbildungsgebäude der Stadt (seit v4.96): Zellenart → Einheiten (CITY.produces). */
 export const TRAINER_KINDS = Object.keys(CITY.produces);
 /** Welches Stadtgebäude bildet `unit` aus? (Zellenart oder null) */
@@ -1155,7 +1155,7 @@ function syncEntity(game, c, i) {
   const lv = c.level[i];
   const k = KINDS[c.kind[i] - 1];
   let e = c.ents.get(i);
-  if (!lv || k === 'road' || k === 'runway') {
+  if (!lv || isFlat(c.kind[i])) {
     if (e) dropEntity(game, c, i);
     return;
   }
@@ -1303,7 +1303,7 @@ export function updateCity(game, dt) {
       const kind = KINDS[c.kind[i] - 1];
       const col = i % c.cols;
       const row = (i - col) / c.cols;
-      if (kind === 'road' || kind === 'runway' || !hasRoad(c, col, row)) continue; // seit v5.20 auch Förderanlagen: ohne Straße wachsen sie nicht
+      if (isFlat(c.kind[i]) || !hasRoad(c, col, row)) continue; // seit v5.20 auch Förderanlagen: ohne Straße wachsen sie nicht
       const lv = c.level[i];
       if (lv >= CITY.maxLevel) continue;
       const need = lv === 0 ? CITY.growTime : CITY.upgradeTime;
@@ -1846,7 +1846,7 @@ export function cmdCity(game, team, cmd) {
   rebuildList(city);
   // Zonen ohne Straße daneben wachsen nicht (Förderanlagen schon): melden
   let noRoad = false;
-  if (!erase && cmd.kind !== 'road' && cmd.kind !== 'runway') {
+  if (!erase && !isFlat(KIND_ID[cmd.kind])) {
     for (let row = r0; row <= r1 && !noRoad; row++) for (let col = c0; col <= c1; col++) if (city.kind[idx(city, col, row)] === id && !hasRoad(city, col, row)) noRoad = true;
   }
   return { ok: true, placed, broke: !!broke, noRoad, occupied, felled, razed, manned, kept };
