@@ -195,6 +195,28 @@ test('Wohnen + Werk + Straße: Einwohner arbeiten, Lager und Geld wachsen', () =
   assert.ok(g.city[1].stats.pop <= g.city[1].stats.housing, 'andere Stadt eigenständig');
 });
 
+test('Großbauten der Stadt (Fabrikhalle, Kaserne) lichten den Nebel über ihrer ganzen Fläche (seit v5.25)', () => {
+  const g = new Game({ seed: 3, city: true });
+  for (const u of g.units) u.alive = false; // nur die Stadtgebäude sehen
+  for (const b of g.buildings) b.def = { ...b.def, sight: 0 };
+  for (let i = 0; i < 10; i++) g.update(0.05);
+  const c = g.city[0];
+  let n = 0;
+  for (const [i] of c.ents) {
+    const k = KINDS[c.kind[i] - 1];
+    if (k !== 'factory' && k !== 'barracks') continue;
+    for (const j of cellsOf(c, i)) {
+      const q = j % c.cols;
+      const r = (j - q) / c.cols;
+      for (const [dx, dy] of [[0.05, 0.05], [0.95, 0.05], [0.05, 0.95], [0.95, 0.95]]) {
+        n++;
+        assert.ok(g.fog[0].isVisible((q + dx) * c.cell, (r + dy) * c.cell), `${k}: Zelle (${q}, ${r}) im Nebel`);
+      }
+    }
+  }
+  assert.ok(n >= 4 * 80, 'Fabrikhalle und Kaserne im Startviertel geprüft');
+});
+
 test('Räumen lässt Rohstoffvorkommen und Förderanlagen stehen; nur Abreißen (demolish) entfernt eine Förderanlage', () => {
   const g = new Game({ seed: 3, city: true, startMoney: 3000 });
   clearStart(g);

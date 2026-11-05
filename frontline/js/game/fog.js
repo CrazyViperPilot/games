@@ -152,9 +152,16 @@ export class Fog {
       const sight = (b.built ? b.def.sight * sightMul(game, b) : CONSTRUCTION_SIGHT) * m; // Radarstellung (Forschung)
       if (sight > 0) this.markEntity(relief, b, sight);
     }
-    // eigene Stadtgebäude (Wohnen, Gewerbe, Förderung, Werke …) lichten den Nebel wie andere Gebäude
+    // eigene Stadtgebäude (Wohnen, Gewerbe, Förderung, Werke …) lichten den Nebel wie andere Gebäude. Seit v5.25 zählt die Sicht ab
+    // dem Rand: Großbauten (Fabrikhalle 8 × 8, Flughafen 10 × 10, Kaserne …) bekommen ihre halbe Diagonale dazu, sonst blieben sie im Nebel
     const cc = game.city?.[team];
-    if (cc) for (const e of cc.ents.values()) if (e.alive) this.markEntity(relief, e, CITY.sight * m);
+    if (cc) {
+      for (const e of cc.ents.values()) {
+        if (!e.alive) continue;
+        const half = ((e.w ?? 0) * BALANCE.map.tile) / 2;
+        this.markEntity(relief, e, CITY.sight * m + half * Math.SQRT2);
+      }
+    }
   }
 
   cellIndex(x, y) {

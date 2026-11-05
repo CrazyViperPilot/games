@@ -13,7 +13,7 @@ export const CITY = {
   flee: { reach: 1, calm: 60 }, // Nachbarschaft (Zellen) und Ruhezeit (s), bis die Bewohner zurückziehen dürfen
   startStock: { bm: 1500, mun: 600, fuel: 1000 }, // Startlager der Hauptstadt bei eingeschalteter Stadt (sonst unendlich)
   yield: { bm: 0.1, mun: 0.06, fuel: 0.05, metal: 0.05, iron: 0.06, kero: 0.04 }, // höchster Ertrag je Arbeiter und Sekunde in Werken (BM-Werk, Munitionswerk, Raffinerie, Kerosin-Raffinerie, Hütte, Stahlwerk), begrenzt durch Rohstoffe
-  sight: 160, // Sichtradius (px) jedes fertigen Stadtgebäudes: hebt den Kriegsnebel um die eigene Stadt auf
+  sight: 160, // Sichtradius (px) jedes fertigen Stadtgebäudes ab seinem Rand (seit v5.25; Großbauten + halbe Diagonale): hebt den Kriegsnebel um die eigene Stadt auf
   taxPop: 0.03, // Geld/s je Einwohner
   taxCom: 0.07, // Geld/s je Arbeiter im Gewerbe (seit v5.20 0,07, vorher 0,15); wirkt nur mit Versorgung, siehe CITY.shop
   // Gewerbe und Markt (seit v5.20, AP3b): Sie brauchen Baumaterial aus dem Lager der Hauptstadt, über die Straße angeliefert.
