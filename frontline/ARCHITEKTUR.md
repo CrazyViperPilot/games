@@ -45,10 +45,11 @@ Die Reihenfolge ist Absicht; ein neues System kommt an die Stelle, deren Ergebni
 | 4 | `updateGarrison`, `updateTowers` | `garrison.js`, `tower.js` | Ein- und Aussteigen in Stadthäuser und Gefechtstürme; Dachaufbauten werden fertig |
 | 5 | `updateFormations` | `formation.js` | Tempo geschlossener Gruppen |
 | 6 | `updateMovement` | `movement.js` | Wege planen und fahren, Verfolgen (ohne Jets) |
-| 6a | `updateAircraft` | `aircraft.js` | Jets: fliegen, kreisen, Rückkehr, Landung, Tanken und Nachladen am Flughafen, Absturz ohne Treibstoff (seit v5.03) |
+| 6a | `updateAircraft` | `aircraft.js` | Jets: fliegen, kreisen, Rückkehr, Landung, Rollen über Straßen und Bahn, Tanken und Nachladen am Stellplatz aus Kerosintank und Munitionslager (seit v5.35 Fliegerhorst), Absturz ohne Treibstoff (seit v5.03) |
 | 7 | `updateCrates` | `crates.js` | Kisten aufheben, tragen, einlagern, Kistengeld |
 | 8 | `updateLogistics` | `logistics.js` | LKW laden, entladen, pendeln; Nachfüllen der Einheiten |
 | 9 | `updateConstruction` | `construction.js` | Baufortschritt, Reparatur, automatische Bauzuweisung |
+| 9a | `updateDig` | `excavator.js` | Bagger fahren zu ihrer Zelle und räumen sie (seit v5.35) |
 | 10 | `updateBridges` | `river.js` | Brücken-Wiederaufbau |
 | 11 | `separate` | `movement.js` | Einheiten auseinanderschieben |
 | 12 | `updateCommanders` | `commander.js` | Aura, Heilung |
@@ -117,7 +118,8 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 | `route` | `ids, fromId, toId, preset?` | `logistics.js` `cmdRoute` | LKW pendeln lassen |
 | `setPreset` | `ids, preset` | `logistics.js` | Ladungsart (`mix`, `bm`, `mun`, `fuel`) |
 | `mortarTarget` | `ids, x, y` | `game.js` `cmdMortarTarget` | Mörser auf einen Punkt richten |
-| `land` | `ids, airportId` | `aircraft.js` `cmdLand` | Flugzeuge landen auf dem eigenen Flughafen (Platzrunde, Landebahn, Ausrollen, Stellplatz; seit v5.15) |
+| `land` | `ids, airportId` | `aircraft.js` `cmdLand` | Flugzeuge landen am Fliegerhorst des eigenen Stellplatzes `airportId` (seit v5.35; Anflug, Bahn, Ausrollen, Rollen zum Stellplatz; seit v5.15) |
+| `dig` | `ids, c0, r0, c1, r1, append?` | `excavator.js` `cmdDig` | Bagger räumen die Zellen des Rechtecks nacheinander (Zonenstraße, Bäume, Häuser, eigene Gebäude; seit v5.35) |
 | `board` | `ids, heliId` | `logistics.js` `cmdBoard` | in ein Fahrzeug oder einen Hubschrauber einsteigen |
 | `dropoff` | `ids, x, y` | `logistics.js` `cmdDropoff` | Passagiere am Punkt absetzen |
 | `garrison`, `ungarrison` | `ids, houseId` (Haus oder Gefechtsturm) / `ids` | `garrison.js` | Haus oder Turm besetzen / verlassen |
@@ -155,7 +157,8 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 | `flow.js` (UI `js/ui/flowpanel.js`) | Ressourcenanzeige: Graph der Kette aus `CITY.chain` und `c.stats`, Verbrauchsmessung, Engpässe (liest nur) |
 | `weather.js`, `research.js`, `river.js` | Wetter und Jahreszeit, Forschungsbaum (seit v5.04: `team.tech = { tier, done, cur, queue }`, Wirkung je Gruppe über `modOf(game, e, stat)`, Daten `js/data/research.js`), Fluss mit Brücken und Furten |
 | `roads.js` | Stadtstraßen der Karte (seit v5.03): Zonenstraßen und Brückenfahrbahnen als Zellen im Stadtraster (`game.roads.kind`: 1 Straße, 2 Brücke), für beide Teams Straßenanschluss (`city.roadAt`), nicht ausweisbar (`canZone`) |
-| `aircraft.js` | Flughafen und Kampfflugzeuge (seit v5.03): Anlage `AIRPORT` (Bahnen, Rollweg, Vorfeld, Stellplätze, Rollgassen `LANE`/`ROW_GAP`; auch fürs Bild in `airport.js`), `u.jet = { home, slot, ready, rtb }`, `u.parked` (im Hangar: `isFoe` falsch, schießt nicht), Ausbildungsprüfung `trainCheck` |
+| `aircraft.js` | Fliegerhorst und Kampfflugzeuge (seit v5.35; vorher Flughafen): Bahnen aus Bahnzellen (`runwaysOf`, Cache je `c.ver`), Weg Stellplatz → Bahn über Straßen und Bahn (`standRoute`), Bahnsperre `c.runwayBusy`, `u.jet = { home, ready, phase, route, rtb }`, `u.parked` (auf dem Stellplatz, angreifbar, Schutz `parkedArmor`, schießt nicht), Ausbildungsprüfung `trainCheck` (ein Jet je Stellplatz); `AIRPORT` nur noch fürs alte Bild in `airport.js` |
+| `excavator.js` | Bagger (seit v5.35): Befehl `dig` (`cmdDig`), Fahren und Räumen (`updateDig`, nach `updateConstruction`); entfernte Zonenstraßen in `game.roads.dug` |
 | `fog.js` | Nebel des Krieges je Team, Sicht im Gelände |
 | `map.js`, `landscape.js`, `relief.js`, `mapdata.js` | Zufallskarte (Stadt, Gehöfte, Kisten), Höhengelände, Höhenraster, Kartenformat für Editor und Speicher |
 | `scars.js`, `animals.js` | Wracks und Krater, Tiere (nur Optik, aber Teil der Simulation) |

@@ -16,7 +16,7 @@ const RAW_NAME = { wood: 'Holz', stone: 'Stein', ore: 'Erz', oil: 'Öl' }; // Ro
 export const FLOW_GOODS = ['bm', 'mun', 'fuel', 'metal', 'kero'];
 /** Zwischenprodukte ohne Lager (seit v5.20): Roheisen von der Hütte zum Stahlwerk. */
 export const FLOW_MIDS = ['iron'];
-const TIP_FULL = { metal: 'Mehr Fahrzeuge ausbilden oder am Markt verkaufen.', kero: 'Kerosin am Flughafen oder bei Hubschraubern verbrauchen oder am Markt verkaufen.' };
+const TIP_FULL = { metal: 'Mehr Fahrzeuge ausbilden oder am Markt verkaufen.', kero: 'Kerosin am Fliegerhorst (Kerosintank) oder bei Hubschraubern verbrauchen oder am Markt verkaufen.' };
 const isRaw = (x) => DEPOSITS.includes(x);
 const isMid = (x) => FLOW_MIDS.includes(x);
 const WORKS = Object.keys(CITY.chain);

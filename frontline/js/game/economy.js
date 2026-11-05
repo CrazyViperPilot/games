@@ -72,7 +72,7 @@ export function updateEconomy(game, dt) {
       const u = game.spawnUnit(type, b.team, spot.x, spot.y);
       if (game.city) u.crew = crewOf(type); // Stadt: die Einheit belegt Einwohner, solange sie lebt
       if (u.def.jet) {
-        parkNew(game, u, b); // Flugzeug: steht im Hangar seines Flughafens (aircraft.js)
+        parkNew(game, u, b); // Flugzeug: steht auf seinem Stellplatz (aircraft.js)
         game.message(b.team, `${ut.name} bereit`, u.x, u.y);
         continue;
       }
