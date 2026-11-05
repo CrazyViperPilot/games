@@ -205,7 +205,7 @@ export function unitHitChance(s, t, w) {
 }
 
 /**
- * Granate einer Artillerie-Einheit (Waffe mit shell, seit v5.18) auf den Punkt (tx, ty): streut zufällig um bis zu spread px
+ * Granate einer Artillerie-Einheit (Waffe mit shell, seit v5.19) auf den Punkt (tx, ty): streut zufällig um bis zu spread px
  * (Forschung acc verkleinert die Streuung), fliegt shellSpeed px/s und trifft mit Splash (impact).
  */
 function fireUnitShell(game, u, w, tx, ty) {

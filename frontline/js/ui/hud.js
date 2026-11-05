@@ -553,7 +553,7 @@ export class Hud {
   }
 
   /**
-   * Straßentransport eines Stadtgebäudes (seit v5.19, AP5, nur lesen): Lieferziel und Weg, Stau der Pendler, Waren der Gewerbe.
+   * Straßentransport eines Stadtgebäudes (seit v5.20, AP5, nur lesen): Lieferziel und Weg, Stau der Pendler, Waren der Gewerbe.
    * Liefert HTML-Zeilen; Warnungen rot über die Klasse „warn“.
    */
   transportText(g, c, i, k, s) {

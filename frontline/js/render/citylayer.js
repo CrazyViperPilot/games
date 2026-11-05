@@ -158,7 +158,7 @@ export function drawCityGround(ren, ctx, team, known, inRect) {
   ctx.restore();
 }
 
-// Auslastung der Straßen im Baumodus (seit v5.19, AP5): Last / Kapazität je Straßenzelle, grün unter 60 %, gelb unter 100 %, rot ab 100 %.
+// Auslastung der Straßen im Baumodus (seit v5.20, AP5): Last / Kapazität je Straßenzelle, grün unter 60 %, gelb unter 100 %, rot ab 100 %.
 const LOAD_TINT = ['rgba(70,180,90,0.42)', 'rgba(235,195,40,0.5)', 'rgba(225,60,40,0.58)'];
 /**
  * Straßen der eigenen Stadt (Eigenstraßen und Stadtstraßen der Karte) nach Auslastung tönen; nur Zellen mit Last. Die Last kommt aus
@@ -782,7 +782,7 @@ export function drawCityBadges(ren, ctx, team, known, inRect, iso) {
       by = r.y - bw / 2;
     }
     ctx.drawImage(img, bx, by, bw, bw);
-    // Baumodus (seit v5.19, AP5): rotes Warnzeichen oben rechts, wenn ein Lieferweg oder Pendlerweg fehlt
+    // Baumodus (seit v5.20, AP5): rotes Warnzeichen oben rechts, wenn ein Lieferweg oder Pendlerweg fehlt
     if (tr && c.team === team && transportWarn(tr, k, i)) {
       const ws = bw * 0.6;
       ctx.drawImage(warnImg, bx + bw - ws * 0.6, by - ws * 0.4, ws, ws);

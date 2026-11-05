@@ -41,7 +41,7 @@ const EFFECT_LIFE = { tracer: 0.12, shell: 0.3, explosion: 0.5, intercept: 0.4, 
 const SHORTAGE_TEXT = {
   mun: 'Einheiten ohne Munition',
   fuel: 'Fahrzeuge ohne Treibstoff',
-  kero: 'Luftfahrzeuge ohne Kerosin (Stadtlager leer: Kerosin-Raffinerie bauen oder am Markt kaufen)', // seit v5.19, nur mit Stadt
+  kero: 'Luftfahrzeuge ohne Kerosin (Stadtlager leer: Kerosin-Raffinerie bauen oder am Markt kaufen)', // seit v5.20, nur mit Stadt
 };
 const WALL_TYPES = new Set(['wall', 'gate']);
 
@@ -915,7 +915,7 @@ export class Game {
    */
   cmdMortarTarget(team, cmd) {
     const mortars = [];
-    const guns = []; // Artillerie-Einheiten (Panzerhaubitze, seit v5.18)
+    const guns = []; // Artillerie-Einheiten (Panzerhaubitze, seit v5.19)
     for (const id of new Set(cmd.ids || [])) {
       const b = this.getEntity(id);
       if (b && b.kind === 'building' && b.team === team && b.def.weapon && b.def.weapon.shell) mortars.push(b);

@@ -1,4 +1,4 @@
-// Straßentransport (js/game/transport.js, seit v5.19, AP2): Wege über Straßen, nächstes Ziel, Stau, Lager-Anschluss, Cache.
+// Straßentransport (js/game/transport.js, seit v5.20, AP2): Wege über Straßen, nächstes Ziel, Stau, Lager-Anschluss, Cache.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
@@ -129,7 +129,7 @@ test('Überlast → Stau-Faktor < 1 nach settleLoads, nach Entlastung wieder 1',
 test('Lager-Anschluss: Straße bis an die Hauptstadt macht mainAccess nicht leer, Werk liefert ins Lager', () => {
   const g = new Game({ seed: 3, city: true, startMoney: 5000 });
   const c = g.city[0];
-  // Seit v5.19 (AP4) hat das Startviertel schon einen Anschluss ans Lager; die Straße hier ergänzt ihn
+  // Seit v5.20 (AP4) hat das Startviertel schon einen Anschluss ans Lager; die Straße hier ergänzt ihn
   // Straße an der Hauptstadt vorbei (Zelle Spalte 8, Zeile 161 liegt im Anschlussbereich), dann ein BM-Werk daran
   g.issue(0, { type: 'city', kind: 'road', c0: 7, r0: 158, c1: 8, r1: 158 });
   g.issue(0, { type: 'city', kind: 'road', c0: 8, r0: 159, c1: 8, r1: 161 });
@@ -162,7 +162,7 @@ test('Cache: nach Bau wird neu berechnet, ohne Änderung bleibt der Stand (auch 
   // ohne Änderung und ohne Zeitablauf: derselbe Stand
   const routes2 = tr2.routes;
   assert.equal(transportOf(g, c).routes, routes2);
-  // Zeit allein rechnet nicht neu (seit dem Review von v5.19): die Wege hängen nur vom Stand der Stadt ab
+  // Zeit allein rechnet nicht neu (seit dem Review von v5.20): die Wege hängen nur vom Stand der Stadt ab
   g.time += 100;
   assert.equal(transportOf(g, c).routes, routes2, 'ohne Änderung derselbe Stand');
   // Wohnung an der Straße, deren Bewohner geflohen sind: kein Pendlerziel; kehren sie zurück (c.ver), ist sie wieder eins
@@ -178,7 +178,7 @@ test('Cache: nach Bau wird neu berechnet, ohne Änderung bleibt der Stand (auch 
   assert.equal(transportInfo(g, c, hut).noHome, false, 'Wohnung wieder Pendlerziel');
 });
 
-// ---- Rechnung je Gebäude (seit v5.19, AP3, PLAN 1.4): Straßen zum Lager, Pendler, Stau, Kerosin ----
+// ---- Rechnung je Gebäude (seit v5.20, AP3, PLAN 1.4): Straßen zum Lager, Pendler, Stau, Kerosin ----
 // Die Tests bauen ihre Straßen selbst: Breitensuche über freie Zellen, dann je Zelle ein Straßenbefehl (wie in city.test.js).
 
 
@@ -460,7 +460,7 @@ test('F-16 tankt Kerosin aus dem Stadtlager (c.kero), den Treibstoff im Lager l�
   run(g, 3);
   assert.ok(u.fuel > 5, `F-16 getankt: ${u.fuel}`);
   assert.ok(c.kero < 300, `Kerosin im Stadtlager ${c.kero}`);
-  // Seit v5.19 (AP4) liefert die Raffinerie des Startviertels Treibstoff ans Lager: der Flug zieht keinen davon ab
+  // Seit v5.20 (AP4) liefert die Raffinerie des Startviertels Treibstoff ans Lager: der Flug zieht keinen davon ab
   assert.ok(m.store.fuel >= fuel0, `Treibstoff im Lager ${fuel0} → ${m.store.fuel}`);
   assert.ok(UNITS.f16.fuelMax > 0);
   // leeres Stadtlager: kein Tanken, Meldung „ohne Kerosin“, Treibstoff im Lager bleibt unberührt (seit dem Review)
@@ -490,7 +490,7 @@ test('Heliport tankt Hubschrauber im Umkreis aus c.kero (CITY.care.refuel je s)'
   const want = Math.min(UNITS.littlebird.fuelMax - 1, UNITS.littlebird.fuelMax * CITY.care.refuel * 0.05);
   assert.ok(Math.abs((kero0 - c.kero) - want) < 1e-6, `Kerosin verbraucht ${kero0 - c.kero} ≈ ${want}`);
   assert.ok(u.fuel > 1, 'Hubschrauber getankt');
-  // leeres Stadtlager: kein Kerosin, aber eine Mangelmeldung (seit dem Review von v5.19)
+  // leeres Stadtlager: kein Kerosin, aber eine Mangelmeldung (seit dem Review von v5.20)
   c.kero = 0;
   u.fuel = 1;
   g.drainEvents();

@@ -1,4 +1,4 @@
-// Straßentransport (PRD §15 „Straßentransport“, seit v5.19, AP2): Wege über Straßenzellen von Förderung und Werken zu ihren Zielen
+// Straßentransport (PRD §15 „Straßentransport“, seit v5.20, AP2): Wege über Straßenzellen von Förderung und Werken zu ihren Zielen
 // (Werke, Lager der Hauptstadt), Pendlerwege zur nächsten bewohnten Wohnzelle und Stau je Straßenzelle. Dieses Modul rechnet nur Wege
 // und Stau, es ändert nichts am Spiel. Kein DOM. Wege, Lasten und Puffer liegen in einer WeakMap je Stadt und werden nicht gespeichert
 // (sie folgen allein aus dem Stand der Stadt); gespeichert wird nur der geglättete Stau-Faktor je Zelle (c.congestion), damit ein
@@ -298,7 +298,7 @@ function build(game, c, tr) {
 
 /**
  * Transportzustand der Stadt eines Teams (lazy, je Stadt eine WeakMap). Neu berechnet nur, wenn sich c.ver (Bau, Abriss, Wachstum,
- * Ruinen, seit v5.19 auch Flucht und Rückkehr der Bewohner), die Hauptstadt oder c.mapRoads ändern. Die Wege hängen nur vom Stand der
+ * Ruinen, seit v5.20 auch Flucht und Rückkehr der Bewohner), die Hauptstadt oder c.mapRoads ändern. Die Wege hängen nur vom Stand der
  * Stadt ab: ein geladener Spielstand ergibt dieselben Wege, und Aufrufe der Anzeige ändern nichts am Spiel.
  * Liefert { routes, commute, mun, shop, load, factor, cap, list, active, nActive }:
  *   routes:  Map<Anker, { to: Anker | 'main' | null, path: Int32Array | null, dist }>  Lieferweg je Förderung und Werk

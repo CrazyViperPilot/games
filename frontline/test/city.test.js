@@ -80,7 +80,7 @@ function connect(g, team, starts, goal) {
   }
   return false;
 }
-// Straße vom Gebäude mit Anker a zum nächsten Straßennetz (seit v5.19 braucht Produktion einen Weg). Hat es schon einen Anschluss: nichts.
+// Straße vom Gebäude mit Anker a zum nächsten Straßennetz (seit v5.20 braucht Produktion einen Weg). Hat es schon einen Anschluss: nichts.
 function linkRoad(g, team, a) {
   const c = g.city[team];
   if (accessCells(c, a).length) return;
@@ -88,7 +88,7 @@ function linkRoad(g, team, a) {
   for (const j of cellsOf(c, a)) starts.push(...nbOf(c, j));
   assert.ok(connect(g, team, starts, (j) => nbOf(c, j).some((k) => roadAt(c, k))), `keine Straße zu Gebäude ${a} möglich`);
 }
-// Das Straßennetz, an dem Gebäude a hängt, an das Lager der Hauptstadt anschließen (seit v5.19 braucht ein Werk einen Weg dorthin).
+// Das Straßennetz, an dem Gebäude a hängt, an das Lager der Hauptstadt anschließen (seit v5.20 braucht ein Werk einen Weg dorthin).
 // Hat a schon einen Weg zum Lager, passiert nichts.
 function linkMain(g, team, a) {
   const c = g.city[team];
@@ -177,9 +177,9 @@ test('Wohnen + Werk + Straße: Einwohner arbeiten, Lager und Geld wachsen', () =
   assert.match(paint(g, 'mine', 5, 4, 5, 4).reason, /vorkommen/);
   assert.match(paint(g, 'mine', 2, 4, 2, 4).reason, /räumen/, 'BM-Werk steht dort: nicht überbauen');
   assert.ok(paint(g, 'mine', 0, 4, 1, 4).ok);
-  linkRoad(g, 0, at(g, 0, 4)); // Förderanlagen brauchen eine Straße (seit v5.19)
+  linkRoad(g, 0, at(g, 0, 4)); // Förderanlagen brauchen eine Straße (seit v5.20)
   linkRoad(g, 0, at(g, 1, 4));
-  linkMain(g, 0, c.list.find((i) => c.kind[i] === KIND_ID.bm)); // das Netz erreicht das Lager (seit v5.19 braucht BM einen Weg dorthin)
+  linkMain(g, 0, c.list.find((i) => c.kind[i] === KIND_ID.bm)); // das Netz erreicht das Lager (seit v5.20 braucht BM einen Weg dorthin)
   const m = g.mainFob(0);
   m.store.bm = 0;
   const money0 = g.teams[0].res.money;
@@ -421,14 +421,14 @@ test('Stahl: Erzmine, Hütte und Stahlwerk liefern, Fahrzeuge kosten Stahl, Abbr
   paint(g, 'road', 0, 0, 9, 0);
   paint(g, 'res', 0, 1, 9, 1);
   assert.ok(paint(g, 'steel', 0, 2, 1, 3).ok); // 2 × 2 (seit v5.08), Straße darunter
-  assert.ok(paint(g, 'smelter', 3, 2, 4, 3).ok); // Hütte (seit v5.19): Erz → Roheisen, Roheisen → Stahlwerk
+  assert.ok(paint(g, 'smelter', 3, 2, 4, 3).ok); // Hütte (seit v5.20): Erz → Roheisen, Roheisen → Stahlwerk
   paint(g, 'road', 0, 4, 4, 4);
   c.deposit[at(g, 5, 3)] = 3; // Erz
   c.deposit[at(g, 6, 3)] = 3;
   paint(g, 'mine', 5, 3, 6, 3);
-  linkRoad(g, 0, at(g, 5, 3)); // Erzmine braucht eine Straße zur Hütte (seit v5.19)
+  linkRoad(g, 0, at(g, 5, 3)); // Erzmine braucht eine Straße zur Hütte (seit v5.20)
   linkRoad(g, 0, at(g, 6, 3));
-  paint(g, 'res', 7, 4, 7, 4); // Wohnen an der Erzstraße: Förderung, Hütte und Stahlwerk pendeln dorthin (seit v5.19 nötig)
+  paint(g, 'res', 7, 4, 7, 4); // Wohnen an der Erzstraße: Förderung, Hütte und Stahlwerk pendeln dorthin (seit v5.20 nötig)
   linkMain(g, 0, c.list.find((i) => c.kind[i] === KIND_ID.steel));
   run(g, 90);
   assert.ok(c.stats.raw.ore > 0 && c.stats.iron > 0 && c.stats.metal > 0, `Stahl/s ${c.stats.metal}, Roheisen/s ${c.stats.iron}`);
@@ -506,7 +506,7 @@ test('Startviertel: Raffinerie, Wohnen und Ölquelle stehen fertig, Treibstoff f
     assert.ok(kinds.includes(6) && kinds.includes(2) && kinds.includes(8), `Team ${team}: ${kinds}`);
   }
   const c0 = g.city[0];
-  linkRoad(g, 0, c0.list.find((i) => c0.kind[i] === KIND_ID.mine && c0.level[i])); // Ölquelle an die Straße (seit v5.19 Pflicht)
+  linkRoad(g, 0, c0.list.find((i) => c0.kind[i] === KIND_ID.mine && c0.level[i])); // Ölquelle an die Straße (seit v5.20 Pflicht)
   const m = g.mainFob(0);
   m.store.fuel = 0;
   run(g, 30);
@@ -798,7 +798,7 @@ test('Alte Spielstände: einzelne Uni-Zellen werden ein 3 × 3-Großbau mit ihre
   assert.equal(d.list.filter((j) => d.kind[j] === KIND_ID.uni).length, 9);
 });
 
-test('Alte Spielstände (vor v5.19): ohne Kerosin und Stau-Faktor laden, Startvorrat Kerosin, Stau frei, Wege und Rechnung laufen', () => {
+test('Alte Spielstände (vor v5.20): ohne Kerosin und Stau-Faktor laden, Startvorrat Kerosin, Stau frei, Wege und Rechnung laufen', () => {
   const g = new Game({ seed: 3, city: true });
   for (const c of g.city) {
     delete c.kero;

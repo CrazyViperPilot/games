@@ -106,7 +106,7 @@ test('Forschung, Schwierigkeit, KI-Mischung und Startmenü', () => {
   assert.ok(WEATHER_SETTINGS.includes(m.weather), `menuDefaults.weather = ${m.weather}`);
 });
 
-test('Stadt (v5.19): Zellenarten stabil, Hütte und Kerosin-Raffinerie vollständig, Ketten und Märkte passen', () => {
+test('Stadt (v5.20): Zellenarten stabil, Hütte und Kerosin-Raffinerie vollständig, Ketten und Märkte passen', () => {
   // IDs bestehender Zellenarten bleiben (Speicherstände); neue Arten stehen hinten
   assert.equal(KIND_ID.road, 1);
   assert.equal(KIND_ID.airport, 17, 'Flughafen bleibt Nummer 17');

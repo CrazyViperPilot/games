@@ -3,7 +3,7 @@
 // Lager mit Erzeugung und Verbrauch. Markiert Engpässe und nennt sie in Worten. Die Kette kommt nur aus CITY.chain, die Zahlen
 // aus c.stats (updateCity), den Lagern und der LKW-Ladung. Liest nur. Kein DOM.
 // Neue Rohstoffe, Werke oder Waren: CITY.chain und die Felder cap/inp/gross/n in updateCity pflegen; test/flow.test.js prüft das.
-// Zwischenprodukte (Roheisen, seit v5.19) haben keinen Bestand: sie laufen direkt vom Werk zum nächsten (Knotentyp 'mid').
+// Zwischenprodukte (Roheisen, seit v5.20) haben keinen Bestand: sie laufen direkt vom Werk zum nächsten (Knotentyp 'mid').
 import { CITY } from '../data/city.js';
 import { BALANCE } from '../data/balance.js';
 import { DEPOSITS, DEPOSIT_NAME, MINE_NAME, KIND_NAME, CITY_STORE_GOODS } from './city.js';
@@ -14,7 +14,7 @@ const WORKS_SHORT = { bm: 'BM-Werk' };
 const RAW_NAME = { wood: 'Holz', stone: 'Stein', ore: 'Erz', oil: 'Öl' }; // Rohstoff (DEPOSIT_NAME nennt das Vorkommen)
 /** Waren mit Lager (BM, MUN, TS in den Lagern der Hauptstadt, Stahl und Kerosin im Stadtlager). */
 export const FLOW_GOODS = ['bm', 'mun', 'fuel', 'metal', 'kero'];
-/** Zwischenprodukte ohne Lager (seit v5.19): Roheisen von der Hütte zum Stahlwerk. */
+/** Zwischenprodukte ohne Lager (seit v5.20): Roheisen von der Hütte zum Stahlwerk. */
 export const FLOW_MIDS = ['iron'];
 const TIP_FULL = { metal: 'Mehr Fahrzeuge ausbilden oder am Markt verkaufen.', kero: 'Kerosin am Flughafen oder bei Hubschraubern verbrauchen oder am Markt verkaufen.' };
 const isRaw = (x) => DEPOSITS.includes(x);
@@ -302,13 +302,13 @@ export function resourceFlow(game, team, rates = null) {
   const mood = s.mood ?? 1;
   if (s.jobs > 0 && fill < 0.95) issue(fill < 0.7 ? 3.5 - fill : 2.6 - fill, `Nur ${pct(fill)} der Arbeitsplätze besetzt: alle Werke arbeiten langsamer.`, 'Wohnen bauen.');
   if (power < 0.999) issue(power < 0.7 ? 3.4 - power : 2.5 - power, `Strom reicht nur für ${pct(power)}: Förderung und Werke laufen langsamer.`, 'Kraftwerk bauen oder ausbauen.');
-  // Gewerbe bauen nur, wenn die Läden die Zufriedenheit kaum tragen (Läden-Anteil unter 50 %, seit v5.19)
+  // Gewerbe bauen nur, wenn die Läden die Zufriedenheit kaum tragen (Läden-Anteil unter 50 %, seit v5.20)
   const shopLow = (s.shop ?? 1) < 0.5;
   if ((s.happy ?? 1) < 0.5) issue(0.9, `Zufriedenheit niedrig (${pct(s.happy)}): Erträge × ${mood.toFixed(2).replace('.', ',')}.`, shopLow ? 'Gewerbe bauen, Stadt schützen, Strom sichern.' : 'Stadt schützen, Strom sichern.');
-  // Gewerbe braucht Baumaterial, über die Straße vom Lager (seit v5.19, AP3b): wenig versorgt = Steuer und Zufriedenheit fallen
+  // Gewerbe braucht Baumaterial, über die Straße vom Lager (seit v5.20, AP3b): wenig versorgt = Steuer und Zufriedenheit fallen
   const sup = s.shopSupply ?? 1;
   if (sup < 0.5 && (s.jobsCom ?? 0) > 0) issue(1 + (0.5 - sup), `Gewerbe ohne Waren (Straße zum Lager, Baumaterial): nur ${pct(sup)} versorgt.`, 'Gewerbe per Straße an das Lager der Hauptstadt anschließen und Baumaterial nachproduzieren.');
-  // Straßentransport (seit v5.19, AP5): Stau auf den Straßen (kleinster Stau-Faktor) und Waren, die gar keinen Weg haben
+  // Straßentransport (seit v5.20, AP5): Stau auf den Straßen (kleinster Stau-Faktor) und Waren, die gar keinen Weg haben
   const jam = s.jam ?? 1;
   if (jam < 0.95) issue(1 + (1 - jam), `Stau auf den Straßen (${pct(jam)}): Waren und Pendler kommen langsamer.`, `Eine zweite Straße zum Ziel legen (Straßen tragen ${CITY.transport.cap}/s, Stadtstraßen ${CITY.transport.mapCap}/s).`);
   const lost = s.lost ?? 0;

@@ -1,4 +1,4 @@
-// Forschungsbaum (seit v5.04, PRD §7 „Forschung“): 10 Stufen, 8 Äste (seit v5.18), je Ast und Stufe eine Verbesserung (80 insgesamt).
+// Forschungsbaum (seit v5.04, PRD §7 „Forschung“): 10 Stufen, 8 Äste (seit v5.19), je Ast und Stufe eine Verbesserung (80 insgesamt).
 // Inspiration: die Freischaltungen der Fahrzeuge in Battlefield 4 / Battlefield 6 (Optik, Munition, Panzerung, Gegenmaßnahmen,
 // Wartung) und die Ausbaustufen aus Wardogs, als Baum wie in Civilization (Stufen als Spalten, Äste als Zeilen, Linien zum Vorgänger).
 // Regeln: Auf jeder Stufe müssen perTier Forschungen fertig sein, bevor Stufe + 1 offen ist. Jede Forschung braucht ihren Vorgänger

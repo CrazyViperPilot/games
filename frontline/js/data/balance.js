@@ -218,7 +218,7 @@ export const BALANCE = {
       winter: { clear: 4, snow: 4, fog: 2 },
     },
   },
-  // Forschung: eigene Datei js/data/research.js (seit v5.04: 10 Stufen, seit v5.18 8 Äste, Wirkungen je Einheitengruppe)
+  // Forschung: eigene Datei js/data/research.js (seit v5.04: 10 Stufen, seit v5.19 8 Äste, Wirkungen je Einheitengruppe)
   // Fluss mit Brücken und Furten (Zufallskarte, im Startmenü; ohne Angabe aus): Furten sind passierbar, Bodeneinheiten dort × ford
   // so schnell, die Wegsuche zahlt fordCost (Zehntel je Zelle) dazu und nimmt lieber eine Brücke. Wasser bis fordDepth unter dem
   // Spiegel zählt in einer Furt als seicht. Brücken (deck px breit) haben bridgeHp und nehmen nur auf Befehl Schaden (Häuser-Faktoren:

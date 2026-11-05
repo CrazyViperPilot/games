@@ -341,7 +341,7 @@ export const UNITS = {
     fuelMax: 40,
     hotkey: 'N',
   },
-  // Flakpanzer Gepard (seit v5.18): Zwillings-Maschinenkanone mit Such- und Feuerleitradar. Trifft auch schnelle Flugzeuge (speedRef
+  // Flakpanzer Gepard (seit v5.19): Zwillings-Maschinenkanone mit Such- und Feuerleitradar. Trifft auch schnelle Flugzeuge (speedRef
   // hoch, siehe BALANCE.airFire), weite Sicht (Radar); gegen leichte Bodenziele brauchbar, gegen Panzer kaum. Bevorzugt Luftziele.
   gepard: {
     name: 'Flakpanzer Gepard',
@@ -362,7 +362,7 @@ export const UNITS = {
     fuelMax: 45,
     hotkey: 'P',
   },
-  // Panzerhaubitze (seit v5.18, nach der Panzerhaubitze 2000): Artillerie. Schießt Granaten (shell) weit über das Gefecht, nicht näher als
+  // Panzerhaubitze (seit v5.19, nach der Panzerhaubitze 2000): Artillerie. Schießt Granaten (shell) weit über das Gefecht, nicht näher als
   // minRange; Ziele muss das Team sehen (eigene Einheiten oder Gebäude). Splash-Schaden um den Einschlag, Streuung spread px
   // (Forschung „acc“ verkleinert sie), Fluggeschwindigkeit shellSpeed px/s. Auch Feuer auf einen Punkt (G, wie der Mörser).
   pzh: {

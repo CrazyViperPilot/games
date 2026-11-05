@@ -1,6 +1,6 @@
-# Frontline – Umsetzungsplan v5.19: Straßentransport und Warenketten
+# Frontline – Umsetzungsplan v5.20: Straßentransport und Warenketten
 
-> **Umgesetzt in v5.19** (AP1 bis AP6). Dieser Plan bleibt als Nachweis; die Regeln stehen in [PRD.md](PRD.md) §15 „Straßentransport (seit v5.19)“, der Aufbau in [ARCHITEKTUR.md](ARCHITEKTUR.md). Wo Plan und Code abweichen, gilt der Code.
+> **Umgesetzt in v5.20** (AP1 bis AP6). Dieser Plan bleibt als Nachweis; die Regeln stehen in [PRD.md](PRD.md) §15 „Straßentransport (seit v5.20)“, der Aufbau in [ARCHITEKTUR.md](ARCHITEKTUR.md). Wo Plan und Code abweichen, gilt der Code.
 
 Daniels Wunsch: Die Straßen verbinden alles. Rohstoffe fahren über angeschlossene Straßen zum nächsten Werk und von dort weiter
 bis ins Lager. Neue Kette Erz → Roheisen → Stahl → Munition, zwei Raffinerien (Treibstoff für Fahrzeuge, Kerosin für Luftfahrzeuge),
@@ -8,7 +8,7 @@ Straßen mit Kapazität, Pendler brauchen auch Kapazität.
 
 Gilt nur **mit Stadt** (`game.city`). Ohne Stadt bleibt alles, wie es ist (Hauptstadt unendlich, keine Transportlogik).
 Regeln aus `frontline/CLAUDE.md` gelten (Daten nach `js/data/`, deutsche Kommentare, `npm run docs`, PRD, `CACHE_VERSION`).
-Version: **v5.19** (main hat v5.17, der Branch v5.18).
+Version: **v5.20** (main hat v5.17, der Branch v5.19).
 
 ---
 
@@ -191,9 +191,9 @@ Aus der Analyse (Gewerbe war mit Abstand die stärkste Geldquelle, Zufriedenheit
 - Hilfe (F1, `menu.js`): Transport, Kapazität, Pendler, neue Gebäude.
 
 ### AP6 – Doku und Feinschliff (Dateien: `PRD.md`, `ARCHITEKTUR.md`, `CLAUDE.md`, `sw.js`)
-- PRD §15 neuer Abschnitt „Straßentransport (seit v5.19)“ mit 1.1–1.5 in Worten, Ressourcenanzeige, Markt, Kerosin, Umbenennung
-  Stahl; Änderungsverlauf v5.19; `npm run docs`; `CACHE_VERSION` +1; Feature-Landkarte und „Wo ändere ich was?“ (CITY.transport).
-- PRD §15 „Räumen“: seit v5.19 lässt Räumen Rohstoffvorkommen und Förderanlagen stehen (Meldung), nur „Abreißen“ eines gewählten
+- PRD §15 neuer Abschnitt „Straßentransport (seit v5.20)“ mit 1.1–1.5 in Worten, Ressourcenanzeige, Markt, Kerosin, Umbenennung
+  Stahl; Änderungsverlauf v5.20; `npm run docs`; `CACHE_VERSION` +1; Feature-Landkarte und „Wo ändere ich was?“ (CITY.transport).
+- PRD §15 „Räumen“: seit v5.20 lässt Räumen Rohstoffvorkommen und Förderanlagen stehen (Meldung), nur „Abreißen“ eines gewählten
   Gebäudes (`cmd.demolish`) entfernt eine Förderanlage; das Vorkommen bleibt immer (schon umgesetzt, nur dokumentieren).
 - `npm test` vollständig grün, Laufzeit nicht mehr als 15 % länger als vorher.
 

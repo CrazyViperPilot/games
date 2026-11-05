@@ -1,4 +1,4 @@
-// KI-Stadt produziert (seit v5.19, AP4; eigene Datei seit dem Review, damit die langen Partien neben city.test.js laufen):
+// KI-Stadt produziert (seit v5.20, AP4; eigene Datei seit dem Review, damit die langen Partien neben city.test.js laufen):
 // KI gegen KI mit Stadt, 12 Spielminuten, zwei Seeds. Beide Städte fördern, haben Baumaterial und erzeugen Stahl und Munition.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -30,7 +30,7 @@ for (const seed of [3, 11]) {
       assert.ok(raw[t] > 0, `Team ${t}: Förderung ${raw[t].toFixed(0)}`);
       assert.ok(bmZero[t] / samples < 0.5, `Team ${t}: Baumaterial im Lager 0 in ${(100 * bmZero[t] / samples).toFixed(0)} % der Zeit`);
       assert.ok(made.mun > 0, `Team ${t}: Munition ${made.mun.toFixed(0)}`);
-      // Stahl (seit dem Review von v5.19 in beiden Städten): Hütte und Stahlwerk mit Weg, Förderung nur so viel, wie die Werke verarbeiten
+      // Stahl (seit dem Review von v5.20 in beiden Städten): Hütte und Stahlwerk mit Weg, Förderung nur so viel, wie die Werke verarbeiten
       assert.ok(made.metal > 0, `Team ${t}: Stahl ${made.metal.toFixed(0)}`);
     }
   });

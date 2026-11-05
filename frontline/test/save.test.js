@@ -32,7 +32,7 @@ test('Laden und Weiterspielen ist identisch zum durchgehenden Spiel', async () =
   console.log('Spielstand gz-Bytes:', bytes.length);
 });
 
-test('Stadt mit Stau (v5.19): Stau-Faktor c.congestion wird gespeichert, Laden und Weiterspielen bleibt identisch', async () => {
+test('Stadt mit Stau (v5.20): Stau-Faktor c.congestion wird gespeichert, Laden und Weiterspielen bleibt identisch', async () => {
   const g1 = new Game({ seed: 11, city: true, startMoney: 3000 });
   const a1 = new AI(g1, 1, 'normal');
   let k = 0;

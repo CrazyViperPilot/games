@@ -1091,7 +1091,7 @@ function steel(g, lv, o) {
   tree(g, 24, 52, 0.8, 2);
 }
 
-// ---------- Hütte (Verhüttung von Erz zu Roheisen, seit v5.19) ----------
+// ---------- Hütte (Verhüttung von Erz zu Roheisen, seit v5.20) ----------
 // Alter gemauerter Hochofen (quadratischer Steinschacht mit Ankerbändern, offene Gicht mit Glut), Gießhalle aus Bruchstein mit
 // glühenden Bogentoren, Masselbett mit Glutrinnen, rötliche Erzhalden, Röstöfen, dunkler Ziegelschornstein. Bewusst anders als
 // das Stahlwerk (runder Stahlofen, Winderhitzer, Walzwerk): dunkler Stein und Rost statt Stahlgrau.
@@ -1235,7 +1235,7 @@ function smelter(g, lv, o) {
   if (lv >= 3) tree(g, -20, 55, 0.75, 2);
 }
 
-// ---------- Kerosin-Raffinerie (Öl zu Kerosin, seit v5.19) ----------
+// ---------- Kerosin-Raffinerie (Öl zu Kerosin, seit v5.20) ----------
 // Helle Kugeltanks mit blauem Gürtel, Rundtanks mit gewölbtem Dach und blauen Tankringen in der Auffangwanne, Kolonne, Pumpenhaus
 // mit blauem Band, Rohrbrücke mit blauen Leitungen, liegende Drucktanks, Verladestation mit blau-weißen Flugfeld-Tankwagen, ab
 // Stufe 3 die Fackel. Anders als die Raffinerie (Schwimmdachtanks, Ofen mit Kamin): hell, blau, Kugeln vorn sichtbar.

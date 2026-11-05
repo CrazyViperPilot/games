@@ -1,4 +1,4 @@
-// Flakpanzer Gepard und Panzerhaubitze (seit v5.18): Ausbildung, Waffen, Feuer auf einen Punkt, Forschungsast „Artillerie und Gepard“.
+// Flakpanzer Gepard und Panzerhaubitze (seit v5.19): Ausbildung, Waffen, Feuer auf einen Punkt, Forschungsast „Artillerie und Gepard“.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';

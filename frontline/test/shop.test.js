@@ -1,4 +1,4 @@
-// Gewerbe und Markt brauchen Baumaterial (seit v5.19, AP3b): Versorgung über den Straßenweg zum Lager, Steuer und Zufriedenheit
+// Gewerbe und Markt brauchen Baumaterial (seit v5.20, AP3b): Versorgung über den Straßenweg zum Lager, Steuer und Zufriedenheit
 // nach Versorgung gewichtet, eigene Nachfrage (Gewerbe wächst nur bis CITY.shop.per).
 import test from 'node:test';
 import assert from 'node:assert/strict';

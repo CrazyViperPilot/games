@@ -24,7 +24,7 @@ test('CITY.chain deckt alle Rohstoffe, Werke und Waren ab', () => {
   for (const l of L.links) assert.ok(L.nodes[l.from].col < L.nodes[l.to].col, `Kante ${l.from} → ${l.to} läuft nach links`);
 });
 
-test('Kette seit v5.19: Erz → Hütte → Roheisen → Stahlwerk → Stahl; Öl → Raffinerie und Kerosin-Raffinerie → Kerosin', () => {
+test('Kette seit v5.20: Erz → Hütte → Roheisen → Stahlwerk → Stahl; Öl → Raffinerie und Kerosin-Raffinerie → Kerosin', () => {
   const { nodes } = flowLayout();
   assert.equal(nodes['mid:iron'].type, 'mid', 'Roheisen ist ein Zwischenprodukt');
   assert.equal(nodes['store:iron'], undefined, 'Roheisen hat kein Lager');

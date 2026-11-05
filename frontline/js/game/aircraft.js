@@ -245,7 +245,7 @@ function stepParked(game, u, dt) {
   const f = dt / (J.rearm * modOf(game, u, 'rearm')); // Schnellwartung (Forschung)
   if (u.fuel < u.def.fuelMax) {
     const want = Math.min(u.def.fuelMax - u.fuel, u.def.fuelMax * f);
-    // Mit Stadt tankt die F-16 Kerosin aus dem Stadtlager (seit v5.19), ohne Stadt wie bisher Treibstoff aus dem Lager der Hauptstadt
+    // Mit Stadt tankt die F-16 Kerosin aus dem Stadtlager (seit v5.20), ohne Stadt wie bisher Treibstoff aus dem Lager der Hauptstadt
     const city = game.city?.[u.team];
     let got;
     if (city) {

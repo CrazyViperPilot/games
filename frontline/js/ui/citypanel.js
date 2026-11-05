@@ -157,9 +157,9 @@ export class CityPanel {
     const raw = s.raw;
     const c = g.city[this.team];
     const stahl = `Stahl ${fmt(c.metal)} ${s.metal >= 0 ? '+' : ''}${fmt(s.metal, 1)}`;
-    const kero = `Kerosin ${fmt(c.kero)} +${fmt(s.kero, 1)}`; // Kerosin im Stadtlager, Ertrag je s (seit v5.19)
+    const kero = `Kerosin ${fmt(c.kero)} +${fmt(s.kero, 1)}`; // Kerosin im Stadtlager, Ertrag je s (seit v5.20)
     const store = m ? `${stahl} · Förderung Holz ${fmt(raw.wood, 1)} Stein ${fmt(raw.stone, 1)} Erz ${fmt(raw.ore, 1)} Öl ${fmt(raw.oil, 1)} · Lager BM ${fmt(m.store.bm)} +${fmt(s.bm, 1)} · MUN ${fmt(m.store.mun)} +${fmt(s.mun, 1)} · TS ${fmt(m.store.fuel)} +${fmt(s.fuel, 1)} · ${kero}` : `${stahl} · ${kero} · Hauptstadt zerstört`;
-    // Straßentransport (seit v5.19): kleinster Stau-Faktor auf den benutzten Straßen, Waren ohne Weg je s
+    // Straßentransport (seit v5.20): kleinster Stau-Faktor auf den benutzten Straßen, Waren ohne Weg je s
     const jam = s.jam ?? 1;
     const jamTxt = Math.round(jam * 100) < 100 ? ` · <b class="warn">Stau ${fmt(Math.round(jam * 100))} %</b>` : '';
     const lostTxt = (s.lost ?? 0) > 0 ? ` · <b class="warn">ohne Weg ${fmt(s.lost, 1)}/s</b>` : '';
