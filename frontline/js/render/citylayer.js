@@ -11,6 +11,8 @@ import { drawTownTop, townLift } from './townhouses.js';
 import { transportOf } from '../game/transport.js';
 import { depositSprite } from './nature.js';
 import { blit, spriteDpr } from './spritecache.js';
+import { groundPattern, patternMatrix } from './ways.js';
+import { railList } from './terrain.js';
 
 // Grundstücke in der Farbe der Zellenart (wie die Werkzeugleiste): Wohnen grün, Gewerbe blau, Werke erdig, Markt gold, Militär oliv
 const LOT = CITY_COLORS;
@@ -257,8 +259,10 @@ function drawBigLot(ren, ctx, c, k, lv, r, team, m) {
 
 // Straßen (v4.97): je Zelle nach den Straßennachbarn Gerade, Kurve, Sackgasse, T-Stück oder Kreuzung. Gehweg an Seiten ohne
 // Anschluss, an Kurven als Bogen; weiße Mittellinie (gestrichelt, in Kurven gebogen); Kreuzungen und T-Stücke frei, davor
-// Zebrastreifen. Alles als Flächen in Zellkoordinaten; die drei Pfade (Asphalt, Gehweg, Markierung) für alle Straßen werden
-// nur neu gebaut, wenn sich Straßen, Sicht, Drehung oder Gelände ändern, sonst je Bild nur drei Füllungen.
+// Zebrastreifen. Alles als Flächen in Zellkoordinaten; die Pfade für alle Straßen werden nur neu gebaut, wenn sich Straßen,
+// Sicht, Drehung, Gelände oder Jahreszeit ändern, sonst je Bild nur die Füllungen der sichtbaren Kacheln (16 × 16 Zellen).
+// Seit v5.31 schöner: Asphalt und Gehwegplatten als Muster (ways.js, ab Zoom 0,5), heller Bordstein mit Rinne (Herbst Laub,
+// Winter Schneewall), Bordsteinecken und Bögen, Kanaldeckel und Gullys, Bahnübergänge mit Betonplatten über den Schienen.
 export const ROAD = { asphalt: '#4e514b', walk: '#9b9a90', mark: 'rgba(240,238,226,0.88)', kerb: 7, line: 2.6 }; // auch die Brücken (bridge.js)
 const RN = 1, RE = 2, RS = 4, RW = 8; // Straßennachbarn
 const DNE = 16, DSE = 32, DSW = 64, DNW = 128; // Straße auch diagonal (dann keine Gehwegecke)
@@ -339,8 +343,8 @@ function curveCorner(n, S) {
   return null;
 }
 
-/** Gehweg: Streifen an Seiten ohne Anschluss, Ecken zwischen zwei Anschlüssen; in Kurven die Außenseite als Bogen. */
-function roadWalk(ctx, m, S) {
+/** Gehweg: Streifen an Seiten ohne Anschluss, Ecken zwischen zwei Anschlüssen; in Kurven die Außenseite als Bogen. E: Überstand. */
+function roadWalk(ctx, m, S, E = 0) {
   const k = ROAD.kerb;
   const n = m & 15;
   const cc = curveCorner(n, S);
@@ -360,10 +364,10 @@ function roadWalk(ctx, m, S) {
     if (!(m & diag)) rectUV(ctx, Math.min(cu, cu + su * k), Math.min(cv, cv + sv * k), Math.max(cu, cu + su * k), Math.max(cv, cv + sv * k));
     return;
   }
-  if (!(n & RN)) rectUV(ctx, 0, 0, S, k);
-  if (!(n & RE)) rectUV(ctx, S - k, 0, S, S);
-  if (!(n & RS)) rectUV(ctx, 0, S - k, S, S);
-  if (!(n & RW)) rectUV(ctx, 0, 0, k, S);
+  if (!(n & RN)) rectUV(ctx, -E, 0, S + E, k);
+  if (!(n & RE)) rectUV(ctx, S - k, -E, S, S + E);
+  if (!(n & RS)) rectUV(ctx, -E, S - k, S + E, S);
+  if (!(n & RW)) rectUV(ctx, 0, -E, k, S + E);
   if ((n & (RN | RE)) === (RN | RE) && !(m & DNE)) rectUV(ctx, S - k, 0, S, k);
   if ((n & (RE | RS)) === (RE | RS) && !(m & DSE)) rectUV(ctx, S - k, S - k, S, S);
   if ((n & (RS | RW)) === (RS | RW) && !(m & DSW)) rectUV(ctx, 0, S - k, k, S);
@@ -427,14 +431,178 @@ function roadMarks(ctx, m, S) {
   else if (n === RE) dashU(S - 22);
 }
 
-// Zwischenspeicher der Straßenpfade (eine Partie, eine Ansicht)
-const cache = { key: '', game: null, relief: null, paths: null };
+// ---------- Bordstein, Rinne, Kanaldeckel, Gullys, Bahnübergänge (seit v5.31) ----------
+
+const KW = 1.7; // Bordstein (im Gehweg)
+const RAIL_GAUGE = 11.2; // halbe Spurweite, wie ways.js
+
+/** Bordstein und Rinne entlang einer achsparallelen Gehwegkante (u0, v0) – (u1, v1); (nu, nv) zeigt zur Fahrbahn. */
+function kerbEdge(kerb, gutter, gw, u0, v0, u1, v1, nu, nv) {
+  if (v0 === v1) {
+    const a = Math.min(u0, u1);
+    const b = Math.max(u0, u1);
+    rectUV(kerb, a, Math.min(v0, v0 - nv * KW), b, Math.max(v0, v0 - nv * KW));
+    rectUV(gutter, a, Math.min(v0, v0 + nv * gw), b, Math.max(v0, v0 + nv * gw));
+  } else {
+    const a = Math.min(v0, v1);
+    const b = Math.max(v0, v1);
+    rectUV(kerb, Math.min(u0, u0 - nu * KW), a, Math.max(u0, u0 - nu * KW), b);
+    rectUV(gutter, Math.min(u0, u0 + nu * gw), a, Math.max(u0, u0 + nu * gw), b);
+  }
+}
+
+/** Viertelring um die Kurvenecke (cu, cv) zwischen den Radien r0 und r1. */
+function arcBand(ctx, cu, cv, su, sv, r0, r1) {
+  const steps = 8;
+  for (let j = 0; j <= steps; j++) {
+    const a = (j / steps) * Math.PI * 0.5;
+    vtx(ctx, cu + su * r1 * Math.cos(a), cv + sv * r1 * Math.sin(a), !j);
+  }
+  for (let j = steps; j >= 0; j--) {
+    const a = (j / steps) * Math.PI * 0.5;
+    vtx(ctx, cu + su * r0 * Math.cos(a), cv + sv * r0 * Math.sin(a));
+  }
+  ctx.closePath();
+}
+
+/** Bordstein (heller Streifen an der Gehwegkante) und Rinne (dunkel, im Winter Schneewall) einer Straßenzelle. */
+function roadKerb(kerb, gutter, m, S, gw) {
+  const k = ROAD.kerb;
+  const n = m & 15;
+  const cc = curveCorner(n, S);
+  if (cc) {
+    const [cu, cv, su, sv] = cc;
+    const R = S - k;
+    arcBand(kerb, cu, cv, su, sv, R, R + KW);
+    arcBand(gutter, cu, cv, su, sv, R - gw, R);
+    const diag = n === (RN | RE) ? DNE : n === (RE | RS) ? DSE : n === (RS | RW) ? DSW : DNW;
+    if (!(m & diag)) {
+      const eu = cu + su * k;
+      const ev = cv + sv * k;
+      kerbEdge(kerb, gutter, gw, eu, cv, eu, ev, su, 0);
+      kerbEdge(kerb, gutter, gw, cu, ev, eu, ev, 0, sv);
+    }
+    return;
+  }
+  const uA = n & RW ? 0 : k;
+  const uB = n & RE ? S : S - k;
+  const vA = n & RN ? 0 : k;
+  const vB = n & RS ? S : S - k;
+  if (!(n & RN)) kerbEdge(kerb, gutter, gw, uA, k, uB, k, 0, 1);
+  if (!(n & RS)) kerbEdge(kerb, gutter, gw, uA, S - k, uB, S - k, 0, -1);
+  if (!(n & RW)) kerbEdge(kerb, gutter, gw, k, vA, k, vB, 1, 0);
+  if (!(n & RE)) kerbEdge(kerb, gutter, gw, S - k, vA, S - k, vB, -1, 0);
+  // Ecken der Nachbarblöcke, wenn zwei Seiten anschließen und die Diagonale keine Straße ist
+  if ((n & (RN | RE)) === (RN | RE) && !(m & DNE)) {
+    kerbEdge(kerb, gutter, gw, S - k, 0, S - k, k, -1, 0);
+    kerbEdge(kerb, gutter, gw, S - k, k, S, k, 0, 1);
+  }
+  if ((n & (RE | RS)) === (RE | RS) && !(m & DSE)) {
+    kerbEdge(kerb, gutter, gw, S - k, S - k, S - k, S, -1, 0);
+    kerbEdge(kerb, gutter, gw, S - k, S - k, S, S - k, 0, -1);
+  }
+  if ((n & (RS | RW)) === (RS | RW) && !(m & DSW)) {
+    kerbEdge(kerb, gutter, gw, k, S - k, k, S, 1, 0);
+    kerbEdge(kerb, gutter, gw, 0, S - k, k, S - k, 0, -1);
+  }
+  if ((n & (RW | RN)) === (RW | RN) && !(m & DNW)) {
+    kerbEdge(kerb, gutter, gw, k, 0, k, k, 1, 0);
+    kerbEdge(kerb, gutter, gw, 0, k, k, k, 0, 1);
+  }
+}
+
+/** Kreis (Vieleck) um (u, v) in der aktuellen Zelle. */
+function circleUV(ctx, u, v, r) {
+  for (let j = 0; j < 10; j++) {
+    const a = -(j / 10) * Math.PI * 2;
+    vtx(ctx, u + Math.cos(a) * r, v + Math.sin(a) * r, !j);
+  }
+  ctx.closePath();
+}
+
+/** Kanaldeckel in der Fahrspur und Gullys an der Rinne, fest je Zelle (nur auf geraden Stücken ohne Zebrastreifen). */
+function roadDetail(rim, lid, drain, m, S, col, row) {
+  const n = m & 15;
+  const vert = n === (RN | RS);
+  const hori = n === (RE | RW);
+  if (!vert && !hori) return;
+  const h = (Math.imul(col, 73856093) ^ Math.imul(row, 19349663)) >>> 0;
+  if (h % 5 === 0 && !(m & (ZN | ZS | ZE | ZW))) {
+    const a = S * (0.3 + ((h >>> 5) % 5) * 0.1);
+    const b = S / 2 + ((h >>> 3) % 2 ? 13 : -13);
+    const [u, v] = vert ? [b, a] : [a, b];
+    circleUV(rim, u, v, 2.6);
+    circleUV(lid, u, v, 2.0);
+  }
+  if (h % 3 === 1) {
+    const k = ROAD.kerb;
+    const a = S * (0.4 + ((h >>> 7) % 3) * 0.1);
+    const near = (h >>> 9) % 2 === 0;
+    const q0 = near ? k + 0.3 : S - k - 2.6;
+    if (vert) rectUV(drain, q0, a - 1.7, q0 + 2.3, a + 1.7);
+    else rectUV(drain, a - 1.7, q0, a + 1.7, q0 + 2.3);
+  }
+}
+
+/** Bahnübergang: wo ein Gleis die Zelle kreuzt, Betonplatten zwischen den Schienen und die Schienen selbst über der Fahrbahn. */
+function railCross(panel, rail, railTop, rails, x0, y0, S) {
+  for (const r of rails) {
+    const dx = r.x2 - r.x1;
+    const dy = r.y2 - r.y1;
+    const L = Math.hypot(dx, dy);
+    if (L < 1) continue;
+    // Strecke des Gleises in der Zelle (Liang-Barsky)
+    let t0 = 0;
+    let t1 = 1;
+    const clip = (p, q) => {
+      if (Math.abs(p) < 1e-9) return q >= 0;
+      const t = q / p;
+      if (p < 0) {
+        if (t > t1) return false;
+        if (t > t0) t0 = t;
+      } else {
+        if (t < t0) return false;
+        if (t < t1) t1 = t;
+      }
+      return true;
+    };
+    if (!(clip(-dx, r.x1 - x0) && clip(dx, x0 + S - r.x1) && clip(-dy, r.y1 - y0) && clip(dy, y0 + S - r.y1)) || t1 - t0 < 1e-6) continue;
+    const ux = dx / L;
+    const uy = dy / L;
+    const nx = -uy;
+    const ny = ux;
+    const strip = (ctx, s0, s1, lo, hi) => {
+      const pts = [[s0, hi], [s1, hi], [s1, lo], [s0, lo]];
+      pts.forEach(([s, o], j) => vtx(ctx, r.x1 + ux * s + nx * o - x0, r.y1 + uy * s + ny * o - y0, !j));
+      ctx.closePath();
+    };
+    const s0 = t0 * L;
+    const s1 = t1 * L;
+    strip(panel, s0, s1, -RAIL_GAUGE - 3.5, RAIL_GAUGE + 3.5);
+    for (const side of [-1, 1]) {
+      strip(rail, s0, s1, side * RAIL_GAUGE - 1.15, side * RAIL_GAUGE + 1.15);
+      strip(railTop, s0, s1, side * RAIL_GAUGE - 0.75, side * RAIL_GAUGE - 0.05);
+    }
+  }
+}
+
+// Zwischenspeicher der Straßenpfade (eine Partie, eine Ansicht), in Kacheln zu 16 × 16 Zellen
+const cache = { key: '', game: null, relief: null, chunks: null };
+const RCHUNK = 16;
+
+const STREET_COL = {
+  summer: { kerb: '#cbc8be', gutter: 'rgba(18,18,16,0.3)', rim: '#2c2e2b', lid: '#595b56', drain: '#1f211e', panel: '#878883', rail: '#3e4043', railTop: '#d6d9db', mark: ROAD.mark, gw: 1.4 },
+  autumn: { kerb: '#c3c0b6', gutter: 'rgba(92,52,20,0.42)', rim: '#2c2e2b', lid: '#555752', drain: '#1f211e', panel: '#82837e', rail: '#433f3c', railTop: '#c9c8c4', mark: ROAD.mark, gw: 1.8 },
+  winter: { kerb: '#edf0f2', gutter: 'rgba(238,242,245,0.95)', rim: '#3a3c3a', lid: '#6c6f6c', drain: '#2b2d2b', panel: '#8f918d', rail: '#3f4144', railTop: '#eef0f2', mark: 'rgba(240,238,226,0.66)', gw: 3.2 },
+};
+const STREET_ORDER = ['asphalt', 'panel', 'gutter', 'walk', 'kerb', 'mark', 'rim', 'lid', 'drain', 'rail', 'railTop'];
 
 /**
- * Alle sichtbaren Straßen (eigene immer, fremde wo erkundet): Asphalt, Gehweg, Markierung als je ein Pfad.
- * Flach (2D und Iso ohne Gelände) in Weltkoordinaten unter der Welt-Transformation. Mit Gelände in Koordinaten
- * „Weltpunkt durch die Iso-Drehung bei Zoom 1, minus Geländehöhe“: Bildschirm = Ursprung + Zoom · Punkt, also nur
- * eine Transformation je Bild, solange die Drehung gleich bleibt.
+ * Alle sichtbaren Straßen (eigene immer, fremde wo erkundet): Asphalt, Gehweg mit Bordstein, Markierung, Kanaldeckel, Gullys und
+ * Bahnübergänge, je Ebene ein Pfad je Kachel; gefüllt werden nur die Kacheln im Bild. Flach (2D und Iso ohne Gelände) in
+ * Weltkoordinaten unter der Welt-Transformation. Mit Gelände in Koordinaten „Weltpunkt durch die Iso-Drehung bei Zoom 1, minus
+ * Geländehöhe“: Bildschirm = Ursprung + Zoom · Punkt, also nur eine Transformation je Bild, solange die Drehung gleich bleibt.
+ * Asphalt und Gehwegplatten als Muster (ways.js), ganz weit weg einfarbig.
  */
 function drawRoads(ren, ctx, team, known) {
   const g = ren.game;
@@ -470,24 +638,51 @@ function drawRoads(ren, ctx, team, known) {
       if (vis) n++;
     }
   }
-  if (!n) return;
+  if (!n || typeof Path2D === 'undefined') return;
+  const season = ren.season ?? 'summer';
   const view = drape ? `${u1x.toFixed(5)},${u1y.toFixed(5)},${u2x.toFixed(5)},${u2y.toFixed(5)}` : 'flat';
-  const key = `${h}|${n}|${view}`;
+  const key = `${h}|${n}|${view}|${season}`;
   if (key !== cache.key || cache.game !== g || cache.relief !== (drape ? cam.relief : null)) {
     cache.key = key;
     cache.game = g;
     cache.relief = drape ? cam.relief : null;
-    cache.paths = buildRoads(g, roadView(g, team, known), drape ? cam.relief : null, u1x, u1y, u2x, u2y);
+    cache.chunks = buildRoads(g, roadView(g, team, known), drape ? cam.relief : null, u1x, u1y, u2x, u2y, season);
   }
+  const S = g.roads?.cell ?? CITY.cell;
+  const span = RCHUNK * S;
+  const R = cam.visibleRect();
+  const shown = [];
+  for (const c of cache.chunks.values()) {
+    const x0 = c.cx * span;
+    const y0 = c.cy * span;
+    if (x0 > R.x1 + 64 || y0 > R.y1 + 64 || x0 + span < R.x0 - 64 || y0 + span < R.y0 - 64) continue;
+    shown.push(c);
+  }
+  if (!shown.length) return;
   ctx.save();
   if (drape) ctx.setTransform(ren.dpr * z, 0, 0, ren.dpr * z, ren.dpr * ax, ren.dpr * ay);
-  const [asphalt, walk, mark] = cache.paths;
-  ctx.fillStyle = ROAD.asphalt;
-  ctx.fill(asphalt);
-  ctx.fillStyle = ROAD.walk;
-  ctx.fill(walk);
-  ctx.fillStyle = ROAD.mark;
-  ctx.fill(mark);
+  const C = STREET_COL[season] ?? STREET_COL.summer;
+  const mat = z >= 0.5 ? patternMatrix(drape ? [u1x, u1y, u2x, u2y] : null) : null;
+  const fill = (layer) => {
+    if (layer === 'asphalt' || layer === 'walk') {
+      const pat = mat ? groundPattern(ctx, layer === 'walk' ? 'pavers' : 'asphalt', season) : null;
+      if (pat) {
+        if (pat.setTransform) pat.setTransform(mat);
+        return pat;
+      }
+      return layer === 'walk' ? (season === 'winter' ? '#c7cbcc' : ROAD.walk) : ROAD.asphalt;
+    }
+    return C[layer];
+  };
+  const fine = z >= 0.45; // Kleinteile nur nah genug
+  for (const layer of STREET_ORDER) {
+    if (!fine && (layer === 'rim' || layer === 'lid' || layer === 'drain' || layer === 'kerb' || layer === 'railTop')) continue;
+    ctx.fillStyle = fill(layer);
+    for (const c of shown) {
+      const p = c.p[layer];
+      if (p) ctx.fill(p);
+    }
+  }
   ctx.restore();
 }
 
@@ -513,11 +708,14 @@ function roadView(g, team, known) {
   return { cols, rows, cell: S, kind };
 }
 
-/** Die drei Straßenpfade neu bauen (relief gesetzt: Pfadkoordinaten mit Gelände, siehe drawRoads). Brücken zeichnet bridge.js. */
-function buildRoads(g, v, relief, u1x, u1y, u2x, u2y) {
-  const paths = [new Path2D(), new Path2D(), new Path2D()];
+/** Pfade der Straßen je Kachel neu bauen (relief gesetzt: Pfadkoordinaten mit Gelände, siehe drawRoads). Brücken zeichnet bridge.js. */
+function buildRoads(g, v, relief, u1x, u1y, u2x, u2y, season) {
+  const chunks = new Map();
   qDrape = !!relief;
   const S = v.cell;
+  const E = 0.6; // Flächen ragen etwas über die Zelle (keine Nähte zwischen den Kacheln)
+  const gw = (STREET_COL[season] ?? STREET_COL.summer).gw;
+  const rails = railList(g.map.town);
   for (let i = 0; i < v.kind.length; i++) {
     if (!v.kind[i] || v.kind[i] === 2) continue;
     const col = i % v.cols;
@@ -536,12 +734,21 @@ function buildRoads(g, v, relief, u1x, u1y, u2x, u2y) {
         Q[k + 1] = x * u1y + y * u2y - relief.displayAt(x, y);
       }
     }
+    const cx = Math.floor(col / RCHUNK);
+    const cy = Math.floor(row / RCHUNK);
+    const ck = `${cx},${cy}`;
+    let ch = chunks.get(ck);
+    if (!ch) chunks.set(ck, (ch = { cx, cy, p: {} }));
+    const P = (name) => (ch.p[name] ??= new Path2D());
     const m = roadMask(v, col, row);
-    rectUV(paths[0], 0, 0, S, S);
-    roadWalk(paths[1], m, S);
-    roadMarks(paths[2], m, S);
+    rectUV(P('asphalt'), -E, -E, S + E, S + E);
+    roadWalk(P('walk'), m, S, E);
+    roadKerb(P('kerb'), P('gutter'), m, S, gw);
+    roadMarks(P('mark'), m, S);
+    roadDetail(P('rim'), P('lid'), P('drain'), m, S, col, row);
+    if (rails.length) railCross(P('panel'), P('rail'), P('railTop'), rails, x0, y0, S);
   }
-  return paths;
+  return chunks;
 }
 
 /** Kreis auf dem Boden (mit Gelände in Bildschirmkoordinaten). */
