@@ -32,8 +32,14 @@ function makeCanvas(w, h) {
   return null; // Node-Tests: kein Canvas, der Aufrufer malt dann direkt
 }
 
-/** Zu Beginn jedes Bilds aufrufen (Renderer): setzt das Zeitbudget zurück und räumt alte Bilder weg. */
-export function spriteFrame() {
+let ratio = 1;
+
+/** Gerätepixel je CSS-Pixel des laufenden Bilds (für den Maßstab der Bilder). */
+export const spriteDpr = () => ratio;
+
+/** Zu Beginn jedes Bilds aufrufen (Renderer): merkt die Gerätepixel, setzt das Zeitbudget zurück und räumt alte Bilder weg. */
+export function spriteFrame(r = 1) {
+  ratio = r || 1;
   now = clock();
   spent = 0;
   if (now - lastSweep < 2000) return;

@@ -274,7 +274,7 @@ export function drawBench(ctx, cam, b) {
 /** Gebäude der Stadt (Haus, Halle, Fabrik) mit Fenstern, Türen, Toren, Balkonen und Dachaufbauten. */
 export function drawTownBuilding(ctx, cam, b, season = 'summer') {
   if (b.kind === 'bigpart') {
-    drawBigBody(ctx, cam, b, season); // Körper eines Großbaus (Kraftwerk, Kaserne, Fabrikhalle, Flughafen; bigbuild.js)
+    drawBigBody(ctx, cam, b, season); // Körper eines Großbaus (Kaserne, Fabrikhalle, Flughafen; bigbuild.js)
     return;
   }
   if (b.kind === 'uni') {
@@ -282,7 +282,7 @@ export function drawTownBuilding(ctx, cam, b, season = 'summer') {
     return;
   }
   if (WORKS_KINDS.includes(b.kind)) {
-    drawWorksIso(ctx, cam, b); // 2 × 2-Werke (seit v5.08), für jede Drehung dasselbe Bild (works.js)
+    drawWorksIso(ctx, cam, b, season); // 2 × 2-Werke und Kraftwerk, für jede Drehung dasselbe Bild (works.js)
     return;
   }
   if (b.kind === 'town') {

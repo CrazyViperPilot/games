@@ -679,7 +679,7 @@ export function drawCityTop(ren, ctx, team, known, inRect) {
     }
     if (big) {
       const b = { x: ctr.x, y: ctr.y, kind: k, level: lv, color, damage: e ? 1 - e.hp / e.def.hp : 0 };
-      if (WORKS_KINDS.includes(k)) drawWorksTop(ctx, b); // 2 × 2-Werke (seit v5.08)
+      if (WORKS_KINDS.includes(k)) drawWorksTop(ctx, b, ren.camera.zoom); // 2 × 2-Werke und Kraftwerk (works.js)
       else drawUniversityTop(ctx, b);
       continue;
     }
