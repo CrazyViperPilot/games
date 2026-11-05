@@ -352,3 +352,26 @@ test('Stellplatz: Ausbau nur per Befehl, Stufe 2 Geld + BM, Stufe 3 auch Stahl; 
   const other = [...c.ents.values()].find((e) => e.alive && KINDS[c.kind[e.cityCell] - 1] === 'atc');
   assert.equal(g.issue(0, { type: 'cityUpgrade', buildingId: other.id }).ok, false);
 });
+
+test('F-16: zwei Luft-Luft-Raketen nur gegen Luftziele, zwei Luft-Boden-Raketen gegen Panzer, beide zugleich', () => {
+  const g = new Game({ seed: 3, city: true });
+  const [aim, agm] = UNITS.f16.weapons;
+  assert.deepEqual([aim.id, aim.rounds, agm.id, agm.rounds], ['aim', 2, 'agm', 2]);
+  assert.ok(!aim.damage.heavy && !aim.damage.light && aim.damage.air > 0, 'Luft-Luft nur gegen Luftziele');
+  assert.ok(agm.damage.heavy > 0 && !agm.damage.air, 'Luft-Boden nur gegen Bodenziele');
+  const z = g.zone;
+  const u = g.spawnUnit('f16', 0, z.x - 300, z.y);
+  u.jet = { home: 0, ready: true, phase: 'air', alt: 1 };
+  const heli = g.spawnUnit('gunship', 1, z.x, z.y);
+  const tank = g.spawnUnit('tank', 1, z.x + 120, z.y);
+  heli.hp = tank.hp = 1e6;
+  g.fog[0].revealAll?.();
+  assert.ok(g.issue(0, { type: 'attackMove', ids: [u.id], x: z.x, y: z.y }).ok);
+  for (let t = 0; t < 30 && (u.weapons[0].rounds > 0 || u.weapons[1].rounds > 0); t++) {
+    run(g, 1);
+    g.fog[0].revealAll?.();
+  }
+  assert.equal(u.weapons[0].rounds, 0, 'Luft-Luft verschossen');
+  assert.equal(u.weapons[1].rounds, 0, 'Luft-Boden verschossen');
+  assert.ok(heli.hp < 1e6 && tank.hp < 1e6, 'Hubschrauber und Panzer getroffen');
+});

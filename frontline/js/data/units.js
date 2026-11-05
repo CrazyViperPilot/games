@@ -313,8 +313,12 @@ export const UNITS = {
     speed: 420,
     radius: 14,
     sight: 560,
+    // Seit v5.41 zwei Waffen, die unabhängig feuern (parallel): Luft-Luft-Lenkraketen nur gegen Hubschrauber und Flugzeuge,
+    // Luft-Boden-Raketen gegen gepanzerte Fahrzeuge (bevorzugt) und Gebäude. Leer geschossen (alle vier) fliegt sie heim.
+    parallel: true,
     weapons: [
-      { id: 'aim', name: 'Lenkrakete', range: 640, cooldown: 2.5, rounds: 2, munCost: 150, hitChance: 0.92, damage: { inf: 160, light: 650, heavy: 1150, struct: 700, air: 700 } },
+      { id: 'aim', name: 'Luft-Luft-Lenkrakete', range: 640, cooldown: 2.5, rounds: 2, munCost: 150, hitChance: 0.92, targets: ['air'], damage: { air: 700 } },
+      { id: 'agm', name: 'Luft-Boden-Rakete', range: 600, cooldown: 2.5, rounds: 2, munCost: 150, hitChance: 0.92, targets: ['heavy', 'light'], damage: { inf: 160, light: 650, heavy: 1150, struct: 700 } },
     ],
     cost: { money: 1400 },
     buildTime: 40,

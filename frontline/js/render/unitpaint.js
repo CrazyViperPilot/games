@@ -752,6 +752,9 @@ function transporter(P) {
 
 function f16(P, o) {
   const S = [];
+  const ms = o.missiles ?? 22;
+  const aim = ms % 10; // Luft-Luft-Lenkraketen an den Flügelspitzen
+  const agm = Math.floor(ms / 10); // Luft-Boden-Raketen unter den Flügeln (seit v5.41)
   const body = mix(P.air, '#9aa3a8', 0.5);
   const dark = mix(body, '#000000', 0.25);
   S.push(cyl([-15, 0, 4.2], [9, 0, 4.2], 2.2, 2.3, 10, body)); // Rumpf
@@ -763,7 +766,13 @@ function f16(P, o) {
   for (const side of [-1, 1]) {
     S.push(prZ([[5, 0], [-6, side * 13], [-9, side * 13], [-9.5, 0]].map(([x, y]) => [x, y + side * 1.6]), 3.6, 4.1, body)); // Flügel
     S.push(prZ([[-10.5, side * 1.6], [-15, side * 7.2], [-17.2, side * 7.2], [-17, side * 1.6]], 3.5, 3.9, body)); // Höhenleitwerk
-    if ((o.missiles ?? 2) >= (side < 0 ? 1 : 2)) {
+    if (agm >= (side < 0 ? 1 : 2)) {
+      S.push(cyl([-3.8, side * 8.2, 3.45], [-3.8, side * 8.2, 2.5], 0.35, 0.35, 4, METAL)); // Pylon
+      S.push(cyl([-6.5, side * 8.2, 2.1], [2.2, side * 8.2, 2.1], 0.85, 0.85, 8, '#8d917c')); // Luft-Boden-Rakete
+      S.push(cyl([2.2, side * 8.2, 2.1], [3.4, side * 8.2, 2.1], 0.85, 0.15, 8, '#3a3e40')); // Suchkopf
+      S.push(fine(box(-6.4, -5, side * 8.2 - 1.6, side * 8.2 + 1.6, 2.05, 2.15, '#6f735f', { noLine: true }))); // Leitwerk
+    }
+    if (aim >= (side < 0 ? 1 : 2)) {
       S.push(cyl([-9.5, side * 14.9, 3.85], [-1.5, side * 14.9, 3.85], 0.5, 0.5, 6, WHITE)); // Lenkrakete an der Flügelspitze
       S.push(cyl([-1.5, side * 14.9, 3.85], [0, side * 14.9, 3.85], 0.5, 0.05, 6, '#7d8288'));
       S.push(fine(box(-9.5, -8, side * 14.9 - 1.3, side * 14.9 + 1.3, 3.8, 3.9, '#9aa0a6', { noLine: true })));
@@ -910,9 +919,14 @@ function nearKeys(make, sec, n) {
 function lookOf(u, now) {
   if (INFANTRY[u.type]) return { frame: (u.speedNow ?? 0) > 3 ? 1 + (Math.floor(now / 140 + u.id * 0.37) % 4) : 0 };
   if (u.type === 'f16') {
-    let m = 0;
-    for (const w of u.weapons ?? []) m += Math.min(2, w.rounds | 0);
-    return { missiles: Math.min(2, m), gear: jetGrounded(u) };
+    // missiles = Luft-Luft-Raketen + 10 × Luft-Boden-Raketen (je 0 … 2), seit v5.41
+    let aim = 0;
+    let agm = 0;
+    for (const w of u.weapons ?? []) {
+      if (w.spec?.id === 'agm' || w.id === 'agm') agm += Math.min(2, w.rounds | 0);
+      else aim += Math.min(2, w.rounds | 0);
+    }
+    return { missiles: Math.min(2, aim) + 10 * Math.min(2, agm), gear: jetGrounded(u) };
   }
   return {};
 }
