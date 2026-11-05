@@ -1161,6 +1161,36 @@ export function drawWreckIso(ctx, cam, w, p) {
   return true;
 }
 
+/**
+ * Wrack von oben (2D, seit v5.34): dasselbe verkohlte Modell wie in Iso, gedreht wie das Fahrzeug beim Abschuss, mit Schatten.
+ * a = Deckkraft (Verblassen). false = kein Modell (dann die einfache Form aus fx.js).
+ */
+export function drawWreckTop(ctx, w, zoom, a = 1) {
+  const wk = wreckOf(w.type);
+  if (!wk) return false;
+  const sc = zoom * spriteDpr();
+  const bnd = boundsOf(wk, wk.solids, 0, false);
+  const e = sprite(`uwo|${w.type}`, sc, bnd, (c, s) => paintSolids(c, wk.solids, 0, { iso: false, s, charred: true }));
+  if (!e) return false;
+  const sh = sprite(`uwo|${w.type}|sh`, sc, bnd, (c, s) => paintSolids(c, wk.solids, 0, { iso: false, s, shadow: true }));
+  const ang = w.angle ?? 0;
+  ctx.save();
+  ctx.translate(w.x, w.y);
+  if (sh) {
+    ctx.save();
+    ctx.translate(1.6, 2);
+    ctx.rotate(ang);
+    ctx.globalAlpha = 0.3 * a;
+    blit(ctx, sh, 0, 0, 1);
+    ctx.restore();
+  }
+  ctx.rotate(ang);
+  ctx.globalAlpha = a;
+  blit(ctx, e, 0, 0, 1);
+  ctx.restore();
+  return true;
+}
+
 const shifted = new WeakMap();
 function shift(so, dx) {
   let s = shifted.get(so);

@@ -78,6 +78,7 @@ const ASSETS = [
   './js/render/unitpaint.js',
   './js/render/nature.js',
   './js/render/ways.js',
+  './js/render/fx.js',
   './js/render/isokit.js',
   './js/render/milbuild.js',
   './js/render/airport.js',

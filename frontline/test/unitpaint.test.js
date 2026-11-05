@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { UNITS } from '../js/data/units.js';
-import { unitModel, unitModelTypes, drawUnitIso, drawUnitTop, drawWreckIso } from '../js/render/unitpaint.js';
+import { unitModel, unitModelTypes, drawUnitIso, drawUnitTop, drawWreckIso, drawWreckTop } from '../js/render/unitpaint.js';
 
 function checkSolids(name, solids) {
   assert.ok(solids.length > 0, `${name}: keine Körper`);
@@ -55,5 +55,7 @@ test('ohne Canvas zeichnen die Funktionen nichts und melden false', () => {
   assert.equal(drawUnitIso({}, cam, u, { x: 0, y: 0 }), false);
   assert.equal(drawUnitTop({}, u, 1), false);
   assert.equal(drawWreckIso({}, cam, { type: 'tank', angle: 0 }, { x: 0, y: 0 }), false);
+  assert.equal(drawWreckTop({}, { type: 'tank', angle: 0, x: 0, y: 0 }, 1), false);
+  assert.equal(drawWreckTop({}, { type: 'rifleman', angle: 0, x: 0, y: 0 }, 1), false);
   assert.equal(drawUnitIso({}, cam, { ...u, type: 'unbekannt' }, { x: 0, y: 0 }), false);
 });

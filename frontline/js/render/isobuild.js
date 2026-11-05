@@ -714,11 +714,14 @@ function roofCross(ctx, cam, x, y, H, a, t, color) {
   quad(x - t, y - a, x + t, y + a);
 }
 
+/**
+ * Trümmer isometrisch (seit v5.34): unregelmäßiger Schuttboden, Schutthügel mit Licht von links und Brocken darauf, eine stehende,
+ * stufig abgebrochene Mauerecke, verstreute Platten und Balken. b: { x, y, w, h, kind, hgt }; burnt = ausgebranntes Teamgebäude
+ * (verkohlt, mit Stahlträger), sonst eingestürztes Stadthaus bzw. Mauer in seinen Wandfarben.
+ */
 export function drawRubble(ctx, cam, b, burnt = false) {
-  const hw = b.w / 2;
-  const hh = b.h / 2;
-  const x0 = b.x - hw;
-  const y0 = b.y - hh;
+  const x0 = b.x - b.w / 2;
+  const y0 = b.y - b.h / 2;
   const seed0 = hash(b.x, b.y);
   let seed = seed0 || 1;
   const rnd = () => (seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 4294967296;
@@ -727,29 +730,131 @@ export function drawRubble(ctx, cam, b, burnt = false) {
   else if (b.kind === 'hall') wall = HALL_WALLS[seed0 % HALL_WALLS.length];
   else if (b.kind === 'station') wall = '#cdbb98';
   else wall = FACT_WALLS[seed0 % FACT_WALLS.length];
-  if (burnt) wall = '#4d4842'; // ausgebranntes Teamgebäude: verkohlt
-  drawBox(ctx, cam, x0 + 2, y0 + 2, x0 + b.w - 2, y0 + b.h - 2, 4, burnt ? '#3a3632' : '#6f6a62', { roof: burnt ? '#45403a' : '#857f75', noShadow: true });
+  if (burnt) wall = '#69635a'; // ausgebranntes Teamgebäude: verrußter Beton
   const H = b.hgt ?? (TOWN_H[b.kind] || 40);
+  const small = b.kind === 'wall';
+  // Schuttboden mit unregelmäßigem Rand
+  const edge = () => 1 + rnd() * 4;
+  const rim = [];
+  for (let i = 0; i < 8; i++) rim.push([x0 + (b.w * i) / 8, y0 + edge()]);
+  for (let i = 0; i < 8; i++) rim.push([x0 + b.w - edge(), y0 + (b.h * i) / 8]);
+  for (let i = 8; i > 0; i--) rim.push([x0 + (b.w * i) / 8, y0 + b.h - edge()]);
+  for (let i = 8; i > 0; i--) rim.push([x0 + edge(), y0 + (b.h * i) / 8]);
+  ctx.fillStyle = burnt ? '#2f2b27' : small ? '#77736b' : '#857e72';
+  ctx.beginPath();
+  rim.forEach(([x, y], i) => {
+    const p = cam.worldToScreen(x, y);
+    if (i) ctx.lineTo(p.x, p.y);
+    else ctx.moveTo(p.x, p.y);
+  });
+  ctx.closePath();
+  ctx.fill();
   const pieces = [];
-  // Mauerrest: eine Ecke steht noch (zwei kurze Wandstücke)
-  const ex = rnd() < 0.5 ? x0 : x0 + b.w;
-  const ey = rnd() < 0.5 ? y0 : y0 + b.h;
-  const sx = ex === x0 ? 1 : -1;
-  const sy = ey === y0 ? 1 : -1;
-  const lx = b.w * (0.3 + rnd() * 0.25);
-  const ly = b.h * (0.3 + rnd() * 0.25);
-  pieces.push({ x0: Math.min(ex, ex + sx * lx), y0: Math.min(ey, ey + sy * 8), x1: Math.max(ex, ex + sx * lx), y1: Math.max(ey, ey + sy * 8), h: H * 0.5, c: wall });
-  pieces.push({ x0: Math.min(ex, ex + sx * 8), y0: Math.min(ey, ey + sy * ly), x1: Math.max(ex, ex + sx * 8), y1: Math.max(ey, ey + sy * ly), h: H * 0.35, c: shade(wall, 0.15) });
-  const n = Math.max(6, Math.min(26, Math.round((b.w * b.h) / 700)));
-  const grays = burnt ? ['#5a554e', '#47423c', '#6d675e', '#2a2724', '#7a5a3a'] : ['#8d877c', '#79736a', '#9a9387', '#6b655d', wall];
-  for (let i = 0; i < n; i++) {
-    const s = 5 + rnd() * 10;
-    const px = x0 + 6 + rnd() * (b.w - 12 - s);
-    const py = y0 + 6 + rnd() * (b.h - 12 - s);
-    pieces.push({ x0: px, y0: py, x1: px + s, y1: py + s * (0.6 + rnd() * 0.8), h: 3 + rnd() * 12, c: grays[i % grays.length] });
+  const grays = burnt ? ['#57524b', '#45403a', '#6a645b', '#3a3632'] : ['#a39c90', '#8f887c', '#b3aa9b', wall];
+  if (!small) {
+    // Mauerecke: zwei Wandarme, stufig abgebrochen (je Arm vier Stücke, zur Ecke hin am höchsten)
+    const ex = rnd() < 0.5 ? x0 : x0 + b.w - 6;
+    const ey = rnd() < 0.5 ? y0 : y0 + b.h - 6;
+    const sx = ex === x0 ? 1 : -1;
+    const sy = ey === y0 ? 1 : -1;
+    const lx = b.w * (0.35 + rnd() * 0.25);
+    const ly = b.h * (0.3 + rnd() * 0.25);
+    const steps = [1, 0.3 + rnd() * 0.2]; // an der Ecke hoch, außen abgebrochen
+    const cut = [0, 0.45 + rnd() * 0.2, 1];
+    for (let j = 0; j < 2; j++) {
+      const hgt = H * 0.55 * steps[j];
+      const ax = ex + (sx > 0 ? 0 : 6) + sx * lx * cut[j];
+      const bx = ex + (sx > 0 ? 0 : 6) + sx * lx * cut[j + 1];
+      pieces.push({ t: 'box', x0: Math.min(ax, bx), y0: ey, x1: Math.max(ax, bx), y1: ey + 6, h: hgt, c: wall });
+      const ay = ey + (sy > 0 ? 6 : 0) + sy * (6 + (ly - 6) * cut[j]) - sy * 6;
+      const by = ey + (sy > 0 ? 6 : 0) + sy * (6 + (ly - 6) * cut[j + 1]) - sy * 6;
+      pieces.push({ t: 'box', x0: ex, y0: Math.min(ay, by), x1: ex + 6, y1: Math.max(ay, by), h: hgt * (j ? 0.7 : 0.85), c: shade(wall, 0.12) });
+    }
+    if (burnt) pieces.push({ t: 'box', x0: b.x + b.w * (rnd() - 0.5) * 0.4, y0: b.y + b.h * (rnd() - 0.5) * 0.4, x1: 0, y1: 0, h: H * (0.45 + rnd() * 0.25), c: '#34302c', post: true }); // Stahlträger
   }
-  pieces.sort((a, c) => cam.depth((a.x0 + a.x1) / 2, (a.y0 + a.y1) / 2) - cam.depth((c.x0 + c.x1) / 2, (c.y0 + c.y1) / 2));
-  for (const p of pieces) drawBox(ctx, cam, p.x0, p.y0, p.x1, p.y1, p.h, p.c, { noShadow: p.h < 10 });
+  // Schutthügel
+  const nm = small ? 1 : Math.max(2, Math.min(6, Math.round((b.w * b.h) / 1800)));
+  for (let i = 0; i < nm; i++) {
+    const r = Math.min(b.w, b.h) * (small ? 0.42 : 0.16 + rnd() * 0.14);
+    pieces.push({ t: 'mound', x: x0 + r + rnd() * Math.max(1, b.w - 2 * r), y: y0 + r + rnd() * Math.max(1, b.h - 2 * r), r, h: Math.min(H * 0.4, r * (0.45 + rnd() * 0.35)), c: grays[i % grays.length] });
+  }
+  // Platten und Balken
+  const ns = Math.max(3, Math.min(10, Math.round((b.w * b.h) / 900)));
+  for (let i = 0; i < ns; i++) {
+    const beam = !small && i % 3 === 2;
+    pieces.push({
+      t: 'slab',
+      x: x0 + 6 + rnd() * (b.w - 12),
+      y: y0 + 6 + rnd() * (b.h - 12),
+      len: beam ? 16 + rnd() * 14 : 7 + rnd() * 10,
+      wid: beam ? 2.6 : 5 + rnd() * 5,
+      a: rnd() * Math.PI,
+      h: beam ? 2.6 : 1.4 + rnd() * 1.8,
+      c: beam ? (burnt ? '#231f1b' : '#6b5238') : grays[(i + 1) % grays.length],
+    });
+  }
+  const depth = (p) => (p.t === 'box' ? cam.depth((p.x0 + (p.post ? 0 : p.x1)) / (p.post ? 1 : 2), (p.y0 + (p.post ? 0 : p.y1)) / (p.post ? 1 : 2)) : cam.depth(p.x, p.y));
+  pieces.sort((p, q) => depth(p) - depth(q));
+  for (const p of pieces) {
+    if (p.t === 'mound') mound(ctx, cam, p.x, p.y, p.r, p.h, p.c, rnd);
+    else if (p.t === 'slab') drawRotBox(ctx, cam, p.x, p.y, p.len, p.wid, p.a, p.h, p.c, { noShadow: true });
+    else if (p.post) drawBox(ctx, cam, p.x0 - 1.5, p.y0 - 1.5, p.x0 + 1.5, p.y0 + 1.5, p.h, p.c, { noShadow: true });
+    else drawBox(ctx, cam, p.x0, p.y0, p.x1, p.y1, p.h, p.c, { noShadow: p.h < 10 });
+  }
+}
+
+/** Schutthügel (Bildschirm): Grundellipse vorn, unregelmäßige Kuppe, Licht von links, Schatten rechts, Brocken obenauf. */
+function mound(ctx, cam, x, y, r, h, col, rnd) {
+  const p = cam.worldToScreen(x, y);
+  const z = cam.zoom;
+  const R = r * z;
+  const Hh = h * z;
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.beginPath();
+  ctx.ellipse(p.x + R * 0.35, p.y + R * 0.06, R * 1.05, R * 0.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  const n = 14;
+  const top = [];
+  for (let i = 0; i <= n; i++) {
+    const u = (2 * i) / n - 1;
+    const d = Math.max(0, 1 - u * u);
+    const j = i % n ? (rnd() - 0.5) * (Hh * 0.28 + R * 0.07) : 0; // etwas kantig, nicht ganz rund
+    top.push([p.x + u * R + (i % n ? (rnd() - 0.5) * R * 0.08 : 0), p.y - (R / 2) * Math.sqrt(d) - Hh * Math.pow(d, 0.6) + j]);
+  }
+  const g = ctx.createLinearGradient(p.x - R, 0, p.x + R, 0);
+  g.addColorStop(0, tint(col, 0.12));
+  g.addColorStop(0.45, col);
+  g.addColorStop(1, shade(col, 0.45));
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(p.x - R, p.y);
+  ctx.ellipse(p.x, p.y, R, R / 2, 0, Math.PI, 0, true); // vordere Unterkante
+  for (let i = n; i >= 0; i--) ctx.lineTo(top[i][0], top[i][1]);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+  ctx.lineWidth = Math.max(0.5, 0.7 * z);
+  ctx.stroke();
+  // Brocken: kantige Vierecke auf der Kuppe, einige ragen über den Rand
+  for (let i = 0; i < 9; i++) {
+    const u = (rnd() * 2 - 1) * 0.85;
+    const d = 1 - u * u;
+    const bx = p.x + u * R;
+    const by = p.y - ((R / 2) * Math.sqrt(d) + Hh * Math.pow(d, 0.6)) * (0.2 + rnd() * 0.85);
+    const sz = (1.2 + rnd() * 2.6) * z;
+    const a = rnd() * Math.PI;
+    const c = Math.cos(a) * sz;
+    const s = Math.sin(a) * sz;
+    ctx.fillStyle = i % 3 === 0 ? tint(col, 0.35) : i % 3 === 1 ? shade(col, 0.4) : col;
+    ctx.beginPath();
+    ctx.moveTo(bx + c, by + s * 0.5);
+    ctx.lineTo(bx - s * 0.8, by + c * 0.45);
+    ctx.lineTo(bx - c, by - s * 0.5);
+    ctx.lineTo(bx + s * 0.8, by - c * 0.45);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
 }
 
 /** Fahrzeugwrack isometrisch ohne Modellbild: flache, verkohlte Wanne; Panzer und Schützenpanzer mit verdrehtem Turm. */
