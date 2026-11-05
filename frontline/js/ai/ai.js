@@ -58,6 +58,13 @@ import {
   FALLBACK_HOLD,
   ENG_NEAR,
   SUPPLY_BEHIND,
+  GEPARD_PER_AIR,
+  GEPARD_MAX,
+  AIR_MEMORY,
+  ART_SHARE,
+  ART_FROM,
+  ART_BEHIND,
+  ART_EVERY,
   SUPPLY_MIN,
   SURPLUS_MIN,
   ROUTE_HOLD,
@@ -178,6 +185,7 @@ export class AI {
     this.research(s); // vor produce: die nächste Stufe bekommt das Geld zuerst
     this.produce(s);
     this.jets(s); // Flughafen: F-16 kaufen und losschicken (seit v5.03)
+    this.artillery(s); // Panzerhaubitzen hinter der Armee in Stellung (seit v5.26)
     this.buildDefense(s);
     this.buildWall(s);
     this.fortify(s);
@@ -209,7 +217,7 @@ export class AI {
     const enemies = g.units.filter((u) => u.alive && u.team !== t && g.sees(t, u));
     this.corridor = home ? { x: home.x, y: home.y, dx: dir.x, dy: dir.y } : null;
 
-    const combat = units.filter((u) => u.def.range > 0 && !u.crate && !u.def.hero && !u.def.jet); // Kistenträger kämpfen nicht, der Kommandeur bleibt hinten, Jets führt jets()
+    const combat = units.filter((u) => u.def.range > 0 && !u.crate && !u.def.hero && !u.def.jet && !u.def.indirect); // Kistenträger kämpfen nicht, der Kommandeur bleibt hinten, Jets führt jets(), Artillerie artillery()
     // Ausbildende Gebäude: Hauptstadt, mit Stadt (seit v4.96) Kaserne, Fabrikhalle und Heliport
     const producers = own.filter((b) => b.produces.length).concat(cityTrainers(g, t));
     const queuedCombat = producers.reduce((n, b) => n + b.queue.filter((e) => UNITS[e.unit ?? e].range > 0).length, 0);
@@ -233,6 +241,7 @@ export class AI {
       enemies,
       units,
       combat,
+      artillery: units.filter((u) => u.def.indirect).sort((a, b) => a.id - b.id),
       combatN: combat.length + queuedCombat,
       commander: units.find((u) => u.def.hero) ?? null,
       trucks: units.filter((u) => u.type === 'truck').sort((a, b) => a.id - b.id),
@@ -655,6 +664,8 @@ export class AI {
 
 
     if (this.saveForScout || this.saveForRadio || this.saveForResearch || this.saveForFob) return; // Geld für Späher, Sendemast, Stufe bzw. FOB-Fahrzeug sparen
+    // Festung (seit v5.26): steht ein Turm und fehlt der Transporthubschrauber, zuerst auf ihn sparen (buyHeli in fortify kauft ihn)
+    if (!s.helis.length && !this.queued(s, 'transporter') && s.own.some((b) => b.type === 'tower' && b.built) && res.money < UNITS.transporter.cost.money + HELI_MIN_MONEY) return;
 
     const mix = this.counterMix(s);
 
@@ -700,6 +711,26 @@ export class AI {
    * viel Gepanzertes → mehr PAK und Panzer, viel Infanterie → mehr Schützen und Schützenpanzer. Sonst die Grundmischung MIX.
    */
   counterMix(s) {
+    const base = this.counterBase(s);
+    if (this.difficulty === 'easy') return base;
+    // Gepard (seit v5.26): gegen gesehene Luftfahrzeuge des Gegners (gemerkt AIR_MEMORY s), Panzerhaubitze ab ART_FROM Kampfeinheiten
+    const air = s.enemies.filter((e) => e.def.air).length;
+    if (air > 0) {
+      this.airSeen = Math.max(this.airSeen ?? 0, air);
+      this.airTime = this.game.time;
+    } else if (this.game.time - (this.airTime ?? -1e9) > AIR_MEMORY) this.airSeen = 0;
+    const gepard = Math.min(GEPARD_MAX, (this.airSeen ?? 0) * GEPARD_PER_AIR);
+    const pzh = (s.combat?.length ?? 0) >= ART_FROM ? ART_SHARE : 0;
+    if (!gepard && !pzh) return base;
+    const sum = Object.values(base).reduce((a, v) => a + v, 0);
+    const out = { ...base };
+    if (gepard) out.gepard = sum * gepard;
+    if (pzh) out.pzh = sum * pzh;
+    return out;
+  }
+
+  /** Grundmischung der Bodentruppen, gegen die gesehene Gegnerarmee angepasst (siehe counterMix). */
+  counterBase(s) {
     const foes = s.enemies.filter((e) => e.def.range > 0 && !e.def.air);
     if (!this.cfg.counter || foes.length < COUNTER_MIN) return MIX;
     const armored = foes.filter((e) => e.def.armor !== 'inf').length / foes.length;
@@ -856,7 +887,7 @@ export class AI {
     const g = this.game;
     if (s.helis.length || this.queued(s, 'transporter') || !s.own.some((b) => b.type === 'tower' && b.built)) return;
     const cost = UNITS.transporter.cost.money;
-    if (g.teams[this.team].res.money < cost + HELI_MIN_MONEY) return;
+    if (g.teams[this.team].res.money < cost) return; // gespart wird in produce (bis Preis + HELI_MIN_MONEY), seit v5.26
     const b = this.pickProducer(s, 'transporter', BALANCE.queueMax, false);
     if (b) g.issue(this.team, { type: 'train', buildingId: b.id, unit: 'transporter' });
   }
@@ -1092,6 +1123,31 @@ export class AI {
     if (!this.once(`vmv${tr.id}`, 4)) return;
     this.supplyAt.set(tr.id, p);
     g.issue(this.team, { type: 'move', ids: [tr.id], x: p.x, y: p.y });
+  }
+
+  /**
+   * Panzerhaubitzen (seit v5.26): fahren nicht mit den Wellen, sondern stehen ART_BEHIND px hinter dem Schwerpunkt der Armee
+   * (Richtung nächste eigene FOB) und schießen von dort auf alles, was das Team sieht; ohne Armee vor der Hauptstadt.
+   */
+  artillery(s) {
+    if (!s.artillery.length) return;
+    let p;
+    const pts = s.combat.filter((u) => !u.house);
+    if (pts.length) {
+      const cx = pts.reduce((a, u) => a + u.x, 0) / pts.length;
+      const cy = pts.reduce((a, u) => a + u.y, 0) / pts.length;
+      const f = this.nearestBuilt(s, cx, cy);
+      const v = f ? unitVec(f.x - cx, f.y - cy) : { x: -s.dir.x, y: -s.dir.y };
+      p = { x: cx + v.x * ART_BEHIND, y: cy + v.y * ART_BEHIND };
+    } else {
+      p = { x: s.ax + s.dir.x * ART_BEHIND, y: s.ay + s.dir.y * ART_BEHIND };
+    }
+    s.artillery.forEach((u, k) => {
+      if (u.order.type === 'attack' || u.fireTarget) return;
+      const q = this.freeNear(p.x + (k % 3) * 40 - 40, p.y + Math.floor(k / 3) * 40);
+      if (dist(u.x, u.y, q.x, q.y) <= 200 || !this.once(`art${u.id}`, ART_EVERY)) return;
+      this.game.issue(this.team, { type: 'move', ids: [u.id], x: q.x, y: q.y });
+    });
   }
 
   // ---- Armee -----------------------------------------------------------------------

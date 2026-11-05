@@ -43,6 +43,15 @@ export const FALLBACK_DIST = 1400; // Rückzugsstrecke Richtung Basis
 export const FALLBACK_HOLD = 30; // s, in denen nach einem Rückzug keine Angriffsbefehle kommen
 export const ENG_NEAR = 250; // Baufahrzeug näher an einer Baustelle: die automatische Zuweisung übernimmt
 export const SUPPLY_BEHIND = 150; // Versorger steht so weit hinter dem Schwerpunkt der Armee
+// Gepard und Panzerhaubitze (seit v5.26, nicht auf Leicht): Gepard nach gesehenen gegnerischen Luftfahrzeugen, Haubitze ab einer
+// Armee von ART_FROM Kampfeinheiten; die Haubitze fährt nicht in den Wellen mit, sondern steht ART_BEHIND px hinter der Armee
+export const GEPARD_PER_AIR = 0.04; // Zielanteil Gepard je gesehenem Hubschrauber oder Flugzeug des Gegners
+export const GEPARD_MAX = 0.2; // höchstens dieser Anteil Gepard an den Kampfeinheiten
+export const AIR_MEMORY = 120; // s, so lange merkt sich die KI gesehene Luftziele (für den Gepard)
+export const ART_SHARE = 0.06; // Zielanteil Panzerhaubitzen an den Kampfeinheiten
+export const ART_FROM = 15; // eigene Kampfeinheiten, ab denen sie Panzerhaubitzen ausbildet
+export const ART_BEHIND = 450; // px hinter dem Schwerpunkt der Armee (Richtung nächste eigene FOB)
+export const ART_EVERY = 5; // s zwischen zwei Stellungswechseln einer Haubitze
 export const SUPPLY_MIN = 0.25; // Versorger lädt nach, wenn die Ladung unter diesem Anteil liegt
 export const SURPLUS_MIN = 120; // Pendler fährt nur, wenn die Quelle so viel Überschuss hat
 export const ROUTE_HOLD = 20; // s, früheste Neuplanung einer Pendler-Route
@@ -71,7 +80,7 @@ export const FORT_BM_MIN = 250; // Baumaterial im Lager der FOB, ab dem der Ausb
 export const FORT_CREW_RANGE = 800; // ein freier Schütze geht nur in einen Turm in diesem Umkreis
 export const FORT_ROOFS = ['mortar', 'sam', 'flak']; // Reihenfolge der Dachaufbauten je Festung (mit gegnerischen Luftzielen zuerst SAM)
 export const FORT_WANT = { bm: 150, mun: 150 }; // zusätzlicher Soll-Lagerstand einer ausgebauten FOB (Nachschub für Mörser, Flak, Reparatur)
-export const HELI_MIN_MONEY = 300; // Geld, das nach dem Transporthubschrauber übrig bleiben soll (er wird erst bei einer Festung gekauft)
+export const HELI_MIN_MONEY = 300; // seit v5.26: so viel über seinem Preis spart die KI auf den Transporthubschrauber (erst bei einer Festung), keine Kampfeinheiten bis dahin; gekauft wird ab seinem Preis
 export const JET_GROUP = 2; // so viele startbereite F-16 fliegen zusammen los (seit v5.03; Zahl der Jets und Reserve: CITY.ai.jets/jetReserve)
 export const JET_EVERY = 6; // s zwischen zwei Startbefehlen an die Jets
 export const JET_QUEUE = 2; // so viele F-16 höchstens in der Warteschlange eines Flughafens

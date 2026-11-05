@@ -293,7 +293,7 @@ function woundInOrder(game, list, amount) {
 /** Feuerratenfaktor der Besatzer eines Hauses mit MG-Nest (1 sonst), siehe combat.tryFireUnit. */
 export function houseFire(game, u) {
   const h = houseOf(game, u);
-  return h && h.works.mgnest ? G.works.mgnest.fire : 1;
+  return h?.works?.mgnest ? G.works.mgnest.fire : 1; // Gefechtsturm (tower.js) hat keine Ausbauten
 }
 
 /** Tote Einheit aus ihrem Haus streichen (Game.cleanup). */
