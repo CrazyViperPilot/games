@@ -3,6 +3,7 @@
 // und Stau, es ändert nichts am Spiel. Kein DOM. Wege, Lasten und Puffer liegen in einer WeakMap je Stadt und werden nicht gespeichert
 // (sie folgen allein aus dem Stand der Stadt); gespeichert wird nur der geglättete Stau-Faktor je Zelle (c.congestion), damit ein
 // geladener Spielstand genau so weiterläuft wie das Spiel ohne Unterbrechung.
+import { laneGrid } from './roads.js';
 import { CITY } from '../data/city.js';
 import { KINDS, KIND_ID, KIND_NAME, DEPOSITS, isPart, roadAt, accessCells, cellRect } from './city.js';
 
@@ -244,9 +245,12 @@ function build(game, c, tr) {
   const capMap = CITY.transport.mapCap;
   let count = 0;
   tr.nActive = 0;
+  // Mehrspurig (seit v5.38): parallele Straßen bilden ein Band, Kapazität × Spuren je Richtung (CITY.transport.maxLanes)
+  const L = laneGrid(c.cols, c.rows, (i) => c.kind[i] === KIND_ID.road || !!c.mapRoads?.[i], CITY.transport.maxLanes);
+  tr.lanes = L.lanes;
   for (let i = 0; i < n; i++) {
     const own = c.kind[i] === KIND_ID.road;
-    tr.cap[i] = own ? capRoad : c.mapRoads?.[i] ? capMap : 0;
+    tr.cap[i] = (own ? capRoad : c.mapRoads?.[i] ? capMap : 0) * (L.lanes[i] || 1);
     if (tr.cap[i] > 0) {
       count++;
       // Liste der Zellen mit Last oder Stau neu (auch nach dem Laden eines Spielstands: Stau-Faktor < 1)

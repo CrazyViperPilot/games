@@ -10,6 +10,7 @@ import { drawUniversityTop, UNI_LAWNS } from './university.js';
 import { drawTownTop, townLift } from './townhouses.js';
 import { transportOf } from '../game/transport.js';
 import { runwaysOf } from '../game/aircraft.js';
+import { laneGrid } from '../game/roads.js';
 import { depositSprite } from './nature.js';
 import { blit, spriteDpr } from './spritecache.js';
 import { groundPattern, patternMatrix } from './ways.js';
@@ -522,6 +523,13 @@ function rectUV(ctx, u0, v0, u1, v1) {
   ctx.closePath();
 }
 
+/** Kurve nur, wenn die Diagonale zwischen den beiden Anschlüssen keine Straße ist (sonst Ecke eines breiten Bandes, seit v5.38). */
+function curveOf(m, S) {
+  const n = m & 15;
+  const diag = n === (RN | RE) ? DNE : n === (RE | RS) ? DSE : n === (RS | RW) ? DSW : n === (RW | RN) ? DNW : 0;
+  return diag && m & diag ? null : curveCorner(n, S);
+}
+
 /** Innere Ecke einer Kurve (wo beide Anschlüsse zusammenstoßen) als [u, v, Richtung u, Richtung v], sonst null. */
 function curveCorner(n, S) {
   if (n === (RN | RE)) return [S, 0, -1, 1];
@@ -535,7 +543,7 @@ function curveCorner(n, S) {
 function roadWalk(ctx, m, S, E = 0) {
   const k = ROAD.kerb;
   const n = m & 15;
-  const cc = curveCorner(n, S);
+  const cc = curveOf(m, S);
   if (cc) {
     const [cu, cv, su, sv] = cc;
     const R = S - k;
@@ -581,7 +589,7 @@ function roadMarks(ctx, m, S) {
   const n = m & 15;
   const w = ROAD.line / 2;
   const h = S / 2;
-  const cc = curveCorner(n, S);
+  const cc = curveOf(m, S);
   if (cc) {
     const [cu, cv, su, sv] = cc;
     const L = Math.PI * 0.5 * h;
@@ -617,6 +625,59 @@ function roadMarks(ctx, m, S) {
   else if (n === RS) dashV(S - 22);
   else if (n === RW) dashU(10);
   else if (n === RE) dashU(S - 22);
+}
+
+/**
+ * Markierung eines mehrspurigen Bandes (seit v5.38): width Zellen nebeneinander = width Spuren je Richtung. Doppelte durchgezogene
+ * Mittellinie in der Mitte des Bandes, gestrichelte Spurlinien dazwischen; vor einer Kreuzung (Nachbar in Fahrtrichtung gehört nicht
+ * zum selben Band) Zebrastreifen über den Teil der Fahrbahn in dieser Zelle. Zellkoordinaten u (x), v (y).
+ */
+function laneMarks(ctx, lg, view, col, row, S) {
+  const i = row * view.cols + col;
+  const H = lg.dir[i] === 1; // läuft waagrecht
+  const w = lg.width[i];
+  const k = lg.idx[i];
+  const kb = ROAD.kerb;
+  const span = w * S - 2 * kb; // Fahrbahn quer
+  const nL = 2 * w;
+  const lw = span / nL;
+  const lh = ROAD.line / 2;
+  // quer a (im Band), längs b0…b1 → Rechteck in der Zelle
+  const rect = (a0, a1, b0, b1) => {
+    const c0 = a0 - k * S;
+    const c1 = a1 - k * S;
+    if (c1 <= 0 || c0 >= S) return;
+    const p0 = Math.max(0, c0);
+    const p1 = Math.min(S, c1);
+    if (H) rectUV(ctx, b0, p0, b1, p1);
+    else rectUV(ctx, p0, b0, p1, b1);
+  };
+  // Nachbarn längs: gehören sie zum selben Band? sonst (Straße) Kreuzung: Zebrastreifen statt Linien am Rand
+  const same = (q, r) => {
+    if (q < 0 || r < 0 || q >= view.cols || r >= view.rows) return null;
+    const j = r * view.cols + q;
+    if (!view.kind[j]) return null;
+    return lg.dir[j] === lg.dir[i] && lg.width[j] === w;
+  };
+  const before = H ? same(col - 1, row) : same(col, row - 1);
+  const after = H ? same(col + 1, row) : same(col, row + 1);
+  const b0 = before === false ? 16 : 0;
+  const b1 = after === false ? S - 16 : S;
+  for (let j = 1; j < nL; j++) {
+    const a = kb + j * lw;
+    if (j === w) {
+      rect(a - 3.2 - lh, a - 3.2 + lh, b0, b1); // doppelte Mittellinie
+      rect(a + 3.2 - lh, a + 3.2 + lh, b0, b1);
+    } else {
+      for (const [d0, d1] of [[10, 22], [42, 54]]) if (d0 >= b0 && d1 <= b1) rect(a - lh, a + lh, d0, d1);
+    }
+  }
+  // Zebrastreifen vor der Kreuzung: Balken quer über die Fahrbahn dieser Zelle
+  for (const [near, flag] of [[true, before], [false, after]]) {
+    if (flag !== false) continue;
+    const z0 = near ? 2 : S - 14;
+    for (let a = kb + 2; a + 4 <= kb + span - 2; a += 9) rect(a, a + 4, z0, z0 + 12);
+  }
 }
 
 // ---------- Bordstein, Rinne, Kanaldeckel, Gullys, Bahnübergänge (seit v5.31) ----------
@@ -657,7 +718,7 @@ function arcBand(ctx, cu, cv, su, sv, r0, r1) {
 function roadKerb(kerb, gutter, m, S, gw) {
   const k = ROAD.kerb;
   const n = m & 15;
-  const cc = curveCorner(n, S);
+  const cc = curveOf(m, S);
   if (cc) {
     const [cu, cv, su, sv] = cc;
     const R = S - k;
@@ -904,6 +965,7 @@ function buildRoads(g, v, relief, u1x, u1y, u2x, u2y, season) {
   const E = 0.6; // Flächen ragen etwas über die Zelle (keine Nähte zwischen den Kacheln)
   const gw = (STREET_COL[season] ?? STREET_COL.summer).gw;
   const rails = railList(g.map.town);
+  const lg = laneGrid(v.cols, v.rows, (i) => v.kind[i] !== 0, 255); // Bänder aus parallelen Straßen (seit v5.38)
   for (let i = 0; i < v.kind.length; i++) {
     if (!v.kind[i] || v.kind[i] === 2) continue;
     const col = i % v.cols;
@@ -932,7 +994,8 @@ function buildRoads(g, v, relief, u1x, u1y, u2x, u2y, season) {
     rectUV(P('asphalt'), -E, -E, S + E, S + E);
     roadWalk(P('walk'), m, S, E);
     roadKerb(P('kerb'), P('gutter'), m, S, gw);
-    roadMarks(P('mark'), m, S);
+    if (lg.dir[i] && lg.width[i] >= 2 && lg.width[i] <= 6) laneMarks(P('mark'), lg, v, col, row, S);
+    else roadMarks(P('mark'), m, S);
     roadDetail(P('rim'), P('lid'), P('drain'), m, S, col, row);
     if (rails.length) railCross(P('panel'), P('rail'), P('railTop'), rails, x0, y0, S);
   }

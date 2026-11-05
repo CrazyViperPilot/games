@@ -99,7 +99,8 @@ export const CITY = {
   // maxDist: längster Weg in Zellen (weiter = kein Ziel); smooth: s, bis der Stau-Faktor folgt. Die Wege werden neu gerechnet, sobald sich
   // die Stadt ändert (Bau, Abriss, Wachstum, Ruinen, Flucht der Bewohner), nicht nach Zeit (seit dem Review von v5.20, vorher reroute 3 s).
   // connectMax (seit v5.20, AP4): längster neuer Anschluss an die Straße zum Lager in Zellen (Startviertel und KI, connectRoad in city.js).
-  transport: { cap: 12, mapCap: 20, commute: 0.05, maxDist: 160, smooth: 2, connectMax: 30 },
+  // maxLanes (seit v5.38): Straßen nebeneinander bilden ein mehrspuriges Band; Kapazität je Zelle × Spuren je Richtung, höchstens so viele
+  transport: { cap: 12, mapCap: 20, maxLanes: 4, commute: 0.05, maxDist: 160, smooth: 2, connectMax: 30 },
 
   // ---- Wissen (seit v4.88, Stufe 5) ----
   // Seit v5.04: ohne fertige Universität ruht jede Forschung (eine reicht, ihre Stufe zählt nicht). Rechenzentren beschleunigen sie:

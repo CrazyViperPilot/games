@@ -70,3 +70,76 @@ export function createRoads(game) {
 export function isMapRoad(game, i) {
   return !!game.roads?.kind[i];
 }
+
+/**
+ * Mehrspurige Straßen (seit v5.38, Daniels Wunsch „2 Straßenlinien nebeneinander“): Straßenzellen nebeneinander bilden ein Band.
+ * isRoad(i) sagt, ob Zelle i Straße ist. Je Zelle: hl/vl = Länge der waagrechten/senkrechten Straßenreihe durch die Zelle;
+ * dir 1 = Band läuft waagrecht (hl > vl), 2 = senkrecht, 0 = Kreuzung, Platz oder Einzelzelle; width = Breite des Bandes in Zellen
+ * (alle Zellen quer durch das Band laufen in dieselbe Richtung), idx = Lage der Zelle im Band (0 = oben bzw. links);
+ * lanes = Fahrspuren je Richtung für die Kapazität: min(hl, vl), höchstens maxLanes (Kreuzungen zählen so viel wie ihr breitestes Band).
+ */
+export function laneGrid(cols, rows, isRoad, maxLanes = 4) {
+  const n = cols * rows;
+  const hl = new Uint16Array(n);
+  const vl = new Uint16Array(n);
+  for (let r = 0; r < rows; r++) {
+    for (let q = 0; q < cols; ) {
+      if (!isRoad(r * cols + q)) {
+        q++;
+        continue;
+      }
+      let e = q;
+      while (e < cols && isRoad(r * cols + e)) e++;
+      for (let k = q; k < e; k++) hl[r * cols + k] = e - q;
+      q = e;
+    }
+  }
+  for (let q = 0; q < cols; q++) {
+    for (let r = 0; r < rows; ) {
+      if (!isRoad(r * cols + q)) {
+        r++;
+        continue;
+      }
+      let e = r;
+      while (e < rows && isRoad(e * cols + q)) e++;
+      for (let k = r; k < e; k++) vl[k * cols + q] = e - r;
+      r = e;
+    }
+  }
+  const dir = new Uint8Array(n);
+  const width = new Uint8Array(n);
+  const idx = new Uint8Array(n);
+  const lanes = new Uint8Array(n);
+  for (let i = 0; i < n; i++) if (hl[i]) lanes[i] = Math.min(maxLanes, hl[i], vl[i]);
+  // waagrechte Bänder: senkrechte Reihe, in der jede Zelle waagrecht läuft (hl > vl)
+  for (let q = 0; q < cols; q++) {
+    for (let r = 0; r < rows; r++) {
+      const i = r * cols + q;
+      if (!vl[i] || (r > 0 && vl[i - cols])) continue; // Anfang einer senkrechten Reihe
+      const w = vl[i];
+      let ok = w <= 255;
+      for (let k = 0; ok && k < w; k++) ok = hl[i + k * cols] > w;
+      if (ok) for (let k = 0; k < w; k++) {
+        dir[i + k * cols] = 1;
+        width[i + k * cols] = w;
+        idx[i + k * cols] = k;
+      }
+    }
+  }
+  // senkrechte Bänder: waagrechte Reihe, in der jede Zelle senkrecht läuft (vl > hl)
+  for (let r = 0; r < rows; r++) {
+    for (let q = 0; q < cols; q++) {
+      const i = r * cols + q;
+      if (!hl[i] || (q > 0 && hl[i - 1])) continue;
+      const w = hl[i];
+      let ok = w <= 255;
+      for (let k = 0; ok && k < w; k++) ok = vl[i + k] > w;
+      if (ok) for (let k = 0; k < w; k++) {
+        dir[i + k] = 2;
+        width[i + k] = w;
+        idx[i + k] = k;
+      }
+    }
+  }
+  return { hl, vl, dir, width, idx, lanes };
+}
