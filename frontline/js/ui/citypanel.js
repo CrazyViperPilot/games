@@ -8,12 +8,17 @@ import { KINDS, KIND_NAME, GOODS, CITY_STORE_GOODS, cellAt, hasMarket, sizeOf, b
 
 // Farben je Zellenart (Werkzeug, Grundstück, Symbol auf der Karte): Wohnen grün (privat), Gewerbe blau (kommerziell), Werke erdig,
 // Markt gold, Militär (Kaserne, Fabrikhalle, Heliport) oliv. Symbole: Werkzeugleiste und Schilder über den Gebäuden (citylayer.js).
-export const CITY_COLORS = { road: '#8a8f86', res: '#4f9a5a', com: '#3f7fd0', bm: '#b0743c', mun: '#8b96a8', fuel: '#9b7bc4', steel: '#7f8c99', mine: '#c9a14a', market: '#e6b422', power: '#e0c040', uni: '#6fa8dc', dc: '#4fc3c7', barracks: '#7d8f45', factory: '#7d8f45', heliport: '#7d8f45', hospital: '#e8707e', airport: '#7d8f45', smelter: '#a0522d', kero: '#56b3e6', erase: '#d05050' };
-export const CITY_ICON = { road: '▬', res: '⌂', com: '▣', bm: '⚒', mun: '✸', fuel: '⛽', steel: '⛓', mine: '⛏', market: '⚖', power: '⚡', uni: '🎓', dc: '🖥', barracks: '⚔', factory: '🔧', heliport: '🚁', hospital: '✚', airport: '✈', smelter: '🔥', kero: '🛢', erase: '✕' };
+export const CITY_COLORS = { road: '#8a8f86', res: '#4f9a5a', com: '#3f7fd0', bm: '#b0743c', mun: '#8b96a8', fuel: '#9b7bc4', steel: '#7f8c99', mine: '#c9a14a', market: '#e6b422', power: '#e0c040', uni: '#6fa8dc', dc: '#4fc3c7', barracks: '#7d8f45', factory: '#7d8f45', heliport: '#7d8f45', hospital: '#e8707e', airport: '#7d8f45', runway: '#5b5f63', stand: '#6f7d4a', atc: '#4f7fa8', ktank: '#56b3e6', mdepot: '#b88a3a', smelter: '#a0522d', kero: '#56b3e6', erase: '#d05050' };
+export const CITY_ICON = { road: '▬', res: '⌂', com: '▣', bm: '⚒', mun: '✸', fuel: '⛽', steel: '⛓', mine: '⛏', market: '⚖', power: '⚡', uni: '🎓', dc: '🖥', barracks: '⚔', factory: '🔧', heliport: '🚁', hospital: '✚', airport: '✈', runway: '🛫', stand: '✈', atc: '📡', ktank: '⛽', mdepot: '🚀', smelter: '🔥', kero: '🛢', erase: '✕' };
 const ICON = CITY_ICON;
 const CARE = CITY.care.by;
-const SHORT = { road: 'Straße', res: 'Wohnen', com: 'Gewerbe', bm: 'BM-Werk', mun: 'Mun.-Werk', fuel: 'Raffinerie', steel: 'Stahlwerk', smelter: 'Hütte', kero: 'Kerosin-Raf.', mine: 'Förderung', market: 'Markt', power: 'Kraftwerk', uni: 'Universität', dc: 'Rechenz.', barracks: 'Kaserne', factory: 'Fabrikhalle', heliport: 'Heliport', hospital: 'Krankenhaus', airport: 'Flughafen', erase: 'Räumen' };
+const SHORT = { road: 'Straße', res: 'Wohnen', com: 'Gewerbe', bm: 'BM-Werk', mun: 'Mun.-Werk', fuel: 'Raffinerie', steel: 'Stahlwerk', smelter: 'Hütte', kero: 'Kerosin-Raf.', mine: 'Förderung', market: 'Markt', power: 'Kraftwerk', uni: 'Universität', dc: 'Rechenz.', barracks: 'Kaserne', factory: 'Fabrikhalle', heliport: 'Heliport', hospital: 'Krankenhaus', airport: 'Flughafen', runway: 'Bahn', stand: 'Stellplatz', atc: 'Tower', ktank: 'Kero-Tank', mdepot: 'Mun.-Lager', erase: 'Räumen' };
 export const CITY_TIP = {
+  runway: `Start-/Landebahn (seit v5.35): Zellen wie eine Straße ziehen, ${CITY.air.runwayWidth} breit und mindestens ${CITY.air.runwayMin} lang, waagrecht oder senkrecht. Flugzeuge rollen darüber zu den Stellplätzen. Jeder Start und jede Landung sperrt die Bahn ${CITY.air.sep} s (mit Tower ${CITY.air.sepAtc} s); mehr Bahnen = mehr Flugbetrieb`,
+  stand: `Großbau 2 × 2 (seit v5.35): Stellplatz für ein Kampfflugzeug, baut es auch (F-16). Stufe 1 offener Stellplatz, Stufe 2 mit Splitterschutzwällen (halber Schaden), Stufe 3 Stahlbeton-Shelter (${Math.round(CITY.air.shelter[3] * 100)} % Schaden). Braucht eine Straße oder Bahn daneben, über die das Flugzeug zur Bahn rollt`,
+  atc: `Großbau 2 × 2 (seit v5.35): Tower mit Radar. Bahnen im Umkreis von ${CITY.air.atcRadius} Feldern sind nach jedem Start oder jeder Landung schon nach ${CITY.air.sepAtc} statt ${CITY.air.sep} s wieder frei; weite Sicht`,
+  ktank: `Großbau 2 × 2 (seit v5.35): Kerosintank. Wird über die Straße aus dem Kerosin des Stadtlagers befüllt; Flugzeuge auf Stellplätzen im Umkreis von ${CITY.air.supplyRadius} Feldern tanken daraus`,
+  mdepot: `Großbau 2 × 2 (seit v5.35): Munitionslager. Wird über die Straße aus dem Lager der Hauptstadt befüllt; Flugzeuge auf Stellplätzen im Umkreis von ${CITY.air.supplyRadius} Feldern laden daraus nach`,
   bm: 'Großbau 2 × 2 (Ziegelei mit Holzlager): Baumaterial aus Holz und Stein (Holzfäller, Steinbruch)', mun: 'Großbau 2 × 2 (Bunker mit Riesenpatrone): Munition aus Stahl',
   fuel: 'Großbau 2 × 2 (großer Öltank, Destillationstürme): Treibstoff aus Öl (Ölquelle)',
   steel: 'Großbau 2 × 2 (Stahlwerk mit Walzstraße): Stahl aus Roheisen (Hütte)', smelter: `Großbau ${CITY.size.smelter} × ${CITY.size.smelter} Zellen (Hochofen mit Glut und Schornstein): Roheisen aus Erz (Erzmine); das Roheisen fährt zum Stahlwerk`,
@@ -31,7 +36,7 @@ export const CITY_TIP = {
 };
 const GOOD_NAME = { bm: 'BM', mun: 'MUN', fuel: 'TS', metal: 'Stahl', kero: 'Kerosin' };
 const GOOD_LONG = { bm: 'Baumaterial', mun: 'Munition', fuel: 'Treibstoff', metal: 'Stahl', kero: 'Kerosin' };
-const TOOLS = [...KINDS, 'erase'];
+const TOOLS = [...KINDS.filter((k) => !CITY.retired?.includes(k)), 'erase']; // ohne alte, nicht mehr baubare Arten (Flughafen)
 const fmt = (v, d = 0) => v.toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d });
 
 export class CityPanel {

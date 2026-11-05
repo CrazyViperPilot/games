@@ -31,6 +31,7 @@ import { createResearch, updateResearch, cmdResearch, cmdCancelResearch, rangeMu
 import { createBridges, updateBridges, cmdRepairBridge, bridgeUnder } from './river.js';
 import { createRoads } from './roads.js';
 import { updateAircraft, trainCheck, cmdLand } from './aircraft.js';
+import { cmdDig, updateDig } from './excavator.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
@@ -667,6 +668,8 @@ export class Game {
         return cmdDrill(this, team, cmd);
       case 'land':
         return cmdLand(this, team, cmd);
+      case 'dig':
+        return cmdDig(this, team, cmd);
       case 'city':
         return cmdCity(this, team, cmd);
       case 'trade':
@@ -1177,6 +1180,7 @@ export class Game {
     updateCrates(this, dt);
     updateLogistics(this, dt);
     updateConstruction(this, dt);
+    updateDig(this, dt); // Bagger räumen Stadtzellen (seit v5.35)
     updateBridges(this, dt);
     separate(this);
     updateCommanders(this, dt);

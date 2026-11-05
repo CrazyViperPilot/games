@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
 import { CITY } from '../js/data/city.js';
-import { cellsOf, anchorOf, canZone, roadAt, accessCells, cellRect, isPart, KIND_ID, bigFits, bigCenter } from '../js/game/city.js';
+import { cellsOf, anchorOf, canZone, roadAt, accessCells, cellRect, isPart, KIND_ID } from '../js/game/city.js';
 import { UNITS } from '../js/data/units.js';
 import { transportOf, transportInfo, mainAccess, pathEff, addLoad, beginLoads, settleLoads } from '../js/game/transport.js';
 
@@ -457,55 +457,6 @@ test('Keine Ware aus dem Nichts: Lager-Zuwachs je Schritt ≤ Förderung über d
   assert.equal(bad, 0, 'nie mehr im Lager als gefördert');
   assert.ok(mun > 0, 'Munition entsteht (die Prüfung greift)');
   assert.ok(take > 0, 'Gewerbe nimmt Baumaterial (die Prüfung greift)');
-});
-
-test('F-16 tankt Kerosin aus dem Stadtlager (c.kero), den Treibstoff im Lager lässt es unberührt', () => {
-  const g = new Game({ seed: 3, city: true, startMoney: 20000 });
-  const c = g.city[0];
-  const m = g.mainFob(0);
-  // Flughafen (10 × 10) mit Straße darunter, wie in aircraft.test.js
-  const n = 10;
-  let a = -1;
-  let bd = Infinity;
-  for (let r = 1; r < c.rows - 1; r++) for (let q = 1; q < c.cols - 1; q++) {
-    const k = r * c.cols + q;
-    const p = bigCenter(c, k, n);
-    const d = Math.hypot(p.x - m.x, p.y - m.y);
-    if (d >= bd || d < 500) continue;
-    if (!bigFits(g, c, k, n + 2, (j) => !c.kind[j] && !c.mapRoads?.[j] && !c.deposit[j])) continue;
-    a = k;
-    bd = d;
-  }
-  assert.ok(a >= 0, 'Platz für den Flughafen');
-  const q = a % c.cols;
-  const r = Math.floor(a / c.cols);
-  assert.ok(g.issue(0, { type: 'city', kind: 'airport', c0: q, r0: r, c1: q, r1: r }).ok);
-  assert.ok(g.issue(0, { type: 'city', kind: 'road', c0: q - 4, r0: r + 6, c1: q + 5, r1: r + 6 }).ok);
-  run(g, CITY.growTime + 1);
-  const ap = c.ents.get(a);
-  assert.ok(ap && ap.alive, 'Flughafen steht');
-  const u = g.spawnUnit('f16', 0, ap.x, ap.y);
-  u.parked = true;
-  u.jet = { home: ap.id, slot: 0, ready: false, phase: 'park', alt: 0 };
-  u.fuel = 5;
-  c.kero = 300;
-  const fuel0 = m.store.fuel;
-  run(g, 3);
-  assert.ok(u.fuel > 5, `F-16 getankt: ${u.fuel}`);
-  assert.ok(c.kero < 300, `Kerosin im Stadtlager ${c.kero}`);
-  // Seit v5.20 (AP4) liefert die Raffinerie des Startviertels Treibstoff ans Lager: der Flug zieht keinen davon ab
-  assert.ok(m.store.fuel >= fuel0, `Treibstoff im Lager ${fuel0} → ${m.store.fuel}`);
-  assert.ok(UNITS.f16.fuelMax > 0);
-  // leeres Stadtlager: kein Tanken, Meldung „ohne Kerosin“, Treibstoff im Lager bleibt unberührt (seit dem Review)
-  c.kero = 0;
-  u.fuel = 5;
-  g.drainEvents();
-  g.teams[0].warnAt = {};
-  const fuel1 = m.store.fuel;
-  stepN(g, 5);
-  assert.equal(u.fuel, 5, 'ohne Kerosin kein Tanken');
-  assert.ok(m.store.fuel >= fuel1, 'kein Treibstoff aus dem Lager als Ersatz');
-  assert.ok(g.drainEvents().some((e) => e.type === 'message' && e.team === 0 && /Kerosin/.test(e.text)), 'Mangelmeldung Kerosin');
 });
 
 test('Heliport tankt Hubschrauber im Umkreis aus c.kero (CITY.care.refuel je s)', () => {

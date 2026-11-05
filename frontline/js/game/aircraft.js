@@ -1,27 +1,28 @@
-// Kampfflugzeuge und Flughafen (seit v5.03, PRD §6 „F-16“, §15 „Flughafen“): Jets (def.jet) fliegen immer, drehen nur mit
-// begrenzter Rate (BALANCE.jets.turn) und kreisen um ihren Befehlspunkt. Sie starten von einem eigenen Flughafen (10 × 10-Großbau
-// der Stadt, capacity Plätze): seit v5.15 rollen sie vom Stellplatz über den Rollweg zu Bahn 1, starten nach einem Startlauf und
-// steigen; zur Landung fliegen sie eine Platzrunde, sinken im Endanflug auf Bahn 2, rollen aus und rollen zum Stellplatz
-// (u.jet.phase: park, taxiOut, roll, air, rollout, taxiIn; u.jet.alt 0…1 Höhe). Befehl `land` wählt den Flughafen.
-// Sie fliegen ohne Raketen oder mit knappem Treibstoff selbst zurück, landen und werden dort betankt,
-// munitioniert (aus dem Lager der Hauptstadt) und repariert. Abgestellte Jets (u.parked) stehen im Hangar: niemand kann sie
-// angreifen (entities.isFoe); fällt der Flughafen, gehen sie mit ihm verloren. Ohne Flughafen stürzt ein Jet ab, wenn der
-// Treibstoff leer ist. Geschossen wird in combat.js wie bei allen Einheiten. Kein DOM, deterministisch.
+// Kampfflugzeuge und Fliegerhorst (seit v5.03 F-16, seit v5.35 Fliegerhorst aus Bausteinen; PRD §6 „F-16“, §15 „Fliegerhorst“).
+// Jets (def.jet) fliegen immer, drehen nur mit begrenzter Rate (BALANCE.jets.turn) und kreisen um ihren Befehlspunkt. Jeder Jet gehört
+// zu einem Stellplatz der Stadt (Zellenart `stand`, 2 × 2): dort wird er gebaut, steht er, tankt Kerosin aus einem Kerosintank und lädt
+// Raketen aus einem Munitionslager in der Nähe (CITY.air.supplyRadius). Zum Start rollt er über Straßen und Bahnzellen zur nächsten
+// Start-/Landebahn (Zellenart `runway`: volles Rechteck CITY.air.runwayWidth breit, mindestens runwayMin lang, waagrecht oder
+// senkrecht), wartet am Rand der Bahn, bis sie frei ist (jeder Start und jede Landung sperrt sie sep s, mit Tower sepAtc s), startet und
+// steigt. Zur Landung fliegt er eine Platzrunde, sinkt im Endanflug auf die Bahn, die mit seinem Stellplatz verbunden ist, rollt aus
+// und rollt zum Stellplatz (u.jet.phase: park, taxiOut, roll, air, rollout, taxiIn; u.jet.alt 0…1). Abgestellte Jets sind angreifbar,
+// der Stellplatz schützt nach Stufe (CITY.air.shelter, siehe parkedArmor); fällt der Stellplatz, geht der Jet mit ihm verloren. Ohne
+// erreichbare Bahn stürzt ein Jet ab, wenn der Treibstoff leer ist. Geschossen wird in combat.js. Kein DOM, deterministisch.
 import { BALANCE } from '../data/balance.js';
+import { CITY } from '../data/city.js';
 import { UNITS } from '../data/units.js';
-import { KIND_ID } from './city.js';
+import { KIND_ID, roadAt, accessCells } from './city.js';
 import { resolveTarget, canAttack, isFoe } from './entities.js';
 import { setIdle } from './movement.js';
 import { modOf } from './research.js';
 
 const J = BALANCE.jets;
+const AIR = CITY.air;
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 
 /**
- * Anlage des Flughafens relativ zu seiner Mitte (px, das Quadrat reicht bis ±320): zwei Start- und Landebahnen (waagrecht), Rollweg,
- * Vorfeld mit capacity Stellplätzen (5 Spalten × 4 Reihen). Spiel (Start, Landung, Stellplätze) und Bild (render/airport.js) nutzen
- * dieselben Maße; das Vorfeld reicht seit v5.22 bis an den Rollweg und über die fünfte Rollgasse. Hangars, Tower und die übrigen
- * Bauten sind nur Bild (render/airport.js).
+ * Maße des alten Flughafens (10 × 10, bis v5.33). Nur noch für sein Bild (render/airport.js); die Zellenart ist nicht mehr baubar
+ * (CITY.retired), migrateCity räumt alte Flughäfen.
  */
 export const AIRPORT = {
   runways: [
@@ -31,46 +32,206 @@ export const AIRPORT = {
   taxi: { y: -104, x0: -280, x1: 280, w: 18 },
   apron: { x0: -304, x1: 100, y0: -95, y1: 300 },
   slots: Array.from({ length: 20 }, (_, k) => ({ x: -262 + (k % 5) * 76, y: -22 + Math.floor(k / 5) * 82 })),
-  landing: { x: 0, y: -176 }, // Mitte von Bahn 2 (Landebahn; Heimweg-Rechnung)
+  landing: { x: 0, y: -176 },
 };
+export const LANE = 38;
+export const ROW_GAP = 41;
 
-/** Ist e ein Flughafen (Ziel-Entity der Stadt)? */
-export function isAirport(game, e) {
+// ---- Fliegerhorst: Stellplätze, Bahnen, Wege ----
+
+/** Ist e ein fertiger Stellplatz (Ziel-Entity der Stadt)? */
+export function isStand(game, e) {
   if (!e || e.type !== 'city' || !e.alive) return false;
   const c = game.city?.[e.team];
-  return !!c && c.kind[e.cityCell] === KIND_ID.airport && c.level[e.cityCell] > 0;
+  return !!c && c.kind[e.cityCell] === KIND_ID.stand && c.level[e.cityCell] > 0;
 }
+/** Alter Name (Steuerung, KI): ein „Flughafen“ ist seit v5.35 ein Stellplatz. */
+export const isAirport = isStand;
 
-/** Lebende fertige Flughäfen eines Teams. */
-export function airportsOf(game, team) {
+/** Lebende fertige Stellplätze eines Teams. */
+export function standsOf(game, team) {
   const c = game.city?.[team];
   if (!c) return [];
   const out = [];
-  for (const [i, e] of c.ents) if (e.alive && c.kind[i] === KIND_ID.airport && c.level[i] > 0) out.push(e);
+  for (const [i, e] of c.ents) if (e.alive && c.kind[i] === KIND_ID.stand && c.level[i] > 0) out.push(e);
   return out;
 }
+export const airportsOf = standsOf;
 
-/** Jets, die zu Flughafen e gehören (stationiert, in der Luft oder in seiner Warteschlange). */
+/** Jets, die zu Stellplatz e gehören (dort, in der Luft oder in seiner Warteschlange). */
 export function jetsAt(game, e) {
   let n = 0;
   for (const u of game.units) if (u.alive && u.jet?.home === e.id) n++;
   return n + (e.queue?.length ?? 0);
 }
 
-/** Freie Plätze eines Flughafens. */
-export const freeSpace = (game, e) => J.capacity - jetsAt(game, e);
+/** Freie Plätze eines Stellplatzes (einer je Stellplatz). */
+export const freeSpace = (game, e) => 1 - jetsAt(game, e);
 
-/** Weltpunkt eines Punkts der Anlage (lokal relativ zur Mitte). */
-const at = (e, p) => ({ x: e.x + p.x, y: e.y + p.y });
+/** Stufe einer Stadt-Entity (0, wenn weg). */
+const levelOf = (game, e) => (e && game.city?.[e.team] ? game.city[e.team].level[e.cityCell] : 0);
 
-/** Nächster eigener Flughafen mit Platz (oder der eigene Heimatflughafen), sonst null. */
+/** Schadensfaktor für einen abgestellten Jet auf seinem Stellplatz (1 offen, Wälle, Stahlbeton; CITY.air.shelter). */
+export function parkedArmor(game, u) {
+  if (!u.parked || !u.def?.jet) return 1;
+  return AIR.shelter[levelOf(game, game.getEntity(u.jet?.home))] ?? 1;
+}
+
+const cellCenter = (c, i) => {
+  const q = i % c.cols;
+  return { x: c.x0 + (q + 0.5) * c.cell, y: c.y0 + ((i - q) / c.cols + 0.5) * c.cell };
+};
+
+/** Bahnen und Wege einer Stadt, neu bei jeder Änderung der Stadt (c.ver); Sperrzeiten in c.runwayBusy (gehören zum Spielstand). */
+const CACHE = new WeakMap();
+export function airOf(game, c) {
+  let st = CACHE.get(c);
+  if (st && st.ver === c.ver) return st;
+  st = buildAir(game, c);
+  CACHE.set(c, st);
+  return st;
+}
+
+/** Bahnen aus den Bahnzellen: zusammenhängende Gruppen; gültig als volles Rechteck runwayWidth × (≥ runwayMin). */
+function buildAir(game, c) {
+  const RW = KIND_ID.runway;
+  const n = c.cols * c.rows;
+  const seen = new Uint8Array(n);
+  const byCell = new Int32Array(n); // Index + 1 der Bahn je Zelle (nur gültige)
+  const runways = [];
+  const S = c.cell;
+  for (const i0 of c.list) {
+    if (c.kind[i0] !== RW || seen[i0]) continue;
+    const cells = [i0];
+    seen[i0] = 1;
+    for (let k = 0; k < cells.length; k++) {
+      const q = cells[k] % c.cols;
+      const r = (cells[k] - q) / c.cols;
+      for (const [x, y] of [[q - 1, r], [q + 1, r], [q, r - 1], [q, r + 1]]) {
+        if (x < 0 || y < 0 || x >= c.cols || y >= c.rows) continue;
+        const j = y * c.cols + x;
+        if (c.kind[j] !== RW || seen[j]) continue;
+        seen[j] = 1;
+        cells.push(j);
+      }
+    }
+    let q0 = Infinity, q1 = -1, r0 = Infinity, r1 = -1;
+    for (const i of cells) {
+      const q = i % c.cols;
+      const r = (i - q) / c.cols;
+      q0 = Math.min(q0, q); q1 = Math.max(q1, q); r0 = Math.min(r0, r); r1 = Math.max(r1, r);
+    }
+    const w = q1 - q0 + 1;
+    const h = r1 - r0 + 1;
+    const valid = cells.length === w * h && Math.min(w, h) === AIR.runwayWidth && Math.max(w, h) >= AIR.runwayMin;
+    const axis = w >= h ? 'x' : 'y';
+    const rw = { key: Math.min(...cells), cells, q0, q1, r0, r1, axis, valid, len: Math.max(w, h), reason: valid ? '' : Math.min(w, h) !== AIR.runwayWidth || cells.length !== w * h ? `muss ein volles Rechteck ${AIR.runwayWidth} Zellen breit sein` : `zu kurz (mindestens ${AIR.runwayMin} Zellen)` };
+    // Mittellinie und Enden in Weltkoordinaten
+    if (axis === 'x') {
+      const y = c.y0 + ((r0 + r1 + 1) / 2) * S;
+      rw.ends = [{ x: c.x0 + q0 * S, y }, { x: c.x0 + (q1 + 1) * S, y }];
+    } else {
+      const x = c.x0 + ((q0 + q1 + 1) / 2) * S;
+      rw.ends = [{ x, y: c.y0 + r0 * S }, { x, y: c.y0 + (r1 + 1) * S }];
+    }
+    rw.cx = (rw.ends[0].x + rw.ends[1].x) / 2;
+    rw.cy = (rw.ends[0].y + rw.ends[1].y) / 2;
+    rw.atc = false;
+    if (valid) {
+      for (const [ia, e] of c.ents) {
+        if (!e.alive || c.kind[ia] !== KIND_ID.atc || !c.level[ia]) continue;
+        if (dist(e.x, e.y, rw.cx, rw.cy) <= AIR.atcRadius * S + (rw.len * S) / 2) rw.atc = true;
+      }
+      for (const i of cells) byCell[i] = runways.length + 1;
+    }
+    runways.push(rw);
+  }
+  return { ver: c.ver, runways, byCell, paths: new Map() };
+}
+
+/** Bahnen eines Teams (gültige und ungültige, für Anzeige und KI). */
+export function runwaysOf(game, team) {
+  const c = game.city?.[team];
+  return c ? airOf(game, c).runways : [];
+}
+
+/** Breitensuche über Straßen- und Bahnzellen von `starts` bis zur ersten Zelle mit goal(i); Weg als Zellenliste oder null. */
+function cellPath(c, starts, goal) {
+  const n = c.cols * c.rows;
+  const prev = new Int32Array(n).fill(-2);
+  const queue = [];
+  for (const s of starts) {
+    if (prev[s] !== -2 || !roadAt(c, s)) continue;
+    prev[s] = -1;
+    queue.push(s);
+  }
+  for (let h = 0; h < queue.length; h++) {
+    const i = queue[h];
+    if (goal(i)) {
+      const path = [];
+      for (let k = i; k >= 0; k = prev[k]) path.push(k);
+      return path.reverse();
+    }
+    const q = i % c.cols;
+    const r = (i - q) / c.cols;
+    for (const [x, y] of [[q - 1, r], [q + 1, r], [q, r - 1], [q, r + 1]]) {
+      if (x < 0 || y < 0 || x >= c.cols || y >= c.rows) continue;
+      const j = y * c.cols + x;
+      if (prev[j] !== -2 || !roadAt(c, j)) continue;
+      prev[j] = i;
+      queue.push(j);
+    }
+  }
+  return null;
+}
+
+/** Weg vom Stellplatz e zur nächsten gültigen Bahn: { cells (Stellplatz → erste Bahnzelle), rw } oder null; zwischengespeichert. */
+export function standRoute(game, e) {
+  const c = game.city?.[e.team];
+  if (!c) return null;
+  const st = airOf(game, c);
+  if (st.paths.has(e.id)) return st.paths.get(e.id);
+  const cells = cellPath(c, accessCells(c, e.cityCell), (i) => st.byCell[i] > 0);
+  const res = cells ? { cells, rw: st.runways[st.byCell[cells[cells.length - 1]] - 1] } : null;
+  st.paths.set(e.id, res);
+  return res;
+}
+
+/** Sperrzeit einer Bahn je Bewegung (s): mit Tower kürzer. */
+const sepOf = (rw) => (rw.atc ? AIR.sepAtc : AIR.sep);
+
+/** Bahn für u belegen (Start oder Landung): frei oder schon von u belegt → sperren und true. */
+function lockRunway(game, c, rw, u) {
+  c.runwayBusy ??= {};
+  const b = c.runwayBusy[rw.key];
+  if (b && b.until > game.time && b.by !== u.id) return false;
+  c.runwayBusy[rw.key] = { until: game.time + sepOf(rw), by: u.id };
+  return true;
+}
+
+/** Ist die Bahn gerade gesperrt (für die Anzeige)? Restzeit in s, 0 frei. */
+export function runwayBusy(game, team, rw) {
+  const b = game.city?.[team]?.runwayBusy?.[rw.key];
+  return b && b.until > game.time ? b.until - game.time : 0;
+}
+
+/** Rollen am Boden (Stellplatz → Bahn, Bahn → Stellplatz), Startlauf und Ausrollen; dort schießt ein Jet nicht. */
+const GROUND = new Set(['taxiOut', 'roll', 'rollout', 'taxiIn']);
+
+/** Steht der Jet am Boden (abgestellt, rollt, startet oder rollt aus)? */
+export const jetGrounded = (u) => !!u.def?.jet && (!!u.parked || GROUND.has(u.jet?.phase));
+
+/** Flughöhe 0 (Boden) … 1 (Reiseflughöhe) für die Darstellung. */
+export const jetAlt = (u) => (u.parked ? 0 : (u.jet?.alt ?? 1));
+
+/** Nächster eigener Stellplatz: der eigene, sonst der nächste freie mit Weg zu einer Bahn; null ohne. */
 function homeFor(game, u) {
   const own = game.getEntity(u.jet.home);
-  if (own && isAirport(game, own)) return own;
+  if (own && isStand(game, own) && standRoute(game, own)) return own;
   let best = null;
   let bestD = Infinity;
-  for (const e of airportsOf(game, u.team)) {
-    if (freeSpace(game, e) <= 0) continue;
+  for (const e of standsOf(game, u.team)) {
+    if (freeSpace(game, e) <= 0 || !standRoute(game, e)) continue;
     const d = dist(e.x, e.y, u.x, u.y);
     if (d < bestD) {
       best = e;
@@ -80,38 +241,15 @@ function homeFor(game, u) {
   return best;
 }
 
-/** Rollen am Boden (Stellplatz → Startbahn, Landebahn → Stellplatz), Startlauf und Ausrollen; dort schießt ein Jet nicht. */
-const GROUND = new Set(['taxiOut', 'roll', 'rollout', 'taxiIn']);
-
-/** Steht der Jet am Boden (abgestellt, rollt, startet oder rollt aus)? */
-export const jetGrounded = (u) => !!u.def?.jet && (!!u.parked || GROUND.has(u.jet?.phase));
-
-/** Flughöhe 0 (Boden) … 1 (Reiseflughöhe) für die Darstellung. */
-export const jetAlt = (u) => (u.parked ? 0 : (u.jet?.alt ?? 1));
-
-export const LANE = 38; // Rollgasse rechts neben jeder Spalte der Stellplätze (halber Abstand der Spalten)
-export const ROW_GAP = 41; // Gasse zwischen zwei Reihen der Stellplätze (halber Abstand der Reihen)
-
-/** Freier Stellplatz des Flughafens e (abgestellte und hereinrollende Jets belegen ihren Platz). */
-function freeSlot(game, u, e) {
-  const used = new Set();
-  for (const o of game.units) if (o.alive && o !== u && o.jet?.home === e.id && o.jet.slot >= 0) used.add(o.jet.slot);
-  let k = 0;
-  while (used.has(k) && k < AIRPORT.slots.length - 1) k++;
-  return k;
-}
-
-/** Abgestellt: auf Stellplatz k (fehlt er: einen freien) des Flughafens e, Nase nach Norden. */
-function park(game, u, e, k = freeSlot(game, u, e)) {
-  const p = at(e, AIRPORT.slots[k]);
-  u.x = p.x;
-  u.y = p.y;
-  u.prevX = p.x;
-  u.prevY = p.y;
+/** Abgestellt: auf Stellplatz e (Mitte), Nase nach Norden. */
+function park(game, u, e) {
+  u.x = e.x;
+  u.y = e.y;
+  u.prevX = e.x;
+  u.prevY = e.y;
   u.angle = -Math.PI / 2;
   u.parked = true;
   u.jet.home = e.id;
-  u.jet.slot = k;
   u.jet.ready = false;
   u.jet.phase = 'park';
   u.jet.alt = 0;
@@ -120,12 +258,13 @@ function park(game, u, e, k = freeSlot(game, u, e)) {
   u.jet.rtb = false;
   u.jet.dir = u.jet.side = undefined;
   u.jet.rtbHome = null;
+  u.jet.land = null;
   setIdle(u);
 }
 
-/** Neue F-16 aus der Ausbildung (economy.js): gleich im Hangar ihres Flughafens. */
+/** Neue F-16 aus der Ausbildung (economy.js): steht gleich auf ihrem Stellplatz. */
 export function parkNew(game, u, e) {
-  u.jet = { home: e.id, slot: -1, ready: false, warned: false };
+  u.jet = { home: e.id, ready: false, warned: false };
   park(game, u, e);
   u.jet.ready = isFull(u);
 }
@@ -136,40 +275,16 @@ const isFull = (u) => u.fuel >= u.def.fuelMax - 1e-6 && u.ammo >= u.def.ammoMax 
 /** Keine einzige volle Rakete mehr. */
 const dry = (u) => !u.weapons.some((w) => w.rounds >= 1);
 
-/** Eigener Flughafen, auf dem der Befehl `land` (oder ein Bewegungsbefehl auf das Gelände) den Jet landen lässt, sonst null. */
+/** Eigener Stellplatz, auf dem der Befehl `land` den Jet landen lässt, sonst null. */
 function landTarget(game, u) {
   const o = u.order;
-  if (o.type === 'land') {
-    const e = game.getEntity(o.targetId);
-    return e && e.team === u.team && isAirport(game, e) ? e : null;
-  }
-  return o.type === 'move' ? airportAt(game, u.team, o.x, o.y) : null;
+  if (o.type !== 'land') return null;
+  const e = game.getEntity(o.targetId);
+  return e && e.team === u.team && isStand(game, e) ? e : null;
 }
 
-/** Wie weit ein Befehl den Jet in die Luft schickt: Bewegung, Angriff, Angriffsmarsch, Landen auf einem anderen Flughafen. */
+/** Wie weit ein Befehl den Jet in die Luft schickt: Bewegung, Angriff, Angriffsmarsch, Landen auf einem anderen Stellplatz. */
 const wantsOut = (u) => u.order.type === 'move' || u.order.type === 'attack' || u.order.type === 'attackMove' || (u.order.type === 'land' && u.order.targetId !== u.jet.home);
-
-/**
- * Rollweg vom Stellplatz k zum Anfang von Bahn 1 (Weltpunkte): nach vorn in die Gasse zwischen den Reihen, in die Rollgasse neben
- * der Spalte, nach Norden zum Rollweg, auf ihm nach Westen, über Bahn 2 bis zum Haltepunkt vor Bahn 1 (hold), dann auf die Bahn.
- */
-function taxiOutRoute(e, k) {
-  const s = AIRPORT.slots[k];
-  const T = AIRPORT.taxi;
-  const [R1, R2] = AIRPORT.runways;
-  const hold = (R1.y + R1.w / 2 + R2.y - R2.w / 2) / 2;
-  const pts = [[s.x, s.y - ROW_GAP], [s.x + LANE, s.y - ROW_GAP], [s.x + LANE, T.y], [T.x0, T.y], [T.x0, hold, true], [T.x0, R1.y]];
-  return pts.map(([x, y, h]) => ({ ...at(e, { x, y }), hold: !!h }));
-}
-
-/** Rollweg von Bahn 2 (bei lokal x) zum Stellplatz k: zum Rollweg, zur Rollgasse der Spalte, in die Gasse hinter der Reihe, vorwärts hinein. */
-function taxiInRoute(e, k, x) {
-  const s = AIRPORT.slots[k];
-  const T = AIRPORT.taxi;
-  const xe = Math.min(T.x1, Math.max(T.x0, x));
-  const pts = [[xe, T.y], [s.x + LANE, T.y], [s.x + LANE, s.y + ROW_GAP], [s.x, s.y + ROW_GAP], [s.x, s.y]];
-  return pts.map(([px, py]) => ({ ...at(e, { x: px, y: py }), hold: false }));
-}
 
 /** Nase höchstens rate × dt in Richtung want drehen. */
 function turnTo(u, want, m) {
@@ -178,12 +293,12 @@ function turnTo(u, want, m) {
   u.angle += Math.max(-m, Math.min(m, d));
 }
 
-/** Rollt vor u ein anderer Jet desselben Flughafens in dieselbe Richtung (Abstand halten)? */
+/** Rollt vor u ein anderer eigener Jet in dieselbe Richtung (Abstand halten)? */
 function blockedAhead(game, u) {
   const cx = Math.cos(u.angle);
   const cy = Math.sin(u.angle);
   for (const o of game.units) {
-    if (o === u || !o.alive || !o.def.jet || o.parked || !GROUND.has(o.jet?.phase) || o.jet.home !== u.jet.home) continue;
+    if (o === u || !o.alive || !o.def.jet || o.parked || o.team !== u.team || !GROUND.has(o.jet?.phase)) continue;
     const dx = o.x - u.x;
     const dy = o.y - u.y;
     const d = Math.hypot(dx, dy);
@@ -193,20 +308,17 @@ function blockedAhead(game, u) {
   return false;
 }
 
-/** Hält ein anderer Jet desselben Flughafens die Startbahn (rollt auf sie oder startet)? */
-const runwayTaken = (game, u) => game.units.some((o) => o !== u && o.alive && o.def.jet && o.jet?.lock && o.jet.home === u.jet.home);
-
-/** Ein Rollschritt entlang u.jet.route. true, wenn der letzte Punkt erreicht ist. */
+/** Ein Rollschritt entlang u.jet.route. Punkte mit `enter` (Bahn) erst, wenn die Bahn frei ist. true am Ende des Weges. */
 function taxi(game, u, dt) {
   const r = u.jet.route;
   const p = r[u.jet.idx];
   if (!p) return true;
-  if (p.hold && Math.hypot(p.x - u.x, p.y - u.y) < 1) {
-    // Haltepunkt vor der Startbahn: warten, bis sie frei ist, dann sie für sich belegen
-    if (runwayTaken(game, u)) return false;
-    u.jet.lock = true;
-    u.jet.idx++;
-    return false;
+  if (p.enter && !u.jet.locked) {
+    // Rand der Bahn: warten, bis sie frei ist, dann für den Start sperren
+    const c = game.city[u.team];
+    const rw = airOf(game, c).runways.find((x) => x.key === p.enter);
+    if (!rw || !lockRunway(game, c, rw, u)) return false;
+    u.jet.locked = true;
   }
   const want = Math.atan2(p.y - u.y, p.x - u.x);
   turnTo(u, want, J.taxiTurn * dt);
@@ -217,7 +329,7 @@ function taxi(game, u, dt) {
   if (d <= step) {
     u.x = p.x;
     u.y = p.y;
-    if (!p.hold) u.jet.idx++;
+    u.jet.idx++;
     return u.jet.idx >= r.length;
   }
   u.x += ((p.x - u.x) / d) * step;
@@ -225,125 +337,164 @@ function taxi(game, u, dt) {
   return false;
 }
 
-/** Am Boden: tanken, nachladen und reparieren aus dem Lager der Hauptstadt; auf Befehl zur Startbahn rollen, wenn bereit. */
-function stepParked(game, u, dt) {
+/** Stellplatz zerstört oder weg: der Jet am Boden geht mit ihm verloren. true, wenn das passiert ist. */
+function lostWithStand(game, u) {
   const e = game.getEntity(u.jet.home);
-  if (!e || !isAirport(game, e)) {
-    u.hp = 0; // Flughafen zerstört: die abgestellten Jets gehen mit ihm verloren
-    u.alive = false;
-    return;
-  }
-  const p = at(e, AIRPORT.slots[u.jet.slot] ?? AIRPORT.slots[0]);
-  u.x = p.x;
-  u.y = p.y;
-  const main = game.mainFob(u.team);
-  const f = dt / (J.rearm * modOf(game, u, 'rearm')); // Schnellwartung (Forschung)
-  if (u.fuel < u.def.fuelMax) {
-    const want = Math.min(u.def.fuelMax - u.fuel, u.def.fuelMax * f);
-    // Mit Stadt tankt die F-16 Kerosin aus dem Stadtlager (seit v5.20), ohne Stadt wie bisher Treibstoff aus dem Lager der Hauptstadt
-    const city = game.city?.[u.team];
-    let got;
-    if (city) {
-      got = Math.min(want, city.kero);
-      city.kero -= got;
-    } else {
-      got = main ? (main.infinite ? want : Math.min(want, main.store.fuel)) : 0;
-      if (main && !main.infinite) main.store.fuel -= got;
+  if (e && isStand(game, e)) return false;
+  u.hp = 0;
+  u.alive = false;
+  return true;
+}
+
+/** Nächster eigener Lager-Bau (Kerosintank oder Munitionslager) mit Bestand im Umkreis des Stellplatzes e. */
+function supplier(game, e, kind) {
+  const c = game.city[e.team];
+  const R = AIR.supplyRadius * c.cell;
+  let best = null;
+  let bestD = Infinity;
+  for (const [i, s] of c.ents) {
+    if (!s.alive || c.kind[i] !== kind || !c.level[i] || !(s.stock > 1e-6)) continue;
+    const d = dist(s.x, s.y, e.x, e.y);
+    if (d <= R && d < bestD) {
+      best = s;
+      bestD = d;
     }
+  }
+  return best;
+}
+
+/** Am Boden: tanken (Kerosintank), nachladen (Munitionslager) und reparieren; auf Befehl zur Bahn rollen, wenn bereit. */
+function stepParked(game, u, dt) {
+  if (lostWithStand(game, u)) return;
+  const e = game.getEntity(u.jet.home);
+  const c = game.city[u.team];
+  u.x = e.x;
+  u.y = e.y;
+  const mod = modOf(game, u, 'rearm'); // Schnellwartung (Forschung): kleiner = schneller
+  if (u.fuel < u.def.fuelMax) {
+    const t = supplier(game, e, KIND_ID.ktank);
+    const want = u.def.fuelMax - u.fuel;
+    const got = t ? Math.min(want, t.stock, (AIR.tank.rate[levelOf(game, t)] * dt) / mod) : 0;
+    if (t) t.stock -= got;
     u.fuel += got;
-    if (got < want - 1e-9) game.shortage(u.team, city ? 'kero' : 'fuel'); // mit Stadt fehlt Kerosin (eigene Meldung, seit dem Review)
+    if (got < want - 1e-9 && !t) game.shortage(u.team, 'kero');
   }
   if (u.ammo < u.def.ammoMax) {
-    const want = Math.min(u.def.ammoMax - u.ammo, u.def.ammoMax * f);
-    const got = main ? (main.infinite ? want : Math.min(want, main.store.mun)) : 0;
-    if (main && !main.infinite) main.store.mun -= got;
+    const d = supplier(game, e, KIND_ID.mdepot);
+    const want = u.def.ammoMax - u.ammo;
+    const got = d ? Math.min(want, d.stock, (AIR.depot.rate[levelOf(game, d)] * dt) / mod) : 0;
+    if (d) d.stock -= got;
     u.ammo += got;
     game.teams[u.team].used.mun += got;
-    if (got < want - 1e-9) game.shortage(u.team, 'mun');
+    if (got < want - 1e-9 && !d) game.shortage(u.team, 'mun');
   }
   if (u.hp < u.maxHp) u.hp = Math.min(u.maxHp, u.hp + u.maxHp * J.repair * dt);
   const was = u.jet.ready;
   u.jet.ready = isFull(u);
-  if (u.order.type === 'land') setIdle(u); // steht schon auf diesem Flughafen
+  if (u.order.type === 'land') setIdle(u); // steht schon auf diesem Stellplatz
   if (u.jet.ready && !was && !wantsOut(u)) game.message(u.team, `${u.def.name} startbereit`, u.x, u.y);
   if (!wantsOut(u)) return;
   if (!u.jet.ready) {
-    if (!u.jet.warned) game.message(u.team, `${u.def.name} wird noch betankt und munitioniert`, u.x, u.y);
+    if (!u.jet.warned) game.message(u.team, `${u.def.name} wird noch betankt und munitioniert (Kerosintank und Munitionslager in der Nähe nötig)`, u.x, u.y);
     u.jet.warned = true;
     return;
   }
-  // Start: vom Stellplatz über den Rollweg zur Startbahn (der Stellplatz bleibt belegt, bis der Jet auf der Bahn steht)
+  const route = standRoute(game, e);
+  if (!route) {
+    if (!u.jet.noRunway) game.message(u.team, `${u.def.name}: kein Weg über Straße oder Rollfeld zu einer Start-/Landebahn`, u.x, u.y);
+    u.jet.noRunway = true;
+    return;
+  }
+  u.jet.noRunway = false;
+  // Start: über den Weg zur Bahn, am Rand warten, dann auf die Mittellinie am näheren Ende; Startlauf zum anderen Ende
+  const rw = route.rw;
+  const entry = cellCenter(c, route.cells[route.cells.length - 1]);
+  const [a, b] = rw.ends;
+  const near = dist(entry.x, entry.y, a.x, a.y) <= dist(entry.x, entry.y, b.x, b.y) ? 0 : 1;
+  const from = rw.ends[near];
+  const to = rw.ends[1 - near];
+  const L = Math.hypot(to.x - from.x, to.y - from.y);
+  const dx = (to.x - from.x) / L;
+  const dy = (to.y - from.y) / L;
+  const start = { x: from.x + dx * (c.cell / 2), y: from.y + dy * (c.cell / 2) };
+  const pts = route.cells.map((i, k) => ({ ...cellCenter(c, i), enter: k === route.cells.length - 1 ? rw.key : 0 }));
+  pts.push({ ...start, enter: 0 });
   u.parked = false;
   u.jet.warned = false;
   u.jet.phase = 'taxiOut';
-  u.jet.route = taxiOutRoute(e, u.jet.slot >= 0 ? u.jet.slot : 0);
+  u.jet.route = pts;
   u.jet.idx = 0;
+  u.jet.locked = false;
   u.jet.alt = 0;
   u.jet.v = 0;
+  u.jet.roll = { dx, dy, ex: to.x, ey: to.y, key: rw.key };
   u.anchorX = u.order.x ?? u.x;
   u.anchorY = u.order.y ?? u.y;
 }
 
-/** Rollen zur Startbahn; am Ende auf der Bahn (Startlauf). Ohne Flughafen ist der Jet verloren. */
+/** Rollen zur Bahn; am Ende Startlauf. Ohne Stellplatz ist der Jet verloren. */
 function stepTaxiOut(game, u, dt) {
-  const e = game.getEntity(u.jet.home);
-  if (!e || !isAirport(game, e)) {
-    u.hp = 0;
-    u.alive = false;
-    return;
-  }
+  if (lostWithStand(game, u)) return;
   if (!taxi(game, u, dt)) return;
   u.jet.phase = 'roll';
   u.jet.route = null;
-  u.jet.slot = -1;
   u.jet.v = J.taxi;
 }
 
-/** Startlauf auf Bahn 1 nach Osten: Nase auf die Bahn drehen, beschleunigen, bei rotate × Reisetempo abheben. */
+/** Startlauf entlang der Bahn: Nase ausrichten, beschleunigen, bei rotate × Reisetempo (spätestens am Bahnende) abheben. */
 function stepRoll(game, u, dt) {
   const full = u.def.speed * modOf(game, u, 'speed');
-  turnTo(u, 0, J.taxiTurn * dt);
-  if (Math.abs(u.angle) > 0.05) return; // erst ausrichten
+  const R = u.jet.roll;
+  const head = Math.atan2(R.dy, R.dx);
+  turnTo(u, head, J.taxiTurn * dt);
+  let d = head - u.angle;
+  d = Math.atan2(Math.sin(d), Math.cos(d));
+  if (Math.abs(d) > 0.05) return; // erst ausrichten
   u.jet.v = Math.min(full, u.jet.v + J.accel * dt);
-  u.x += u.jet.v * dt;
-  if (u.jet.v >= J.rotate * full) {
+  u.x += R.dx * u.jet.v * dt;
+  u.y += R.dy * u.jet.v * dt;
+  const left = (R.ex - u.x) * R.dx + (R.ey - u.y) * R.dy;
+  if (u.jet.v >= J.rotate * full || left <= 0) {
     u.jet.phase = 'air';
     u.jet.alt = 0;
     u.jet.lift = true; // Steigflug: erst geradeaus, dann frei
-    u.jet.lock = false;
+    u.jet.locked = false;
   }
 }
 
-/** Ausrollen auf Bahn 2: bremsen bis zum Rolltempo, dann über den Rollweg zum reservierten Stellplatz. */
+/** Ausrollen auf der Bahn: bremsen bis zum Rolltempo, dann über Rollfeld und Straßen zum Stellplatz. */
 function stepRollout(game, u, dt) {
-  const e = game.getEntity(u.jet.home);
-  if (!e || !isAirport(game, e)) {
-    u.hp = 0;
-    u.alive = false;
-    return;
-  }
-  const R = AIRPORT.runways[1];
-  const d = u.jet.dir ?? 1;
-  turnTo(u, d > 0 ? 0 : Math.PI, J.taxiTurn * dt);
+  if (lostWithStand(game, u)) return;
+  const L = u.jet.land;
+  const c = game.city[u.team];
+  turnTo(u, Math.atan2(L.dy, L.dx), J.taxiTurn * dt);
   u.jet.v = Math.max(J.taxi, u.jet.v - J.decel * dt);
-  u.x += Math.cos(u.angle) * u.jet.v * dt;
-  u.y += (e.y + R.y - u.y) * Math.min(1, 4 * dt); // auf die Mittellinie
-  const left = d > 0 ? e.x + R.x1 - 40 - u.x : u.x - (e.x + R.x0 + 40); // Bahn bis zum Ende
-  if (u.jet.v > J.taxi && left > 0) return;
+  u.x += L.dx * u.jet.v * dt;
+  u.y += L.dy * u.jet.v * dt;
+  // auf die Mittellinie
+  const cross = (u.x - L.tx) * -L.dy + (u.y - L.ty) * L.dx;
+  u.x -= -L.dy * cross * Math.min(1, 4 * dt);
+  u.y -= L.dx * cross * Math.min(1, 4 * dt);
+  const left = (L.ex - u.x) * L.dx + (L.ey - u.y) * L.dy;
+  if (u.jet.v > J.taxi && left > c.cell / 2) return;
+  // Weg von der Zelle unter dem Jet zum Stellplatz
+  const e = game.getEntity(u.jet.home);
+  const q = Math.floor((u.x - c.x0) / c.cell);
+  const r = Math.floor((u.y - c.y0) / c.cell);
+  const here = r * c.cols + q;
+  const goal = new Set(accessCells(c, e.cityCell));
+  const cells = cellPath(c, [here], (i) => goal.has(i));
+  const pts = (cells ?? []).map((i) => ({ ...cellCenter(c, i), enter: 0 }));
+  pts.push({ x: e.x, y: e.y, enter: 0 });
   u.jet.phase = 'taxiIn';
-  u.jet.route = taxiInRoute(e, u.jet.slot, u.x - e.x);
+  u.jet.route = pts;
   u.jet.idx = 0;
 }
 
 /** Rollen zum Stellplatz; dort abstellen (tanken, nachladen). */
 function stepTaxiIn(game, u, dt) {
-  const e = game.getEntity(u.jet.home);
-  if (!e || !isAirport(game, e)) {
-    u.hp = 0;
-    u.alive = false;
-    return;
-  }
-  if (taxi(game, u, dt)) park(game, u, e, u.jet.slot);
+  if (lostWithStand(game, u)) return;
+  if (taxi(game, u, dt)) park(game, u, game.getEntity(u.jet.home));
 }
 
 /** Ein Flugschritt Richtung (tx, ty): Nase höchstens turn × dt × tf drehen, dann mit dem Tempo des Jets geradeaus. */
@@ -360,71 +511,89 @@ function circle(u, ox, oy, dt, tf) {
   fly(u, ox + Math.cos(a) * J.orbit, oy + Math.sin(a) * J.orbit, dt, tf);
 }
 
-/** Liegt (x, y) auf dem Gelände eines eigenen Flughafens? Dann landet der Jet dort (Rechtsklick auf den eigenen Flughafen). */
-function airportAt(game, team, x, y) {
-  for (const e of airportsOf(game, team)) {
-    const h = (e.w * BALANCE.map.tile) / 2;
-    if (Math.abs(x - e.x) <= h && Math.abs(y - e.y) <= h) return e;
-  }
-  return null;
-}
-
-/** Landerichtung auf Bahn 2: +1 von Westen nach Osten, −1 umgekehrt; von der Seite, auf der die Platzrunde in die Karte passt. */
-function landDir(e) {
-  const R = AIRPORT.runways[1];
+/**
+ * Landerichtung auf der Bahn rw: von dem Ende aus, vor dem die Platzrunde in die Karte passt (sonst das mit mehr Platz).
+ * Liefert { tx, ty (Schwelle), dx, dy (Landerichtung), ex, ey (Bahnende) }.
+ */
+function landPlan(rw) {
   const need = J.final + J.base + 600;
-  const west = e.x + R.x0 - need;
-  const east = BALANCE.map.width - (e.x + R.x1) - need;
-  return west >= 0 || west >= east ? 1 : -1;
+  const room = (p, q) => {
+    // Platz vor der Schwelle p, entgegen der Landerichtung p → q
+    const dx = Math.sign(q.x - p.x);
+    const dy = Math.sign(q.y - p.y);
+    const toEdge = dx > 0 ? p.x : dx < 0 ? BALANCE.map.width - p.x : dy > 0 ? p.y : BALANCE.map.height - p.y;
+    return toEdge - need;
+  };
+  const [a, b] = rw.ends;
+  const ra = room(a, b);
+  const rb = room(b, a);
+  const [p, q] = ra >= 0 || ra >= rb ? [a, b] : [b, a];
+  const L = Math.hypot(q.x - p.x, q.y - p.y);
+  return { tx: p.x, ty: p.y, dx: (q.x - p.x) / L, dy: (q.y - p.y) / L, ex: q.x, ey: q.y, key: rw.key };
 }
 
 /**
- * Landeanflug auf Bahn 2 des Flughafens e (wie eine Platzrunde; d = Landerichtung, landDir): Liegt der Jet noch nicht vor dem
+ * Landeanflug auf die Bahn des Stellplatzes e (Platzrunde in Bahnrichtung, waagrecht oder senkrecht): Liegt der Jet noch nicht vor dem
  * Eindrehpunkt (Schwelle − base) oder fehlt ihm zum Ausrichten der Platz, fliegt er im Gegenanflug seitlich versetzt hinaus; dann dreht
- * er in den Endanflug (Kurs auf einen Punkt voraus auf der Mittellinie), wird langsamer, sinkt im Gleitpfad, setzt an der Aufsetzmarke
- * auf und rollt aus. Verpasst er die Marke, steigt er wieder und fliegt die Runde neu (Durchstarten).
+ * er in den Endanflug, wird langsamer, sinkt im Gleitpfad, setzt an der Aufsetzmarke auf und rollt aus. Ist die Bahn belegt, fliegt er
+ * die Runde weiter; verpasst er die Marke, startet er durch.
  */
 function approach(game, u, e, dt) {
-  const R = AIRPORT.runways[1];
-  const d = (u.jet.dir ??= landDir(e));
-  const tx = e.x + (d > 0 ? R.x0 : R.x1); // Schwelle
-  const ty = e.y + R.y;
-  const along = (u.x - tx) * d; // Strecke hinter der Schwelle in Landerichtung (davor negativ)
-  const head = Math.cos(u.angle) * d; // 1 = Nase in Landerichtung
+  const c = game.city[u.team];
+  const route = standRoute(game, e);
+  if (!route) return false;
+  const P = (u.jet.land && u.jet.land.key === route.rw.key ? u.jet.land : (u.jet.land = landPlan(route.rw)));
+  const ex = P.dx;
+  const ey = P.dy;
+  const px = -ey; // quer zur Bahn
+  const py = ex;
+  const W = (a, b) => ({ x: P.tx + ex * a + px * b, y: P.ty + ey * a + py * b });
+  const along = (u.x - P.tx) * ex + (u.y - P.ty) * ey; // Strecke hinter der Schwelle in Landerichtung (davor negativ)
+  const cross = (u.x - P.tx) * px + (u.y - P.ty) * py;
+  let hd = u.angle - Math.atan2(ey, ex);
+  hd = Math.atan2(Math.sin(hd), Math.cos(hd));
+  const head = Math.cos(hd); // 1 = Nase in Landerichtung
   const full = u.jet.speed;
-  const dy = u.y - ty;
-  const near = dist(u.x, u.y, tx, ty) < J.final * 2.5;
-  const aligned = head > 0.95 && Math.abs(dy) < 30;
-  const onFinal = head > 0.85 && Math.abs(dy) < 80 && along < J.touch + J.zone && along > -J.final * 2;
-  const room = J.touch - along >= Math.abs(dy) * 1.5 + J.glide * 0.6; // genug Strecke, um auf die Mittellinie einzudrehen
-  const clampX = (x) => Math.min(BALANCE.map.width - 100, Math.max(100, x));
-  const clampY = (y) => Math.min(BALANCE.map.height - 100, Math.max(100, y));
+  const near = dist(u.x, u.y, P.tx, P.ty) < J.final * 2.5;
+  const aligned = head > 0.95 && Math.abs(cross) < 30;
+  let onFinal = head > 0.85 && Math.abs(cross) < 80 && along < J.touch + J.zone && along > -J.final * 2;
+  // Bahn für die Landung belegen, sobald der Gleitpfad beginnt; belegt: weiter Platzrunde
+  if (onFinal && along > -J.glide - 60 && !lockRunway(game, c, route.rw, u)) onFinal = false;
+  const room = J.touch - along >= Math.abs(cross) * 1.5 + J.glide * 0.6; // genug Strecke, um auf die Mittellinie einzudrehen
+  const clamp = (p) => ({ x: Math.min(BALANCE.map.width - 100, Math.max(100, p.x)), y: Math.min(BALANCE.map.height - 100, Math.max(100, p.y)) });
   let want = full;
-  if (onFinal || (along < -J.base && room)) {
-    // Endanflug: Ziel ein Stück voraus auf der Mittellinie (dreht sicher auf die Bahn ein)
-    fly(u, tx + d * Math.min(along + 300, J.touch + 300), ty, dt);
+  if (onFinal || (along < -J.base && room && !u.jet.goAround)) {
+    const t = W(Math.min(along + 300, J.touch + 300), 0);
+    fly(u, t.x, t.y, dt);
     const glide = onFinal && aligned ? Math.max(0, (J.touch - along) / J.glide) : 1;
     u.jet.alt = glide < u.jet.alt ? Math.max(glide, u.jet.alt - (2 * dt) / J.climb) : Math.min(1, u.jet.alt + dt / J.climb);
     if (onFinal && along >= J.touch - 2 && u.jet.alt <= 0.02) {
-      // in der Aufsetzzone (Marke bis Marke + zone) am Boden
       u.jet.phase = 'rollout'; // aufgesetzt
       u.jet.alt = 0;
       u.jet.home = e.id;
-      u.jet.slot = freeSlot(game, u, e);
       u.jet.rtb = false;
-      return;
+      return true;
     }
     want = J.approach * full;
   } else {
     // Gegenanflug: seitlich der Bahn (Seite, auf der er ankommt) hinaus, bis Platz zum Eindrehen ist
-    u.jet.side ??= dy >= 0 ? 1 : -1;
-    if (clampY(ty + u.jet.side * J.pattern) !== ty + u.jet.side * J.pattern) u.jet.side = -u.jet.side; // Kartenrand
-    const off = along < -J.base ? Math.max(J.pattern, Math.min(Math.abs(dy), J.pattern * 2)) : J.pattern;
-    fly(u, clampX(tx - d * (J.final + J.base + 400)), clampY(ty + u.jet.side * off), dt);
+    u.jet.side ??= cross >= 0 ? 1 : -1;
+    const off = along < -J.base ? Math.max(J.pattern, Math.min(Math.abs(cross), J.pattern * 2)) : J.pattern;
+    let t = W(-(J.final + J.base + 400), u.jet.side * off);
+    const tc = clamp(t);
+    if (tc.x !== t.x || tc.y !== t.y) {
+      const t2 = W(-(J.final + J.base + 400), -u.jet.side * off); // Kartenrand: andere Seite
+      if (clamp(t2).x === t2.x && clamp(t2).y === t2.y) u.jet.side = -u.jet.side;
+      t = clamp(W(-(J.final + J.base + 400), u.jet.side * off));
+    }
+    fly(u, t.x, t.y, dt);
     u.jet.alt = Math.min(1, u.jet.alt + dt / J.climb);
+    if (along < -J.base * 1.5) u.jet.goAround = false;
     if (near) want = J.downwind * full;
   }
+  if (along > J.touch + J.zone) u.jet.goAround = true; // verpasst: neue Runde
   u.jet.v = u.jet.v > want ? Math.max(want, u.jet.v - J.slow * dt) : Math.min(want, u.jet.v + J.accel * dt);
+  return true;
 }
 
 /** In der Luft: Treibstoff, Heimweg, Befehl (Ziel verfolgen, Punkt anfliegen, kreisen), Landung. */
@@ -446,23 +615,29 @@ function stepAirborne(game, u, dt) {
   if (u.jet.lift && u.jet.alt >= 1) u.jet.lift = false;
   const o = u.order;
   let home = homeFor(game, u);
-  // freiwillig landen: Befehl „Landen“ oder Befehlspunkt auf einem eigenen Flughafen
+  // freiwillig landen: Befehl „Landen“ auf einen eigenen Stellplatz
   let asked = landTarget(game, u);
   if (asked && !(freeSpace(game, asked) + (u.jet.home === asked.id ? 1 : 0) > 0)) {
-    game.message(u.team, `${u.def.name}: Flughafen voll`, u.x, u.y);
+    game.message(u.team, `${u.def.name}: Stellplatz belegt`, u.x, u.y);
     setIdle(u);
     asked = null;
-  } else if (!asked && o.type === 'land') setIdle(u); // Flughafen weg
+  } else if (asked && !standRoute(game, asked)) {
+    game.message(u.team, `${u.def.name}: dieser Stellplatz hat keinen Weg zu einer Start-/Landebahn`, u.x, u.y);
+    setIdle(u);
+    asked = null;
+  } else if (!asked && o.type === 'land') setIdle(u); // Stellplatz weg
   if (asked) home = asked;
-  const toHome = home ? dist(u.x, u.y, home.x + AIRPORT.landing.x, home.y + AIRPORT.landing.y) + J.final : 0;
-  const bingo = home && u.fuel <= (toHome / u.jet.speed) * u.def.fuelPerSec * modOf(game, u, 'fuel') * J.reserve + J.margin;
+  const rw = home ? standRoute(game, home)?.rw : null;
+  const toHome = rw ? dist(u.x, u.y, rw.cx, rw.cy) + J.final : 0;
+  const bingo = rw && u.fuel <= (toHome / u.jet.speed) * u.def.fuelPerSec * modOf(game, u, 'fuel') * J.reserve + J.margin;
   // Rückkehr wegen Treibstoff oder Raketen bleibt bis zur Landung (u.jet.rtb), auf Befehl nur, solange der Befehl gilt
   if (u.jet.rtb === 'asked' && !asked) u.jet.rtb = false;
-  if (home && (u.jet.rtb || bingo || dry(u) || asked)) {
+  if (rw && (u.jet.rtb || bingo || dry(u) || asked)) {
     const why = u.jet.rtb || (bingo ? 'fuel' : dry(u) ? 'ammo' : 'asked');
-    if (!u.jet.rtb && why !== 'asked') game.message(u.team, `${u.def.name} kehrt zum Flughafen zurück (${why === 'fuel' ? 'Treibstoff' : 'keine Raketen'})`, u.x, u.y);
-    if (u.jet.rtbHome !== home.id) u.jet.side = u.jet.dir = undefined; // neue Platzrunde
+    if (!u.jet.rtb && why !== 'asked') game.message(u.team, `${u.def.name} kehrt zum Fliegerhorst zurück (${why === 'fuel' ? 'Treibstoff' : 'keine Raketen'})`, u.x, u.y);
+    if (u.jet.rtbHome !== home.id) u.jet.side = u.jet.land = undefined; // neue Platzrunde
     u.jet.rtbHome = home.id;
+    u.jet.home = home.id; // der Stellplatz ist für ihn reserviert
     u.jet.rtb = why;
     if (u.jet.lift) {
       fly(u, u.x + Math.cos(u.angle) * 300, u.y + Math.sin(u.angle) * 300, dt, tf); // erst steigen
@@ -473,14 +648,14 @@ function stepAirborne(game, u, dt) {
     return;
   }
   u.jet.rtbHome = null;
-  u.jet.side = u.jet.dir = undefined;
+  u.jet.side = u.jet.land = undefined;
   // Höhe und Tempo zurück auf Reiseflug
   u.jet.alt = Math.min(1, u.jet.alt + dt / J.climb);
   u.jet.v = Math.min(u.jet.speed, u.jet.v + J.accel * dt);
-  if (!home && !u.jet.lost) {
+  if (!rw && !u.jet.lost) {
     u.jet.lost = true;
-    game.message(u.team, `${u.def.name}: kein Flughafen mit freiem Platz`, u.x, u.y);
-  } else if (home) u.jet.lost = false;
+    game.message(u.team, `${u.def.name}: kein freier Stellplatz mit Weg zu einer Start-/Landebahn`, u.x, u.y);
+  } else if (rw) u.jet.lost = false;
   u.jet.rtb = false;
   if (o.type === 'attack') {
     const t = resolveTarget(game, o.targetId);
@@ -527,8 +702,15 @@ function stepAirborne(game, u, dt) {
 export function updateAircraft(game, dt) {
   for (const u of game.units) {
     if (!u.alive || !u.def.jet) continue;
-    u.jet ??= { home: 0, slot: -1, ready: true, warned: false };
+    u.jet ??= { home: 0, ready: true, warned: false };
     u.jet.phase ??= u.parked ? 'park' : 'air';
+    if (!game.city) {
+      // ohne Stadt gibt es keinen Fliegerhorst: fliegen, bis der Treibstoff leer ist
+      if (u.parked || GROUND.has(u.jet.phase)) {
+        u.parked = false;
+        u.jet.phase = 'air';
+      }
+    }
     if (u.parked) stepParked(game, u, dt);
     else if (u.jet.phase === 'taxiOut') stepTaxiOut(game, u, dt);
     else if (u.jet.phase === 'roll') stepRoll(game, u, dt);
@@ -541,27 +723,37 @@ export function updateAircraft(game, dt) {
 }
 
 /**
- * Befehl `{ type: 'land', ids, airportId }` (seit v5.15): gewählte Flugzeuge landen auf dem eigenen Flughafen airportId (Landeanflug,
- * Ausrollen, Rollen zum Stellplatz). Abgestellte Jets eines anderen Flughafens starten und fliegen hinüber.
+ * Befehl `{ type: 'land', ids, airportId }` (seit v5.15; seit v5.35 ist airportId ein Stellplatz): die gewählten Flugzeuge landen am
+ * Fliegerhorst dieses Stellplatzes, jedes auf seinem eigenen Stellplatz, sonst einem freien Stellplatz mit Weg zur selben Bahn.
  */
 export function cmdLand(game, team, cmd) {
   const e = game.getEntity(cmd.airportId);
-  if (!e || e.team !== team || !isAirport(game, e)) return { ok: false, reason: 'Eigenen fertigen Flughafen wählen' };
+  if (!e || e.team !== team || !isStand(game, e)) return { ok: false, reason: 'Eigenen fertigen Stellplatz wählen' };
+  const route = standRoute(game, e);
+  if (!route) return { ok: false, reason: 'Dieser Stellplatz hat keinen Weg zu einer Start-/Landebahn' };
   const jets = game.ownUnits(team, cmd.ids).filter((u) => u.def.jet);
   if (!jets.length) return { ok: false, reason: 'Kein Flugzeug gewählt' };
-  const homed = jets.filter((u) => u.jet?.home === e.id).length;
-  if (freeSpace(game, e) + homed <= 0) return { ok: false, reason: `Flughafen voll (${J.capacity} Flugzeuge)` };
+  // freie Stellplätze an derselben Bahn (der angeklickte zuerst)
+  const base = standsOf(game, team).filter((s) => standRoute(game, s)?.rw.key === route.rw.key).sort((a, b) => (a === e ? -1 : b === e ? 1 : dist(a.x, a.y, e.x, e.y) - dist(b.x, b.y, e.x, e.y)));
+  const taken = new Set();
+  let n = 0;
   for (const u of jets) {
-    u.order = { type: 'land', x: e.x, y: e.y, targetId: e.id };
+    const own = base.find((s) => s.id === u.jet?.home);
+    const s = own ?? base.find((x) => !taken.has(x.id) && freeSpace(game, x) > 0);
+    if (!s) continue;
+    taken.add(s.id);
+    u.order = { type: 'land', x: s.x, y: s.y, targetId: s.id };
     u.targetId = null;
+    n++;
   }
-  return { ok: true, count: jets.length };
+  if (!n) return { ok: false, reason: 'Kein freier Stellplatz an diesem Fliegerhorst' };
+  return { ok: true, count: n };
 }
 
-/** Zusatzprüfung der Ausbildung (game.cmdTrain): Platz im Flughafen. Fehlertext oder null. */
+/** Zusatzprüfung der Ausbildung (game.cmdTrain): ein Flugzeug je Stellplatz. Fehlertext oder null. */
 export function trainCheck(game, b, unit) {
   if (!UNITS[unit]?.jet) return null;
-  if (!isAirport(game, b)) return 'Nur ein fertiger Flughafen bildet Flugzeuge aus';
-  if (freeSpace(game, b) <= 0) return `Flughafen voll (${J.capacity} Flugzeuge)`;
+  if (!isStand(game, b)) return 'Nur ein fertiger Stellplatz baut Flugzeuge';
+  if (freeSpace(game, b) <= 0) return 'Stellplatz belegt (ein Flugzeug je Stellplatz)';
   return null;
 }

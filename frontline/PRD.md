@@ -159,6 +159,7 @@ Die Tabellen „Werte“ und „Waffen und Schaden“ erzeugt `npm run docs` aus
 | Kommandeur | C | 0 | 300 | 42 | 340 | 180 | 400 Geld | 20 s | – |
 | LKW | E | 1 | 250 | 110 | 220 | – | 80 Geld | 6 s | 30 / 0,2 |
 | Baufahrzeug | R | 1 | 400 | 70 | 260 | – | 150 Geld | 9 s | 40 / 0,3 |
+| Bagger | X | 2 | 650 | 48 | 240 | 34 | 320 Geld | 14 s | 45 / 0,35 |
 | FOB-Fahrzeug | B | 2 | 600 | 60 | 260 | – | 500 Geld | 30 s | 50 / 0,4 |
 | Schützenpanzer | A | 3 | 450 | 85 | 300 | 240 | 250 Geld | 12 s | 40 / 0,4 |
 | Kampfpanzer | S | 5 | 1100 | 60 | 320 | 300 | 500 Geld | 20 s | 60 / 0,6 |
@@ -199,6 +200,7 @@ Schaden je Schuss nach Panzerklasse des Ziels (Inf = Infanterie, Leicht, Schwer,
 | Panzerabwehrsoldat: RPG | 240 | 3 | 5 | 10 | 10 | 90 | 120 | 60 | 40 | 0 | Soldat: 1 Treffer |
 | Scharfschütze: Scharfschützengewehr | 480 | 8 | 10 | 4 | 200 | 6 | 1 | 2 | 2 | 0 | Soldat: 1 Treffer |
 | Kommandeur: Maschinenpistole | 180 | 0,6 | 90 | 0,033 | 10 | 2 | 1 | 2 | 2 | 0 | Soldat: 6 Treffer |
+| Bagger: Schaufel | 34 | 1,2 | 9999 | 0 | – | – | – | 32 | – | – | bevorzugt gegen Geb |
 | Schützenpanzer: Granatwerfer | 240 | 2 | 60 | 10 | 30 | 40 | 10 | 25 | – | – | bevorzugt gegen Leicht, Schwer, Geb; Soldat: 1 Treffer |
 | Schützenpanzer: MG | 220 | 0,25 | 300 | 5 | 9 | 3 | 1 | 3 | 6 | 2 | Soldat: 2 Treffer |
 | Kampfpanzer: Hauptkanone | 300 | 6 | 30 | 20 | 45 | 120 | 150 | 120 | – | – | bevorzugt gegen Leicht, Schwer, Geb; Soldat: 1 Treffer |

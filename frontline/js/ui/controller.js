@@ -1,7 +1,7 @@
 // Spieler-Steuerung (docs/verlauf.md §5 ui/controller.js, §11.3–11.8): Auswahl, Modi, Befehle und Befehlskarte. Kein DOM.
 // Hält den Ansichtszustand `view`, den renderer.render(view) liest. Befehle laufen nur über game.issue.
 import { cityEntityAt, freePop, crewOf, KINDS as CITY_KINDS } from '../game/city.js';
-import { trainCheck, isAirport, airportsOf } from '../game/aircraft.js';
+import { trainCheck, isAirport, airportsOf, standRoute } from '../game/aircraft.js';
 import { CITY } from '../data/city.js';
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
@@ -21,7 +21,7 @@ const WALL_MAX = 40; // max. Zellen je Mauerzug (Vorschau und Befehl)
 const DOUBLE_MS = 350; // Doppelklick auf einen Typ = alle dieses Typs im Bild
 const GROUP_DOUBLE_MS = 500; // Gruppentaste zweimal = Kamera hin
 const PICK_PX = 16; // Trefferradius in Bildschirm-Pixeln
-const TARGET_MODES = ['board', 'storm', 'place', 'wall', 'attackMove', 'loadFob', 'unloadFob', 'routeFrom', 'routeTo', 'mortarTarget', 'dropoff', 'landAt'];
+const TARGET_MODES = ['board', 'storm', 'place', 'wall', 'attackMove', 'loadFob', 'unloadFob', 'routeFrom', 'routeTo', 'mortarTarget', 'dropoff', 'landAt', 'dig'];
 const BUILD_MENU = Object.keys(BUILDINGS).filter((k) => BUILDINGS[k].hotkey && BUILDINGS[k].buildable !== false);
 // Befehle, die der Ton quittiert (Marsch, Angriff, Bau …); Ausbildung und Forschung melden sich über ihre Meldungen
 const FORTIFY_KEYS = [['sandbags', 'Z'], ['mgnest', 'N'], ['wire', 'W']];
@@ -30,7 +30,7 @@ const FORTIFY_TIPS = {
   mgnest: 'Die Besatzer schießen schneller.',
   wire: 'Stürmer machen nur 60 % Schaden.',
 };
-const ORDER_SOUND = new Set(['land', 'move', 'attackMove', 'attack', 'garrison', 'ungarrison', 'storm', 'fortifyHouse', 'board', 'pickup', 'deliver', 'load', 'unload', 'route', 'build', 'repair', 'deploy', 'buildWall', 'mortarTarget', 'dropoff', 'repairBridge']);
+const ORDER_SOUND = new Set(['land', 'move', 'attackMove', 'attack', 'garrison', 'ungarrison', 'storm', 'fortifyHouse', 'board', 'pickup', 'deliver', 'load', 'unload', 'route', 'build', 'repair', 'deploy', 'buildWall', 'mortarTarget', 'dropoff', 'repairBridge', 'dig']);
 const RES_KEYS = ['money', 'bm', 'mun', 'fuel'];
 const CARGO_KEYS = ['bm', 'mun', 'fuel']; // Lagersorten (FOB-Lager, LKW-Ladung)
 const SHORT = { money: 'G', bm: 'BM', mun: 'MUN', fuel: 'TS' };
@@ -493,6 +493,9 @@ export class Controller {
       case 'landAt':
         this.confirmLand(wx, wy);
         return;
+      case 'dig':
+        this.confirmDig(wx, wy, shift);
+        return;
       case 'dropoff':
         this.confirmDropoff(wx, wy);
         return;
@@ -582,7 +585,7 @@ export class Controller {
         if (!rest.length) return;
       }
     }
-    // Eigener Flughafen: Flugzeuge landen dort (die übrigen gehen hin)
+    // Eigener Stellplatz: Flugzeuge landen dort (die übrigen gehen hin)
     const ap = rest.some((u) => u.def.jet) ? this.pickAirport(wx, wy) : null;
     if (ap) {
       const jets = rest.filter((u) => u.def.jet);
@@ -790,13 +793,13 @@ export class Controller {
     if (this.issue({ type: 'route', ids, fromId: this.routeFromId, toId: fob.id }).ok) this.setMode('normal');
   }
 
-  /** Eigener fertiger Flughafen an (wx, y) oder null. */
+  /** Eigener fertiger Stellplatz an (wx, y) oder null. */
   pickAirport(wx, wy) {
     const e = this.pickCity(wx, wy);
     return e && isAirport(this.game, e) ? e : null;
   }
 
-  /** Landen (L): gewählte Flugzeuge landen auf dem angeklickten eigenen Flughafen. */
+  /** Landen (L): gewählte Flugzeuge landen und rollen zum angeklickten eigenen Stellplatz. */
   confirmLand(wx, wy) {
     const ids = this.selectedUnits().filter((u) => u.def.jet).map((u) => u.id);
     if (!ids.length) {
@@ -806,13 +809,29 @@ export class Controller {
     }
     const ap = this.pickAirport(wx, wy);
     if (!ap) {
-      this.message('Eigenen Flughafen anklicken');
+      this.message('Eigenen Stellplatz anklicken');
       return;
     }
     if (this.issue({ type: 'land', ids, airportId: ap.id }).ok) {
       this.moveMarker(ap.x, ap.y);
       this.setMode('normal');
     }
+  }
+
+  /** Baggern (G): gewählte Bagger räumen die angeklickte Stadtzelle (Shift: weitere Zellen anhängen). */
+  confirmDig(wx, wy, shift) {
+    const ids = this.selectedUnits().filter((u) => u.def.digger).map((u) => u.id);
+    if (!ids.length) {
+      this.message('Kein Bagger gewählt');
+      this.setMode('normal');
+      return;
+    }
+    const S = CITY.cell;
+    const c = Math.floor(wx / S);
+    const r = Math.floor(wy / S);
+    if (!this.issue({ type: 'dig', ids, c0: c, r0: r, c1: c, r1: r, append: shift }).ok) return;
+    this.moveMarker((c + 0.5) * S, (r + 0.5) * S);
+    if (!shift) this.setMode('normal');
   }
 
   /** Mörser-Ziel: Klick auf die Karte, alle gewählten Mörser in Reichweite feuern dorthin. */
@@ -1119,7 +1138,9 @@ export class Controller {
       case 'dropoff':
         return 'Absetzen: Zielpunkt anklicken · Esc bricht ab';
       case 'landAt':
-        return 'Landen: eigenen Flughafen anklicken · Esc bricht ab';
+        return 'Landen: eigenen Stellplatz anklicken · Esc bricht ab';
+      case 'dig':
+        return 'Baggern: Zelle anklicken (Zonenstraße, Bäume, Haus, eigenes Gebäude) · Shift = weitere Zellen · Esc bricht ab';
       case 'storm':
         return 'Stürmen: gegnerisch besetztes Haus anklicken · Esc bricht ab';
       case 'board':
@@ -1269,10 +1290,18 @@ export class Controller {
       const any = airportsOf(this.game, this.team).length > 0;
       card.push(
         entry('Landen', 'L', {
-          tip: 'Landen (L): danach den eigenen Flughafen anklicken (oder Rechtsklick darauf). Das Flugzeug fliegt die Platzrunde, landet auf der Landebahn, rollt aus und rollt zu seinem Stellplatz; dort wird es betankt und munitioniert.',
+          tip: 'Landen (L): danach einen eigenen Stellplatz anklicken (oder Rechtsklick darauf). Das Flugzeug fliegt die Platzrunde, landet auf der Landebahn, rollt aus und rollt zu seinem Stellplatz; dort wird es betankt und munitioniert.',
           enabled: any,
-          reason: 'Kein eigener Flughafen',
+          reason: 'Kein eigener Stellplatz',
           action: () => this.setMode('landAt'),
+        }),
+      );
+    }
+    if (units.some((u) => u.def.digger)) {
+      card.push(
+        entry('Baggern', 'G', {
+          tip: 'Baggern (G): danach eine Zelle anklicken (Shift: mehrere). Der Bagger fährt hin und räumt sie: Zonenstraßen der Karte (nicht Brücken) verschwinden für beide Seiten, Bäume und leere Häuser werden geräumt, eigene Stadtgebäude abgerissen. Gegnerische Gebäude greift er mit der Schaufel an (langsam).',
+          action: () => this.setMode('dig'),
         }),
       );
     }
@@ -1374,12 +1403,16 @@ export class Controller {
     const col = i % c.cols;
     const row = (i - col) / c.cols;
     const card = b.produces ? this.trainEntries([b]) : []; // Kaserne, Fabrikhalle, Heliport (seit v4.96)
-    if (CITY_KINDS[c.kind[i] - 1] === 'airport') {
-      // Flughafen (seit v5.03): alle Flugzeuge dieses Flughafens wählen (am Boden und in der Luft)
-      const jets = this.game.units.filter((u) => u.alive && u.jet?.home === b.id);
+    if (['stand', 'atc'].includes(CITY_KINDS[c.kind[i] - 1])) {
+      // Fliegerhorst (seit v5.35): alle Flugzeuge der Stellplätze, die mit derselben Bahn verbunden sind (am Boden und in der Luft)
+      const g = this.game;
+      const key = CITY_KINDS[c.kind[i] - 1] === 'stand' ? standRoute(g, b)?.rw.key : null;
+      const stands = airportsOf(g, this.team).filter((s) => key == null || standRoute(g, s)?.rw.key === key);
+      const ids = new Set(stands.map((s) => s.id));
+      const jets = g.units.filter((u) => u.alive && u.team === this.team && ids.has(u.jet?.home));
       card.push(
         entry('Staffel', 'W', {
-          tip: `Alle ${jets.length} Flugzeuge dieses Flughafens wählen (W); Befehl = Start (Rollen zur Startbahn, Startlauf), sobald betankt; Landen (L) oder Rechtsklick auf den eigenen Flughafen = landen`,
+          tip: `Alle ${jets.length} Flugzeuge dieses Fliegerhorsts wählen (W); Befehl = Start (Rollen zur Bahn, Startlauf), sobald betankt; Landen (L) oder Rechtsklick auf einen eigenen Stellplatz = landen`,
           enabled: jets.length > 0,
           reason: 'Keine Flugzeuge stationiert',
           action: () => {
@@ -1433,7 +1466,7 @@ export class Controller {
       else if (def.hero && hasCommander(this.game, ready.team)) reason = 'Nur ein Kommandeur je Team';
       else if (this.game.city && freePop(this.game, ready.team) < crewOf(u)) reason = 'Zu wenig freie Einwohner (Stadt: Wohnen ausbauen)';
       else if (this.game.city && this.game.city[ready.team].metal < (CITY.metalCost[u] ?? 0)) reason = 'Zu wenig Stahl (Stadt: Erzmine, Hütte und Stahlwerk oder Markt)';
-      else reason = trainCheck(this.game, ready, u) ?? this.trainReason(ready, def.cost); // Flughafen: Platz für Flugzeuge
+      else reason = trainCheck(this.game, ready, u) ?? this.trainReason(ready, def.cost); // Stellplatz: Platz für Flugzeuge
       card.push(
         entry(def.short || def.name, def.hotkey, {
           cost: costText(def.cost),

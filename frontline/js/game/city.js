@@ -12,14 +12,17 @@ import { bridgeUnder } from './river.js';
 import { transportOf, transportInfo, pathEff, addLoad, beginLoads, settleLoads, minFactor, mainAccess } from './transport.js';
 
 /** Zellenarten (Code im Raster): 0 leer. Neue Arten nur hinten anhängen (Code = Index + 1). */
-export const KINDS = ['road', 'res', 'com', 'bm', 'mun', 'fuel', 'steel', 'mine', 'market', 'power', 'uni', 'dc', 'barracks', 'factory', 'heliport', 'hospital', 'airport', 'smelter', 'kero'];
+export const KINDS = ['road', 'res', 'com', 'bm', 'mun', 'fuel', 'steel', 'mine', 'market', 'power', 'uni', 'dc', 'barracks', 'factory', 'heliport', 'hospital', 'airport', 'smelter', 'kero', 'runway', 'stand', 'atc', 'ktank', 'mdepot'];
 export const KIND_ID = Object.fromEntries(KINDS.map((k, i) => [k, i + 1]));
 export const KIND_NAME = {
   road: 'Straße', res: 'Wohnen', com: 'Gewerbe', bm: 'Baumaterial-Werk', mun: 'Munitionswerk', fuel: 'Raffinerie',
   steel: 'Stahlwerk', mine: 'Förderanlage', market: 'Markt', power: 'Kraftwerk', uni: 'Universität', dc: 'Rechenzentrum',
   barracks: 'Kaserne', factory: 'Fabrikhalle', heliport: 'Heliport', hospital: 'Krankenhaus', airport: 'Flughafen',
   smelter: 'Hütte', kero: 'Kerosin-Raffinerie',
+  runway: 'Start-/Landebahn', stand: 'Stellplatz', atc: 'Tower', ktank: 'Kerosintank', mdepot: 'Munitionslager',
 };
+/** Flache Zellen (seit v5.35): Straße und Start-/Landebahn wachsen nicht, haben kein Gebäude und zählen als Straßenanschluss. */
+export const isFlat = (id) => id === KIND_ID.road || id === KIND_ID.runway;
 /** Ausbildungsgebäude der Stadt (seit v4.96): Zellenart → Einheiten (CITY.produces). */
 export const TRAINER_KINDS = Object.keys(CITY.produces);
 /** Welches Stadtgebäude bildet `unit` aus? (Zellenart oder null) */
@@ -543,7 +546,7 @@ export function updateClaim(game, c) {
     stamp(b.x, b.y, b.main ? TR.main : TR.fob);
   }
   for (const i of c.list) {
-    if (!c.level[i] || c.kind[i] === KIND_ID.road || isPart(c, i)) continue;
+    if (!c.level[i] || isFlat(c.kind[i]) || isPart(c, i)) continue;
     stamp((i % c.cols + 0.5) * c.cell + c.x0, (Math.floor(i / c.cols) + 0.5) * c.cell + c.y0, TR.building);
   }
   let changed = false;
@@ -873,6 +876,22 @@ export function migrateCity(game) {
         if (lv) syncEntity(game, c, a);
       }
     }
+    // Nicht mehr baubare Arten (seit v5.35: der Flughafen 10 × 10) räumen; Flugzeuge darauf gehen mit ihm verloren (aircraft.js)
+    for (const k of CITY.retired ?? []) {
+      const id = KIND_ID[k];
+      for (let j = 0; j < c.kind.length; j++) {
+        if (c.kind[j] !== id) continue;
+        if (c.ents.has(j)) dropEntity(game, c, j);
+        const q = j % c.cols;
+        if (c.level[j]) releaseCell(game, c, q, (j - q) / c.cols);
+        c.kind[j] = 0;
+        c.level[j] = 0;
+        c.part[j] = 0;
+        c.timer[j] = 0;
+        changed = true;
+      }
+    }
+    if (changed) c.ver++;
     if (shrinkBig(game, c)) changed = true; // Großbauten, die kleiner geworden sind (seit v5.33: Fabrikhalle 8 × 8 → 5 × 5)
     if (changed) rebuildList(c); // sonst bleibt der Stand unverändert (Laden = durchgehend gespielt)
   }
@@ -1001,7 +1020,7 @@ function releaseCell(game, c, col, row) {
 
 /** Eigene Straße oder Stadtstraße der Karte (Zone, Brücke; seit v5.03) in Zelle i? */
 export function roadAt(c, i) {
-  return c.kind[i] === KIND_ID.road || !!c.mapRoads?.[i];
+  return isFlat(c.kind[i]) || !!c.mapRoads?.[i]; // seit v5.35 auch die Start-/Landebahn (Rollen, Anschluss)
 }
 
 /** Hat die Zelle eine Straße als direkten Nachbarn (4er-Nachbarschaft)? Stadtstraßen der Karte zählen mit. */
@@ -1136,7 +1155,7 @@ function syncEntity(game, c, i) {
   const lv = c.level[i];
   const k = KINDS[c.kind[i] - 1];
   let e = c.ents.get(i);
-  if (!lv || k === 'road') {
+  if (!lv || k === 'road' || k === 'runway') {
     if (e) dropEntity(game, c, i);
     return;
   }
@@ -1284,7 +1303,7 @@ export function updateCity(game, dt) {
       const kind = KINDS[c.kind[i] - 1];
       const col = i % c.cols;
       const row = (i - col) / c.cols;
-      if (kind === 'road' || !hasRoad(c, col, row)) continue; // seit v5.20 auch Förderanlagen: ohne Straße wachsen sie nicht
+      if (kind === 'road' || kind === 'runway' || !hasRoad(c, col, row)) continue; // seit v5.20 auch Förderanlagen: ohne Straße wachsen sie nicht
       const lv = c.level[i];
       if (lv >= CITY.maxLevel) continue;
       const need = lv === 0 ? CITY.growTime : CITY.upgradeTime;
@@ -1336,7 +1355,7 @@ export function updateCity(game, dt) {
     const anchors = W.anchors;
     let nA = 0;
     for (const i of c.list) {
-      if (!c.level[i] || isPart(c, i) || c.kind[i] === KIND_ID.road) continue;
+      if (!c.level[i] || isPart(c, i) || isFlat(c.kind[i])) continue;
       anchors[nA++] = i;
       arr[i] = 0; // Lieferziele sind fertige Gebäude (Anker)
     }
@@ -1484,6 +1503,30 @@ export function updateCity(game, dt) {
       const v0 = main.store.mun;
       main.store.mun = Math.min(BALANCE.logistics.capitalCap, v0 + s.mun * dt);
       made.mun += Math.max(0, main.store.mun - v0);
+    }
+    // Fliegerhorst (seit v5.35): Kerosintanks aus dem Kerosin des Stadtlagers, Munitionslager aus dem Lager der Hauptstadt befüllen,
+    // über ihren Weg zum Lager (Last = Menge), höchstens fill je s und bis zur Lagergröße
+    const KT = KIND_ID.ktank;
+    const MD = KIND_ID.mdepot;
+    for (let m = 0; m < nA; m++) {
+      const i = anchors[m];
+      const k = c.kind[i];
+      if (k !== KT && k !== MD) continue;
+      const e = c.ents.get(i);
+      const p = tr.depot.get(i) ?? null;
+      if (!e || !p || !credit) continue;
+      const A = k === KT ? CITY.air.tank : CITY.air.depot;
+      const lv = c.level[i];
+      e.stock ??= 0;
+      const room = Math.max(0, A.cap[lv] - e.stock) / Math.max(dt, 1e-6);
+      const src = k === KT ? c.kero : main.store.mun;
+      const want = Math.min(A.fill[lv], room, src / Math.max(dt, 1e-6));
+      if (!(want > 0)) continue;
+      addLoad(tr, p, want);
+      const got = want * pathEff(tr, p);
+      if (k === KT) c.kero = Math.max(0, c.kero - want * dt);
+      else main.store.mun = Math.max(0, main.store.mun - want * dt);
+      e.stock = Math.min(A.cap[lv], e.stock + got * dt);
     }
     // Stau: kleinster Stau-Faktor auf den in diesem Schritt benutzten Straßen (1 ohne Stau), dann Glättung für den nächsten Schritt
     s.jam = minFactor(tr);
@@ -1700,6 +1743,7 @@ export function cmdCity(game, team, cmd) {
   if (!city) return { ok: false, reason: 'Die Stadt ist in dieser Partie ausgeschaltet' };
   const erase = cmd.kind === 'erase';
   if (!erase && !KIND_ID[cmd.kind]) return { ok: false, reason: 'Unbekannte Zellenart' };
+  if (CITY.retired?.includes(cmd.kind)) return { ok: false, reason: `${KIND_NAME[cmd.kind]}: nicht mehr baubar (seit v5.35 Fliegerhorst aus Bahn, Stellplätzen, Tower, Kerosintank und Munitionslager)` };
   const c0 = Math.max(0, Math.min(cmd.c0, cmd.c1) | 0);
   const c1 = Math.min(city.cols - 1, Math.max(cmd.c0, cmd.c1) | 0);
   const r0 = Math.max(0, Math.min(cmd.r0, cmd.r1) | 0);
@@ -1802,7 +1846,7 @@ export function cmdCity(game, team, cmd) {
   rebuildList(city);
   // Zonen ohne Straße daneben wachsen nicht (Förderanlagen schon): melden
   let noRoad = false;
-  if (!erase && cmd.kind !== 'road') {
+  if (!erase && cmd.kind !== 'road' && cmd.kind !== 'runway') {
     for (let row = r0; row <= r1 && !noRoad; row++) for (let col = c0; col <= c1; col++) if (city.kind[idx(city, col, row)] === id && !hasRoad(city, col, row)) noRoad = true;
   }
   return { ok: true, placed, broke: !!broke, noRoad, occupied, felled, razed, manned, kept };
@@ -2123,7 +2167,7 @@ export function aiCity(game, team, difficulty) {
     rad = CITY.ai.quarter;
   }
   if (!anchor) return;
-  if (aiAirport(game, city, main, reserve)) n++;
+  if (aiAirport(game, city, main, reserve, CITY.ai.jets[difficulty] ?? CITY.ai.jets.normal)) n++;
   if (n < CITY.ai.perStep && aiConnect(game, city)) n++;
   const add = {};
   const skip = new Set(); // Großbauten, für die in diesem Takt kein Platz war
@@ -2230,48 +2274,71 @@ function aiConnect(game, c) {
 }
 
 /**
- * Flughafen der KI (seit v5.03): Der 10 × 10-Großbau passt selten zwischen ihre Straßenreihen; darum sucht sie eigens das nächste
- * freie Quadrat (ohne Vorkommen und Gefahr, mit einer Zelle Rand) um die Hauptstadt und legt eine Straße an der Seite zur
- * Hauptstadt an. true, wenn gebaut.
+ * Fliegerhorst der KI (seit v5.35, ersetzt den Flughafen): ab CITY.ai.airportFrom Arbeitsstätten eine Bahn 2 × 10 nahe der Hauptstadt
+ * (bis airportReach Zellen; waagrecht oder senkrecht, mit freiem Rand), daneben zwei Stellplätze, Tower, Kerosintank und Munitionslager;
+ * Tank und Lager per connectRoad an die Straße zum Lager. Danach je Takt ein weiterer Stellplatz an der Bahn, bis sie `want` hat.
  */
-function aiAirport(game, c, main, reserve) {
+export function aiAirport(game, c, main, reserve, want = 2) {
   const A = CITY.ai;
   if (!main) return false;
-  if (game.teams[c.team].res.money < CITY.cost.airport + reserve || main.store.bm < (CITY.costBm.airport ?? 0) + 200) return false;
+  const money = game.teams[c.team].res.money;
   let work = 0;
+  const stands = [];
   for (const i of c.list) {
     if (isPart(c, i)) continue;
     const k = KINDS[c.kind[i] - 1];
-    if (k === 'airport') return false; // einer reicht
-    if (k === 'com' || k === 'market' || WORKS.includes(k)) work++;
+    if (k === 'stand') stands.push(i); // auch noch nicht fertige (sonst baut sie doppelt)
+    if (c.level[i] && (k === 'com' || k === 'market' || WORKS.includes(k))) work++;
   }
-  if (work < A.airportFrom) return false;
-  const n = sizeOf('airport');
+  const hasRunway = c.list.some((i) => c.kind[i] === KIND_ID.runway);
+  const free = (j) => !c.kind[j] && !c.deposit[j] && !c.mapRoads?.[j] && canZone(game, c, j) && cellFree(game, c, j % c.cols, Math.floor(j / c.cols)) && !inDanger(c, j % c.cols, Math.floor(j / c.cols), game.time);
+  const put = (kind, q, r) => game.issue(c.team, { type: 'city', kind, c0: q, r0: r, c1: q, r1: r }).ok;
+  if (hasRunway) {
+    // weitere Stellplätze an der Bahn (beide Längsseiten)
+    if (stands.length >= want || money < CITY.cost.stand + reserve || main.store.bm < CITY.costBm.stand + 100) return false;
+    const rw = c.list.filter((i) => c.kind[i] === KIND_ID.runway);
+    for (const i of rw) {
+      const q = i % c.cols;
+      const r = (i - q) / c.cols;
+      for (const [x, y] of [[q, r - 2], [q, r + 1], [q - 2, r], [q + 1, r], [q - 1, r - 2], [q - 1, r + 1]]) {
+        const cells = [[x, y], [x + 1, y], [x, y + 1], [x + 1, y + 1]];
+        if (cells.some(([u, v]) => u < 0 || v < 0 || u >= c.cols || v >= c.rows || !free(v * c.cols + u))) continue;
+        if (put('stand', x, y)) return true; // 2 × 2: Anker links oben der Mitte
+      }
+    }
+    return false;
+  }
+  if (work < A.airportFrom || stands.length) return false;
+  if (money < 900 + reserve || main.store.bm < 800) return false;
   const [fc, fr] = cellAt(c, main.x, main.y);
-  const R = A.airportReach; // Zellen um die Hauptstadt
-  const free = (j) => !c.kind[j] && !c.deposit[j] && !c.mapRoads?.[j] && !inDanger(c, j % c.cols, Math.floor(j / c.cols), game.time);
+  const R = A.airportReach;
+  const L = 10; // Länge der Bahn
+  const fits = (q, r, w, h) => {
+    for (let y = r - 1; y <= r + h; y++) for (let x = q - 1; x <= q + w; x++) if (x < 0 || y < 0 || x >= c.cols || y >= c.rows || !free(y * c.cols + x)) return false;
+    return true;
+  };
   const cand = [];
-  for (let r = Math.max(0, fr - R); r <= Math.min(c.rows - 1, fr + R); r++) {
-    for (let q = Math.max(0, fc - R); q <= Math.min(c.cols - 1, fc + R); q++) cand.push({ a: r * c.cols + q, d: Math.hypot(q - fc, r - fr) });
+  for (let r = Math.max(1, fr - R); r <= Math.min(c.rows - 2, fr + R); r++) {
+    for (let q = Math.max(1, fc - R); q <= Math.min(c.cols - 2, fc + R); q++) cand.push({ q, r, d: Math.hypot(q - fc, r - fr) });
   }
-  cand.sort((p, o) => p.d - o.d || p.a - o.a);
-  const hit = cand.find((k) => bigFits(game, c, k.a, n, free));
-  if (!hit) return false;
-  const res = game.issue(c.team, { type: 'city', kind: 'airport', c0: hit.a % c.cols, r0: Math.floor(hit.a / c.cols), c1: hit.a % c.cols, r1: Math.floor(hit.a / c.cols) });
-  if (!res.ok) return false;
-  const [lo, hi] = bigSpan(n);
-  const q = hit.a % c.cols;
-  const r = Math.floor(hit.a / c.cols);
-  const dx = fc - q;
-  const dy = fr - r;
-  // Straße entlang der Seite zur Hauptstadt (eine Zelle außerhalb des Quadrats), nur auf leeren Zellen (nichts überbauen)
-  if (hasRoad(c, q, r)) return true;
-  for (let k = -lo - 1; k <= hi + 1; k++) {
-    const [x, y] = Math.abs(dx) > Math.abs(dy) ? [dx > 0 ? q + hi + 1 : q - lo - 1, r + k] : [q + k, dy > 0 ? r + hi + 1 : r - lo - 1];
-    if (x < 0 || y < 0 || x >= c.cols || y >= c.rows || c.kind[y * c.cols + x] || !canZone(game, c, y * c.cols + x)) continue;
-    game.issue(c.team, { type: 'city', kind: 'road', c0: x, r0: y, c1: x, r1: y });
+  cand.sort((p, o) => p.d - o.d || p.r - o.r || p.q - o.q);
+  for (const { q, r } of cand) {
+    for (const vertical of [false, true]) {
+      // Bahn L × 2 (bzw. 2 × L) mit einer Reihe 2 × 2-Bauten daneben: Fläche L × 4
+      if (!fits(q, r, vertical ? 4 : L, vertical ? L : 4)) continue;
+      if (vertical) {
+        if (!game.issue(c.team, { type: 'city', kind: 'runway', c0: q, r0: r, c1: q + 1, r1: r + L - 1 }).ok) return false;
+      } else if (!game.issue(c.team, { type: 'city', kind: 'runway', c0: q, r0: r, c1: q + L - 1, r1: r + 1 }).ok) return false;
+      const spots = [0, 2, 4, 6, 8].map((k) => (vertical ? [q + 2, r + k] : [q + k, r + 2]));
+      ['stand', 'stand', 'atc', 'ktank', 'mdepot'].forEach((kind, k) => {
+        const [x, y] = spots[k];
+        put(kind, x, y);
+        if (kind === 'ktank' || kind === 'mdepot') connectRoad(game, c, y * c.cols + x, true);
+      });
+      return true;
+    }
   }
-  return true;
+  return false;
 }
 
 /** Freie Vorkommen im eigenen Gebiet (Zellindizes). */

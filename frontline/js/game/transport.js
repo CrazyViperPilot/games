@@ -209,6 +209,7 @@ function newTransport(c) {
     commute: new Map(),
     mun: new Map(),
     shop: new Map(),
+    depot: new Map(), // seit v5.35: Kerosintank und Munitionslager ↔ Lager
     load: new Float32Array(n),
     factor,
     cap: new Float32Array(n),
@@ -282,6 +283,7 @@ function build(game, c, tr) {
   const commute = new Map();
   const mun = new Map();
   const shop = new Map();
+  const depot = new Map();
   for (const a of anchors) {
     const k = KINDS[c.kind[a] - 1];
     const g = groupOf(c, a);
@@ -289,11 +291,13 @@ function build(game, c, tr) {
     if (WORKPLACE_KINDS.includes(k)) commute.set(a, pathFrom(tr.fields.res, accessCells(c, a))?.path ?? null);
     if (k === 'mun') mun.set(a, pathFrom(tr.fields.main, accessCells(c, a))?.path ?? null);
     if (k === 'com' || k === 'market') shop.set(a, pathFrom(tr.fields.main, accessCells(c, a))?.path ?? null);
+    if (k === 'ktank' || k === 'mdepot') depot.set(a, pathFrom(tr.fields.main, accessCells(c, a))?.path ?? null); // Fliegerhorst (seit v5.35)
   }
   tr.routes = routes;
   tr.commute = commute;
   tr.mun = mun;
   tr.shop = shop;
+  tr.depot = depot;
 }
 
 /**
@@ -305,6 +309,7 @@ function build(game, c, tr) {
  *   commute: Map<Anker, Int32Array | null>  Pendlerweg je Arbeitsstätte (null = kein Wohnen erreichbar)
  *   mun:     Map<Anker, Int32Array | null>  Weg Munitionswerk → Lager
  *   shop:    Map<Anker, Int32Array | null>  Weg Gewerbe/Markt → Lager
+ *   depot:   Map<Anker, Int32Array | null>  Weg Kerosintank/Munitionslager → Lager (seit v5.35)
  *   load, factor, cap: Float32Array je Stadtzelle (factor = c.congestion); list: Int32Array der Straßenzellen;
  *   active (die ersten nActive): Straßenzellen mit Last oder Stau
  * `dist` = Anzahl der Straßenzellen auf dem Weg (0, wenn es kein Ziel gibt).

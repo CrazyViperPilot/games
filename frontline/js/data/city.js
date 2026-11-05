@@ -8,7 +8,7 @@ export const CITY = {
   // Gebiet (seit v4.82): gebaut werden darf nur in Zellen im eigenen Gebiet. Radien in Zellen.
   territory: { main: 10, fob: 4, building: 2, interval: 1 }, // um die Hauptstadt, um jede andere fertige FOB, um jedes fertige Stadtgebäude; Neuberechnung alle interval s
   // Einwohner als Truppen (seit v4.82): ausgebildete Einheiten brauchen so viele freie Einwohner (Startarmee und Nachschub nicht)
-  crew: { default: 1, fobTruck: 2, ifv: 3, tank: 3, flak: 2, sam: 2, gepard: 3, pzh: 4, littlebird: 2, transporter: 2, gunship: 2, f16: 2 },
+  crew: { default: 1, fobTruck: 2, ifv: 3, tank: 3, flak: 2, sam: 2, gepard: 3, pzh: 4, excavator: 2, littlebird: 2, transporter: 2, gunship: 2, f16: 2 },
   // Flucht (seit v4.82): Wohnzellen in der Konfliktzone leeren sich, wenn in ihnen oder den Nachbarzellen geschossen wird
   flee: { reach: 1, calm: 60 }, // Nachbarschaft (Zellen) und Ruhezeit (s), bis die Bewohner zurückziehen dürfen
   startStock: { bm: 1500, mun: 600, fuel: 1000 }, // Startlager der Hauptstadt bei eingeschalteter Stadt (sonst unendlich)
@@ -22,24 +22,27 @@ export const CITY = {
   shop: { need: 0.004, base: 0.3, per: 0.25 },
 
   // ---- Bau ----
-  cost: { road: 0, res: 20, com: 30, bm: 40, mun: 40, fuel: 40, steel: 50, smelter: 50, kero: 50, mine: 30, market: 60, power: 80, uni: 400, dc: 250, barracks: 80, factory: 150, heliport: 200, hospital: 120, airport: 800 }, // Geld je Zelle, bei Großbauten (size) je Gebäude (Abriss kostenlos, keine Erstattung)
+  cost: { road: 0, res: 20, com: 30, bm: 40, mun: 40, fuel: 40, steel: 50, smelter: 50, kero: 50, mine: 30, market: 60, power: 80, uni: 400, dc: 250, barracks: 80, factory: 150, heliport: 200, hospital: 120, airport: 800, runway: 10, stand: 120, atc: 150, ktank: 60, mdepot: 60 }, // Geld je Zelle, bei Großbauten (size) je Gebäude (Abriss kostenlos, keine Erstattung)
   // Großbauten (seit v5.00): Kantenlänge in Zellen (fehlt = 1; seit v5.03 auch gerade). Ein Großbau ist ein Gebäude: eine Stufe, ein
   // Ziel mit Trefferpunkten hp × Kantenlänge, Arbeitsplätze und Strom wie eine Zelle; Straße an irgendeiner Außenzelle reicht.
   // Seit v5.08 sind auch die Werke (BM-Werk, Munitionswerk, Raffinerie, Stahlwerk) 2 × 2 groß, mit eigenem Aussehen (render/works.js).
-  size: { uni: 3, power: 2, barracks: 4, factory: 5, airport: 10, bm: 2, mun: 2, fuel: 2, steel: 2, smelter: 2, kero: 2 },
+  size: { uni: 3, power: 2, barracks: 4, factory: 5, airport: 10, bm: 2, mun: 2, fuel: 2, steel: 2, smelter: 2, kero: 2, stand: 2, atc: 2, ktank: 2, mdepot: 2 },
+  // Nicht mehr baubar (Zellenart bleibt für alte Stände, migrateCity räumt sie): der Flughafen 10 × 10 (bis v5.33), ersetzt durch den
+  // Fliegerhorst aus Bausteinen (seit v5.35: Bahn, Stellplatz, Tower, Kerosintank, Munitionslager; CITY.air)
+  retired: ['airport'],
   // Räumen reißt seit v5.16 auch diese Gebäude der Karte ab (Häuser, Hallen, Fabriken der Zonenstadt und außerhalb), kostenlos wie das
   // übrige Räumen; besetzte Häuser nicht. Wachtürme, Zug, Mauern, Fels und Wasser bleiben.
   clearable: ['house', 'hall', 'factory'],
-  costBm: { road: 10, barracks: 100, factory: 200, heliport: 150, hospital: 80, airport: 400 }, // Baumaterial je Zelle aus dem Lager der Hauptstadt (seit v4.83: Straßen kosten Baumaterial statt Geld)
+  costBm: { road: 10, barracks: 100, factory: 200, heliport: 150, hospital: 80, airport: 400, runway: 15, stand: 80, atc: 60, ktank: 40, mdepot: 60 }, // Baumaterial je Zelle aus dem Lager der Hauptstadt (seit v4.83: Straßen kosten Baumaterial statt Geld)
 
   // ---- Ausbildung (seit v4.96, PRD §15) ----
   // Mit Stadt bilden nur diese Stadtgebäude Truppen aus (die Hauptstadt nicht mehr). Sie bezahlen direkt aus der Stadt:
   // Geld aus der Kasse, Metall aus dem Stadtlager, Einwohner als Truppen; kein LKW nötig, egal wo sie stehen.
   produces: {
     barracks: ['rifleman', 'at', 'sniper', 'commander'], // Kaserne: Soldaten
-    factory: ['truck', 'engineer', 'fobTruck', 'ifv', 'tank', 'flak', 'sam', 'gepard', 'pzh'], // Fabrikhalle: alle Fahrzeuge (auch das FOB-Fahrzeug)
+    factory: ['truck', 'engineer', 'fobTruck', 'ifv', 'tank', 'flak', 'sam', 'gepard', 'pzh', 'excavator'], // Fabrikhalle: alle Fahrzeuge (auch das FOB-Fahrzeug)
     heliport: ['littlebird', 'transporter', 'gunship'], // Heliport: Hubschrauber
-    airport: ['f16'], // Flughafen (seit v5.03): Kampfflugzeuge, die dort auch landen, tanken und nachladen (BALANCE.jets)
+    stand: ['f16'], // Stellplatz/Hangar (seit v5.35): je Stellplatz ein Kampfflugzeug, das dort auch steht, tankt und nachlädt (CITY.air)
   },
   trainSlots: [0, 2, 3, 4], // gleichzeitige Ausbildungen je Stufe (Stufe 1 wie früher die Hauptstadt)
 
@@ -87,7 +90,7 @@ export const CITY = {
   startMetal: 400, // Stahl im Hauptlager zu Beginn (Stahl bleibt dort, LKW fahren es nicht; Schlüssel metal)
   startKero: 300, // Kerosin im Stadtlager zu Beginn (seit v5.20; F-16 und Hubschrauber tanken es)
   // Metall je ausgebildeter Einheit (zusätzlich zum Geld); fehlt die Sorte, kostet sie kein Metall
-  metalCost: { truck: 20, engineer: 20, fobTruck: 80, ifv: 60, tank: 120, flak: 60, sam: 80, gepard: 100, pzh: 140, littlebird: 60, transporter: 80, gunship: 120, f16: 160 },
+  metalCost: { truck: 20, engineer: 20, fobTruck: 80, ifv: 60, tank: 120, flak: 60, sam: 80, gepard: 100, pzh: 140, excavator: 80, littlebird: 60, transporter: 80, gunship: 120, f16: 160 },
   // Markt: handelt in Losen; verkaufen bringt wenig, kaufen kostet viel (Geld je Los)
   market: { lot: 100, sell: { bm: 20, mun: 30, fuel: 30, metal: 40, kero: 35 }, buy: { bm: 80, mun: 120, fuel: 120, metal: 160, kero: 140 } },
 
@@ -111,12 +114,31 @@ export const CITY = {
   power: {
     base: 40,
     supply: [0, 60, 120, 200],
-    use: { res: 1, com: 3, market: 3, bm: 8, mun: 8, fuel: 8, kero: 8, smelter: 10, steel: 10, mine: 4, uni: 12, dc: 30, power: 0, barracks: 2, factory: 8, heliport: 6, hospital: 6, airport: 12 },
+    use: { res: 1, com: 3, market: 3, bm: 8, mun: 8, fuel: 8, kero: 8, smelter: 10, steel: 10, mine: 4, uni: 12, dc: 30, power: 0, barracks: 2, factory: 8, heliport: 6, hospital: 6, airport: 12, stand: 2, atc: 6, ktank: 2, mdepot: 2 },
   },
   // Zufriedenheit 0 … 1 = base + shops × Versorgung (Gewerbe-Arbeiter je Einwohner, voll ab shopPer) + safety × Sicherheit
   // (weniger Treffer auf die Stadt in den letzten 60 s, null ab hitsBad) + power × Strom. Wirkung: Erträge und Steuern × (lo + span × Zufriedenheit),
   // Zuzug × (0,5 + Zufriedenheit).
   happy: { base: 0.2, shops: 0.35, shopPer: 0.1, safety: 0.25, hitsBad: 10, power: 0.2, lo: 0.7, span: 0.4 },
+
+  // ---- Fliegerhorst (seit v5.35, PRD §15 „Fliegerhorst“; Logik js/game/aircraft.js) ----
+  // Start-/Landebahn: Zellen wie Straßen (sofort fertig); eine Bahn ist ein volles Rechteck runwayWidth breit und mindestens runwayMin
+  // lang (waagrecht oder senkrecht). Jeder Start und jede Landung sperrt die Bahn sep s, mit Tower im Umkreis atcRadius Zellen sepAtc s.
+  // Stellplatz (2 × 2): je ein Flugzeug, bildet es aus; Schaden an einem abgestellten Flugzeug × shelter[Stufe] (1 offen, 2 Wälle,
+  // 3 Stahlbeton). Kerosintank und Munitionslager (2 × 2) werden über die Straße aus dem Stadtlager bzw. dem Lager der Hauptstadt
+  // befüllt (fill je s, Stufe × Rate), Flugzeuge auf Stellplätzen im Umkreis supplyRadius Zellen tanken und laden daraus (rate je s).
+  air: {
+    runwayMin: 8,
+    runwayWidth: 2,
+    sep: 14,
+    sepAtc: 7,
+    atcRadius: 14,
+    atcSight: 520, // Sicht (px) des Towers (Radar)
+    supplyRadius: 12,
+    shelter: [1, 1, 0.5, 0.15],
+    tank: { cap: [0, 300, 600, 1000], rate: [0, 3, 6, 10], fill: [0, 6, 12, 20] }, // Kerosin: Lager, Tanken je s, Befüllen je s
+    depot: { cap: [0, 400, 800, 1400], rate: [0, 6, 12, 20], fill: [0, 10, 20, 32] }, // Munition: Lager, Nachladen je s, Befüllen je s
+  },
 
   // ---- Angriff (seit v4.83) ----
   hp: [0, 300, 500, 800], // Trefferpunkte eines Stadtgebäudes je Stufe
@@ -165,14 +187,14 @@ export const CITY = {
     defendRange: 2500, // px, nur Einheiten in diesem Abstand
     defendCooldown: 12, // s zwischen zwei Verteidigungsbefehlen
     // Angriffsziele: Wert je Zellenart (geteilt durch Entfernung); Werke und Förderung zuerst
-    targetValue: { steel: 3, fuel: 3, mun: 3, power: 3, dc: 2.5, uni: 2, mine: 2.5, market: 2, bm: 2, com: 1, res: 0.5, barracks: 2.5, factory: 3, heliport: 3, hospital: 2, airport: 3.5 },
+    targetValue: { steel: 3, fuel: 3, mun: 3, power: 3, dc: 2.5, uni: 2, mine: 2.5, market: 2, bm: 2, com: 1, res: 0.5, barracks: 2.5, factory: 3, heliport: 3, hospital: 2, airport: 3.5, stand: 3, atc: 3, ktank: 2.5, mdepot: 2.5 },
     // Ausbildungsgebäude (seit v4.96): so viele will sie haben; ab moreFrom Arbeitsstätten je eins mehr (Heliport erst, wenn Hubschrauber freigeschaltet sind)
     producers: { barracks: 1, factory: 1, heliport: 1 },
     moreFrom: 14,
     hospitalFrom: 10, // Arbeitsstätten, ab denen sie ein Krankenhaus baut (seit v5.01, eins reicht)
-    airportFrom: 14, // Arbeitsstätten, ab denen sie einen Flughafen baut (seit v5.03, einer reicht; erst wenn die F-16 freigeschaltet ist)
-    airportReach: 60, // so viele Zellen um die Hauptstadt sucht sie einen freien Platz für ihn
-    jets: { easy: 2, normal: 4, hard: 6 }, // so viele F-16 hält sie (seit v5.03)
+    airportFrom: 14, // Arbeitsstätten, ab denen sie einen Fliegerhorst baut (seit v5.35 aus Bahn, Stellplätzen, Tower, Kerosintank, Munitionslager; einer reicht)
+    airportReach: 60, // so viele Zellen um die Hauptstadt sucht sie Platz für die Bahn mit ihren Bauten (10 × 4 Zellen plus Rand)
+    jets: { easy: 2, normal: 4, hard: 6 }, // so viele F-16 hält sie (seit v5.03; seit v5.35 je ein Stellplatz, die KI baut so viele)
     jetReserve: 400, // Geld, das nach dem Kauf einer F-16 übrig bleiben muss
     // seit v5.20 (Review): höchstens so viele Förderanlagen je Werk, das ihren Rohstoff nimmt (Holz und Stein zusammen je BM-Werk, Erz je
     // Hütte, Öl je Raffinerie oder Kerosin-Raffinerie; aufgerundet). Mehr Förderung, als die Werke verarbeiten, verstopft nur die Straßen.

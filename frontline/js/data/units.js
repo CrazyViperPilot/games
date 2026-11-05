@@ -140,6 +140,30 @@ export const UNITS = {
     seats: 1,
     hotkey: 'R',
   },
+  // Bagger (seit v5.35): räumt mit dem Befehl „Baggern“ (G) Zellen, auch Stadtstraßen der Karte in der Konfliktzone (nicht Brücken),
+  // Bäume und Häuser, und reißt eigene Stadtgebäude ab (BALANCE.excavator). Seine Schaufel trifft nur Gebäude, langsam: so zerstört er
+  // auch gegnerische Gebäude und Stadtgebäude, wenn er sie angreift.
+  excavator: {
+    name: 'Bagger',
+    short: 'Bagger', // Kurzname in der Befehlskarte
+    armor: 'light',
+    slots: 2,
+    hp: 650,
+    speed: 48,
+    radius: 13,
+    sight: 240,
+    digger: true,
+    weapons: [
+      { id: 'shovel', name: 'Schaufel', range: 34, cooldown: 1.2, rounds: 9999, munCost: 0, targets: ['struct'], damage: { struct: 32 } },
+    ],
+    cost: { money: 320 },
+    buildTime: 14,
+    producedAt: 'fob',
+    fuelPerSec: 0.35,
+    fuelMax: 45,
+    canRide: false,
+    hotkey: 'X',
+  },
   fobTruck: {
     name: 'FOB-Fahrzeug',
     short: 'FOB-Fz.', // Kurzname in der Befehlskarte
@@ -294,7 +318,7 @@ export const UNITS = {
     ],
     cost: { money: 1400 },
     buildTime: 40,
-    producedAt: 'airport',
+    producedAt: 'stand', // Stellplatz des Fliegerhorsts (seit v5.35)
     fuelPerSec: 1,
     fuelMax: 55, // seit v5.14 55 statt 45: die Zone liegt auf der größeren Karte weiter vom Flughafen, die Zeit über ihr bleibt gleich
     hotkey: 'K', // V, J und H sind feste Tasten (Ansicht, Bauer, Hauptstadt)

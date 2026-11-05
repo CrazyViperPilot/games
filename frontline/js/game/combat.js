@@ -12,7 +12,7 @@ import { armorMul, modOf, rangeMul, sightMul, dealtMul, smokeMul, hasUnlock } fr
 const autoTurret = (game, team) => hasUnlock(game, team, 'autoturret');
 import { damageBridge, deckDist } from './river.js';
 import { forEnemyCity } from './city.js';
-import { jetGrounded } from './aircraft.js';
+import { jetGrounded, parkedArmor } from './aircraft.js';
 
 const SCAN = BALANCE.scanInterval;
 const MAX_UNIT_RADIUS = 16; // größter Einheitenradius (Trefferkreis-Suche)
@@ -26,7 +26,7 @@ export function weaponOf(e) {
   return e.kind === 'unit' ? null : (e.def.weapon ?? null);
 }
 
-const dmgKey = (e) => (e.kind === 'building' ? 'struct' : e.def.jet ? 'jet' : e.def.armor);
+const dmgKey = (e) => (e.kind === 'building' ? 'struct' : e.def.jet ? (jetGrounded(e) ? 'light' : 'jet') : e.def.armor); // Jet am Boden (seit v5.35): wie ein leichtes Fahrzeug
 
 /**
  * Schaden einer Schadenstabelle gegen e. Flugzeuge (def.jet, seit v5.15) haben die eigene Klasse 'jet'; fehlt sie in der
@@ -137,7 +137,7 @@ export function hit(game, target, amount) {
     damageBridge(game, target, amount);
     return;
   }
-  if (target.kind === 'unit') amount *= armorMul(game, target, amount) * smokeMul(game, target);
+  if (target.kind === 'unit') amount *= armorMul(game, target, amount) * smokeMul(game, target) * parkedArmor(game, target); // abgestellter Jet: Schutz des Stellplatzes (seit v5.35)
   else if (target.kind === 'building') amount *= armorMul(game, target, amount); // Militärgebäude: Sandsäcke, Beton (Forschung)
   target.hp -= amount;
   target.lastHitTime = game.time;
@@ -429,7 +429,7 @@ function impact(game, p) {
     if (d < R) hit(game, b, (p.damage.struct || 0) * houseMult(p.damage) * (1 - d / R));
   }
   const splash = (e) => {
-    if (!e.alive || e.team === p.team || e.house || e.parked) return; // abgestellte Jets: im Hangar
+    if (!e.alive || e.team === p.team || e.house) return; // seit v5.35 treffen Granaten auch abgestellte Jets (Schutz: parkedArmor)
     const d = Math.max(0, Math.hypot(e.x - p.tx, e.y - p.ty) - radiusOf(e));
     if (d >= R) return;
     const dmg = dmgVs(p.damage, e) * (1 - d / R) * (p.mul ?? 1);

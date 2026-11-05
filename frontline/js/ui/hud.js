@@ -12,7 +12,7 @@ import { RESEARCH } from '../data/research.js';
 import { CITY } from '../data/city.js';
 import { KINDS, DEPOSITS, DEPOSIT_NAME, hasMarket, hasRoad, careOf } from '../game/city.js';
 import { transportInfo, transportOf } from '../game/transport.js';
-import { jetsAt } from '../game/aircraft.js';
+import { jetsAt, standRoute, runwaysOf, runwayBusy } from '../game/aircraft.js';
 import { CITY_TIP } from './citypanel.js';
 
 // Wettersymbole (16 × 16, Strichfarbe = currentColor)
@@ -526,13 +526,28 @@ export class Hud {
     else if (k === 'dc') h += line(`Arbeitsplätze ${CITY.jobsDc[lv]}`);
     else if (b.produces) {
       h += line(`Bildet aus: ${b.produces.map((u) => UNITS[u].short || UNITS[u].name).join(', ')} · ${b.trainSlots} gleichzeitig (Stufe ${lv})`);
-      if (k === 'airport') {
-        // Flughafen (seit v5.03): belegte Plätze, Flugzeuge am Boden und davon startbereit
-        const jets = g.units.filter((u) => u.alive && u.jet?.home === b.id);
-        const down = jets.filter((u) => u.parked);
-        h += line(`Plätze ${jetsAt(g, b)} / ${BALANCE.jets.capacity} · am Boden ${down.length}, startbereit ${down.filter((u) => u.jet.ready).length} · in der Luft ${jets.length - down.length}`);
+      if (k === 'stand') {
+        // Stellplatz (seit v5.35): Schutz, Flugzeug, Weg zur Bahn, Kerosin und Munition in der Nähe
+        const jet = g.units.find((u) => u.alive && u.jet?.home === b.id);
+        const prot = ['', 'offener Stellplatz', 'Splitterschutzwälle', 'Stahlbeton-Shelter'][lv];
+        h += line(`${prot} · Schaden am Flugzeug ${Math.round(CITY.air.shelter[lv] * 100)} %`);
+        h += line(jet ? `${jet.def.name}: ${jet.parked ? (jet.jet.ready ? 'startbereit' : 'wird betankt und munitioniert') : 'unterwegs'}` : `Frei${b.queue?.length ? ' · Flugzeug in Bau' : ''}`);
+        const r = standRoute(g, b);
+        h += r ? line(`Bahn ${r.rw.len} Felder lang${r.rw.atc ? ' · mit Tower' : ''} · ${r.cells.length} Felder Rollweg`) : '<div class="warn small">Kein Weg über Straße oder Rollfeld zu einer gültigen Start-/Landebahn</div>';
+        const R = CITY.air.supplyRadius * c.cell;
+        const near = (kind) => [...c.ents].some(([j, e]) => e.alive && KINDS[c.kind[j] - 1] === kind && c.level[j] && Math.hypot(e.x - b.x, e.y - b.y) <= R);
+        if (!near('ktank')) h += '<div class="warn small">Kein Kerosintank in der Nähe: das Flugzeug tankt nicht</div>';
+        if (!near('mdepot')) h += '<div class="warn small">Kein Munitionslager in der Nähe: das Flugzeug lädt nicht nach</div>';
       }
       h += '<div class="muted small">Zahlt direkt aus der Stadt: Geld, Stahl, Einwohner</div>';
+    }
+    if (k === 'atc') {
+      // Tower (seit v5.35): Bahnen in seinem Umkreis
+      const rws = runwaysOf(g, b.team).filter((rw) => rw.valid && Math.hypot(rw.cx - b.x, rw.cy - b.y) <= CITY.air.atcRadius * c.cell + (rw.len * c.cell) / 2);
+      h += line(rws.length ? `Lotst ${rws.length} Bahn${rws.length > 1 ? 'en' : ''}: nach Start oder Landung ${CITY.air.sepAtc} statt ${CITY.air.sep} s gesperrt${rws.some((rw) => runwayBusy(g, b.team, rw) > 0) ? ' · gerade belegt' : ''}` : `Keine Bahn im Umkreis von ${CITY.air.atcRadius} Feldern`);
+    } else if (k === 'ktank' || k === 'mdepot') {
+      const A = k === 'ktank' ? CITY.air.tank : CITY.air.depot;
+      h += line(`${k === 'ktank' ? 'Kerosin' : 'Munition'} ${Math.floor(b.stock ?? 0)} / ${A.cap[lv]} · befüllt bis ${A.fill[lv]}/s über die Straße · gibt bis ${A.rate[lv]}/s an Flugzeuge im Umkreis von ${CITY.air.supplyRadius} Feldern`);
     }
     h += this.transportText(g, c, i, k, s);
     const care = careOf(g, b);

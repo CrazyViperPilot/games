@@ -165,7 +165,7 @@ export function createShell(id, team, sx, sy, tx, ty, def) {
 }
 
 /** Gegner von `team`? Leere Stadthäuser (team −1) sind niemandes Gegner. */
-export const isFoe = (team, e) => !!e && e.team >= 0 && e.team !== team && !e.parked; // abgestellte Jets (aircraft.js) sind im Hangar geschützt
+export const isFoe = (team, e) => !!e && e.team >= 0 && e.team !== team; // seit v5.35 auch abgestellte Jets (Schutz des Stellplatzes: aircraft.parkedArmor)
 
 /** Ziel eines Angriffsbefehls: ein Gegner oder eine intakte Brücke (river.js; die greift niemand von selbst an). */
 export const canAttack = (team, e) => isFoe(team, e) || (!!e && e.kind === 'bridge' && !e.broken);

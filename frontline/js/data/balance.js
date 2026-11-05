@@ -87,6 +87,8 @@ export const BALANCE = {
   shortageWarn: 20, // s zwischen zwei Meldungen je Sorte und Team
   // Straßen der Karte (Stadtraster und Feldwege): Bodenfahrzeuge fahren darauf schneller; abseits verbrauchen sie mehr Treibstoff
   roads: { speedMul: 1.35, offroadFuel: 1.15 },
+  // Bagger (seit v5.35): Sekunden Arbeit je Stadtzelle beim Baggern und Abstand (px) zur Zellmitte, ab dem er arbeitet
+  excavator: { digTime: 6, reach: 54 },
   fuelSlowMul: 0.25, // Tempo von Fahrzeugen ohne Treibstoff
   // Soldaten-Nachschub (§12): kostenloser Schütze an der Hauptstadt alle `interval` s, solange weniger als `soldierMin` Infanterie lebt
   reinforce: { interval: QUICK.reinforceEvery, soldierMin: 29, unit: 'rifleman' },

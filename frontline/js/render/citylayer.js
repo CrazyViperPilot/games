@@ -9,6 +9,7 @@ import { CITY_COLORS, CITY_ICON } from '../ui/citypanel.js';
 import { drawUniversityTop, UNI_LAWNS } from './university.js';
 import { drawTownTop, townLift } from './townhouses.js';
 import { transportOf } from '../game/transport.js';
+import { runwaysOf } from '../game/aircraft.js';
 import { depositSprite } from './nature.js';
 import { blit, spriteDpr } from './spritecache.js';
 import { groundPattern, patternMatrix } from './ways.js';
@@ -140,6 +141,13 @@ export function drawCityGround(ren, ctx, team, known, inRect) {
       for (const [fx, fy, fr] of DOTS) groundDot(ren, ctx, r.x0 + fx * 64, r.y0 + fy * 64, fr * 40, '#2b2826');
       continue;
     }
+    if (k === 'runway') {
+      // Start-/Landebahn (seit v5.35): Asphalt je Zelle, Markierungen danach je Bahn (drawRunways)
+      groundRect(ren, ctx, r.x0, r.y0, r.x1, r.y1);
+      ctx.fillStyle = '#45494d';
+      ctx.fill();
+      continue;
+    }
     if (k === 'road' || big === 'part') continue; // Straßen danach in einem Zug (drawRoads); Großbau zeichnet seine Mitte
     if (big) {
       drawBigLot(ren, ctx, c, k, lv, r, team, ctr);
@@ -162,10 +170,57 @@ export function drawCityGround(ren, ctx, team, known, inRect) {
       ctx.fill();
     }
   }
+  drawRunways(ren, ctx, known);
   drawRoads(ren, ctx, team, known);
   if (ren.cityUi?.open) drawLoads(ren, ctx, team, known, inRect); // Baumodus: Auslastung der Straßen
   drawTerritory(ren, ctx, team, known);
   ctx.restore();
+}
+
+/**
+ * Markierungen der Start-/Landebahnen (seit v5.35): Randlinien, Mittellinie (gestrichelt), Schwellen mit Balken an beiden Enden,
+ * Aufsetzmarken; eine ungültige Bahn (zu kurz, nicht 2 breit) rot umrandet. Bahnen beider Teams, wo erkundet.
+ */
+function drawRunways(ren, ctx, known) {
+  const g = ren.game;
+  const W = '#f2f0e6';
+  for (const c of g.city) {
+    for (const rw of runwaysOf(g, c.team)) {
+      if (!known(rw.cx, rw.cy)) continue;
+      const S = c.cell;
+      const x0 = c.x0 + rw.q0 * S;
+      const y0 = c.y0 + rw.r0 * S;
+      const x1 = c.x0 + (rw.q1 + 1) * S;
+      const y1 = c.y0 + (rw.r1 + 1) * S;
+      if (!rw.valid) {
+        groundRect(ren, ctx, x0 + 3, y0 + 3, x1 - 3, y1 - 3);
+        ctx.strokeStyle = '#e0553a';
+        ctx.lineWidth = ren.draping() ? Math.max(2, 3 * ren.camera.zoom) : 4;
+        ctx.stroke();
+        continue;
+      }
+      const X = rw.axis === 'x';
+      // lokale Rechtecke (Länge a, Quer b) in Welt umrechnen
+      const rect = (a0, a1, b0, b1) => {
+        if (X) groundRect(ren, ctx, x0 + a0, rw.cy + b0, x0 + a1, rw.cy + b1);
+        else groundRect(ren, ctx, rw.cx + b0, y0 + a0, rw.cx + b1, y0 + a1);
+        ctx.fillStyle = W;
+        ctx.fill();
+      };
+      const L = rw.len * S;
+      const half = S - 6;
+      rect(0, L, -half - 2, -half + 1); // Randlinien
+      rect(0, L, half - 1, half + 2);
+      for (let a = 70; a < L - 80; a += 48) rect(a, a + 26, -1.5, 1.5); // Mittellinie
+      for (const e of [0, 1]) {
+        const a = e ? L - 34 : 8;
+        for (let k = -4; k <= 4; k++) if (k) rect(a, a + 26, k * 12 - 3, k * 12 + 3); // Schwelle
+        const t = e ? L - 120 : 94;
+        rect(t, t + 30, -24, -14); // Aufsetzmarken
+        rect(t, t + 30, 14, 24);
+      }
+    }
+  }
 }
 
 // Auslastung der Straßen im Baumodus (seit v5.20, AP5): Last / Kapazität je Straßenzelle, grün unter 60 %, gelb unter 100 %, rot ab 100 %.

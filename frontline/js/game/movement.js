@@ -16,7 +16,7 @@ export const HASH_CELL = 128; // räumliches Hash-Gitter
 const TILE = BALANCE.map.tile;
 
 /** Aufträge, die logistics.js, construction.js, garrison.js und crates.js selbst fahren (updateMovement lässt sie aus). */
-export const OWN_DRIVERS = new Set(['load', 'unload', 'route', 'build', 'repair', 'board', 'dropoff', 'garrison', 'storm', 'pickup', 'deliver', 'repairBridge']);
+export const OWN_DRIVERS = new Set(['load', 'unload', 'route', 'build', 'repair', 'board', 'dropoff', 'garrison', 'storm', 'pickup', 'deliver', 'repairBridge', 'dig']);
 
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 
@@ -393,6 +393,11 @@ const groundVehicle = (u) => !u.def.air && u.def.armor !== 'inf' && (u.def.fuelP
 
 /** Liegt der Punkt auf einer Straße oder einem Feldweg der Karte (game.map.town.roads, Breite w)? */
 function onRoad(game, x, y) {
+  const R = game.roads;
+  if (R?.dug?.length) {
+    const i = Math.floor(y / R.cell) * R.cols + Math.floor(x / R.cell);
+    if (R.dug.includes(i)) return false; // vom Bagger abgetragen (excavator.js)
+  }
   for (const r of game.map.town?.roads ?? []) {
     const dx = r.x2 - r.x1;
     const dy = r.y2 - r.y1;

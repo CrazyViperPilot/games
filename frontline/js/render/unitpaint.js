@@ -651,6 +651,31 @@ function engineer(P) {
   return { S, foot: [-14.5, 16, -9.6, 9.6] };
 }
 
+/** Bagger (seit v5.35): Kettenfahrwerk, Oberwagen mit Kabine und Gegengewicht, langer Ausleger mit Tieflöffel. */
+function excavator(P) {
+  const S = [];
+  for (const side of [-1, 1]) tracks(S, side, -12, 12, 5.4, 9, 4, P, { wheels: 4 });
+  S.push(lowerHull(-12, 12, 5.4, 3.8, P));
+  S.push(cyl([0, 0, 3.8], [0, 0, 5.2], 5, 5, 12, METAL)); // Drehkranz
+  const upper = box(-11, 6, -7.6, 7.6, 5.2, 9.6, YELLOW); // Oberwagen
+  S.push(upper);
+  S.push(on(upper, box(-12.6, -9.4, -7.2, 7.2, 5.4, 10.4, mix(YELLOW, '#2a2a26', 0.35)))); // Gegengewicht
+  camoSides(S, upper, 7.6, [[-9, 5.6, 4.2, 8.8]], P.camo);
+  const cab = loft([[-1, 1], [6, 1], [6, 7.2], [-1, 7.2]], [[-0.6, 1.4], [5.2, 1.4], [5.2, 6.8], [-0.6, 6.8]], 9.6, 15, YELLOW);
+  S.push(cab);
+  S.push(on(cab, box(-0.4, 5, 1.6, 6.6, 15, 15.25, P.light)));
+  S.push(on(cab, box(5.4, 5.7, 1.8, 6.4, 10.6, 14.2, GLASS, { noLine: true, only: 'iso' })));
+  S.push(on(cab, box(-0.4, 5, 7.1, 7.3, 10.6, 14.2, GLASS, { noLine: true, only: 'iso' })));
+  S.push(fine(box(-6, -2, -7.8, -7.6, 6.4, 8.6, P.mark, { noLine: true, only: 'iso' }))); // Kennung
+  S.push(cyl([3, -3, 9.4], [14, -3, 19], 1.3, 1.1, 4, YELLOW)); // Ausleger
+  S.push(cyl([14, -3, 19], [21, -3, 8.5], 1, 0.9, 4, YELLOW)); // Stiel
+  S.push(box(19, 23, -5.6, -0.4, 4.2, 8.6, METAL)); // Tieflöffel
+  for (let i = 0; i < 3; i++) S.push(fine(box(22.8, 23.6, -5 + i * 1.8, -4 + i * 1.8, 3.4, 4.4, '#1e1f1c', { noLine: true, only: 'iso' }))); // Zähne
+  S.push(fine(cyl([5, -3, 10.8], [12, -3, 17], 0.45, 0.45, 4, METAL))); // Hydraulik
+  lights(S, upper, 6, 6.4, 8.8, -12.6, 7);
+  return { S, foot: [-12.6, 23.6, -9, 9] };
+}
+
 // ---------- Modelle: Luftfahrzeuge ----------
 
 function littlebird(P) {
@@ -813,7 +838,7 @@ function soldier(P, o) {
   return { S, foot: [-1.6, 1.6, -1.6, 1.6], inf: true };
 }
 
-const MODELS = { tank, ifv, flak, sam, gepard, pzh, truck, fobTruck, engineer, littlebird, gunship, transporter, f16 };
+const MODELS = { tank, ifv, flak, sam, gepard, pzh, truck, fobTruck, engineer, excavator, littlebird, gunship, transporter, f16 };
 const INFANTRY = { rifleman: 'rifleman', at: 'at', sniper: 'sniper', commander: 'commander' };
 const TEAM_KEYS = ['b', 'r', 'n'];
 

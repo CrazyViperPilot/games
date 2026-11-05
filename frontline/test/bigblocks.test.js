@@ -36,7 +36,7 @@ test('Zonenstadt hat mehrere große Blöcke, punktsymmetrisch, ohne Stadtstraße
   assert.ok(free >= 100, `leerer Block fast ganz frei (${free})`);
 });
 
-test('Räumen reißt Häuser eines großen Blocks ab, danach passt ein Flughafen', () => {
+test('Räumen reißt Häuser eines großen Blocks ab, danach passt eine Start-/Landebahn', () => {
   for (const seed of [3, 7]) {
     const g = new Game({ seed, city: true });
     const c = g.city[0];
@@ -47,8 +47,6 @@ test('Räumen reißt Häuser eines großen Blocks ab, danach passt ein Flughafen
     const before = g.map.town.buildings.filter(inside).filter((o) => ['house', 'hall', 'factory'].includes(o.kind));
     assert.ok(before.length > 0, `seed ${seed}: Block bebaut`);
     const houses = g.houses.length;
-    const air = { type: 'city', kind: 'airport', c0: k.c0, r0: k.r0, c1: k.c0 + 9, r1: k.r0 + 9 };
-    assert.equal(g.issue(0, air).ok, false, 'vor dem Räumen kein Platz');
     const res = g.issue(0, { type: 'city', kind: 'erase', ...k });
     assert.ok(res.ok && res.razed >= before.length, `seed ${seed}: abgerissen (${res.razed})`);
     assert.equal(g.map.town.buildings.filter(inside).filter((o) => ['house', 'hall', 'factory'].includes(o.kind)).length, 0);
@@ -57,9 +55,17 @@ test('Räumen reißt Häuser eines großen Blocks ab, danach passt ein Flughafen
     // Raster frei: Zellmitte eines abgerissenen Hauses begehbar (sofern nicht anderes sperrt)
     const o = before[0];
     assert.ok(g.grid.free(g.grid.toCell(o.x), g.grid.toCell(o.y)), 'Raster freigegeben');
+    // Bahn 10 × 2 irgendwo im geräumten Block: alle 20 Zellen belegt
     let ok = false;
-    for (let dr = 0; dr <= k.r1 - k.r0 - 9 && !ok; dr++) for (let dc = 0; dc <= k.c1 - k.c0 - 9 && !ok; dc++) ok = g.issue(0, { ...air, c0: k.c0 + dc, r0: k.r0 + dr, c1: k.c0 + dc + 9, r1: k.r0 + dr + 9 }).ok;
-    assert.ok(ok, `seed ${seed}: Flughafen passt`);
+    for (let dr = 0; dr <= k.r1 - k.r0 - 1 && !ok; dr++) {
+      for (let dc = 0; dc <= k.c1 - k.c0 - 9 && !ok; dc++) {
+        const cells = [];
+        for (let y = 0; y < 2; y++) for (let x = 0; x < 10; x++) cells.push((k.r0 + dr + y) * c.cols + k.c0 + dc + x);
+        if (cells.some((j) => c.kind[j] || c.mapRoads?.[j] || !canZone(g, c, j))) continue;
+        ok = g.issue(0, { type: 'city', kind: 'runway', c0: k.c0 + dc, r0: k.r0 + dr, c1: k.c0 + dc + 9, r1: k.r0 + dr + 1 }).ok && cells.every((j) => c.kind[j]);
+      }
+    }
+    assert.ok(ok, `seed ${seed}: Bahn passt`);
   }
 });
 
