@@ -62,7 +62,7 @@ export function updateClaim(game, c) {
   const TR = CITY.territory;
   for (const b of game.buildings) {
     if (!b.alive || !b.built || b.team !== c.team || b.type !== 'fob') continue;
-    stamp(b.x, b.y, b.main ? TR.main : TR.fob);
+    stamp(b.x, b.y, b.main ? TR.main : game.buildRules ? CITY.build.fobClaim : TR.fob); // mit Baugebiet wächst das Gebiet einer FOB (seit v5.78)
   }
   for (const i of c.list) {
     if (!c.level[i] || isFlat(c.kind[i]) || isPart(c, i)) continue;

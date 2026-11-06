@@ -75,6 +75,7 @@ const WEATHER_KEY = 'frontline-wetter'; // Startmenü: Wetter aus, Zufall oder f
 const RESEARCH_KEY = 'frontline-forschung'; // Startmenü: Forschung an/aus
 const CITY_KEY = 'frontline-stadt'; // Startmenü: Stadt (SimCity-Teil) an/aus
 const RIVER_KEY = 'frontline-fluss'; // Startmenü: Flüsse auf Zufallskarten an/aus
+const BUILD_KEY = 'frontline-baugebiet'; // Startmenü: Baugebiet der Stadt an/aus (seit v5.78)
 function readMapSel() {
   try {
     return localStorage.getItem(MAPSEL_KEY) || 'random';
@@ -123,7 +124,7 @@ function writeMapSel(v) {
 }
 
 /**
- * Startmenü: onStart({difficulty, winPoints, mapId, radio, weather, research, river}) beim Klick auf Start (mapId 'random' oder Karten-ID,
+ * Startmenü: onStart({difficulty, winPoints, mapId, radio, weather, research, river, city, buildRules}) beim Klick auf Start (mapId 'random' oder Karten-ID,
  * radio = Sendemast-Sieg, weather = 'off' | 'random' | Jahreszeit, research = Forschungsbaum, river = Flüsse auf Zufallskarten).
  */
 export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.money, resetWallet = () => {}, resume = null } = {}) {
@@ -138,6 +139,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
   let research = readFlag(RESEARCH_KEY, D.research);
   let river = readFlag(RIVER_KEY, D.river);
   let city = readFlag(CITY_KEY, D.city);
+  let buildRules = readFlag(BUILD_KEY, D.buildRules);
   let sound = readFlag(SOUND_KEY, true); // Ton: gleicher Speicher wie der Schalter im Spiel (audio/sound.js)
   show(
     root,
@@ -173,6 +175,10 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
       <div class="field">
         <span class="flabel" title="Stadt auf der ganzen Karte rund um die Hauptstadt (die erste FOB); Stadtgebäude, Straßen und Fabriken überall, FOBs braucht man nur für militärische Gebäude: Wohnen, Gewerbe und Werke bauen; die Werke füllen das Lager der Hauptstadt mit Baumaterial, Munition und Treibstoff (ohne Stadt hat sie unendlich davon); ausgebildete Einheiten kosten Einwohner">Stadt</span>
         <div class="seg"><button type="button" data-city="1">An</button><button type="button" data-city="0">Aus</button></div>
+      </div>
+      <div class="field">
+        <span class="flabel" title="Baugebiet der Stadt (nur mit Stadt): Stadtgebäude nur im eigenen Gebiet (um die Hauptstadt, FOBs und Gebäude), nur auf erkundetem Gelände, nicht nahe sichtbaren Feinden und nicht in der Konfliktzone; Straßen dürfen auch außerhalb liegen. Aus: überall bauen wie bisher">Baugebiet</span>
+        <div class="seg"><button type="button" data-build="1">An</button><button type="button" data-build="0">Aus</button></div>
       </div>
       <div class="field">
         <span class="flabel" title="Zufallskarten: je ein Fluss vor jeder Startecke mit drei zerstörbaren Brücken und zwei Furten">Fluss</span>
@@ -243,6 +249,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
     root.querySelectorAll('[data-mood]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mood === mood)));
     root.querySelectorAll('[data-research]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.research === '1') === research)));
     root.querySelectorAll('[data-city]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.city === '1') === city)));
+    root.querySelectorAll('[data-build]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.build === '1') === buildRules)));
     root.querySelectorAll('[data-river]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.river === '1') === river)));
     root.querySelectorAll('[data-sound]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.sound === '1') === sound)));
     markFullscreen(root);
@@ -361,6 +368,9 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
     } else if (b.dataset.city) {
       city = b.dataset.city === '1';
       writeFlag(CITY_KEY, city);
+    } else if (b.dataset.build) {
+      buildRules = b.dataset.build === '1';
+      writeFlag(BUILD_KEY, buildRules);
     } else if (b.dataset.river) {
       river = b.dataset.river === '1';
       writeFlag(RIVER_KEY, river);
@@ -384,7 +394,7 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
       showWallet();
     } else if (b.dataset.act === 'start') {
       hideOverlay(root);
-      onStart({ difficulty, winPoints, mapId: mapSel, radio, weather, mood, research, river, city });
+      onStart({ difficulty, winPoints, mapId: mapSel, radio, weather, mood, research, river, city, buildRules });
       return;
     }
     mark();

@@ -1,7 +1,7 @@
 // Stadt auf der Karte (PRD §15): Straßen, ausgewiesene Zonen, Gebäude, Gebietsgrenzen und im Baumodus das gezogene Rechteck.
 // Liest nur game.city (und ren.cityUi, die Stadtleiste). 2D: flach von oben; isometrisch: Boden hier, Gebäude als Stadthäuser
 // über drawTownBuilding (renderer.js).
-import { DEPOSITS, cellRect, canZone, hasRoad, sizeOf, fitBig, bigCenter, bigSpan } from '../game/city/cells.js';
+import { DEPOSITS, cellRect, buildAllowed, hasRoad, sizeOf, fitBig, bigCenter, bigSpan } from '../game/city/cells.js';
 import { BIG_KINDS, bigPlan, drawBigGround, drawBigTop, partFoot, bigTop } from './bigbuild.js';
 import { drawWorksTop, worksLift, WORKS_GROUND, WORKS_KINDS } from './works.js';
 import { CITY } from '../data/city.js';
@@ -1127,15 +1127,37 @@ function drawTerritory(ren, ctx, team) {
     const r0 = Math.max(0, Math.floor(V.y0 / S) - 1);
     const r1 = Math.min(c.rows - 1, Math.ceil(V.y1 / S) + 1);
     if (ui && own) {
-      // Baumodus: gesperrte Zellen dunkel (bauen kann man überall sonst, seit v4.87 ohne Gebietsgrenze)
+      // Baumodus: gesperrte Zellen dunkel. Ohne Baugebiet (Standard der Tests) nur die Zellen, die canZone sperrt; mit Baugebiet (seit
+      // v5.78) auch Zellen außerhalb des Gebiets, unerkundete, Konfliktzone und Nähe zum Feind (buildAllowed, nur lesen)
       for (let r = r0; r <= r1; r++) {
         for (let q = q0; q <= q1; q++) {
           const i = r * c.cols + q;
-          if (c.kind[i] || c.mapRoads?.[i] || canZone(g, c, i)) continue; // Stadtstraßen der Karte bleiben hell
+          if (c.kind[i] || c.mapRoads?.[i] || buildAllowed(g, c, i, ui.tool === 'road' ? 'road' : undefined)) continue; // Stadtstraßen der Karte bleiben hell; mit Werkzeug Straße gilt die Straßenregel (außerhalb des Gebiets erlaubt)
           groundRect(ren, ctx, q * S + 1, r * S + 1, (q + 1) * S - 1, (r + 1) * S - 1);
           ctx.fillStyle = 'rgba(0,0,0,0.35)';
           ctx.fill();
         }
+      }
+      if (g.buildRules) {
+        // Gebietsgrenze des Baugebiets (seit v5.78): dünne Linie in Teamfarbe am Rand der eigenen Zellen, die Gebäude tragen dürfen
+        ctx.beginPath();
+        for (let r = r0; r <= r1; r++) {
+          for (let q = q0; q <= q1; q++) {
+            const i = r * c.cols + q;
+            if (!c.claim[i]) continue;
+            const x0 = q * S;
+            const y0 = r * S;
+            const x1 = x0 + S;
+            const y1 = y0 + S;
+            if (r === 0 || !c.claim[i - c.cols]) groundLine(ren, ctx, x0, y0, x1, y0);
+            if (r === c.rows - 1 || !c.claim[i + c.cols]) groundLine(ren, ctx, x0, y1, x1, y1);
+            if (q === 0 || !c.claim[i - 1]) groundLine(ren, ctx, x0, y0, x0, y1);
+            if (q === c.cols - 1 || !c.claim[i + 1]) groundLine(ren, ctx, x1, y0, x1, y1);
+          }
+        }
+        ctx.strokeStyle = g.teams[c.team].color;
+        ctx.lineWidth = 2 * z;
+        ctx.stroke();
       }
     }
   }
@@ -1145,7 +1167,7 @@ function drawTerritory(ren, ctx, team) {
     const c = g.city[team];
     const S = c.cell;
     const n = sizeOf(ui.tool);
-    const a = fitBig(g, c, d.c1, d.r1, ui.tool);
+    const a = fitBig(g, c, d.c1, d.r1, ui.tool, undefined, (j) => buildAllowed(g, c, j, ui.tool));
     const q = a >= 0 ? a % c.cols : d.c1;
     const r = a >= 0 ? Math.floor(a / c.cols) : d.r1;
     const [lo, hi] = bigSpan(n);

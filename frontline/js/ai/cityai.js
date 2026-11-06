@@ -4,7 +4,7 @@
 import { CITY } from '../data/city.js';
 import { KINDS, KIND_ID, WORKS, SUPPLIER_KINDS } from '../data/citykinds.js';
 import { transportOf, transportInfo } from '../game/transport.js';
-import { DEPOSITS, cellAt, idx, sizeOf, isPart, fitBig, cellFree, roadAt, hasRoad, canZone, nbrsOf } from '../game/city/cells.js';
+import { DEPOSITS, cellAt, idx, sizeOf, isPart, fitBig, cellFree, roadAt, hasRoad, buildAllowed, nbrsOf } from '../game/city/cells.js';
 import { mainRoadReach, connectRoad, goalOf } from '../game/city/roadnet.js';
 import { totals } from '../game/city/state.js';
 
@@ -153,7 +153,7 @@ function aiCandidates(game, c, x, y, rad, reach) {
   for (let row = Math.max(0, ar - rad); row <= Math.min(c.rows - 1, ar + rad); row++) {
     for (let col = Math.max(0, ac - rad); col <= Math.min(c.cols - 1, ac + rad); col++) {
       const i = idx(c, col, row);
-      if (c.kind[i] || !canZone(game, c, i) || inDanger(c, col, row, game.time) || !cellFree(game, c, col, row)) continue; // Fels, Wasser oder Gebäude: dort wüchse nie etwas
+      if (c.kind[i] || !buildAllowed(game, c, i) || inDanger(c, col, row, game.time) || !cellFree(game, c, col, row)) continue; // Fels, Wasser oder Gebäude: dort wüchse nie etwas
       // seit v5.20 (AP4): Zellen neben einer Straße zum Lager zählen einen Ring näher (Werke und Großbauten zuerst dort)
       const far = reach && !touchesRoad(c, i, reach) ? CITY.ai.connectRing * 100 : 0;
       const d = Math.max(Math.abs(col - ac), Math.abs(row - ar)) * 100 + Math.abs(col - ac) + Math.abs(row - ar) + far;
@@ -209,7 +209,7 @@ export function aiCity(game, team, difficulty, mem = cityAiMemory()) {
     for (const pass of [true, false]) {
       for (const c2 of cands) {
         if (pass ? !touchesRoad(city, c2.i, reach) : !(near[c2.i] && hasRoad(city, c2.col, c2.row))) continue;
-        const a = fitBig(game, city, c2.col, c2.row, kind, free);
+        const a = fitBig(game, city, c2.col, c2.row, kind, free, (j) => buildAllowed(game, city, j, kind));
         if (a >= 0) return a;
       }
     }
@@ -303,7 +303,7 @@ export function aiAirport(game, c, main, reserve, want = 2) {
     if (c.level[i] && (k === 'com' || k === 'market' || WORKS.includes(k))) work++;
   }
   const hasRunway = c.list.some((i) => c.kind[i] === KIND_ID.runway);
-  const free = (j) => !c.kind[j] && !c.deposit[j] && !c.mapRoads?.[j] && canZone(game, c, j) && cellFree(game, c, j % c.cols, Math.floor(j / c.cols)) && !inDanger(c, j % c.cols, Math.floor(j / c.cols), game.time);
+  const free = (j) => !c.kind[j] && !c.deposit[j] && !c.mapRoads?.[j] && buildAllowed(game, c, j) && cellFree(game, c, j % c.cols, Math.floor(j / c.cols)) && !inDanger(c, j % c.cols, Math.floor(j / c.cols), game.time);
   const put = (kind, q, r) => game.issue(c.team, { type: 'city', kind, c0: q, r0: r, c1: q, r1: r }).ok;
   if (hasRunway) {
     // Stellplätze ausbauen (seit v5.39 nur per Befehl): den ersten fertigen unter Stufe 3, wenn genug übrig bleibt
@@ -378,7 +378,7 @@ function depositCells(game, c) {
   }
   const out = [];
   for (let i = 0; i < c.deposit.length; i++) {
-    if (!c.deposit[i] || !c.claim[i] || c.kind[i] || !canZone(game, c, i)) continue;
+    if (!c.deposit[i] || !c.claim[i] || c.kind[i] || !buildAllowed(game, c, i)) continue;
     const g = group[DEPOSITS[c.deposit[i] - 1]];
     if (!g || mines[g] >= Math.ceil(works[g] * CITY.ai.minesPer[g])) continue;
     const q = i % c.cols;

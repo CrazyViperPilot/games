@@ -3,7 +3,7 @@
 import { CITY } from '../../data/city.js';
 import { KINDS } from '../../data/citykinds.js';
 import { mainAccess } from '../transport.js';
-import { DEPOSITS, anchorOf, isPart, cellsOf, cellRect, cellFree, roadAt, accessCells, canZone, nbrsOf } from './cells.js';
+import { DEPOSITS, anchorOf, isPart, cellsOf, cellRect, cellFree, roadAt, accessCells, canZone, buildAllowed, nbrsOf } from './cells.js';
 import { rebuildList, placeBuilt } from './state.js';
 
 /**
@@ -77,7 +77,8 @@ export function connectRoad(game, c, a, pay, goal = null) {
   if (accessCells(c, anchor).some((j) => reach[j])) return 0;
   const max = CITY.transport.connectMax;
   const n = c.cols * c.rows;
-  const ok = (j) => canZone(game, c, j) && !c.kind[j] && !c.deposit[j] && cellFree(game, c, j % c.cols, Math.floor(j / c.cols));
+  // Baugebiet (seit v5.78) gilt für Anschlüsse, die der Spieler oder die KI bezahlen (pay); das Startviertel (pay false) baut ohne Regel
+  const ok = (j) => (pay ? buildAllowed(game, c, j, 'road') : canZone(game, c, j)) && !c.kind[j] && !c.deposit[j] && cellFree(game, c, j % c.cols, Math.floor(j / c.cols));
   const prev = new Int32Array(n).fill(-1);
   const seen = new Uint8Array(n);
   const cells = cellsOf(c, anchor);

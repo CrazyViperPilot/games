@@ -19,6 +19,7 @@ Für die Pakete ab P2 gilt PRD §13: erst ein Vorschlag zur Ausgestaltung (unten
 | P5a | Stadt: Werkslager und LKW laden am Werk (Simulation, Befehle, Rechtsklick, Infofeld) | §13 SimCity-Stadt | mittel | **gebaut (v5.69)** |
 | P5b | Stadt: Route ab Werk in der Oberfläche, KI holt am Werk, Ressourcenanzeige | §13 SimCity-Stadt | mittel | **gebaut (v5.70)** |
 | P6 | KI-Lücken aus §10: KI baut Flak/SAM gegen Luft, Scharfschützen (Bagger bewusst nicht) | §10 „Nicht gebaut“ | mittel | **gebaut (v5.71)** |
+| A7 | Bauen nur im eigenen, sicheren Gebiet (Schalter Baugebiet im Startmenü) | §15 „Überall bauen“ | mittel | **gebaut (v5.78)** |
 | – | LLM für Gegner und Dialoge | §13 | – | nicht paketiert: Grundsatzfragen offen (Modell, Gerät/Server, Offline-PWA, Kosten) |
 
 ## P1 – Statistik am Spielende (v5.65)
@@ -252,7 +253,12 @@ treffen Hubschrauber und Jets (ohne `jet`-Schaden gilt `air`).
   gesehenen Hubschraubern gibt tatsächlich einen `train`-Befehl für Flak oder Gepard. `test/ai.test.js`, `test/aiart.test.js`,
   `test/golden.test.js` laufen lassen; Golden darf sich ändern (gewollte Regeländerung, im Bericht nennen).
 
-## A7 – Bauen nur im eigenen, sicheren Gebiet (v5.78, von Daniel bestätigt am 2026-11-06)
+## A7 – Bauen nur im eigenen, sicheren Gebiet (v5.78, von Daniel bestätigt am 2026-11-06) – **gebaut (v5.78)**
+
+Umsetzung (Abweichungen vom Vorschlag unten): Der FOB-Radius 6 gilt nur mit Schalter (`CITY.build.fobClaim`), `CITY.territory.fob` bleibt 4,
+damit die KI ohne Schalter gleich spielt (Golden). Die Regel heißt `buildWhy`/`buildAllowed` in `js/game/city/cells.js`; Startviertel und
+Anschlüsse ohne Bezahlung (`connectRoad` mit `pay` false) bauen ohne Regel. Anzeige: dunkle Zellen und Gebietsgrenze im Baumodus, kein
+eigener Tipp je Zellenart (die Meldung nach dem Befehl und die Hilfe nennen den Grund). Test: `test/buildrules.test.js` (11 Tests).
 
 Heute (seit v4.87) lassen sich Stadtzellen überall bauen, wo nichts im Weg steht (`canZone` in `js/game/city/cells.js`). Das Gebiet
 (`c.claim`, `updateClaim` in `js/game/city/state.js`, Radien `CITY.territory`) wird weiter berechnet, nutzt aber nur die KI.

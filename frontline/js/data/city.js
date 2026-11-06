@@ -16,6 +16,13 @@ export const CITY = {
   fobMargin: 64, // um jede Hauptstadt bleibt so viel Platz frei (px; dort erscheinen neue Einheiten)
   // Gebiet (seit v4.82): gebaut werden darf nur in Zellen im eigenen Gebiet. Radien in Zellen.
   territory: { main: 10, fob: 4, building: 2, interval: 1 }, // um die Hauptstadt, um jede andere fertige FOB, um jedes fertige Stadtgebäude; Neuberechnung alle interval s
+  // Baugebiet (seit v5.78, Schalter „Baugebiet“ im Startmenü; nur mit `buildRules` im Spiel, Regel in js/game/city/cells.js `buildWhy`):
+  // Stadtgebäude nur im eigenen Gebiet, nur auf erkundetem Gelände, nicht nahe sichtbarem Feind, nicht in der Konfliktzone.
+  build: {
+    fobClaim: 6, // Gebietsradius (Zellen) einer FOB mit dieser Regel; ohne sie gilt territory.fob (4), damit die KI ohne Regel gleich bleibt
+    enemyR: 500, // Abstand (px), in dem keine Stadtzelle an sichtbare gegnerische Bodeneinheiten oder gegnerische Gebäude grenzt
+    noZone: true, // Schalter: Stadtzellen nicht in der Konfliktzone (Kreis game.zone)
+  },
   // Einwohner als Truppen (seit v4.82): ausgebildete Einheiten brauchen so viele freie Einwohner (Startarmee und Nachschub nicht)
   crew: { default: 1, fobTruck: 2, ifv: 3, tank: 3, flak: 2, sam: 2, gepard: 3, pzh: 4, excavator: 2, littlebird: 2, transporter: 2, gunship: 2, f16: 2 },
   // Flucht (seit v4.82): Wohnzellen in der Konfliktzone leeren sich, wenn in ihnen oder den Nachbarzellen geschossen wird

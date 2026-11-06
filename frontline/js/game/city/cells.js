@@ -99,7 +99,7 @@ export function cellsOf(c, i) {
  * Passt ein n × n-Großbau mit Mitte a? Alle Zellen auf der Karte, ausweisbar, ohne Hindernis oder fremdes Gebäude und `free(j)`
  * (Standard: leer).
  */
-export function bigFits(game, c, a, n, free = (j) => !c.kind[j]) {
+export function bigFits(game, c, a, n, free = (j) => !c.kind[j], ok = (j) => canZone(game, c, j)) {
   const [lo, hi] = bigSpan(n);
   const q = a % c.cols;
   const r = (a - q) / c.cols;
@@ -107,7 +107,7 @@ export function bigFits(game, c, a, n, free = (j) => !c.kind[j]) {
   for (let y = r - lo; y <= r + hi; y++) {
     for (let x = q - lo; x <= q + hi; x++) {
       const j = y * c.cols + x;
-      if (!canZone(game, c, j) || !free(j) || !cellFree(game, c, x, y)) return false;
+      if (!ok(j) || !free(j) || !cellFree(game, c, x, y)) return false;
     }
   }
   return true;
@@ -117,7 +117,7 @@ export function bigFits(game, c, a, n, free = (j) => !c.kind[j]) {
  * Mitte für einen Großbau der Art `kind`, der die Zelle (col, row) enthält: zuerst genau dort, sonst so weit verschoben,
  * dass er passt (erst gerade, dann schräg). −1, wenn nichts passt.
  */
-export function fitBig(game, c, col, row, kind, free) {
+export function fitBig(game, c, col, row, kind, free, ok) {
   const n = sizeOf(kind);
   const [lo, hi] = bigSpan(n);
   const offs = [];
@@ -127,7 +127,7 @@ export function fitBig(game, c, col, row, kind, free) {
     const x = col + dx;
     const y = row + dy;
     if (x < 0 || y < 0 || x >= c.cols || y >= c.rows) continue;
-    if (bigFits(game, c, y * c.cols + x, n, free)) return y * c.cols + x;
+    if (bigFits(game, c, y * c.cols + x, n, free, ok)) return y * c.cols + x;
   }
   return -1;
 }
@@ -263,6 +263,94 @@ export function canZone(game, c, i) {
   if (c.mapRoads?.[i]) return false; // Stadtstraße der Karte (Zone, Brücke): gehört niemandem, bleibt Straße
   for (const o of game.city) if (o !== c && o.kind[i]) return false;
   return true;
+}
+
+/** Meldungen, warum das Baugebiet eine Zelle sperrt (Schlüssel aus buildWhy). */
+export const BUILD_BLOCK = {
+  territory: 'Nur im eigenen Gebiet bauen (Gebiet wächst mit FOBs und Gebäuden)',
+  unexplored: 'Unerkundetes Gelände: erst aufklären',
+  enemy: 'Zu nah am Feind',
+  zone: 'Nicht in der Konfliktzone',
+};
+
+// Feindnähe je Team (Zwischenspeicher, nicht im Spielstand): Uint8Array über das Stadtraster, 1 = Zellmitte höchstens CITY.build.enemyR
+// von einer sichtbaren gegnerischen Bodeneinheit oder einem gegnerischen Gebäude bzw. Stadtgebäude (ohne Straßen). Einmal je Takt
+// ENEMY_EVERY s Spielzeit neu gestempelt (Einheiten bewegen sich in der Zeit kaum), sofort neu, wenn eine Stadt (ver) oder die Zahl
+// der Gebäude sich ändert. So kostet jede Zellprüfung nur einen Feldzugriff (KI-Suchen, Baumodus je Bild).
+const ENEMY_CACHE = new WeakMap(); // Game → { slot, nb, vers, near: [Uint8Array|null, …] }
+const ENEMY_EVERY = 0.5; // s: Takt der Neuberechnung (reine Rechenhilfe, keine Spielregel)
+
+function enemyNear(game, c) {
+  const team = c.team;
+  const cities = game.city ?? [];
+  const slot = Math.floor(game.time / ENEMY_EVERY);
+  let hit = ENEMY_CACHE.get(game);
+  const fresh = hit && hit.slot === slot && hit.nb === game.buildings.length && cities.every((o, t) => (o ? o.ver : -1) === hit.vers[t]);
+  if (!fresh) {
+    hit = { slot, nb: game.buildings.length, vers: cities.map((o) => (o ? o.ver : -1)), near: [null, null] };
+    ENEMY_CACHE.set(game, hit);
+  }
+  if (hit.near[team]) return hit.near[team];
+  const near = new Uint8Array(c.cols * c.rows);
+  const R = CITY.build.enemyR;
+  const rc = Math.ceil(R / c.cell);
+  const stamp = (x, y) => {
+    const cc = Math.floor((x - c.x0) / c.cell);
+    const cr = Math.floor((y - c.y0) / c.cell);
+    for (let r = Math.max(0, cr - rc); r <= Math.min(c.rows - 1, cr + rc); r++) {
+      const dy = c.y0 + (r + 0.5) * c.cell - y;
+      for (let q = Math.max(0, cc - rc); q <= Math.min(c.cols - 1, cc + rc); q++) {
+        const dx = c.x0 + (q + 0.5) * c.cell - x;
+        if (dx * dx + dy * dy <= R * R) near[r * c.cols + q] = 1;
+      }
+    }
+  };
+  const seen = game.fog[team];
+  for (const u of game.units) {
+    if (u.alive && u.team !== team && !u.def.air && seen.isVisible(u.x, u.y)) stamp(u.x, u.y);
+  }
+  for (const b of game.buildings) {
+    if (b.alive && b.team !== team) stamp(b.x, b.y);
+  }
+  for (const o of cities) {
+    if (!o || o.team === team) continue;
+    for (const j of o.list) {
+      if (isFlat(o.kind[j])) continue; // Straßen des Gegners zählen nicht
+      const col = j % o.cols;
+      const x = o.x0 + (col + 0.5) * o.cell;
+      const y = o.y0 + ((j - col) / o.cols + 0.5) * o.cell;
+      stamp(x, y);
+    }
+  }
+  hit.near[team] = near;
+  return near;
+}
+
+/**
+ * Baugebiet (seit v5.78, nur mit game.buildRules): Grund, warum Zelle i für eine Zellenart `kind` gesperrt ist, oder null.
+ * Gründe (Schlüssel von BUILD_BLOCK): `territory` nicht im eigenen Gebiet (c.claim; Straßen `kind` 'road' dürfen außerhalb liegen),
+ * `unexplored` nie aufgedeckt, `zone` in der Konfliktzone (CITY.build.noZone), `enemy` nahe (CITY.build.enemyR) einer sichtbaren
+ * gegnerischen Bodeneinheit oder eines gegnerischen Gebäudes. Ohne Regel immer null. Kein Zufall, nur lesen.
+ */
+export function buildWhy(game, c, i, kind) {
+  if (!game.buildRules) return null;
+  if (kind !== 'road' && !c.claim[i]) return 'territory';
+  const col = i % c.cols;
+  const x = c.x0 + (col + 0.5) * c.cell;
+  const y = c.y0 + ((i - col) / c.cols + 0.5) * c.cell;
+  if (!game.fog[c.team].isExplored(x, y)) return 'unexplored';
+  const z = game.zone;
+  if (CITY.build.noZone && z && (x - z.x) ** 2 + (y - z.y) ** 2 <= z.r * z.r) return 'zone';
+  if (enemyNear(game, c)[i]) return 'enemy';
+  return null;
+}
+
+/**
+ * Darf das Team (Stadt c) Zelle i für `kind` ausweisen? canZone und, mit Baugebiet, buildWhy. `kind` 'road' für Straßen.
+ * Ohne `kind` gilt die strengere Prüfung für Gebäude.
+ */
+export function buildAllowed(game, c, i, kind) {
+  return canZone(game, c, i) && buildWhy(game, c, i, kind) === null;
 }
 
 /** Die 4er-Nachbarzellen von Zelle i (Kartenrand beachtet). */

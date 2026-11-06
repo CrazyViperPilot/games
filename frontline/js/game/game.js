@@ -138,8 +138,9 @@ export class Game {
   /** weather: 'off' | 'random' | 'summer' | 'autumn' | 'winter' (Wetter und Jahreszeit, weather.js; ohne Angabe aus). */
   /** research: Forschungsstufen (research.js; ohne Angabe aus: alle Einheiten frei, keine Verbesserungen). */
   /** city: Zonenstadt hinter der Hauptstadt (js/game/city/; ohne Angabe aus: Hauptstadt hat unendlich Material). */
+  /** buildRules: Baugebiet der Stadt (seit v5.78): Gebäude nur im eigenen Gebiet, auf erkundetem Gelände, nicht nahe dem Feind und nicht in der Konfliktzone (js/game/city/cells.js `buildWhy`). Wirkt nur mit city; ohne Angabe aus. */
   /** river: Zufallskarte mit Flüssen, Brücken und Furten (river.js; ohne Angabe aus). Fertige Karten bringen ihre eigenen mit. */
-  constructor({ seed = 1, winPoints = BALANCE.winPoints, startMoney = BALANCE.startRes.money, map = null, radio = false, weather = 'off', research = false, river = false, city = false, debug = false } = {}) {
+  constructor({ seed = 1, winPoints = BALANCE.winPoints, startMoney = BALANCE.startRes.money, map = null, radio = false, weather = 'off', research = false, river = false, city = false, buildRules = false, debug = false } = {}) {
     this.seed = seed;
     this.debug = !!debug; // ?debug=1: erlaubt den Befehl `debug` (Geld, festes Wetter), seit v5.58
     this.rng = makeRng(seed);
@@ -165,6 +166,7 @@ export class Game {
     this.winReason = null;
     this.winPoints = winPoints;
     this.radioWin = !!radio;
+    this.buildRules = !!buildRules; // Baugebiet der Stadt (seit v5.78; Spielstand: Feld wird mitgespeichert)
     this.fogTimer = 0;
     this.statTimer = 0; // Takt der Heeresgröße für die Statistik (sampleArmy, einmal je s)
     this.pathWork = 0; // untersuchte Zellen der Wegsuche seit dem letzten Schritt (Wegbudget, pathplan.js)

@@ -415,7 +415,7 @@ function startGame(opts) {
   const map = opts.mapId && opts.mapId !== 'random' ? loadMap(opts.mapId) : null; // gespeicherte Karte, sonst aus dem Seed
   const weather = DEBUG && WEATHER_SETTINGS.includes(params.get('weather')) ? params.get('weather') : opts.weather ?? 'off';
   const river = params.has('river') ? params.get('river') === '1' : opts.river !== false; // ?river=0|1 übersteuert das Startmenü
-  const game = new Game({ seed, winPoints: opts.winPoints, startMoney: loadWallet(), map, radio: opts.radio !== false, weather, research: opts.research !== false, river, city: !!opts.city, debug: DEBUG });
+  const game = new Game({ seed, winPoints: opts.winPoints, startMoney: loadWallet(), map, radio: opts.radio !== false, weather, research: opts.research !== false, river, city: !!opts.city, buildRules: opts.buildRules !== false, debug: DEBUG });
   if (DEBUG && WEATHER_NAMES[params.get('wx')]) {
     const wx = params.get('wx');
     game.issue(HUMAN, { type: 'debug', weather: wx, season: wx === 'snow' ? 'winter' : game.weather.season, hold: true }); // Schnee nur im Winter; bleibt so (Grafik prüfen)

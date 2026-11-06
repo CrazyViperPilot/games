@@ -4,7 +4,7 @@ import { BALANCE } from '../../data/balance.js';
 import { CITY } from '../../data/city.js';
 import { KINDS, KIND_ID, KIND_NAME } from '../../data/citykinds.js';
 import { STORED_GOODS, MARKET_GOODS, CITY_STORE_GOODS } from '../../data/goods.js';
-import { isFlat, idx, sizeOf, anchorOf, bigCells, cellsOf, fitBig, releaseCell, hasRoad, canZone } from './cells.js';
+import { isFlat, idx, sizeOf, anchorOf, bigCells, cellsOf, fitBig, releaseCell, hasRoad, canZone, buildAllowed, buildWhy, BUILD_BLOCK } from './cells.js';
 import { woodScan, fellTiles, clearableAt, demolish, felledOf } from './clearing.js';
 import { hasMarket } from './query.js';
 import { zeroGoods, rebuildList, syncEntity, refundQueue, dropEntity } from './state.js';
@@ -27,8 +27,18 @@ function clearBig(game, team, c, a) {
 /** Großbau der Art `kind` mit Mitte nahe (col, row) ausweisen (ein Gebäude, Preis CITY.cost je Gebäude). */
 function placeBig(game, team, c, kind, col, row) {
   const n = sizeOf(kind);
-  const a = fitBig(game, c, col, row, kind);
-  if (a < 0) return { ok: false, reason: `${KIND_NAME[kind]} braucht ${n} × ${n} freie Zellen` };
+  const a = fitBig(game, c, col, row, kind, undefined, (j) => buildAllowed(game, c, j, kind));
+  if (a < 0) {
+    // Mit Baugebiet: liegt der Platz nur am Gebiet, Erkundung oder Feind, sagt die Meldung das (erste gesperrte Zelle)
+    const plain = game.buildRules ? fitBig(game, c, col, row, kind) : -1;
+    if (plain >= 0) {
+      for (const j of bigCells(c, plain, n)) {
+        const why = buildWhy(game, c, j, kind);
+        if (why) return { ok: false, reason: BUILD_BLOCK[why] };
+      }
+    }
+    return { ok: false, reason: `${KIND_NAME[kind]} braucht ${n} × ${n} freie Zellen` };
+  }
   const t = game.teams[team];
   const price = CITY.cost[kind];
   const bm = CITY.costBm[kind] ?? 0;
@@ -140,7 +150,7 @@ export function cmdCity(game, team, cmd) {
   }
   const id = erase ? 0 : KIND_ID[cmd.kind];
   // Ergebnis je Rechteck: gesetzte Zellen und Gründe, warum andere nicht gingen
-  const f = { placed: 0, broke: false, outside: false, noDeposit: false, occupied: false, felled: 0, stuck: false, manned: false, razed: 0, kept: false };
+  const f = { placed: 0, broke: false, outside: false, rule: null, noDeposit: false, occupied: false, felled: 0, stuck: false, manned: false, razed: 0, kept: false };
   const S = city.cell;
   const scan = erase ? woodScan(game, c0 * S, r0 * S, (c1 + 1) * S, (r1 + 1) * S) : null;
   for (let row = r0; row <= r1; row++) {
@@ -206,6 +216,13 @@ function zoneCell(game, team, city, col, row, cmd, id, f) {
     if (!city.blocked[i] && !city.claim[i]) f.outside = true;
     return;
   }
+  if (!erase && game.buildRules) {
+    const why = buildWhy(game, city, i, cmd.kind); // Baugebiet (seit v5.78): Gebiet, Erkundung, Konfliktzone, Feind
+    if (why) {
+      f.rule = why;
+      return;
+    }
+  }
   if (cmd.kind === 'mine' && !city.deposit[i]) {
     f.noDeposit = true; // Förderanlagen nur auf Rohstoffvorkommen
     return;
@@ -236,5 +253,5 @@ function zoneCell(game, team, city, col, row, cmd, id, f) {
 /** Meldung, wenn kein Feld gesetzt wurde (wichtigster Grund zuerst). */
 function failReason(f, erase) {
   const poor = f.broke === 'bm' ? 'Zu wenig Baumaterial im Lager der Hauptstadt' : 'Zu wenig Geld';
-  return f.kept && erase ? 'Rohstoffvorkommen werden beim Räumen nicht angetastet' : f.broke ? poor : f.occupied ? 'Dort steht schon etwas: erst räumen' : f.noDeposit ? 'Förderanlagen nur auf Rohstoffvorkommen' : f.outside ? 'Nur im eigenen Gebiet bauen' : f.manned ? 'Besetzte Häuser lassen sich nicht räumen' : f.stuck ? 'Nur Bäume und Häuser lassen sich räumen, kein Fels, Wasser, Turm oder Mauer' : 'Nichts zu ändern';
+  return f.kept && erase ? 'Rohstoffvorkommen werden beim Räumen nicht angetastet' : f.broke ? poor : f.occupied ? 'Dort steht schon etwas: erst räumen' : f.noDeposit ? 'Förderanlagen nur auf Rohstoffvorkommen' : f.outside ? 'Nur im eigenen Gebiet bauen' : f.rule ? BUILD_BLOCK[f.rule] : f.manned ? 'Besetzte Häuser lassen sich nicht räumen' : f.stuck ? 'Nur Bäume und Häuser lassen sich räumen, kein Fels, Wasser, Turm oder Mauer' : 'Nichts zu ändern';
 }
