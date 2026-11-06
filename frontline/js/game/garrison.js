@@ -3,6 +3,7 @@
 // Hausschadens trifft die Besatzer, Infanterie kann ein besetztes Haus stürmen, und Besatzer bauen es zur Stellung aus. Kein DOM.
 import { BALANCE } from '../data/balance.js';
 import { driveTo, setIdle, exitHouse } from './movement.js';
+import { segDist } from './roads.js';
 
 const G = BALANCE.garrison;
 const TILE = BALANCE.map.tile;
@@ -14,9 +15,29 @@ const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 export const canGarrison = (u) => u.def.armor === 'inf' && !u.crate;
 
 /**
+ * Fensterseiten eines Hauses (seit v5.63): { n, e, s, w }, true = Fenster. Fensterseite ist eine Seite, deren Mittelpunkt höchstens
+ * G.streetReach px von einer Stadtstraße (Strecke x1,y1–x2,y2 aus roads, ohne Feldwege) entfernt ist. Liegt keine Seite an einer Straße,
+ * sind alle vier Seiten offen.
+ */
+function windowsOf(b, roads) {
+  const x0 = b.x - b.w / 2;
+  const x1 = b.x + b.w / 2;
+  const y0 = b.y - b.h / 2;
+  const y1 = b.y + b.h / 2;
+  const reach = G.streetReach;
+  const near = (px, py) => {
+    for (const r of roads) if (segDist(px, py, r.x1, r.y1, r.x2, r.y2) <= reach) return true;
+    return false;
+  };
+  const win = { n: near(b.x, y0), e: near(x1, b.y), s: near(b.x, y1), w: near(x0, b.y) };
+  return win.n || win.e || win.s || win.w ? win : { n: true, e: true, s: true, w: true };
+}
+
+/**
  * Häuser aus den Stadtgebäuden der Karte (Arten aus BALANCE.garrison, nicht gedreht, keine Mauern). Sie sind Entities mit
  * negativen IDs (die IDs von Einheiten und Gebäuden bleiben gleich), Rüstung 'struct' und team −1, solange niemand drin ist.
  * pw/ph = Größe in px, cx/cy/w/h in Zellen wie bei Gebäuden; reach = halbe mittlere Seitenlänge (Reichweite ab Hauswand).
+ * windows = Fensterseiten zur Straße (windowsOf); Häuser ohne windows (alte Stände) gelten als rundum offen.
  */
 export function createHouses(game) {
   game.houses = [];
@@ -24,6 +45,7 @@ export function createHouses(game) {
   game.garrisoned = []; // besetzte Häuser (Zielsuche)
   game.ruins = []; // eingestürzte Häuser (Deckung an Ruinen, ruinCoverMul)
   let id = -1;
+  const roads = (game.map.town?.roads ?? []).filter((r) => !r.dirt); // Stadtstraßen, ohne Feldwege (windowsOf)
   for (const b of game.map.town?.buildings ?? []) {
     const k = G.kinds[b.kind];
     if (!k || b.angle || b.w < G.minSize || b.h < G.minSize) continue;
@@ -50,6 +72,7 @@ export function createHouses(game) {
       works: {}, // fertige Ausbauten (Schlüssel aus BALANCE.garrison.works)
       building: null, // laufender Ausbau { work, left } (left = Restzeit in s)
       lastHitTime: -1e9,
+      windows: windowsOf(b, roads), // Fensterseiten zur Straße für den Feuerbereich (houseCanFire)
       src: b,
     };
     game.houses.push(h);
@@ -312,6 +335,23 @@ export function ruinCoverMul(game, u) {
     if (dx * dx + dy * dy <= r * r) return G.ruinCover.mul;
   }
   return 1;
+}
+
+/**
+ * Feuerbereich (seit v5.63): Sitzt u in einem Stadthaus, darf sie target nur sehen und beschießen, wenn die Richtung von der
+ * Hausmitte zum Ziel durch eine Fensterseite geht. Die Richtung: ist |dx| / halbe Breite ≥ |dy| / halbe Höhe, zählt die Ost- bzw. Westseite,
+ * sonst Süd bzw. Nord (y wächst nach unten). Außerhalb von Stadthäusern (auch in Gefechtstürmen) und ohne windows (alte Stände): immer true.
+ * Keine Allokation.
+ */
+export function houseCanFire(game, u, target) {
+  const h = houseOf(game, u);
+  if (!h || h.kind !== 'house' || !h.windows) return true;
+  const dx = target.x - h.x;
+  const dy = target.y - h.y;
+  let side;
+  if (Math.abs(dx) / (h.pw / 2) >= Math.abs(dy) / (h.ph / 2)) side = dx > 0 ? 'e' : 'w';
+  else side = dy > 0 ? 's' : 'n';
+  return h.windows[side];
 }
 
 /** Tote Einheit aus ihrem Haus streichen (Game.cleanup). */

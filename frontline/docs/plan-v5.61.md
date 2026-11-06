@@ -10,7 +10,7 @@ Für die Pakete ab P2 gilt PRD §13: erst ein Vorschlag zur Ausgestaltung (unten
 |---|---|---|---|---|
 | **P1** | Statistik am Spielende + Doku-Abgleich §1/§13 | §12 Could, §13 | klein | **gebaut (v5.61)** |
 | P2 | Häuserkampf I: Zonen-Nutzen besetzter Häuser (Punkte, Sicht), Ruinen als Deckung | §13 Häuserkampf | mittel | **gebaut (v5.62)** |
-| P3 | Häuserkampf II: KI stürmt Häuser und baut sie zur Stellung aus; Feuerbereich je Haus | §13 Häuserkampf | mittel | **in Arbeit (v5.63)** |
+| P3 | Häuserkampf II: KI stürmt Häuser und baut sie zur Stellung aus; Feuerbereich je Haus | §13 Häuserkampf | mittel | **gebaut (v5.63)** |
 | P4 | Musik (synthetisiert, je Lage ruhig/Gefecht) und Lautstärkeregler für Ton und Musik | §13 Musik | mittel | geparkt |
 | P5 | Stadt: LKW holen Material direkt an Werken statt nur aus dem Lager der Hauptstadt | §13 SimCity-Stadt | groß | geparkt |
 | P6 | KI-Lücken aus §10: KI baut Flak/SAM gegen Luft, Scharfschützen, Bagger | §10 „Nicht gebaut“ | mittel | geparkt |
@@ -97,9 +97,9 @@ Besatzers größer; Infanterie an einer Ruine nimmt 70 % Schaden, weiter weg 100
 
 ### C. Feuerbereich (Fenster) für Besatzer in Stadthäusern (nicht Gefechtstürme)
 - Beim Anlegen der Häuser (`createHouses` in `js/game/garrison.js`) bekommt jedes Haus `h.windows = { n, e, s, w }` (true = Fensterseite).
-  Eine Seite ist **blind**, wenn ein anderes Stadtgebäude der Karte (`game.map.town.buildings`) höchstens `BALANCE.garrison.blindGap` (14 px)
-  vor dieser Seite liegt und sich mit ihr auf mindestens der halben Seitenlänge überdeckt. Sonst Fenster. Hat ein Haus keine Fensterseite (eingeklemmt): alle vier Seiten offen.
-- Richtung zum Ziel: dx, dy von der Hausmitte; ist |dx|/(pw/2) ≥ |dy|/(ph/2), dann Seite e (dx>0) bzw. w, sonst s (dy>0) bzw. n.
+  Fensterseite ist eine Seite, deren Mittelpunkt höchstens `BALANCE.garrison.streetReach` (60 px) von einer Stadtstraße entfernt liegt
+  (Strecke aus `game.map.town.roads` ohne Feldwege, Abstand über `segDist` aus `js/game/roads.js`). Liegt keine Seite an einer Straße, sind alle vier offen.
+  (Revision nach Nachmessung: Häuser stehen auf Zufallskarten 60–120 px auseinander, die Nachbarregel mit 14 px griff nie.)
 - Besatzer dürfen nur Ziele beschießen und als Ziel wählen, deren Richtung durch eine Fensterseite geht. Eine Hilfsfunktion
   `houseCanFire(game, u, target)` in garrison.js (true außerhalb von Stadthäusern), genutzt in der Zielsuche und vor dem Schuss in `js/game/combat.js`.
   Keine Allokationen je Aufruf.

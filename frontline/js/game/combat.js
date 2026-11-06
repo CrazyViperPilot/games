@@ -2,7 +2,7 @@
 import { BALANCE } from '../data/balance.js';
 import { createShell, inRange, radiusOf, isFoe, canAttack, resolveTarget } from './entities.js';
 import { buildHash, nearby } from './movement.js';
-import { damageHouse, houseFire, ruinCoverMul } from './garrison.js';
+import { damageHouse, houseFire, ruinCoverMul, houseCanFire } from './garrison.js';
 import { addCrater } from './scars.js';
 import { auraCooldown } from './commander.js';
 import { weatherSight } from './weather.js';
@@ -160,6 +160,7 @@ function findTarget(game, hash, s, radius, minRange, allowBuildings, dmg) {
   const consider = (e) => {
     if (!e.alive || !isFoe(team, e) || e.house) return;
     if (!(dmgVs(dmg, e) > 0)) return; // z. B. Mörser und Panzer können keine Hubschrauber treffen, Soldaten keine Flugzeuge
+    if (s.house && !houseCanFire(game, s, e)) return; // Besatzer sehen und zielen nur durch Fensterseiten (seit v5.63)
     if (leashed && Math.hypot(e.x - s.anchorX, e.y - s.anchorY) > Math.max(BALANCE.leash, radius) + radiusOf(e)) return;
     const d = Math.hypot(e.x - s.x, e.y - s.y);
     if (d < minRange || d > radius + radiusOf(e)) return;
@@ -240,7 +241,9 @@ function fireWeapon(game, u, w, t) {
 
 /** Reichweite der Waffe w von u gegen t (Forschung, Hauswand; Artillerie nicht unter minRange)? */
 const weaponReaches = (game, u, w, t) =>
-  inRange(u, t, w.spec.range * rangeMul(game, u) + reachBonus(game, u)) && !(w.spec.minRange && Math.hypot(t.x - u.x, t.y - u.y) < w.spec.minRange);
+  inRange(u, t, w.spec.range * rangeMul(game, u) + reachBonus(game, u)) &&
+  !(w.spec.minRange && Math.hypot(t.x - u.x, t.y - u.y) < w.spec.minRange) &&
+  houseCanFire(game, u, t); // Besatzer schießen nur durch eine Fensterseite (seit v5.63)
 
 /** Artillerie mit gewähltem Punkt (u.fireTarget, Befehl mortarTarget): feuert dorthin, solange Vorrat und Reichweite reichen. */
 function unitFireAtGround(game, u) {
@@ -307,6 +310,7 @@ function weaponTarget(game, hash, u, w) {
     if (!e.alive || !isFoe(u.team, e) || e.house || !(dmgVs(w.spec.damage, e) > 0)) return;
     const d = Math.hypot(e.x - u.x, e.y - u.y);
     if (d > R + radiusOf(e)) return;
+    if (u.house && !houseCanFire(game, u, e)) return; // Fensterseite (seit v5.63)
     if (leashed && Math.hypot(e.x - u.anchorX, e.y - u.anchorY) > Math.max(BALANCE.leash, R) + radiusOf(e)) return;
     if (!game.sees(u.team, e)) return;
     const score = d + (prefers(w.spec, e) ? 0 : 1e6);

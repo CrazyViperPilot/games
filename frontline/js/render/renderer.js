@@ -76,6 +76,8 @@ const STAR_R = 8; // Radius des Sterns (Bildschirm-px)
 const ISO_STAR_UP = 0; // Iso: zusätzlich angehoben (Welt-px), über dem Kopf der Figur
 const MARKER_LIFE = 0.8; // s, Lebensdauer des Wegziel-Markers
 const SLOT_LIFE = 1.6; // s, so lange zeigen Punkte die Formationsplätze
+const WIN_OFF = 4; // Feuerbereich (seit v5.63): Strich vor der Hauswand (Welt-px)
+const WIN_HALF = 0.3; // halbe Länge des Strichs, Anteil der Seitenlänge
 const SC = BALANCE.scars;
 const SMOKE_AT = 0.6; // Gebäude und Häuser rauchen unter diesem Lebensanteil, Fahrzeuge unter VEHICLE_SMOKE
 const VEHICLE_SMOKE = 0.5;
@@ -436,6 +438,7 @@ export class Renderer {
     for (const h of g.garrisoned ?? []) {
       if (!inRect(h.x, h.y, 200) || !(h.team === team || reveal || g.sees(team, h))) continue;
       const p = cam.worldToScreen(h.x, h.y - h.ph / 2);
+      if (h.team === team) this.drawWindows(ctx, h, cam); // Feuerbereich (seit v5.63)
       this.drawGarrison(ctx, p.x, p.y - 12, h);
     }
     if (v.dragBox) this.drawDragBox(ctx, v.dragBox);
@@ -1012,6 +1015,7 @@ export class Renderer {
       if (!inRect(h.x, h.y, PAD) || !(h.team === team || reveal || g.sees(team, h))) continue;
       if (relief) cam.pin(this.baseHeight({ t: 0, o: h.src }));
       const p = cam.worldToScreen(h.x, h.y);
+      if (h.team === team) this.drawWindows(ctx, h, cam); // Feuerbereich (seit v5.63), mit derselben Höhe wie das Haus
       cam.unpin();
       this.drawGarrison(ctx, p.x, p.y - ((TOWN_H[h.type] || 40) + 20) * z, h);
     }
@@ -1338,6 +1342,40 @@ export class Renderer {
     if (!occupied && !worksMask(h)) return false;
     if (h.team === this.team || this.revealAll) return true;
     return occupied ? this.game.sees(this.team, h) : known(h.x, h.y);
+  }
+
+  /**
+   * Feuerbereich am eigenen besetzten Haus (seit v5.63): an jeder Fensterseite ein kurzer Strich in Teamfarbe, vor der Wand.
+   * cam bildet Welt- auf Bildschirmkoordinaten ab (während eines Pins die feste Höhe). Nur Bild.
+   */
+  drawWindows(ctx, h, cam) {
+    const w = h.windows;
+    if (!w) return;
+    const hx = h.pw * WIN_HALF;
+    const hy = h.ph * WIN_HALF;
+    const left = h.x - h.pw / 2 - WIN_OFF;
+    const right = h.x + h.pw / 2 + WIN_OFF;
+    const top = h.y - h.ph / 2 - WIN_OFF;
+    const bottom = h.y + h.ph / 2 + WIN_OFF;
+    ctx.save();
+    ctx.strokeStyle = this.game.teams[h.team]?.color ?? '#888';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    if (w.n) this.windowLine(ctx, cam, h.x - hx, top, h.x + hx, top);
+    if (w.s) this.windowLine(ctx, cam, h.x - hx, bottom, h.x + hx, bottom);
+    if (w.w) this.windowLine(ctx, cam, left, h.y - hy, left, h.y + hy);
+    if (w.e) this.windowLine(ctx, cam, right, h.y - hy, right, h.y + hy);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /** Ein Segment (Weltpunkte) in den laufenden Pfad von drawWindows. */
+  windowLine(ctx, cam, x0, y0, x1, y1) {
+    const a = cam.worldToScreen(x0, y0);
+    const b = cam.worldToScreen(x1, y1);
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
   }
 
   /** Besatzung eines Hauses (Bildschirmkoordinaten, Transformation auf DPR): Schild in Teamfarbe „n/Plätze“, darunter der Zustand. */

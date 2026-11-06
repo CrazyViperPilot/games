@@ -23,7 +23,7 @@ import { createHot, updateHot, cmdDrill } from './hotzone.js';
 import { updateLogistics, cmdLoad, cmdUnload, cmdRoute, cmdSetPreset, cmdBoard, cmdDropoff, cargoSum, storeCapOf } from './logistics.js';
 import { updateConstruction, canBuild, cmdRepair, orderBuild, orderBuildSeq } from './construction.js';
 import { cmdRoof, cmdFortify, updateTowers, ejectCrew } from './tower.js';
-import { createHouses, updateGarrison, cmdGarrison, cmdUngarrison, cmdStorm, cmdFortifyHouse, dropOccupant } from './garrison.js';
+import { createHouses, updateGarrison, cmdGarrison, cmdUngarrison, cmdStorm, cmdFortifyHouse, dropOccupant, houseCanFire } from './garrison.js';
 import { createCrates, updateCrates, updateCrateIntel, cmdPickup, cmdDeliver, cmdDropCrate } from './crates.js';
 import { createScars, updateScars, updateScarIntel, addUnitWreck, addBuildingWreck, clearWrecksUnder } from './scars.js';
 import { createAnimals, updateAnimals } from './animals.js';
@@ -810,9 +810,10 @@ export class Game {
     if (!units.length) return fail(armed.length ? 'Kistenträger schießen nicht' : 'Keine bewaffnete Einheit gewählt');
     const aim = t.house ? this.getEntity(t.house) : t;
     for (const u of units) {
-      // Besatzer bleiben im Haus, solange das Ziel aus den Fenstern erreichbar ist; sonst gehen sie hinaus und verfolgen es
+      // Besatzer bleiben im Haus, solange das Ziel aus den Fenstern erreichbar ist und durch eine Fensterseite liegt (houseCanFire, seit v5.63);
+      // sonst gehen sie hinaus und verfolgen es
       const h = u.house ? this.getEntity(u.house) : null;
-      if (u.house && !(h && aim && inRange(u, aim, u.def.range * rangeMul(this, u) + h.reach))) exitHouse(this, u, t.x, t.y);
+      if (u.house && !(h && aim && inRange(u, aim, u.def.range * rangeMul(this, u) + h.reach) && houseCanFire(this, u, aim))) exitHouse(this, u, t.x, t.y);
       u.order = { type: 'attack', x: t.x, y: t.y, targetId: t.id };
       u.targetId = t.id;
       u.path = [];

@@ -11,6 +11,7 @@ import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { makeRng } from '../core/rng.js';
 import { hasCommander } from '../game/commander.js';
+import { canGarrison } from '../game/garrison.js';
 import { radioEta } from '../game/radio.js';
 import { weatherSight } from '../game/weather.js';
 import { researchBlock, RESEARCH_KEYS } from '../game/research.js';
@@ -86,6 +87,15 @@ import {
   GARRISON_SHARE,
   GARRISON_RANGE,
   GARRISON_EVERY,
+  STORM_EVERY,
+  STORM_RANGE,
+  STORM_RATIO,
+  STORM_WIRE,
+  STORM_MIN,
+  STORM_MAX,
+  HOUSE_WORK_EVERY,
+  HOUSE_WORK_ORDER,
+  HOUSE_WORK_RESERVE,
   CRATE_EVERY,
   CRATE_RANGE,
   CMD_BEHIND,
@@ -209,6 +219,8 @@ export class AI {
     this.manageTrucks(s);
     this.rally(s);
     this.garrisonZone(s);
+    this.stormHouses(s); // Häuser stürmen (seit v5.63)
+    this.fortifyHouses(s); // eigene Besatzungshäuser ausbauen (seit v5.63)
     if (!this.attackRadio(s)) this.army(s); // steht ein gegnerischer Sendemast, gilt ihm der ganze Angriff
     this.guardCommander(s);
     this.collectCrates(s); // nach der Welle: Kisten holen nur, die zurückbleiben (Reserve, Nachschub)
@@ -1305,6 +1317,48 @@ export class AI {
       if (!best || !g.issue(t, { type: 'garrison', ids: [u.id], houseId: best.id }).ok) continue;
       pending.set(best.id, (pending.get(best.id) || 0) + 1);
       want--;
+    }
+  }
+
+  /**
+   * Häuser stürmen (Häuserkampf II, seit v5.63): ein vom Gegner besetztes, von der KI gesehenes Haus in der Konfliktzone bekommt einen
+   * Sturm, wenn genug freie Infanterie in STORM_RANGE daneben steht: mindestens STORM_RATIO je Besatzer (× STORM_WIRE mit Stacheldraht)
+   * und mindestens STORM_MIN. Es gehen höchstens STORM_MAX, die nächsten zuerst. Je Takt höchstens ein Haus. Nur Schwierigkeiten mit houseStorm.
+   */
+  stormHouses(s) {
+    const g = this.game;
+    const t = this.team;
+    if (!this.cfg.houseStorm || !g.houses?.length || !this.once('storm', STORM_EVERY)) return;
+    const z = s.zone;
+    const foes = g.houses
+      .filter((h) => h.alive && h.team >= 0 && h.team !== t && h.occupants.length > 0 && dist(h.x, h.y, z.x, z.y) <= z.r && g.sees(t, h))
+      .sort((a, b) => dist(a.x, a.y, z.x, z.y) - dist(b.x, b.y, z.x, z.y) || a.id - b.id);
+    if (!foes.length) return;
+    const raiding = this.raid ? this.raid.ids : null;
+    const free = s.units.filter((u) => canGarrison(u) && u.def.range > 0 && !u.def.hero && !u.house && u.order.type === 'idle' && !(raiding && raiding.has(u.id)));
+    for (const h of foes) {
+      const near = free.filter((u) => dist(u.x, u.y, h.x, h.y) <= STORM_RANGE).sort((a, b) => dist(a.x, a.y, h.x, h.y) - dist(b.x, b.y, h.x, h.y) || a.id - b.id);
+      const need = STORM_RATIO * h.occupants.length * (h.works.wire ? STORM_WIRE : 1);
+      if (near.length < STORM_MIN || near.length < need) continue;
+      if (g.issue(t, { type: 'storm', ids: near.slice(0, STORM_MAX).map((u) => u.id), houseId: h.id }).ok) return;
+    }
+  }
+
+  /**
+   * Eigene Besatzungshäuser ausbauen (Häuserkampf II, seit v5.63): je besetztem eigenem Haus ohne laufende Arbeit die nächste fehlende
+   * Arbeit aus HOUSE_WORK_ORDER, wenn das Geld nach dem Preis noch HOUSE_WORK_RESERVE lässt. Je Takt höchstens ein Auftrag.
+   * Nur Schwierigkeiten mit houseWorks.
+   */
+  fortifyHouses(s) {
+    const g = this.game;
+    const t = this.team;
+    if (!this.cfg.houseWorks || !g.houses?.length || !this.once('houseWork', HOUSE_WORK_EVERY)) return;
+    const money = g.teams[t].res.money;
+    for (const h of g.houses) {
+      if (!h.alive || h.team !== t || !h.occupants.length || h.building) continue;
+      const work = HOUSE_WORK_ORDER.find((w) => !h.works[w]);
+      if (!work || money < BALANCE.garrison.works[work].cost.money + HOUSE_WORK_RESERVE) continue;
+      if (g.issue(t, { type: 'fortifyHouse', houseId: h.id, work }).ok) return;
     }
   }
 
