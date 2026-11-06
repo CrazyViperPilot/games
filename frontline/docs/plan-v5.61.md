@@ -12,7 +12,8 @@ Für die Pakete ab P2 gilt PRD §13: erst ein Vorschlag zur Ausgestaltung (unten
 | P2 | Häuserkampf I: Zonen-Nutzen besetzter Häuser (Punkte, Sicht), Ruinen als Deckung | §13 Häuserkampf | mittel | **gebaut (v5.62)** |
 | P3 | Häuserkampf II: KI stürmt Häuser und baut sie zur Stellung aus; Feuerbereich je Haus | §13 Häuserkampf | mittel | **gebaut (v5.63)** |
 | P4 | Musik (synthetisiert, je Lage ruhig/Gefecht) und Lautstärkeregler für Ton und Musik | §13 Musik | mittel | **gebaut (v5.64)** |
-| P5 | Stadt: LKW holen Material direkt an Werken statt nur aus dem Lager der Hauptstadt | §13 SimCity-Stadt | groß | geparkt |
+| P5a | Stadt: Werkslager und LKW laden am Werk (Simulation, Befehle, Rechtsklick, Infofeld) | §13 SimCity-Stadt | mittel | **in Arbeit (v5.65)** |
+| P5b | Stadt: Route ab Werk in der Oberfläche, KI holt am Werk, Ressourcenanzeige | §13 SimCity-Stadt | mittel | geparkt |
 | P6 | KI-Lücken aus §10: KI baut Flak/SAM gegen Luft, Scharfschützen, Bagger | §10 „Nicht gebaut“ | mittel | geparkt |
 | – | LLM für Gegner und Dialoge | §13 | – | nicht paketiert: Grundsatzfragen offen (Modell, Gerät/Server, Offline-PWA, Kosten) |
 
@@ -146,8 +147,48 @@ Reines Browser-Modul wie `js/audio/sound.js` (kein Teil der Simulation, liest nu
   kein Absturz über 60 s Spiel, intensity steigt bei vielen Kampfeffekten und fällt danach, bei Musik 0 % werden keine Noten geplant,
   Lautstärke wird gespeichert und gelesen (localStorage-Attrappe). `test/assets.test.js` muss grün bleiben.
 
-## P5 – Material aus Werken (Vorschlag)
-- LKW einer FOB dürfen BM/MUN/TS direkt am nächstgelegenen Werk laden, wenn es näher ist als die Hauptstadt; Werk führt dafür ein kleines Ausgangslager.
+## P5a – Werkslager, LKW laden am Werk (v5.65, von Daniel bestätigt am 2026-11-06)
+
+Heute fließt der Ausstoß von BM-Werk (`bm`), Munitionswerk (`mun`) und Raffinerie (`fuel`) über die Straße ins Lager der Hauptstadt
+(`runWorks` und `storeAndMunitions` in `js/game/city/economy.js`). LKW laden nur an FOBs (`js/game/logistics.js`).
+
+### Regel
+- Jedes dieser drei Werke hat ein kleines **Ausgangslager** für seine Ware, höchstens `CITY.pickup.cap` (400). Neuer Abschnitt
+  `CITY.pickup = { cap: 400, share: 0.5, kinds: ['bm', 'mun', 'fuel'] }` in `js/data/city.js` mit deutschem Kommentar
+  (`kinds` = Zellenarten-Schlüssel der Werke, deren Ware LKW abholen dürfen; Ware aus `CITY.chain[k].to`).
+- Vom Ausstoß eines solchen Werks gehen `share` (50 %) ins eigene Ausgangslager, solange es nicht voll ist, **ohne Straßenweg**
+  (kein `pathEff`, keine Straßenlast, kein Verlust); der Rest und alles, was nicht mehr passt, läuft wie heute zur Hauptstadt.
+  Ist das Werk nicht in Betrieb (kein Ausstoß), füllt sich nichts. Beim Munitionswerk gilt dasselbe für die erzeugte Munition.
+- Speicher: `c.out` (Float32Array, eine Zahl je Zelle, nur am Anker des Werks belegt) in `createCity` anlegen; beim Abriss/Einsturz
+  des Werks (Stelle suchen, wo Zellen geleert werden, z. B. `js/game/city/clearing.js`/`state.js`) auf 0 setzen. Ältere Spielstände
+  ohne `c.out`: in `restoreAccessors` (game.js) ergänzen.
+- Stadtzahlen: was ins Ausgangslager geht, zählt für `c.made` bzw. die Statistik wie Ware, die im Lager ankommt (Ressourcenanzeige bleibt stimmig;
+  `test/flow.test.js` muss grün bleiben).
+
+### LKW
+- `cmdLoad` (`js/game/logistics.js`) nimmt statt `fobId` auch `work: i` (Zellindex eines eigenen Werks der Arten `CITY.pickup.kinds`, Anker
+  über `anchorOf`). Der LKW fährt zur Mitte des Werks (`bigCenter`), Ankunftsabstand `transferReach` plus halbe Werksgröße, und lädt mit
+  `transferRate` aus `c.out[anker]`, nur die Ware dieses Werks (Ladungsart des LKW ignorieren). Fertig, wenn voll oder Werkslager leer.
+- `cmdRoute` nimmt statt `fromId` auch `fromWork: i` (Pendeln Werk → FOB). Ziel bleibt eine FOB.
+- Ist das Werk weg (abgerissen, zerstört, Besitzer anders): Auftrag endet mit Meldung „Werk nicht mehr da“.
+- Gemeinsame Hilfen für „Ladequelle“ (FOB oder Werk) statt doppeltem Code; keine Allokationen je Schritt.
+
+### Oberfläche (klein)
+- Rechtsklick mit gewählten LKW auf ein eigenes Werk dieser Arten (`pickCity` in `js/ui/controller.js`) → `load` mit `work`.
+- Infofeld des Werks (`cityInfo` in `js/ui/hud.js`): Zeile „Abholbereit: 230 / 400 BM (LKW: Rechtsklick)“.
+- Hilfe (F1) in `js/ui/menu.js` ergänzen.
+
+### Doku und Test
+- PRD §3 (Hauptstadt/LKW), §15 (Werke, Straßentransport), §13 SimCity-Stadt („LKW holen Material aus Werken“ als gebaut v5.65),
+  Änderungsverlauf v5.65, `CACHE_VERSION` `frontline-v178`, `npm run docs`, ARCHITEKTUR „Befehle“ (`load`/`route` neue Felder),
+  Feature-Landkarte in `CLAUDE.md` (Zeile Lager/LKW).
+- Test `test/pickup.test.js`: Werk füllt sein Ausgangslager mit etwa share des Ausstoßes bis cap; LKW lädt am Werk nur dessen Ware;
+  Route Werk → FOB bringt Ware in die FOB; abgerissenes Werk beendet den Auftrag; Spielstand ohne `c.out` lädt.
+- Gewollte Regeländerung: Golden-Werte dürfen sich ändern (Läufe mit Stadt); dann nach Anleitung im Testkopf neu setzen und im Bericht nennen.
+
+## P5b – Werk als Quelle in Oberfläche und KI (Vorschlag)
+- Routen-Modus der Oberfläche akzeptiert ein Werk als Start; Ressourcenanzeige zeigt die Ausgangslager.
+- Armee-KI lässt LKW für eine vordere FOB am Werk laden, wenn das Werk deutlich näher liegt als die Hauptstadt und genug abholbereit ist.
 
 ## P6 – KI-Lücken (Vorschlag)
 - KI baut Flak/SAM, sobald der Gegner Hubschrauber oder Jets hat; Scharfschützen in kleiner Zahl; Bagger nur für Straßen der Stadt.
