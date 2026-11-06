@@ -1,7 +1,7 @@
 # Frontline – Architektur
 
 Wie der Code aufgebaut ist. Regeln für Änderungen, Wegweiser zu Werten und Rezepte: [CLAUDE.md](CLAUDE.md).
-Spielregeln: [PRD.md](PRD.md). Zahlen stehen hier bewusst nicht, sie gehören in `js/data/`.
+Spielregeln: [PRD.md](PRD.md) (Einstieg) und die Themen-Dateien in [docs/prd/](docs/prd/). Zahlen stehen hier bewusst nicht, sie gehören in `js/data/`.
 
 ## 1. Schichten
 

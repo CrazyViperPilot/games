@@ -7,7 +7,7 @@ Spieler (Blau) gegen Computer (Rot). Vanilla JS, Canvas 2D und WebGL, kein Build
 |---|---|
 | [CLAUDE.md](CLAUDE.md) | Einstieg für Erweiterungen: Regeln, „Wo ändere ich was?“, Feature-Landkarte, Rezepte |
 | [ARCHITEKTUR.md](ARCHITEKTUR.md) | Aufbau des Codes: Schichten, Simulationsschritt, Datenmodelle, Befehle, Dateien |
-| [PRD.md](PRD.md) | Spielregeln, Steuerung (§8), KI (§10), Änderungsverlauf |
+| [PRD.md](PRD.md) | Einstieg in die Spielregeln mit Übersicht; die Regeln je Thema in [docs/prd/](docs/prd/), Änderungsverlauf in [docs/changelog.md](docs/changelog.md) |
 | [docs/verlauf.md](docs/verlauf.md) | Ursprünglicher Umsetzungsplan (v1 bis v4.23), nur zum Nachlesen |
 | [docs/plan-v5.20.md](docs/plan-v5.20.md) | Umsetzungsplan Straßentransport (v5.20), historisch |
 
@@ -43,7 +43,7 @@ Beispiel: `http://localhost:8765/frontline/?debug=1&seed=123&speed=3`
 ```sh
 cd frontline
 npm run test:quick   # Config und PRD-Tabellen prüfen (Sekunden)
-npm run docs         # Wertetabellen in PRD.md aus js/data/ erzeugen
+npm run docs         # Wertetabellen in docs/prd/ aus js/data/ erzeugen
 npm test             # alle Tests: Simulation und KI ohne Browser (dauert einige Minuten)
 ```
 

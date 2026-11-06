@@ -4,7 +4,9 @@ Echtzeit-Strategie im Browser (Blau = Spieler gegen Rot = KI). Vanilla JS mit ES
 kein Build-Schritt, offline als PWA. Diese Datei ist der Einstieg für Menschen und Modelle: erst sie lesen, dann gezielt
 die genannten Dateien.
 
-- **Regeln des Spiels:** [PRD.md](PRD.md) (was gilt, in Worten, mit Änderungsverlauf)
+- **Regeln des Spiels:** [PRD.md](PRD.md) ist der Einstieg (Ziel, Ablauf, Übersicht); die Regeln je Thema stehen seit v5.79 in
+  [docs/prd/](docs/prd/) (Abschnittsnummern §3 … §16 wie früher, Zuordnung in der Übersicht von PRD.md). **Für ein Paket nur PRD.md
+  und die Themen-Datei(en) lesen, nicht alle.** Änderungsverlauf: [docs/changelog.md](docs/changelog.md) (nur bei Bedarf).
 - **Aufbau des Codes:** [ARCHITEKTUR.md](ARCHITEKTUR.md) (Schichten, Simulationsschritt, Datenmodelle, Befehle)
 - **Entstehung:** [docs/verlauf.md](docs/verlauf.md) (alter Umsetzungsplan v1 bis v4.23, nur zum Nachlesen; Code-Kommentare verweisen auf seine Abschnitte)
 
@@ -20,13 +22,14 @@ die genannten Dateien.
    Zufallskarten ohne Fluss müssen je Seed unverändert bleiben (gespeicherte Seeds, Tests).
 5. Imports immer mit Endung (`'./zone.js'`), nie über den Ordner `frontline/` hinaus, keine CDNs oder externen Dateien.
 6. Neue Datei, die der Browser lädt: in `sw.js` unter `ASSETS` eintragen. Jede Änderung an ausgelieferten Dateien: `CACHE_VERSION` in `sw.js` um 1 erhöhen.
-7. Regel- oder Feature-Änderung: [PRD.md](PRD.md) im passenden Abschnitt anpassen und oben im **Änderungsverlauf** eintragen
+7. Regel- oder Feature-Änderung: die passende Themen-Datei unter `docs/prd/` anpassen (Abschnitt laut Übersicht in PRD.md) und oben in
+   [docs/changelog.md](docs/changelog.md) eintragen
    (neue Version `v4.xx`, Cache-Version). Die Hilfe (F1) in `js/ui/helptext.js` liest die meisten Zahlen und Tasten aus den Daten
-   (seit v5.63); der Rest steht von Hand dort und in `js/ui/menu.js`: mitpflegen (Suche z. B. `grep -rn "300 Plätze" js PRD.md`).
-8. Neue Ideen, die Daniel nur festhalten will: PRD §13 „Geparkte Ideen“, nicht bauen.
+   (seit v5.63); der Rest steht von Hand dort und in `js/ui/menu.js`: mitpflegen (Suche z. B. `grep -rn "300 Plätze" js docs/prd`).
+8. Neue Ideen, die Daniel nur festhalten will: PRD §13 „Geparkte Ideen“ (`docs/prd/ideen.md`), nicht bauen.
 9. Startmenü-Schalter (Sendemast, Wetter, Forschung, Fluss, Stadt) sind im Menü standardmäßig an, in `new Game()` ohne Angabe aus. Tests verlassen sich darauf.
 10. Texte im Spiel, Kommentare und Doku auf Deutsch, Bezeichner im Code englisch. Nach jeder Änderung in `js/data/`: `npm run docs`
-    (erzeugt die Wertetabellen in PRD §6) und `npm run test:quick`. Vor dem Push `npm test` (alle grün).
+    (erzeugt die Wertetabellen in `docs/prd/`) und `npm run test:quick`. Vor dem Push `npm test` (alle grün).
 11. Ressourcen der Stadt (Rohstoffe, Werke, Waren, Förder- und Verarbeitungsformeln) ändern: Zellenarten stehen im Register
     `js/data/citykinds.js`, Waren im Register `js/data/goods.js` (Namen, Farben, Lager, Markt, Rollen; alle Listen in Simulation, UI und
     Darstellung leiten sich daraus ab, seit v5.59). Dazu die Kette `CITY.chain` in `js/data/city.js` (**Ressourcenanzeige**, PRD §15)
@@ -43,7 +46,7 @@ python3 -m http.server 8765
 
 cd frontline
 npm run test:quick                # Config-Prüfung und PRD-Tabellen, wenige Sekunden
-npm run docs                      # Wertetabellen in PRD.md §6 aus js/data/ neu erzeugen
+npm run docs                      # Wertetabellen in docs/prd/ (§6, Forschung) aus js/data/ neu erzeugen
 npm test                          # alle Tests (node --test, Node 22), dauert einige Minuten
 node --test test/radio.test.js    # nur eine Datei
 ```
@@ -59,7 +62,8 @@ node --test test/radio.test.js    # nur eine Datei
   `test/imports.test.js`, dass `js/` keinen Importzyklus hat (Stadt: Blattmodul `js/game/city/cells.js`, Stadt-KI in `js/ai/cityai.js`).
 - `test/config.test.js` findet Tippfehler in der Config (unbekannte Einheit, doppelte Taste, Taste auf einer festen Taste, Startarmee über dem Limit, NaN,
   tote Datenschlüssel …),
-  `test/doctables.test.js` meldet veraltete PRD-Tabellen. Beide laufen auch in `npm test`.
+  `test/doctables.test.js` meldet veraltete PRD-Tabellen, `test/docs.test.js` u. a. eine Themen-Datei ohne Eintrag in der Übersicht von
+  PRD.md und einen zu großen Einstieg (über 20 000 Zeichen). Alle laufen auch in `npm test`.
 - CI: `.github/workflows/test-frontline.yml` läuft bei jeder Änderung unter `frontline/`.
 
 ## Wo ändere ich was?
@@ -174,7 +178,7 @@ Wo jedes Feature liegt. „KI“ = Konstanten-Präfix in `js/data/ai.js`, Logik 
 
 ### Einen Wert ändern
 1. Schlüssel in „Wo ändere ich was?“ suchen, Wert in `js/data/` ändern.
-2. `npm run docs` (Tabellen in PRD §6), dann PRD-Text und Hilfetexte (`js/ui/menu.js`) auf die alte Zahl durchsuchen und anpassen; Eintrag im PRD-Änderungsverlauf.
+2. `npm run docs` (Tabellen in PRD §6), dann PRD-Text und Hilfetexte (`js/ui/menu.js`) auf die alte Zahl durchsuchen und anpassen; Eintrag in docs/changelog.md.
 3. `CACHE_VERSION` in `sw.js` erhöhen, `npm run test:quick`, dann `npm test`. Schlägt ein Test fehl, der genau diesen Wert prüft: Test an die neue Regel anpassen, nicht umgekehrt.
 
 ### Neue Einheit
@@ -183,7 +187,7 @@ Wo jedes Feature liegt. „KI“ = Konstanten-Präfix in `js/data/ai.js`, Logik 
 3. `js/data/research.js`: Gruppe in `RESEARCH.groups` eintragen (fehlt sie, wirken nur `all`, `veh` und `air`; Einheiten sind ohne Forschung frei). Mit Stadt: `CITY.crew` (Einwohner) und `CITY.metalCost` (Metall aus dem Stadtlager, fehlt = 0) in `js/data/city.js`.
 4. Aussehen: Modell in `js/render/unitpaint.js` (Funktion in `MODELS` bzw. `INFANTRY`, gilt für 2D und Iso; `test/unitpaint.test.js` prüft, dass jede Einheit eines hat). Ohne Modell zeichnen `js/render/sprites.js` (`drawUnit`) und der Renderer eine einfache Form.
 5. KI: Soll sie die Einheit bauen? Dann `MIX` in `js/data/ai.js` und die Ausbildung in `js/ai/ai.js` ergänzen, sonst im PRD §10 vermerken, dass sie es nicht tut.
-6. Test in `test/` (Ausbildung über `game.issue(team, { type: 'train', … })`), Hilfe in `js/ui/menu.js`, `npm run docs` (Tabellen), PRD §6 (Rolle) und Änderungsverlauf, `CACHE_VERSION`.
+6. Test in `test/` (Ausbildung über `game.issue(team, { type: 'train', … })`), Hilfe in `js/ui/menu.js`, `npm run docs` (Tabellen), PRD §6 (Rolle) und docs/changelog.md, `CACHE_VERSION`.
 
 ### Neues Gebäude
 1. `js/data/buildings.js`: Eintrag mit `name`, `short` (Kurzname in der Befehlskarte), `w`, `h` (Zellen), `hp`, `sight`, `cost`, `buildTime`,
@@ -192,7 +196,7 @@ Wo jedes Feature liegt. „KI“ = Konstanten-Präfix in `js/data/ai.js`, Logik 
 2. Sonderregeln beim Setzen in `game.js` (`canPlace`), Wirkung im passenden Modul oder in einem neuen Modul (Rezept „Neues Spielsystem“).
 3. Aussehen: Maler in `js/render/milbuild.js` (Typ in `MIL_TYPES` eintragen), Höhe in `js/render/iso.js` (`BUILD_H`), Kürzel in
    `js/render/sprites.js` (`BUILD_ABBR`, 2D-Ansicht).
-4. KI optional in `js/ai/ai.js`; Test, Baumenü-Zeile der Hilfe (`js/ui/menu.js`, Taste B), PRD §5 und Änderungsverlauf, `CACHE_VERSION`.
+4. KI optional in `js/ai/ai.js`; Test, Baumenü-Zeile der Hilfe (`js/ui/menu.js`, Taste B), PRD §5 und docs/changelog.md, `CACHE_VERSION`.
 
 ### Neue Stadtzellenart
 1. `js/data/citykinds.js`: Eintrag in `CITY_KINDS` an der Stelle seiner Baumenü-Gruppe (`group`), mit der **nächsten freien `id`**
@@ -205,7 +209,7 @@ Wo jedes Feature liegt. „KI“ = Konstanten-Präfix in `js/data/ai.js`, Logik 
 3. Logik in `js/game/city/`, wenn die Art mehr tut als Arbeitsplätze und Strom: z. B. `totals` in `state.js` (Wohnen, Strom, Forschung), Werk:
    Kette `CITY.chain` (`js/data/city.js`) und `WORK_ORDER` in `economy.js`, bei neuem Zielwerk `GROUP_OF_KIND` in `js/game/transport.js`;
    Ausbildung `CITY.produces`, Pflege `CITY.care.by`; Infozeilen in `js/ui/hud.js` (`cityInfo`); KI optional (`CITY.ai.mix`, `aiNeed` in `js/ai/cityai.js`).
-4. Test, PRD §15 und Änderungsverlauf, `CACHE_VERSION`.
+4. Test, PRD §15 und docs/changelog.md, `CACHE_VERSION`.
 
 ### Neue Ware
 Für Waren, die ein Werk der Stadt erzeugt und die im Lager der Hauptstadt, im Stadtlager oder als Zwischenprodukt (ohne Lager) laufen.
@@ -216,7 +220,7 @@ Neue Sorten der FOB-Lager und LKW (wie Baumaterial, Munition, Treibstoff) brauch
 2. Werk: Zeile in `CITY.chain` (`js/data/city.js`), meist mit neuer Zellenart (Rezept oben).
 3. Logik in `updateCity` (`js/game/city/economy.js`): Gutschrift ins Lager (`main.store` bzw. Feld `c.<Ware>` mit Startwert in `createCity`)
    und Verbrauch; KI-Regeln (`aiNeed`, Markt) optional.
-4. `test/registry.test.js` und `test/flow.test.js` laufen lassen (sie prüfen Register, Kette und Stadtzahlen), PRD §15 und Änderungsverlauf, `CACHE_VERSION`.
+4. `test/registry.test.js` und `test/flow.test.js` laufen lassen (sie prüfen Register, Kette und Stadtzahlen), PRD §15 und docs/changelog.md, `CACHE_VERSION`.
 
 ### Neuer Befehl
 1. Handler im zuständigen Modul: `export function cmdX(game, team, cmd)` → `{ ok: true }` oder `{ ok: false, reason: 'deutscher Text' }`. Nur eigene, lebende Einheiten akzeptieren.
@@ -225,7 +229,7 @@ Neue Sorten der FOB-Lager und LKW (wie Baumaterial, Munition, Treibstoff) brauch
    [ARCHITEKTUR.md](ARCHITEKTUR.md) §6 beschreiben (`test/docs.test.js` prüft das).
 3. UI: Eintrag in der Befehlskarte (`js/ui/controller.js`, `entry(label, hotkey, { action })`) und/oder Rechtsklick. Braucht er ein Ziel auf
    der Karte: Zeile in der Modustabelle `MODES` (`hint`, `click`) plus `confirmX`-Methode. Taste in der Hilfe (`js/ui/helptext.js`).
-4. Test über `game.issue` (`test/commands.test.js` prüft Register und Modi allgemein), PRD §8 (Steuerung) und Änderungsverlauf.
+4. Test über `game.issue` (`test/commands.test.js` prüft Register und Modi allgemein), PRD §8 (Steuerung) und docs/changelog.md.
 
 ### Neue Option im Startmenü
 1. Standard in `BALANCE.menuDefaults`; `js/ui/menu.js` → `showStartMenu`: Zustand, Schalter im HTML, Speicherung (`readFlag`/`writeFlag` mit eigenem Schlüssel `frontline-…`), Wert in `onStart({ … })`.
