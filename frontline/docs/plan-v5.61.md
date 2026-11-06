@@ -11,7 +11,7 @@ Für die Pakete ab P2 gilt PRD §13: erst ein Vorschlag zur Ausgestaltung (unten
 | **P1** | Statistik am Spielende + Doku-Abgleich §1/§13 | §12 Could, §13 | klein | **gebaut (v5.61)** |
 | P2 | Häuserkampf I: Zonen-Nutzen besetzter Häuser (Punkte, Sicht), Ruinen als Deckung | §13 Häuserkampf | mittel | **gebaut (v5.62)** |
 | P3 | Häuserkampf II: KI stürmt Häuser und baut sie zur Stellung aus; Feuerbereich je Haus | §13 Häuserkampf | mittel | **gebaut (v5.63)** |
-| P4 | Musik (synthetisiert, je Lage ruhig/Gefecht) und Lautstärkeregler für Ton und Musik | §13 Musik | mittel | geparkt |
+| P4 | Musik (synthetisiert, je Lage ruhig/Gefecht) und Lautstärkeregler für Ton und Musik | §13 Musik | mittel | **in Arbeit (v5.64)** |
 | P5 | Stadt: LKW holen Material direkt an Werken statt nur aus dem Lager der Hauptstadt | §13 SimCity-Stadt | groß | geparkt |
 | P6 | KI-Lücken aus §10: KI baut Flak/SAM gegen Luft, Scharfschützen, Bagger | §10 „Nicht gebaut“ | mittel | geparkt |
 | – | LLM für Gegner und Dialoge | §13 | – | nicht paketiert: Grundsatzfragen offen (Modell, Gerät/Server, Offline-PWA, Kosten) |
@@ -116,9 +116,35 @@ Besatzers größer; Infanterie an einer Ruine nimmt 70 % Schaden, weiter weg 100
   Besatzer schießt nicht durch die blinde Seite, wohl durch eine Fensterseite.
 - Gewollte Regeländerung: Golden-Werte dürfen sich ändern (dann neu setzen nach Anleitung im Testkopf, im Bericht nennen).
 
-## P4 – Musik (Vorschlag)
-- Synthetisierte Musik (WebAudio, wie `js/audio/sound.js`), zwei Stimmungen: ruhig (Aufbau) und Gefecht (Kampf in Sicht), weich überblendet.
-- Startmenü und Pause: zwei Regler (Geräusche, Musik), gespeichert unter `frontline-…`.
+## P4 – Musik und Lautstärke (v5.64, von Daniel bestätigt am 2026-11-06)
+
+Reines Browser-Modul wie `js/audio/sound.js` (kein Teil der Simulation, liest nur; `Math.random` ist hier erlaubt, nicht in `js/game`).
+
+### Musik (`js/audio/music.js`, neu, in `sw.js` → `ASSETS`)
+- `export class Music`, erzeugt von `Sound` bzw. in `main.js` und an denselben AudioContext gehängt (eigener Gain-Bus `music`, direkt in
+  `ctx.destination`, nicht durch den Kompressor der Geräusche). Kein Audiodatei-Laden, alles mit Oszillatoren und dem Rausch-Puffer.
+- Takt: ein Vorausplaner (Lookahead): `update(dt)` plant die Noten der nächsten ~0,25 s mit `ctx.currentTime`; 96 BPM, Viertel-Raster, 4/4.
+- Stück: Akkordfolge in d-Moll (Dm – B♭ – F – C, je ein Takt, endlos). Zwei Schichten, beide laufen immer, nur die Pegel ändern sich:
+  - **Ruhig:** weiche Flächen (zwei verstimmte Sägezahn- oder Dreieck-Oszillatoren durch Tiefpass, langsamer Anstieg) je Akkord und eine leise Glocke (Sinus) mit einer Note je Halbtakt aus dem Akkord.
+  - **Gefecht:** Marschtrommel (Rauschen, Bandpass, Muster „x . x x | x . x .“ je Achtel), tiefe Pauke auf 1 und 3, Bass-Ostinato (Grundton in Achteln, Rechteck durch Tiefpass).
+- Lage `intensity` 0…1: Ziel 1, wenn in den letzten 6 s mindestens `BATTLE_EFFECTS` (6) Kampfeffekte (`game.effects` der Arten Schuss, Einschlag,
+  Explosion, Tod; Namen im Code nachsehen) im Bild der Kamera oder in der Nähe eigener Einheiten/Gebäude lagen oder die Basis angegriffen wird
+  (vorhandene Meldung nutzen, falls einfach); sonst 0. Weich nachgeführt (hoch in 2 s, runter in 8 s). Ruhige Schicht = 1 − 0,6·intensity, Gefecht = intensity.
+- Pause: Musik leiser (×0,3), nicht stumm. Spielende: Musik blendet in 3 s aus. Ton aus (F2, Schalter): alles stumm wie heute.
+- Alle Musikwerte als Konstanten oben in `music.js` mit deutschem Kommentar.
+
+### Lautstärke
+- Zwei Regler 0–100 %: **Geräusche** (Standard 80 %) und **Musik** (Standard 50 %), gespeichert unter `frontline-ton-laut` und `frontline-musik-laut`
+  (Lesen/Schreiben mit try/catch wie `loadSoundOn`). Geräusche: `master.gain = MASTER × Wert`. Musik: Gain des Musik-Busses. Musik bei 0 % plant keine Noten.
+- Startmenü (`js/ui/menu.js`, beim Schalter „Ton“) und Pausenmenü (`showPause`): je ein `<input type="range">` mit Beschriftung und Prozentzahl, wirkt sofort
+  (Pausenmenü live über eine Rückruf-Funktion aus `main.js`). Der An/Aus-Schalter (🔊/🔇, F2) bleibt.
+
+### Doku und Test
+- PRD §14 (Musik und Regler), §1 („Musik“ aus „Nicht im Umfang“ streichen), §13 Musik als gebaut, Hilfe (F1), Änderungsverlauf v5.64,
+  `CACHE_VERSION` `frontline-v177`, Feature-Landkarte in `CLAUDE.md` (Zeile Ton).
+- Test `test/music.test.js` mit dem Attrappen-AudioContext aus `test/sound.test.js` (dort ggf. in eine kleine Hilfsdatei auslagern):
+  kein Absturz über 60 s Spiel, intensity steigt bei vielen Kampfeffekten und fällt danach, bei Musik 0 % werden keine Noten geplant,
+  Lautstärke wird gespeichert und gelesen (localStorage-Attrappe). `test/assets.test.js` muss grün bleiben.
 
 ## P5 – Material aus Werken (Vorschlag)
 - LKW einer FOB dürfen BM/MUN/TS direkt am nächstgelegenen Werk laden, wenn es näher ist als die Hauptstadt; Werk führt dafür ein kleines Ausgangslager.
