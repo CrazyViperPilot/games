@@ -530,6 +530,26 @@ export function drawSmoke(ctx, x, y, s, k, t, seed) {
 }
 
 /**
+ * Staubwolke am arbeitenden Bagger (seit v5.77): graubraune Schwaden, die am Boden quellen und leicht steigen, unten dichter.
+ * s = Größe, k = Dichte 0–1 (Einblenden zu Arbeitsbeginn), t = Zeit in s, seed je Bagger.
+ */
+export function drawDust(ctx, x, y, s, k, t, seed) {
+  const off = ((Math.abs(seed) % 997) / 997) * TAU;
+  ctx.save();
+  // ruhiger Kern am Boden, damit die Wolke auch zwischen zwei Schwaden dicht bleibt
+  blob(ctx, '#8f8170', x, y - s * 0.1, s * 0.8, 0.7 * k, LIT);
+  for (let i = 0; i < 7; i++) {
+    const ph = (t * 0.55 + i / 7 + off / TAU) % 1; // jede Schwade quillt auf, steigt ein wenig und verblasst
+    const g = off + i * 0.9;
+    const px = x + Math.cos(g) * s * (0.2 + 0.7 * ph);
+    const py = y + Math.sin(g) * s * 0.3 - s * 0.8 * ph;
+    const a = 0.85 * k * (1 - ph) * Math.min(1, ph * 5);
+    blob(ctx, i % 3 === 0 ? '#7e715f' : i % 3 === 1 ? '#a39580' : '#c2b6a2', px, py, s * (0.5 + 0.6 * ph), a, LIT);
+  }
+  ctx.restore();
+}
+
+/**
  * Nebelwand (Fähigkeit): dichte, helle Schwaden, die sich langsam am Ort wälzen statt aufzusteigen; unten grauer, oben fast weiß.
  * s = Größe eines Teils der Wand, k = Dichte 0–1 (Auf- und Abklingen), t = Zeit in s, seed je Teil.
  */

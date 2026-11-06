@@ -2,7 +2,7 @@
 // nur mit endlichen Zahlen, auch ohne Canvas (Node: weiche Flecken als einfache Kreise), Narben sind je id gleich.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { drawEffect, drawEffectUp, drawShell, drawShellIso, drawSmoke, drawFire, drawCrater, drawWreck, drawWreckRubble, drawMine, scarRng } from '../js/render/fx.js';
+import { drawEffect, drawEffectUp, drawShell, drawShellIso, drawSmoke, drawDust, drawFire, drawCrater, drawWreck, drawWreckRubble, drawMine, scarRng } from '../js/render/fx.js';
 
 /** Zeichenfläche, die jeden Aufruf annimmt und prüft, dass alle Zahlen endlich sind. */
 function fakeCtx() {
@@ -75,4 +75,11 @@ test('Krater, Brandflecken, Wracks und Trümmer zeichnen und sehen je id gleich 
   const r1 = scarRng(42);
   const r2 = scarRng(42);
   for (let i = 0; i < 5; i++) assert.equal(r1(), r2());
+});
+
+test('Staub am Bagger (seit v5.77): zeichnet über die Zeit mit endlichen Zahlen, ohne Dichte nichts Sichtbares', () => {
+  const { ctx, calls } = fakeCtx();
+  for (let t = 0; t < 4; t += 0.13) drawDust(ctx, 100, 200, 24, 1, t, 42);
+  assert.ok(calls.length > 0, 'zeichnet');
+  drawDust(ctx, 100, 200, 24, 0, 1, 42); // k = 0: unsichtbar, aber ohne Fehler
 });

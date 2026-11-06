@@ -57,7 +57,7 @@ import { bridgeUnder } from '../game/river.js';
 import { setMapTown, drawMapTown2D, drawMapCars2D, drawPark } from './maptown.js';
 import { drawHouseWorksIso, drawHouseWorksTop, drawHouseFlagIso, drawHouseFlagTop, worksMask } from './stronghold.js';
 import { drawUnitTop, drawUnitShadowIso, drawWreckTop } from './unitpaint.js';
-import { drawShell, drawShellIso, drawShellTarget, drawEffect, drawEffectUp, drawCrater, drawWreck, drawWreckRubble, drawSmoke, drawSmokeScreen, drawFire, drawMine } from './fx.js';
+import { drawShell, drawShellIso, drawShellTarget, drawEffect, drawEffectUp, drawCrater, drawWreck, drawWreckRubble, drawSmoke, drawSmokeScreen, drawDust, drawFire, drawMine } from './fx.js';
 import { drawCityGround, drawCityTop, drawCityRoofs, cityBuildings, drawCityBadges } from './citylayer.js';
 import { drawWays } from './ways.js';
 import { drawSelectMark, drawDragFrame, drawCargoGauge, drawCareMark, drawNoAmmoMark, drawMoveRing, drawSlotMark, strokeTrail, drawArrowHead, drawFootRing, drawRallyFlag } from './marks.js';
@@ -449,6 +449,10 @@ export class Renderer {
       }
       if (q.screen) {
         drawSmokeScreen(ctx, q.x, q.y, q.s, q.k, t, q.seed);
+        continue;
+      }
+      if (q.dust) {
+        drawDust(ctx, q.x, q.y, q.s, q.k, t, q.seed);
         continue;
       }
       if (q.fire) drawFire(ctx, q.x, q.y, q.s * 0.7, t, q.seed);
@@ -1063,6 +1067,10 @@ export class Renderer {
         drawSmokeScreen(ctx, p.x, y, q.s * z, q.k, t, q.seed);
         continue;
       }
+      if (q.dust) {
+        drawDust(ctx, p.x, y, q.s * z, q.k, t, q.seed);
+        continue;
+      }
       if (q.fire) drawFire(ctx, p.x, y, q.s * 0.7 * z, t, q.seed);
       drawSmoke(ctx, p.x, y, q.s * z, q.k, t, q.seed);
     }
@@ -1209,6 +1217,12 @@ export class Renderer {
       if (!u.alive || u.house || u.def.armor === 'inf' || u.hp >= u.maxHp * VEHICLE_SMOKE || !inRect(u.x, u.y, pad) || !shown(u)) continue;
       const f = u.hp / u.maxHp;
       out.push({ x: u.x, y: u.y, lift: unitLift(u) + 6, s: 4 + u.def.radius * 0.3, k: (VEHICLE_SMOKE - f) / VEHICLE_SMOKE, fire: f < FIRE_AT / 2, seed: u.id * 17 });
+    }
+    // Staub am arbeitenden Bagger (seit v5.77, nur Bild): an der Zelle, die er gerade räumt, solange er dort arbeitet (order.t > 0)
+    for (const u of g.units) {
+      const o = u.order;
+      if (!u.alive || o.type !== 'dig' || !(o.t > 0) || !inRect(o.x, o.y, pad) || !shown(u)) continue;
+      out.push({ x: o.x * 0.7 + u.x * 0.3, y: o.y * 0.7 + u.y * 0.3, lift: 4, s: 24, k: Math.min(1, o.t * 2), fire: false, seed: u.id * 11, dust: true });
     }
     for (const w of g.wrecks ?? []) {
       const age = g.time - w.t0;
