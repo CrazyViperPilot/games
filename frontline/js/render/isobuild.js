@@ -13,6 +13,7 @@ import { drawSiteIso } from './citysite.js';
 import { drawBox, drawRotBox, wallPoint, wallQuad, buildingHeight, TOWN_H, drawTree } from './iso.js';
 import { shade, tint, hexA } from './sprites.js';
 import { snowy } from './season.js';
+import { hashXY } from './color.js';
 
 const TILE = BALANCE.map.tile;
 const OUTLINE = 'rgba(0,0,0,0.55)';
@@ -24,7 +25,6 @@ const DETAIL_ZOOM = 0.5; // darunter keine Fenster/Türen (Leistung)
 /** Austauschpunkt für Sprites: Schlüssel = Stadtart (house, hall, factory) oder Gebäudetyp (fob, depot, helipad …). */
 export const spriteOverrides = {};
 
-const hash = (x, y = 0) => (Math.imul(Math.round(x) | 0, 73856093) ^ Math.imul(Math.round(y) | 0, 19349663)) >>> 0;
 
 function path(ctx, polys) {
   ctx.beginPath();
@@ -68,7 +68,7 @@ function windows(ctx, w, rows, { gap = 26, ww = 10, skip = null, lit = 0.25, see
       const t = (i + 0.5) / n;
       if (skip && skip(t, r)) continue;
       const q = wallQuad(w, t - hw, t + hw, rows[r][0], rows[r][1]);
-      (hash(seed + i * 7 + r * 13, w.edge * 3) % 100 < lit * 100 ? warm : glass).push(q);
+      (hashXY(seed + i * 7 + r * 13, w.edge * 3) % 100 < lit * 100 ? warm : glass).push(q);
     }
   }
   fillPolys(ctx, glass, GLASS);
@@ -180,7 +180,7 @@ const FACT_WALLS = ['#9a6a55', '#7b7e80', '#8a7f72'];
 
 function houseDetails(ctx, top, seed) {
   const detail = top.cam.zoom >= DETAIL_ZOOM;
-  const balcony = hash(seed) % 3 !== 0;
+  const balcony = hashXY(seed) % 3 !== 0;
   for (const w of top.walls) {
     const odd = w.edge % 2 === 1;
     plinth(ctx, w, top.color, 23);
@@ -335,7 +335,7 @@ export function drawTownBuilding(ctx, cam, b, season = 'summer') {
   const y0 = b.y - hh;
   const x1 = b.x + hw;
   const y1 = b.y + hh;
-  const seed = hash(b.x, b.y);
+  const seed = hashXY(b.x, b.y);
   const H = TOWN_H[b.kind];
   const z = cam.zoom;
   if (b.kind === 'wall') {
@@ -464,7 +464,7 @@ function drawBigBody(ctx, cam, b, season) {
   const base = p.base ?? 0;
   const top = drawBox(ctx, cam, p.x0, p.y0, p.x1, p.y1, p.h, p.c, { base, roof: p.roof, noShadow: base > 0, noTop: !!p.gable, wallS: shade(p.c, 0.12), wallE: shade(p.c, 0.34) });
   const detail = cam.zoom >= DETAIL_ZOOM;
-  const seed = hash(p.x0, p.y0);
+  const seed = hashXY(p.x0, p.y0);
   for (const w of top.walls) {
     if (!base && p.h > 8) plinth(ctx, w, p.c);
     if (p.stripe) fillPolys(ctx, [wallQuad(w, 0, 1, p.h - 4.5, p.h - 1)], b.color); // Band in Teamfarbe unter der Dachkante
@@ -743,7 +743,7 @@ function roofCross(ctx, cam, x, y, H, a, t, color) {
 export function drawRubble(ctx, cam, b, burnt = false) {
   const x0 = b.x - b.w / 2;
   const y0 = b.y - b.h / 2;
-  const seed0 = hash(b.x, b.y);
+  const seed0 = hashXY(b.x, b.y);
   let seed = seed0 || 1;
   const rnd = () => (seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 4294967296;
   let wall;
@@ -880,7 +880,7 @@ function mound(ctx, cam, x, y, r, h, col, rnd) {
 
 /** Fahrzeugwrack isometrisch ohne Modellbild: flache, verkohlte Wanne; Panzer und Schützenpanzer mit verdrehtem Turm. */
 export function drawWreckBox(ctx, cam, w) {
-  const seed = hash(w.x, w.y) || 1;
+  const seed = hashXY(w.x, w.y) || 1;
   const big = w.type === 'tank';
   const len = w.air ? w.r * 2.4 : big ? 28 : w.type === 'ifv' ? 24 : 18;
   const wid = w.air ? w.r * 0.9 : big ? 18 : w.type === 'ifv' ? 14 : 12;

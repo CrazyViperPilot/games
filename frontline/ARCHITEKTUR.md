@@ -44,7 +44,7 @@ Die Reihenfolge ist Absicht; ein neues System kommt an die Stelle, deren Ergebni
 | 3a | `updateCity` | `city/economy.js` | nur mit Stadt (Phasen in fester Reihenfolge: Gebiet, Ruinen, Treffer, Einwohner, Wachstum, Wirtschaft, Pflege): Einwohner, Wachstum, Steuern und Gewerbe-Absatz; Ketten (Förderung → Hütte → Stahlwerk/BM/Raffinerien/Kerosin → Lager, Munitionswerk holt Stahl) und Pendler laufen über die Straßenwege aus `transport.js`: `beginLoads` (Last auf 0), Flüsse und Pendler eintragen (`addLoad`), Gutschrift mit der Wirkung des Weges (`pathEff`), `settleLoads` (Stau glätten, wirkt im nächsten Schritt). Wege werden nur neu gerechnet, wenn sich die Stadt ändert (`c.ver`, auch bei Flucht und Rückkehr der Bewohner), der geglättete Stau-Faktor je Zelle liegt in `c.congestion` (gespeichert) |
 | 4 | `updateGarrison`, `updateTowers` | `garrison.js`, `tower.js` | Ein- und Aussteigen in Stadthäuser und Gefechtstürme; Dachaufbauten werden fertig |
 | 5 | `updateFormations` | `formation.js` | Tempo geschlossener Gruppen |
-| 6 | `updateMovement` | `movement.js` | Wege planen und fahren, Verfolgen (ohne Jets) |
+| 6 | `updateMovement` | `movement.js` | zuerst zurückgestellte Wege planen (`planPending`, `pathplan.js`), dann Wege fahren, Verfolgen (ohne Jets); am Ende von `update` setzt `game.js` das Wegbudget `pathWork` und die geteilten Wege `pathShare` zurück |
 | 6a | `updateAircraft` | `aircraft.js` | Jets: fliegen, kreisen, Rückkehr, Landung, Rollen über Straßen und Bahn, Tanken und Nachladen am Stellplatz aus Kerosintank und Munitionslager (seit v5.35 Fliegerhorst), Absturz ohne Treibstoff (seit v5.03) |
 | 6b | `updateHelis` | `helipad.js` | Hubschrauber mit Heliport: senkrecht starten und landen, Luftraumsperre, gelandet tanken und nachladen aus Kerosintank und Munitionslager, Heimflug (seit v5.51) |
 | 7 | `updateCrates` | `crates.js` | Kisten aufheben, tragen, einlagern, Kistengeld |
@@ -102,6 +102,9 @@ queue [{ unit, payerId }], queueTimes, rallyX/Y, main (Hauptstadt), store { bm, 
 ## 6. Befehle (`game.issue(team, cmd)`)
 
 Antwort immer `{ ok: true, … }` oder `{ ok: false, reason: 'deutscher Text' }`. `ids` = Liste eigener Einheiten.
+Alle Befehle stehen im **Befehlsregister** `COMMANDS` (`js/game/commands.js`, seit v5.63): je Typ der Handler `run`, `drives`
+(der gleichnamige Auftrag wird von seinem Modul gefahren, `updateMovement` lässt ihn aus: `OWN_DRIVERS`) und `sound` (die Steuerung
+quittiert ihn mit dem Befehlston). `game.issue` schlägt nur dort nach; `test/docs.test.js` prüft, dass jeder Registereintrag hier steht.
 Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 
 | `cmd.type` | Felder | Handler (`js/game/`) | Wirkung |
@@ -115,8 +118,8 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 | `deploy` | `ids`, optional `x, y` (≤ `fob.deploySnap` vom Fahrzeug) | `game.js` `cmdDeploy` | FOB-Fahrzeug wird an seiner Stelle (oder der nächsten freien) zur fertigen FOB (seit v5.09; `buildFob` antwortet nur noch mit einem Fehler) |
 | `repair` | `ids, targetId` | `construction.js` `cmdRepair` | Gebäude reparieren |
 | `repairBridge` | `ids, bridgeId` | `river.js` `cmdRepairBridge` | Brücke wieder aufbauen |
-| `load`, `unload` | `ids, fobId, preset?`; `load` auch `work` statt `fobId` (seit v5.65) | `logistics.js` | LKW an einer FOB laden / entladen; `work` (Zellindex eines eigenen Werks mit Ausgangslager, `CITY.pickup.kinds`) lädt dort nur die Ware des Werks |
-| `route` | `ids, fromId, toId, preset?`; `fromWork` statt `fromId` (seit v5.65) | `logistics.js` `cmdRoute` | LKW pendeln lassen, Start an einer FOB oder einem Werk |
+| `load`, `unload` | `ids, fobId, preset?`; `load` auch `work` statt `fobId` (seit v5.69) | `logistics.js` | LKW an einer FOB laden / entladen; `work` (Zellindex eines eigenen Werks mit Ausgangslager, `CITY.pickup.kinds`) lädt dort nur die Ware des Werks |
+| `route` | `ids, fromId, toId, preset?`; `fromWork` statt `fromId` (seit v5.69) | `logistics.js` `cmdRoute` | LKW pendeln lassen, Start an einer FOB oder einem Werk |
 | `setPreset` | `ids, preset` | `logistics.js` | Ladungsart (`mix`, `bm`, `mun`, `fuel`) |
 | `mortarTarget` | `ids, x, y` | `game.js` `cmdMortarTarget` | Mörser auf einen Punkt richten |
 | `land` | `ids, airportId` | `aircraft.js` `cmdLand`, Heliport als Ziel `helipad.js` `cmdHeliLand` (seit v5.51) | Flugzeuge landen am Fliegerhorst des eigenen Stellplatzes `airportId` (seit v5.35; Anflug, Bahn, Ausrollen, Rollen zum Stellplatz; seit v5.15) |
@@ -153,12 +156,13 @@ seit v5.59). Die beiden Register importieren nichts; Simulation, UI und Darstell
 
 | Datei | Inhalt |
 |---|---|
-| `game.js` | Klasse `Game`: Zustand, `issue`, Platzierung (`canPlace`), Lager, Spawn, Aufräumen, Sieg |
+| `game.js` | Klasse `Game`: Zustand, `issue` (schlägt im Befehlsregister nach), Platzierung (`canPlace`, Zahler `placePayer`), Lager, Spawn, Aufräumen, Sieg |
+| `commands.js` | Befehlsregister `COMMANDS` (Handler, `drives`, `sound`), daraus `OWN_DRIVERS` (seit v5.63) |
 | `entities.js` | `createUnit`, `createBuilding`, `createShell`, Hilfen wie `isFoe`, `inRange` |
 | `economy.js` | Ausbildung, Nachschub, Einkommensanzeige |
 | `zone.js`, `hotzone.js` | Konfliktzone und Punkte; Hot Zone und Bohrer |
-| `movement.js`, `pathfinding.js`, `grid.js`, `formation.js` | Bewegung, A*-Wegsuche, Zellenraster, Formationen |
-| `combat.js` | Zielsuche, Direktfeuer, Mörser, Flugabwehr, Schaden |
+| `movement.js`, `pathfinding.js`, `pathplan.js`, `grid.js`, `formation.js` | Bewegung, A*-Wegsuche (`findPath` für Kartenbau, `findUnitPath` für Einheiten), Wegplanung der Einheiten (Wegbudget je Schritt, Warteschlange, lange Suche über mehrere Schritte, geteilte Wege; Zustand `game.pathWork`, `pathBacklog`, `pathSeq`, `pathLong`, `pathShare`), Zellenraster, Formationen |
+| `combat.js` | Zielsuche (eine Suche `searchTarget` für Schützen und Einzelwaffen), Direktfeuer, Mörser, Flugabwehr, Schaden |
 | `logistics.js`, `construction.js` | LKW, Nachfüllen, Transport; Bauen und Reparieren |
 | `city/` (Daten `js/data/city.js`, UI `js/ui/citypanel.js`, Karte `js/render/citylayer.js`, KI `js/ai/cityai.js`) | Zonenstadt um die Hauptstadt (PRD §15), seit v5.60 in Modulen (Review A-01/A-04): `cells.js` Zellgeometrie und Straßenzugang (`isFlat`, `sizeOf`, `bigSpan`/`bigCells`/`fitBig`, `cellRect`, `roadAt`, `hasRoad`, `accessCells` mit Kette, `canZone`, `DEPOSITS`; Blattmodul nur mit Daten-Importen), `query.js` Abfragen (`cityLevel`, `citySum`, `powerRatio`, `freePop`, `crewOf`, `cityTrainers`, `trainerKind`, `forEnemyCity`, `hasMarket`), `state.js` Zellzustand (`totals`, `zeroStats`, `updateClaim`, Belegung von `grid.struct` mit `city.gridId`, `syncEntity`/`dropEntity`, `payMetal`, `placeBuilt`, `cityNoise`), `roadnet.js` Straßennetz (`roadReach`, `mainRoadReach`, `connectRoad`: Anschluss an das Lagernetz oder ein Ziel, für Startviertel und KI), `create.js` Erzeugung und Startviertel (`createCity`), `clearing.js` Bäume fällen und Abriss (`treeGone`), `commands.js` Befehle `city`, `cityUpgrade`, `trade`, `economy.js` Wirtschaftsschritt `updateCity` (rechnet die Ketten über `transport.js`), `care.js` Heilen und Reparieren. Fertige Gebäude haben seit v4.83 eine Ziel-Entity (`kind: 'building'`, `type: 'city'`, nicht in `game.buildings`), die der Spieler seit v4.94 wählen kann. Importe ohne Zyklus: `transport.js` und `research.js` lesen nur `cells.js`/`query.js` |
 | `transport.js` | Straßentransport (seit v5.20, kein DOM): Breitensuche über Straßenzellen (`nearestField`, mehrere Ziele gleichzeitig), Wege je Gebäude (`pathFrom`, `pathEff`), Last und Stau (`addLoad`, `beginLoads`, `settleLoads`), Lager am Straßennetz (`mainAccess`), Anzeige der Lieferung und des Pendlers (`transportInfo`, liest nur). Zustand: `transportOf` in einer WeakMap je Stadt |
@@ -181,8 +185,9 @@ seit v5.59). Die beiden Register importieren nichts; Simulation, UI und Darstell
 
 | Datei | Inhalt |
 |---|---|
-| `renderer.js` | Klasse `Renderer`: zeichnet alles in 2D oder isometrisch, Nebel, Overlays. Nebel seit v5.49: `fogData` liefert dem WebGL-Nebel je Zelle Sicht und Erkundet weichgezeichnet (`blur121`), Iso und 2D zeichnen ihn über `ground.renderFog`; ohne WebGL und für die Minimap `updateFogLayer` (weich, Wolkentöne `fogTone` über eine Farbtabelle, Minimap ohne Wolken) |
+| `renderer.js` | Klasse `Renderer`: zeichnet alles in 2D oder isometrisch, Nebel, Overlays. Seit v5.64 in Durchläufen: `render` baut mit `frameOf` die Werte eines Bildes (Kamera, Ausschnitt `inRect`, Sichtregeln `seen`/`known`/`shown`, Auswahl), 2D `renderTop` → `topGround`, `topObjects`, `topEffects`, `topFog`, `drawSky`, `topBars`, `topScreen`; Iso `renderIso` → `isoGround`, `isoMarks`, `isoItems` (Objekte nach Tiefe), `isoShadows`, `isoObjects`, Flieger, `isoEffects`, `isoFog`, `drawSky`, `isoBars`, `isoScreen`. Nebel seit v5.49: `fogData` liefert dem WebGL-Nebel je Zelle Sicht und Erkundet weichgezeichnet (`blur121`), Iso und 2D zeichnen ihn über `ground.renderFog`; ohne WebGL und für die Minimap `updateFogLayer` (weich, Wolkentöne `fogTone` über eine Farbtabelle, Minimap ohne Wolken) |
 | `camera.js` | Ausschnitt, Zoom, Welt ↔ Bildschirm, Iso-Umrechnung |
+| `color.js` | Farb- und Rechenhilfen aller Malmodule (seit v5.59/v5.64): `rgbOf`, `hexOf`, `mix`, `clamp`, `hashXY` (fester Streuwert je Lage) |
 | `sprites.js` | einfache Formen von oben: Einheiten, Gebäude, Kisten, Tiere (Ersatz, wenn ein gemaltes Modell fehlt); Farbhilfen `shade`, `tint`, `hexA` |
 | `fx.js` | Effekte (seit v5.34): Explosion (Blitz, Feuerball aus Flammenwolken, Rauch, Funken, Brocken; Iso Bodenteil in `drawEffect(…, true)`, aufrecht in `drawEffectUp`), Leuchtspur, Geschoss mit Rauchspur, Mündungsfeuer, Abfangen, Mörsergranate (`drawShell` 2D, `drawShellIso`, Zielring `drawShellTarget`), Rauch, Feuer, Nebelwand, Mine, Krater, Trümmer von oben (`drawWreckRubble`, auch eingestürzte Häuser mit `ruin`), Ersatz-Wrack; weiche Flecken als einmal gemalte 64-px-Bilder (`dot`: weich, Schwade, Wolke) |
 | `iso.js`, `isobuild.js`, `isosprites.js` | Iso-Grundkörper, Iso-Gebäude (einfache Ersatzformen, solange ein gemaltes Bild fehlt), `isosprites.js` nur noch Hülle um Einheiten und Wracks aus `unitpaint.js` (Bilddateien gibt es seit v5.43 keine mehr); Trümmer `drawRubble` seit v5.34 mit Schutthügeln, abgebrochener Mauerecke, Platten und Balken |
@@ -206,10 +211,10 @@ seit v5.59). Die beiden Register importieren nichts; Simulation, UI und Darstell
 | `bridge.js`, `season.js`, `weatherfx.js` | Brücken (seit v5.31 mit runden Stützen, Querträgern, Gesims, Widerlagern, Geländer mit Holmen, Laternen, Fahrbahn mit den Mustern aus `ways.js`; zerstört mit Bewehrungseisen) und Furtstangen, Jahreszeitenfarben, Regen/Schnee/Nebel (seit v5.47 gemalt: Regen in drei Tiefen mit Spritzern, Schnee als weiche Flocken aus einem einmal gemalten Bild, Wind stetig über `windDrift`, Nebelbänke in einem Bild mit 1/4 Auflösung; Schleier einfarbig, weil Verläufe über das ganze Bild ohne Grafikchip teuer sind) |
 | `minimap.js` | Minimap |
 
-`js/ui/` – `controller.js` Auswahl, Modi, Befehlskarte (kein DOM, ruft `game.issue`), `input.js` Maus/Tastatur/Touch,
-`hud.js` DOM-Anzeige, `menu.js` Start-, Pause-, Hilfe- und Endbildschirm, `status.js` lesende Texthilfen.
+`js/ui/` – `controller.js` Auswahl, Modi (Tabelle `MODES`: Hinweis, Klick, Vorschau je Modus), Befehlskarte (kein DOM, ruft `game.issue`), `input.js` Maus/Tastatur/Touch,
+`hud.js` DOM-Anzeige, `menu.js` Start-, Pause-, Hilfe- und Endbildschirm, `helptext.js` Tastenliste der Hilfe mit Zahlen aus den Daten (kein DOM), `status.js` lesende Texthilfen (Auftragstext, FOB-Namen; den Bauzustand `builderState` liest die UI wie der Renderer aus `js/game/construction.js`).
 
-`js/audio/sound.js` – Ton (PRD §14): synthetisiert per WebAudio, liest `game.effects` (Hinweis `snd`), Meldungen und Wetter; `main.js` hält ein `Sound` für alle Partien. `js/audio/music.js` (seit v5.64): Hintergrundmusik, von `Sound` erzeugt und mit ihr gesteuert; liest Lage und Spielzeit, ändert nichts an der Partie.
+`js/audio/sound.js` – Ton (PRD §14): synthetisiert per WebAudio, liest `game.effects` (Hinweis `snd`), Meldungen und Wetter; `main.js` hält ein `Sound` für alle Partien. `js/audio/music.js` (seit v5.68): Hintergrundmusik, von `Sound` erzeugt und mit ihr gesteuert; liest Lage und Spielzeit, ändert nichts an der Partie.
 
 `js/editor/editor.js` + `editor.html` – Karteneditor; speichert Karten über `js/game/mapdata.js` im `localStorage`.
 
@@ -218,4 +223,4 @@ Sonstiges: `sw.js` Service Worker (network-first, Präfix `frontline-`), `manife
 `test/` (node --test; `config.test.js` prüft die Config, `doctables.test.js` die PRD-Tabellen).
 
 ## 8. Spielstand
-`core/snapshot.js` wandelt einen Objektgraphen (Maps, Sets, Typed Arrays, Zyklen, Klasseninstanzen, `makeRng`-Zustand) in JSON und zurück; `game/savegame.js` meldet Klassen (`CLASSES`) und feste Spieldaten (`STATICS`: nur Verweise) an und bietet `snapshotGame` / `restoreGame`. `ui/saves.js` speichert in IndexedDB und auf dem Webspace (PHP `frontline/api.php` im Repo vipervocs), `main.js` ruft es auf (`captureSave`, `resumeGame`). Regeln und Pflege: PRD §16.
+`core/snapshot.js` wandelt einen Objektgraphen (Maps, Sets, Typed Arrays, Zyklen, Klasseninstanzen, `makeRng`-Zustand) in JSON und zurück; `game/savegame.js` meldet Klassen (`CLASSES`) und feste Spieldaten (`STATICS`: nur Verweise) an und bietet `snapshotGame` / `restoreGame`. Abgeleitetes steht nicht im Stand (seit v5.62): `snapshotGame` ersetzt beim Kodieren das Gelände durch sein Grobraster (oder nichts) und das Raster durch den Unterschied zum Raster der Karte (`terrainGrid`), `restoreGame` baut beide neu auf; Zwischenspeicher (Sichtfelder in `fog.js`, beste Zielklasse in `combat.js`, Straßentransport) liegen in `WeakMap`s. Ein Verweis auf `Grid` oder `Relief` von anderswo im Zustand bricht das Speichern ab (beide fehlen in `CLASSES`). `ui/saves.js` speichert in IndexedDB und auf dem Webspace (PHP `frontline/api.php` im Repo vipervocs), `main.js` ruft es auf (`captureSave`, `resumeGame`). Regeln und Pflege: PRD §16.

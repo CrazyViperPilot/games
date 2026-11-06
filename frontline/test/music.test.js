@@ -1,4 +1,4 @@
-// Musik (Paket P4, v5.64): Vorausplaner, Lage (ruhig/Gefecht), Pause, Spielende, Regler und Speicher. Läuft mit der Attrappe aus
+// Musik (Paket P4, v5.68): Vorausplaner, Lage (ruhig/Gefecht), Pause, Spielende, Regler und Speicher. Läuft mit der Attrappe aus
 // test/audiofake.js (Node hat keinen AudioContext). Die Musik liest die Partie nur; hier wird sie mit einer echten Partie gefüttert.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

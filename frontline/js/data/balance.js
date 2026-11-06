@@ -133,7 +133,7 @@ export const BALANCE = {
     // fobCap: FOBs mit Hauptstadt (höchstens fob.max); radioFrom: Spielzeit (s), ab der sie einen Sendemast baut (Infinity = nie);
     // cratePickers: so viele Soldaten holen oder tragen gleichzeitig Versorgungskisten;
     // fort: baut ab Spielzeit `from` (s) bis zu `fobs` FOBs zur Festung aus (Mauerring, Tore, `towers` Türme mit Besatzung und Dachaufbau). Weitere KI-Werte: js/data/ai.js
-    // houseStorm: stürmt vom Gegner besetzte Häuser in der Konfliktzone, wenn genug freie Infanterie daneben steht; houseWorks: baut eigene Besatzungshäuser aus (Sandsäcke, MG-Nest, Stacheldraht), seit v5.63
+    // houseStorm: stürmt vom Gegner besetzte Häuser in der Konfliktzone, wenn genug freie Infanterie daneben steht; houseWorks: baut eigene Besatzungshäuser aus (Sandsäcke, MG-Nest, Stacheldraht), seit v5.67
     easy: { think: 3.0, incomeMult: 0.8, attackStrength: 2500, scout: false, counter: false, raid: false, fallback: false, weather: false, research: [240, 720], upgrades: false, fobCap: 3, radioFrom: Infinity, cratePickers: 1, fort: { from: Infinity, fobs: 0, towers: 0 }, houseStorm: false, houseWorks: false },
     normal: { think: 2.0, incomeMult: 1.0, attackStrength: 2000, scout: true, counter: true, raid: false, fallback: false, weather: true, research: [150, 540], upgrades: true, fobCap: 5, radioFrom: 720, cratePickers: 2, fort: { from: 600, fobs: 1, towers: 1 }, houseStorm: true, houseWorks: true },
     hard: { think: 1.0, incomeMult: 1.0, attackStrength: 1600, scout: true, counter: true, raid: true, fallback: true, weather: true, research: [90, 420], upgrades: true, fobCap: 7, radioFrom: 540, cratePickers: 3, fort: { from: 420, fobs: 2, towers: 2 }, houseStorm: true, houseWorks: true },
@@ -150,6 +150,14 @@ export const BALANCE = {
   sightHeight: { base: 40, per: 350, max: 0.4, eye: { inf: 16, veh: 20, bld: 30 }, target: 12, near: 72 },
   // Tempo am Hang: Faktor = 1 − Steigung × up (bergab: 1 + Gefälle × down), begrenzt auf min … max; Fahrzeuge spüren es stärker
   slope: { upVeh: 1.5, upInf: 0.8, downVeh: 0.6, downInf: 0.3, min: 0.55, max: 1.2, pathCost: 1.2 },
+  // Wegsuche der Einheiten (movement.js, pathfinding.js findUnitPath, seit v5.61), in untersuchten Zellen:
+  // budget: je Simulationsschritt; ist es aufgebraucht, warten weitere Einheiten einen oder wenige Schritte auf ihren Weg.
+  // slice: so viel darf eine Suche am Stück; braucht sie mehr, läuft sie als lange Suche (eine zur Zeit) je Schritt um slice weiter.
+  // pocket: so viele Zellen flutet die Prüfung, ob ein Ziel in einer abgeschlossenen Tasche liegt (dann gilt die nächste freie
+  // Zelle außerhalb); ring: so weit (Zellen) sucht sie um ein versperrtes Ziel nach der nächsten freien Zelle.
+  // Geteilte Wege (pathplan.js): Start höchstens shareStart px und Ziel höchstens shareGoal px von einem eben gefundenen Weg entfernt
+  // → die Einheit übernimmt ihn; shareKeep Wege bleiben je Schritt gemerkt.
+  path: { budget: 8000, slice: 8000, pocket: 4096, ring: 64, shareStart: 320, shareGoal: 256, shareKeep: 16 },
   // Häuserkampf (§7): Infanterie besetzt Stadthäuser (cap Plätze, hp hält das Haus aus), schießt von dort mit Reichweite ab Hauswand
   // und steht `floor` px höher (Höhenvorteil). Schwere Waffen (Schaden gegen Gebäude ab `heavy`: Kanone, RPG, Granaten, Mörser)
   // treffen Häuser × heavyMult, Handwaffen nur × lightMult. Stürzt ein Haus ein, fallen die Besatzer mit ejectDamage (Anteil der
@@ -183,15 +191,15 @@ export const BALANCE = {
       mgnest: { name: 'MG-Nest', cost: { money: 200 }, time: 18, fire: 1.35 },
       wire: { name: 'Stacheldraht', cost: { money: 80 }, time: 10, stormMult: 0.6 },
     },
-    // Besetztes Haus in der Konfliktzone (seit v5.62): zusätzlich zu den Besatzern zählt es zoneWeight Gewicht für die Zonenkontrolle
+    // Besetztes Haus in der Konfliktzone (seit v5.66): zusätzlich zu den Besatzern zählt es zoneWeight Gewicht für die Zonenkontrolle
     // (je Zone und je Hot Zone, die die Hausmitte erreicht; in der Hot Zone also doppelt). Keine Stimme, kein Geld.
     zoneWeight: 2,
-    // Ausguck (seit v5.62): Besatzer sehen sightMul-mal so weit (nur Nebel aufdecken; Waffenreichweite bleibt).
+    // Ausguck (seit v5.66): Besatzer sehen sightMul-mal so weit (nur Nebel aufdecken; Waffenreichweite bleibt).
     sightMul: 1.25,
-    // Deckung an Ruinen (seit v5.62): Infanterie außerhalb von Häusern, höchstens r px vom Rand einer eingestürzten Stadthausruine,
+    // Deckung an Ruinen (seit v5.66): Infanterie außerhalb von Häusern, höchstens r px vom Rand einer eingestürzten Stadthausruine,
     // nimmt nur mul des Schadens (direkte Treffer und Granaten, nicht Splitter und nicht Fahrzeuge).
     ruinCover: { r: 40, mul: 0.7 },
-    // Feuerbereich (seit v5.63): Fensterseite = Seite, deren Mittelpunkt höchstens streetReach px von einer Stadtstraße entfernt ist
+    // Feuerbereich (seit v5.67): Fensterseite = Seite, deren Mittelpunkt höchstens streetReach px von einer Stadtstraße entfernt ist
     // (game.map.town.roads ohne Feldwege). Besatzer schießen und zielen nur durch Fensterseiten; ein Haus ohne Straße in der Nähe ist rundum offen.
     streetReach: 60,
   },

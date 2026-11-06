@@ -7,7 +7,7 @@
 // Nadelbäume, Büsche und Felsen verschneit. Nur Darstellung, keine Spielregel.
 import { sprite, blit, spriteDpr } from './spritecache.js';
 import { PAINT } from './unitpaint.js';
-import { rgbOf, mix } from './color.js';
+import { rgbOf, mix, hashXY } from './color.js';
 
 const TAU = Math.PI * 2;
 const R = 16; // Bezugsradius der Bäume (Weltpixel); jedes Bild wird nach t.r skaliert
@@ -17,8 +17,6 @@ const CELL = 64; // Stadtzelle (Vorkommen), wie CITY.cell
 const ANIMAL_ISO = 1.0; // Iso: Tiere im Maßstab der Welt (Soldaten 1,35)
 
 // ---------- Zufall und Farben ----------
-
-export const hashXY = (x, y = 0) => (Math.imul(Math.round(x) | 0, 73856093) ^ Math.imul(Math.round(y) | 0, 19349663)) >>> 0;
 
 /** Fester Zufall (mulberry32): gleicher Startwert → gleiches Bild in jedem Maßstab. */
 function rng(seed) {

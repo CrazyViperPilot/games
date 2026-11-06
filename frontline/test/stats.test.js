@@ -1,4 +1,4 @@
-// Statistik am Spielende (seit v5.61): Zähler je Team in game.js (newStats), Ausbildung in economy.js.
+// Statistik am Spielende (seit v5.65): Zähler je Team in game.js (newStats), Ausbildung in economy.js.
 // Die Zähler dienen nur der Anzeige; sie dürfen den Spielverlauf nicht verändern (test/golden.test.js).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -93,7 +93,7 @@ test('Statistik: Höchste Armeegröße bleibt stehen, wenn Einheiten fallen', ()
   assert.ok(g.teams[0].stats.peakUnits <= 1000);
 });
 
-test('Statistik: Spielstand ohne stats (älter als v5.61) lädt mit Nullen weiter', async () => {
+test('Statistik: Spielstand ohne stats (älter als v5.65) lädt mit Nullen weiter', async () => {
   const g1 = mk({ seed: 9 });
   const a1 = new AI(g1, 1, 'normal');
   run(g1, 3);

@@ -61,7 +61,7 @@ export function flowLayout() {
   return LAYOUT;
 }
 
-/** Bestand je Ware: alle eigenen Lager (ohne unendliche Hauptstadt), Ausgangslager der Werke (seit v5.65), Ladung der LKW, Stahl und Kerosin im Stadtlager. */
+/** Bestand je Ware: alle eigenen Lager (ohne unendliche Hauptstadt), Ausgangslager der Werke (seit v5.69), Ladung der LKW, Stahl und Kerosin im Stadtlager. */
 export function teamStock(game, team) {
   const c = game.city?.[team];
   const st = { bm: 0, mun: 0, fuel: 0, metal: c?.metal ?? 0, kero: c?.kero ?? 0 };
@@ -73,7 +73,7 @@ export function teamStock(game, team) {
     if (u.team !== team || !u.alive || !(u.def?.cargoCap > 0)) continue;
     for (const k of ['bm', 'mun', 'fuel']) st[k] += u.cargo?.[k] ?? 0;
   }
-  // Ausgangslager der Werke (CITY.pickup, seit v5.65) zählen wie das Lager, aus dem LKW holen (c.made zählt die Einlagerung mit)
+  // Ausgangslager der Werke (CITY.pickup, seit v5.69) zählen wie das Lager, aus dem LKW holen (c.made zählt die Einlagerung mit)
   if (c?.out) for (const i of c.list) if (c.out[i]) st[CITY.chain[KINDS[c.kind[i] - 1]].to] += c.out[i];
   return st;
 }
@@ -268,7 +268,7 @@ export function resourceFlow(game, team, rates = null) {
   const main = game.mainFob(team);
   const cap = BALANCE.logistics.storeCap;
   const stock = teamStock(game, team);
-  // Ausgangslager der Werke je Ware (CITY.pickup, seit v5.66): „davon an Werken“ am Lagerknoten
+  // Ausgangslager der Werke je Ware (CITY.pickup, seit v5.70): „davon an Werken“ am Lagerknoten
   const atWorks = {};
   if (c.out) {
     for (const i of c.list) {

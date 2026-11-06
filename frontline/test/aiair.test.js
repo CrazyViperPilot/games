@@ -1,4 +1,4 @@
-// KI-Lücken (seit v5.67, P6): Luftabwehr nach Art der Luftgegner (Gepard, Flak, SAM), Scharfschützen gegen viele Soldaten.
+// KI-Lücken (seit v5.71, P6): Luftabwehr nach Art der Luftgegner (Gepard, Flak, SAM), Scharfschützen gegen viele Soldaten.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';

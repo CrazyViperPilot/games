@@ -55,3 +55,10 @@ test('Stadt: Zellgeometrie ist ein Blattmodul, die Stadt-KI liegt in js/ai', () 
   }
   assert.ok(!existsSync(join(ROOT, 'js/game/city.js')), 'js/game/city.js ist seit v5.60 in js/game/city/ aufgeteilt');
 });
+
+test('Schichten: die Darstellung (js/render) importiert nichts aus der UI (js/ui), seit v5.64 (Review A-02, P11)', () => {
+  for (const [f, list] of graph()) {
+    if (!f.startsWith('js/render/')) continue;
+    for (const t of list) assert.ok(!t.startsWith('js/ui/'), `${f} importiert ${t}`);
+  }
+});

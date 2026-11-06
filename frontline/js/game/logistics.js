@@ -13,7 +13,7 @@ const TRUCK_ORDERS = new Set(['load', 'unload', 'route']);
 const BOARD_REACH = BALANCE.logistics.boardReach; // Infanterie steigt ein, wenn sie so nah am Hubschrauber ist
 const DROP_RING = BALANCE.logistics.dropRing; // Absetzen: Abstand der Passagiere um den Hubschrauber
 const EPS = 1e-9;
-const PICKUP_KINDS = new Set(CITY.pickup.kinds); // Werke mit Ausgangslager (CITY.pickup, seit v5.65)
+const PICKUP_KINDS = new Set(CITY.pickup.kinds); // Werke mit Ausgangslager (CITY.pickup, seit v5.69)
 
 const fail = (reason) => ({ ok: false, reason });
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
@@ -54,7 +54,7 @@ function ownFob(game, team, id, needBuilt) {
 
 /**
  * Eigenes fertiges Werk der Stadt mit Ausgangslager (CITY.pickup.kinds) an Zelle i (Anker oder ein Teil des Großbaus) oder null.
- * Seit v5.65: Ladequelle für LKW, auch für die Oberfläche (Rechtsklick).
+ * Seit v5.69: Ladequelle für LKW, auch für die Oberfläche (Rechtsklick).
  */
 export function ownWork(game, team, i) {
   const c = game.city?.[team];
@@ -74,7 +74,7 @@ function workReach(game, u, a) {
 
 /**
  * { type: 'load', ids, fobId, preset? } oder { type: 'load', ids, work, preset? }: LKW fährt zur fertigen FOB und lädt; mit `work`
- * (Zellindex eines eigenen Werks, seit v5.65) fährt er zum Werk und holt dessen Ware aus dem Ausgangslager.
+ * (Zellindex eines eigenen Werks, seit v5.69) fährt er zum Werk und holt dessen Ware aus dem Ausgangslager.
  */
 export function cmdLoad(game, team, cmd) {
   const trucks = trucksOf(game, team, cmd.ids);
@@ -109,7 +109,7 @@ export function cmdUnload(game, team, cmd) {
 
 /**
  * { type: 'route', ids, fromId, toId, preset? } oder { type: 'route', ids, fromWork, toId, preset? }: pendelt zwischen zwei eigenen FOBs,
- * mit `fromWork` (Zellindex eines Werks, seit v5.65) startet die Fahrt am Ausgangslager des Werks.
+ * mit `fromWork` (Zellindex eines Werks, seit v5.69) startet die Fahrt am Ausgangslager des Werks.
  */
 export function cmdRoute(game, team, cmd) {
   const trucks = trucksOf(game, team, cmd.ids);
@@ -184,7 +184,7 @@ function unloadStep(u, fob, dt) {
 }
 
 /**
- * Merker je Werk (seit v5.65, c.pickClaim): 1 am Anker, wenn ihm gerade ein eigener LKW zugeteilt ist (Ladeauftrag oder Route ab
+ * Merker je Werk (seit v5.69, c.pickClaim): 1 am Anker, wenn ihm gerade ein eigener LKW zugeteilt ist (Ladeauftrag oder Route ab
  * diesem Werk, egal in welcher Phase). Nur darüber zweigt das Werk Ware in sein Ausgangslager ab (economy.js).
  */
 function claimWorks(game) {
@@ -197,7 +197,7 @@ function claimWorks(game) {
 }
 
 /**
- * Ein Ladeschritt am Ausgangslager eines Werks (seit v5.65): nur die Ware dieses Werks, die Ladungsart des LKW gilt hier nicht.
+ * Ein Ladeschritt am Ausgangslager eines Werks (seit v5.69): nur die Ware dieses Werks, die Ladungsart des LKW gilt hier nicht.
  * Lädt, bis der LKW voll ist oder das Werkslager leer (dann 'empty', ohne zu warten). Gleiche Rückgabe wie loadStep.
  */
 function loadWork(game, u, a, dt) {

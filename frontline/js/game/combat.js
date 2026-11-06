@@ -126,7 +126,7 @@ function warnBase(game, target) {
   game.message(target.team, 'Basis wird angegriffen', target.x, target.y);
 }
 
-/** Fügt Schaden zu, setzt lastHitTime und markiert Tote. Stadthäuser: garrison.damageHouse, Brücken: river.damageBridge. Einheiten: erforschte Panzerung, Deckung an Ruinen (seit v5.62). */
+/** Fügt Schaden zu, setzt lastHitTime und markiert Tote. Stadthäuser: garrison.damageHouse, Brücken: river.damageBridge. Einheiten: erforschte Panzerung, Deckung an Ruinen (seit v5.66). */
 export function hit(game, target, amount) {
   if (!target.alive || !(amount > 0)) return;
   if (target.kind === 'house') {
@@ -137,7 +137,7 @@ export function hit(game, target, amount) {
     damageBridge(game, target, amount);
     return;
   }
-  if (target.kind === 'unit') amount *= armorMul(game, target, amount) * smokeMul(game, target) * parkedArmor(game, target) * ruinCoverMul(game, target); // abgestellter Jet: Schutz des Stellplatzes (seit v5.35); Infanterie an einer Ruine: Deckung (seit v5.62)
+  if (target.kind === 'unit') amount *= armorMul(game, target, amount) * smokeMul(game, target) * parkedArmor(game, target) * ruinCoverMul(game, target); // abgestellter Jet: Schutz des Stellplatzes (seit v5.35); Infanterie an einer Ruine: Deckung (seit v5.66)
   else if (target.kind === 'building') amount *= armorMul(game, target, amount); // Militärgebäude: Sandsäcke, Beton (Forschung)
   target.hp -= amount;
   target.lastHitTime = game.time;
@@ -149,37 +149,44 @@ export function hit(game, target, amount) {
 }
 
 /**
- * Zielsuche für einen Schützen: zuerst Einheiten (nächste sichtbare, Besatzer zählen nicht), dann vom Gegner besetzte Häuser,
- * sonst Gebäude (ohne Mauern/Tore). Idle-Einheiten suchen nur innerhalb der Leine um ihren Ankerpunkt.
+ * Gemeinsame Zielsuche (Review Q-02): nächster sichtbarer Gegner im Umkreis R (ab minRange), dem `dmg` schadet; Besatzer zählen nicht,
+ * Idle-Einheiten suchen nur innerhalb der Leine um ihren Ankerpunkt. Reihenfolge: Einheiten, vom Gegner besetzte Häuser, Gebäude (ohne
+ * Mauern/Tore), zuletzt Gebäude der gegnerischen Stadt. prefer(e): bevorzugte Ziele schlagen jedes andere (sonst gilt die Entfernung);
+ * die Suche endet, sobald das beste Ziel bevorzugt ist (ohne prefer: sobald eines da ist). unitsFirst: Einheiten schon vor den Häusern
+ * als Ergebnis nehmen. buildings: false = keine Gebäude und keine Stadt.
  */
-function findTarget(game, hash, s, radius, minRange, allowBuildings, dmg) {
+function searchTarget(game, hash, s, R, dmg, { minRange = 0, prefer = null, unitsFirst = false, buildings = true }) {
   const team = s.team;
   const leashed = s.kind === 'unit' && s.order.type === 'idle';
   let best = null;
-  let bestD = Infinity;
+  let bestScore = Infinity;
   const consider = (e) => {
     if (!e.alive || !isFoe(team, e) || e.house) return;
     if (!(dmgVs(dmg, e) > 0)) return; // z. B. Mörser und Panzer können keine Hubschrauber treffen, Soldaten keine Flugzeuge
-    if (s.house && !houseCanFire(game, s, e)) return; // Besatzer sehen und zielen nur durch Fensterseiten (seit v5.63)
-    if (leashed && Math.hypot(e.x - s.anchorX, e.y - s.anchorY) > Math.max(BALANCE.leash, radius) + radiusOf(e)) return;
+    if (s.house && !houseCanFire(game, s, e)) return; // Besatzer sehen und zielen nur durch Fensterseiten (seit v5.67)
+    if (leashed && Math.hypot(e.x - s.anchorX, e.y - s.anchorY) > Math.max(BALANCE.leash, R) + radiusOf(e)) return;
     const d = Math.hypot(e.x - s.x, e.y - s.y);
-    if (d < minRange || d > radius + radiusOf(e)) return;
+    if (d < minRange || d > R + radiusOf(e)) return;
     if (!game.sees(team, e)) return;
-    if (d < bestD) {
+    const score = prefer && !prefer(e) ? d + 1e6 : d;
+    if (score < bestScore) {
       best = e;
-      bestD = d;
+      bestScore = score;
     }
   };
-  for (const e of nearby(hash, s.x, s.y, radius + MAX_UNIT_RADIUS)) consider(e);
-  if (best) return best;
+  const done = () => best !== null && (!prefer || prefer(best));
+  for (const e of nearby(hash, s.x, s.y, R + MAX_UNIT_RADIUS)) consider(e);
+  if (unitsFirst && done()) return best;
   for (const h of game.garrisoned) consider(h);
-  if (best || !allowBuildings) return best;
-  for (const b of game.buildings) {
-    if (b.def.blocksAll || b.def.gate) continue;
-    consider(b);
-  }
-  if (!best) forEnemyCity(game, team, s.x, s.y, radius + 32, consider); // zuletzt: Gebäude der gegnerischen Stadt
+  if (done() || !buildings) return best;
+  for (const b of game.buildings) if (!b.def.blocksAll && !b.def.gate) consider(b);
+  if (!best) forEnemyCity(game, team, s.x, s.y, R + 32, consider);
   return best;
+}
+
+/** Zielsuche für einen Schützen (Einheit oder Gebäude): Einheiten zuerst, dann besetzte Häuser, sonst Gebäude (searchTarget). */
+function findTarget(game, hash, s, radius, minRange, allowBuildings, dmg) {
+  return searchTarget(game, hash, s, radius, dmg, { minRange, unitsFirst: true, buildings: allowBuildings });
 }
 
 function fireDirect(game, s, t, w) {
@@ -243,7 +250,7 @@ function fireWeapon(game, u, w, t) {
 const weaponReaches = (game, u, w, t) =>
   inRange(u, t, w.spec.range * rangeMul(game, u) + reachBonus(game, u)) &&
   !(w.spec.minRange && Math.hypot(t.x - u.x, t.y - u.y) < w.spec.minRange) &&
-  houseCanFire(game, u, t); // Besatzer schießen nur durch eine Fensterseite (seit v5.63)
+  houseCanFire(game, u, t); // Besatzer schießen nur durch eine Fensterseite (seit v5.67)
 
 /** Artillerie mit gewähltem Punkt (u.fireTarget, Befehl mortarTarget): feuert dorthin, solange Vorrat und Reichweite reichen. */
 function unitFireAtGround(game, u) {
@@ -290,11 +297,14 @@ function tryFireUnit(game, u, t) {
   fireWeapon(game, u, pick, t);
 }
 
+const bestClass = new WeakMap(); // Waffe (feste Daten) → Zielklasse mit dem höchsten Schaden; nicht in UNITS/BUILDINGS geschrieben
+
 /** Bevorzugt die Waffe diese Zielklasse? Mit targets: diese Klassen; sonst die Klasse mit ihrem höchsten Schaden (MG: Infanterie). */
 function prefers(spec, e) {
   if (spec.targets) return meant(spec, e);
-  spec.bestKey ??= Object.entries(spec.damage).reduce((a, b) => (b[1] > a[1] ? b : a))[0];
-  return dmgKey(e) === spec.bestKey;
+  let best = bestClass.get(spec);
+  if (best === undefined) bestClass.set(spec, (best = Object.entries(spec.damage).reduce((a, b) => (b[1] > a[1] ? b : a))[0]));
+  return dmgKey(e) === best;
 }
 
 /**
@@ -303,28 +313,7 @@ function prefers(spec, e) {
  */
 function weaponTarget(game, hash, u, w) {
   const R = w.spec.range * rangeMul(game, u) + reachBonus(game, u);
-  const leashed = u.order.type === 'idle';
-  let best = null;
-  let bestScore = Infinity;
-  const consider = (e) => {
-    if (!e.alive || !isFoe(u.team, e) || e.house || !(dmgVs(w.spec.damage, e) > 0)) return;
-    const d = Math.hypot(e.x - u.x, e.y - u.y);
-    if (d > R + radiusOf(e)) return;
-    if (u.house && !houseCanFire(game, u, e)) return; // Fensterseite (seit v5.63)
-    if (leashed && Math.hypot(e.x - u.anchorX, e.y - u.anchorY) > Math.max(BALANCE.leash, R) + radiusOf(e)) return;
-    if (!game.sees(u.team, e)) return;
-    const score = d + (prefers(w.spec, e) ? 0 : 1e6);
-    if (score < bestScore) {
-      best = e;
-      bestScore = score;
-    }
-  };
-  for (const e of nearby(hash, u.x, u.y, R + MAX_UNIT_RADIUS)) consider(e);
-  for (const h of game.garrisoned) consider(h);
-  if (best && prefers(w.spec, best)) return best;
-  for (const b of game.buildings) if (!b.def.blocksAll && !b.def.gate) consider(b);
-  if (!best) forEnemyCity(game, u.team, u.x, u.y, R + 32, consider);
-  return best;
+  return searchTarget(game, hash, u, R, w.spec.damage, { prefer: (e) => prefers(w.spec, e) });
 }
 
 /**

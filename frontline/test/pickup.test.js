@@ -1,4 +1,4 @@
-// Werkslager und LKW am Werk (seit v5.65, P5a): ein Werk der Arten CITY.pickup.kinds legt einen Anteil seines Ausstoßes in sein
+// Werkslager und LKW am Werk (seit v5.69, P5a): ein Werk der Arten CITY.pickup.kinds legt einen Anteil seines Ausstoßes in sein
 // Ausgangslager (c.out am Anker), aber nur, solange ihm ein eigener LKW zugeteilt ist (c.pickClaim, Merker aus updateLogistics).
 // LKW holen dort die Ware, eine Route kann am Werk starten, Abriss und Spielstände ohne die neuen Felder.
 import test from 'node:test';
@@ -195,7 +195,7 @@ test('Ressourcenanzeige zählt das Ausgangslager zum Bestand der Ware', () => {
   assert.ok(st.fuel >= g.mainFob(0).store.fuel + 20 - 1e-6, `Bestand ${st.fuel} ohne Ausgangslager`);
 });
 
-test('Spielstand ohne c.out und c.pickClaim (älter als v5.65) lädt und spielt weiter', async () => {
+test('Spielstand ohne c.out und c.pickClaim (älter als v5.69) lädt und spielt weiter', async () => {
   const g = new Game({ seed: 3, city: true });
   const ai = new AI(g, 1, 'normal');
   run(g, 5);

@@ -4,40 +4,40 @@ import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { makeRng } from '../core/rng.js';
 import { generateMap } from './map.js';
-import { blockers } from './mapdata.js';
-import { Grid, lineCells } from './grid.js';
+import { terrainGrid } from './mapdata.js';
+import { lineCells } from './grid.js';
 import { reliefOf } from './relief.js';
 import { createUnit, createBuilding, defineAmmo, canAttack, inRange } from './entities.js';
 import { Fog } from './fog.js';
 import { updateEconomy, smoothIncome } from './economy.js';
 import { createCity } from './city/create.js';
 import { updateCity } from './city/economy.js';
-import { cmdCity, cmdCityUpgrade, cmdTrade } from './city/commands.js';
 import { cityNoise, payMetal } from './city/state.js';
 import { freePop, crewOf, cityTrainers, trainerKind } from './city/query.js';
 import { KIND_NAME } from '../data/citykinds.js';
 import { updateMovement, nearestPassable, planPath, setIdle, separate, exitHouse } from './movement.js';
 import { updateCombat } from './combat.js';
 import { updateZone } from './zone.js';
-import { createHot, updateHot, cmdDrill } from './hotzone.js';
-import { updateLogistics, cmdLoad, cmdUnload, cmdRoute, cmdSetPreset, cmdBoard, cmdDropoff, cargoSum, storeCapOf } from './logistics.js';
-import { updateConstruction, canBuild, cmdRepair, orderBuild, orderBuildSeq } from './construction.js';
-import { cmdRoof, cmdFortify, updateTowers, ejectCrew } from './tower.js';
-import { createHouses, updateGarrison, cmdGarrison, cmdUngarrison, cmdStorm, cmdFortifyHouse, dropOccupant, houseCanFire } from './garrison.js';
-import { createCrates, updateCrates, updateCrateIntel, cmdPickup, cmdDeliver, cmdDropCrate } from './crates.js';
+import { createHot, updateHot } from './hotzone.js';
+import { updateLogistics, cargoSum, storeCapOf } from './logistics.js';
+import { updateConstruction, canBuild, orderBuild, orderBuildSeq } from './construction.js';
+import { updateTowers, ejectCrew } from './tower.js';
+import { createHouses, updateGarrison, dropOccupant, houseCanFire } from './garrison.js';
+import { createCrates, updateCrates, updateCrateIntel } from './crates.js';
 import { createScars, updateScars, updateScarIntel, addUnitWreck, addBuildingWreck, clearWrecksUnder } from './scars.js';
 import { createAnimals, updateAnimals } from './animals.js';
 import { FORMATIONS, formationSlots, updateFormations } from './formation.js';
 import { hasCommander, updateCommanders, commanderFallen } from './commander.js';
 import { updateRadio, radioStarted, radioLost } from './radio.js';
 import { createWeather, updateWeather, setWeather, WEATHER_NAMES } from './weather.js';
-import { updateAbilities, cmdAbility } from './abilities.js';
-import { createResearch, updateResearch, cmdResearch, cmdCancelResearch, rangeMul } from './research.js';
-import { createBridges, updateBridges, cmdRepairBridge, bridgeUnder } from './river.js';
+import { updateAbilities } from './abilities.js';
+import { createResearch, updateResearch, rangeMul } from './research.js';
+import { createBridges, updateBridges, bridgeUnder } from './river.js';
 import { createRoads } from './roads.js';
-import { updateAircraft, trainCheck, cmdLand } from './aircraft.js';
-import { updateHelis, heliTrainCheck, cmdHeliLand, isHeliport } from './helipad.js';
-import { cmdDig, updateDig } from './excavator.js';
+import { updateAircraft, trainCheck } from './aircraft.js';
+import { updateHelis, heliTrainCheck } from './helipad.js';
+import { updateDig } from './excavator.js';
+import { commandOf, OWN_DRIVERS } from './commands.js';
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
@@ -124,7 +124,7 @@ function takeCarried(list, bm) {
     if (left <= 1e-9) break;
   }
 }
-/** Zähler je Team für den Endbildschirm (seit v5.61). Reine Anzeige: die Simulation liest sie nicht. */
+/** Zähler je Team für den Endbildschirm (seit v5.65). Reine Anzeige: die Simulation liest sie nicht. */
 export function newStats() {
   return { trained: 0, lost: 0, kills: 0, buildingsLost: 0, buildingsKilled: 0, peakUnits: 0 };
 }
@@ -144,12 +144,9 @@ export class Game {
     this.debug = !!debug; // ?debug=1: erlaubt den Befehl `debug` (Geld, festes Wetter), seit v5.58
     this.rng = makeRng(seed);
     this.map = map ?? generateMap(seed, { river });
-    this.grid = new Grid(W / TILE, H / TILE, TILE);
-    this.grid.rasterizeObstacles(this.map.obstacles);
-    this.grid.rasterizeRects(blockers(this.map.town?.buildings ?? []));
-    this.grid.rasterizeTrees([...(this.map.town?.trees ?? []), ...(this.map.trees ?? [])]);
-    this.relief = reliefOf(this.map); // Höhengelände oder null (flache Karte)
-    this.grid.rasterizeRelief(this.relief, this.map.fords ?? []); // steile Hänge, Seen und Flüsse (Furten passierbar), Hangkosten
+    this.relief = reliefOf(this.map); // Höhengelände oder null (flache Karte); im Spielstand nur das Grobraster (savegame.js)
+    // Raster: Hindernisse, Häuser, Bäume, steile Hänge, Seen und Flüsse (Furten passierbar), Hangkosten; im Spielstand nur der Unterschied dazu
+    this.grid = terrainGrid(this.map, this.relief);
 
     this.time = 0;
     this.nextId = 1;
@@ -170,6 +167,11 @@ export class Game {
     this.radioWin = !!radio;
     this.fogTimer = 0;
     this.statTimer = 0; // Takt der Heeresgröße für die Statistik (sampleArmy, einmal je s)
+    this.pathWork = 0; // untersuchte Zellen der Wegsuche seit dem letzten Schritt (Wegbudget, pathplan.js)
+    this.pathBacklog = false; // warten Einheiten auf ihren Weg (neue Anfragen stellen sich dann an)? (pathplan.js)
+    this.pathSeq = 0; // Reihenfolge der wartenden Wege
+    this.pathLong = null; // laufende lange Wegsuche einer Einheit { id, sx, sy, x, y, done, hash } (pathplan.js)
+    this.pathShare = []; // in diesem Schritt gefundene Wege zum Teilen (pathplan.js)
     this.logiTimer = 0; // Takt des Nachfüllens (logistics.js)
     this.consTimer = 0; // Takt der automatischen Bauzuweisung (construction.js)
     this.teams = [0, 1].map((id) => {
@@ -185,7 +187,7 @@ export class Game {
         pointProgress: 0,
         used: { mun: 0, fuel: 0 }, // Summe des Verbrauchs (Statistik)
         earned: 0, // Geld aus Prämien und Bau (reward)
-        stats: newStats(), // Zähler für den Endbildschirm (Statistik, seit v5.61)
+        stats: newStats(), // Zähler für den Endbildschirm (Statistik, seit v5.65)
         warnAt: {}, // Zeitpunkt der letzten Meldung je Schlüssel (notify)
         incomeMult: 1,
         isAI: false,
@@ -231,19 +233,19 @@ export class Game {
   restoreAccessors() {
     for (const team of this.teams) this.bindStocks(team);
     for (const u of this.units) defineAmmo(u, u.def);
-    // Statistik fehlt in Ständen vor v5.61: Felder mit 0 ergänzen (SAVE_FORMAT unverändert)
+    // Statistik fehlt in Ständen vor v5.65: Felder mit 0 ergänzen (SAVE_FORMAT unverändert)
     for (const team of this.teams) {
       team.stats = { ...newStats(), ...team.stats };
       team.earned = team.earned || 0;
     }
     this.statTimer = this.statTimer || 0;
-    // Ruinenliste fehlt in Ständen vor v5.62: aus den eingestürzten Häusern neu aufbauen
+    // Ruinenliste fehlt in Ständen vor v5.66: aus den eingestürzten Häusern neu aufbauen
     if (!this.ruins) this.ruins = (this.houses || []).filter((h) => h.ruined);
     // Nachrüstungen für ältere Stände (Straßen, Forschungsbaum, Stadt, FOB-Baustellen) gibt es seit v5.56 nicht mehr: Stände eines
-    // anderen SAVE_FORMAT laden nicht (savegame.js). Ausnahme: das Ausgangslager der Werke (seit v5.65) fehlt in Ständen davor, leer ergänzen.
+    // anderen SAVE_FORMAT laden nicht (savegame.js). Ausnahme: das Ausgangslager der Werke (seit v5.69) fehlt in Ständen davor, leer ergänzen.
     for (const c of this.city ?? []) {
       c.out ??= new Float32Array(c.kind.length);
-      c.workOut ??= new Float32Array(c.kind.length); // seit v5.66: Ausstoß je s am Anker (leer in älteren Ständen)
+      c.workOut ??= new Float32Array(c.kind.length); // seit v5.70: Ausstoß je s am Anker (leer in älteren Ständen)
       c.pickClaim ??= new Uint8Array(c.kind.length);
     }
   }
@@ -565,34 +567,40 @@ export class Game {
       }
     }
 
-    let payer = null;
+    const p = this.placePayer(team, type, mx, my, carried);
+    if (p.reason) return bad(p.reason);
+    return { ok: true, reason: null, cx, cy, x: mx, y: my, payer: p.payer };
+  }
+
+  /**
+   * Wer zahlt einen Bau mit Mitte (mx, my) (Teil von canPlace): { payer } oder { reason }. FOB: Abstände und Höchstzahl, kein Zahler;
+   * im Bauradius einer FOB zahlt deren Lager (getragenes Baumaterial: niemand); Mauer/Tor außerhalb: ein eigener LKW in Reichweite.
+   */
+  placePayer(team, type, mx, my, carried) {
+    const def = BUILDINGS[type];
     if (type === 'fob') {
       let count = 0;
       for (const b of this.buildings) {
         if (!b.alive || b.team !== team || b.type !== 'fob') continue;
         count++;
-        if (dist(b.x, b.y, mx, my) < BALANCE.fob.minDistOwn) return bad('Zu nah an einer eigenen FOB');
+        if (dist(b.x, b.y, mx, my) < BALANCE.fob.minDistOwn) return { reason: 'Zu nah an einer eigenen FOB' };
       }
-      if (count >= BALANCE.fob.max) return bad(`Höchstens ${BALANCE.fob.max} FOBs möglich`);
+      if (count >= BALANCE.fob.max) return { reason: `Höchstens ${BALANCE.fob.max} FOBs möglich` };
       for (const b of this.buildings) {
-        if (b.alive && b.team !== team && dist(b.x, b.y, mx, my) < BALANCE.fob.minDistEnemy) {
-          return bad('Zu nah an einem gegnerischen Gebäude');
-        }
+        if (b.alive && b.team !== team && dist(b.x, b.y, mx, my) < BALANCE.fob.minDistEnemy) return { reason: 'Zu nah an einem gegnerischen Gebäude' };
       }
-    } else if (this.fobsInRadius(team, mx, my).length) {
-      if (carried) return { ok: true, reason: null, cx, cy, x: mx, y: my, payer: null };
-      const f = this.payerFor(team, mx, my, def.cost);
-      if (!f) return bad(this.stockReason(team, mx, my, def.cost));
-      payer = { kind: 'fob', id: f.id };
-    } else if (WALL_TYPES.has(type) && !carried) {
-      const tr = this.truckPayer(team, mx, my, def.cost);
-      if (!tr) return bad('Außerhalb des Bauradius einer eigenen FOB');
-      payer = { kind: 'truck', id: tr.id };
-    } else {
-      return bad('Außerhalb des Bauradius einer eigenen FOB');
+      return { payer: null };
     }
-
-    return { ok: true, reason: null, cx, cy, x: mx, y: my, payer };
+    if (this.fobsInRadius(team, mx, my).length) {
+      if (carried) return { payer: null };
+      const f = this.payerFor(team, mx, my, def.cost);
+      return f ? { payer: { kind: 'fob', id: f.id } } : { reason: this.stockReason(team, mx, my, def.cost) };
+    }
+    if (WALL_TYPES.has(type) && !carried) {
+      const tr = this.truckPayer(team, mx, my, def.cost);
+      if (tr) return { payer: { kind: 'truck', id: tr.id } };
+    }
+    return { reason: 'Außerhalb des Bauradius einer eigenen FOB' };
   }
 
   // ---- Befehle ------------------------------------------------------------------
@@ -601,105 +609,8 @@ export class Game {
   issue(team, cmd) {
     if (!cmd || !this.teams[team]) return fail('Unbekannter Befehl');
     if (this.winner !== null) return fail('Partie ist beendet');
-    switch (cmd.type) {
-      case 'move':
-      case 'attackMove':
-        return this.cmdMove(team, cmd);
-      case 'attack':
-        return this.cmdAttack(team, cmd);
-      case 'stop': {
-        const units = this.ownUnits(team, cmd.ids);
-        if (!units.length) return fail('Keine eigenen Einheiten gewählt');
-        for (const u of units) {
-          setIdle(u);
-          u.fireTarget = null; // Stopp beendet auch das Feuer der Artillerie auf einen Punkt
-        }
-        return { ok: true };
-      }
-      case 'build':
-        return this.cmdBuild(team, cmd);
-      case 'buildWall':
-        return this.cmdBuildWall(team, cmd);
-      case 'buildFob':
-        return fail('Baufahrzeuge bauen keine FOB mehr: FOB-Fahrzeug ausbilden und dort aufbauen');
-      case 'deploy':
-        return this.cmdDeploy(team, cmd);
-      case 'repair':
-        return cmdRepair(this, team, cmd);
-      case 'repairBridge':
-        return cmdRepairBridge(this, team, cmd);
-      case 'load':
-        return cmdLoad(this, team, cmd);
-      case 'unload':
-        return cmdUnload(this, team, cmd);
-      case 'route':
-        return cmdRoute(this, team, cmd);
-      case 'setPreset':
-        return cmdSetPreset(this, team, cmd);
-      case 'mortarTarget':
-        return this.cmdMortarTarget(team, cmd);
-      case 'board':
-        return cmdBoard(this, team, cmd);
-      case 'garrison':
-        return cmdGarrison(this, team, cmd);
-      case 'ungarrison':
-        return cmdUngarrison(this, team, cmd);
-      case 'roof':
-        return cmdRoof(this, team, cmd);
-      case 'storm':
-        return cmdStorm(this, team, cmd);
-      case 'fortifyHouse':
-        return cmdFortifyHouse(this, team, cmd);
-      case 'fortify':
-        return cmdFortify(this, team, cmd);
-      case 'pickup':
-        return cmdPickup(this, team, cmd);
-      case 'deliver':
-        return cmdDeliver(this, team, cmd);
-      case 'dropCrate':
-        return cmdDropCrate(this, team, cmd);
-      case 'dropoff':
-        return cmdDropoff(this, team, cmd);
-      case 'drill':
-        return cmdDrill(this, team, cmd);
-      case 'land':
-        return isHeliport(this, this.getEntity(cmd.airportId)) ? cmdHeliLand(this, team, cmd) : cmdLand(this, team, cmd); // Heliport: Hubschrauber (seit v5.51), sonst Stellplatz: Jets
-      case 'dig':
-        return cmdDig(this, team, cmd);
-      case 'city':
-        return cmdCity(this, team, cmd);
-      case 'cityUpgrade':
-        return cmdCityUpgrade(this, team, cmd);
-      case 'trade':
-        return cmdTrade(this, team, cmd);
-      case 'train':
-        return this.cmdTrain(team, cmd);
-      case 'cancelTrain':
-        return this.cmdCancelTrain(team, cmd);
-      case 'research':
-        return cmdResearch(this, team, cmd);
-      case 'smoke':
-      case 'mine':
-        return cmdAbility(this, team, cmd);
-      case 'cancelResearch':
-        return cmdCancelResearch(this, team, cmd);
-      case 'rally':
-        return this.cmdRally(team, cmd);
-      case 'demolish':
-        return this.cmdDemolish(team, cmd);
-      case 'setDifficulty': {
-        // KI meldet sich an (seit v5.58, Regel 2): Team als KI markieren, Einkommensfaktor der Schwierigkeit
-        const d = BALANCE.difficulty[cmd.difficulty];
-        if (!d) return fail('Unbekannte Schwierigkeit');
-        this.teams[team].isAI = true;
-        this.teams[team].incomeMult = d.incomeMult;
-        return { ok: true };
-      }
-      case 'debug':
-        return this.cmdDebug(team, cmd);
-      default:
-        return fail('Unbekannter Befehl');
-    }
+    const c = commandOf(cmd.type); // Befehlsregister js/game/commands.js
+    return c ? c.run(this, team, cmd) : fail('Unbekannter Befehl');
   }
 
   /** Debug-Befehl (nur mit `debug` im Spiel, ?debug=1): money = Geld dazu; weather (+ season) = Wetter setzen, hold = es bleibt so. */
@@ -815,7 +726,7 @@ export class Game {
     if (!units.length) return fail(armed.length ? 'Kistenträger schießen nicht' : 'Keine bewaffnete Einheit gewählt');
     const aim = t.house ? this.getEntity(t.house) : t;
     for (const u of units) {
-      // Besatzer bleiben im Haus, solange das Ziel aus den Fenstern erreichbar ist und durch eine Fensterseite liegt (houseCanFire, seit v5.63);
+      // Besatzer bleiben im Haus, solange das Ziel aus den Fenstern erreichbar ist und durch eine Fensterseite liegt (houseCanFire, seit v5.67);
       // sonst gehen sie hinaus und verfolgen es
       const h = u.house ? this.getEntity(u.house) : null;
       if (u.house && !(h && aim && inRange(u, aim, u.def.range * rangeMul(this, u) + h.reach) && houseCanFire(this, u, aim))) exitHouse(this, u, t.x, t.y);
@@ -1210,7 +1121,7 @@ export class Game {
     updateGarrison(this, dt);
     updateTowers(this, dt);
     updateFormations(this);
-    updateMovement(this, dt);
+    updateMovement(this, dt, OWN_DRIVERS);
     updateAircraft(this, dt); // Jets: Flug, Rückkehr, Landung, Rollen, Tanken am Stellplatz (seit v5.03, Fliegerhorst seit v5.35)
     updateHelis(this, dt); // Hubschrauber: Start, Landung, Tanken am Heliport (seit v5.51)
     updateCrates(this, dt);
@@ -1243,5 +1154,7 @@ export class Game {
     this.cleanup();
     updateScars(this);
     if (this.winner === null) this.checkElimination();
+    this.pathWork = 0; // Wegbudget (pathplan.js): gilt für KI-Befehle und Simulation bis zum Ende des nächsten Schritts
+    this.pathShare = [];
   }
 }

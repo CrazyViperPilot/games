@@ -187,3 +187,43 @@ export class Grid {
     }
   }
 }
+
+/**
+ * Unterschied eines Rasters zu seinem Grundraster (terrainGrid der Karte) für den Spielstand: Felder, die in beiden ein Typed Array
+ * gleicher Art und Länge sind, als geänderte Stellen { at: Int32Array, val }, alle anderen Felder unverändert in `keep`.
+ * Gegenstück: patchGrid.
+ */
+export function gridDelta(grid, base) {
+  const delta = {};
+  const keep = {};
+  for (const k of Object.keys(grid)) {
+    const v = grid[k];
+    const b = base[k];
+    if (!ArrayBuffer.isView(v) || !ArrayBuffer.isView(b) || v.constructor !== b.constructor || v.length !== b.length) {
+      keep[k] = v;
+      continue;
+    }
+    let n = 0;
+    for (let i = 0; i < v.length; i++) if (v[i] !== b[i]) n++;
+    const at = new Int32Array(n);
+    const val = new v.constructor(n);
+    for (let i = 0, j = 0; j < n; i++) {
+      if (v[i] === b[i]) continue;
+      at[j] = i;
+      val[j++] = v[i];
+    }
+    delta[k] = { at, val };
+  }
+  return { delta, keep };
+}
+
+/** Wendet einen Unterschied aus gridDelta auf ein frisches Grundraster an (ändert und liefert `base`). */
+export function patchGrid(base, { delta, keep }) {
+  for (const k of Object.keys(keep)) base[k] = keep[k];
+  for (const k of Object.keys(delta)) {
+    const a = base[k];
+    const { at, val } = delta[k];
+    for (let j = 0; j < at.length; j++) a[at[j]] = val[j];
+  }
+  return base;
+}

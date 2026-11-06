@@ -1,6 +1,7 @@
 // Bewegung: Wegfolgen, Verfolgung, Fahrhelfer für LKW/Bauer und Trennung (docs/verlauf.md §5, §11). Kein DOM.
 import { BALANCE } from '../data/balance.js';
-import { findPath, lineOfSight } from './pathfinding.js';
+import { lineOfSight } from './pathfinding.js';
+import { planUnitPath, pathPending, planPending } from './pathplan.js';
 import { inRange, resolveTarget, isFoe, canAttack } from './entities.js';
 import { weatherSpeed } from './weather.js';
 import { rangeMul, modOf } from './research.js';
@@ -15,8 +16,6 @@ const CORNER = 48; // nahe einer Wegecke: bei freier Sicht gleich zum nächsten 
 export const HASH_CELL = 128; // räumliches Hash-Gitter
 const TILE = BALANCE.map.tile;
 
-/** Aufträge, die logistics.js, construction.js, garrison.js und crates.js selbst fahren (updateMovement lässt sie aus). */
-export const OWN_DRIVERS = new Set(['load', 'unload', 'route', 'build', 'repair', 'board', 'dropoff', 'garrison', 'storm', 'pickup', 'deliver', 'repairBridge', 'dig', 'land']);
 
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 
@@ -57,8 +56,7 @@ export function planPath(game, u, x, y) {
     u.pathIndex = 0;
     return;
   }
-  u.path = findPath(game.grid, u.x, u.y, x, y, u.team);
-  u.pathIndex = 0;
+  planUnitPath(game, u, x, y); // Bodeneinheiten: Wegbudget, Warteschlange, lange Suchen, geteilte Wege (pathplan.js)
 }
 
 /** Setzt eine Einheit auf idle; Ankerpunkt = aktuelle Position. */
@@ -241,6 +239,7 @@ function replanBlocked(game, u) {
  * wenn sie sich wirklich bewegen; leer → Meldung (Tempo wird in updateMovement gesetzt).
  */
 export function drive(game, u, dt) {
+  if (pathPending(u)) return true; // wartet auf den Weg (Wegbudget)
   const x0 = u.x;
   const y0 = u.y;
   const ok = followPath(game, u, dt);
@@ -411,9 +410,12 @@ function onRoad(game, x, y) {
  * Bewegt die Einheiten um dt (ohne LKW- und Bauaufträge; die fahren logistics.js bzw. construction.js).
  * Setzt Repath-Timer und Tempo (25 % bei Fahrzeugen ohne Treibstoff, carrySpeed mit Kiste, Schnee und Winterboden bremsen
  * Bodenfahrzeuge, in einer Furt river.ford). Trennung: separate(game).
+ * ownDrivers: Auftragsarten, die ihr Modul selbst fährt (OWN_DRIVERS aus dem Befehlsregister js/game/commands.js; dorthin kein
+ * Import, sonst Importzyklus über die Fachmodule).
  */
-export function updateMovement(game, dt) {
+export function updateMovement(game, dt, ownDrivers) {
   const grid = game.grid;
+  planPending(game);
   for (const u of game.units) {
     if (!u.alive) continue;
     u.repathTimer = Math.max(0, u.repathTimer - dt);
@@ -429,7 +431,7 @@ export function updateMovement(game, dt) {
     if (dt > 0) u.speedNow = Math.hypot(u.x - u.prevX, u.y - u.prevY) / dt;
     u.prevX = u.x;
     u.prevY = u.y;
-    if (u.house || u.def.jet || OWN_DRIVERS.has(u.order.type) || (u.heli && u.heli.phase !== 'air')) continue; // Besatzer eines Hauses bewegen sich nicht; Jets fliegt aircraft.js, Hubschrauber am Heliport helipad.js
+    if (u.house || u.def.jet || ownDrivers.has(u.order.type) || (u.heli && u.heli.phase !== 'air')) continue; // Besatzer eines Hauses bewegen sich nicht; Jets fliegt aircraft.js, Hubschrauber am Heliport helipad.js
     stepUnit(game, u, dt);
   }
 }

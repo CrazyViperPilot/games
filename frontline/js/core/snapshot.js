@@ -4,9 +4,12 @@
 //
 // Format: Objekte, die mehrfach erreichbar sind (gemeinsame Verweise, Zyklen), stehen einmal in `table` und werden mit
 // { $r: Nr } verwiesen; alles andere steht eingebettet. Sonderfälle: { $m: [[k, v], …] } Map, { $s: […] } Set,
-// { $t: 'Float32Array', b: Base64 } Typed Array, { $g: Zustand } Zufallsgenerator, { $d: Pfad } feste Spielwerte (UNITS …),
-// { $c: 'Klasse', p: {…} } Klasseninstanz, { $n: 'inf' | '-inf' | 'nan' | '-0' }, { $u: 1 } undefined.
+// { $t: 'Float32Array', b: Base64 } Typed Array (meist gleichförmige seit v5.62 als { $t, n: Länge, f: Füllbits, i: Stellen,
+// v: Werte }), { $g: Zustand } Zufallsgenerator, { $d: Pfad } feste Spielwerte (UNITS …), { $c: 'Klasse', p: {…} } Klasseninstanz,
+// { $n: 'inf' | '-inf' | 'nan' | '-0' }, { $u: 1 } undefined.
 // Zugriffsmethoden (Getter) und Funktionen werden übergangen; wer sie braucht, legt sie nach dem Laden neu an (Game.restoreAccessors).
+// Ableitbares (Gelände, Raster der Karte) ersetzt der Aufrufer über `replace` durch eine kleine Beschreibung und baut es nach dem Laden
+// neu auf (game/savegame.js).
 // Eigene Schlüssel dürfen nicht mit „$“ beginnen.
 
 const TYPED = { Uint8Array, Int8Array, Uint16Array, Int16Array, Uint32Array, Int32Array, Float32Array, Float64Array };
@@ -21,6 +24,44 @@ function fromB64(str) {
   const s = atob(str);
   const out = new Uint8Array(s.length);
   for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+  return out;
+}
+
+const UINT = { 1: Uint8Array, 2: Uint16Array, 4: Uint32Array }; // gleich große Ganzzahlsicht je Elementgröße (Vergleich der Bits)
+const bytesOf = (a) => new Uint8Array(a.buffer, a.byteOffset, a.byteLength);
+
+/**
+ * Typed Array als Füllwert (Bits des ersten Elements) plus abweichende Stellen, wenn das höchstens ein Viertel der Bytes braucht
+ * (Stadt-, Nebel- und Rasterfelder sind meist gleichförmig); sonst null. Bitgenau, auch für -0 und NaN.
+ */
+function sparse(o) {
+  const U = UINT[o.BYTES_PER_ELEMENT];
+  if (!U || o.length < 64) return null;
+  const a = new U(o.buffer, o.byteOffset, o.length);
+  const f = a[0];
+  const max = Math.floor(o.byteLength / 4 / (4 + o.BYTES_PER_ELEMENT));
+  let n = 0;
+  for (let i = 0; i < a.length; i++) if (a[i] !== f && ++n > max) return null;
+  const at = new Uint32Array(n);
+  const val = new U(n);
+  for (let i = 0, j = 0; j < n; i++) {
+    if (a[i] === f) continue;
+    at[j] = i;
+    val[j++] = a[i];
+  }
+  return { $t: o.constructor.name, n: o.length, f, i: toB64(bytesOf(at)), v: toB64(bytesOf(val)) };
+}
+
+/** Typed Array aus { $t, b } (alle Bytes) oder { $t, n, f, i, v } (sparse). */
+function typedFrom(t) {
+  const T = TYPED[t.$t];
+  if (t.b !== undefined) return new T(fromB64(t.b).buffer);
+  const out = new T(t.n);
+  const U = UINT[T.BYTES_PER_ELEMENT];
+  const a = new U(out.buffer).fill(t.f);
+  const at = new Uint32Array(fromB64(t.i).buffer);
+  const val = new U(fromB64(t.v).buffer);
+  for (let j = 0; j < at.length; j++) a[at[j]] = val[j];
   return out;
 }
 
@@ -42,15 +83,17 @@ function indexStatics(statics) {
  * @param {object} root  Wurzelobjekt (z. B. { game, ai })
  * @param {Record<string, object>} statics  feste Spieldaten, auf die nur verwiesen wird (z. B. { UNITS, BUILDINGS, BALANCE })
  * @param {Record<string, Function>} classes  Klassen, deren Instanzen vorkommen dürfen (Name → Konstruktor)
+ * @param {Map<object, any>} [replace]  Objekt → Ersatz, der an seiner Stelle gespeichert wird (z. B. null oder ein Unterschied zur Karte)
  */
-export function encode(root, statics, classes) {
+export function encode(root, statics, classes, replace = null) {
   const sidx = indexStatics(statics);
   const className = new Map(Object.entries(classes).map(([n, c]) => [c.prototype, n]));
   const count = new Map(); // Objekt → Zahl der Verweise
   const stack = [root];
   // Durchgang 1: Verweise zählen (Kinder nur beim ersten Besuch)
   while (stack.length) {
-    const o = stack.pop();
+    let o = stack.pop();
+    if (replace?.has(o)) o = replace.get(o);
     if (o === null || typeof o !== 'object' || sidx.has(o)) continue;
     const n = count.get(o) ?? 0;
     count.set(o, n + 1);
@@ -72,6 +115,7 @@ export function encode(root, statics, classes) {
   const ids = new Map(); // gemeinsame Objekte → Tabellennummer
   const table = [];
   const enc = (v) => {
+    if (replace?.has(v)) v = replace.get(v);
     if (v === null || typeof v === 'boolean' || typeof v === 'string') return v;
     if (v === undefined) return { $u: 1 };
     if (typeof v === 'number') {
@@ -97,7 +141,7 @@ export function encode(root, statics, classes) {
     if (ArrayBuffer.isView(o)) {
       const name = o.constructor.name;
       if (!TYPED[name]) throw new Error(`snapshot: ${name} nicht speicherbar`);
-      return { $t: name, b: toB64(new Uint8Array(o.buffer, o.byteOffset, o.byteLength)) };
+      return sparse(o) ?? { $t: name, b: toB64(bytesOf(o)) };
     }
     if (isRng(o)) return { $g: o.getState() };
     if (o instanceof Map) return { $m: [...o].map(([k, v]) => [enc(k), enc(v)]) };
@@ -125,10 +169,7 @@ export function decode(data, statics, classes) {
   for (const [o, p] of indexStatics(statics)) sidx.set(p, o);
   const { table, root } = data;
   const shells = table.map((t) => {
-    if (t.$t) {
-      const bytes = fromB64(t.b);
-      return new TYPED[t.$t](bytes.buffer);
-    }
+    if (t.$t) return typedFrom(t);
     if (t.$g !== undefined) return makeRngShell(t.$g);
     if (t.$m) return new Map();
     if (t.$s) return new Set();
@@ -147,10 +188,7 @@ export function decode(data, statics, classes) {
       if (!o) throw new Error(`snapshot: feste Daten ${v.$d} fehlen`);
       return o;
     }
-    if (v.$t) {
-      const bytes = fromB64(v.b);
-      return new TYPED[v.$t](bytes.buffer);
-    }
+    if (v.$t) return typedFrom(v);
     if (v.$g !== undefined) return makeRngShell(v.$g);
     if (v.$m) return new Map(v.$m.map(([k, x]) => [dec(k), dec(x)]));
     if (v.$s) return new Set(v.$s.map(dec));

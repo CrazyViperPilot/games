@@ -23,7 +23,7 @@ export function updateZone(game, dt) {
     if (inHot) money[u.team] += H.unitIncome;
     else if (inZone) money[u.team] += Z.unitIncome;
   }
-  // Besetzte Häuser (seit v5.62): Hausmitte in der Zone bzw. Hot Zone zählt zoneWeight Gewicht je Stufe, zusätzlich zu den Besatzern
+  // Besetzte Häuser (seit v5.66): Hausmitte in der Zone bzw. Hot Zone zählt zoneWeight Gewicht je Stufe, zusätzlich zu den Besatzern
   for (const h of game.garrisoned ?? []) {
     if (!h.alive || h.team < 0) continue;
     const inZone = Math.hypot(h.x - z.x, h.y - z.y) <= z.r;

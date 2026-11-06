@@ -19,21 +19,19 @@ import { hasUnlock } from '../game/research.js';
 import { RESEARCH } from '../data/research.js';
 import { deckDist } from '../game/river.js';
 import { unitLift, buildingHeight, TOWN_H } from '../render/iso.js';
+import { commandOf } from '../game/commands.js';
 
 const WALL_MAX = BALANCE.construction.wallMax; // max. Zellen je Mauerzug (Vorschau; der Befehl prüft dasselbe)
 const DOUBLE_MS = 350; // Doppelklick auf einen Typ = alle dieses Typs im Bild
 const GROUP_DOUBLE_MS = 500; // Gruppentaste zweimal = Kamera hin
 const PICK_PX = 16; // Trefferradius in Bildschirm-Pixeln
-const TARGET_MODES = ['board', 'storm', 'place', 'wall', 'attackMove', 'loadFob', 'unloadFob', 'routeFrom', 'routeTo', 'mortarTarget', 'dropoff', 'landAt', 'dig'];
 const BUILD_MENU = Object.keys(BUILDINGS).filter((k) => BUILDINGS[k].hotkey && BUILDINGS[k].buildable !== false);
-// Befehle, die der Ton quittiert (Marsch, Angriff, Bau …); Ausbildung und Forschung melden sich über ihre Meldungen
 const FORTIFY_KEYS = [['sandbags', 'Z'], ['mgnest', 'N'], ['wire', 'W']];
 const FORTIFY_TIPS = {
   sandbags: 'Das Haus hält 50 % mehr aus, Splitter treffen die Besatzung nur halb so stark.',
   mgnest: 'Die Besatzer schießen schneller.',
   wire: 'Stürmer machen nur 60 % Schaden.',
 };
-const ORDER_SOUND = new Set(['land', 'move', 'attackMove', 'attack', 'garrison', 'ungarrison', 'storm', 'fortifyHouse', 'board', 'pickup', 'deliver', 'load', 'unload', 'route', 'build', 'repair', 'deploy', 'buildWall', 'mortarTarget', 'dropoff', 'repairBridge', 'dig']);
 const RES_KEYS = ['money', 'bm', 'mun', 'fuel'];
 const CARGO_KEYS = ['bm', 'mun', 'fuel']; // Lagersorten (FOB-Lager, LKW-Ladung)
 const SHORT = { money: 'G', bm: 'BM', mun: 'MUN', fuel: 'TS' };
@@ -51,6 +49,85 @@ const PRESET_BTN = [
   ['fuel', 'R', 'Treibstoff', 'Treibstoff'],
 ];
 const LOADED = 0.5; // ab dieser Ladung gilt ein LKW als beladen
+
+/**
+ * UI-Modi der Steuerung (Review E-04, seit v5.63): je Modus der Hinweis oben (hint) und was ein Linksklick auf die Karte tut (click).
+ * target: true = Zielmodus (Befehlskarte zeigt nur „Abbruch“, der Klick wählt nichts aus); Zielmodus ohne click (Mauer) läuft über
+ * beginWall/endWall. preview(c, wx, wy) = Vorschau unter dem Mauszeiger (view.placement). Ein Modus ohne target (Baumenü)
+ * endet beim Klick auf die Karte, danach wählt der Klick aus. Neuer Zielmodus: hier eintragen und eine confirm-Methode schreiben.
+ */
+const MODES = {
+  build: {
+    hint: (c) => (c.buildPermission().level === 'fort' ? 'Baumenü Infanterie: nur Mauer und Tor' : 'Baumenü: Gebäude wählen (Baufahrzeug)'),
+  },
+  place: {
+    target: true,
+    hint: (c) => `${BUILDINGS[c.placeType]?.name || 'Gebäude'}: Klick baut · Rechtsklick oder Esc bricht ab · Shift = mehrfach`,
+    click: (c, wx, wy, shift) => c.confirmPlace(wx, wy, shift),
+    preview: (c, wx, wy) => c.placementFor(c.placeType, wx, wy),
+  },
+  wall: {
+    target: true,
+    hint: () => `Mauer: Maus gedrückt halten und ziehen (max. ${WALL_MAX} Zellen)`,
+    preview: (c, wx, wy) => c.wallPreview(wx, wy),
+  },
+  attackMove: {
+    target: true,
+    hint: () => 'Angriffsbewegung: Ziel anklicken (auf eine Brücke: sprengen) · Esc bricht ab',
+    click: (c, wx, wy, shift) => c.confirmAttackMove(wx, wy, shift),
+  },
+  loadFob: {
+    target: true,
+    hint: () => 'LKW laden: eigene fertige FOB anklicken · Esc bricht ab',
+    click: (c, wx, wy) => c.confirmTruckFob('load', wx, wy),
+  },
+  unloadFob: {
+    target: true,
+    hint: () => 'LKW entladen: eigene FOB anklicken · Esc bricht ab',
+    click: (c, wx, wy) => c.confirmTruckFob('unload', wx, wy),
+  },
+  routeFrom: {
+    target: true,
+    hint: () => 'Pendeln: Start eigene fertige FOB oder Werk (Ausgangslager) anklicken · Esc bricht ab',
+    click: (c, wx, wy) => c.confirmRouteFrom(wx, wy),
+  },
+  routeTo: {
+    target: true,
+    hint: () => 'Pendeln: Ziel-FOB anklicken · Esc bricht ab',
+    click: (c, wx, wy) => c.confirmRouteTo(wx, wy),
+  },
+  mortarTarget: {
+    target: true,
+    hint: () => 'Mörser / Artillerie: Ziel auf der Karte anklicken (Kreis zeigt Reichweite) · Esc bricht ab',
+    click: (c, wx, wy) => c.confirmMortarTarget(wx, wy),
+  },
+  dropoff: {
+    target: true,
+    hint: () => 'Absetzen: Zielpunkt anklicken · Esc bricht ab',
+    click: (c, wx, wy) => c.confirmDropoff(wx, wy),
+  },
+  landAt: {
+    target: true,
+    hint: () => 'Landen: eigenen Stellplatz (Flugzeuge) oder Heliport (Hubschrauber) anklicken · Esc bricht ab',
+    click: (c, wx, wy) => c.confirmLand(wx, wy),
+  },
+  dig: {
+    target: true,
+    hint: () => 'Baggern: Zelle anklicken (Zonenstraße, Bäume, Haus, eigenes Gebäude) · Shift = weitere Zellen · Esc bricht ab',
+    click: (c, wx, wy, shift) => c.confirmDig(wx, wy, shift),
+  },
+  storm: {
+    target: true,
+    hint: () => 'Stürmen: gegnerisch besetztes Haus anklicken · Esc bricht ab',
+    click: (c, wx, wy) => c.confirmStorm(wx, wy),
+  },
+  board: {
+    target: true,
+    hint: () => 'Einsteigen: eigenes Transportfahrzeug (LKW, Baufahrzeug, SPz, Hubschrauber) oder ein Haus der Stadt anklicken · Esc bricht ab',
+    click: (c, wx, wy) => c.confirmBoard(wx, wy),
+  },
+};
+export const UI_MODES = Object.keys(MODES); // für Tests
 
 /** Mauerzug von Start- zu Endzelle, höchstens WALL_MAX Zellen. */
 function wallLine(a, b) {
@@ -102,7 +179,7 @@ export class Controller {
     this.placeType = null; // Gebäudetyp im Modus place
     this.wall = null; // Startzelle {c, r} eines Mauerzugs (während der Maus gedrückt ist)
     this.routeFromId = null; // Start-FOB beim Pendeln (Modus routeTo)
-    this.routeFromWork = null; // Start-Werk beim Pendeln ab einem Werk mit Ausgangslager (Zellindex, seit v5.66; sonst null)
+    this.routeFromWork = null; // Start-Werk beim Pendeln ab einem Werk mit Ausgangslager (Zellindex, seit v5.70; sonst null)
     this.pointer = null; // letzte Weltposition des Mauszeigers
     this.lastClick = null;
     this.lastGroup = null;
@@ -122,7 +199,7 @@ export class Controller {
   issue(cmd) {
     const r = this.game.issue(this.team, cmd);
     if (!r.ok) this.message(r.reason);
-    else if (ORDER_SOUND.has(cmd.type)) this.onOrder?.(cmd);
+    else if (commandOf(cmd.type)?.sound) this.onOrder?.(cmd); // Befehlston (Befehlsregister); Ausbildung und Forschung melden sich über ihre Meldungen
     return r;
   }
 
@@ -451,51 +528,12 @@ export class Controller {
 
   /** Linksklick auf die Welt, je nach Modus: Platzieren, Ziel, Auswahl (mit Doppelklick). */
   leftClickWorld(wx, wy, shift, pointer = 'mouse') {
-    switch (this.view.mode) {
-      case 'place':
-        this.confirmPlace(wx, wy, shift);
-        return;
-      case 'attackMove':
-        this.confirmAttackMove(wx, wy, shift);
-        return;
-      case 'loadFob':
-        this.confirmTruckFob('load', wx, wy);
-        return;
-      case 'unloadFob':
-        this.confirmTruckFob('unload', wx, wy);
-        return;
-      case 'routeFrom':
-        this.confirmRouteFrom(wx, wy);
-        return;
-      case 'routeTo':
-        this.confirmRouteTo(wx, wy);
-        return;
-      case 'mortarTarget':
-        this.confirmMortarTarget(wx, wy);
-        return;
-      case 'landAt':
-        this.confirmLand(wx, wy);
-        return;
-      case 'dig':
-        this.confirmDig(wx, wy, shift);
-        return;
-      case 'dropoff':
-        this.confirmDropoff(wx, wy);
-        return;
-      case 'board':
-        this.confirmBoard(wx, wy);
-        return;
-      case 'storm':
-        this.confirmStorm(wx, wy);
-        return;
-      case 'wall':
-        return; // Mauerzug läuft über beginWall/endWall
-      case 'build':
-        this.setMode('normal');
-        break;
-      default:
-        break;
+    const mode = MODES[this.view.mode];
+    if (mode?.target) {
+      mode.click?.(this, wx, wy, shift); // Mauer: Zug läuft über beginWall/endWall
+      return;
     }
+    if (mode) this.setMode('normal'); // Baumenü endet, der Klick wählt aus
     const now = performance.now();
     const hit = this.pick(wx, wy, (e) => e.team === this.team);
     const last = this.lastClick;
@@ -596,7 +634,7 @@ export class Controller {
       rest = units.filter((u) => !done.has(u.id));
       if (!rest.length) return;
     }
-    // Eigenes Werk der Stadt (seit v5.65): LKW holen dort die Ware aus dem Ausgangslager
+    // Eigenes Werk der Stadt (seit v5.69): LKW holen dort die Ware aus dem Ausgangslager
     const work = this.pickWork(wx, wy);
     if (work) {
       const trucks = rest.filter(isCarrier);
@@ -762,7 +800,7 @@ export class Controller {
     if (this.issue({ type: kind, ids, fobId: fob.id }).ok) this.setMode('normal');
   }
 
-  /** Pendeln, Schritt 1: Start = eigene fertige FOB oder eigenes Werk mit Ausgangslager (seit v5.66, pickWork). */
+  /** Pendeln, Schritt 1: Start = eigene fertige FOB oder eigenes Werk mit Ausgangslager (seit v5.70, pickWork). */
   confirmRouteFrom(wx, wy) {
     const ids = this.selectedUnits().filter(isCarrier);
     if (!ids.length) {
@@ -797,7 +835,7 @@ export class Controller {
     if (this.issue(cmd).ok) this.setMode('normal');
   }
 
-  /** Eigenes fertiges Werk mit Ausgangslager (CITY.pickup) unter dem Weltpunkt oder null (seit v5.65). */
+  /** Eigenes fertiges Werk mit Ausgangslager (CITY.pickup) unter dem Weltpunkt oder null (seit v5.69). */
   pickWork(wx, wy) {
     const e = this.pickCity(wx, wy);
     return e && ownWork(this.game, this.team, e.cityCell) ? e : null;
@@ -1016,16 +1054,8 @@ export class Controller {
       this.pickCrate(wx, wy) ||
       this.pickHouse(wx, wy, (h) => h.team >= 0 && this.game.sees(this.team, h));
     this.view.hoverId = hover ? hover.id : 0;
-    switch (this.view.mode) {
-      case 'place':
-        this.view.placement = this.placementFor(this.placeType, wx, wy);
-        break;
-      case 'wall':
-        this.view.placement = this.wallPreview(wx, wy);
-        break;
-      default:
-        this.view.placement = null;
-    }
+    const preview = MODES[this.view.mode]?.preview;
+    this.view.placement = preview ? preview(this, wx, wy) : null;
   }
 
   // ---- Modi ---------------------------------------------------------------------
@@ -1139,46 +1169,13 @@ export class Controller {
 
   /** Kurzer Hinweistext für den aktuellen Modus (leer im Normalbetrieb). */
   hint() {
-    switch (this.view.mode) {
-      case 'build':
-        return this.buildPermission().level === 'fort'
-          ? 'Baumenü Infanterie: nur Mauer und Tor'
-          : 'Baumenü: Gebäude wählen (Baufahrzeug)';
-      case 'place':
-        return `${BUILDINGS[this.placeType]?.name || 'Gebäude'}: Klick baut · Rechtsklick oder Esc bricht ab · Shift = mehrfach`;
-      case 'wall':
-        return `Mauer: Maus gedrückt halten und ziehen (max. ${WALL_MAX} Zellen)`;
-      case 'attackMove':
-        return 'Angriffsbewegung: Ziel anklicken (auf eine Brücke: sprengen) · Esc bricht ab';
-      case 'loadFob':
-        return 'LKW laden: eigene fertige FOB anklicken · Esc bricht ab';
-      case 'unloadFob':
-        return 'LKW entladen: eigene FOB anklicken · Esc bricht ab';
-      case 'routeFrom':
-        return 'Pendeln: Start eigene fertige FOB oder Werk (Ausgangslager) anklicken · Esc bricht ab';
-      case 'routeTo':
-        return 'Pendeln: Ziel-FOB anklicken · Esc bricht ab';
-      case 'mortarTarget':
-        return 'Mörser / Artillerie: Ziel auf der Karte anklicken (Kreis zeigt Reichweite) · Esc bricht ab';
-      case 'dropoff':
-        return 'Absetzen: Zielpunkt anklicken · Esc bricht ab';
-      case 'landAt':
-        return 'Landen: eigenen Stellplatz (Flugzeuge) oder Heliport (Hubschrauber) anklicken · Esc bricht ab';
-      case 'dig':
-        return 'Baggern: Zelle anklicken (Zonenstraße, Bäume, Haus, eigenes Gebäude) · Shift = weitere Zellen · Esc bricht ab';
-      case 'storm':
-        return 'Stürmen: gegnerisch besetztes Haus anklicken · Esc bricht ab';
-      case 'board':
-        return 'Einsteigen: eigenes Transportfahrzeug (LKW, Baufahrzeug, SPz, Hubschrauber) oder ein Haus der Stadt anklicken · Esc bricht ab';
-      default:
-        return '';
-    }
+    return MODES[this.view.mode]?.hint(this) ?? '';
   }
 
   /** Befehlskarte für Auswahl bzw. Modus. Einträge: { label, hotkey, cost, tip, enabled, reason, active, action }. */
   commandCard() {
     const m = this.view.mode;
-    if (TARGET_MODES.includes(m)) {
+    if (MODES[m]?.target) {
       return [entry('Abbruch', 'Esc', { tip: 'Abbrechen (Esc)', action: () => this.cancel() })];
     }
     if (m === 'build') return this.buildCard();

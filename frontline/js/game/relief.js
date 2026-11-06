@@ -196,6 +196,11 @@ export function reliefOf(map) {
   return relief;
 }
 
+/** Gelände `relief` als das der Karte merken, ohne map.relief zu ändern (Laden eines Spielstands: genaues Gelände der Zufallskarte). */
+export function keepRelief(map, relief) {
+  cache.set(map, { src: map.relief, relief });
+}
+
 /** Gelände in die Karte schreiben (Text) und das Objekt für reliefOf merken (Editor: dasselbe Objekt bleibt aktiv). */
 export function setRelief(map, relief) {
   if (!relief) {

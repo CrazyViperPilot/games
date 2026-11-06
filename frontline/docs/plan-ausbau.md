@@ -1,4 +1,8 @@
-# Frontline – Plan Weiterentwicklung (nach dem Review, ab v5.61)
+# Frontline – Plan Weiterentwicklung (Ausbau-Pakete, v5.65 bis v5.71)
+
+**Hinweis (2026-11-06, Merge mit `main`):** Parallel liefen auf `main` die Review-Pakete P8–P11 als v5.61–v5.64. Die Pakete dieses
+Plans heißen deshalb im PRD-Änderungsverlauf **Ausbau-Paket A1–A6** (P1 → A1 … P6 → A6) und haben die Versionen v5.65–v5.71
+(Cache `frontline-v178` bis `frontline-v184`). Cache-Nummern im Text unten sind die ursprünglich geplanten.
 
 Quelle: PRD §12 „Priorisierung“ (Could) und §13 „Geparkte Ideen“. Stand des Codes: v5.60, Cache `frontline-v173`.
 Jedes Paket ist eine Version (Regel 7 in `CLAUDE.md`). Umgesetzt wird **ein Paket nach dem anderen**, nach Daniels Zeichen.
@@ -8,16 +12,16 @@ Für die Pakete ab P2 gilt PRD §13: erst ein Vorschlag zur Ausgestaltung (unten
 
 | Paket | Inhalt | Quelle | Größe | Stand |
 |---|---|---|---|---|
-| **P1** | Statistik am Spielende + Doku-Abgleich §1/§13 | §12 Could, §13 | klein | **gebaut (v5.61)** |
-| P2 | Häuserkampf I: Zonen-Nutzen besetzter Häuser (Punkte, Sicht), Ruinen als Deckung | §13 Häuserkampf | mittel | **gebaut (v5.62)** |
-| P3 | Häuserkampf II: KI stürmt Häuser und baut sie zur Stellung aus; Feuerbereich je Haus | §13 Häuserkampf | mittel | **gebaut (v5.63)** |
-| P4 | Musik (synthetisiert, je Lage ruhig/Gefecht) und Lautstärkeregler für Ton und Musik | §13 Musik | mittel | **gebaut (v5.64)** |
-| P5a | Stadt: Werkslager und LKW laden am Werk (Simulation, Befehle, Rechtsklick, Infofeld) | §13 SimCity-Stadt | mittel | **gebaut (v5.65)** |
-| P5b | Stadt: Route ab Werk in der Oberfläche, KI holt am Werk, Ressourcenanzeige | §13 SimCity-Stadt | mittel | **gebaut (v5.66)** |
-| P6 | KI-Lücken aus §10: KI baut Flak/SAM gegen Luft, Scharfschützen (Bagger bewusst nicht) | §10 „Nicht gebaut“ | mittel | **gebaut (v5.67)** |
+| **P1** | Statistik am Spielende + Doku-Abgleich §1/§13 | §12 Could, §13 | klein | **gebaut (v5.65)** |
+| P2 | Häuserkampf I: Zonen-Nutzen besetzter Häuser (Punkte, Sicht), Ruinen als Deckung | §13 Häuserkampf | mittel | **gebaut (v5.66)** |
+| P3 | Häuserkampf II: KI stürmt Häuser und baut sie zur Stellung aus; Feuerbereich je Haus | §13 Häuserkampf | mittel | **gebaut (v5.67)** |
+| P4 | Musik (synthetisiert, je Lage ruhig/Gefecht) und Lautstärkeregler für Ton und Musik | §13 Musik | mittel | **gebaut (v5.68)** |
+| P5a | Stadt: Werkslager und LKW laden am Werk (Simulation, Befehle, Rechtsklick, Infofeld) | §13 SimCity-Stadt | mittel | **gebaut (v5.69)** |
+| P5b | Stadt: Route ab Werk in der Oberfläche, KI holt am Werk, Ressourcenanzeige | §13 SimCity-Stadt | mittel | **gebaut (v5.70)** |
+| P6 | KI-Lücken aus §10: KI baut Flak/SAM gegen Luft, Scharfschützen (Bagger bewusst nicht) | §10 „Nicht gebaut“ | mittel | **gebaut (v5.71)** |
 | – | LLM für Gegner und Dialoge | §13 | – | nicht paketiert: Grundsatzfragen offen (Modell, Gerät/Server, Offline-PWA, Kosten) |
 
-## P1 – Statistik am Spielende (v5.61)
+## P1 – Statistik am Spielende (v5.65)
 
 Ziel: Der Endbildschirm zeigt für **beide Teams nebeneinander** eine kleine Bilanz der Partie.
 
@@ -46,8 +50,8 @@ Ziel: Der Endbildschirm zeigt für **beide Teams nebeneinander** eine kleine Bil
 ### Doku-Abgleich (beim Review aufgefallen)
 - PRD §1 Zeile „Nicht im Umfang“: „Speichern laufender Partien“ streichen (gibt es seit v4.90, §16).
 - PRD §13 „SimCity-Stadt“: „Verkehr“ ist seit v5.20 als Straßentransport gebaut (§15) – als gebaut vermerken, geparkt bleibt „LKW holen Material aus Werken“.
-- PRD §12: „Statistik am Spielende“ als gebaut (v5.61) vermerken; PRD §9 bzw. §2 einen Satz zum Endbildschirm.
-- PRD Änderungsverlauf: Eintrag v5.61 (Cache v174). `sw.js`: `CACHE_VERSION` auf `frontline-v174`.
+- PRD §12: „Statistik am Spielende“ als gebaut (v5.65) vermerken; PRD §9 bzw. §2 einen Satz zum Endbildschirm.
+- PRD Änderungsverlauf: Eintrag v5.65 (Cache v174). `sw.js`: `CACHE_VERSION` auf `frontline-v174`.
 - `CLAUDE.md` Feature-Landkarte: Zeile „Spielzustand, Befehle, Platzierung, Sieg“ um die Statistik ergänzen.
 
 ### Test
@@ -55,9 +59,9 @@ Ziel: Der Endbildschirm zeigt für **beide Teams nebeneinander** eine kleine Bil
   mit `hp = 0` versehen, `game.update(dt)` → `lost`/`kills` stimmen; Gebäude ebenso; ein Spielstand ohne `stats` lädt ohne Fehler (Snapshot aus `test/save.test.js` als Vorbild).
 - `npm run test:quick` und `npm test` grün, `test/golden.test.js` unverändert.
 
-## P2 – Häuserkampf I (v5.62, von Daniel bestätigt am 2026-11-06, gebaut in v5.62)
+## P2 – Häuserkampf I (v5.66, von Daniel bestätigt am 2026-11-06, gebaut in v5.66)
 
-Heute (v5.61) zählen Besatzer schon wie Einheiten für Zone, Hot Zone, Punkte und Limit und sehen mit Gebäude-Augenhöhe.
+Heute (v5.65) zählen Besatzer schon wie Einheiten für Zone, Hot Zone, Punkte und Limit und sehen mit Gebäude-Augenhöhe.
 Neu kommt dazu (alle Werte in `BALANCE.garrison`, `js/data/balance.js`, mit deutschem Kommentar):
 
 1. **Stellung in der Zone:** Jedes besetzte, nicht eingestürzte Haus, dessen Mitte in der Konfliktzone liegt, gibt seinem Team
@@ -73,14 +77,14 @@ Neu kommt dazu (alle Werte in `BALANCE.garrison`, `js/data/balance.js`, mit deut
    verträglich: fehlt die Liste nach dem Laden, aus `h.ruined` neu aufbauen), keine Allokationen je Treffer.
 4. **Anzeige:** Hilfe (F1) in `js/ui/menu.js` ergänzen (Abschnitt Häuserkampf); Infozeile im HUD ist nicht nötig.
 
-Doku: PRD §7 „Häuserkampf“ (drei Punkte ergänzen, Satz „Weiter geparkt“ in §13 kürzen), Änderungsverlauf v5.62, `CACHE_VERSION`
+Doku: PRD §7 „Häuserkampf“ (drei Punkte ergänzen, Satz „Weiter geparkt“ in §13 kürzen), Änderungsverlauf v5.66, `CACHE_VERSION`
 `frontline-v175`, `npm run docs`. Das ist eine gewollte Regeländerung: `test/golden.test.js` darf sich ändern, dann neu setzen mit
 `GOLDEN=print node --test test/golden.test.js` (Anleitung im Testkopf) und die neuen Werte eintragen.
 
 Test `test/garrison.test.js` (erweitern) oder neu `test/housefight.test.js`: Zonengewicht mit/ohne besetztes Haus; Sichtradius des
 Besatzers größer; Infanterie an einer Ruine nimmt 70 % Schaden, weiter weg 100 %, Fahrzeug an der Ruine 100 %.
 
-## P3 – Häuserkampf II (v5.63, von Daniel bestätigt am 2026-11-06)
+## P3 – Häuserkampf II (v5.67, von Daniel bestätigt am 2026-11-06)
 
 ### A. KI stürmt (Armee-KI `js/ai/ai.js`, Werte in `js/data/ai.js`, je Schwierigkeit in `BALANCE.difficulty`)
 - Neue Methode `stormHouses(s)`, aufgerufen in `think()` direkt nach `garrisonZone(s)`, Takt `STORM_EVERY` (8 s, über `this.once`).
@@ -111,13 +115,13 @@ Besatzers größer; Infanterie an einer Ruine nimmt 70 % Schaden, weiter weg 100
 ### Doku und Test
 - PRD §7 „Häuserkampf“ (Sätze „Die KI stürmt nicht“ und „Die KI baut nichts aus“ ersetzen, Feuerbereich ergänzen), §10 KI (Häuserkampf-Zeile)
   und Tabelle „KI-Konstanten“ (neue Konstanten), §13 „Weiter geparkt“ kürzen (bleibt: Kampf von Raum zu Raum), Hilfe (F1) in `js/ui/menu.js`,
-  Änderungsverlauf v5.63, `CACHE_VERSION` `frontline-v176`, `npm run docs`, Feature-Landkarte in `CLAUDE.md`.
+  Änderungsverlauf v5.67, `CACHE_VERSION` `frontline-v176`, `npm run docs`, Feature-Landkarte in `CLAUDE.md`.
 - Test `test/housefight2.test.js`: KI (Normal) stürmt ein Haus mit 1 Besatzer, wenn 4 eigene Schützen daneben stehen, nicht bei 1;
   Leicht stürmt nicht; KI baut mit genug Geld Sandsäcke, ohne Geld nicht; blinde Seite zwischen zwei eng stehenden Häusern;
   Besatzer schießt nicht durch die blinde Seite, wohl durch eine Fensterseite.
 - Gewollte Regeländerung: Golden-Werte dürfen sich ändern (dann neu setzen nach Anleitung im Testkopf, im Bericht nennen).
 
-## P4 – Musik und Lautstärke (v5.64, von Daniel bestätigt am 2026-11-06)
+## P4 – Musik und Lautstärke (v5.68, von Daniel bestätigt am 2026-11-06)
 
 Reines Browser-Modul wie `js/audio/sound.js` (kein Teil der Simulation, liest nur; `Math.random` ist hier erlaubt, nicht in `js/game`).
 
@@ -141,13 +145,13 @@ Reines Browser-Modul wie `js/audio/sound.js` (kein Teil der Simulation, liest nu
   (Pausenmenü live über eine Rückruf-Funktion aus `main.js`). Der An/Aus-Schalter (🔊/🔇, F2) bleibt.
 
 ### Doku und Test
-- PRD §14 (Musik und Regler), §1 („Musik“ aus „Nicht im Umfang“ streichen), §13 Musik als gebaut, Hilfe (F1), Änderungsverlauf v5.64,
+- PRD §14 (Musik und Regler), §1 („Musik“ aus „Nicht im Umfang“ streichen), §13 Musik als gebaut, Hilfe (F1), Änderungsverlauf v5.68,
   `CACHE_VERSION` `frontline-v177`, Feature-Landkarte in `CLAUDE.md` (Zeile Ton).
 - Test `test/music.test.js` mit dem Attrappen-AudioContext aus `test/sound.test.js` (dort ggf. in eine kleine Hilfsdatei auslagern):
   kein Absturz über 60 s Spiel, intensity steigt bei vielen Kampfeffekten und fällt danach, bei Musik 0 % werden keine Noten geplant,
   Lautstärke wird gespeichert und gelesen (localStorage-Attrappe). `test/assets.test.js` muss grün bleiben.
 
-## P5a – Werkslager, LKW laden am Werk (v5.65, von Daniel bestätigt am 2026-11-06)
+## P5a – Werkslager, LKW laden am Werk (v5.69, von Daniel bestätigt am 2026-11-06)
 
 Heute fließt der Ausstoß von BM-Werk (`bm`), Munitionswerk (`mun`) und Raffinerie (`fuel`) über die Straße ins Lager der Hauptstadt
 (`runWorks` und `storeAndMunitions` in `js/game/city/economy.js`). LKW laden nur an FOBs (`js/game/logistics.js`).
@@ -179,16 +183,16 @@ Heute fließt der Ausstoß von BM-Werk (`bm`), Munitionswerk (`mun`) und Raffine
 - Hilfe (F1) in `js/ui/menu.js` ergänzen.
 
 ### Doku und Test
-- PRD §3 (Hauptstadt/LKW), §15 (Werke, Straßentransport), §13 SimCity-Stadt („LKW holen Material aus Werken“ als gebaut v5.65),
-  Änderungsverlauf v5.65, `CACHE_VERSION` `frontline-v178`, `npm run docs`, ARCHITEKTUR „Befehle“ (`load`/`route` neue Felder),
+- PRD §3 (Hauptstadt/LKW), §15 (Werke, Straßentransport), §13 SimCity-Stadt („LKW holen Material aus Werken“ als gebaut v5.69),
+  Änderungsverlauf v5.69, `CACHE_VERSION` `frontline-v178`, `npm run docs`, ARCHITEKTUR „Befehle“ (`load`/`route` neue Felder),
   Feature-Landkarte in `CLAUDE.md` (Zeile Lager/LKW).
 - Test `test/pickup.test.js`: Werk füllt sein Ausgangslager mit etwa share des Ausstoßes bis cap; LKW lädt am Werk nur dessen Ware;
   Route Werk → FOB bringt Ware in die FOB; abgerissenes Werk beendet den Auftrag; Spielstand ohne `c.out` lädt.
 - Gewollte Regeländerung: Golden-Werte dürfen sich ändern (Läufe mit Stadt); dann nach Anleitung im Testkopf neu setzen und im Bericht nennen.
 
-## P5b – Werk als Quelle in Oberfläche und KI (v5.66, von Daniel bestätigt am 2026-11-06)
+## P5b – Werk als Quelle in Oberfläche und KI (v5.70, von Daniel bestätigt am 2026-11-06)
 
-Grundlage P5a (v5.65): `CITY.pickup`, `c.out`, `c.pickClaim`, Befehle `load` mit `work`, `route` mit `fromWork`, `ownWork`/`pickWork`.
+Grundlage P5a (v5.69): `CITY.pickup`, `c.out`, `c.pickClaim`, Befehle `load` mit `work`, `route` mit `fromWork`, `ownWork`/`pickWork`.
 
 ### Oberfläche (`js/ui/controller.js`)
 - Pendeln (Taste T, Modus `routeFrom`): Als Start darf statt einer eigenen fertigen FOB auch ein eigenes Werk der Arten `CITY.pickup.kinds`
@@ -210,14 +214,14 @@ Grundlage P5a (v5.65): `CITY.pickup`, `c.out`, `c.pickClaim`, Befehle `load` mit
 - Am Lagerknoten von BM, MUN, TS eine Zeile „davon an Werken: N“, wenn N > 0 (Summe `c.out` der Werke dieser Ware; `teamStock` zählt sie schon).
 
 ### Doku und Test
-- PRD §15 (Werkslager: Oberfläche und KI), §10 KI (Pendler) und Tabelle „KI-Konstanten“, §8 Steuerung (T), Änderungsverlauf v5.66,
-  `CACHE_VERSION` `frontline-v179`, `npm run docs`, Feature-Landkarte in `CLAUDE.md`, Plan P5b auf „gebaut (v5.66)“.
+- PRD §15 (Werkslager: Oberfläche und KI), §10 KI (Pendler) und Tabelle „KI-Konstanten“, §8 Steuerung (T), Änderungsverlauf v5.70,
+  `CACHE_VERSION` `frontline-v179`, `npm run docs`, Feature-Landkarte in `CLAUDE.md`, Plan P5b auf „gebaut (v5.70)“.
 - Test in `test/pickup.test.js` (oder neu `test/pickupai.test.js`): KI plant eine Route ab Werk, wenn ein passendes Werk nah an einer
   bedürftigen vorderen FOB liegt und keine FOB Überschuss hat; nicht ohne Stadt; die Route bringt Ware in die FOB.
   `test/ai.test.js`, `test/cityprod.test.js`, `test/golden.test.js` laufen lassen. Ändern sich Golden-Werte, ist das als gewollte
   Regeländerung erlaubt (Anleitung im Testkopf), im Bericht nennen.
 
-## P6 – KI-Lücken (v5.67, von Daniel bestätigt am 2026-11-06)
+## P6 – KI-Lücken (v5.71, von Daniel bestätigt am 2026-11-06)
 
 Heute: `counterMix` in `js/ai/ai.js` mischt nur den Gepard gegen gesehene Luftfahrzeuge (`GEPARD_PER_AIR`, `GEPARD_MAX`, `AIR_MEMORY`)
 und die Panzerhaubitze ein. Flak, SAM und Scharfschütze baut die KI nie, den Bagger auch nicht (PRD §10 „Nicht gebaut“).
@@ -240,7 +244,7 @@ treffen Hubschrauber und Jets (ohne `jet`-Schaden gilt `air`).
   die Zeile „Nicht gebaut“ entsprechend umformulieren (mit Begründung).
 
 ### Doku und Test
-- Werte in `js/data/ai.js` mit deutschem Kommentar; PRD §10 (Konter-Mix, Nicht gebaut) und Tabelle „KI-Konstanten“, Änderungsverlauf v5.67,
+- Werte in `js/data/ai.js` mit deutschem Kommentar; PRD §10 (Konter-Mix, Nicht gebaut) und Tabelle „KI-Konstanten“, Änderungsverlauf v5.71,
   `CACHE_VERSION` `frontline-v180`, `npm run docs`; Feature-Landkarte in `CLAUDE.md` (Zeilen Flugabwehr „baut Flak/SAM noch nicht“ und
   Scharfschütze „baut ihn nicht“ anpassen).
 - Test `test/aiair.test.js`: `counterMix` mit gesehenen Hubschraubern → Gepard und Flak > 0, SAM 0; mit gesehenen Jets → SAM > 0;

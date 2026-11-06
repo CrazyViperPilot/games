@@ -1,14 +1,14 @@
-// Doku-Abgleich: ARCHITEKTUR §6 nennt jeden Befehl aus game.issue, der Änderungsverlauf ist absteigend sortiert,
+// Doku-Abgleich: ARCHITEKTUR §6 nennt jeden Befehl aus dem Befehlsregister (game.issue), der Änderungsverlauf ist absteigend sortiert,
 // und es gibt nur eine Fassung der Dokumente (PLAN.md liegt historisch in docs/).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
+import { COMMANDS } from '../js/game/commands.js';
 
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 
-test('jeder case in game.issue steht in ARCHITEKTUR §6 (Befehle)', () => {
-  const game = read('../js/game/game.js');
-  const cmds = [...new Set([...game.matchAll(/case '([a-zA-Z]+)':/g)].map((m) => m[1]))];
+test('jeder Befehl des Befehlsregisters (js/game/commands.js) steht in ARCHITEKTUR §6 (Befehle)', () => {
+  const cmds = Object.keys(COMMANDS);
   assert.ok(cmds.length > 30, 'zu wenige Befehle gefunden: Muster prüfen');
   const arch = read('../ARCHITEKTUR.md');
   const from = arch.indexOf('## 6. Befehle');

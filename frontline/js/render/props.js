@@ -10,11 +10,11 @@ import { PAINT } from './unitpaint.js';
 import { sprite, blit, spriteDpr } from './spritecache.js';
 import { setIsoAt } from './iso.js';
 import { box as kbox, FACE, flat, G, lit, onFace, OUTLINE, poly, rectF, stroke } from './isokit.js';
+import { hashXY } from './color.js';
 
 const TAU = Math.PI * 2;
 const K = Math.SQRT1_2;
 const { box, cyl, loft, prX, prY, on, fine, paintSolids, boundsOf, viewAngle, sectorOf, nearKeys, getSprite, mix } = PAINT;
-const hashXY = (x, y) => (Math.imul(Math.round(x) | 0, 73856093) ^ Math.imul(Math.round(y) | 0, 19349663)) >>> 0;
 const SNOW = '#eef2f4';
 const seasonKey = (season) => (season === 'winter' ? 'w' : 's');
 

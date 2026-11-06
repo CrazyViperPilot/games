@@ -15,7 +15,7 @@ const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 export const canGarrison = (u) => u.def.armor === 'inf' && !u.crate;
 
 /**
- * Fensterseiten eines Hauses (seit v5.63): { n, e, s, w }, true = Fenster. Fensterseite ist eine Seite, deren Mittelpunkt höchstens
+ * Fensterseiten eines Hauses (seit v5.67): { n, e, s, w }, true = Fenster. Fensterseite ist eine Seite, deren Mittelpunkt höchstens
  * G.streetReach px von einer Stadtstraße (Strecke x1,y1–x2,y2 aus roads, ohne Feldwege) entfernt ist. Liegt keine Seite an einer Straße,
  * sind alle vier Seiten offen.
  */
@@ -322,7 +322,7 @@ export function houseFire(game, u) {
 }
 
 /**
- * Deckung an Ruinen (seit v5.62): Schadensfaktor für einen Treffer auf u. Infanterie außerhalb von Häusern, die höchstens
+ * Deckung an Ruinen (seit v5.66): Schadensfaktor für einen Treffer auf u. Infanterie außerhalb von Häusern, die höchstens
  * ruinCover.r px vom Rand einer eingestürzten Stadthausruine steht, nimmt ruinCover.mul des Schadens; sonst 1.
  * Läuft nur über game.ruins (beim Einsturz gefüllt, beim Abriss geleert). Keine Allokation.
  */
@@ -338,7 +338,7 @@ export function ruinCoverMul(game, u) {
 }
 
 /**
- * Feuerbereich (seit v5.63): Sitzt u in einem Stadthaus, darf sie target nur sehen und beschießen, wenn die Richtung von der
+ * Feuerbereich (seit v5.67): Sitzt u in einem Stadthaus, darf sie target nur sehen und beschießen, wenn die Richtung von der
  * Hausmitte zum Ziel durch eine Fensterseite geht. Die Richtung: ist |dx| / halbe Breite ≥ |dy| / halbe Höhe, zählt die Ost- bzw. Westseite,
  * sonst Süd bzw. Nord (y wächst nach unten). Außerhalb von Stadthäusern (auch in Gefechtstürmen) und ohne windows (alte Stände): immer true.
  * Keine Allokation.

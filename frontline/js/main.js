@@ -73,7 +73,7 @@ const hudRoot = document.getElementById('hud');
 const overlay = document.getElementById('overlay');
 
 const sound = new Sound(); // Ton (PRD §14): ein Sound-Objekt für alle Partien, der AudioContext entsteht erst bei der ersten Geste
-const levelCtl = { get: (kind) => sound.getLevel(kind), set: (kind, v) => sound.setLevel(kind, v) }; // Regler im Pausenmenü (seit v5.64)
+const levelCtl = { get: (kind) => sound.getLevel(kind), set: (kind, v) => sound.setLevel(kind, v) }; // Regler im Pausenmenü (seit v5.68)
 for (const ev of ['pointerdown', 'keydown']) window.addEventListener(ev, () => sound.unlock(), { capture: true });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) sound.ctx?.suspend?.().catch?.(() => {});
@@ -398,7 +398,7 @@ function frame(s) {
           time: g.time,
           points: [g.teams[0].points, g.teams[1].points],
           winPoints: g.winPoints,
-          teams: g.teams.map((t) => ({ ...t.stats, earned: t.earned || 0, used: { ...t.used } })), // Statistik je Team (seit v5.61)
+          teams: g.teams.map((t) => ({ ...t.stats, earned: t.earned || 0, used: { ...t.used } })), // Statistik je Team (seit v5.65)
         },
       },
       () => startGame(settings),

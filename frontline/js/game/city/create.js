@@ -151,9 +151,9 @@ function createTeamCity(game, team, shared) {
     level: new Uint8Array(n), // 0 = ausgewiesen, 1..maxLevel = Gebäude
     part: new Int32Array(n), // Großbau (seit v5.00): Mittelzelle + 1 für jede seiner Zellen, 0 = Einzelzelle
     timer: new Float32Array(n), // Wachstumszeit der Zelle
-    out: new Float32Array(n), // Ausgangslager eines Werks (CITY.pickup), nur am Anker belegt; LKW holen es dort ab (seit v5.65)
-    workOut: new Float32Array(n), // Ausstoß je s des Werks am Anker im letzten Schritt (Ware je s, seit v5.66; die KI nimmt nur laufende Werke als Pendlerquelle)
-    pickClaim: new Uint8Array(n), // 1 am Anker: dem Werk ist gerade ein eigener LKW zugeteilt (updateLogistics setzt den Merker je Schritt, seit v5.65)
+    out: new Float32Array(n), // Ausgangslager eines Werks (CITY.pickup), nur am Anker belegt; LKW holen es dort ab (seit v5.69)
+    workOut: new Float32Array(n), // Ausstoß je s des Werks am Anker im letzten Schritt (Ware je s, seit v5.70; die KI nimmt nur laufende Werke als Pendlerquelle)
+    pickClaim: new Uint8Array(n), // 1 am Anker: dem Werk ist gerade ein eigener LKW zugeteilt (updateLogistics setzt den Merker je Schritt, seit v5.69)
     flee: new Float32Array(n), // > 0: Bewohner geflohen, Ruhezeit bis zur Rückkehr (s)
     congestion: new Float32Array(n).fill(1), // Stau-Faktor je Straßenzelle (seit v5.20, transport.js): 1 frei, geglättet, wird gespeichert
     claim: new Uint8Array(n), // 1 = eigenes Gebiet

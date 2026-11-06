@@ -671,7 +671,7 @@ body.flow-open .flow-fab { background: #2e372e; }
 .fl-where { fill: var(--muted); font-size: 10px; font-weight: 500; }
 .fl-t2 { fill: var(--text); font-size: 11px; font-variant-numeric: tabular-nums; }
 .fl-t3 { fill: #8fd18f; font-size: 10px; }
-.fl-t4 { fill: var(--muted); font-size: 10px; } /* davon an Werken (seit v5.66) */
+.fl-t4 { fill: var(--muted); font-size: 10px; } /* davon an Werken (seit v5.70) */
 .fl-bar { fill: #8fd18f; }
 .fl-node.warn .fl-box { stroke: #d6b84a; }
 .fl-node.warn .fl-t3, .fl-node.warn .fl-bar { fill: #e2c65a; }

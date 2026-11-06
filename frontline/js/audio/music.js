@@ -1,4 +1,4 @@
-// Musik (PRD §14, Paket P4 v5.64): wie die Geräusche mit WebAudio selbst erzeugt, keine Audiodateien. Ein Stück in d-Moll mit der
+// Musik (PRD §14, Paket P4 v5.68): wie die Geräusche mit WebAudio selbst erzeugt, keine Audiodateien. Ein Stück in d-Moll mit der
 // Akkordfolge Dm – B♭ – F – C (je ein Takt, endlos). Zwei Schichten laufen immer, nur ihre Pegel ändern sich: ruhig (weiche Flächen
 // und Glocke) und Gefecht (Marschtrommel, Pauke, Bass). Die Lage `intensity` 0…1 folgt den Kampfeffekten der Partie.
 // Reines Browser-Modul wie sound.js: liest das Spiel und ändert es nicht. Math.random ist hier erlaubt (nicht in js/game).

@@ -1,5 +1,6 @@
-// Farbhilfen der Darstellung (seit v5.59, Review-Paket P6, Befund Q-05 Farben): einmal hier statt je Malmodul (nature.js,
-// unitpaint.js, sprites.js, citylayer.js hatten eigene Kopien). Nur Rechnen mit Farbtexten, kein Zeichnen, kein DOM.
+// Farb- und Rechenhilfen der Darstellung (seit v5.59, Review-Paket P6, Befund Q-05 Farben; hashXY und clamp seit v5.64, P11):
+// einmal hier statt je Malmodul (nature.js, unitpaint.js, sprites.js, citylayer.js, fx.js, isobuild.js, maptown.js, props.js,
+// camera.js, reliefimg.js hatten eigene Kopien). Nur Rechnen, kein Zeichnen, kein DOM.
 
 /** Farbe als [r, g, b] (0 … 255): '#rrggbb' oder 'rgb(r,g,b)' (Ergebnis von shade/tint in sprites.js). */
 export function rgbOf(c) {
@@ -17,3 +18,9 @@ export function mix(a, b, t) {
   const B = rgbOf(b);
   return hexOf(A.map((v, i) => v + (B[i] - v) * t));
 }
+
+/** Wert auf lo … hi begrenzen. */
+export const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+/** Fester Streuwert (32 Bit, ohne Vorzeichen) für einen Punkt: gleiche Lage, gleiches Aussehen. Koordinaten werden gerundet. */
+export const hashXY = (x, y = 0) => (Math.imul(Math.round(x) | 0, 73856093) ^ Math.imul(Math.round(y) | 0, 19349663)) >>> 0;

@@ -1,4 +1,4 @@
-// Häuserkampf II (seit v5.63): die KI stürmt besetzte Häuser und baut ihre Besatzungshäuser aus; Besatzer schießen nur durch
+// Häuserkampf II (seit v5.67): die KI stürmt besetzte Häuser und baut ihre Besatzungshäuser aus; Besatzer schießen nur durch
 // Fensterseiten (blinde Seiten zwischen eng stehenden Stadtgebäuden).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

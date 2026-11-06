@@ -1,4 +1,4 @@
-// Werk als Quelle in Oberfläche und KI (seit v5.66, P5b): der Befehl route mit fromWork startet am Ausgangslager eines Werks, die
+// Werk als Quelle in Oberfläche und KI (seit v5.70, P5b): der Befehl route mit fromWork startet am Ausgangslager eines Werks, die
 // Oberfläche (T, dann Werk anklicken, dann Ziel-FOB) schickt ihn so, die KI plant Pendler ab einem Werk, wenn keine FOB Überschuss hat
 // oder das Werk klar näher liegt, und die Ressourcenanzeige zeigt „davon an Werken“.
 import test from 'node:test';

@@ -5,7 +5,7 @@ import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { jetAlt } from '../game/aircraft.js';
-import { rgbOf } from './color.js';
+import { rgbOf, clamp } from './color.js';
 
 const TILE = BALANCE.map.tile;
 const OUTLINE = 'rgba(0,0,0,0.65)';
@@ -14,7 +14,6 @@ const GOLD = '#f2c94c';
 const BUILD_ABBR = { fob: 'FOB', mortar: 'MÖR', aa: 'FLA', tower: 'TURM', drill: 'BOHR', radio: 'MAST', phalanx: 'PHALANX' };
 const WALL_GREY = '#8c9089';
 
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 
 /** Farbe abdunkeln (f = 0 unverändert, 1 schwarz). */

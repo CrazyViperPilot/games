@@ -1,6 +1,7 @@
 // Höhengelände als Bild für die 2D-Ansicht, die Minimap, den Karteneditor und die Iso-Ansicht ohne WebGL:
 // Schummerung (Licht aus Nordwest), Fels an steilen Hängen, Ufer und Seen. Farben wie im WebGL-Boden (ground.js).
 import { RELIEF } from '../game/relief.js';
+import { clamp } from './color.js';
 
 export const RELIEF_SCALE = 1 / 8; // Bildpunkte je Weltpixel (1 Bildpunkt = 8 px)
 const LIGHT_2D = (() => {
@@ -9,7 +10,6 @@ const LIGHT_2D = (() => {
   return l.map((v) => v / n);
 })();
 
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const smooth = (a, b, v) => {
   const t = clamp((v - a) / (b - a), 0, 1);
   return t * t * (3 - 2 * t);

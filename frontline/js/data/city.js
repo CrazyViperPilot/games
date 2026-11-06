@@ -111,7 +111,7 @@ export const CITY = {
   // maxLanes (seit v5.38): Straßen nebeneinander bilden ein mehrspuriges Band; Kapazität je Zelle × Spuren je Richtung, höchstens so viele
   transport: { cap: 12, mapCap: 20, maxLanes: 4, commute: 0.05, maxDist: 160, smooth: 2, connectMax: 30 },
 
-  // ---- Werkslager (seit v5.65, PRD §15 „Werke und LKW am Werk“) ----
+  // ---- Werkslager (seit v5.69, PRD §15 „Werke und LKW am Werk“) ----
   // Jedes Werk der Arten in `kinds` (Zellenart-Schlüssel; Ware aus CITY.chain[Art].to) hat ein kleines Ausgangslager für seine Ware.
   // share: Anteil des Ausstoßes, der dorthin geht, solange es nicht voll ist (ohne Straßenweg, ohne Verlust) und dem Werk gerade ein
   // eigener LKW zugeteilt ist (Ladeauftrag oder Route ab dem Werk). Ohne LKW läuft der ganze Ausstoß wie bisher zur Hauptstadt; was im

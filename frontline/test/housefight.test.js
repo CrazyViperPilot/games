@@ -1,4 +1,4 @@
-// Häuserkampf I (seit v5.62): besetzte Häuser zählen in der Zone, Besatzer sehen weiter, Infanterie an Ruinen hat Deckung.
+// Häuserkampf I (seit v5.66): besetzte Häuser zählen in der Zone, Besatzer sehen weiter, Infanterie an Ruinen hat Deckung.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';

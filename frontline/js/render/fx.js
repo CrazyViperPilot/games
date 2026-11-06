@@ -8,9 +8,9 @@
 // Leuchtspuren und Mündungsfeuer aufrecht in Bildschirmkoordinaten (drawEffectUp, CSS-Pixel, Maße × Zoom). Weiche Flecken
 // sind kleine, einmal gemalte Bilder (dot), damit viele gleichzeitige Effekte flüssig bleiben. Nur Darstellung.
 import { shade, tint } from './sprites.js';
+import { clamp, hashXY } from './color.js';
 
 const TAU = Math.PI * 2;
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const ease = (k) => 1 - (1 - k) * (1 - k); // erst schnell, dann langsam
 const OUTLINE = 'rgba(0,0,0,0.65)';
 
@@ -19,7 +19,6 @@ export function scarRng(seed) {
   let s = (Math.imul(seed | 0, 2654435761) >>> 0) || 1;
   return () => (s = (Math.imul(s, 1103515245) + 12345) >>> 0) / 4294967296;
 }
-const hashXY = (x, y) => (Math.imul(Math.round(x) | 0, 73856093) ^ Math.imul(Math.round(y) | 0, 19349663)) >>> 0;
 
 /** [r, g, b] aus '#rrggbb' oder 'rgb(r,g,b)' (Ergebnis von shade/tint). */
 function rgb(col) {

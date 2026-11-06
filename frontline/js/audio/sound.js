@@ -5,7 +5,7 @@
 import { Music, BATTLE_TYPES } from './music.js';
 
 export const SOUND_KEY = 'frontline-ton';
-/** Lautstärke-Regler in Prozent (0–100) im Speicher: 'sfx' Geräusche, 'music' Musik (seit v5.64). */
+/** Lautstärke-Regler in Prozent (0–100) im Speicher: 'sfx' Geräusche, 'music' Musik (seit v5.68). */
 export const LEVEL_KEYS = { sfx: 'frontline-ton-laut', music: 'frontline-musik-laut' };
 const LEVEL_DEFAULT = { sfx: 0.8, music: 0.5 };
 const NEAR_OWN = 240; // Weltpunkte: Kampf nahe eigenen Einheiten oder Gebäuden zählt für die Musik auch außerhalb des Bilds
