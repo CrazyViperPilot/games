@@ -21,8 +21,8 @@ die genannten Dateien.
 5. Imports immer mit Endung (`'./zone.js'`), nie über den Ordner `frontline/` hinaus, keine CDNs oder externen Dateien.
 6. Neue Datei, die der Browser lädt: in `sw.js` unter `ASSETS` eintragen. Jede Änderung an ausgelieferten Dateien: `CACHE_VERSION` in `sw.js` um 1 erhöhen.
 7. Regel- oder Feature-Änderung: [PRD.md](PRD.md) im passenden Abschnitt anpassen und oben im **Änderungsverlauf** eintragen
-   (neue Version `v4.xx`, Cache-Version). Die Hilfe (F1) und die Spielanleitung in `js/ui/menu.js` nennen Zahlen und Tasten
-   von Hand: mitpflegen (Suche z. B. `grep -rn "300 Plätze" js PRD.md`).
+   (neue Version `v4.xx`, Cache-Version). Die Hilfe (F1) in `js/ui/helptext.js` liest die meisten Zahlen und Tasten aus den Daten
+   (seit v5.63); der Rest steht von Hand dort und in `js/ui/menu.js`: mitpflegen (Suche z. B. `grep -rn "300 Plätze" js PRD.md`).
 8. Neue Ideen, die Daniel nur festhalten will: PRD §13 „Geparkte Ideen“, nicht bauen.
 9. Startmenü-Schalter (Sendemast, Wetter, Forschung, Fluss, Stadt) sind im Menü standardmäßig an, in `new Game()` ohne Angabe aus. Tests verlassen sich darauf.
 10. Texte im Spiel, Kommentare und Doku auf Deutsch, Bezeichner im Code englisch. Nach jeder Änderung in `js/data/`: `npm run docs`
@@ -160,7 +160,7 @@ Wo jedes Feature liegt. „KI“ = Konstanten-Präfix in `js/data/ai.js`, Logik 
 | Natur: Bäume, Büsche, Felsen, Waldboden, Bodenbild der Vorkommen (nur Optik) | §7 „Natur“ | – | `map.js` (Lage), `renderer.js` (`buildDeco`: Waldbäume, Unterholz, Büsche, Geröll) | – | `nature.js`, `terrain.js` (`forestFloor`), `citylayer.js` (`drawDeposits`) | `nature.test.js` |
 | KI allgemein | §10 | `difficulty` | – | `js/ai/ai.js` | – | `ai.test.js` |
 | Karteneditor, gespeicherte Karten | §9a | – | `mapdata.js` | – | `js/editor/editor.js`, `editor.html`, `css/editor.css` | `mapdata.test.js` |
-| Steuerung, Befehlskarte, HUD, Menüs, Hilfe | §8, §9 | – | – | – | `controller.js`, `input.js`, `hud.js`, `menu.js`, `status.js` | – |
+| Steuerung, Befehlskarte, HUD, Menüs, Hilfe (Befehlsregister `js/game/commands.js`, Modustabelle `MODES`, Hilfe aus Daten `helptext.js`, seit v5.63) | §8, §9 | – | `commands.js` | – | `controller.js`, `input.js`, `hud.js`, `menu.js`, `helptext.js`, `status.js` | `commands.test.js` |
 | Anzeigen auf der Karte (Auswahlring, Hover, Auswahlrahmen, Balken über den Einheiten, Heilkreuz, Kommandeursstern, Warnzeichen, Wegziel, Sammelpunkt, LKW-Routen; nur Bild) | §9 „Aussehen der Anzeigen auf der Karte“ | – | – | – | `marks.js` (gemalt seit v5.50, Bilder über `spritecache.js`), aufgerufen aus `renderer.js` (`drawSelectRing`, `drawDragBox`, `drawHp`, `drawSupply`, `drawCare`, `drawMoveMarker`, `drawRally`, `drawRoutes`) und `sprites.js` (`drawBar`, `drawStar`) | `marks.test.js` |
 | Kamera, Iso-Ansicht, Minimap | §9 | – | – | – | `camera.js`, `iso.js`, `renderer.js`, `minimap.js` | – |
 | Ton (Waffen, Einschläge, Wetter, Meldungen; synthetisiert, Schalter) | §14 | – | – (liest `game.effects`, Hinweis `snd` aus `addEffect`) | – | `js/audio/sound.js`, `main.js`, `hud.js` (Knopf), `menu.js` | `sound.test.js` |
@@ -218,9 +218,12 @@ Neue Sorten der FOB-Lager und LKW (wie Baumaterial, Munition, Treibstoff) brauch
 
 ### Neuer Befehl
 1. Handler im zuständigen Modul: `export function cmdX(game, team, cmd)` → `{ ok: true }` oder `{ ok: false, reason: 'deutscher Text' }`. Nur eigene, lebende Einheiten akzeptieren.
-2. In `js/game/game.js` → `issue()` einen `case 'x':` ergänzen und den Befehl in [ARCHITEKTUR.md](ARCHITEKTUR.md) („Befehle“) eintragen.
-3. UI: Eintrag in der Befehlskarte (`js/ui/controller.js`, `entry(label, hotkey, { action })`) und/oder Rechtsklick; Taste in der Hilfe (`js/ui/menu.js`).
-4. Test über `game.issue`, PRD §8 (Steuerung) und Änderungsverlauf.
+2. Eintrag im Befehlsregister `js/game/commands.js`: `x: { run: cmdX, drives: true, sound: true }` (`drives`: setzt einen Auftrag `x`, den das
+   Modul selbst fährt, z. B. in seinem `update…`; `sound`: Befehlston). `game.issue` braucht nichts weiter. Den Befehl in
+   [ARCHITEKTUR.md](ARCHITEKTUR.md) §6 beschreiben (`test/docs.test.js` prüft das).
+3. UI: Eintrag in der Befehlskarte (`js/ui/controller.js`, `entry(label, hotkey, { action })`) und/oder Rechtsklick. Braucht er ein Ziel auf
+   der Karte: Zeile in der Modustabelle `MODES` (`hint`, `click`) plus `confirmX`-Methode. Taste in der Hilfe (`js/ui/helptext.js`).
+4. Test über `game.issue` (`test/commands.test.js` prüft Register und Modi allgemein), PRD §8 (Steuerung) und Änderungsverlauf.
 
 ### Neue Option im Startmenü
 1. Standard in `BALANCE.menuDefaults`; `js/ui/menu.js` → `showStartMenu`: Zustand, Schalter im HTML, Speicherung (`readFlag`/`writeFlag` mit eigenem Schlüssel `frontline-…`), Wert in `onStart({ … })`.

@@ -102,6 +102,9 @@ queue [{ unit, payerId }], queueTimes, rallyX/Y, main (Hauptstadt), store { bm, 
 ## 6. Befehle (`game.issue(team, cmd)`)
 
 Antwort immer `{ ok: true, … }` oder `{ ok: false, reason: 'deutscher Text' }`. `ids` = Liste eigener Einheiten.
+Alle Befehle stehen im **Befehlsregister** `COMMANDS` (`js/game/commands.js`, seit v5.63): je Typ der Handler `run`, `drives`
+(der gleichnamige Auftrag wird von seinem Modul gefahren, `updateMovement` lässt ihn aus: `OWN_DRIVERS`) und `sound` (die Steuerung
+quittiert ihn mit dem Befehlston). `game.issue` schlägt nur dort nach; `test/docs.test.js` prüft, dass jeder Registereintrag hier steht.
 Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 
 | `cmd.type` | Felder | Handler (`js/game/`) | Wirkung |
@@ -153,12 +156,13 @@ seit v5.59). Die beiden Register importieren nichts; Simulation, UI und Darstell
 
 | Datei | Inhalt |
 |---|---|
-| `game.js` | Klasse `Game`: Zustand, `issue`, Platzierung (`canPlace`), Lager, Spawn, Aufräumen, Sieg |
+| `game.js` | Klasse `Game`: Zustand, `issue` (schlägt im Befehlsregister nach), Platzierung (`canPlace`, Zahler `placePayer`), Lager, Spawn, Aufräumen, Sieg |
+| `commands.js` | Befehlsregister `COMMANDS` (Handler, `drives`, `sound`), daraus `OWN_DRIVERS` (seit v5.63) |
 | `entities.js` | `createUnit`, `createBuilding`, `createShell`, Hilfen wie `isFoe`, `inRange` |
 | `economy.js` | Ausbildung, Nachschub, Einkommensanzeige |
 | `zone.js`, `hotzone.js` | Konfliktzone und Punkte; Hot Zone und Bohrer |
 | `movement.js`, `pathfinding.js`, `pathplan.js`, `grid.js`, `formation.js` | Bewegung, A*-Wegsuche (`findPath` für Kartenbau, `findUnitPath` für Einheiten), Wegplanung der Einheiten (Wegbudget je Schritt, Warteschlange, lange Suche über mehrere Schritte, geteilte Wege; Zustand `game.pathWork`, `pathBacklog`, `pathSeq`, `pathLong`, `pathShare`), Zellenraster, Formationen |
-| `combat.js` | Zielsuche, Direktfeuer, Mörser, Flugabwehr, Schaden |
+| `combat.js` | Zielsuche (eine Suche `searchTarget` für Schützen und Einzelwaffen), Direktfeuer, Mörser, Flugabwehr, Schaden |
 | `logistics.js`, `construction.js` | LKW, Nachfüllen, Transport; Bauen und Reparieren |
 | `city/` (Daten `js/data/city.js`, UI `js/ui/citypanel.js`, Karte `js/render/citylayer.js`, KI `js/ai/cityai.js`) | Zonenstadt um die Hauptstadt (PRD §15), seit v5.60 in Modulen (Review A-01/A-04): `cells.js` Zellgeometrie und Straßenzugang (`isFlat`, `sizeOf`, `bigSpan`/`bigCells`/`fitBig`, `cellRect`, `roadAt`, `hasRoad`, `accessCells` mit Kette, `canZone`, `DEPOSITS`; Blattmodul nur mit Daten-Importen), `query.js` Abfragen (`cityLevel`, `citySum`, `powerRatio`, `freePop`, `crewOf`, `cityTrainers`, `trainerKind`, `forEnemyCity`, `hasMarket`), `state.js` Zellzustand (`totals`, `zeroStats`, `updateClaim`, Belegung von `grid.struct` mit `city.gridId`, `syncEntity`/`dropEntity`, `payMetal`, `placeBuilt`, `cityNoise`), `roadnet.js` Straßennetz (`roadReach`, `mainRoadReach`, `connectRoad`: Anschluss an das Lagernetz oder ein Ziel, für Startviertel und KI), `create.js` Erzeugung und Startviertel (`createCity`), `clearing.js` Bäume fällen und Abriss (`treeGone`), `commands.js` Befehle `city`, `cityUpgrade`, `trade`, `economy.js` Wirtschaftsschritt `updateCity` (rechnet die Ketten über `transport.js`), `care.js` Heilen und Reparieren. Fertige Gebäude haben seit v4.83 eine Ziel-Entity (`kind: 'building'`, `type: 'city'`, nicht in `game.buildings`), die der Spieler seit v4.94 wählen kann. Importe ohne Zyklus: `transport.js` und `research.js` lesen nur `cells.js`/`query.js` |
 | `transport.js` | Straßentransport (seit v5.20, kein DOM): Breitensuche über Straßenzellen (`nearestField`, mehrere Ziele gleichzeitig), Wege je Gebäude (`pathFrom`, `pathEff`), Last und Stau (`addLoad`, `beginLoads`, `settleLoads`), Lager am Straßennetz (`mainAccess`), Anzeige der Lieferung und des Pendlers (`transportInfo`, liest nur). Zustand: `transportOf` in einer WeakMap je Stadt |
@@ -206,8 +210,8 @@ seit v5.59). Die beiden Register importieren nichts; Simulation, UI und Darstell
 | `bridge.js`, `season.js`, `weatherfx.js` | Brücken (seit v5.31 mit runden Stützen, Querträgern, Gesims, Widerlagern, Geländer mit Holmen, Laternen, Fahrbahn mit den Mustern aus `ways.js`; zerstört mit Bewehrungseisen) und Furtstangen, Jahreszeitenfarben, Regen/Schnee/Nebel (seit v5.47 gemalt: Regen in drei Tiefen mit Spritzern, Schnee als weiche Flocken aus einem einmal gemalten Bild, Wind stetig über `windDrift`, Nebelbänke in einem Bild mit 1/4 Auflösung; Schleier einfarbig, weil Verläufe über das ganze Bild ohne Grafikchip teuer sind) |
 | `minimap.js` | Minimap |
 
-`js/ui/` – `controller.js` Auswahl, Modi, Befehlskarte (kein DOM, ruft `game.issue`), `input.js` Maus/Tastatur/Touch,
-`hud.js` DOM-Anzeige, `menu.js` Start-, Pause-, Hilfe- und Endbildschirm, `status.js` lesende Texthilfen.
+`js/ui/` – `controller.js` Auswahl, Modi (Tabelle `MODES`: Hinweis, Klick, Vorschau je Modus), Befehlskarte (kein DOM, ruft `game.issue`), `input.js` Maus/Tastatur/Touch,
+`hud.js` DOM-Anzeige, `menu.js` Start-, Pause-, Hilfe- und Endbildschirm, `helptext.js` Tastenliste der Hilfe mit Zahlen aus den Daten (kein DOM), `status.js` lesende Texthilfen.
 
 `js/audio/sound.js` – Ton (PRD §14): synthetisiert per WebAudio, liest `game.effects` (Hinweis `snd`), Meldungen und Wetter; `main.js` hält ein `Sound` für alle Partien.
 
