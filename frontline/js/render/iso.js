@@ -14,9 +14,6 @@ export const BUILD_H = {
   // Militärgebäude: Höhe des Hauptkörpers der Bilder aus milbuild.js (seit v5.21), für Lebensbalken, Rauch und Antippen
   fob: 40,
   radio: 14, // Sockel des Sendemasts (der Mast selbst ist viel höher und dünn)
-  depot: 50,
-  helipad: 5,
-  extractor: 36,
   drill: 66,
   mortar: 20,
   tower: 70, // Gefechtsturm (Festung)

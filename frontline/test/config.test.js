@@ -156,10 +156,10 @@ test('Stadt (v5.20): Zellenarten stabil, Hütte und Kerosin-Raffinerie vollstän
 });
 
 // Tote Datenschlüssel (seit v5.55, Befunde K-04, U-03): jeder Schlüssel in js/data/ muss als Name irgendwo im Code außerhalb von
-// js/data/ vorkommen. Grob (ein gleichnamiges Wort anderswo genügt; `BALANCE.jets.rearm` rutscht so durch), findet aber Schlüssel,
+// js/data/ vorkommen. Grob (ein gleichnamiges Wort anderswo genügt; so rutschte `BALANCE.jets.rearm` bis v5.55 durch), findet aber Schlüssel,
 // die niemand mehr liest. Verzeichnisse mit erzeugten Schlüsseln (Forschungen je Ast) sind ausgenommen. UNUSED listet die heute
 // bekannten toten Schlüssel; wer einen löscht oder wieder liest, streicht ihn hier (der Test meldet das).
-const UNUSED = ['BALANCE.logistics.noFobWarn', 'CITY.care.refuel', 'CITY.air.atcSight', 'UNITS.rifleman.producedAt'];
+const UNUSED = ['CITY.air.atcSight']; // P4 setzt die Tower-Sicht um
 const SKIP = new Set(['RESEARCH.items', 'RESEARCH.lanes']);
 test('Datenschlüssel: jeder wird im Code gelesen (außer der Liste bekannter toter Schlüssel)', () => {
   const root = fileURLToPath(new URL('../js/', import.meta.url));

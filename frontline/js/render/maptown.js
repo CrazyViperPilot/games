@@ -464,7 +464,7 @@ function rollDoor(g, f, a, plane, dock) {
 }
 
 /** Lagerhalle: Wellblech mit Farbband, Rolltore und Laderampen an der Längsseite, Büro an der Stirnseite, Sattel- oder Tonnendach. */
-function halle(g, o) {
+function paintHall(g, o) {
   const f = frameOf(o.long);
   const { a0, a1, b0, b1 } = o;
   const wall = HALL_WALL[o.c % HALL_WALL.length];
@@ -573,7 +573,7 @@ function sawRoof(g, f, a0, a1, b0, b1, H, rt, wall) {
 }
 
 /** Fabrik: Hof mit Silos und Lkw, Shedhalle mit Industriefenstern und Tor, Bürobau mit Schild, Schornstein hinten. */
-function fabrik(g, o) {
+function paintFactory(g, o) {
   const f = frameOf(o.long);
   const { a0, a1, b0, b1 } = o;
   const wall = FACT_WALL[o.c % FACT_WALL.length];
@@ -718,7 +718,7 @@ function factoryTop(c, o) {
 // ---------- Mauer ----------
 
 /** Mauer ums Fabrikgelände: Betonfelder zwischen Pfeilern, Abdeckung, Stacheldraht; von hinten nach vorn gemalt. */
-function mauer(g, o) {
+function paintWall(g, o) {
   const f = frameOf(o.long);
   const { a0, a1, b0, b1 } = o;
   const R = (x0, x1, y0, y1) => f.R(x0, x1, y0, y1);
@@ -913,7 +913,7 @@ function trainTop(c, o) {
 // ---------- Bahnhof und Bahnsteig (Karteneditor) ----------
 
 /** Bahnhof: Empfangshalle mit Uhrgiebel und Rundbogenfenstern, zwei Flügel mit Walmdach, Vordach über dem Eingang. */
-function bahnhof(g, o) {
+function paintStation(g, o) {
   const f = frameOf(o.long);
   const { a0, a1, b0, b1 } = o;
   const R = (x0, x1, y0, y1) => f.R(x0, x1, y0, y1);
@@ -953,7 +953,7 @@ function bahnhof(g, o) {
 }
 
 /** Bahnsteig: Platte mit gelben Sicherheitsstreifen, Dach auf Stützen, Bänke, Schild. */
-function bahnsteig(g, o) {
+function paintPlatform(g, o) {
   const f = frameOf(o.long);
   const { a0, a1, b0, b1 } = o;
   const R = (x0, x1, y0, y1) => f.R(x0, x1, y0, y1);
@@ -1370,7 +1370,7 @@ function putTop(ctx, x, y, zoom, key, bounds, paint) {
   return true;
 }
 
-const PAINTERS = { hall: halle, factory: fabrik, wall: mauer, station: bahnhof, platform: bahnsteig };
+const PAINTERS = { hall: paintHall, factory: paintFactory, wall: paintWall, station: paintStation, platform: paintPlatform };
 const TALL = { hall: 44, factory: 122, wall: 22, station: 60, platform: 34 };
 
 /** Iso: Gebäude b der Karte gemalt; false = nicht hier (schräger Zug oder Bahnsteig). */

@@ -5,8 +5,7 @@ import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
 import { CITY } from '../js/data/city.js';
 import { BALANCE } from '../js/data/balance.js';
-import { canZone, hasRoad, bigFits, bigCells, bigCenter, sizeOf, KIND_ID, migrateCity } from '../js/game/city.js';
-import { withValue } from './util.js';
+import { canZone, hasRoad, bigFits, bigCells, bigCenter, sizeOf, KIND_ID } from '../js/game/city.js';
 
 const DT = 0.05;
 const run = (g, s) => {
@@ -102,7 +101,7 @@ test('Zonenstraßen und Brücken sind Stadtstraßen für beide Teams', () => {
 });
 
 test('Großbauten mit gerader Kante: Kraftwerk 2 × 2, Kaserne 4 × 4, Fabrikhalle 5 × 5 (seit v5.33); Startviertel', () => {
-  assert.deepEqual([sizeOf('power'), sizeOf('barracks'), sizeOf('factory'), sizeOf('airport')], [2, 4, 5, 10]);
+  assert.deepEqual([sizeOf('power'), sizeOf('barracks'), sizeOf('factory')], [2, 4, 5]);
   const g = new Game({ seed: 3, city: true });
   for (const c of g.city) {
     const big = [...c.ents.values()].filter((e) => ['barracks', 'factory'].includes(Object.keys(KIND_ID).find((k) => KIND_ID[k] === c.kind[e.cityCell])));
@@ -118,26 +117,4 @@ test('Großbauten mit gerader Kante: Kraftwerk 2 × 2, Kaserne 4 × 4, Fabrikhal
   const { e } = buildBig(g, 'power');
   assert.equal(e.w * BALANCE.map.tile, 2 * CITY.cell);
   assert.equal(e.def.hp, CITY.hp[1] * 2);
-});
-
-// Flughafen-Tests (bis v5.33) ersetzt durch test/airbase.test.js (Fliegerhorst, seit v5.35)
-
-test('Alte Stände: eine Fabrikhalle über 8 × 8 Zellen wird beim Laden 5 × 5 (Straße bleibt dran, Rest frei, Ziel bleibt)', () => {
-  const g = withValue(CITY.size, 'factory', 8, () => new Game({ seed: 3, city: true })); // so wurde sie bis v5.30 gebaut
-  const c = g.city[0];
-  const anchorOld = [...c.ents.keys()].find((i) => c.kind[i] === KIND_ID.factory);
-  const e = c.ents.get(anchorOld);
-  const before = [...c.part].filter((p) => p === anchorOld + 1).length;
-  assert.equal(before, 64, 'alte Halle 8 × 8');
-  const queue = e.queue;
-  migrateCity(g);
-  const a = e.cityCell;
-  assert.equal(c.ents.get(a), e, 'dasselbe Ziel (Warteschlange bleibt)');
-  assert.equal(e.queue, queue);
-  const cells = [...c.part].map((p, j) => (p === a + 1 ? j : -1)).filter((j) => j >= 0);
-  assert.equal(cells.length, 25, 'jetzt 5 × 5');
-  assert.equal([...c.part].filter((p, j) => c.kind[j] === KIND_ID.factory && p !== a + 1).length, 0, 'keine Reste');
-  assert.equal(e.w, (5 * CITY.cell) / BALANCE.map.tile);
-  assert.ok(hasRoad(c, a % c.cols, Math.floor(a / c.cols)), 'Straße bleibt dran');
-  for (let i = 0; i < 20; i++) g.update(0.05); // läuft weiter
 });

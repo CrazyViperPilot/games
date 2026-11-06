@@ -10,7 +10,7 @@ import { reliefOf } from './relief.js';
 import { createUnit, createBuilding, defineAmmo, isFoe, canAttack, inRange } from './entities.js';
 import { Fog } from './fog.js';
 import { updateEconomy, smoothIncome } from './economy.js';
-import { createCity, updateCity, cmdCity, cmdCityUpgrade, cmdTrade, cityNoise, freePop, crewOf, payMetal, cityTrainers, trainerKind, KIND_NAME, migrateCity } from './city.js';
+import { createCity, updateCity, cmdCity, cmdCityUpgrade, cmdTrade, cityNoise, freePop, crewOf, payMetal, cityTrainers, trainerKind, KIND_NAME } from './city.js';
 import { updateMovement, nearestPassable, planPath, setIdle, separate, exitHouse } from './movement.js';
 import { updateCombat } from './combat.js';
 import { updateZone } from './zone.js';
@@ -27,7 +27,7 @@ import { hasCommander, updateCommanders, commanderFallen } from './commander.js'
 import { updateRadio, radioStarted, radioLost } from './radio.js';
 import { createWeather, updateWeather } from './weather.js';
 import { updateAbilities, cmdAbility } from './abilities.js';
-import { createResearch, updateResearch, cmdResearch, cmdCancelResearch, rangeMul, migrateResearch } from './research.js';
+import { createResearch, updateResearch, cmdResearch, cmdCancelResearch, rangeMul } from './research.js';
 import { createBridges, updateBridges, cmdRepairBridge, bridgeUnder } from './river.js';
 import { createRoads } from './roads.js';
 import { updateAircraft, trainCheck, cmdLand } from './aircraft.js';
@@ -243,17 +243,8 @@ export class Game {
   restoreAccessors() {
     for (const team of this.teams) this.bindStocks(team);
     for (const u of this.units) defineAmmo(u, u.def);
-    if (!this.roads) createRoads(this); // ältere Stände (vor v5.03): Stadtstraßen der Karte nachträglich
-    migrateResearch(this); // ältere Stände (vor v5.04): alter Forschungsbaum
-    migrateCity(this); // ältere Stände: Universität als 3 × 3-Großbau (seit v5.00)
-    // ältere Stände: FOB-Baustellen gibt es seit v5.09 nicht mehr, sie stehen jetzt fertig da (mit mindestens dem Startvorrat)
-    for (const b of this.buildings) {
-      if (!b.alive || b.type !== 'fob' || b.built) continue;
-      b.built = true;
-      b.progress = 1;
-      b.hp = b.maxHp;
-      for (const k of STOCK_KEYS) b.store[k] = Math.max(b.store[k], Math.round(BALANCE.logistics.storeCap * BALANCE.fob.startStock));
-    }
+    // Nachrüstungen für ältere Stände (Straßen, Forschungsbaum, Stadt, FOB-Baustellen) gibt es seit v5.56 nicht mehr: Stände eines
+    // anderen SAVE_FORMAT laden nicht (savegame.js).
   }
 
   newId() {

@@ -17,7 +17,9 @@ const STATICS = { QUICK, BALANCE, UNITS, BUILDINGS, MAPGEN, CITY, AI_CONST };
 const CLASSES = { Game, Grid, Fog, Relief, AI };
 
 /** Version des Abbilds; bei inkompatibler Änderung der Spielzustände erhöhen (alte Stände werden dann nicht geladen). */
-export const SAVE_FORMAT = 2; // 2 seit v5.14: größere Karte (11072 px), Stände der alten Größe passen nicht mehr
+// 2 seit v5.14: größere Karte (11072 px). 3 seit v5.56: Migrationen alter Stände entfernt (Flughafen, Universität und Werke als
+// Einzelzellen, alter Forschungsbaum, FOB-Baustellen, F-16 mit einer Waffe); Daniels Entscheidung: alte Stände müssen nicht laden.
+export const SAVE_FORMAT = 3;
 
 export function snapshotGame(game, ai) {
   return encode({ game, ai }, STATICS, CLASSES);

@@ -66,17 +66,6 @@ export function createResearch(game, on) {
   for (const t of game.teams) t.tech = { tier: 1, done: [], cur: null, queue: [] };
 }
 
-/** Ältere Spielstände (vor v5.04): alte Forschungen gelten nicht mehr, laufende werden erstattet. */
-export function migrateResearch(game) {
-  for (const t of game.teams) {
-    const tech = (t.tech ??= { tier: 1, done: [], cur: null, queue: [] });
-    tech.queue ??= [];
-    if (tech.cur && !R.items[tech.cur.key]) tech.cur = null;
-    tech.done = tech.done.filter((k) => R.items[k]);
-    tech.tier = openTier(tech.done);
-  }
-}
-
 /** Höchste offene Stufe, wenn `have` (fertig oder geplant) erforscht ist. */
 function openTier(have) {
   const set = have instanceof Set ? have : new Set(have);
@@ -92,9 +81,6 @@ function openTier(have) {
 
 /** Fertige, laufende und eingereihte Forschungen des Teams (für die Planung der Warteschlange). */
 const planned = (tech) => new Set([...tech.done, ...(tech.cur ? [tech.cur.key] : []), ...tech.queue]);
-
-/** Hat das Team diese Forschung erforscht? */
-export const hasTech = (game, team, key) => !!game.research && game.teams[team].tech.done.includes(key);
 
 /** Hat das Team die Fähigkeit (unlock) freigeschaltet? */
 export function hasUnlock(game, team, what) {

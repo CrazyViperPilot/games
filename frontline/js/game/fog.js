@@ -140,7 +140,7 @@ export class Fog {
    */
   update(game, team) {
     this.visible.fill(0);
-    this.version = (this.version ?? 0) + 1; // alte Spielstände kennen den Zähler nicht
+    this.version++;
     const relief = game.relief ?? null;
     const m = weatherSight(game);
     const mu = m;
@@ -186,6 +186,6 @@ export class Fog {
   revealAll() {
     this.visible.fill(1);
     this.explored.fill(1);
-    this.version = (this.version ?? 0) + 1;
+    this.version++;
   }
 }

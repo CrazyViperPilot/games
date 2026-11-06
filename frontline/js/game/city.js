@@ -11,7 +11,7 @@ import { RELIEF } from './relief.js';
 import { bridgeUnder } from './river.js';
 import { transportOf, transportInfo, pathEff, addLoad, beginLoads, settleLoads, minFactor, mainAccess } from './transport.js';
 
-/** Zellenarten (Code im Raster): 0 leer. Neue Arten nur hinten anhängen (Code = Index + 1). */
+/** Zellenarten (Code im Raster): 0 leer. Neue Arten nur hinten anhängen (Code = Index + 1); 'airport' ist nur Platzhalter (CITY.retired). */
 export const KINDS = ['road', 'res', 'com', 'bm', 'mun', 'fuel', 'steel', 'mine', 'market', 'power', 'uni', 'dc', 'barracks', 'factory', 'heliport', 'hospital', 'airport', 'smelter', 'kero', 'runway', 'stand', 'atc', 'ktank', 'mdepot', 'taxi'];
 export const KIND_ID = Object.fromEntries(KINDS.map((k, i) => [k, i + 1]));
 export const KIND_NAME = {
@@ -38,8 +38,6 @@ export function careOf(game, e) {
 export const careClass = (u) => (u.def.air ? 'air' : u.def.armor === 'inf' ? 'inf' : 'ground');
 /** Werke (Verarbeitung in updateCity): BM-Werk, Munitionswerk, Raffinerie, Stahlwerk, Hütte (seit v5.20), Kerosin-Raffinerie (seit v5.20). */
 export const WORKS = ['bm', 'mun', 'fuel', 'steel', 'smelter', 'kero'];
-/** Dieselben Werkarten (seit v5.20, für js/game/transport.js). */
-export const WORKS_KINDS = WORKS;
 /** Rohstoffvorkommen (Code im Raster `deposit`): 0 keins. */
 export const DEPOSITS = ['wood', 'stone', 'ore', 'oil'];
 export const DEPOSIT_NAME = { wood: 'Wald', stone: 'Fels', ore: 'Erz', oil: 'Öl' };
@@ -201,7 +199,7 @@ function demolish(game, b, scan) {
   }
 }
 
-/** Gefällte Zellen (1 = Bäume gefällt, für beide Teams gleich); alte Spielstände bekommen das Feld beim ersten Fällen. */
+/** Gefällte Zellen (1 = Bäume gefällt, für beide Teams gleich); das Feld entsteht beim ersten Fällen. */
 function felledOf(game) {
   const c = game.city[0];
   if (!c.felled) {
@@ -758,217 +756,6 @@ function placeBig(game, team, c, kind, col, row) {
   return { ok: true, placed: 1, broke: false, noRoad: !hasRoad(c, q, (a - q) / c.cols), anchor: a };
 }
 
-/**
- * Alte Spielstände (vor v5.00): Universitäten waren einzelne Zellen. Jede zusammenhängende Gruppe alter Uni-Zellen wird ein
- * 3 × 3-Großbau an der Stelle, die die meisten ihrer Zellen deckt (übrige Zellen der Gruppe gehen darin auf), mit der höchsten
- * Stufe der Gruppe. Passt nirgends ein Quadrat hin, bleibt die alte kleine Uni, wie sie war (sie zählt weiter).
- */
-export function migrateCity(game) {
-  if (!game.city) return;
-  for (const c of game.city) {
-    c.kero ??= CITY.startKero; // Kerosin im Stadtlager (seit v5.20): alte Stände bekommen den Startvorrat, F-16 tanken jetzt Kerosin
-    c.congestion ??= new Float32Array(c.kind.length).fill(1); // Stau-Faktor je Zelle (seit v5.20)
-    c.part ??= new Int32Array(c.kind.length);
-    if (c.mapRoads === undefined) c.mapRoads = game.roads?.kind ?? null; // vor v5.03: Stadtstraßen der Karte
-    let changed = false;
-    for (const kind of ['uni']) {
-      // nur die Universität (v5.00); Kraftwerke, Kasernen, Fabrikhallen und Flughäfen (v5.03) alter Stände bleiben kleine Zellen,
-      // Werke (v5.08) siehe unten
-      const n = sizeOf(kind);
-      const id = KIND_ID[kind];
-      if (n <= 1 || !id) continue;
-      const done = new Set();
-      for (const i0 of [...c.list]) {
-        if (c.kind[i0] !== id || c.part[i0] || done.has(i0)) continue;
-        const group = [i0];
-        done.add(i0);
-        for (let k = 0; k < group.length; k++) {
-          const q = group[k] % c.cols;
-          const r = (group[k] - q) / c.cols;
-          for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-            const x = q + dx;
-            const y = r + dy;
-            const j = y * c.cols + x;
-            if (x < 0 || y < 0 || x >= c.cols || y >= c.rows || c.kind[j] !== id || c.part[j] || done.has(j)) continue;
-            done.add(j);
-            group.push(j);
-          }
-        }
-        const own = new Set(group);
-        const lv = Math.max(...group.map((i) => c.level[i]));
-        const mq = group.reduce((s, i) => s + (i % c.cols), 0) / group.length;
-        const mr = group.reduce((s, i) => s + Math.floor(i / c.cols), 0) / group.length;
-        let best = -1;
-        let bestN = 0;
-        let bestD = Infinity;
-        const tried = new Set();
-        const [lo, hi] = bigSpan(n);
-        for (const i of group) {
-          const q = i % c.cols;
-          const r = (i - q) / c.cols;
-          for (let dy = -hi; dy <= lo; dy++) {
-            for (let dx = -hi; dx <= lo; dx++) {
-              const a = (r + dy) * c.cols + q + dx;
-              if (q + dx < 0 || r + dy < 0 || q + dx >= c.cols || r + dy >= c.rows || tried.has(a)) continue;
-              tried.add(a);
-              if (!bigFits(game, c, a, n, (j) => !c.kind[j] || own.has(j))) continue;
-              const cover = bigCells(c, a, n).filter((j) => own.has(j)).length;
-              const d = Math.hypot(q + dx - mq, r + dy - mr);
-              if (cover > bestN || (cover === bestN && d < bestD)) {
-                best = a;
-                bestN = cover;
-                bestD = d;
-              }
-            }
-          }
-        }
-        if (best < 0) continue; // kein Platz: alte kleine Uni bleibt
-        changed = true;
-        for (const i of group) {
-          const q = i % c.cols;
-          if (c.level[i]) releaseCell(game, c, q, (i - q) / c.cols);
-          dropEntity(game, c, i);
-          c.kind[i] = 0;
-          c.level[i] = 0;
-          c.timer[i] = 0;
-        }
-        for (const j of bigCells(c, best, n)) {
-          const q = j % c.cols;
-          c.kind[j] = id;
-          c.part[j] = best + 1;
-          c.level[j] = lv;
-          c.timer[j] = 0;
-          c.flee[j] = 0;
-          if (lv) occupyCell(game, c, q, (j - q) / c.cols);
-        }
-        if (lv) syncEntity(game, c, best);
-      }
-    }
-    // Werke (seit v5.08): jede alte Werkzelle wird ein eigenes 2 × 2-Werk gleicher Stufe, wenn daneben Platz ist (das Quadrat enthält
-    // die alte Zelle, die übrigen drei Zellen sind leer und ohne Vorkommen); sonst bleibt sie die alte kleine Zelle. Ein Werk bleibt
-    // ein Werk: gleiche Arbeitsplätze, gleicher Strom, nichts geht verloren.
-    for (const kind of WORKS) {
-      const n = sizeOf(kind);
-      const id = KIND_ID[kind];
-      if (n <= 1 || !id) continue;
-      for (const i of [...c.list]) {
-        if (c.kind[i] !== id || c.part[i] || c.timer[i] < 0) continue; // Ruinen wachsen später als alte Zelle nach
-        const q = i % c.cols;
-        const r = (i - q) / c.cols;
-        const a = fitBig(game, c, q, r, kind, (j) => j === i || (!c.kind[j] && !c.deposit[j]));
-        if (a < 0) continue;
-        changed = true;
-        const lv = c.level[i];
-        const t = c.timer[i];
-        if (lv) releaseCell(game, c, q, r);
-        dropEntity(game, c, i);
-        c.kind[i] = 0;
-        c.level[i] = 0;
-        for (const j of bigCells(c, a, n)) {
-          c.kind[j] = id;
-          c.part[j] = a + 1;
-          c.level[j] = lv;
-          c.timer[j] = 0;
-          c.flee[j] = 0;
-          if (lv) occupyCell(game, c, j % c.cols, Math.floor(j / c.cols));
-        }
-        c.timer[a] = t; // Wachstumszeit der alten Zelle zählt weiter
-        if (lv) syncEntity(game, c, a);
-      }
-    }
-    // Nicht mehr baubare Arten (seit v5.35: der Flughafen 10 × 10) räumen; Flugzeuge darauf gehen mit ihm verloren (aircraft.js)
-    for (const k of CITY.retired ?? []) {
-      const id = KIND_ID[k];
-      for (let j = 0; j < c.kind.length; j++) {
-        if (c.kind[j] !== id) continue;
-        if (c.ents.has(j)) dropEntity(game, c, j);
-        const q = j % c.cols;
-        if (c.level[j]) releaseCell(game, c, q, (j - q) / c.cols);
-        c.kind[j] = 0;
-        c.level[j] = 0;
-        c.part[j] = 0;
-        c.timer[j] = 0;
-        changed = true;
-      }
-    }
-    if (changed) c.ver++;
-    if (shrinkBig(game, c)) changed = true; // Großbauten, die kleiner geworden sind (seit v5.33: Fabrikhalle 8 × 8 → 5 × 5)
-    if (changed) rebuildList(c); // sonst bleibt der Stand unverändert (Laden = durchgehend gespielt)
-  }
-}
-
-/**
- * Alte Stände (seit v5.33): ein Großbau, der mehr Zellen belegt, als seine Art heute groß ist (CITY.size, z. B. die Fabrikhalle 8 × 8
- * → 5 × 5), behält ein n × n-Quadrat seiner alten Fläche: bevorzugt eines mit Straße daneben, sonst das um den alten Anker. Die übrigen
- * Zellen werden frei. Das Ziel (Trefferpunkte anteilig, Warteschlange, Sammelpunkt) bleibt dasselbe Objekt.
- */
-function shrinkBig(game, c) {
-  const groups = new Map(); // Anker → alte Zellen
-  for (let j = 0; j < c.part.length; j++) {
-    if (!c.part[j]) continue;
-    const a = c.part[j] - 1;
-    if (!groups.has(a)) groups.set(a, []);
-    groups.get(a).push(j);
-  }
-  let changed = false;
-  for (const [a, old] of groups) {
-    const k = KINDS[c.kind[a] - 1];
-    const n = sizeOf(k);
-    if (n <= 1 || old.length === n * n) continue;
-    const own = new Set(old);
-    const roadBy = (cells) => cells.some((j) => roadNext(c, j % c.cols, Math.floor(j / c.cols)));
-    let best = -1;
-    let bestScore = -Infinity;
-    for (const cand of old) {
-      const cells = bigCells(c, cand, n);
-      if (!cells.every((j) => own.has(j))) continue;
-      const score = (roadBy(cells) ? 10 : 0) + (cand === a ? 1 : 0);
-      if (score > bestScore) {
-        best = cand;
-        bestScore = score;
-      }
-    }
-    if (best < 0) continue; // passt nicht (sollte nicht vorkommen): unverändert lassen
-    const keep = new Set(bigCells(c, best, n));
-    const lv = c.level[a];
-    const timer = c.timer[a];
-    for (const j of old) {
-      if (keep.has(j)) {
-        c.part[j] = best + 1;
-        continue;
-      }
-      const q = j % c.cols;
-      if (c.level[j]) releaseCell(game, c, q, (j - q) / c.cols);
-      c.kind[j] = 0;
-      c.level[j] = 0;
-      c.part[j] = 0;
-      c.timer[j] = 0;
-    }
-    c.timer[best] = timer;
-    const e = c.ents.get(a);
-    if (e) {
-      c.ents.delete(a);
-      const r = bigCenter(c, best, n);
-      const w = (c.cell * n) / game.grid.tile;
-      const hp = CITY.hp[lv] * n;
-      Object.assign(e, { cityCell: best, x: r.x, y: r.y, cx: (r.x - (c.cell * n) / 2) / game.grid.tile, cy: (r.y - (c.cell * n) / 2) / game.grid.tile, w, h: w });
-      e.hp = Math.max(1, Math.min(hp, (e.hp / (e.def.hp || hp)) * hp)); // Schaden anteilig
-      e.def = { ...e.def, hp };
-      if (e.produces) {
-        const z = game.zone ?? { x: r.x, y: r.y };
-        const d = Math.hypot(z.x - r.x, z.y - r.y) || 1;
-        e.rallyX = r.x + ((z.x - r.x) / d) * ((c.cell * n) / 2 + c.cell);
-        e.rallyY = r.y + ((z.y - r.y) / d) * ((c.cell * n) / 2 + c.cell);
-      }
-      delete e.fogKey; // Sichtfeld neu (fog.js)
-      c.ents.set(best, e);
-    }
-    changed = true;
-    c.ver++;
-  }
-  return changed;
-}
-
 /** Rechteck einer Stadtzelle auf der Karte (px). */
 export function cellRect(c, col, row) {
   const x = c.x0 + col * c.cell;
@@ -1409,15 +1196,15 @@ export function updateCity(game, dt) {
       const i = anchors[m];
       const lv = c.level[i];
       const k = KINDS[c.kind[i] - 1];
-      let pend = 1;
+      let commuteEff = 1;
       if (tr.commute.has(i)) {
         // Arbeitsstätte: Pendler laufen über den Pendlerweg zur nächsten Wohnung (Last), die Arbeit wirkt mit dessen Stau
         const p = tr.commute.get(i);
-        pend = pathEff(tr, p);
+        commuteEff = pathEff(tr, p);
         const jobsB = jobsOf(c, i, k, lv);
         if (p && jobsB > 0) addLoad(tr, p, jobsB * fill * CITY.transport.commute);
       }
-      eff[i] = base * pend;
+      eff[i] = base * commuteEff;
     }
     const Y = CITY.yield;
     const K = CITY.convert;
@@ -1429,13 +1216,13 @@ export function updateCity(game, dt) {
       const lv = c.level[i];
       const d = DEPOSITS[c.deposit[i] - 1];
       if (!d) continue;
-      const roh = CITY.jobsMine[lv] * eff[i] * CITY.extract[d];
-      s.raw[d] += roh;
+      const rawRate = CITY.jobsMine[lv] * eff[i] * CITY.extract[d];
+      s.raw[d] += rawRate;
       const r = tr.routes.get(i);
       const p = r ? r.path : null;
-      addLoad(tr, p, roh);
-      if (!p) s.lost += roh;
-      else arr[r.to] += roh * pathEff(tr, p);
+      addLoad(tr, p, rawRate);
+      if (!p) s.lost += rawRate;
+      else arr[r.to] += rawRate * pathEff(tr, p);
     }
     // Werke in Kettenfolge (Hütte → Stahlwerk, dann BM, Raffinerien): Ausstoß = min(Leistung, Eingang / Verbrauch), Fluss zum Ziel
     for (const k of WORK_ORDER) {
@@ -1462,7 +1249,6 @@ export function updateCity(game, dt) {
     s.iron = s.gross.iron;
     // Lager gutschreiben (vor den Munitionswerken, die den Stahl daraus ziehen)
     const made = (c.made ??= { bm: 0, mun: 0, fuel: 0, metal: 0, kero: 0 }); // Summe, die wirklich ins Lager kam (Flussanzeige misst damit den Verbrauch)
-    made.kero ??= 0; // Stände vor v5.20
     const metal0 = c.metal;
     const kero0 = c.kero;
     if (credit) {
@@ -1488,14 +1274,14 @@ export function updateCity(game, dt) {
       s.cap.mun += cap;
       const p = tr.mun.get(i) ?? null;
       if (!p || !credit) continue; // ohne Weg zum Lager (oder ohne fertiges Lager): kein Stahl, keine Munition
-      const bed = Math.min(cap * K.mun, Math.max(0, stock - drawn));
+      const steelUse = Math.min(cap * K.mun, Math.max(0, stock - drawn));
       const w = pathEff(tr, p);
-      addLoad(tr, p, bed);
-      const mun = (bed * w) / K.mun; // Munition je s am Werk
+      addLoad(tr, p, steelUse);
+      const mun = (steelUse * w) / K.mun; // Munition je s am Werk
       addLoad(tr, p, mun);
       s.gross.mun += mun;
       s.mun += mun * w; // Ankunft im Lager
-      drawn += bed;
+      drawn += steelUse;
     }
     s.metal -= drawn; // Stahl je s: Zugang der Stahlwerke minus Munitionswerke
     c.metal = Math.max(0, c.metal - drawn * dt);
@@ -2036,7 +1822,7 @@ function aiRoad(col, row, ac, ar) {
 function aiNeed(game, c, add, skip = null) {
   const t = totals(c);
   const A = CITY.ai;
-  const count = { res: 0, com: 0, bm: 0, mun: 0, fuel: 0, steel: 0, smelter: 0, kero: 0, market: 0, power: 0, uni: 0, dc: 0, barracks: 0, factory: 0, heliport: 0, hospital: 0, airport: 0 };
+  const count = { res: 0, com: 0, bm: 0, mun: 0, fuel: 0, steel: 0, smelter: 0, kero: 0, market: 0, power: 0, uni: 0, dc: 0, barracks: 0, factory: 0, heliport: 0, hospital: 0 };
   for (const k in add) count[k] += add[k];
   for (const i of c.list) {
     if (isPart(c, i)) continue; // Großbau zählt einmal

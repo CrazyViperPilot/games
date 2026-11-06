@@ -10,7 +10,6 @@ import { openBridges } from './river.js';
 const W = BALANCE.map.width;
 const H = BALANCE.map.height;
 const TILE = BALANCE.map.tile;
-export const MAP_FORMAT = 1;
 export const BUILDING_KINDS = ['house', 'factory', 'hall', 'tower', 'train', 'station', 'platform', 'wall']; // wall: Mauer um Fabrikgelände
 const TURNABLE = ['train', 'platform']; // dürfen beliebig gedreht sein (`angle`, Bogenmaß)
 const SPAWN_CLEAR = 180; // freier Platz um einen Startpunkt (Hauptstadt und Startunits)

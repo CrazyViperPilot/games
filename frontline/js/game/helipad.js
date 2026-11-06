@@ -4,7 +4,7 @@
 // Heliports im Umkreis kurz (mit Tower kürzer). Heimflug bei knappem Treibstoff oder leeren Waffen. Kein DOM, deterministisch.
 //
 // Zustand am Hubschrauber: u.heli = { home: Id des Heliports, phase: 'landed' | 'takeoff' | 'air' | 'landing', t, alt (0 Boden … 1) }.
-// Ohne u.heli (ohne Stadt, alte Spielstände, Hubschrauber aus der Hauptstadt) fliegt er wie bisher.
+// Ohne u.heli (ohne Stadt, Hubschrauber aus der Hauptstadt) fliegt er wie bisher.
 import { CITY } from '../data/city.js';
 import { KINDS, KIND_ID } from './city.js';
 import { supplier } from './aircraft.js';
@@ -230,7 +230,7 @@ export function cmdHeliLand(game, team, cmd) {
     const pad = own && !taken.has(own.id) ? own : pads.find((p) => !taken.has(p.id) && helisAt(game, p) === 0);
     if (!pad) continue;
     taken.add(pad.id);
-    u.heli ??= { home: pad.id, phase: 'air', t: 0, alt: 1 }; // Hubschrauber ohne Heliport (alte Stände): bekommt diesen
+    u.heli ??= { home: pad.id, phase: 'air', t: 0, alt: 1 }; // Hubschrauber ohne eigenen Heliport: bekommt diesen
     u.order = { type: 'land', x: pad.x, y: pad.y, targetId: pad.id };
     u.targetId = null;
     u.path = [];

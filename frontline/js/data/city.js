@@ -22,18 +22,19 @@ export const CITY = {
   shop: { need: 0.004, base: 0.3, per: 0.25 },
 
   // ---- Bau ----
-  cost: { road: 0, res: 20, com: 30, bm: 40, mun: 40, fuel: 40, steel: 50, smelter: 50, kero: 50, mine: 30, market: 60, power: 80, uni: 400, dc: 250, barracks: 80, factory: 150, heliport: 200, hospital: 120, airport: 800, runway: 10, stand: 120, atc: 150, ktank: 60, mdepot: 60, taxi: 5 }, // Geld je Zelle, bei Großbauten (size) je Gebäude (Abriss kostenlos, keine Erstattung)
+  cost: { road: 0, res: 20, com: 30, bm: 40, mun: 40, fuel: 40, steel: 50, smelter: 50, kero: 50, mine: 30, market: 60, power: 80, uni: 400, dc: 250, barracks: 80, factory: 150, heliport: 200, hospital: 120, runway: 10, stand: 120, atc: 150, ktank: 60, mdepot: 60, taxi: 5 }, // Geld je Zelle, bei Großbauten (size) je Gebäude (Abriss kostenlos, keine Erstattung)
   // Großbauten (seit v5.00): Kantenlänge in Zellen (fehlt = 1; seit v5.03 auch gerade). Ein Großbau ist ein Gebäude: eine Stufe, ein
   // Ziel mit Trefferpunkten hp × Kantenlänge, Arbeitsplätze und Strom wie eine Zelle; Straße an irgendeiner Außenzelle reicht.
   // Seit v5.08 sind auch die Werke (BM-Werk, Munitionswerk, Raffinerie, Stahlwerk) 2 × 2 groß, mit eigenem Aussehen (render/works.js).
-  size: { uni: 3, power: 2, barracks: 4, factory: 5, airport: 10, bm: 2, mun: 2, fuel: 2, steel: 2, smelter: 2, kero: 2, stand: 2, atc: 2, ktank: 2, mdepot: 2 },
-  // Nicht mehr baubar (Zellenart bleibt für alte Stände, migrateCity räumt sie): der Flughafen 10 × 10 (bis v5.33), ersetzt durch den
-  // Fliegerhorst aus Bausteinen (seit v5.35: Bahn, Stellplatz, Tower, Kerosintank, Munitionslager; CITY.air)
+  size: { uni: 3, power: 2, barracks: 4, factory: 5, bm: 2, mun: 2, fuel: 2, steel: 2, smelter: 2, kero: 2, stand: 2, atc: 2, ktank: 2, mdepot: 2 },
+  // Nicht mehr baubar: der Flughafen 10 × 10 (bis v5.34), ersetzt durch den Fliegerhorst aus Bausteinen (seit v5.35: Bahn, Stellplatz,
+  // Tower, Kerosintank, Munitionslager; CITY.air). Die Zellenart bleibt nur als Platzhalter in KINDS (Nummer 17), damit die Nummern
+  // der späteren Arten gleich bleiben; Werkzeug, Bild und Daten gibt es seit v5.56 nicht mehr (alte Stände laden nicht, SAVE_FORMAT 3).
   retired: ['airport'],
   // Räumen reißt seit v5.16 auch diese Gebäude der Karte ab (Häuser, Hallen, Fabriken der Zonenstadt und außerhalb), kostenlos wie das
   // übrige Räumen; besetzte Häuser nicht. Wachtürme, Zug, Mauern, Fels und Wasser bleiben.
   clearable: ['house', 'hall', 'factory'],
-  costBm: { road: 10, barracks: 100, factory: 200, heliport: 150, hospital: 80, airport: 400, runway: 15, stand: 80, atc: 60, ktank: 40, mdepot: 60, taxi: 8 }, // Baumaterial je Zelle aus dem Lager der Hauptstadt (seit v4.83: Straßen kosten Baumaterial statt Geld)
+  costBm: { road: 10, barracks: 100, factory: 200, heliport: 150, hospital: 80, runway: 15, stand: 80, atc: 60, ktank: 40, mdepot: 60, taxi: 8 }, // Baumaterial je Zelle aus dem Lager der Hauptstadt (seit v4.83: Straßen kosten Baumaterial statt Geld)
 
   // ---- Ausbildung (seit v4.96, PRD §15) ----
   // Mit Stadt bilden nur diese Stadtgebäude Truppen aus (die Hauptstadt nicht mehr). Sie bezahlen direkt aus der Stadt:
@@ -54,7 +55,6 @@ export const CITY = {
     delay: 6, // s ohne Treffer, bevor geheilt oder repariert wird
     levelMul: [0, 1, 1.5, 2], // Tempo × je Stufe des Gebäudes
     metalShare: 0.5, // Reparatur kostet Metall aus dem Stadtlager: metalCost der Einheit × repariert/maxHp × metalShare (Soldaten gratis)
-    refuel: 0.05, // v5.20 bis v5.41: Heliport tankte Hubschrauber im Umkreis aus c.kero; seit v5.51 tanken sie gelandet am Kerosintank (CITY.air.heli, helipad.js). Nicht mehr benutzt
     by: {
       barracks: { units: 'inf', radius: 2, rate: 0.02 }, // Soldaten, Anteil maxHp je s (Stufe 1: 50 s von 0 auf voll)
       factory: { units: 'ground', radius: 2, rate: 0.02 }, // Bodenfahrzeuge
@@ -115,7 +115,7 @@ export const CITY = {
   power: {
     base: 40,
     supply: [0, 60, 120, 200],
-    use: { res: 1, com: 3, market: 3, bm: 8, mun: 8, fuel: 8, kero: 8, smelter: 10, steel: 10, mine: 4, uni: 12, dc: 30, power: 0, barracks: 2, factory: 8, heliport: 6, hospital: 6, airport: 12, stand: 2, atc: 6, ktank: 2, mdepot: 2 },
+    use: { res: 1, com: 3, market: 3, bm: 8, mun: 8, fuel: 8, kero: 8, smelter: 10, steel: 10, mine: 4, uni: 12, dc: 30, power: 0, barracks: 2, factory: 8, heliport: 6, hospital: 6, stand: 2, atc: 6, ktank: 2, mdepot: 2 },
   },
   // Zufriedenheit 0 … 1 = base + shops × Versorgung (Gewerbe-Arbeiter je Einwohner, voll ab shopPer) + safety × Sicherheit
   // (weniger Treffer auf die Stadt in den letzten 60 s, null ab hitsBad) + power × Strom. Wirkung: Erträge und Steuern × (lo + span × Zufriedenheit),
@@ -200,7 +200,7 @@ export const CITY = {
     defendRange: 2500, // px, nur Einheiten in diesem Abstand
     defendCooldown: 12, // s zwischen zwei Verteidigungsbefehlen
     // Angriffsziele: Wert je Zellenart (geteilt durch Entfernung); Werke und Förderung zuerst
-    targetValue: { steel: 3, fuel: 3, mun: 3, power: 3, dc: 2.5, uni: 2, mine: 2.5, market: 2, bm: 2, com: 1, res: 0.5, barracks: 2.5, factory: 3, heliport: 3, hospital: 2, airport: 3.5, stand: 3, atc: 3, ktank: 2.5, mdepot: 2.5 },
+    targetValue: { steel: 3, fuel: 3, mun: 3, power: 3, dc: 2.5, uni: 2, mine: 2.5, market: 2, bm: 2, com: 1, res: 0.5, barracks: 2.5, factory: 3, heliport: 3, hospital: 2, stand: 3, atc: 3, ktank: 2.5, mdepot: 2.5 },
     // Ausbildungsgebäude (seit v4.96): so viele will sie haben; ab moreFrom Arbeitsstätten je eins mehr (Heliport erst, wenn Hubschrauber freigeschaltet sind)
     producers: { barracks: 1, factory: 1, heliport: 2 }, // seit v5.51 zwei Heliports: einer je Hubschrauber (Späher und Transporter)
     moreFrom: 14,

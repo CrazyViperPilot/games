@@ -14,7 +14,7 @@ const GROUP_OF_KIND = { bm: 'bm', smelter: 'smelter', steel: 'steel', fuel: 'oil
 /** Produkte fahren zum Lager der Hauptstadt (`'main'`). */
 const PRODUCT_KINDS = ['bm', 'steel', 'fuel', 'kero', 'mun'];
 /** Arbeitsstätten mit Pendlerweg: alle Werke, Förderung, Gewerbe, Markt, Kraftwerk, Uni und Rechenzentrum. */
-// Literal statt WORKS_KINDS: city.js importiert dieses Modul, ein Zugriff auf city.js-Exporte beim Laden gäbe einen Zyklusfehler.
+// Literal statt WORKS aus city.js: city.js importiert dieses Modul, ein Zugriff auf city.js-Exporte beim Laden gäbe einen Zyklusfehler.
 const WORKPLACE_KINDS = ['bm', 'mun', 'fuel', 'steel', 'smelter', 'kero', 'mine', 'com', 'market', 'power', 'uni', 'dc'];
 /** Kennung des Lagers der Hauptstadt im Breitensuche-Feld (Besitzer). Gebäude haben als Besitzer ihren Anker (≥ 0). */
 const MAIN = -1;

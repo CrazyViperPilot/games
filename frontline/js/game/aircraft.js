@@ -20,23 +20,6 @@ const J = BALANCE.jets;
 const AIR = CITY.air;
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 
-/**
- * Maße des alten Flughafens (10 × 10, bis v5.33). Nur noch für sein Bild (render/airport.js); die Zellenart ist nicht mehr baubar
- * (CITY.retired), migrateCity räumt alte Flughäfen.
- */
-export const AIRPORT = {
-  runways: [
-    { y: -258, x0: -296, x1: 296, w: 36 },
-    { y: -176, x0: -296, x1: 296, w: 36 },
-  ],
-  taxi: { y: -104, x0: -280, x1: 280, w: 18 },
-  apron: { x0: -304, x1: 100, y0: -95, y1: 300 },
-  slots: Array.from({ length: 20 }, (_, k) => ({ x: -262 + (k % 5) * 76, y: -22 + Math.floor(k / 5) * 82 })),
-  landing: { x: 0, y: -176 },
-};
-export const LANE = 38;
-export const ROW_GAP = 41;
-
 // ---- Fliegerhorst: Stellplätze, Bahnen, Wege ----
 
 /** Ist e ein fertiger Stellplatz (Ziel-Entity der Stadt)? */
@@ -45,8 +28,6 @@ export function isStand(game, e) {
   const c = game.city?.[e.team];
   return !!c && c.kind[e.cityCell] === KIND_ID.stand && c.level[e.cityCell] > 0;
 }
-/** Alter Name (Steuerung, KI): ein „Flughafen“ ist seit v5.35 ein Stellplatz. */
-export const isAirport = isStand;
 
 /** Lebende fertige Stellplätze eines Teams. */
 export function standsOf(game, team) {
@@ -56,7 +37,6 @@ export function standsOf(game, team) {
   for (const [i, e] of c.ents) if (e.alive && c.kind[i] === KIND_ID.stand && c.level[i] > 0) out.push(e);
   return out;
 }
-export const airportsOf = standsOf;
 
 /** Jets, die zu Stellplatz e gehören (dort, in der Luft oder in seiner Warteschlange). */
 export function jetsAt(game, e) {

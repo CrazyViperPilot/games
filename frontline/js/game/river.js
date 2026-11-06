@@ -119,9 +119,6 @@ export function createBridges(game) {
   });
 }
 
-/** Intakte Brücke, die man angreifen kann. */
-export const isBridgeTarget = (t) => !!t && t.kind === 'bridge' && !t.broken;
-
 /** Intakte Brücke, auf deren Fahrbahn (x, y) liegt, oder null (der ganze geöffnete Streifen zählt: deckCells bis zum Zellrand). */
 export function bridgeUnder(game, x, y) {
   const half = RV.deck / 2 + 8 + TILE / 2;

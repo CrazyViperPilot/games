@@ -6,7 +6,7 @@ import { CITY } from '../js/data/city.js';
 import { BALANCE } from '../js/data/balance.js';
 import { AI } from '../js/ai/ai.js';
 import { treeGone } from '../js/game/city.js';
-import { KINDS, canZone, cityNoise, freePop, aiCity, aiDefend, aiRaid, hasRoad, hasMarket, cityEntityAt, cityTrainers, KIND_ID, sizeOf, cellsOf, isPart, forEnemyCity, migrateCity, cityLevel, accessCells, roadAt, cellRect, connectRoad, DEPOSITS, cellAt } from '../js/game/city.js';
+import { KINDS, canZone, cityNoise, freePop, aiCity, aiDefend, aiRaid, hasRoad, hasMarket, cityEntityAt, cityTrainers, KIND_ID, sizeOf, cellsOf, isPart, forEnemyCity, cityLevel, accessCells, roadAt, cellRect, connectRoad, DEPOSITS, cellAt } from '../js/game/city.js';
 import { transportOf, transportInfo } from '../js/game/transport.js';
 import { snapshotGame, restoreGame } from '../js/game/savegame.js';
 import { RELIEF } from '../js/game/relief.js';
@@ -797,67 +797,6 @@ test('Universität: zerstört wird das ganze Quadrat Ruine und wächst neu', () 
   assert.ok(c.ents.get(a)?.alive);
 });
 
-test('Alte Spielstände: einzelne Uni-Zellen werden ein 3 × 3-Großbau mit ihrer Stufe', () => {
-  const g = new Game({ seed: 3, city: true });
-  const c = g.city[0];
-  const b = spot(g, 5, 5);
-  // wie vor v5.00: zwei Uni-Zellen nebeneinander, Stufe 2 und 1, ohne Großbau-Angabe
-  const i0 = (b.r + 2) * c.cols + b.c + 2;
-  for (const [i, lv] of [[i0, 2], [i0 + 1, 1]]) {
-    c.kind[i] = KIND_ID.uni;
-    c.level[i] = lv;
-  }
-  c.list = [...c.list, i0, i0 + 1].sort((x, y) => x - y);
-  delete c.part;
-  const { game } = restoreGame(snapshotGame(g, null)); // Laden ruft migrateCity
-  const d = game.city[0];
-  const a = d.part[i0] - 1;
-  assert.ok(a >= 0, 'Großbau angelegt');
-  assert.equal(d.part[i0 + 1], a + 1, 'beide alten Zellen im Quadrat');
-  assert.ok(cellsOf(d, a).every((j) => d.level[j] === 2 && d.kind[j] === KIND_ID.uni));
-  assert.equal(d.ents.get(a).w * game.grid.tile, 3 * d.cell);
-  assert.equal(cityLevel(game, 0, 'uni'), 2);
-  migrateCity(game); // zweimal laden ändert nichts
-  assert.equal(d.list.filter((j) => d.kind[j] === KIND_ID.uni).length, 9);
-});
-
-test('Alte Spielstände (vor v5.20): ohne Kerosin und Stau-Faktor laden, Startvorrat Kerosin, Stau frei, Wege und Rechnung laufen', () => {
-  const g = new Game({ seed: 3, city: true });
-  for (const c of g.city) {
-    delete c.kero;
-    delete c.congestion;
-    delete c.made;
-  }
-  const { game } = restoreGame(snapshotGame(g, null)); // Laden ruft migrateCity
-  for (const c of game.city) {
-    assert.equal(c.kero, CITY.startKero, 'Kerosin: Startvorrat');
-    assert.ok(c.congestion instanceof Float32Array && c.congestion.length === c.kind.length && c.congestion.every((f) => f === 1), 'Stau frei');
-    assert.equal(transportOf(game, c).factor, c.congestion, 'transport.js rechnet auf dem gespeicherten Stau-Faktor');
-  }
-  for (let k = 0; k < 200; k++) game.update(0.05);
-  for (const c of game.city) {
-    assert.ok(Number.isFinite(c.kero) && Number.isFinite(c.metal) && c.made.kero >= 0, 'Lager und Zähler gültig');
-    assert.ok(c.stats.fuel > 0, 'Startviertel: Raffinerie liefert über die Straße');
-  }
-});
-
-test('Alte Uni ohne Platz für 3 × 3 bleibt klein und zählt weiter', () => {
-  const g = new Game({ seed: 3, city: true });
-  const c = g.city[0];
-  const b = spot(g, 5, 5);
-  const i0 = (b.r + 2) * c.cols + b.c + 2;
-  // die alte Uni in der Mitte, die Umgebung (5 × 5) voller Straßen: kein Quadrat passt
-  for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) c.kind[i0 + dy * c.cols + dx] = KIND_ID.road;
-  c.kind[i0] = KIND_ID.uni;
-  c.level[i0] = 1;
-  c.list = [];
-  for (let i = 0; i < c.kind.length; i++) if (c.kind[i]) c.list.push(i);
-  migrateCity(g);
-  assert.equal(c.part[i0], 0);
-  assert.equal(c.kind[i0], KIND_ID.uni);
-  assert.equal(cityLevel(g, 0, 'uni'), 1);
-});
-
 test('KI baut die Universität als 3 × 3-Großbau', () => {
   const g = new Game({ seed: 5, city: true });
   const ai = new AI(g, 1, 'normal');
@@ -997,38 +936,6 @@ test('2 × 2-BM-Werk: Straßenanschluss auch über ein benachbartes BM-Werk an d
   assert.ok(!hasRoad(c, ...at2(mun2)), 'andere Werke nur direkt');
 });
 
-test('Alte Spielstände (vor v5.08): Werkzellen werden je ein 2 × 2-Werk, ohne Platz bleiben sie klein', () => {
-  const g = new Game({ seed: 3, city: true });
-  const c = g.city[0];
-  const b = spot(g, 8, 6);
-  const at2 = (x, y) => (b.r + y) * c.cols + b.c + x;
-  const put = (x, y, kind, lv) => {
-    c.kind[at2(x, y)] = KIND_ID[kind];
-    c.level[at2(x, y)] = lv;
-  };
-  // eine BM-Zelle Stufe 2 mit Platz daneben, eine Munitionszelle ringsum von Straßen eingeschlossen
-  put(1, 1, 'bm', 2);
-  for (const [x, y] of [[4, 3], [6, 3], [5, 2], [5, 4], [4, 2], [6, 2], [4, 4], [6, 4]]) put(x, y, 'road', 0);
-  put(5, 3, 'mun', 1);
-  c.list = [];
-  for (let i = 0; i < c.kind.length; i++) if (c.kind[i]) c.list.push(i);
-  delete c.part;
-  const jobsBefore = CITY.jobs[2] + CITY.jobs[1];
-  const { game } = restoreGame(snapshotGame(g, null)); // Laden ruft migrateCity
-  const d = game.city[0];
-  const a = d.part[at2(1, 1)] - 1;
-  assert.ok(a >= 0, 'BM-Zelle ist jetzt ein Großbau');
-  assert.ok(cellsOf(d, a).length === 4 && cellsOf(d, a).every((j) => d.kind[j] === KIND_ID.bm && d.level[j] === 2), '2 × 2 mit ihrer Stufe');
-  assert.ok(d.ents.get(a)?.alive, 'ein Ziel');
-  assert.equal(d.kind[at2(5, 3)], KIND_ID.mun, 'Munition ohne Platz bleibt …');
-  assert.equal(d.part[at2(5, 3)], 0, '… eine kleine Zelle');
-  run(game, 1);
-  const t = d.list.filter((j) => !isPart(d, j) && [KIND_ID.bm, KIND_ID.mun].includes(d.kind[j]) && d.level[j]).reduce((s, j) => s + CITY.jobs[d.level[j]], 0);
-  assert.equal(t, jobsBefore, 'nichts geht verloren');
-  migrateCity(game); // zweimal laden ändert nichts
-  assert.equal(d.list.filter((j) => d.kind[j] === KIND_ID.bm).length, 4);
-});
-
 test('KI baut Werke als 2 × 2-Großbauten', () => {
   const g = new Game({ seed: 5, city: true });
   g.teams[1].res.money = 50000;
@@ -1136,4 +1043,3 @@ test('Startviertel (AP4): Raffinerie hat einen Weg ins Lager, Ölquelle einen We
     assert.equal(transportInfo(g, c, oil).to, 'Raffinerie', `Team ${team}: Ölquelle → Raffinerie`);
   }
 });
-

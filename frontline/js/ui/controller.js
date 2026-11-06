@@ -1,7 +1,7 @@
 // Spieler-Steuerung (docs/verlauf.md §5 ui/controller.js, §11.3–11.8): Auswahl, Modi, Befehle und Befehlskarte. Kein DOM.
 // Hält den Ansichtszustand `view`, den renderer.render(view) liest. Befehle laufen nur über game.issue.
 import { cityEntityAt, freePop, crewOf, KINDS as CITY_KINDS } from '../game/city.js';
-import { trainCheck, isAirport, airportsOf, standRoute } from '../game/aircraft.js';
+import { trainCheck, isStand, standsOf, standRoute } from '../game/aircraft.js';
 import { heliTrainCheck, isHeliport } from '../game/helipad.js';
 import { CITY } from '../data/city.js';
 import { BALANCE } from '../data/balance.js';
@@ -595,7 +595,7 @@ export class Controller {
       if (!rest.length) return;
     }
     // Eigener Stellplatz: Flugzeuge landen dort (die übrigen gehen hin)
-    const ap = rest.some((u) => u.def.jet) ? this.pickAirport(wx, wy) : null;
+    const ap = rest.some((u) => u.def.jet) ? this.pickStand(wx, wy) : null;
     if (ap) {
       const jets = rest.filter((u) => u.def.jet);
       if (this.issue({ type: 'land', ids: jets.map((u) => u.id), airportId: ap.id }).ok) this.moveMarker(ap.x, ap.y);
@@ -803,9 +803,9 @@ export class Controller {
   }
 
   /** Eigener fertiger Stellplatz an (wx, y) oder null. */
-  pickAirport(wx, wy) {
+  pickStand(wx, wy) {
     const e = this.pickCity(wx, wy);
-    return e && isAirport(this.game, e) ? e : null;
+    return e && isStand(this.game, e) ? e : null;
   }
 
   /** Eigener fertiger Heliport an (wx, wy) oder null (seit v5.51). */
@@ -823,7 +823,7 @@ export class Controller {
       return;
     }
     const hp = this.pickHeliport(wx, wy);
-    const ap = hp ? null : this.pickAirport(wx, wy);
+    const ap = hp ? null : this.pickStand(wx, wy);
     const ids = air.filter((u) => (hp ? !u.def.jet : u.def.jet)).map((u) => u.id);
     if ((!hp && !ap) || !ids.length) {
       this.message(hp ? 'Kein Hubschrauber gewählt' : ap ? 'Kein Flugzeug gewählt' : 'Eigenen Stellplatz (Flugzeuge) oder Heliport (Hubschrauber) anklicken');
@@ -1314,7 +1314,7 @@ export class Controller {
     if (jets.length || rotors.length) {
       const c = this.game.city?.[this.team];
       const pads = c ? [...c.ents.values()].some((e) => isHeliport(this.game, e)) : false;
-      const any = (jets.length && airportsOf(this.game, this.team).length > 0) || (rotors.length && pads);
+      const any = (jets.length && standsOf(this.game, this.team).length > 0) || (rotors.length && pads);
       card.push(
         entry('Landen', units.some(isCarrier) ? null : 'L', {
           tip: 'Landen (L): Flugzeuge danach einen eigenen Stellplatz anklicken (Platzrunde, Landebahn, Rollen zum Stellplatz), Hubschrauber einen eigenen Heliport (senkrecht landen, seit v5.51); auch Rechtsklick darauf. Dort wird betankt und munitioniert (Kerosintank, Munitionslager in der Nähe).',
@@ -1434,7 +1434,7 @@ export class Controller {
       // Fliegerhorst (seit v5.35): alle Flugzeuge der Stellplätze, die mit derselben Bahn verbunden sind (am Boden und in der Luft)
       const g = this.game;
       const key = CITY_KINDS[c.kind[i] - 1] === 'stand' ? standRoute(g, b)?.rw.key : null;
-      const stands = airportsOf(g, this.team).filter((s) => key == null || standRoute(g, s)?.rw.key === key);
+      const stands = standsOf(g, this.team).filter((s) => key == null || standRoute(g, s)?.rw.key === key);
       const ids = new Set(stands.map((s) => s.id));
       const jets = g.units.filter((u) => u.alive && u.team === this.team && ids.has(u.jet?.home));
       card.push(

@@ -193,7 +193,7 @@ export function drawCityGround(ren, ctx, team, known, inRect) {
   ctx.restore();
 }
 
-// ---- Fliegerhorst am Boden (seit v5.37, Farben und Markierungen wie beim alten Flughafen, airport.js) ----
+// ---- Fliegerhorst am Boden (seit v5.37, Farben und Markierungen wie beim alten Flughafen bis v5.55) ----
 const AF = {
   asph: '#3d3f3c', // Bahn
   conc: '#a9a89f', // Rollfeld (Beton)
@@ -207,7 +207,7 @@ const AF = {
   green: '#57e37f',
   red: '#e0553a',
 };
-// Ziffern als Striche (x 0…1, y 0…2, y nach unten), wie airport.js
+// Ziffern als Striche (x 0…1, y 0…2, y nach unten), wie beim alten Flughafen
 const SEG = { a: [0, 0, 1, 0], b: [1, 0, 1, 1], c: [1, 1, 1, 2], d: [0, 2, 1, 2], e: [0, 1, 0, 2], f: [0, 0, 0, 1], g: [0, 1, 1, 1] };
 const DIGIT = { 0: 'abcdef', 1: 'bc', 2: 'abged', 3: 'abgcd', 4: 'fgbc', 5: 'afgcd', 6: 'afgedc', 7: 'abc', 8: 'abcdefg', 9: 'abcdfg' };
 
@@ -325,7 +325,7 @@ function drawAirfield(ren, ctx, team, known, inRect) {
   }
 }
 
-/** Markierungen einer gültigen Bahn (örtlich: a längs ab dem Ende, b quer; Maße wie airport.js, längs × 2, quer × 3,4). */
+/** Markierungen einer gültigen Bahn (örtlich: a längs ab dem Ende, b quer; Maße wie beim alten Flughafen, längs × 2, quer × 3,4). */
 function runwayMarks(rw, c, R, fine) {
   const S = c.cell;
   const X = rw.axis === 'x';
@@ -406,7 +406,7 @@ function drawLoads(ren, ctx, team, known, inRect) {
 
 /**
  * Grundstück eines Großbaus: ausgewiesen blass mit Fortschritt; gebaut die Universität als Pflaster mit vier Rasenflächen, die
- * anderen (Kraftwerk, Kaserne, Fabrikhalle, Flughafen) mit ihrem Boden aus bigbuild.js (Bahnen, Höfe, Plätze). r: Ankerzelle, m: Mitte.
+ * anderen (Kraftwerk, Kaserne, Fabrikhalle, Fliegerhorst) mit ihrem Boden aus bigbuild.js (Bahnen, Höfe, Plätze). r: Ankerzelle, m: Mitte.
  */
 function drawBigLot(ren, ctx, c, k, lv, r, team, m) {
   const h = (sizeOf(k) * c.cell) / 2;

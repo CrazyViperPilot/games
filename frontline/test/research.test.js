@@ -9,7 +9,7 @@ import { RESEARCH } from '../js/data/research.js';
 import { UNITS } from '../js/data/units.js';
 import { AI } from '../js/ai/ai.js';
 import { hit } from '../js/game/combat.js';
-import { armorMul, rangeMul, sightMul, modOf, researchEffect, researchBlock, migrateResearch, RESEARCH_KEYS } from '../js/game/research.js';
+import { armorMul, rangeMul, sightMul, modOf, researchEffect, researchBlock, RESEARCH_KEYS } from '../js/game/research.js';
 import { Controller } from '../js/ui/controller.js';
 
 const R = RESEARCH;
@@ -180,17 +180,4 @@ test('KI: forscht ab ihrer Zeit Stufe für Stufe, höchstens eine wartend, nach 
     const it = R.items[k];
     if (it.req) assert.ok(tech.done.includes(it.req), `${k} ohne Vorgänger`);
   }
-});
-
-test('Alte Spielstände: alter Forschungsbaum fällt weg, Stufe neu berechnet', () => {
-  const g = empty({ research: true });
-  const tech = g.teams[0].tech;
-  tech.done = ['tier2', 'vests', 'tank1', 'inf1', 'mech1'];
-  tech.cur = { key: 'engine1', t: 3 };
-  delete tech.queue;
-  migrateResearch(g);
-  assert.deepEqual(tech.done, ['tank1', 'inf1', 'mech1']);
-  assert.equal(tech.cur, null);
-  assert.deepEqual(tech.queue, []);
-  assert.equal(tech.tier, 2);
 });

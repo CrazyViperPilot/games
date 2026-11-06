@@ -108,7 +108,6 @@ export const BALANCE = {
     ammoRate: 60, // Nachfüllen Munition je s und Einheit (Lagereinheiten; Waffen füllen der Reihe nach)
     resupplyInterval: 0.5, // Takt des Nachfüllens (s)
     truckSupplyRange: 180, // Nachfüllen/Mauerbau aus LKW-Ladung
-    noFobWarn: 30, // s zwischen zwei Meldungen „Förderanlage ohne FOB“
     boardReach: 45, // Infanterie steigt ein, wenn sie so nah am Hubschrauber ist
     dropRing: 26, // Absetzen: Abstand der Passagiere um den Hubschrauber
   },
@@ -227,17 +226,15 @@ export const BALANCE = {
   // schwere Waffen mehr, Handwaffen weniger). Zerstört sperren sie; ein Baufahrzeug baut sie für rebuildCost Geld in rebuild s wieder
   // auf (mehrere schneller, höchstens construction.maxBuilders), es arbeitet bis reach px vom Brückenkopf.
   river: { ford: 0.5, fordCost: 30, fordDepth: 12, deck: 80, bridgeHp: 2400, rebuildCost: 200, rebuild: 30, reach: 90 },
-  // Kampfflugzeuge (seit v5.03, PRD §6 „F-16“, §15 „Flughafen“): ein Flughafen bietet capacity Plätze. In der Luft dreht ein Jet
+  // Kampfflugzeuge (seit v5.03, PRD §6 „F-16“, §15 „Fliegerhorst“): In der Luft dreht ein Jet
   // höchstens turn rad/s und kreist im Abstand orbit (px) um seinen Befehlspunkt. Er fliegt zurück, wenn der Treibstoff für den
   // Heimweg × reserve plus margin s nicht mehr reicht oder keine Rakete mehr da ist; landet über eine Platzrunde auf Bahn 2 (Werte unten).
-  // Am Boden tanken und munitionieren sie nach den Raten in CITY.air (Tank, Munitionslager); repair × maxHp je s wird repariert. Der Schlüssel rearm wird nicht gelesen.
+  // Am Boden tanken und munitionieren sie nach den Raten in CITY.air (Tank, Munitionslager); repair × maxHp je s wird repariert.
   jets: {
-    capacity: 20,
     turn: 2.4,
     orbit: 280,
     reserve: 1.3,
     margin: 8, // s Treibstoff Reserve über dem Heimweg (seit v5.15 8 statt 4: Platzrunde und Rollen)
-    rearm: 25,
     repair: 0.04,
     lift: 92,
     // Start und Landung (seit v5.15, aircraft.js): Rollen am Boden, Startlauf, Steigflug, Platzrunde, Gleitpfad, Ausrollen

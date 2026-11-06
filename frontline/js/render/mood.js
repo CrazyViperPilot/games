@@ -5,7 +5,6 @@ import { makeRng } from '../core/rng.js';
 
 /** Einstellungen des Startmenüs: aus, Zufall (aus dem Seed, nach Jahreszeit gewichtet) oder eine feste Stimmung. */
 export const MOOD_SETTINGS = ['off', 'random', 'morning', 'day', 'evening', 'night'];
-export const MOOD_NAMES = { morning: 'Morgen', day: 'Tag', evening: 'Abend', night: 'Nacht' };
 
 /**
  * mult: Farbe der Multiplikation (255 = unverändert) · glow: Lichtschein [r, g, b, Stärke] von der Seite `x`/`y` (0 … 1 im Bild) ·

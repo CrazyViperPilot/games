@@ -1,12 +1,11 @@
 // Großbauten der Stadt ohne eigenes Bild (seit v5.03, PRD §15; das Kraftwerk zeichnet seit v5.18 works.js): Kaserne (4 × 4,
 // Unterkünfte mit Ziegeldach um einen Exerzierplatz, Wache, Fahrzeuge; seit v5.11 mit Fenstern, Toren und Bäumen), Fabrikhalle
-// (5 × 5 seit v5.33, vorher 8 × 8; Montagehalle mit Sheddach, Verwaltung, Lackiererei, Schornsteine, Fahrzeughof mit fertigen Fahrzeugen, Portalkran) und
-// Flughafen (10 × 10; Boden und gemalte Bauten seit v5.22 aus airport.js; nicht mehr baubar). Den Fliegerhorst aus Bausteinen
-// (Stellplatz, Tower, Kerosintank, Munitionslager, je 2 × 2) malt seit v5.42 airbase.js. Jede Anlage ist eine Liste von Teilen in Weltkoordinaten:
-// Boden (Flächen, Linien, Vielecke) und Körper (Quader, Zylinder, Fahnen, gemalte Teile des Flughafens). Die 2D-Ansicht zeichnet sie
+// (5 × 5 seit v5.33, vorher 8 × 8; Montagehalle mit Sheddach, Verwaltung, Lackiererei, Schornsteine, Fahrzeughof mit fertigen Fahrzeugen, Portalkran).
+// Den Fliegerhorst aus Bausteinen (Stellplatz, Tower, Kerosintank, Munitionslager, je 2 × 2) malt seit v5.42 airbase.js (den alten
+// Flughafen 10 × 10 gibt es seit v5.56 auch im Bild nicht mehr). Jede Anlage ist eine Liste von Teilen in Weltkoordinaten:
+// Boden (Flächen, Linien, Vielecke) und Körper (Quader, Zylinder, Fahnen, gemalte Teile des Fliegerhorsts). Die 2D-Ansicht zeichnet sie
 // von oben, die Iso-Ansicht jeden Körper einzeln in der Tiefenordnung (so stehen Einheiten richtig davor oder dahinter) und für jede
 // Drehung der Karte richtig. Nur Zeichnen, keine Spielregeln.
-import { airportGround, airportBodies, drawAirportIso, drawAirportTop } from './airport.js';
 import { airbaseGround, airbaseBodies, drawAirbaseIso, drawAirbaseTop } from './airbase.js';
 import { drawBox } from './iso.js';
 import { shade, tint } from './sprites.js';
@@ -28,7 +27,7 @@ export function drawShowIso(ctx, cam, p) {
 }
 
 /** Großbauten, die hier gezeichnet werden (die Universität hat ihr eigenes Bild, university.js). */
-export const BIG_KINDS = new Set(['barracks', 'factory', 'airport', 'stand', 'atc', 'ktank', 'mdepot']); // seit v5.35 auch der Fliegerhorst (2 × 2)
+export const BIG_KINDS = new Set(['barracks', 'factory', 'stand', 'atc', 'ktank', 'mdepot']); // seit v5.35 auch der Fliegerhorst (2 × 2)
 
 const CONCRETE = '#b3afa4';
 /** Bausteine des Fliegerhorsts (seit v5.42 gemalt, airbase.js). */
@@ -82,7 +81,7 @@ function groundOf(k, lv, half) {
     if (lv >= 2) rect(96, 26, 152, 84, '#96938a'); // Containerlager
   } else if (AIRBASE.has(k)) {
     return airbaseGround(k, lv, half); // seit v5.42: Beton mit Fugen, Führungslinie, Parkplatz … (airbase.js)
-  } else if (k === 'airport') return airportGround(lv); // seit v5.22: Markierungen, Befeuerung, Rollgassen (airport.js)
+  }
   return g;
 }
 
@@ -162,11 +161,11 @@ function bodiesOf(k, lv, half) {
     }
   } else if (AIRBASE.has(k)) {
     return airbaseBodies(k, lv); // seit v5.42: gemalte Überdachung, Shelter, Tower, Tanks, Bunker (airbase.js)
-  } else if (k === 'airport') return airportBodies(lv); // seit v5.22: gemalte Hangars, Tower, Tanklager … (airport.js)
+  }
   return b;
 }
 
-const plans = new Map(); // Anlagen je Art, Stufe und Lage (seit v5.22; der Flughafen hat viele Teile, nicht jedes Bild neu bauen)
+const plans = new Map(); // Anlagen je Art, Stufe und Lage (seit v5.22; der Fliegerhorst hat viele Teile, nicht jedes Bild neu bauen)
 
 /** Größe, Stufe und Mitte → Anlage { ground, bodies } in Weltkoordinaten (Mitte cx, cy). Nicht verändern (Zwischenspeicher). */
 export function bigPlan(k, lv, cx, cy, size) {
@@ -230,13 +229,13 @@ export function drawBigGround(g, plan, detail = true, winter = false) {
 
 /**
  * Körper von oben: Schatten nach rechts unten (länger, je höher), Dach, Lichtseite; Zylinder als Kreis. Team = Fahne und Streifen.
- * Gemalte Teile des Flughafens (t 'ap') bringen ihren Schatten mit (airport.js, zoom für die Bildgröße).
+ * Gemalte Teile des Fliegerhorsts (t 'ab') bringen ihren Schatten mit (airbase.js, zoom für die Bildgröße).
  */
 export function drawBigTop(ctx, plan, color, damage = 0, zoom = 1, over = false) {
   const bodies = plan.bodies.filter((p) => !!p.over === over); // over: Dächer über abgestellten Flugzeugen (eigener Durchgang)
   if (!bodies.length) return;
   for (const p of bodies) {
-    if (p.t === 'ap' || p.t === 'ab') continue;
+    if (p.t === 'ab') continue;
     const s = Math.min(40, ((p.base ?? 0) + (p.h ?? 0) + (p.gable ?? 0)) * 0.22);
     ctx.fillStyle = 'rgba(0,0,0,0.26)';
     if (p.t === 'box') ctx.fillRect(p.x0 + s, p.y0 + s, p.x1 - p.x0, p.y1 - p.y0);
@@ -251,8 +250,7 @@ export function drawBigTop(ctx, plan, color, damage = 0, zoom = 1, over = false)
   }
   for (const p of bodies) {
     if (p.alpha) ctx.globalAlpha = p.alpha;
-    if (p.t === 'ap') drawAirportTop(ctx, p, color, zoom);
-    else if (p.t === 'ab') drawAirbaseTop(ctx, p, color, zoom);
+    if (p.t === 'ab') drawAirbaseTop(ctx, p, color, zoom);
     else if (p.t === 'box') boxTop(ctx, p, color);
     else if (p.t === 'cyl') {
       ctx.beginPath();
@@ -289,7 +287,7 @@ export function drawBigTop(ctx, plan, color, damage = 0, zoom = 1, over = false)
     ctx.fillStyle = `rgba(20,10,5,${(0.5 * damage).toFixed(2)})`;
     for (const p of bodies) {
       if (p.t === 'box') ctx.fillRect(p.x0, p.y0, p.x1 - p.x0, p.y1 - p.y0);
-      else if ((p.t === 'ap' || p.t === 'ab') && p.fw > 20) ctx.fillRect(p.x - p.fw / 2, p.y - p.fh / 2, p.fw, p.fh);
+      else if (p.t === 'ab' && p.fw > 20) ctx.fillRect(p.x - p.fw / 2, p.y - p.fh / 2, p.fw, p.fh);
     }
   }
 }
@@ -392,10 +390,6 @@ function vehTop(ctx, p) {
 
 /** Ein Körper einer Anlage isometrisch (Transformation: Bildschirm, dpr gesetzt; Höhe: cam.pin vom Renderer). */
 export function drawBigPart(ctx, cam, p, color) {
-  if (p.t === 'ap') {
-    drawAirportIso(ctx, cam, p, color); // gemalter Teil des Flughafens (seit v5.22)
-    return;
-  }
   if (p.t === 'ab') {
     drawAirbaseIso(ctx, cam, p, color); // gemalter Teil des Fliegerhorsts (seit v5.42)
     return;
@@ -468,7 +462,7 @@ export function drawBigPart(ctx, cam, p, color) {
 
 /** Mittelpunkt und Fußabdruck eines Körpers (für Tiefenordnung und Geländehöhe im Renderer). */
 export function partFoot(p) {
-  if (p.t === 'ap' || p.t === 'ab') return { x: p.x, y: p.y, w: p.fw, h: p.fh };
+  if (p.t === 'ab') return { x: p.x, y: p.y, w: p.fw, h: p.fh };
   if (p.t === 'veh') {
     const [hx, hy] = vehHalf(p);
     return { x: p.x, y: p.y, w: hx * 2, h: hy * 2 };

@@ -312,7 +312,7 @@ export function drawTownBuilding(ctx, cam, b, season = 'summer') {
     return;
   }
   if (b.kind === 'bigpart') {
-    drawBigBody(ctx, cam, b, season); // Körper eines Großbaus (Kaserne, Fabrikhalle, Flughafen; bigbuild.js)
+    drawBigBody(ctx, cam, b, season); // Körper eines Großbaus (Kaserne, Fabrikhalle, Fliegerhorst; bigbuild.js)
     return;
   }
   if (b.kind === 'uni') {

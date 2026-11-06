@@ -394,9 +394,9 @@ const groundVehicle = (u) => !u.def.air && u.def.armor !== 'inf' && (u.def.fuelP
 /** Liegt der Punkt auf einer Straße oder einem Feldweg der Karte (game.map.town.roads, Breite w)? */
 function onRoad(game, x, y) {
   const R = game.roads;
-  if (R?.dug?.length) {
+  if (R?.dug) {
     const i = Math.floor(y / R.cell) * R.cols + Math.floor(x / R.cell);
-    if (R.dug.includes(i)) return false; // vom Bagger abgetragen (excavator.js)
+    if (R.dug[i]) return false; // vom Bagger abgetragen (excavator.js)
   }
   for (const r of game.map.town?.roads ?? []) {
     const dx = r.x2 - r.x1;

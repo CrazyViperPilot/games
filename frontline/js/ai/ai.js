@@ -3,7 +3,7 @@
 // Forschung, Produktion (nur Hauptstadt), Verteidigungsgebäude und Mauer, Brücken, Baufahrzeuge, LKW (Lieferant/Pendler/Versorger), Sammelpunkte, Armee.
 import { CITY } from '../data/city.js';
 import { aiCity, aiRaid, aiDefend, cityTrainers } from '../game/city.js';
-import { airportsOf, freeSpace } from '../game/aircraft.js';
+import { standsOf, freeSpace } from '../game/aircraft.js';
 import { heliTrainCheck } from '../game/helipad.js';
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
@@ -261,7 +261,7 @@ export class AI {
   jets(s) {
     const g = this.game;
     const t = this.team;
-    const ports = airportsOf(g, t);
+    const ports = standsOf(g, t);
     if (!ports.length) return;
     const jets = s.units.filter((u) => u.def.jet);
     const want = CITY.ai.jets[this.difficulty] ?? CITY.ai.jets.normal;

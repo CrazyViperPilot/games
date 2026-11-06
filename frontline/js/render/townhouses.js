@@ -13,9 +13,6 @@
 import { box, FACE, lit, OUTLINE, poly, pyramid, acTop, acUnit, archWins, ASPH, awning, awningTop, balcony, ball, bush, cap, car, CAR_COLORS, carTop, circle, clampLv, cobble, cobbleTop, coneRoof, conifer, conveyor, crate, cyl, disc, dish, dishTop, door, excavator, fan, fanWin, fence, fenceTop, flagpole, flat, flatTop, frustum, G, gable, gableTop, groundRing, heap, heapTop, HEDGE, hip, hipTop, k3, lamp, latticeTop, LAWN, LAWN2, LEAF, ledge, lineT, loader, logPile, logsTop, mast, onFace, parapet, PATH, PAVE, planks, planksTop, PLAZA, plinth, polyF, pyramidTop, rails, railsTop, rectF, rectS, ribs, rnd, roofSnowOn, seam, shade, shadow, shadowTop, shed, snowy, stroke, tankTop, tint, tree, treeTop, truck, van, vanTop, vault, vaultTop, wallBand, wheel, WHITE, wins, winsAt, yellowTop } from './isokit.js';
 import { sprite, blit, spriteFrame } from './spritecache.js';
 
-/** Zellenarten, die hier gezeichnet werden (alle 1 × 1-Gebäude der Stadt). */
-export const TOWN_KINDS = new Set(['res', 'com', 'market', 'dc', 'hospital', 'heliport', 'mine']);
-
 // Höhe des höchsten Punkts über der Zellmitte im Iso-Bild (Weltpixel, hinten stehende Teile zählen höher): Größe des Bilds
 // und Höhe des Schilds darüber, je Art und Stufe (Förderanlagen je Vorkommen)
 const TALL = {

@@ -12,9 +12,6 @@ const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 
 export const isTower = (b) => !!b && b.kind === 'building' && b.type === 'tower';
 
-/** Turm mit mindestens einem Soldaten innen (nur dann feuert der Dachaufbau). */
-export const crewed = (b) => b.occupants.length > 0;
-
 const variants = {};
 
 /** Gebäudewerte eines Turms mit Aufbau: Turm plus Waffe (und Abfangwerte) des Aufbaus. So greifen Mörser-Zielwahl, Flak und Renderer ohne Sonderfälle. */

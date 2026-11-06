@@ -9,9 +9,8 @@ import { jetAlt } from '../game/aircraft.js';
 const TILE = BALANCE.map.tile;
 const OUTLINE = 'rgba(0,0,0,0.65)';
 const GOLD = '#f2c94c';
-export const BUILD_ABBR = { fob: 'FOB', depot: 'FZ-HALLE', extractor: 'FÖR', mortar: 'MÖR', aa: 'FLA', tower: 'TURM', helipad: 'HELI', drill: 'BOHR', radio: 'MAST', phalanx: 'PHALANX' };
-export const NODE_COLOR = { bm: '#8b5a2b', mun: '#d9b600', fuel: '#3b2350' };
-export const NODE_LABEL = { bm: 'BM', mun: 'MUN', fuel: 'TS' };
+/** Kürzel auf der Karte (kürzer und in Großbuchstaben, daher nicht `short` aus buildings.js, das die Befehlskarte nutzt). */
+const BUILD_ABBR = { fob: 'FOB', mortar: 'MÖR', aa: 'FLA', tower: 'TURM', drill: 'BOHR', radio: 'MAST', phalanx: 'PHALANX' };
 const WALL_GREY = '#8c9089';
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -511,36 +510,6 @@ function drawOverlays(ctx, b, x0, y0, w, h, z, pic) {
       ctx.fillRect(x0, by, w * frac, bh);
     }
   }
-}
-
-/** Vorkommen: farbige Kuppe mit Kürzel; besetzt (Förderanlage) abgeblendet. */
-export function drawNode(ctx, node, occupied = false, zoom = 1) {
-  const z = zoom || 1;
-  const col = NODE_COLOR[node.type] || '#888888';
-  ctx.save();
-  ctx.globalAlpha = occupied ? 0.4 : 1;
-  ctx.fillStyle = 'rgba(15,15,12,0.55)';
-  ctx.beginPath();
-  ctx.arc(node.x + 1.5, node.y + 2, 26, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = col;
-  ctx.beginPath();
-  ctx.arc(node.x, node.y, 22, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.lineWidth = 2 / z;
-  ctx.strokeStyle = node.type === 'fuel' ? '#9b6bd1' : 'rgba(0,0,0,0.55)';
-  ctx.stroke();
-  ctx.fillStyle = tint(col, 0.35);
-  ctx.globalAlpha *= 0.5;
-  ctx.beginPath();
-  ctx.arc(node.x - 6, node.y - 6, 6, 0, Math.PI * 2);
-  ctx.fill();
-  if (!occupied) {
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = '#ffffff';
-    fitText(ctx, NODE_LABEL[node.type] || '', node.x, node.y, 11, z, 36);
-  }
-  ctx.restore();
 }
 
 export const CRATE_COLOR = '#66713c'; // Versorgungskiste: olivgrünes Holz

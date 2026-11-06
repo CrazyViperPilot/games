@@ -60,7 +60,7 @@ function dig(game, team, i) {
   const R = game.roads;
   if (R?.kind[i] === MAP_ROAD) {
     R.kind[i] = 0; // Stadtstraße der Karte: weg für beide Teams (c.mapRoads ist dasselbe Feld)
-    (R.dug ??= []).push(i); // movement.js: dort kein Straßentempo mehr
+    (R.dug ??= new Uint8Array(R.kind.length))[i] = 1; // movement.js: dort kein Straßentempo mehr (1 je abgetragene Zelle)
     R.ver = (R.ver ?? 0) + 1;
     for (const c of game.city ?? []) c.ver++; // Wege neu (transport.js, Fliegerhorst)
     return true;

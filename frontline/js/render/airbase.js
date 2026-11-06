@@ -5,23 +5,24 @@
 // Erdanschüttung an den Seiten), Tower (Betriebsgebäude mit Glaskanzel, Windsack, Parkplatz; Radar ab Stufe 2, Wetterradar-Kuppel in
 // Stufe 3), Kerosintank (2 bis 4 Tanks in einer Auffangwanne, Rohre, Pumpenhaus, Ladebühne mit Tankwagen) und Munitionslager (1 bis 3
 // erdbedeckte Bunker mit Betonstirn und Stahltor, Blitzschutzmasten, Zaun mit Tor und Wache, Gabelstapler mit Munitionskisten;
-// Wachturm in Stufe 3). Jedes Teil wird wie die Werke (works.js) über spritecache.js einmal je Maßstab gemalt (Bauteile aus isokit.js,
-// works.js und airport.js). Überdachung und Shelter liegen in der Welt fest und werden je Drehung passend gemalt; sie liegen als ein
+// Wachturm in Stufe 3). Jedes Teil wird wie die Werke (works.js) über spritecache.js einmal je Maßstab gemalt (Bauteile aus isokit.js
+// und works.js; Tower, Radar, Flutlicht und Windsack stammen vom alten Flughafen und stehen seit v5.56 hier). Überdachung und Shelter
+// liegen in der Welt fest und werden je Drehung passend gemalt; sie liegen als ein
 // Teil über dem abgestellten Jet (over), Dach und Röhre halb durchsichtig, damit der Jet zu sehen bleibt. Den Boden (Beton mit Fugen,
 // Führungslinie, Parkplatz, Schotter) liefert airbaseGround für bigbuild.js. Örtliche Koordinaten ab der Mitte des Bausteins (±64):
 // x nach Osten, y nach Süden. Nur Zeichnen, keine Spielregeln.
 import { ISO_K } from './camera.js';
 import {
-  CAR_COLORS, DECK, FACE, G, OUTLINE, band, box, car, carTop, circle, cyl, door, flat, frustum, lamp, lineT, lit, onFace,
-  parapet, poly, polyF, rectF, rectS, shade, shadow, shadowTop, snowy, stroke, tint, wins,
+  CAR_COLORS, DECK, FACE, G, OUTLINE, acTop, acUnit, band, box, car, carTop, circle, cyl, dish, dishTop, door, fence, flagpole,
+  flat, flatTop, frustum, lamp, latticeTop, lineT, lit, mast, onFace, parapet, poly, polyF, rectF, rectS, shade, shadow, shadowTop,
+  snowy, stroke, tint, wins,
 } from './isokit.js';
 import { roofSnowOn } from './season.js';
 import { sprite, blit, spriteDpr } from './spritecache.js';
 import {
   blockTop, bund, discTop, forklift, forkliftTop, lorry, lorryTop, pallet, palletTop, pipe, pipeTop, ringTop, roundShadow,
-  tank, walls,
+  shadowRound, strip, tank, walls,
 } from './works.js';
-import { flood, floodTop, radar, radarAntenna, radarTop, sock, sockTop, tower, towerTop } from './airport.js';
 
 const TAU = Math.PI * 2;
 const K = ISO_K;
@@ -37,6 +38,7 @@ const view = (rot, dx, dy) => {
   return [a * dx + b * dy, c * dx + d * dy];
 };
 
+const CONCW = '#d9d5ca'; // helle Betonwand (Tower)
 const CONC = '#aba89e'; // Beton der Stellflächen
 const JOINT = 'rgba(60,58,50,0.2)';
 const SHELL = '#aeaa9e'; // Shelter
@@ -838,6 +840,164 @@ function depot(g, team, lv) {
   fenceSeg(g, F, F, F, -F);
 }
 
+// ---------- Tower, Radar, Flutlicht, Windsack (vom alten Flughafen, bis v5.55 render/airport.js) ----------
+
+/** Glaskanzel des Towers: schräge Scheiben (r0 unten, r1 oben) mit Sprossen auf der sichtbaren Hälfte. */
+function cab(g, u, v, r0, r1, h0, h1) {
+  const { P, ctx, z } = g;
+  frustum(g, u, v, r0, r1, h0, h1, '#4d7591', false);
+  if (!g.fine) return;
+  for (let k = 0; k < 10; k++) {
+    const t = -Math.PI / 4 + (k / 9) * Math.PI;
+    const a = [u + r0 * Math.cos(t), v + r0 * Math.sin(t)];
+    const b = [u + r1 * Math.cos(t), v + r1 * Math.sin(t)];
+    stroke(g, [P(a[0], a[1], h0), P(b[0], b[1], h1)], 'rgba(30,38,44,0.75)', 0.6);
+  }
+  const [x, y] = P(u, v, h0 + (h1 - h0) * 0.62);
+  ctx.beginPath();
+  ctx.ellipse(x - r1 * 0.3 * z, y, r1 * 0.32 * z, r1 * 0.09 * z, 0, 0, TAU);
+  ctx.fillStyle = 'rgba(255,255,255,0.22)';
+  ctx.fill();
+}
+
+/** Tower: zweigeschossiger Betriebsbau, runder Schaft, Kanzel mit Umgang, Dach mit Antennen und Radarschüssel. */
+function tower(g, team) {
+  const { P } = g;
+  walls(g, -24, 24, -24, 24, 14, CONCW, { band: team });
+  strip(g, 's', 24, -20, -6, 3.2, 6.4, 3);
+  strip(g, 's', 24, -20, 20, 8.6, 11.4, 3);
+  strip(g, 'e', 24, -20, 20, 3.2, 6.4, 3);
+  strip(g, 'e', 24, -20, 20, 8.6, 11.4, 3);
+  door(g, 's', 24, 6, 6, 6.4, '#4f5a63');
+  box(g, 1, 11, 24, 29, 6.6, 7.4, '#6d7174', '#7d8184'); // Vordach
+  parapet(g, -24, 24, -24, 24, 14, CONCW, DECK);
+  acUnit(g, -14, -14, 14, 2.4);
+  acUnit(g, 14, -12, 14, 2.4);
+  dish(g, -15, 12, 14, 3.2);
+  shadowRound(g, 4, 2, 8, 70, 0.18);
+  cyl(g, 4, 2, 7.5, 14, 64, '#e4e1d8', false);
+  if (g.fine) {
+    const a = P(4 - 1.2, 2 + 7.4, 18);
+    const b = P(4 - 1.2, 2 + 7.4, 60);
+    stroke(g, [a, b], 'rgba(52,80,109,0.75)', 1.4); // Fensterschlitz des Treppenhauses
+  }
+  band(g, 4, 2, 7.5, 40, 41.2, '#c9c5ba');
+  cyl(g, 4, 2, 13.5, 64, 68, '#d6d2c8'); // Boden der Kanzel
+  cab(g, 4, 2, 12, 14.6, 68, 78);
+  cyl(g, 4, 2, 15.6, 78, 80.6, '#4a4f53'); // Dach
+  const { ctx, z } = g;
+  // Umgang
+  const [x, y] = P(4, 2, 68);
+  ctx.beginPath();
+  ctx.ellipse(x, y, 14.6 * z, 7.3 * z, 0, 0, Math.PI);
+  ctx.strokeStyle = 'rgba(60,64,68,0.8)';
+  ctx.lineWidth = Math.max(0.6, 0.7 * z);
+  ctx.stroke();
+  stroke(g, [P(-2, 0, 80.6), P(-2, 0, 94)], '#6b7177', 0.8);
+  stroke(g, [P(9, 5, 80.6), P(9, 5, 89)], '#6b7177', 0.7);
+  dish(g, 6, -4, 80.6, 2.6);
+  flagpole(g, 20, 30, 0, 22, team);
+}
+
+/** Radar: umzäunter Platz, Gerätecontainer, Gitterturm mit Plattform; die Antenne dreht sich (drawRadarAntenna, jedes Bild). */
+function radar(g) {
+  flat(g, -16, 16, -16, 16, '#a39d90');
+  fence(g, -16, 16, -16, 16, 'back');
+  walls(g, 4, 14, 2, 14, 7, '#d3d0c6');
+  parapet(g, 4, 14, 2, 14, 7, '#d3d0c6', DECK);
+  door(g, 's', 14, 9, 2.6, 5, '#55606a');
+  shadowRound(g, -5, -5, 5, 38, 0.16);
+  mast(g, -5, -5, 0, 34, 5, 3, '#c9cdd0', false);
+  box(g, -9, -1, -9, -1, 34, 35.4, '#9aa1a8', '#b9bfc4');
+  cyl(g, -5, -5, 1.2, 35.4, 38, '#6b7177');
+  fence(g, -16, 16, -16, 16, 'front');
+}
+
+/** Drehende Radarantenne über dem Turm (jedes Bild neu): Reflektor als gebogene Fläche, Winkel t. */
+function radarAntenna(g, t) {
+  const { P, ctx, z } = g;
+  const u = -5;
+  const v = -5;
+  const L = 9;
+  const c = Math.cos(t);
+  const s = Math.sin(t);
+  const pts = [];
+  for (let k = 0; k <= 8; k++) {
+    const q = (k / 8) * 2 - 1;
+    const bow = (1 - q * q) * 1.6; // nach vorn gewölbt
+    pts.push([u + c * q * L - s * bow, v + s * q * L + c * bow]);
+  }
+  const top = pts.map(([a, b]) => P(a, b, 43));
+  const bot = pts.map(([a, b]) => P(a, b, 39));
+  const face = Math.cos(t) * 0.7 + Math.sin(t) * 0.7; // zur Kamera?
+  ctx.beginPath();
+  top.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  for (let i = bot.length - 1; i >= 0; i--) ctx.lineTo(bot[i][0], bot[i][1]);
+  ctx.closePath();
+  ctx.fillStyle = face > 0 ? '#eef0f1' : '#b8bec3';
+  ctx.fill();
+  ctx.strokeStyle = OUTLINE;
+  ctx.lineWidth = Math.max(0.6, 0.6 * z);
+  ctx.stroke();
+  stroke(g, [P(u, v, 38), P(u - s * 3.4, v + c * 3.4, 41)], '#55595d', 0.7);
+}
+
+/** Flutlichtmast am Vorfeld. */
+function flood(g) {
+  const { P } = g;
+  stroke(g, [P(0, 0, 0), P(0, 0, 37)], '#6b7177', 1.4);
+  box(g, -3.2, 3.2, -1.2, 1.2, 36, 38.6, '#d4d6d2', '#9aa0a5');
+  const pt = onFace(g, 's', 1.2);
+  if (g.fine) for (const a of [-2.2, 0, 2.2]) poly(g, [pt(a - 0.8, 36.6), pt(a + 0.8, 36.6), pt(a + 0.8, 38), pt(a - 0.8, 38)], '#fff3c4', null);
+}
+
+/** Windsack auf einem Mast (rot-weiß gestreift, nach Osten). */
+function sock(g) {
+  const { P } = g;
+  stroke(g, [P(0, 0, 0), P(0, 0, 15)], '#d9d6cc', 0.9);
+  const seg = 4;
+  for (let k = 0; k < seg; k++) {
+    const a0 = 1 + k * 2.6;
+    const a1 = a0 + 2.6;
+    const r0 = 1.5 - k * 0.22;
+    const r1 = r0 - 0.22;
+    const drop = 0.5 * k;
+    poly(g, [P(a0, 0.6, 14.6 - drop + r0), P(a1, 0.8, 14.6 - drop - 0.5 + r1), P(a1, 0.8, 14.6 - drop - 0.5 - r1), P(a0, 0.6, 14.6 - drop - r0)], k % 2 ? '#f2efe6' : '#e2572f', OUTLINE);
+  }
+}
+
+function towerTop(c, team) {
+  shadowTop(c, -24, -24, 24, 24, 14);
+  flatTop(c, -24, -24, 24, 24, CONCW);
+  rectF(c, -24, 22.6, 24, 24, team);
+  acTop(c, -14, -14, 2.4);
+  acTop(c, 14, -12, 2.4);
+  dishTop(c, -15, 12, 3.2);
+  roundShadow(c, 4, 2, 15.6, 94, 0.26);
+  discTop(c, 4, 2, 15.6, '#4a4f53');
+  ringTop(c, 4, 2, 13.9, '#4d7591', 1.6);
+  dishTop(c, 6, -4, 2.6);
+  circle(c, -2, 0, 1, '#ff4a3a');
+  rectF(c, 20, 30, 28, 34, team);
+}
+
+function radarTop(c) {
+  rectS(c, -16, -16, 16, 16, '#a39d90', 'rgba(66,72,78,0.8)', 0.6);
+  blockTop(c, 4, 2, 14, 14, 7, '#d3d0c6');
+  latticeTop(c, -5, -5, 4, 38, '#c9cdd0');
+}
+
+function floodTop(c) {
+  lineT(c, [[0, 0], [8, 8]], 'rgba(0,0,0,0.25)', 1.4);
+  rectS(c, -3.2, -1.2, 3.2, 1.2, '#d4d6d2', 'rgba(0,0,0,0.4)', 0.3);
+}
+
+function sockTop(c) {
+  lineT(c, [[0, 0], [3, 3]], 'rgba(0,0,0,0.25)', 0.8);
+  for (let k = 0; k < 4; k++) rectF(c, 1 + k * 2.6, -1.2 + k * 0.15, 3.6 + k * 2.6, 1.2 - k * 0.15, k % 2 ? '#f2efe6' : '#e2572f');
+  circle(c, 0, 0, 0.9, '#d9d6cc');
+}
+
 // ---------- Bauteile von oben (2D) ----------
 
 /** Überdachung von oben: Stützen, Windschutz und Binder unter dem halb durchsichtigen Satteldach (Wellen, First, Rinnen). */
@@ -1105,7 +1265,7 @@ export function drawAirbaseIso(ctx, cam, p, color) {
     radarAntenna(G(ctx, z), now() / 1100);
     ctx.restore();
   } else if (p.id === 'tower' && Math.floor(now() / 700) % 2 === 0) {
-    // Warnlicht auf der Antenne blinkt (wie airport.js)
+    // Warnlicht auf der Antenne blinkt
     const x = q.x + -2 * K * z;
     const y = q.y + -2 * K * 0.5 * z - 94.6 * z;
     const grad = ctx.createRadialGradient(x, y, 0, x, y, 5 * z);

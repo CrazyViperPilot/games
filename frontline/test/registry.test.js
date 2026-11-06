@@ -19,9 +19,9 @@ test('KINDS: Reihenfolge festgeschrieben (Zell-IDs im Spielstand), neue Arten nu
   for (const k of CITY.retired ?? []) assert.ok(KINDS.includes(k), `CITY.retired: unbekannte Art ${k}`);
 });
 
-test('Jede Zellenart: Name, Preis, Baumaterial, Größe, Strom', () => {
-  for (const k of KINDS) {
-    assert.ok(typeof KIND_NAME[k] === 'string' && KIND_NAME[k], `KIND_NAME.${k} fehlt`);
+test('Jede Zellenart: Name; jede baubare: Preis, Baumaterial, Größe, Strom', () => {
+  for (const k of KINDS) assert.ok(typeof KIND_NAME[k] === 'string' && KIND_NAME[k], `KIND_NAME.${k} fehlt`);
+  for (const k of LIVE) {
     assert.ok(num(CITY.cost[k]) && CITY.cost[k] >= 0, `CITY.cost.${k} = ${CITY.cost[k]} (fehlt: Kasse wird NaN, Q-10)`);
     const bm = CITY.costBm[k];
     assert.ok(bm === undefined || (num(bm) && bm >= 0), `CITY.costBm.${k} = ${bm}`);
@@ -35,6 +35,14 @@ test('Jede Zellenart: Name, Preis, Baumaterial, Größe, Strom', () => {
   }
   for (const k of Object.keys(CITY.power.use)) assert.ok(KINDS.includes(k), `CITY.power.use.${k}: unbekannte Zellenart`);
   for (const k of Object.keys(CITY.ai.targetValue)) assert.ok(KINDS.includes(k), `CITY.ai.targetValue.${k}: unbekannte Zellenart`);
+});
+
+test('Nicht mehr baubare Arten (CITY.retired) sind nur Platzhalter: keine Daten, kein Werkzeug, Bauen wird abgelehnt (seit v5.56)', () => {
+  const tabs = { cost: CITY.cost, costBm: CITY.costBm, size: CITY.size, 'power.use': CITY.power.use, 'ai.targetValue': CITY.ai.targetValue, CITY_COLORS, CITY_ICON };
+  for (const k of CITY.retired ?? []) {
+    for (const [name, tab] of Object.entries(tabs)) assert.ok(!(k in tab), `${name}.${k}: Altlast der nicht mehr baubaren Art`);
+    assert.ok(!TOOL_GROUPS.some(([, ks]) => ks.includes(k)), `${k} im Baumenü`);
+  }
 });
 
 test('Jede baubare Zellenart: Farbe, Symbol und Werkzeug in einer benannten Gruppe des Baumenüs', () => {

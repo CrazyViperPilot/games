@@ -66,11 +66,6 @@ export function createRoads(game) {
   game.roads = { cols, rows, cell: S, kind };
 }
 
-/** Ist Zelle i (Stadtraster) eine Stadtstraße der Karte (Zone oder Brücke)? */
-export function isMapRoad(game, i) {
-  return !!game.roads?.kind[i];
-}
-
 /**
  * Mehrspurige Straßen (seit v5.38, Daniels Wunsch „2 Straßenlinien nebeneinander“): Straßenzellen nebeneinander bilden ein Band.
  * isRoad(i) sagt, ob Zelle i Straße ist. Je Zelle: hl/vl = Länge der waagrechten/senkrechten Straßenreihe durch die Zelle;
