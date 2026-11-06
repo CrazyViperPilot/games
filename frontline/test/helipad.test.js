@@ -1,4 +1,4 @@
-// v5.50: Heliport als Landeplatz wie der Fliegerhorst: ein Hubschrauber je Heliport, Start und Landung senkrecht, Tanken und
+// v5.51: Heliport als Landeplatz wie der Fliegerhorst: ein Hubschrauber je Heliport, Start und Landung senkrecht, Tanken und
 // Nachladen aus Kerosintank und Munitionslager in der Nähe, Luftraumsperre (mit Tower kürzer), Heimflug bei knappem Treibstoff.
 import test from 'node:test';
 import assert from 'node:assert/strict';

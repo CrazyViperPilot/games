@@ -586,7 +586,7 @@ export class Controller {
         if (!rest.length) return;
       }
     }
-    // Eigener Heliport: Hubschrauber landen dort (seit v5.50, die übrigen gehen hin)
+    // Eigener Heliport: Hubschrauber landen dort (seit v5.51, die übrigen gehen hin)
     const hp = rest.some((u) => u.def.air && !u.def.jet) ? this.pickHeliport(wx, wy) : null;
     if (hp) {
       const helis = rest.filter((u) => u.def.air && !u.def.jet);
@@ -808,13 +808,13 @@ export class Controller {
     return e && isAirport(this.game, e) ? e : null;
   }
 
-  /** Eigener fertiger Heliport an (wx, wy) oder null (seit v5.50). */
+  /** Eigener fertiger Heliport an (wx, wy) oder null (seit v5.51). */
   pickHeliport(wx, wy) {
     const e = this.pickCity(wx, wy);
     return e && isHeliport(this.game, e) ? e : null;
   }
 
-  /** Landen (L): gewählte Flugzeuge landen am angeklickten Stellplatz, Hubschrauber am angeklickten Heliport (seit v5.50). */
+  /** Landen (L): gewählte Flugzeuge landen am angeklickten Stellplatz, Hubschrauber am angeklickten Heliport (seit v5.51). */
   confirmLand(wx, wy) {
     const air = this.selectedUnits().filter((u) => u.def.air);
     if (!air.length) {
@@ -1317,7 +1317,7 @@ export class Controller {
       const any = (jets.length && airportsOf(this.game, this.team).length > 0) || (rotors.length && pads);
       card.push(
         entry('Landen', units.some(isCarrier) ? null : 'L', {
-          tip: 'Landen (L): Flugzeuge danach einen eigenen Stellplatz anklicken (Platzrunde, Landebahn, Rollen zum Stellplatz), Hubschrauber einen eigenen Heliport (senkrecht landen, seit v5.50); auch Rechtsklick darauf. Dort wird betankt und munitioniert (Kerosintank, Munitionslager in der Nähe).',
+          tip: 'Landen (L): Flugzeuge danach einen eigenen Stellplatz anklicken (Platzrunde, Landebahn, Rollen zum Stellplatz), Hubschrauber einen eigenen Heliport (senkrecht landen, seit v5.51); auch Rechtsklick darauf. Dort wird betankt und munitioniert (Kerosintank, Munitionslager in der Nähe).',
           enabled: !!any,
           reason: jets.length ? 'Kein eigener Stellplatz' : 'Kein eigener Heliport',
           action: () => this.setMode('landAt'),
@@ -1450,7 +1450,7 @@ export class Controller {
       );
     }
     if (CITY_KINDS[c.kind[i] - 1] === 'heliport') {
-      // Heliport (seit v5.50): sein Hubschrauber (gelandet oder in der Luft)
+      // Heliport (seit v5.51): sein Hubschrauber (gelandet oder in der Luft)
       const helis = this.game.units.filter((u) => u.alive && u.team === this.team && u.heli?.home === b.id);
       card.push(
         entry('Hubschrauber', 'W', {

@@ -668,7 +668,7 @@ export class Game {
       case 'drill':
         return cmdDrill(this, team, cmd);
       case 'land':
-        return isHeliport(this, this.getEntity(cmd.airportId)) ? cmdHeliLand(this, team, cmd) : cmdLand(this, team, cmd); // Heliport: Hubschrauber (seit v5.50), sonst Stellplatz: Jets
+        return isHeliport(this, this.getEntity(cmd.airportId)) ? cmdHeliLand(this, team, cmd) : cmdLand(this, team, cmd); // Heliport: Hubschrauber (seit v5.51), sonst Stellplatz: Jets
       case 'dig':
         return cmdDig(this, team, cmd);
       case 'city':
@@ -1180,7 +1180,7 @@ export class Game {
     updateFormations(this);
     updateMovement(this, dt);
     updateAircraft(this, dt); // Jets: Flug, Rückkehr, Landung, Rollen, Tanken am Stellplatz (seit v5.03, Fliegerhorst seit v5.35)
-    updateHelis(this, dt); // Hubschrauber: Start, Landung, Tanken am Heliport (seit v5.50)
+    updateHelis(this, dt); // Hubschrauber: Start, Landung, Tanken am Heliport (seit v5.51)
     updateCrates(this, dt);
     updateLogistics(this, dt);
     updateConstruction(this, dt);

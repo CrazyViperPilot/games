@@ -78,7 +78,7 @@ export function updateEconomy(game, dt) {
         continue;
       }
       if (u.def.air && isHeliport(game, b)) {
-        landHeliNew(game, u, b); // Hubschrauber: steht gelandet auf seinem Heliport (helipad.js, seit v5.50)
+        landHeliNew(game, u, b); // Hubschrauber: steht gelandet auf seinem Heliport (helipad.js, seit v5.51)
         game.message(b.team, `${ut.name} bereit`, u.x, u.y);
         continue;
       }

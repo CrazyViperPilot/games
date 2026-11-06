@@ -459,7 +459,7 @@ test('Keine Ware aus dem Nichts: Lager-Zuwachs je Schritt ≤ Förderung über d
   assert.ok(take > 0, 'Gewerbe nimmt Baumaterial (die Prüfung greift)');
 });
 
-// Seit v5.50 tanken Hubschrauber gelandet auf ihrem Heliport aus dem Kerosintank (test/helipad.test.js), nicht mehr im Umkreis aus c.kero.
+// Seit v5.51 tanken Hubschrauber gelandet auf ihrem Heliport aus dem Kerosintank (test/helipad.test.js), nicht mehr im Umkreis aus c.kero.
 test('Ohne Hauptstadt (zerstört): Werke liefern nichts ins Lager, Munitionswerk steht, Gewerbe unversorgt, keine ungültigen Zahlen', () => {
   const g = new Game({ seed: 3, city: true, startMoney: 5000 });
   const c = netBase(g);

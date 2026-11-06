@@ -528,7 +528,7 @@ export class Hud {
     else if (b.produces) {
       h += line(`Bildet aus: ${b.produces.map((u) => UNITS[u].short || UNITS[u].name).join(', ')} · ${b.trainSlots} gleichzeitig (Stufe ${lv})`);
       if (k === 'heliport') {
-        // Heliport als Landeplatz (seit v5.50): Hubschrauber, Luftraum, Kerosin und Munition in der Nähe
+        // Heliport als Landeplatz (seit v5.51): Hubschrauber, Luftraum, Kerosin und Munition in der Nähe
         const heli = g.units.find((u) => u.alive && u.heli?.home === b.id);
         const ph = { landed: 'gelandet', takeoff: 'startet', landing: 'landet', air: 'in der Luft' };
         h += line(heli ? `${heli.def.name}: ${ph[heli.heli.phase] ?? ''}` : `Frei${b.queue?.length ? ' · Hubschrauber in Bau' : ''} · ein Hubschrauber je Heliport`);

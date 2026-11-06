@@ -1554,7 +1554,7 @@ function updateCare(game, c, dt) {
   }
   if (!givers.length) return;
   const power = c.stats.powerRatio ?? 1;
-  // Tanken der Hubschrauber: seit v5.50 gelandet am Heliport aus dem Kerosintank (helipad.js), nicht mehr im Umkreis aus c.kero
+  // Tanken der Hubschrauber: seit v5.51 gelandet am Heliport aus dem Kerosintank (helipad.js), nicht mehr im Umkreis aus c.kero
   for (const u of game.units) {
     if (!u.alive || u.team !== c.team || u.hp >= u.maxHp || game.time - u.lastHitTime < C.delay) continue;
     const cls = careClass(u);

@@ -1,4 +1,4 @@
-// Heliport als Landeplatz der Hubschrauber (seit v5.50, PRD §15 „Heliport“, Daniels Wunsch „den Heliport an den Flughafen
+// Heliport als Landeplatz der Hubschrauber (seit v5.51, PRD §15 „Heliport“, Daniels Wunsch „den Heliport an den Flughafen
 // angleichen“): ein Hubschrauber je Heliport, dort ausgebildet; er startet und landet dort senkrecht, tankt gelandet Kerosin aus dem
 // nächsten Kerosintank und lädt aus dem Munitionslager (Umkreis CITY.air.supplyRadius, wie die Jets). Start und Landung sperren die
 // Heliports im Umkreis kurz (mit Tower kürzer). Heimflug bei knappem Treibstoff oder leeren Waffen. Kein DOM, deterministisch.
@@ -209,7 +209,7 @@ export function heliTrainCheck(game, b, unit) {
 }
 
 /**
- * Befehl `{ type: 'land', ids, airportId }` mit einem Heliport als Ziel (seit v5.50; game.js wählt zwischen diesem und cmdLand der
+ * Befehl `{ type: 'land', ids, airportId }` mit einem Heliport als Ziel (seit v5.51; game.js wählt zwischen diesem und cmdLand der
  * Jets): gewählte Hubschrauber fliegen hin und landen. Jeder Heliport nimmt einen Hubschrauber: seinen eigenen oder, wenn er frei
  * ist, den ersten Gewählten (der damit dort zu Hause ist); die übrigen landen auf freien Heliports in der Nähe.
  */

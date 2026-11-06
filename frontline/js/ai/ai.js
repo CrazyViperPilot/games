@@ -624,7 +624,7 @@ export class AI {
     let bestKey = Infinity;
     for (const b of s.producers) {
       if (!b.built || !b.produces.includes(type) || b.queue.length >= qmax) continue;
-      if (UNITS[type]?.air && !UNITS[type].jet && heliTrainCheck(this.game, b, type)) continue; // Heliport belegt (ein Hubschrauber je Heliport, seit v5.50)
+      if (UNITS[type]?.air && !UNITS[type].jet && heliTrainCheck(this.game, b, type)) continue; // Heliport belegt (ein Hubschrauber je Heliport, seit v5.51)
       const key = b.queue.length * 100000 + (towardZone ? dist(b.x, b.y, s.zone.x, s.zone.y) : b.id);
       if (key < bestKey) {
         bestKey = key;

@@ -54,7 +54,7 @@ export const CITY = {
     delay: 6, // s ohne Treffer, bevor geheilt oder repariert wird
     levelMul: [0, 1, 1.5, 2], // Tempo × je Stufe des Gebäudes
     metalShare: 0.5, // Reparatur kostet Metall aus dem Stadtlager: metalCost der Einheit × repariert/maxHp × metalShare (Soldaten gratis)
-    refuel: 0.05, // v5.20 bis v5.41: Heliport tankte Hubschrauber im Umkreis aus c.kero; seit v5.50 tanken sie gelandet am Kerosintank (CITY.air.heli, helipad.js). Nicht mehr benutzt
+    refuel: 0.05, // v5.20 bis v5.41: Heliport tankte Hubschrauber im Umkreis aus c.kero; seit v5.51 tanken sie gelandet am Kerosintank (CITY.air.heli, helipad.js). Nicht mehr benutzt
     by: {
       barracks: { units: 'inf', radius: 2, rate: 0.02 }, // Soldaten, Anteil maxHp je s (Stufe 1: 50 s von 0 auf voll)
       factory: { units: 'ground', radius: 2, rate: 0.02 }, // Bodenfahrzeuge
@@ -143,7 +143,7 @@ export const CITY = {
     upgrade: { 2: { money: 300, bm: 150, steel: 0 }, 3: { money: 700, bm: 300, steel: 150 } },
     upgradeAiReserve: 1200,
     standName: ['', 'Offener Stellplatz', 'Überdachter Stellplatz', 'Stahlbeton-Shelter'],
-    // Heliport als Landeplatz (seit v5.50, Daniels Wunsch, Logik js/game/helipad.js): ein Hubschrauber je Heliport, dort ausgebildet,
+    // Heliport als Landeplatz (seit v5.51, Daniels Wunsch, Logik js/game/helipad.js): ein Hubschrauber je Heliport, dort ausgebildet,
     // startet und landet senkrecht (liftTime s), tankt und lädt gelandet aus Kerosintank und Munitionslager im Umkreis supplyRadius
     // (Raten wie bei den Jets, tank.rate/depot.rate je Stufe des Lagers). Start und Landung sperren alle Heliports im Umkreis sepRadius
     // Zellen sep s, mit Tower (atcRadius) sepAtc s. Heimflug, wenn der Treibstoff nur noch für den Heimweg × home + reserve s reicht
@@ -202,7 +202,7 @@ export const CITY = {
     // Angriffsziele: Wert je Zellenart (geteilt durch Entfernung); Werke und Förderung zuerst
     targetValue: { steel: 3, fuel: 3, mun: 3, power: 3, dc: 2.5, uni: 2, mine: 2.5, market: 2, bm: 2, com: 1, res: 0.5, barracks: 2.5, factory: 3, heliport: 3, hospital: 2, airport: 3.5, stand: 3, atc: 3, ktank: 2.5, mdepot: 2.5 },
     // Ausbildungsgebäude (seit v4.96): so viele will sie haben; ab moreFrom Arbeitsstätten je eins mehr (Heliport erst, wenn Hubschrauber freigeschaltet sind)
-    producers: { barracks: 1, factory: 1, heliport: 2 }, // seit v5.50 zwei Heliports: einer je Hubschrauber (Späher und Transporter)
+    producers: { barracks: 1, factory: 1, heliport: 2 }, // seit v5.51 zwei Heliports: einer je Hubschrauber (Späher und Transporter)
     moreFrom: 14,
     hospitalFrom: 10, // Arbeitsstätten, ab denen sie ein Krankenhaus baut (seit v5.01, eins reicht)
     airportFrom: 14, // Arbeitsstätten, ab denen sie einen Fliegerhorst baut (seit v5.35 aus Bahn, Stellplätzen, Tower, Kerosintank, Munitionslager; einer reicht)
