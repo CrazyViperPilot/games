@@ -151,8 +151,8 @@ Bei einem neuen Feature dort eine Zeile ergänzen.
 
 ### Einen Wert ändern
 1. Schlüssel in „Wo ändere ich was?“ suchen, Wert in `js/data/` ändern.
-2. `npm run docs` (Tabellen in PRD §6), dann PRD-Text und Hilfetexte (`js/ui/menu.js`) auf die alte Zahl durchsuchen und anpassen; Eintrag in docs/changelog.md.
-3. `CACHE_VERSION` in `sw.js` erhöhen, `npm run test:quick`, dann `npm test`. Schlägt ein Test fehl, der genau diesen Wert prüft: Test an die neue Regel anpassen, nicht umgekehrt.
+2. `npm run docs` (Tabellen in PRD §6), dann PRD-Text und Hilfetexte (`js/ui/menu.js`) auf die alte Zahl durchsuchen und anpassen; Eintrag als Datei in `docs/changes/`.
+3. `npm run test:quick`, dann `npm test` (`CACHE_VERSION` erhöht `npm run release`). Schlägt ein Test fehl, der genau diesen Wert prüft: Test an die neue Regel anpassen, nicht umgekehrt.
 
 ### Neue Einheit
 1. `js/data/units.js`: ähnliche Einheit kopieren, neuen Schlüssel vergeben; `name`, `short`, Werte, `weapons`, `cost`, `buildTime`, `slots`, `hotkey` anpassen (Taste darf in der Hauptstadt noch nicht belegt sein).
@@ -160,7 +160,7 @@ Bei einem neuen Feature dort eine Zeile ergänzen.
 3. `js/data/research.js`: Gruppe in `RESEARCH.groups` eintragen (fehlt sie, wirken nur `all`, `veh` und `air`; Einheiten sind ohne Forschung frei). Mit Stadt: `CITY.crew` (Einwohner) und `CITY.metalCost` (Metall aus dem Stadtlager, fehlt = 0) in `js/data/city.js`.
 4. Aussehen: Modell in `js/render/unitpaint.js` (Funktion in `MODELS` bzw. `INFANTRY`, gilt für 2D und Iso; `test/unitpaint.test.js` prüft, dass jede Einheit eines hat). Ohne Modell zeichnen `js/render/sprites.js` (`drawUnit`) und der Renderer eine einfache Form.
 5. KI: Soll sie die Einheit bauen? Dann `MIX` in `js/data/ai.js` und die Ausbildung in `js/ai/army/produce.js` (`produce`, `counterMix`) ergänzen, sonst im PRD §10 vermerken, dass sie es nicht tut.
-6. Test in `test/` (Ausbildung über `game.issue(team, { type: 'train', … })`), Hilfe in `js/ui/menu.js`, `npm run docs` (Tabellen), PRD §6 (Rolle) und docs/changelog.md, `CACHE_VERSION`.
+6. Test in `test/` (Ausbildung über `game.issue(team, { type: 'train', … })`), Hilfe in `js/ui/menu.js`, `npm run docs` (Tabellen), PRD §6 (Rolle) und Eintrag in `docs/changes/`.
 
 ### Neues Gebäude
 1. `js/data/buildings.js`: Eintrag mit `name`, `short` (Kurzname in der Befehlskarte), `w`, `h` (Zellen), `hp`, `sight`, `cost`, `buildTime`,
@@ -169,7 +169,7 @@ Bei einem neuen Feature dort eine Zeile ergänzen.
 2. Sonderregeln beim Setzen in `game.js` (`canPlace`), Wirkung im passenden Modul oder in einem neuen Modul (Rezept „Neues Spielsystem“).
 3. Aussehen: Maler in `js/render/milbuild.js` (Typ in `MIL_TYPES` eintragen), Höhe in `js/render/iso.js` (`BUILD_H`), Kürzel in
    `js/render/sprites.js` (`BUILD_ABBR`, 2D-Ansicht).
-4. KI optional in `js/ai/army/build.js` (`buildDefense`, `findSite`); Test, Baumenü-Zeile der Hilfe (`js/ui/menu.js`, Taste B), PRD §5 und docs/changelog.md, `CACHE_VERSION`.
+4. KI optional in `js/ai/army/build.js` (`buildDefense`, `findSite`); Test, Baumenü-Zeile der Hilfe (`js/ui/menu.js`, Taste B), PRD §5 und Eintrag in `docs/changes/`.
 
 ### Neue Stadtzellenart
 1. `js/data/citykinds.js`: Eintrag in `CITY_KINDS` an der Stelle seiner Baumenü-Gruppe (`group`), mit der **nächsten freien `id`**
@@ -182,7 +182,7 @@ Bei einem neuen Feature dort eine Zeile ergänzen.
 3. Logik in `js/game/city/`, wenn die Art mehr tut als Arbeitsplätze und Strom: z. B. `totals` in `state.js` (Wohnen, Strom, Forschung), Werk:
    Kette `CITY.chain` (`js/data/city.js`) und `WORK_ORDER` in `economy.js`, bei neuem Zielwerk `GROUP_OF_KIND` in `js/game/transport.js`;
    Ausbildung `CITY.produces`, Pflege `CITY.care.by`; Infozeilen in `js/ui/hud.js` (`cityInfo`); KI optional (`CITY.ai.mix`, `aiNeed` in `js/ai/cityai.js`).
-4. Test, PRD §15 und docs/changelog.md, `CACHE_VERSION`.
+4. Test, PRD §15 und Eintrag in `docs/changes/`.
 
 ### Neue Ware
 Für Waren, die ein Werk der Stadt erzeugt und die im Lager der Hauptstadt, im Stadtlager oder als Zwischenprodukt (ohne Lager) laufen.
@@ -193,7 +193,7 @@ Neue Sorten der FOB-Lager und LKW (wie Baumaterial, Munition, Treibstoff) brauch
 2. Werk: Zeile in `CITY.chain` (`js/data/city.js`), meist mit neuer Zellenart (Rezept oben).
 3. Logik in `updateCity` (`js/game/city/economy.js`): Gutschrift ins Lager (`main.store` bzw. Feld `c.<Ware>` mit Startwert in `createCity`)
    und Verbrauch; KI-Regeln (`aiNeed`, Markt) optional.
-4. `test/registry.test.js` und `test/flow.test.js` laufen lassen (sie prüfen Register, Kette und Stadtzahlen), PRD §15 und docs/changelog.md, `CACHE_VERSION`.
+4. `test/registry.test.js` und `test/flow.test.js` laufen lassen (sie prüfen Register, Kette und Stadtzahlen), PRD §15 und Eintrag in `docs/changes/`.
 
 ### Neuer Befehl
 1. Handler im zuständigen Modul: `export function cmdX(game, team, cmd)` → `{ ok: true }` oder `{ ok: false, reason: 'deutscher Text' }`. Nur eigene, lebende Einheiten akzeptieren.
@@ -202,7 +202,7 @@ Neue Sorten der FOB-Lager und LKW (wie Baumaterial, Munition, Treibstoff) brauch
    [ARCHITEKTUR.md](ARCHITEKTUR.md) §6 beschreiben (`test/docs.test.js` prüft das).
 3. UI: Eintrag in der Befehlskarte (`js/ui/controller/cards.js`, `entry(label, hotkey, { action })`) und/oder Rechtsklick. Braucht er ein Ziel auf
    der Karte: Zeile in der Modustabelle `MODES` (`js/ui/controller/modes.js`: `hint`, `click`) plus `confirmX`-Methode (`js/ui/controller/targets.js`). Taste in der Hilfe (`js/ui/helptext.js`).
-4. Test über `game.issue` (`test/commands.test.js` prüft Register und Modi allgemein), PRD §8 (Steuerung) und docs/changelog.md.
+4. Test über `game.issue` (`test/commands.test.js` prüft Register und Modi allgemein), PRD §8 (Steuerung) und Eintrag in `docs/changes/`.
 
 ### Neue Option im Startmenü
 1. Standard in `BALANCE.menuDefaults`; `js/ui/menu.js` → `showStartMenu`: Zustand, Schalter im HTML, Speicherung (`readFlag`/`writeFlag` mit eigenem Schlüssel `frontline-…`), Wert in `onStart({ … })`.

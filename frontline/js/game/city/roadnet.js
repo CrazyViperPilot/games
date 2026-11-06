@@ -90,6 +90,19 @@ export function connectRoad(game, c, a, pay, goal = null) {
       frontier.push(j);
     }
   }
+  // Auch vom Straßennetz aus, an dem das Gebäude schon hängt (seit v5.82): Liegt eine Mine mitten im Vorkommen, sind ihre freien
+  // Nachbarn oft schon Straße oder Vorkommen; der neue Anschluss muss dann am Rand dieses Netzes beginnen (sonst findet die KI nie einen
+  // Weg zur Hütte, wenn Minen- und Hüttennetz nur über die Hauptstadt zusammenhängen, durch die keine Ware fährt).
+  // Nur für bezahlte Anschlüsse (KI, Spieler); das Startviertel (pay false) baut wie bisher, damit Startzustände je Seed gleich bleiben.
+  const own = pay ? roadReach(c, accessCells(c, anchor)) : null;
+  for (let i = 0; own && i < n; i++) {
+    if (!own[i] || !roadAt(c, i)) continue;
+    for (const j of nbrsOf(c, i)) {
+      if (seen[j] || !ok(j)) continue;
+      seen[j] = 1;
+      frontier.push(j);
+    }
+  }
   // Breitensuche in Schichten: Schicht d hat Wege mit d neuen Zellen; Ende, sobald eine Zelle an eine verbundene Straße grenzt
   let end = -1;
   for (let d = 1; d <= max && frontier.length && end < 0; d++) {

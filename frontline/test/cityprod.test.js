@@ -31,7 +31,8 @@ for (const seed of [3, 11]) {
       assert.ok(bmZero[t] / samples < 0.5, `Team ${t}: Baumaterial im Lager 0 in ${(100 * bmZero[t] / samples).toFixed(0)} % der Zeit`);
       assert.ok(made.mun > 0, `Team ${t}: Munition ${made.mun.toFixed(0)}`);
       // Stahl (seit dem Review von v5.20 in beiden Städten): Hütte und Stahlwerk mit Weg, Förderung nur so viel, wie die Werke verarbeiten
-      assert.ok(made.metal > 0, `Team ${t}: Stahl ${made.metal.toFixed(0)}`);
+      // seit v5.82 mehr als nur ein Rest: vorher bestand Seed 11 mit 3e-12, weil die Erzmine von Blau keinen Weg zur Hütte bekam
+      assert.ok(made.metal > 50, `Team ${t}: Stahl ${made.metal.toFixed(0)}`);
     }
   });
 }
