@@ -368,3 +368,202 @@ export function drawNoAmmoMark(ctx, x, y, z) {
     c.fill();
   });
 }
+
+// ---------- Befehle (Gruppe 3, v5.54) ----------
+
+const MOVE = [150, 255, 180]; // Wegziel: hellgrün wie bisher
+
+/**
+ * Wegziel am Boden (Weltkoordinaten auf der Bodenebene): Ring mit dunklem Saum wächst und verblasst, vier Winkel laufen dabei zur
+ * Mitte zusammen, in der Mitte ein Punkt. k = Alter 0..1 (MARKER_LIFE), z = Zoom.
+ */
+export function drawMoveRing(ctx, x, y, k, z, iso = false) {
+  const a = 1 - k;
+  if (!(a > 0)) return;
+  const p = (iso ? ISO_THICK : 1) / z;
+  const r = (6 + 10 * k) / z;
+  const [R, Gc, B] = MOVE;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, TAU);
+  ctx.strokeStyle = `rgba(8,12,10,${0.55 * a})`;
+  ctx.lineWidth = 3.6 * p;
+  ctx.stroke();
+  ctx.strokeStyle = `rgba(${R},${Gc},${B},${a})`;
+  ctx.lineWidth = 1.8 * p;
+  ctx.stroke();
+  // Winkel (Pfeilspitzen zur Mitte) auf den Diagonalen
+  const d = (17 - 9 * k) / z;
+  const s = 3.4 / z;
+  ctx.beginPath();
+  for (let i = 0; i < 4; i++) {
+    const ang = Math.PI / 4 + (i * Math.PI) / 2;
+    const cx = x + Math.cos(ang) * d;
+    const cy = y + Math.sin(ang) * d;
+    const ux = Math.cos(ang);
+    const uy = Math.sin(ang);
+    ctx.moveTo(cx + (ux - uy) * s, cy + (uy + ux) * s);
+    ctx.lineTo(cx, cy);
+    ctx.lineTo(cx + (ux + uy) * s, cy + (uy - ux) * s);
+  }
+  ctx.strokeStyle = `rgba(8,12,10,${0.5 * a})`;
+  ctx.lineWidth = 3.4 * p;
+  ctx.stroke();
+  ctx.strokeStyle = `rgba(${R},${Gc},${B},${a})`;
+  ctx.lineWidth = 1.6 * p;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(x, y, 2.2 / z, 0, TAU);
+  ctx.fillStyle = `rgba(8,12,10,${0.5 * a})`;
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(x, y, 1.3 / z, 0, TAU);
+  ctx.fillStyle = `rgba(${R},${Gc},${B},${a})`;
+  ctx.fill();
+  ctx.restore();
+}
+
+/** Formationsplatz am Boden: kleiner grüner Punkt mit dunklem Rand und hellem Kern (einmal gemalt), alpha = Deckkraft. */
+export function drawSlotMark(ctx, x, y, z, alpha) {
+  if (!(alpha > 0)) return;
+  const old = typeof ctx.globalAlpha === 'number' ? ctx.globalAlpha : 1;
+  ctx.globalAlpha = old * Math.min(1, alpha);
+  icon(ctx, 'slot', 6, x, y, z, (c) => {
+    c.beginPath();
+    c.arc(0, 0, 3.4, 0, TAU);
+    c.fillStyle = 'rgba(8,12,10,0.6)';
+    c.fill();
+    c.beginPath();
+    c.arc(0, 0, 2.5, 0, TAU);
+    c.fillStyle = 'rgb(150,255,180)';
+    c.fill();
+    c.beginPath();
+    c.arc(-0.6, -0.6, 0.9, 0, TAU);
+    c.fillStyle = 'rgba(255,255,255,0.8)';
+    c.fill();
+  });
+  ctx.globalAlpha = old;
+}
+
+/**
+ * Linie mit dunklem Saum: der Aufrufer baut den Pfad (beginPath, moveTo/lineTo), hier wird er erst durchgehend dunkel und breit, dann
+ * gestrichelt in der Farbe gezogen. w = Breite der Farblinie, dash = [Strich, Lücke], beides in Zeichenkoordinaten.
+ */
+export function strokeTrail(ctx, color, w, dash) {
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.setLineDash([]);
+  ctx.strokeStyle = 'rgba(8,12,10,0.42)';
+  ctx.lineWidth = w * 2.3;
+  ctx.stroke();
+  ctx.setLineDash(dash);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = w;
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** Pfeilspitze am Boden: Spitze bei (x, y) in Richtung ang, Länge s; Füllung mit dunklem Rand (Breite px). */
+export function drawArrowHead(ctx, x, y, ang, s, color, px) {
+  const c = Math.cos(ang);
+  const sn = Math.sin(ang);
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x - c * s * 1.5 + sn * s * 0.85, y - sn * s * 1.5 - c * s * 0.85);
+  ctx.lineTo(x - c * s * 1.05, y - sn * s * 1.05);
+  ctx.lineTo(x - c * s * 1.5 - sn * s * 0.85, y - sn * s * 1.5 + c * s * 0.85);
+  ctx.closePath();
+  ctx.strokeStyle = 'rgba(8,12,10,0.6)';
+  ctx.lineWidth = px * 2.4;
+  ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.restore();
+}
+
+/** Ring am Boden um einen Punkt (Anfang einer Route, Fuß des Sammelpunkts): dunkler Saum, farbiger Kern. r und px in Zeichenkoordinaten. */
+export function drawFootRing(ctx, x, y, r, color, px) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, TAU);
+  ctx.fillStyle = 'rgba(8,12,10,0.28)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(8,12,10,0.55)';
+  ctx.lineWidth = px * 3.4;
+  ctx.stroke();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = px * 1.6;
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * Sammelpunkt-Fahne (einmal gemalt, Bildschirmpixel): Mast mit Knauf und ein goldener Wimpel mit Schwalbenschwanz und dunklem Saum.
+ * Fußpunkt bei (x, y); f = Zeichenkoordinaten je Bildschirmpixel (2D: 1/Zoom, Iso aufrecht: 1).
+ */
+export function drawRallyFlag(ctx, x, y, f) {
+  const dpr = spriteDpr();
+  const e = sprite('rally', dpr, [-4, -22, 16, 3], (c, s) => {
+    c.scale(s, s);
+    paintFlag(c);
+  });
+  if (e) {
+    blit(ctx, e, x, y, f);
+    return;
+  }
+  if (e === false) return;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(f, f);
+  paintFlag(ctx);
+  ctx.restore();
+}
+
+function paintFlag(c) {
+  c.lineCap = 'round';
+  c.lineJoin = 'round';
+  // Mast
+  c.strokeStyle = 'rgba(8,12,10,0.7)';
+  c.lineWidth = 3.2;
+  c.beginPath();
+  c.moveTo(0, 0);
+  c.lineTo(0, -19);
+  c.stroke();
+  c.strokeStyle = '#e9ece6';
+  c.lineWidth = 1.4;
+  c.stroke();
+  // Wimpel mit Schwalbenschwanz
+  c.beginPath();
+  c.moveTo(0.6, -19);
+  c.lineTo(12.5, -16.8);
+  c.lineTo(9.2, -14.2);
+  c.lineTo(12.5, -11.6);
+  c.lineTo(0.6, -11);
+  c.closePath();
+  c.strokeStyle = 'rgba(8,12,10,0.7)';
+  c.lineWidth = 2.4;
+  c.stroke();
+  c.fillStyle = GOLD;
+  c.fill();
+  c.fillStyle = 'rgba(255,240,180,0.55)'; // oberer Streifen heller
+  c.beginPath();
+  c.moveTo(0.6, -19);
+  c.lineTo(12.5, -16.8);
+  c.lineTo(11.2, -15.8);
+  c.lineTo(0.6, -16.4);
+  c.closePath();
+  c.fill();
+  // Knauf
+  c.beginPath();
+  c.arc(0, -19.6, 1.5, 0, TAU);
+  c.fillStyle = GOLD_HI;
+  c.fill();
+  c.strokeStyle = 'rgba(8,12,10,0.7)';
+  c.lineWidth = 0.8;
+  c.stroke();
+}

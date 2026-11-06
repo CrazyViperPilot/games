@@ -54,7 +54,7 @@ import { drawUnitTop, drawUnitShadowIso, drawWreckTop } from './unitpaint.js';
 import { drawShell, drawShellIso, drawShellTarget, drawEffect, drawEffectUp, drawCrater, drawWreck, drawWreckRubble, drawSmoke, drawSmokeScreen, drawFire, drawMine } from './fx.js';
 import { drawCityGround, drawCityTop, drawCityRoofs, cityBuildings, drawCityBadges } from './citylayer.js';
 import { drawWays } from './ways.js';
-import { drawSelectMark, drawDragFrame, drawCargoGauge, drawCareMark, drawNoAmmoMark } from './marks.js';
+import { drawSelectMark, drawDragFrame, drawCargoGauge, drawCareMark, drawNoAmmoMark, drawMoveRing, drawSlotMark, strokeTrail, drawArrowHead, drawFootRing, drawRallyFlag } from './marks.js';
 import { beginTownFrame, townLift } from './townhouses.js';
 
 const TILE = BALANCE.map.tile;
@@ -63,6 +63,8 @@ const H = BALANCE.map.height;
 const BG = '#0d110d';
 const BG_RGB = [13, 17, 13];
 const ACCENT = '#c9a227';
+const GOLD_RALLY = '#ffd65a'; // Ring am Sammelpunkt
+const ROUTE_COLOR = 'rgba(222,182,52,0.95)'; // Route gewählter LKW
 const CARGO_COLOR = { bm: '#a0703f', mun: '#d9b600', fuel: '#9b7bc4' }; // LKW-Ladung je Sorte
 const AMMO_COLOR = '#7f93ad'; // Munitionsbalken (grau-blau)
 const FUEL_COLOR = '#9b7bc4'; // Treibstoffbalken (violett)
@@ -948,6 +950,7 @@ export class Renderer {
       drawSmoke(ctx, p.x, y, q.s * z, q.k, t, q.seed);
     }
     if (relief && v.moveMarker) this.groundAt(ctx, v.moveMarker.x, v.moveMarker.y);
+    else setIsoGround(ctx, cam, dpr); // ohne Gelände: flache Bodenebene
     this.drawMoveMarker(ctx, v.moveMarker, now, z, relief ? (x, y) => this.groundAt(ctx, x, y) : null);
 
     if (!reveal) {
@@ -1372,16 +1375,11 @@ export class Renderer {
     drawSelectMark(ctx, e, z, dashed, this.camera.iso, z * this.dpr);
   }
 
-  /** Gestrichelte Routenlinie gewählter LKW von Start-FOB nach Ziel-FOB, mit Pfeilspitze am Ziel. */
+  /** Route gewählter LKW von Start-FOB nach Ziel-FOB: gestrichelte Goldlinie mit dunklem Saum und Pfeilspitze am Ziel (seit v5.54, marks.js). */
   drawRoutes(ctx, sel, z) {
     const g = this.game;
     const seen = new Set();
     const drape = this.draping();
-    ctx.save();
-    ctx.strokeStyle = 'rgba(201,162,39,0.85)';
-    ctx.fillStyle = 'rgba(201,162,39,0.85)';
-    ctx.lineWidth = 2 / z;
-    ctx.setLineDash([10 / z, 7 / z]);
     for (const id of sel) {
       const u = g.getEntity(id);
       if (!u || u.kind !== 'unit' || u.type !== 'truck' || u.order.type !== 'route') continue;
@@ -1391,35 +1389,23 @@ export class Renderer {
       const key = `${a.id}>${b.id}`;
       if (seen.has(key)) continue;
       seen.add(key);
+      ctx.save();
       if (drape) {
-        ctx.save();
         ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-        ctx.lineWidth = 2;
-        ctx.setLineDash([10, 7]);
         ctx.beginPath();
         this.groundLine(ctx, a.x, a.y, b.x, b.y);
-        ctx.stroke();
-        ctx.restore();
+        strokeTrail(ctx, ROUTE_COLOR, 2, [10, 7]);
         this.groundAt(ctx, b.x, b.y);
       } else {
         ctx.beginPath();
         ctx.moveTo(a.x, a.y);
         ctx.lineTo(b.x, b.y);
-        ctx.stroke();
+        strokeTrail(ctx, ROUTE_COLOR, 2 / z, [10 / z, 7 / z]);
       }
-      ctx.setLineDash([]);
       const ang = Math.atan2(b.y - a.y, b.x - a.x);
-      const hx = b.x - Math.cos(ang) * 30;
-      const hy = b.y - Math.sin(ang) * 30;
-      const s = 9 / z;
-      ctx.beginPath();
-      ctx.moveTo(hx + Math.cos(ang) * s, hy + Math.sin(ang) * s);
-      ctx.lineTo(hx + Math.cos(ang + 2.5) * s, hy + Math.sin(ang + 2.5) * s);
-      ctx.lineTo(hx + Math.cos(ang - 2.5) * s, hy + Math.sin(ang - 2.5) * s);
-      ctx.fill();
-      ctx.setLineDash([10 / z, 7 / z]);
+      drawArrowHead(ctx, b.x - Math.cos(ang) * 22, b.y - Math.sin(ang) * 22, ang, 6.5 / z, ROUTE_COLOR, 1 / z);
+      ctx.restore();
     }
-    ctx.restore();
   }
 
   /** Eigene Baustelle: ohne Bauer ein graues „!“ an der Ecke. */
@@ -1463,68 +1449,49 @@ export class Renderer {
     if (lacksAmmo(u)) drawNoAmmoMark(ctx, u.x + r + 5 / z, u.y - r - 3 / z, z);
   }
 
-  /** Sammelpunkt-Linie mit kleiner Flagge. */
+  /** Sammelpunkt: gestrichelte Linie mit Saum, Ring am Boden und aufrechte Fahne (gemalt seit v5.54, marks.js). */
   drawRally(ctx, b, z) {
     if (b.rallyX === undefined) return; // Stadtgebäude haben keinen Sammelpunkt
+    const px = b.rallyX;
+    const py = b.rallyY;
+    const color = hexA(ACCENT, 0.9);
     ctx.save();
-    ctx.strokeStyle = hexA(ACCENT, 0.75);
-    ctx.fillStyle = ACCENT;
-    ctx.lineWidth = 1.5 / z;
-    ctx.setLineDash([5 / z, 4 / z]);
     if (this.draping()) {
-      ctx.save();
       ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([5, 4]);
       ctx.beginPath();
-      this.groundLine(ctx, b.x, b.y, b.rallyX, b.rallyY);
-      ctx.stroke();
-      ctx.restore();
-      this.groundAt(ctx, b.rallyX, b.rallyY);
+      this.groundLine(ctx, b.x, b.y, px, py);
+      strokeTrail(ctx, color, 1.5, [5, 4]);
+      this.groundAt(ctx, px, py);
     } else {
       ctx.beginPath();
       ctx.moveTo(b.x, b.y);
-      ctx.lineTo(b.rallyX, b.rallyY);
-      ctx.stroke();
+      ctx.lineTo(px, py);
+      strokeTrail(ctx, color, 1.5 / z, [5 / z, 4 / z]);
     }
-    ctx.setLineDash([]);
-    const px = b.rallyX;
-    const py = b.rallyY;
-    ctx.fillRect(px - 0.75 / z, py - 10 / z, 1.5 / z, 10 / z);
-    ctx.beginPath();
-    ctx.moveTo(px, py - 10 / z);
-    ctx.lineTo(px + 7 / z, py - 7.5 / z);
-    ctx.lineTo(px, py - 5 / z);
-    ctx.fill();
+    drawFootRing(ctx, px, py, 5 / z, GOLD_RALLY, 1 / z);
+    if (this.camera.iso) {
+      // Fahne aufrecht über dem Fußpunkt (Bildschirm)
+      const p = this.draping() ? this.screenAt(px, py) : this.camera.worldToScreen(px, py);
+      ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      drawRallyFlag(ctx, p.x, p.y, 1);
+    } else drawRallyFlag(ctx, px, py, 1 / z);
     ctx.restore();
   }
 
-  /** Wegziel-Markierung: wächst und verblasst über MARKER_LIFE. */
-  /** Wegziel: Ring am Klickpunkt, bei Formationen kurz Punkte auf den Zielplätzen. at(x, y) setzt im Relief die Bodenebene dort. */
+  /** Wegziel: Ring am Klickpunkt, bei Formationen kurz Punkte auf den Zielplätzen (gemalt seit v5.54, marks.js). at(x, y) setzt im Relief die Bodenebene dort. */
   drawMoveMarker(ctx, m, now, z, at = null) {
     if (!m || !Number.isFinite(m.t)) return;
     const age = (now - m.t) / 1000;
     if (!(age >= 0 && age < Math.max(MARKER_LIFE, m.slots ? SLOT_LIFE : 0))) return;
-    ctx.save();
     if (m.slots) {
-      ctx.fillStyle = `rgba(150,255,180,${0.85 * (1 - age / SLOT_LIFE)})`;
+      const a = 0.9 * (1 - age / SLOT_LIFE);
       for (const p of m.slots) {
         at?.(p.x, p.y);
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 3 / z, 0, Math.PI * 2);
-        ctx.fill();
+        drawSlotMark(ctx, p.x, p.y, z, a);
       }
       at?.(m.x, m.y);
     }
-    if (age < MARKER_LIFE) {
-      const k = age / MARKER_LIFE;
-      ctx.strokeStyle = `rgba(150,255,180,${1 - k})`;
-      ctx.lineWidth = 2 / z;
-      ctx.beginPath();
-      ctx.arc(m.x, m.y, (6 + 10 * k) / z, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-    ctx.restore();
+    if (age < MARKER_LIFE) drawMoveRing(ctx, m.x, m.y, age / MARKER_LIFE, z, this.camera.iso);
   }
 
   /** Platzierungsvorschau: grün gültig, rot ungültig; bei Mauerzug jede Zelle einzeln. */
