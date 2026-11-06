@@ -19,7 +19,9 @@ Der Änderungsverlauf steht in [docs/changelog.md](docs/changelog.md) (nur bei B
 | 10 | KI-Gegner | [ki.md](docs/prd/ki.md) | Verhalten der Armee-KI (Wellen, Späher, Expansion, Konter-Mix, Luftabwehr), was sie nicht baut, Tabelle „KI-Konstanten“ |
 | 13 | Geparkte Ideen | [ideen.md](docs/prd/ideen.md) | Ideen, die nur festgehalten werden (nicht bauen, Regel 8 in CLAUDE.md) |
 | 14, 16 | Ton, Musik, Spielstand | [ton-speichern.md](docs/prd/ton-speichern.md) | Synthetisierte Geräusche und Musik, Lautstärke; Speichern und Laden |
-| 15 | Stadt | [stadt.md](docs/prd/stadt.md) | Zonenstadt: Startviertel, Ausbildung in Kaserne/Fabrikhalle/Heliport, Großbauten, Werke, Einwohner, Strom, Zufriedenheit, Rohstoffe, Markt, Baugebiet, Angriff auf die Stadt, Stadt-KI, Ressourcenanzeige |
+| 15 | Stadt (Kern) | [stadt.md](docs/prd/stadt.md) | Zonenstadt: Startviertel, Ausbildung in Kaserne/Fabrikhalle/Heliport, Großbauten, Heilen und Krankenhaus, Universität und Rechenzentrum, Strom, Zufriedenheit, Baugebiet, Bedienung, Wachstum, Einwohner (auch als Truppen), Flucht, Arbeit, Stadtgebäude wählen, Angriff auf die Stadt, Stadt-KI |
+| 15 | Stadt: Wirtschaft | [stadt-wirtschaft.md](docs/prd/stadt-wirtschaft.md) | Rohstoffe und Vorkommen, Werke als 2 × 2-Großbauten, Ertrag, Stahl, Markt, Straßenkosten, Steuern, Ressourcenanzeige |
+| 15 | Stadt: Aussehen | [stadt-aussehen.md](docs/prd/stadt-aussehen.md) | Schilder und Farben, gemalte 1 × 1-Gebäude, Baustellen und Ruinen, Universität als Bild, Darstellung auf der Karte |
 | 15 | Stadt: Fliegerhorst, Heliport | [stadt-luft.md](docs/prd/stadt-luft.md) | Bahn, Rollfeld, Stellplätze, Tower, Kerosintank, Munitionslager, F-16; Heliport als Landeplatz |
 | 15 | Stadt: Straßentransport | [stadt-transport.md](docs/prd/stadt-transport.md) | Wege über Straßen, Kapazität und Stau, Pendler, Gewerbe-Absatz, Kerosin, Werkslager und LKW am Werk |
 

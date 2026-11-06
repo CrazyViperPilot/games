@@ -5,7 +5,7 @@ Spieler (Blau) gegen Computer (Rot). Vanilla JS, Canvas 2D und WebGL, kein Build
 
 | Datei | Inhalt |
 |---|---|
-| [CLAUDE.md](CLAUDE.md) | Einstieg für Erweiterungen: Regeln, „Wo ändere ich was?“, Feature-Landkarte, Rezepte |
+| [CLAUDE.md](CLAUDE.md) | Einstieg für Erweiterungen: Regeln, „Wo ändere ich was?“, Rezepte (Feature-Landkarte seit v5.79 in ARCHITEKTUR.md §9) |
 | [ARCHITEKTUR.md](ARCHITEKTUR.md) | Aufbau des Codes: Schichten, Simulationsschritt, Datenmodelle, Befehle, Dateien |
 | [PRD.md](PRD.md) | Einstieg in die Spielregeln mit Übersicht; die Regeln je Thema in [docs/prd/](docs/prd/), Änderungsverlauf in [docs/changelog.md](docs/changelog.md) |
 | [docs/verlauf.md](docs/verlauf.md) | Ursprünglicher Umsetzungsplan (v1 bis v4.23), nur zum Nachlesen |
