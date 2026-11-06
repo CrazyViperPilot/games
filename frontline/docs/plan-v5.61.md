@@ -9,7 +9,7 @@ Für die Pakete ab P2 gilt PRD §13: erst ein Vorschlag zur Ausgestaltung (unten
 | Paket | Inhalt | Quelle | Größe | Stand |
 |---|---|---|---|---|
 | **P1** | Statistik am Spielende + Doku-Abgleich §1/§13 | §12 Could, §13 | klein | **gebaut (v5.61)** |
-| P2 | Häuserkampf I: Zonen-Nutzen besetzter Häuser (Punkte, Sicht), Ruinen als Deckung | §13 Häuserkampf | mittel | geparkt |
+| P2 | Häuserkampf I: Zonen-Nutzen besetzter Häuser (Punkte, Sicht), Ruinen als Deckung | §13 Häuserkampf | mittel | **in Arbeit (v5.62)** |
 | P3 | Häuserkampf II: KI stürmt Häuser und baut sie zur Stellung aus; Feuerbereich je Haus | §13 Häuserkampf | mittel | geparkt |
 | P4 | Musik (synthetisiert, je Lage ruhig/Gefecht) und Lautstärkeregler für Ton und Musik | §13 Musik | mittel | geparkt |
 | P5 | Stadt: LKW holen Material direkt an Werken statt nur aus dem Lager der Hauptstadt | §13 SimCity-Stadt | groß | geparkt |
@@ -54,9 +54,30 @@ Ziel: Der Endbildschirm zeigt für **beide Teams nebeneinander** eine kleine Bil
   mit `hp = 0` versehen, `game.update(dt)` → `lost`/`kills` stimmen; Gebäude ebenso; ein Spielstand ohne `stats` lädt ohne Fehler (Snapshot aus `test/save.test.js` als Vorbild).
 - `npm run test:quick` und `npm test` grün, `test/golden.test.js` unverändert.
 
-## P2 – Häuserkampf I (Vorschlag)
-- Besetztes Haus in der Konfliktzone zählt für die Zonenkontrolle wie seine Besatzung (heute schon?) plus Sichtbonus aus dem Haus (Weitsicht wie erhöht).
-- Ruinen eingestürzter Häuser geben Infanterie darin Deckung (weniger Schaden, Wert in `BALANCE.garrison`).
+## P2 – Häuserkampf I (v5.62, von Daniel bestätigt am 2026-11-06)
+
+Heute (v5.61) zählen Besatzer schon wie Einheiten für Zone, Hot Zone, Punkte und Limit und sehen mit Gebäude-Augenhöhe.
+Neu kommt dazu (alle Werte in `BALANCE.garrison`, `js/data/balance.js`, mit deutschem Kommentar):
+
+1. **Stellung in der Zone:** Jedes besetzte, nicht eingestürzte Haus, dessen Mitte in der Konfliktzone liegt, gibt seinem Team
+   zusätzlich `zoneWeight: 2` Gewicht für die Zonenkontrolle (`weight` in `js/game/zone.js`, nicht `counts`, kein Geld).
+   Ein gehaltenes Haus wiegt also so viel wie zwei Soldaten mehr. Liegt die Hausmitte auch in der Hot Zone: doppelt (wie Einheiten).
+2. **Ausguck:** Besatzer sehen `sightMul: 1.25`-mal so weit (in `js/game/fog.js`, Stelle `u.house ? …`; die Wand-Zugabe `reach` bleibt).
+   Gilt nur für das Aufdecken des Nebels, nicht für die Waffenreichweite.
+3. **Ruinen als Deckung:** Infanterie (`def.armor === 'inf'`), die nicht in einem Haus sitzt und höchstens `ruinCover.r: 40` px vom Rand
+   einer Ruine (eingestürztes Haus, `h.ruined`) entfernt steht, nimmt von Treffern nur `ruinCover.mul: 0.7` des Schadens
+   (`ruinCover: { r: 40, mul: 0.7 }`). Gilt für direkte Treffer und Splash/Granaten, nicht für Splitter im Haus (`spill`) und nicht für Fahrzeuge.
+   Stelle: wo Einheiten Schaden nehmen (`js/game/combat.js`, `target.hp -= amount` bzw. die gemeinsame Schadensfunktion suchen).
+   Leistung: nur über die Liste der Ruinen laufen (z. B. `game.ruins` beim Einsturz in `js/game/garrison.js` füllen, mit Spielständen
+   verträglich: fehlt die Liste nach dem Laden, aus `h.ruined` neu aufbauen), keine Allokationen je Treffer.
+4. **Anzeige:** Hilfe (F1) in `js/ui/menu.js` ergänzen (Abschnitt Häuserkampf); Infozeile im HUD ist nicht nötig.
+
+Doku: PRD §7 „Häuserkampf“ (drei Punkte ergänzen, Satz „Weiter geparkt“ in §13 kürzen), Änderungsverlauf v5.62, `CACHE_VERSION`
+`frontline-v175`, `npm run docs`. Das ist eine gewollte Regeländerung: `test/golden.test.js` darf sich ändern, dann neu setzen mit
+`GOLDEN=print node --test test/golden.test.js` (Anleitung im Testkopf) und die neuen Werte eintragen.
+
+Test `test/garrison.test.js` (erweitern) oder neu `test/housefight.test.js`: Zonengewicht mit/ohne besetztes Haus; Sichtradius des
+Besatzers größer; Infanterie an einer Ruine nimmt 70 % Schaden, weiter weg 100 %, Fahrzeug an der Ruine 100 %.
 
 ## P3 – Häuserkampf II (Vorschlag)
 - KI stürmt besetzte Häuser in der Zone, wenn sie überlegen ist, und baut eigene besetzte Häuser aus (Werte in `js/data/ai.js`, `GARRISON_*`).
