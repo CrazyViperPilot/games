@@ -23,7 +23,7 @@ function play(seed, level, minutes) {
 
 const of = (g, team, type) => g.buildings.filter((b) => b.alive && b.team === team && b.type === type);
 
-test('KI (schwer) baut die Hauptstadt zur Festung aus: Tore, Mauern, Türme mit Besatzung und Aufbau, Hubschrauber', () => {
+test('KI (schwer) baut die Hauptstadt zur Festung aus: Tore, Mauern, Türme mit Besatzung und Aufbau, Hubschrauber [langsam]', () => {
   const { game: g, heli } = play(5, 'hard', 14);
   const towers = of(g, 0, 'tower').filter((b) => b.built);
   assert.ok(of(g, 0, 'gate').length >= 3, `Tore ${of(g, 0, 'gate').length}`);
@@ -34,7 +34,7 @@ test('KI (schwer) baut die Hauptstadt zur Festung aus: Tore, Mauern, Türme mit 
   assert.ok(heli, 'Transporthubschrauber');
 });
 
-test('KI (leicht) baut keine Festung', () => {
+test('KI (leicht) baut keine Festung [langsam]', () => {
   const { game: g } = play(5, 'easy', 14);
   assert.equal(of(g, 0, 'tower').length, 0);
 });

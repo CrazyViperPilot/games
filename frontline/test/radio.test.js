@@ -65,7 +65,7 @@ test('Eingeschaltet: Baufahrzeug baut ihn (Geld + Baumaterial), einer je Team, d
   assert.ok(b.built, 'fertig gebaut');
 });
 
-test('Fertig: der Gegner sieht ihn überall (auch im Nebel); nach hold s gewinnt sein Team', () => {
+test('Fertig: der Gegner sieht ihn überall (auch im Nebel); nach hold s gewinnt sein Team [langsam]', () => {
   const g = new Game({ seed: 3, radio: true });
   const b = builtMast(g, 0);
   g.updateFog();

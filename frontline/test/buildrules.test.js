@@ -199,7 +199,7 @@ test('Spielstand: Baugebiet bleibt erhalten', () => {
 });
 
 for (const seed of [3, 11]) {
-  test(`KI mit Baugebiet produziert (Seed ${seed}, 12 min): Stahl und Munition in beiden Städten`, () => {
+  test(`KI mit Baugebiet produziert (Seed ${seed}, 12 min): Stahl und Munition in beiden Städten [langsam]`, () => {
     const g = rules(seed);
     const ais = [new AI(g, 0, 'normal'), new AI(g, 1, 'normal')];
     const steps = Math.round((12 * 60) / 0.1);

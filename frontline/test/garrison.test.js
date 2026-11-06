@@ -156,7 +156,7 @@ test('Tod im Haus: wer im Haus stirbt, verschwindet aus der Besatzung', () => {
   assert.equal(h.team, -1);
 });
 
-test('KI besetzt Häuser in der Zone; Besatzung und Häuser bleiben stimmig (Seed 3, 8 min)', async () => {
+test('KI besetzt Häuser in der Zone; Besatzung und Häuser bleiben stimmig (Seed 3, 8 min) [langsam]', async () => {
   const { AI } = await import('../js/ai/ai.js');
   const g = new Game({ seed: 3 });
   const ais = [new AI(g, 0, 'normal'), new AI(g, 1, 'normal')];

@@ -165,7 +165,7 @@ test('Ablegen, keine Häuser und keine Fahrzeuge mit Kiste; untätige Träger br
   assert.equal(u.order.type, 'deliver');
 });
 
-test('KI holt Kisten und lagert sie ein (Seed 3, 10 min); Kisten bleiben stimmig', async () => {
+test('KI holt Kisten und lagert sie ein (Seed 3, 10 min); Kisten bleiben stimmig [langsam]', async () => {
   const { AI } = await import('../js/ai/ai.js');
   const g = new Game({ seed: 3 });
   const ais = [new AI(g, 0, 'normal'), new AI(g, 1, 'normal')];

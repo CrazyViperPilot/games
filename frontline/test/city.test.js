@@ -286,7 +286,7 @@ test('Ausbau nur bei Bedarf: Wohnen ohne Arbeit bleibt Stufe 1', () => {
   for (let col = 0; col < 4; col++) assert.equal(g.city[0].level[at(g, col, 1)], 1);
 });
 
-test('KI baut nach Bauplan und liefert Material', () => {
+test('KI baut nach Bauplan und liefert Material [langsam]', () => {
   const g = new Game({ seed: 5, city: true, startMoney: 2000 });
   const ai = new AI(g, 1, 'normal');
   const n0 = g.city[1].kind.filter(Boolean).length;
@@ -734,7 +734,7 @@ test('Ausbildungsgebäude abreißen erstattet die Warteschlange, zerstört verf�
   assert.equal(g.unitCount(0), g.units.filter((u) => u.team === 0).length, 'nichts mehr in Ausbildung');
 });
 
-test('KI mit Stadt bildet in Kaserne und Fabrikhalle aus und baut einen Heliport', () => {
+test('KI mit Stadt bildet in Kaserne und Fabrikhalle aus und baut einen Heliport [langsam]', () => {
   const g = new Game({ seed: 5, city: true, startMoney: 4000 });
   const ai = new AI(g, 1, 'normal');
   const own = () => g.units.filter((u) => u.alive && u.team === 1 && u.crew).length;

@@ -44,7 +44,7 @@ function playAiVsAi(seed, minutes) {
   };
 }
 
-test('KI allein (Seed 7): nach 10 min ≥ 3 FOBs, eine FOB in der Zone, Front-Lager gefüllt, Hauptstadt bildet aus', () => {
+test('KI allein (Seed 7): nach 10 min ≥ 3 FOBs, eine FOB in der Zone, Front-Lager gefüllt, Hauptstadt bildet aus [langsam]', () => {
   const game = new Game({ seed: 7 });
   const ai = new AI(game, 1, 'normal');
   const steps = Math.round((10 * 60) / DT);
@@ -79,7 +79,7 @@ for (const seed of [2, 3]) {
   });
 }
 
-test('KI: leicht und schwer laufen ohne Exception (gegeneinander)', () => {
+test('KI: leicht und schwer laufen ohne Exception (gegeneinander) [langsam]', () => {
   const game = new Game({ seed: 3 });
   const ais = [new AI(game, 0, 'easy'), new AI(game, 1, 'hard')];
   for (let i = 0; i < Math.round((6 * 60) / DT); i++) {
@@ -105,7 +105,7 @@ test('KI ersetzt ein verlorenes Baufahrzeug', () => {
   assert.ok(eng().length >= 1, 'kein Ersatz-Baufahrzeug ausgebildet');
 });
 
-test('KI: bildet ab 3 min mit Armee einen Späher (Little Bird) aus', () => {
+test('KI: bildet ab 3 min mit Armee einen Späher (Little Bird) aus [langsam]', () => {
   // Späher fliegen an den gegnerischen Zonenrand und fallen dort oft; gezählt wird, ob einer ausgebildet wurde
   const r = playAiVsAi(2, 8);
   const scouts = [0, 1].map((t) => r.types[t].has('littlebird'));
@@ -161,7 +161,7 @@ test('KI: Gruppen-Rückzug bei klarer Unterlegenheit (schwer, Seed 1, 20 min) un
   assert.ok(fell, 'kein Rückzug ausgelöst');
 });
 
-test('KI: Zonen-FOB bekommt zwei Mörser (Seed 7, 12 min)', () => {
+test('KI: Zonen-FOB bekommt zwei Mörser (Seed 7, 12 min) [langsam]', () => {
   const game = new Game({ seed: 7 });
   const ai = new AI(game, 1, 'normal');
   for (let i = 0; i < (12 * 60) / DT; i++) {

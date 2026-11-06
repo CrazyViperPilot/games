@@ -17,7 +17,7 @@ const run = (g, ai, n) => {
   }
 };
 
-test('Laden und Weiterspielen ist identisch zum durchgehenden Spiel', async () => {
+test('Laden und Weiterspielen ist identisch zum durchgehenden Spiel [langsam]', async () => {
   const opts = { seed: 11, radio: true, weather: 'random', research: true, river: true, city: true };
   const g1 = new Game(opts);
   const a1 = new AI(g1, 1, 'normal');
@@ -77,7 +77,7 @@ test('Karte aus dem Editor (Gelände aus map.relief): Stand ohne Gelände, Raste
   assert.deepEqual(snapshotGame(g2, a2), snapshotGame(g1, a1));
 });
 
-test('Stadt mit Stau (v5.20): Stau-Faktor c.congestion wird gespeichert, Laden und Weiterspielen bleibt identisch', async () => {
+test('Stadt mit Stau (v5.20): Stau-Faktor c.congestion wird gespeichert, Laden und Weiterspielen bleibt identisch [langsam]', async () => {
   const g1 = new Game({ seed: 11, city: true, startMoney: 3000 });
   const a1 = new AI(g1, 1, 'normal');
   let k = 0;

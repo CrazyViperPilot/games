@@ -20,7 +20,7 @@ test('Generierte Karte übersteht JSON-Rundlauf und ist spielbar', () => {
   assert.equal(g.map, copy);
 });
 
-test('Leere Karte: spielbar, KI gegen KI läuft ohne Fehler', () => {
+test('Leere Karte: spielbar, KI gegen KI läuft ohne Fehler [langsam]', () => {
   const m = createEmptyMap('Test');
   assert.deepEqual(checkMap(m), []);
   const g = new Game({ seed: 3, map: m });

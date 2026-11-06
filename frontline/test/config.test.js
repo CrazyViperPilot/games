@@ -92,8 +92,12 @@ test('Befehlskarten-Tasten liegen nicht auf festen Tasten', () => {
     ...Object.entries(BUILDINGS.tower.roofs ?? {}).map(([k, r]) => [`BUILDINGS.tower.roofs.${k}`, r.hotkey]),
   ];
   // Einträge der Befehlskarte mit fester Taste im Code (entry('Name', 'X', …)); Y „Baumodus“ ist gewollt (die feste Taste tut dasselbe)
-  const ctl = readFileSync(fileURLToPath(new URL('../js/ui/controller.js', import.meta.url)), 'utf8');
-  for (const m of ctl.matchAll(/entry\('([^']*)', '([A-Z])'/g)) if (m[2] !== 'Y' || m[1] !== 'Baumodus') used.push([`controller.js ${m[1]}`, m[2]]);
+  // Befehlskarten liegen seit v5.81 auch in js/ui/controller/ (cards.js, targets.js …)
+  const ctlFiles = ['controller.js', ...readdirSync(fileURLToPath(new URL('../js/ui/controller/', import.meta.url))).map((f) => `controller/${f}`)];
+  for (const f of ctlFiles) {
+    const ctl = readFileSync(fileURLToPath(new URL(`../js/ui/${f}`, import.meta.url)), 'utf8');
+    for (const m of ctl.matchAll(/entry\('([^']*)', '([A-Z])'/g)) if (m[2] !== 'Y' || m[1] !== 'Baumodus') used.push([`${f} ${m[1]}`, m[2]]);
+  }
   const clash = used.filter(([, key]) => FIXED_KEYS.includes(key)).map(([w, key]) => `${w} (${key})`);
   assert.deepEqual(clash, [], `auf festen Tasten: ${clash.join(', ')}`);
 });

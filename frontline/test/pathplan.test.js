@@ -144,7 +144,7 @@ test('Laden mitten in einer langen Suche: Weiterspielen bleibt bitgleich', () =>
 // Benchmark: KI gegen KI mit allen Schaltern. Vor v5.61 kostete hier ein Schritt bei 182 s 260 ms (Wegsuchen zu versperrten Zielen).
 // Geprüft wird (1) die Arbeit der Wegsuche je Schritt (untersuchte Zellen, fest je Seed, flackert nie) und (2) großzügig die Uhr:
 // kein Schritt nach dem Aufwärmen über 100 ms (gemessen ≈ 13 ms).
-test('Benchmark: kein Simulationsschritt sprengt das Wegbudget (Seed 3, 200 s KI gegen KI)', () => {
+test('Benchmark: kein Simulationsschritt sprengt das Wegbudget (Seed 3, 200 s KI gegen KI) [langsam]', () => {
   const g = new Game({ seed: 3, radio: true, weather: 'random', research: true, river: true, city: true });
   const ais = [new AI(g, 0, 'normal'), new AI(g, 1, 'normal')];
   const bound = P.budget + 2 * P.slice + 6 * P.pocket;

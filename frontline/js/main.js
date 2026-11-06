@@ -84,6 +84,8 @@ hudRoot.addEventListener('click', (e) => {
 });
 
 let session = null; // laufendes Spiel: { game, ai, camera, renderer, minimap, controller, hud, input, loop, … }
+// Nur mit ?debug=1: Zugriff für Browser-Prüfungen (tools/smoke.mjs, Playwright), z. B. window.__frontline.session().game (seit v5.81)
+if (DEBUG) window.__frontline = { session: () => session };
 let settings = { difficulty: 'normal', winPoints: BALANCE.winPoints, radio: true, weather: 'random', mood: 'random', research: true, river: true, city: true };
 
 function nearestSpeedIndex(v) {

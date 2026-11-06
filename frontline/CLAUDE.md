@@ -21,10 +21,11 @@ die genannten Dateien.
 4. Zufall in der Simulation nur über `game.rng` bzw. `makeRng(seed)` (`js/core/rng.js`), nie `Math.random()`. Gleicher Seed = gleiche Partie.
    Zufallskarten ohne Fluss müssen je Seed unverändert bleiben (gespeicherte Seeds, Tests).
 5. Imports immer mit Endung (`'./zone.js'`), nie über den Ordner `frontline/` hinaus, keine CDNs oder externen Dateien.
-6. Neue Datei, die der Browser lädt: in `sw.js` unter `ASSETS` eintragen. Jede Änderung an ausgelieferten Dateien: `CACHE_VERSION` in `sw.js` um 1 erhöhen.
-7. Regel- oder Feature-Änderung: die passende Themen-Datei unter `docs/prd/` anpassen (Abschnitt laut Übersicht in PRD.md) und oben in
-   [docs/changelog.md](docs/changelog.md) eintragen
-   (neue Version `v4.xx`, Cache-Version). Die Hilfe (F1) in `js/ui/helptext.js` liest die meisten Zahlen und Tasten aus den Daten
+6. Neue Datei, die der Browser lädt: in `sw.js` unter `ASSETS` eintragen. `CACHE_VERSION` in `sw.js` **nicht** von Hand erhöhen: das macht
+   `npm run release` beim Zusammenführen auf `main` (Abschnitt „Zusammenarbeit“).
+7. Regel- oder Feature-Änderung: die passende Themen-Datei unter `docs/prd/` anpassen (Abschnitt laut Übersicht in PRD.md) und den
+   Eintrag für den Änderungsverlauf als eigene Datei nach [docs/changes/](docs/changes/README.md) legen (eine Zeile, ohne Versionsnummer);
+   `docs/changelog.md` nicht direkt bearbeiten. Die Hilfe (F1) in `js/ui/helptext.js` liest die meisten Zahlen und Tasten aus den Daten
    (seit v5.63); der Rest steht von Hand dort und in `js/ui/menu.js`: mitpflegen (Suche z. B. `grep -rn "300 Plätze" js docs/prd`).
 8. Neue Ideen, die Daniel nur festhalten will: PRD §13 „Geparkte Ideen“ (`docs/prd/ideen.md`), nicht bauen.
 9. Startmenü-Schalter (Sendemast, Wetter, Forschung, Fluss, Stadt) sind im Menü standardmäßig an, in `new Game()` ohne Angabe aus. Tests verlassen sich darauf.
@@ -47,9 +48,16 @@ python3 -m http.server 8765
 cd frontline
 npm run test:quick                # Config-Prüfung und PRD-Tabellen, wenige Sekunden
 npm run docs                      # Wertetabellen in docs/prd/ (§6, Forschung) aus js/data/ neu erzeugen
-npm test                          # alle Tests (node --test, Node 22), dauert einige Minuten
+npm run test:fast                 # alle Tests ohne die langsamen „[langsam]“ (KI-gegen-KI-Läufe): zum Iterieren
+npm test                          # alle Tests (node --test, Node 22), einige Minuten: vor dem Push und in der CI
 node --test test/radio.test.js    # nur eine Datei
+npm run smoke                     # Browser-Rundgang (Playwright): Start, 2D, Iso, Hilfe, Pause, Baumodus, Ressourcen, Ausbildung; Fotos in .smoke/
+npm run release                   # Versionen vergeben (nur beim Zusammenführen auf main, siehe „Zusammenarbeit“)
 ```
+
+- Tests, die länger als etwa 5 s laufen, tragen „[langsam]“ im Namen (`test:fast` lässt sie aus). Neue lange Tests ebenso markieren.
+- Fehler im Browser nachstellen: `tools/smoke.mjs` exportiert `openGame({ seed, query })` → `run(fn)` wertet im Browser aus (mit `?debug=1`
+  ist die Partie unter `window.__frontline.session()` erreichbar), `shot(name)` macht ein Foto. Vorlage für eigene Prüfskripte.
 
 - URL-Parameter: `?debug=1` (kein Nebel, Taste M = +1000 Geld, bis 10× Tempo), `?seed=N`, `?speed=N`, `?river=0|1`,
   `?gl=0` (ohne WebGL-Boden), `?debug=1&fog=1`, `?debug=1&weather=winter&wx=snow`.
@@ -65,6 +73,16 @@ node --test test/radio.test.js    # nur eine Datei
   `test/doctables.test.js` meldet veraltete PRD-Tabellen, `test/docs.test.js` u. a. eine Themen-Datei ohne Eintrag in der Übersicht von
   PRD.md und einen zu großen Einstieg (über 20 000 Zeichen). Alle laufen auch in `npm test`.
 - CI: `.github/workflows/test-frontline.yml` läuft bei jeder Änderung unter `frontline/`.
+
+## Zusammenarbeit (mehrere Agenten, seit v5.81)
+
+- **Vor jedem Paket** `git pull origin main` (bzw. auf `main` neu aufsetzen). Pakete nach **Thema** benennen (z. B. „Baugebiet“), nicht
+  durchnummerieren (P1, A1 …): zwei Agenten vergeben sonst dieselben Namen.
+- **Versionen und Cache** vergibt nur `npm run release` (Regel 6, 7): Jedes Paket legt seinen Eintrag als Datei nach `docs/changes/`.
+  Beim Zusammenführen: `git pull origin main`, `npm run release` (trägt die Einträge mit fortlaufenden Versionen oben in
+  `docs/changelog.md` ein, erhöht `CACHE_VERSION` einmal, löscht die Dateien), `npm test`, committen, nach `main` pushen.
+- **Vor dem Plan messen:** Beruht ein Paket auf einer Annahme über das Spiel (wie oft etwas vorkommt, wie weit Dinge auseinander liegen,
+  ob die KI etwas tut), die Annahme vorher mit einem kurzen Skript an echten Seeds prüfen (`new Game({ seed, … })`, KI gegen KI).
 
 ## Wo ändere ich was?
 
@@ -141,7 +159,7 @@ Bei einem neuen Feature dort eine Zeile ergänzen.
 2. `js/data/buildings.js`: Schlüssel in `fob.produces` eintragen, für Partien mit Stadt auch in `CITY.produces` (`js/data/city.js`: Kaserne, Fabrikhalle oder Heliport).
 3. `js/data/research.js`: Gruppe in `RESEARCH.groups` eintragen (fehlt sie, wirken nur `all`, `veh` und `air`; Einheiten sind ohne Forschung frei). Mit Stadt: `CITY.crew` (Einwohner) und `CITY.metalCost` (Metall aus dem Stadtlager, fehlt = 0) in `js/data/city.js`.
 4. Aussehen: Modell in `js/render/unitpaint.js` (Funktion in `MODELS` bzw. `INFANTRY`, gilt für 2D und Iso; `test/unitpaint.test.js` prüft, dass jede Einheit eines hat). Ohne Modell zeichnen `js/render/sprites.js` (`drawUnit`) und der Renderer eine einfache Form.
-5. KI: Soll sie die Einheit bauen? Dann `MIX` in `js/data/ai.js` und die Ausbildung in `js/ai/ai.js` ergänzen, sonst im PRD §10 vermerken, dass sie es nicht tut.
+5. KI: Soll sie die Einheit bauen? Dann `MIX` in `js/data/ai.js` und die Ausbildung in `js/ai/army/produce.js` (`produce`, `counterMix`) ergänzen, sonst im PRD §10 vermerken, dass sie es nicht tut.
 6. Test in `test/` (Ausbildung über `game.issue(team, { type: 'train', … })`), Hilfe in `js/ui/menu.js`, `npm run docs` (Tabellen), PRD §6 (Rolle) und docs/changelog.md, `CACHE_VERSION`.
 
 ### Neues Gebäude
@@ -151,7 +169,7 @@ Bei einem neuen Feature dort eine Zeile ergänzen.
 2. Sonderregeln beim Setzen in `game.js` (`canPlace`), Wirkung im passenden Modul oder in einem neuen Modul (Rezept „Neues Spielsystem“).
 3. Aussehen: Maler in `js/render/milbuild.js` (Typ in `MIL_TYPES` eintragen), Höhe in `js/render/iso.js` (`BUILD_H`), Kürzel in
    `js/render/sprites.js` (`BUILD_ABBR`, 2D-Ansicht).
-4. KI optional in `js/ai/ai.js`; Test, Baumenü-Zeile der Hilfe (`js/ui/menu.js`, Taste B), PRD §5 und docs/changelog.md, `CACHE_VERSION`.
+4. KI optional in `js/ai/army/build.js` (`buildDefense`, `findSite`); Test, Baumenü-Zeile der Hilfe (`js/ui/menu.js`, Taste B), PRD §5 und docs/changelog.md, `CACHE_VERSION`.
 
 ### Neue Stadtzellenart
 1. `js/data/citykinds.js`: Eintrag in `CITY_KINDS` an der Stelle seiner Baumenü-Gruppe (`group`), mit der **nächsten freien `id`**
@@ -182,8 +200,8 @@ Neue Sorten der FOB-Lager und LKW (wie Baumaterial, Munition, Treibstoff) brauch
 2. Eintrag im Befehlsregister `js/game/commands.js`: `x: { run: cmdX, drives: true, sound: true }` (`drives`: setzt einen Auftrag `x`, den das
    Modul selbst fährt, z. B. in seinem `update…`; `sound`: Befehlston). `game.issue` braucht nichts weiter. Den Befehl in
    [ARCHITEKTUR.md](ARCHITEKTUR.md) §6 beschreiben (`test/docs.test.js` prüft das).
-3. UI: Eintrag in der Befehlskarte (`js/ui/controller.js`, `entry(label, hotkey, { action })`) und/oder Rechtsklick. Braucht er ein Ziel auf
-   der Karte: Zeile in der Modustabelle `MODES` (`hint`, `click`) plus `confirmX`-Methode. Taste in der Hilfe (`js/ui/helptext.js`).
+3. UI: Eintrag in der Befehlskarte (`js/ui/controller/cards.js`, `entry(label, hotkey, { action })`) und/oder Rechtsklick. Braucht er ein Ziel auf
+   der Karte: Zeile in der Modustabelle `MODES` (`js/ui/controller/modes.js`: `hint`, `click`) plus `confirmX`-Methode (`js/ui/controller/targets.js`). Taste in der Hilfe (`js/ui/helptext.js`).
 4. Test über `game.issue` (`test/commands.test.js` prüft Register und Modi allgemein), PRD §8 (Steuerung) und docs/changelog.md.
 
 ### Neue Option im Startmenü
@@ -198,5 +216,6 @@ Neue Sorten der FOB-Lager und LKW (wie Baumaterial, Munition, Treibstoff) brauch
 
 ### KI-Verhalten anpassen
 1. Schwellen und Takte zuerst über `BALANCE.difficulty` oder `js/data/ai.js` ändern.
-2. Neues Verhalten als eigene Methode der Klasse `AI`, aufgerufen aus `think()` (Denkschritt); die KI ändert das Spiel nur über `game.issue`.
+2. Neues Verhalten als Methode in einem der Module unter `js/ai/army/` (Bau, Ausbildung, Logistik, Kampf; seit v5.81 per Mixin an die
+   Klasse `AI` in `js/ai/ai.js` gehängt), aufgerufen aus `think()` (Denkschritt); die KI ändert das Spiel nur über `game.issue`.
 3. `test/ai.test.js` (KI gegen KI über feste Seeds) laufen lassen; PRD §10 und die Tabelle „KI-Konstanten“ aktualisieren.

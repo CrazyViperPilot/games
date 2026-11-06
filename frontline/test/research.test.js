@@ -163,7 +163,7 @@ test('Befehlskarte: Forschung (U) öffnet das Menü, keine gesperrten Einheiten'
   assert.equal(btn('U').active, true);
 });
 
-test('KI: forscht ab ihrer Zeit Stufe für Stufe, höchstens eine wartend, nach den Regeln des Baums', () => {
+test('KI: forscht ab ihrer Zeit Stufe für Stufe, höchstens eine wartend, nach den Regeln des Baums [langsam]', () => {
   const g = new Game({ seed: 3, research: true, startMoney: 4000 });
   const ai = new AI(g, 1, 'hard');
   const tech = g.teams[1].tech;

@@ -9,7 +9,9 @@
 const STEP = Math.log(2) / 4; // Abstand zweier Maßstäbe (natürlicher Logarithmus)
 const MIN_SCALE = 0.25; // Gerätepixel je Einheit, kleiner/größer wird nicht gemalt
 const MAX_SCALE = 6;
-const BUDGET_MS = 6; // Zeit je Bild für neue Zeichnungen
+// Zeit je Bild für neue Zeichnungen. Nur im Browser: In Node (Tests) gibt es keine Bilder im Sekundentakt, ein Budget würde dort nur
+// unter Last zufällig „diesmal nicht zeichnen“ liefern und Bildtests wackeln lassen (seit v5.81).
+const BUDGET_MS = typeof window === 'undefined' ? Infinity : 6;
 const MAX_PIXELS = 10e6; // Obergrenze aller Bilder zusammen (Bildpunkte, ≈ 40 MB); darüber fallen die ältesten heraus (weich, siehe trim)
 const IDLE_MS = 30000; // so lange nicht gebraucht: Bild fällt heraus
 
