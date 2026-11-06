@@ -2,7 +2,8 @@
 // Reihenfolge je Denkschritt: Baustellen pflegen, Verteidigung, Rückzug, Expansion (FOB-Baustellen: Zone, Relais, Flanken),
 // Forschung, Produktion (nur Hauptstadt), Verteidigungsgebäude und Mauer, Brücken, Baufahrzeuge, LKW (Lieferant/Pendler/Versorger), Sammelpunkte, Armee.
 import { CITY } from '../data/city.js';
-import { aiCity, aiRaid, aiDefend, cityTrainers } from '../game/city.js';
+import { cityAiMemory, aiCity, aiRaid, aiDefend } from './cityai.js';
+import { cityTrainers } from '../game/city/query.js';
 import { standsOf, freeSpace } from '../game/aircraft.js';
 import { heliTrainCheck } from '../game/helipad.js';
 import { BALANCE } from '../data/balance.js';
@@ -162,7 +163,7 @@ export class AI {
     this.lastWave = 0; // Zeitpunkt der letzten Angriffswelle
     this.zoneBan = 0; // bis dahin keine neue Zonen-FOB (nach Verlust, gegen Nachschub in den Tod)
     // Buchhaltung der Stadt-KI (seit v5.58 hier statt im Stadtzustand): Ausbautakte, Zeit seit dem letzten Überfall, letzter Verteidigungsbefehl
-    this.cityMem = { turn: 0, raidTimer: 0, defendAt: -1e9 };
+    this.cityMem = cityAiMemory();
 
     game.issue(team, { type: 'setDifficulty', difficulty: this.difficulty }); // Team als KI markieren, Einkommensfaktor (Regel 2)
   }
@@ -183,7 +184,7 @@ export class AI {
     }
     if (this.game.city && this.cityTimer >= CITY.ai.interval[this.difficulty]) {
       this.cityTimer = 0;
-      aiCity(this.game, this.team, this.difficulty, this.cityMem); // Stadt ausbauen: Ringe, Viertel, Förderung, Markt (city.js)
+      aiCity(this.game, this.team, this.difficulty, this.cityMem); // Stadt ausbauen: Ringe, Viertel, Förderung, Markt (cityai.js)
     }
     const s = this.snapshot();
     this.budget = MAX_PLACE;

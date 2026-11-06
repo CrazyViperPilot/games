@@ -5,7 +5,7 @@ import { RELIEF, FINE_N } from './relief.js';
 import { weatherSight } from './weather.js';
 import { sightMul } from './research.js';
 import { CITY } from '../data/city.js';
-import { KIND_ID } from './city.js';
+import { KIND_ID } from '../data/citykinds.js';
 
 const CONSTRUCTION_SIGHT = BALANCE.construction.siteSight; // Baustellen sehen weniger
 const RAY_GAP = 44; // Abstand benachbarter Sichtstrahlen am Rand (px), kleiner als eine Nebelzelle

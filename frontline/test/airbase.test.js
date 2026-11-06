@@ -5,7 +5,9 @@ import { Game } from '../js/game/game.js';
 import { CITY } from '../js/data/city.js';
 import { BALANCE } from '../js/data/balance.js';
 import { UNITS } from '../js/data/units.js';
-import { canZone, roadAt, KINDS, KIND_ID, connectRoad } from '../js/game/city.js';
+import { canZone, roadAt } from '../js/game/city/cells.js';
+import { KINDS, KIND_ID } from '../js/data/citykinds.js';
+import { connectRoad } from '../js/game/city/roadnet.js';
 import { isFoe } from '../js/game/entities.js';
 import { standsOf, freeSpace, runwaysOf, standRoute, jetGrounded, parkedArmor, runwayBusy } from '../js/game/aircraft.js';
 import { MAP_ROAD, BRIDGE_ROAD } from '../js/game/roads.js';
@@ -267,7 +269,7 @@ test('Bagger: räumt eine Zonenstraße (nicht die Brücke), reißt ein eigenes G
 });
 
 test('KI baut einen Fliegerhorst mit gültiger Bahn, Stellplätzen, Tower, Kerosintank und Munitionslager', async () => {
-  const { aiAirport } = await import('../js/game/city.js');
+  const { aiAirport } = await import('../js/ai/cityai.js');
   const g = new Game({ seed: 3, city: true });
   const { c, m } = rich(g, 1);
   const from = CITY.ai.airportFrom;

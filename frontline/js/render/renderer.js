@@ -3,7 +3,8 @@
 import { BALANCE } from '../data/balance.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { CITY } from '../data/city.js';
-import { careOf, treeGone } from '../game/city.js';
+import { careOf } from '../game/city/care.js';
+import { treeGone } from '../game/city/clearing.js';
 import { rangeMul } from '../game/research.js';
 import { buildTerrain, railList } from './terrain.js';
 import { lacksAmmo } from '../game/entities.js';

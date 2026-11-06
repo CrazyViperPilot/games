@@ -4,9 +4,10 @@
 // Dazu das Marktmenü (MarketPanel, seit v4.94): Fenster zum Handeln, geöffnet über Geldanzeige, Markt-Auswahl oder „Handel“.
 import { CITY } from '../data/city.js';
 import { BALANCE } from '../data/balance.js';
-import { GOODS, CITY_STORE_GOODS, cellAt, hasMarket, sizeOf, bigAnchorAt } from '../game/city.js';
+import { cellAt, sizeOf, bigAnchorAt } from '../game/city/cells.js';
+import { hasMarket } from '../game/city/query.js';
 import { CITY_KINDS, KIND, KIND_COLOR, KIND_ICON, BUILD_MENU } from '../data/citykinds.js';
-import { GOOD_NAME as GOOD_LONG, GOOD_SHORT } from '../data/goods.js';
+import { GOOD_NAME as GOOD_LONG, GOOD_SHORT, MARKET_GOODS, CITY_STORE_GOODS } from '../data/goods.js';
 
 // Werkzeuge, Farben, Symbole, Kurznamen, Tipps und Gruppen des Baumenüs kommen seit v5.59 aus dem Register js/data/citykinds.js
 // (Daniels Gruppen seit v5.36: Grundlagen, Wohnen & Gewerbe, Förderung, Ressourcen, Einheiten, Stadt, Fliegerhorst; eine Art ohne
@@ -180,7 +181,7 @@ export class MarketPanel {
     root.setAttribute('aria-label', 'Markt');
     root.innerHTML = `
       <div class="mk-head"><b>⚖ Markt</b><span class="mk-money" data-mk-money></span><button type="button" class="btn-sm mk-close" data-mk-close title="Schließen (Esc)" aria-label="Schließen">✕</button></div>
-      <div class="mk-rows">${GOODS.map((g) => `<div class="mk-row"><span class="mk-good" title="${GOOD_LONG[g]}${CITY_STORE_GOODS.includes(g) ? ' (Stadtlager)' : ' (Lager der Hauptstadt)'}"><b>${GOOD_NAME[g]}</b><small data-mk-have="${g}">0</small></span>` +
+      <div class="mk-rows">${MARKET_GOODS.map((g) => `<div class="mk-row"><span class="mk-good" title="${GOOD_LONG[g]}${CITY_STORE_GOODS.includes(g) ? ' (Stadtlager)' : ' (Lager der Hauptstadt)'}"><b>${GOOD_NAME[g]}</b><small data-mk-have="${g}">0</small></span>` +
         `<button type="button" class="btn-sm mk-sell" data-trade="${g}" data-dir="sell" title="${M.lot} ${GOOD_LONG[g]} verkaufen">Verkaufen <b>+${M.sell[g]}</b></button>` +
         `<button type="button" class="btn-sm mk-buy" data-trade="${g}" data-dir="buy" title="${M.lot} ${GOOD_LONG[g]} kaufen">Kaufen <b>−${M.buy[g]}</b></button></div>`).join('')}</div>
       <small class="mk-note">Je ${M.lot} Stück, Preise in Geld. BM, MUN, TS im Lager der Hauptstadt, Stahl und Kerosin im Stadtlager.</small>`;
@@ -226,7 +227,7 @@ export class MarketPanel {
     const money = g.teams[this.team].res.money;
     const main = g.mainFob(this.team);
     this.root.querySelector('[data-mk-money]').textContent = `Geld ${fmt(Math.floor(money))}`;
-    for (const k of GOODS) {
+    for (const k of MARKET_GOODS) {
       const inCity = CITY_STORE_GOODS.includes(k);
       const have = inCity ? g.city[this.team][k] : main ? main.store[k] : 0;
       this.root.querySelector(`[data-mk-have="${k}"]`).textContent = main || inCity ? fmt(Math.floor(have)) : '–';

@@ -3,7 +3,7 @@
 // Teams, Bäume und leere Häuser wie mit „Räumen“, ein eigenes Stadtgebäude wird abgerissen (auch eine Förderanlage; das Vorkommen
 // bleibt). Gegnerische Gebäude zerstört er langsam mit seiner Schaufel (Waffe, combat.js). Kein DOM, deterministisch.
 import { BALANCE } from '../data/balance.js';
-import { cmdCity } from './city.js';
+import { cmdCity } from './city/commands.js';
 import { driveTo, setIdle } from './movement.js';
 import { MAP_ROAD } from './roads.js';
 

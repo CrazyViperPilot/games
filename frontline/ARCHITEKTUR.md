@@ -41,7 +41,7 @@ Die Reihenfolge ist Absicht; ein neues System kommt an die Stelle, deren Ergebni
 | 2 | `updateResearch` | `research.js` | Forschungsfortschritt |
 | 2b | `updateAbilities` | `abilities.js` | Rauch, Minen, Feldwerkstatt |
 | 3 | `updateEconomy` | `economy.js` | `team.rate` zurücksetzen, Ausbildung, Soldaten-Nachschub |
-| 3a | `updateCity` | `city.js` | nur mit Stadt: Einwohner, Wachstum, Steuern und Gewerbe-Absatz; Ketten (Förderung → Hütte → Stahlwerk/BM/Raffinerien/Kerosin → Lager, Munitionswerk holt Stahl) und Pendler laufen über die Straßenwege aus `transport.js`: `beginLoads` (Last auf 0), Flüsse und Pendler eintragen (`addLoad`), Gutschrift mit der Wirkung des Weges (`pathEff`), `settleLoads` (Stau glätten, wirkt im nächsten Schritt). Wege werden nur neu gerechnet, wenn sich die Stadt ändert (`c.ver`, auch bei Flucht und Rückkehr der Bewohner), der geglättete Stau-Faktor je Zelle liegt in `c.congestion` (gespeichert) |
+| 3a | `updateCity` | `city/economy.js` | nur mit Stadt (Phasen in fester Reihenfolge: Gebiet, Ruinen, Treffer, Einwohner, Wachstum, Wirtschaft, Pflege): Einwohner, Wachstum, Steuern und Gewerbe-Absatz; Ketten (Förderung → Hütte → Stahlwerk/BM/Raffinerien/Kerosin → Lager, Munitionswerk holt Stahl) und Pendler laufen über die Straßenwege aus `transport.js`: `beginLoads` (Last auf 0), Flüsse und Pendler eintragen (`addLoad`), Gutschrift mit der Wirkung des Weges (`pathEff`), `settleLoads` (Stau glätten, wirkt im nächsten Schritt). Wege werden nur neu gerechnet, wenn sich die Stadt ändert (`c.ver`, auch bei Flucht und Rückkehr der Bewohner), der geglättete Stau-Faktor je Zelle liegt in `c.congestion` (gespeichert) |
 | 4 | `updateGarrison`, `updateTowers` | `garrison.js`, `tower.js` | Ein- und Aussteigen in Stadthäuser und Gefechtstürme; Dachaufbauten werden fertig |
 | 5 | `updateFormations` | `formation.js` | Tempo geschlossener Gruppen |
 | 6 | `updateMovement` | `movement.js` | Wege planen und fahren, Verfolgen (ohne Jets) |
@@ -92,7 +92,7 @@ targetId, weapons [{ spec, rounds, cd }], ammo (Getter), fuel, cargo { bm, mun, 
 **Gebäude** (`kind: 'building'`): `id, type, team, def (= BUILDINGS[type]), x, y, cx, cy, w, h, hp, maxHp, alive, built, progress,
 queue [{ unit, payerId }], queueTimes, rallyX/Y, main (Hauptstadt), store { bm, mun, fuel }, drill, fireTarget`.
 
-**Stadt** (`game.city[team]`, nur mit Stadt, `js/game/city.js`): Raster `cols, rows, cell`, je Zelle `kind[]` (Index in `KINDS`), `level[]`, `deposit[]`, `flee[]`, `blocked[]`, `felled`, `list` (belegte Zellen), `ver` (Zähler: steigt bei jeder Änderung an Zellen, Wege werden dann neu gerechnet), `hitLog`, `mapRoads` (Stadtstraßen der Karte). Vorräte im Stadtlager: `metal` (Stahl, Schlüssel bleibt `metal`), `kero` (Kerosin, seit v5.20). `stats` ist nur Anzeige: je Schritt neu gesetzt (Ausbeute `raw`, `cap`, `inp`, `gross`, `n`, Gewerbe-Versorgung `shopSupply`, `lost` = Waren ohne Weg je s, `jam` = kleinster Stau-Faktor).
+**Stadt** (`game.city[team]`, nur mit Stadt, angelegt in `js/game/city/create.js`): Raster `cols, rows, cell`, je Zelle `kind[]` (Index in `KINDS`), `level[]`, `deposit[]`, `flee[]`, `blocked[]`, `felled`, `list` (belegte Zellen), `ver` (Zähler: steigt bei jeder Änderung an Zellen, Wege werden dann neu gerechnet), `hitLog`, `mapRoads` (Stadtstraßen der Karte). Vorräte im Stadtlager: `metal` (Stahl, Schlüssel bleibt `metal`), `kero` (Kerosin, seit v5.20). `stats` ist nur Anzeige: je Schritt neu gesetzt (Ausbeute `raw`, `cap`, `inp`, `gross`, `n`, Gewerbe-Versorgung `shopSupply`, `lost` = Waren ohne Weg je s, `jam` = kleinster Stau-Faktor).
 **Straßentransport** (`transportOf(game, c)` in `js/game/transport.js`, seit v5.20): Zustand je Stadtobjekt in einer `WeakMap` (`STATE`). Er enthält `routes` (Lieferweg je Förderung und Werk: Ziel, Weg, Länge), `depot` (Wege zu Kerosintank und Munitionslager, seit v5.35), `commute` (Pendlerweg je Arbeitsstätte, `null` = keine Wohnung), `mun` und `shop` (Wege Munitionswerk bzw. Gewerbe und Markt zum Lager), `load`, `factor`, `cap` je Stadtzelle und `list` (Straßenzellen). Der Zustand liegt nicht im Objektgraphen und damit nicht im Spielstand; nach dem Laden wird er beim ersten Zugriff neu berechnet.
 
 **Effekt** (nur Darstellung, `game.effects`): `{ type, x, y, x2, y2, team, t, life }`, angelegt mit `game.addEffect`.
@@ -106,7 +106,7 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 
 | `cmd.type` | Felder | Handler (`js/game/`) | Wirkung |
 |---|---|---|---|
-| `city` | `kind` (Zellenart aus `KINDS`, Register `js/data/citykinds.js`, z. B. `road`, `res`, `com`, `market`, `barracks`, `factory`, `heliport`, `smelter`, `kero`, oder `erase`), `c0, r0, c1, r1`, bei `erase` optional `demolish: true` | `city.js` `cmdCity` | Stadtzellen im Rechteck ausweisen oder räumen (nur mit Stadt). `erase` lässt Rohstoffvorkommen und Förderanlagen stehen (seit v5.20); nur mit `demolish: true` (Abreißen eines gewählten Gebäudes) entfernt es eine Förderanlage |
+| `city` | `kind` (Zellenart aus `KINDS`, Register `js/data/citykinds.js`, z. B. `road`, `res`, `com`, `market`, `barracks`, `factory`, `heliport`, `smelter`, `kero`, oder `erase`), `c0, r0, c1, r1`, bei `erase` optional `demolish: true` | `city/commands.js` `cmdCity` | Stadtzellen im Rechteck ausweisen oder räumen (nur mit Stadt). `erase` lässt Rohstoffvorkommen und Förderanlagen stehen (seit v5.20); nur mit `demolish: true` (Abreißen eines gewählten Gebäudes) entfernt es eine Förderanlage |
 | `move`, `attackMove` | `ids, x, y, formation?` | `game.js` `cmdMove` | Marsch bzw. Angriffsmarsch, optional in Formation |
 | `attack` | `ids, targetId` | `game.js` `cmdAttack` | Ziel angreifen (auch Brücken) |
 | `stop` | `ids` | `game.js` | Anhalten |
@@ -120,10 +120,10 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 | `setPreset` | `ids, preset` | `logistics.js` | Ladungsart (`mix`, `bm`, `mun`, `fuel`) |
 | `mortarTarget` | `ids, x, y` | `game.js` `cmdMortarTarget` | Mörser auf einen Punkt richten |
 | `land` | `ids, airportId` | `aircraft.js` `cmdLand`, Heliport als Ziel `helipad.js` `cmdHeliLand` (seit v5.51) | Flugzeuge landen am Fliegerhorst des eigenen Stellplatzes `airportId` (seit v5.35; Anflug, Bahn, Ausrollen, Rollen zum Stellplatz; seit v5.15) |
-| `cityUpgrade` | `buildingId` | `city.js` `cmdCityUpgrade` | Stellplatz eine Stufe ausbauen (Überdachung, Stahlbeton-Shelter) gegen Geld, BM und Stahl (seit v5.39) |
+| `cityUpgrade` | `buildingId` | `city/commands.js` `cmdCityUpgrade` | Stellplatz eine Stufe ausbauen (Überdachung, Stahlbeton-Shelter) gegen Geld, BM und Stahl (seit v5.39) |
 | `dig` | `ids, c0, r0, c1, r1, append?` | `excavator.js` `cmdDig` | Bagger räumen die Zellen des Rechtecks nacheinander (Zonenstraße, Bäume, Häuser, eigene Gebäude; seit v5.35) |
 | `storm`, `fortifyHouse` | `ids, houseId` (Sturm) / `houseId, work` (ausbauen) | `garrison.js` `cmdStorm`, `cmdFortifyHouse` | Besetztes gegnerisches Haus stürmen / ein eigenes Haus zur Stellung ausbauen |
-| `trade` | `good` (`bm`, `mun`, `fuel`, `metal`, `kero`), `dir` (`sell`, `buy`) | `city.js` `cmdTrade` | Ein Los am eigenen Markt handeln (nur mit fertigem Markt) |
+| `trade` | `good` (`bm`, `mun`, `fuel`, `metal`, `kero`), `dir` (`sell`, `buy`) | `city/commands.js` `cmdTrade` | Ein Los am eigenen Markt handeln (nur mit fertigem Markt) |
 | `board` | `ids, heliId` | `logistics.js` `cmdBoard` | in ein Fahrzeug oder einen Hubschrauber einsteigen |
 | `dropoff` | `ids, x, y` | `logistics.js` `cmdDropoff` | Passagiere am Punkt absetzen |
 | `garrison`, `ungarrison` | `ids, houseId` (Haus oder Gefechtsturm) / `ids` | `garrison.js` | Haus oder Turm besetzen / verlassen |
@@ -160,7 +160,7 @@ seit v5.59). Die beiden Register importieren nichts; Simulation, UI und Darstell
 | `movement.js`, `pathfinding.js`, `grid.js`, `formation.js` | Bewegung, A*-Wegsuche, Zellenraster, Formationen |
 | `combat.js` | Zielsuche, Direktfeuer, Mörser, Flugabwehr, Schaden |
 | `logistics.js`, `construction.js` | LKW, Nachfüllen, Transport; Bauen und Reparieren |
-| `city.js` (Daten `js/data/city.js`, UI `js/ui/citypanel.js`, Karte `js/render/citylayer.js`) | Zonenstadt um die Hauptstadt (PRD §15), Befehl `city`; Stadtgebäude belegen `grid.struct` mit `city.gridId`; fertige Gebäude haben seit v4.83 eine Ziel-Entity (`kind: 'building'`, `type: 'city'`, nicht in `game.buildings`), die der Spieler seit v4.94 wählen kann. Seit v5.20: `accessCells` (Straßenzellen am Gebäude, mit Kette), `connectRoad` (Anschluss an das Lagernetz oder ein Ziel, für Startviertel und KI), `updateCity` rechnet die Ketten über `transport.js` |
+| `city/` (Daten `js/data/city.js`, UI `js/ui/citypanel.js`, Karte `js/render/citylayer.js`, KI `js/ai/cityai.js`) | Zonenstadt um die Hauptstadt (PRD §15), seit v5.60 in Modulen (Review A-01/A-04): `cells.js` Zellgeometrie und Straßenzugang (`isFlat`, `sizeOf`, `bigSpan`/`bigCells`/`fitBig`, `cellRect`, `roadAt`, `hasRoad`, `accessCells` mit Kette, `canZone`, `DEPOSITS`; Blattmodul nur mit Daten-Importen), `query.js` Abfragen (`cityLevel`, `citySum`, `powerRatio`, `freePop`, `crewOf`, `cityTrainers`, `trainerKind`, `forEnemyCity`, `hasMarket`), `state.js` Zellzustand (`totals`, `zeroStats`, `updateClaim`, Belegung von `grid.struct` mit `city.gridId`, `syncEntity`/`dropEntity`, `payMetal`, `placeBuilt`, `cityNoise`), `roadnet.js` Straßennetz (`roadReach`, `mainRoadReach`, `connectRoad`: Anschluss an das Lagernetz oder ein Ziel, für Startviertel und KI), `create.js` Erzeugung und Startviertel (`createCity`), `clearing.js` Bäume fällen und Abriss (`treeGone`), `commands.js` Befehle `city`, `cityUpgrade`, `trade`, `economy.js` Wirtschaftsschritt `updateCity` (rechnet die Ketten über `transport.js`), `care.js` Heilen und Reparieren. Fertige Gebäude haben seit v4.83 eine Ziel-Entity (`kind: 'building'`, `type: 'city'`, nicht in `game.buildings`), die der Spieler seit v4.94 wählen kann. Importe ohne Zyklus: `transport.js` und `research.js` lesen nur `cells.js`/`query.js` |
 | `transport.js` | Straßentransport (seit v5.20, kein DOM): Breitensuche über Straßenzellen (`nearestField`, mehrere Ziele gleichzeitig), Wege je Gebäude (`pathFrom`, `pathEff`), Last und Stau (`addLoad`, `beginLoads`, `settleLoads`), Lager am Straßennetz (`mainAccess`), Anzeige der Lieferung und des Pendlers (`transportInfo`, liest nur). Zustand: `transportOf` in einer WeakMap je Stadt |
 | `garrison.js`, `tower.js`, `crates.js`, `commander.js`, `radio.js` | Häuserkampf, Festung (Gefechtsturm, Dachaufbau, Ausbau-Befehl), Versorgungskisten, Kommandeur, Sendemast |
 | `researchpanel.js` (UI) | Forschungsfenster: Äste, Stufen, Warteschlange |
@@ -175,6 +175,7 @@ seit v5.59). Die beiden Register importieren nichts; Simulation, UI und Darstell
 | `scars.js`, `animals.js` | Wracks und Krater, Tiere (nur Optik, aber Teil der Simulation) |
 
 `js/ai/ai.js` – Klasse `AI`: `update(dt)` ruft im Takt `BALANCE.difficulty.<stufe>.think` die Methode `think()`; Werte aus `js/data/ai.js` und `BALANCE.difficulty`.
+`js/ai/cityai.js` – Stadt-KI (seit v5.60 aus der Simulation hierher): `aiCity` (Ausbau), `aiRaid`, `aiDefend`; Werte aus `CITY.ai`, Buchhaltung `cityAiMemory()` in `AI.cityMem`, Befehle nur über `game.issue`.
 
 `js/render/` (Zeichnen, liest nur)
 

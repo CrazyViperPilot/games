@@ -1,11 +1,11 @@
 // Stadt auf der Karte (PRD §15): Straßen, ausgewiesene Zonen, Gebäude, Gebietsgrenzen und im Baumodus das gezogene Rechteck.
 // Liest nur game.city (und ren.cityUi, die Stadtleiste). 2D: flach von oben; isometrisch: Boden hier, Gebäude als Stadthäuser
 // über drawTownBuilding (renderer.js).
-import { KINDS, KIND_ID, DEPOSITS, cellRect, canZone, hasRoad, sizeOf, fitBig, bigCenter, bigSpan } from '../game/city.js';
+import { DEPOSITS, cellRect, canZone, hasRoad, sizeOf, fitBig, bigCenter, bigSpan } from '../game/city/cells.js';
 import { BIG_KINDS, bigPlan, drawBigGround, drawBigTop, partFoot, bigTop } from './bigbuild.js';
 import { drawWorksTop, worksLift, WORKS_GROUND, WORKS_KINDS } from './works.js';
 import { CITY } from '../data/city.js';
-import { KIND_COLOR as CITY_COLORS, KIND_ICON as CITY_ICON, FLAT_KINDS as FLAT_LIST, SUPPLIER_KINDS as SUPPLIERS } from '../data/citykinds.js'; // Register (seit v5.59), nicht mehr aus der UI
+import { KIND_COLOR as CITY_COLORS, KIND_ICON as CITY_ICON, FLAT_KINDS as FLAT_LIST, SUPPLIER_KINDS as SUPPLIERS, KINDS, KIND_ID } from '../data/citykinds.js'; // Register (seit v5.59), nicht mehr aus der UI
 import { drawUniversityTop, UNI_LAWNS } from './university.js';
 import { drawTownTop, townLift } from './townhouses.js';
 import { transportOf } from '../game/transport.js';

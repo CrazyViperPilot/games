@@ -1,6 +1,7 @@
 // Spieler-Steuerung (docs/verlauf.md §5 ui/controller.js, §11.3–11.8): Auswahl, Modi, Befehle und Befehlskarte. Kein DOM.
 // Hält den Ansichtszustand `view`, den renderer.render(view) liest. Befehle laufen nur über game.issue.
-import { cityEntityAt, freePop, crewOf, KINDS as CITY_KINDS } from '../game/city.js';
+import { cityEntityAt, freePop, crewOf } from '../game/city/query.js';
+import { KINDS as CITY_KINDS } from '../data/citykinds.js';
 import { trainCheck, isStand, standsOf, standRoute } from '../game/aircraft.js';
 import { heliTrainCheck, isHeliport } from '../game/helipad.js';
 import { CITY } from '../data/city.js';

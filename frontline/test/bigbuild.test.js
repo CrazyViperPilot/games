@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
 import { CITY } from '../js/data/city.js';
 import { BALANCE } from '../js/data/balance.js';
-import { canZone, hasRoad, bigFits, bigCells, bigCenter, sizeOf, KIND_ID } from '../js/game/city.js';
+import { canZone, hasRoad, bigFits, bigCells, bigCenter, sizeOf } from '../js/game/city/cells.js';
+import { KIND_ID } from '../js/data/citykinds.js';
 
 const DT = 0.05;
 const run = (g, s) => {

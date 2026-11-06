@@ -5,7 +5,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
 import { CITY } from '../js/data/city.js';
-import { KINDS, DEPOSITS } from '../js/game/city.js';
+import { KINDS } from '../js/data/citykinds.js';
+import { DEPOSITS } from '../js/game/city/cells.js';
 import { resourceFlow, flowLayout, FlowMeter, teamStock, FLOW_GOODS, FLOW_MIDS } from '../js/game/flow.js';
 
 const run = (g, s, fn) => { for (let t = 0; t < s * 20; t++) { g.update(0.05); fn?.(); } };

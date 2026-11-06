@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { laneGrid } from '../js/game/roads.js';
 import { Game } from '../js/game/game.js';
 import { CITY } from '../js/data/city.js';
-import { canZone, roadAt } from '../js/game/city.js';
+import { canZone, roadAt } from '../js/game/city/cells.js';
 import { transportOf } from '../js/game/transport.js';
 
 /** Raster aus Textzeilen: '#' = Straße. */

@@ -8,14 +8,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { CITY_KINDS, KIND, KINDS, KIND_ID, KIND_NAME, WORKS, SUPPLIER_KINDS, WORKPLACE_KINDS, FLAT_KINDS, BUILD_MENU } from '../js/data/citykinds.js';
 import { GOODS, STORED_GOODS, MID_GOODS, CITY_STORE_GOODS, MARKET_GOODS } from '../js/data/goods.js';
-import * as cityGame from '../js/game/city.js';
+import { isFlat } from '../js/game/city/cells.js';
 import { CITY } from '../js/data/city.js';
 import { CITY_COLORS, CITY_ICON, CITY_TIP, TOOL_GROUPS } from '../js/ui/citypanel.js';
 import { FLOW_GOODS, FLOW_MIDS } from '../js/game/flow.js';
 import { Game } from '../js/game/game.js';
 
 const LIVE = KINDS.filter((k) => !CITY.retired?.includes(k)); // baubare Arten
-const flat = (k) => cityGame.isFlat(KIND_ID[k]); // Straße, Bahn, Rollfeld: kein Gebäude, kein Ziel, kein Strom
+const flat = (k) => isFlat(KIND_ID[k]); // Straße, Bahn, Rollfeld: kein Gebäude, kein Ziel, kein Strom
 const num = (v) => typeof v === 'number' && Number.isFinite(v);
 const FIELDS = new Set(['key', 'id', 'name', 'short', 'icon', 'color', 'group', 'tip', 'cost', 'bm', 'size', 'power', 'target', 'jobs', 'works', 'supply', 'flat', 'retired']);
 
@@ -29,17 +29,13 @@ test('KINDS: Reihenfolge festgeschrieben (Zell-IDs im Spielstand), neue Arten nu
   for (const k of CITY.retired ?? []) assert.ok(KINDS.includes(k), `CITY.retired: unbekannte Art ${k}`);
 });
 
-test('Register: Schlüssel eindeutig, IDs lückenlos 1 … n und gleich Index + 1, nur bekannte Felder; city.js reicht dieselben Listen weiter', () => {
+test('Register: Schlüssel eindeutig, IDs lückenlos 1 … n und gleich Index + 1, nur bekannte Felder', () => {
   const keys = CITY_KINDS.map((e) => e.key);
   assert.equal(new Set(keys).size, keys.length, 'Schlüssel doppelt');
   const ids = CITY_KINDS.filter((e) => e.id !== undefined).map((e) => e.id);
   assert.deepEqual([...ids].sort((a, b) => a - b), ids.map((_, i) => i + 1), 'IDs lückenlos ab 1, keine doppelt');
   KINDS.forEach((k, i) => assert.equal(KIND_ID[k], i + 1, `${k}: Code = Index + 1`));
   for (const e of CITY_KINDS) for (const f of Object.keys(e)) assert.ok(FIELDS.has(f), `${e.key}.${f}: unbekanntes Feld (Tippfehler?)`);
-  assert.equal(cityGame.KINDS, KINDS);
-  assert.equal(cityGame.KIND_ID, KIND_ID);
-  assert.equal(cityGame.KIND_NAME, KIND_NAME);
-  assert.equal(cityGame.WORKS, WORKS);
 });
 
 test('Jede Zellenart: Name; jede baubare: Preis, Baumaterial, Größe, Strom', () => {
@@ -113,7 +109,7 @@ test('Rollen: Werke, Lieferanten, Arbeitsstätten, flache Zellen passen zu Kette
   }
   for (const k of SUPPLIER_KINDS) assert.ok(WORKPLACE_KINDS.includes(k), `Lieferant ${k} braucht Arbeitsplätze`);
   for (const k of FLAT_KINDS) assert.ok(!WORKPLACE_KINDS.includes(k) && !KIND[k].target, `${k}: flache Zelle ohne Arbeit und Ziel`);
-  for (const k of KINDS) assert.equal(cityGame.isFlat(KIND_ID[k]), FLAT_KINDS.includes(k), `isFlat(${k})`);
+  for (const k of KINDS) assert.equal(isFlat(KIND_ID[k]), FLAT_KINDS.includes(k), `isFlat(${k})`);
 });
 
 // Bekannte Lücke (P2): Hütte und Kerosin-Raffinerie haben keinen Zielwert, die KI rechnet mit 1. Nachtragen ändert das KI-Verhalten
@@ -140,8 +136,6 @@ test('Warenregister: jede Ware vollständig; Listen, Markt, Ertrag und Kette aus
   assert.deepEqual(CITY_STORE_GOODS, ['metal', 'kero']);
   assert.equal(FLOW_GOODS, STORED_GOODS);
   assert.equal(FLOW_MIDS, MID_GOODS);
-  assert.deepEqual(cityGame.GOODS, MARKET_GOODS);
-  assert.deepEqual(cityGame.CITY_STORE_GOODS, CITY_STORE_GOODS);
   assert.deepEqual(CITY.market.sell, Object.fromEntries(MARKET_GOODS.map((g) => [g, GOODS[g].sell])));
   assert.deepEqual(CITY.market.buy, Object.fromEntries(MARKET_GOODS.map((g) => [g, GOODS[g].buy])));
 });

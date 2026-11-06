@@ -7,8 +7,9 @@
 // Zwischenprodukte (Roheisen, seit v5.20) haben keinen Bestand: sie laufen direkt vom Werk zum nächsten (Knotentyp 'mid').
 import { CITY } from '../data/city.js';
 import { BALANCE } from '../data/balance.js';
-import { GOODS, GOOD_NAME, GOOD_SHORT, STORED_GOODS, MID_GOODS } from '../data/goods.js';
-import { DEPOSITS, DEPOSIT_NAME, MINE_NAME, KIND_NAME, CITY_STORE_GOODS } from './city.js';
+import { GOODS, GOOD_NAME, GOOD_SHORT, STORED_GOODS, MID_GOODS, CITY_STORE_GOODS } from '../data/goods.js';
+import { DEPOSITS, DEPOSIT_NAME, MINE_NAME } from './city/cells.js';
+import { KIND_NAME } from '../data/citykinds.js';
 
 export { GOOD_NAME };
 const WORKS_SHORT = { bm: 'BM-Werk' };

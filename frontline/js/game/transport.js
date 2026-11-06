@@ -5,9 +5,9 @@
 // geladener Spielstand genau so weiterläuft wie das Spiel ohne Unterbrechung.
 import { laneGrid } from './roads.js';
 import { CITY } from '../data/city.js';
-import { WORKS, WORKPLACE_KINDS } from '../data/citykinds.js'; // Arbeitsstätten mit Pendlerweg: alle Arten mit Arbeitsplätzen
+import { WORKS, WORKPLACE_KINDS, KINDS, KIND_ID, KIND_NAME } from '../data/citykinds.js'; // Arbeitsstätten mit Pendlerweg: alle Arten mit Arbeitsplätzen
 import { GOODS } from '../data/goods.js';
-import { KINDS, KIND_ID, KIND_NAME, DEPOSITS, isPart, roadAt, accessCells, cellRect } from './city.js';
+import { DEPOSITS, isPart, roadAt, accessCells, cellRect } from './city/cells.js';
 
 /** Ziel je Rohstoff der Förderung (Vorkommen) und je Zwischenprodukt: Gruppe der Zielwerke (Breitensuche-Feld, siehe groupOf). */
 const MINE_GROUP = { wood: 'bm', stone: 'bm', ore: 'smelter', oil: 'oil' };

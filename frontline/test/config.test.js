@@ -13,7 +13,8 @@ import * as AI_DATA from '../js/data/ai.js';
 import { MAPGEN } from '../js/data/mapgen.js';
 import { WEATHER_SETTINGS } from '../js/game/weather.js';
 import { CITY } from '../js/data/city.js';
-import { KIND_ID, KIND_NAME, WORKS, GOODS } from '../js/game/city.js';
+import { KIND_ID, KIND_NAME, WORKS } from '../js/data/citykinds.js';
+import { MARKET_GOODS } from '../js/data/goods.js';
 
 const RES = Object.keys(BALANCE.resNames);
 const positive = (v) => typeof v === 'number' && v > 0;
@@ -152,7 +153,7 @@ test('Stadt (v5.20): Zellenarten stabil, Hütte und Kerosin-Raffinerie vollstän
   for (const w of WORKS) assert.ok(CITY.yield[CITY.chain[w].to] > 0, `Werk ${w}: keine Ausbeute für ${CITY.chain[w].to}`);
   for (const g of ['iron', 'kero']) assert.ok(CITY.yield[g] > 0 && CITY.convert[g] > 0, `yield/convert ${g}`);
   assert.ok(CITY.startKero >= 0 && Number.isFinite(CITY.startKero), 'startKero');
-  for (const g of GOODS) assert.ok(CITY.market.sell[g] > 0 && CITY.market.buy[g] > 0, `Markt: Preis für ${g} fehlt`);
+  for (const g of MARKET_GOODS) assert.ok(CITY.market.sell[g] > 0 && CITY.market.buy[g] > 0, `Markt: Preis für ${g} fehlt`);
   assert.ok(CITY.ai.lowKero > 0, 'ai.lowKero');
   const t = CITY.transport;
   for (const f of ['cap', 'mapCap', 'commute', 'maxDist', 'smooth']) assert.ok(positive(t[f]), `CITY.transport.${f}`);

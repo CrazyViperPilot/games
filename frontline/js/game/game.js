@@ -10,7 +10,12 @@ import { reliefOf } from './relief.js';
 import { createUnit, createBuilding, defineAmmo, canAttack, inRange } from './entities.js';
 import { Fog } from './fog.js';
 import { updateEconomy, smoothIncome } from './economy.js';
-import { createCity, updateCity, cmdCity, cmdCityUpgrade, cmdTrade, cityNoise, freePop, crewOf, payMetal, cityTrainers, trainerKind, KIND_NAME } from './city.js';
+import { createCity } from './city/create.js';
+import { updateCity } from './city/economy.js';
+import { cmdCity, cmdCityUpgrade, cmdTrade } from './city/commands.js';
+import { cityNoise, payMetal } from './city/state.js';
+import { freePop, crewOf, cityTrainers, trainerKind } from './city/query.js';
+import { KIND_NAME } from '../data/citykinds.js';
 import { updateMovement, nearestPassable, planPath, setIdle, separate, exitHouse } from './movement.js';
 import { updateCombat } from './combat.js';
 import { updateZone } from './zone.js';
@@ -38,7 +43,7 @@ const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
 const H = BALANCE.map.height;
 const STOCK_KEYS = ['bm', 'mun', 'fuel']; // Lagersorten (team.res.* sind Summen über FOB-Lager)
-const NOISY = new Set(['tracer', 'shell', 'explosion', 'muzzle']); // Effekte, die Stadtbewohner in der Konfliktzone vertreiben (city.js)
+const NOISY = new Set(['tracer', 'shell', 'explosion', 'muzzle']); // Effekte, die Stadtbewohner in der Konfliktzone vertreiben (cityNoise in js/game/city/state.js)
 const EFFECT_LIFE = { tracer: 0.12, shell: 0.3, explosion: 0.5, intercept: 0.4, muzzle: 0.1, death: 0.1 };
 const SHORTAGE_TEXT = {
   mun: 'Einheiten ohne Munition',
@@ -127,7 +132,7 @@ export class Game {
   /** radio: Sendemast als zweite Siegbedingung (Startmenü; ohne Angabe aus). */
   /** weather: 'off' | 'random' | 'summer' | 'autumn' | 'winter' (Wetter und Jahreszeit, weather.js; ohne Angabe aus). */
   /** research: Forschungsstufen (research.js; ohne Angabe aus: alle Einheiten frei, keine Verbesserungen). */
-  /** city: Zonenstadt hinter der Hauptstadt (city.js; ohne Angabe aus: Hauptstadt hat unendlich Material). */
+  /** city: Zonenstadt hinter der Hauptstadt (js/game/city/; ohne Angabe aus: Hauptstadt hat unendlich Material). */
   /** river: Zufallskarte mit Flüssen, Brücken und Furten (river.js; ohne Angabe aus). Fertige Karten bringen ihre eigenen mit. */
   constructor({ seed = 1, winPoints = BALANCE.winPoints, startMoney = BALANCE.startRes.money, map = null, radio = false, weather = 'off', research = false, river = false, city = false, debug = false } = {}) {
     this.seed = seed;

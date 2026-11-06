@@ -11,7 +11,7 @@ import { armorMul, modOf, rangeMul, sightMul, dealtMul, smokeMul, hasUnlock } fr
 /** Forschung „Autonome Türme“: Dachaufbauten feuern ohne Besatzung. */
 const autoTurret = (game, team) => hasUnlock(game, team, 'autoturret');
 import { damageBridge, deckDist } from './river.js';
-import { forEnemyCity } from './city.js';
+import { forEnemyCity } from './city/query.js';
 import { jetGrounded, parkedArmor } from './aircraft.js';
 
 const SCAN = BALANCE.scanInterval;

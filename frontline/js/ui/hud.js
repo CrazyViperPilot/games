@@ -10,12 +10,14 @@ import { radios, radioLeft } from '../game/radio.js';
 import { SEASON_NAMES, WEATHER_NAMES, weatherEffect } from '../game/weather.js';
 import { RESEARCH } from '../data/research.js';
 import { CITY } from '../data/city.js';
-import { KINDS, DEPOSITS, DEPOSIT_NAME, hasMarket, hasRoad, careOf } from '../game/city.js';
+import { DEPOSITS, DEPOSIT_NAME, hasRoad } from '../game/city/cells.js';
+import { hasMarket } from '../game/city/query.js';
+import { careOf } from '../game/city/care.js';
 import { transportInfo, transportOf } from '../game/transport.js';
 import { standRoute, runwaysOf, runwayBusy } from '../game/aircraft.js';
 import { padBusy } from '../game/helipad.js';
 import { CITY_TIP } from './citypanel.js';
-import { WORKS, SUPPLIER_KINDS, WORKPLACE_KINDS } from '../data/citykinds.js';
+import { WORKS, SUPPLIER_KINDS, WORKPLACE_KINDS, KINDS } from '../data/citykinds.js';
 import { GOOD_SHORT } from '../data/goods.js';
 
 // Wettersymbole (16 × 16, Strichfarbe = currentColor)

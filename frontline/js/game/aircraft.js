@@ -11,7 +11,8 @@
 import { BALANCE } from '../data/balance.js';
 import { CITY } from '../data/city.js';
 import { UNITS } from '../data/units.js';
-import { KIND_ID, roadAt, accessCells } from './city.js';
+import { KIND_ID } from '../data/citykinds.js';
+import { roadAt, accessCells } from './city/cells.js';
 import { resolveTarget, canAttack, isFoe } from './entities.js';
 import { setIdle } from './movement.js';
 import { modOf } from './research.js';

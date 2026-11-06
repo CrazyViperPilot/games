@@ -1,12 +1,17 @@
-// Stadt (city.js, PRD §15): Zonen, Wachstum, Einwohner, Erträge ins Lager der Hauptstadt, Befehl und KI-Bauplan.
+// Stadt (js/game/city/ und js/ai/cityai.js, PRD §15): Zonen, Wachstum, Einwohner, Erträge ins Lager der Hauptstadt, Befehl und KI-Bauplan.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
 import { CITY } from '../js/data/city.js';
 import { BALANCE } from '../js/data/balance.js';
 import { AI } from '../js/ai/ai.js';
-import { treeGone } from '../js/game/city.js';
-import { KINDS, canZone, cityNoise, freePop, cityAiMemory, aiCity, aiDefend, aiRaid, hasRoad, hasMarket, cityEntityAt, cityTrainers, KIND_ID, sizeOf, cellsOf, isPart, forEnemyCity, cityLevel, accessCells, roadAt, cellRect, connectRoad, DEPOSITS, cellAt } from '../js/game/city.js';
+import { treeGone } from '../js/game/city/clearing.js';
+import { KINDS, KIND_ID } from '../js/data/citykinds.js';
+import { canZone, hasRoad, sizeOf, cellsOf, isPart, accessCells, roadAt, cellRect, DEPOSITS, cellAt } from '../js/game/city/cells.js';
+import { cityNoise } from '../js/game/city/state.js';
+import { freePop, hasMarket, cityEntityAt, cityTrainers, forEnemyCity, cityLevel } from '../js/game/city/query.js';
+import { cityAiMemory, aiCity, aiDefend, aiRaid } from '../js/ai/cityai.js';
+import { connectRoad } from '../js/game/city/roadnet.js';
 import { transportOf, transportInfo } from '../js/game/transport.js';
 import { snapshotGame, restoreGame } from '../js/game/savegame.js';
 import { RELIEF } from '../js/game/relief.js';

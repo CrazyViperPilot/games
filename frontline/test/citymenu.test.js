@@ -1,7 +1,7 @@
 // v5.36: Baumenü der Stadt in Gruppen; jede baubare Art steht genau einmal darin, alte Arten (Flughafen) fehlen.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { KINDS } from '../js/game/city.js';
+import { KINDS } from '../js/data/citykinds.js';
 import { CITY } from '../js/data/city.js';
 import { TOOL_GROUPS } from '../js/ui/citypanel.js';
 

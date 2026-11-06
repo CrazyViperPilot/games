@@ -7,7 +7,7 @@
 // queue: [Schlüssel] }. Kein DOM.
 import { RESEARCH } from '../data/research.js';
 import { CITY } from '../data/city.js';
-import { cityLevel, citySum, powerRatio } from './city.js';
+import { cityLevel, citySum, powerRatio } from './city/query.js';
 
 const R = RESEARCH;
 export const RESEARCH_KEYS = Object.keys(R.items);

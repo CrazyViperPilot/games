@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
 import { townBigBlocks } from '../js/game/map.js';
-import { canZone } from '../js/game/city.js';
+import { canZone } from '../js/game/city/cells.js';
 
 /** Stadtzellen-Rechteck (Spalten, Zeilen) innerhalb eines großen Blocks, ohne die Straßen am Rand. */
 function cellsOf(c, b) {

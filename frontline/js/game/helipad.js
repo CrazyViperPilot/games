@@ -6,7 +6,7 @@
 // Zustand am Hubschrauber: u.heli = { home: Id des Heliports, phase: 'landed' | 'takeoff' | 'air' | 'landing', t, alt (0 Boden … 1) }.
 // Ohne u.heli (ohne Stadt, Hubschrauber aus der Hauptstadt) fliegt er wie bisher.
 import { CITY } from '../data/city.js';
-import { KINDS, KIND_ID } from './city.js';
+import { KINDS, KIND_ID } from '../data/citykinds.js';
 import { supplier } from './aircraft.js';
 import { driveTo, setIdle, planPath } from './movement.js';
 import { modOf } from './research.js';

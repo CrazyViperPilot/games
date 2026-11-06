@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
 import { CITY } from '../js/data/city.js';
 import { UNITS } from '../js/data/units.js';
-import { canZone, roadAt, KINDS } from '../js/game/city.js';
+import { canZone, roadAt } from '../js/game/city/cells.js';
+import { KINDS } from '../js/data/citykinds.js';
 import { heliGrounded, padBusy } from '../js/game/helipad.js';
 
 const DT = 0.05;

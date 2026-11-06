@@ -6,7 +6,7 @@
 import { BALANCE } from '../data/balance.js';
 import { RESEARCH } from '../data/research.js';
 import { researchBlock, researchEffect, researchSpeed } from '../game/research.js';
-import { cityLevel, citySum } from '../game/city.js';
+import { cityLevel, citySum } from '../game/city/query.js';
 
 const R = RESEARCH;
 const LANES = Object.keys(R.lanes);

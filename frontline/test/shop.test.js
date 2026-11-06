@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
 import { CITY } from '../js/data/city.js';
-import { canZone, cellsOf } from '../js/game/city.js';
+import { canZone, cellsOf } from '../js/game/city/cells.js';
 import { transportOf } from '../js/game/transport.js';
 import { resourceFlow } from '../js/game/flow.js';
 

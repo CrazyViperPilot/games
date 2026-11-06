@@ -3,7 +3,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
 import { CITY } from '../js/data/city.js';
-import { cellsOf, anchorOf, canZone, roadAt, accessCells, cellRect, isPart, KIND_ID } from '../js/game/city.js';
+import { cellsOf, anchorOf, canZone, roadAt, accessCells, cellRect, isPart } from '../js/game/city/cells.js';
+import { KIND_ID } from '../js/data/citykinds.js';
 import { UNITS } from '../js/data/units.js';
 import { transportOf, transportInfo, mainAccess, pathEff, addLoad, beginLoads, settleLoads } from '../js/game/transport.js';
 
