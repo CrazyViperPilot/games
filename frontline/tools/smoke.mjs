@@ -2,8 +2,12 @@
 // ?debug=1 in Chromium (Playwright) und läuft einen festen Rundgang ab: Startmenü, Partie, 2D, Iso, Hilfe, Pausenmenü,
 // Baumodus der Stadt, Ressourcenanzeige, ein gewähltes Ausbildungsgebäude. Bildschirmfotos landen im Ausgabeordner,
 // Konsolen- und Seitenfehler werden gesammelt; Exit-Code 1, wenn es welche gab.
+// Geräteprofile (seit dem Paket „Rauchtest Tablet und Telefon“): desktop (1280 × 800, Maus und Tastatur), tablet (iPad Pro 11 quer)
+// und phone (Pixel 7 quer); auf Touch-Geräten tippt der Rundgang auf die Knöpfe der Leiste statt Tasten zu drücken. Dazu misst er
+// je Ansicht (2D, Iso) 10 s lang bei 3× Tempo die Bildrate per requestAnimationFrame (nur Ausgabe, kein Fehler: schwankt je Rechner).
 //
-// Aufruf (im Ordner frontline/):  npm run smoke                      → Fotos in .smoke/
+// Aufruf (im Ordner frontline/):  npm run smoke                      → Fotos in .smoke/desktop/
+//                                  npm run smoke -- --device phone    → Fotos in .smoke/phone/ (desktop|tablet|phone|all)
 //                                  node tools/smoke.mjs --seed 7 --out /tmp/x --scale 2
 // Braucht Playwright mit Chromium (`npm i -D playwright` bzw. vorinstalliert); nicht Teil von `npm test`.
 //
@@ -19,6 +23,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url)); // Repo-Wurzel (games/): das Spiel lädt nur aus frontline/
+/** Geräteprofile: Playwright-Gerät (Name) oder eigene Werte. Bei benannten Geräten setzt Playwright Bildschirm und Pixeldichte. */
+export const DEVICES = { desktop: null, tablet: 'iPad Pro 11 landscape', phone: 'Pixel 7 landscape' };
+
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
 
 /** Playwright laden: als ES-Modul oder, wenn es nur global installiert ist (NODE_PATH), über require. */
@@ -51,13 +58,21 @@ export function serve() {
 /**
  * Spiel öffnen und eine Partie starten. opts: seed, query (weitere URL-Parameter, z. B. 'weather=summer&wx=clear'), scale
  * (Gerätepixel, 1 für eigene Prüfungen, 2 für Bilder, die ein Mensch ansieht), out (Ordner für shot), width, height, start (false =
- * im Startmenü bleiben). Fehler im Browser (Konsole, Seite) sammelt `errors`; Netzwerkfehler externer Adressen zählen nicht.
+ * im Startmenü bleiben), device ('desktop', 'tablet', 'phone': Bildschirm, Pixeldichte und Touch des Geräts; width/height/scale
+ * gelten dann nicht). Fehler im Browser (Konsole, Seite) sammelt `errors`; Netzwerkfehler externer Adressen zählen nicht.
  */
-export async function openGame({ seed = 3, query = '', scale = 1, out = '.smoke', width = 1280, height = 800, start = true } = {}) {
-  const { chromium } = await loadPlaywright();
+export async function openGame({ seed = 3, query = '', scale = 1, out = '.smoke', width = 1280, height = 800, start = true, device = 'desktop' } = {}) {
+  const { chromium, devices } = await loadPlaywright();
+  if (!(device in DEVICES)) throw new Error(`unbekanntes Gerät „${device}“ (${Object.keys(DEVICES).join(', ')})`);
   const { srv, port } = await serve();
   const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: scale });
+  let ctx = { viewport: { width, height }, deviceScaleFactor: scale };
+  if (DEVICES[device]) {
+    const { defaultBrowserType, ...d } = devices[DEVICES[device]]; // wir nehmen immer Chromium
+    ctx = d;
+  }
+  const page = await (await browser.newContext(ctx)).newPage();
+  const touch = !!ctx.hasTouch;
   const errors = [];
   page.on('pageerror', (e) => errors.push(`Seite: ${e.message}`));
   page.on('console', (m) => {
@@ -66,8 +81,28 @@ export async function openGame({ seed = 3, query = '', scale = 1, out = '.smoke'
   await mkdir(out, { recursive: true });
   await page.goto(`http://127.0.0.1:${port}/frontline/?debug=1&seed=${seed}${query ? '&' + query : ''}`);
   await page.waitForTimeout(1000);
+  /** Knopf drücken: auf Touch-Geräten tippen, sonst klicken. */
+  const press = (sel) => (touch ? page.tap(sel, { timeout: 15000 }) : page.click(sel, { timeout: 15000 }));
+  /** Liegt die Mitte des Elements sichtbar im Bildschirm (nicht abgeschnitten, nicht verdeckt)? */
+  const reachable = (sel) =>
+    page.evaluate((sel) => {
+      const e = document.querySelector(sel);
+      if (!e || !e.offsetParent) return false;
+      // in einem scrollbaren Feld (z. B. lange Hilfe) darf der Knopf erst ins Bild gescrollt werden, wie mit dem Finger
+      for (let p = e.parentElement; p; p = p.parentElement) {
+        if (/auto|scroll/.test(getComputedStyle(p).overflowY + getComputedStyle(p).overflowX)) {
+          e.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+          break;
+        }
+      }
+      const r = e.getBoundingClientRect();
+      const x = r.x + r.width / 2;
+      const y = r.y + r.height / 2;
+      if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return false;
+      return e.contains(document.elementFromPoint(x, y));
+    }, sel);
   if (start) {
-    await page.click('button.primary');
+    await press('button.primary');
     await page.waitForFunction(() => window.__frontline?.session()?.game);
     await page.waitForTimeout(1500);
   }
@@ -75,6 +110,9 @@ export async function openGame({ seed = 3, query = '', scale = 1, out = '.smoke'
     page,
     browser,
     errors,
+    touch,
+    press,
+    reachable,
     /** Funktion im Browser ausführen (window.__frontline.session() ist die laufende Partie). */
     run: (fn, arg) => page.evaluate(fn, arg),
     /** Bildschirmfoto `<out>/<name>.png`. */
@@ -84,6 +122,31 @@ export async function openGame({ seed = 3, query = '', scale = 1, out = '.smoke'
       srv.close();
     },
   };
+}
+
+/** Im Browser `ms` Millisekunden lang Bilder zählen (requestAnimationFrame): Mittel in fps und langsamstes Bild in ms. */
+export function measureFps(g, ms = 10000) {
+  return g.run(
+    (ms) =>
+      new Promise((done) => {
+        let n = 0,
+          worst = 0,
+          t0 = null,
+          last = 0;
+        const tick = (t) => {
+          if (t0 === null) t0 = last = t;
+          else {
+            n++;
+            worst = Math.max(worst, t - last);
+            last = t;
+          }
+          if (t - t0 < ms) requestAnimationFrame(tick);
+          else done({ fps: (n * 1000) / (t - t0), worst });
+        };
+        requestAnimationFrame(tick);
+      }),
+    ms,
+  );
 }
 
 /** Fester Rundgang. Ergebnis: Liste der Schritte mit ok/Fehlertext und die gesammelten Browserfehler. */
@@ -98,40 +161,55 @@ export async function smoke(opts = {}) {
       steps.push({ name, ok: false, error: e.message.split('\n')[0] });
     }
   };
+  const fps = [];
+  const notes = []; // Auffälligkeiten (z. B. Knopf außerhalb des Bildschirms): nur Hinweis, kein Fehler
+  const { page } = g;
+  // Auf Touch-Geräten über die Knöpfe der Leiste, sonst über die Tasten (wie ein Spieler am jeweiligen Gerät).
+  const viaKey = async (key, sel) => {
+    if (!g.touch) return page.keyboard.press(key);
+    if (await g.reachable(sel)) return g.press(sel);
+    notes.push(`Knopf ${sel} nicht antippbar (außerhalb des Bildschirms oder verdeckt), Taste ${key} benutzt`);
+    return page.keyboard.press(key);
+  };
+  const setSpeed = (v) => g.run((v) => (window.__frontline.session().loop.speed = v), v);
   try {
     await step('2D', () => g.shot('01-2d'));
     await step('Iso', async () => {
-      await g.page.keyboard.press('v');
-      await g.page.waitForTimeout(1200);
+      await viaKey('v', '[data-act=view]');
+      await page.waitForTimeout(1200);
+      if (!(await g.run(() => window.__frontline.session().camera.iso))) throw new Error('Ansicht nicht isometrisch');
       await g.shot('02-iso');
-      await g.page.keyboard.press('v');
+      await viaKey('v', '[data-act=view]');
     });
     await step('Hilfe (F1)', async () => {
-      await g.page.keyboard.press('F1');
-      await g.page.waitForTimeout(400);
+      await viaKey('F1', '[data-act=help]');
+      await page.waitForTimeout(400);
       await g.shot('03-hilfe');
-      await g.page.keyboard.press('Escape');
+      await viaKey('Escape', '#overlay [data-act=close]');
     });
     await step('Pausenmenü', async () => {
-      await g.page.keyboard.press('p');
-      await g.page.waitForTimeout(400);
-      if (!(await g.page.$('input[type=range]'))) throw new Error('keine Lautstärkeregler im Pausenmenü');
+      await viaKey('p', '[data-act=pause]');
+      await page.waitForTimeout(400);
+      if (!(await page.$('input[type=range]'))) throw new Error('keine Lautstärkeregler im Pausenmenü');
       await g.shot('04-pause');
-      await g.page.keyboard.press('p');
+      await viaKey('p', '#overlay [data-act=resume]');
     });
     await step('Baumodus (Y)', async () => {
-      await g.page.keyboard.press('y');
-      await g.page.waitForTimeout(600);
+      await viaKey('y', '.city-fab[data-act=city]');
+      await page.waitForTimeout(600);
       await g.shot('05-baumodus');
-      await g.page.keyboard.press('y');
+      await viaKey('y', '.city-done'); // im Baumodus ist der Stadt-Knopf verborgen: „Fertig“
     });
     await step('Ressourcenanzeige', async () => {
-      const b = await g.page.$('[data-act=flow]');
-      if (!b) throw new Error('Knopf „Ressourcen“ fehlt');
-      await b.click();
-      await g.page.waitForTimeout(600);
+      if (!(await page.$('[data-act=flow]'))) throw new Error('Knopf „Ressourcen“ fehlt');
+      await g.press('[data-act=flow]');
+      await page.waitForTimeout(600);
+      if (!(await g.run(() => document.body.classList.contains('flow-open')))) throw new Error('Ressourcenanzeige nicht offen');
       await g.shot('06-ressourcen');
-      await b.click();
+      // schließen: über denselben Knopf, oder mit ✕, wenn die Anzeige ihn verdeckt (Telefon)
+      await g.press((await g.reachable('[data-act=flow]')) ? '[data-act=flow]' : '[data-fl-close]');
+      await page.waitForTimeout(300);
+      if (await g.run(() => document.body.classList.contains('flow-open'))) throw new Error('Ressourcenanzeige geht nicht zu');
     });
     await step('Ausbildungsgebäude wählen', async () => {
       const n = await g.run(() => {
@@ -143,23 +221,33 @@ export async function smoke(opts = {}) {
         return 1;
       });
       if (!n) throw new Error('kein Ausbildungsgebäude (Stadt aus?)');
-      await g.page.waitForTimeout(600);
-      if (!(await g.page.$('.cbtn'))) throw new Error('Befehlskarte leer');
+      await page.waitForTimeout(600);
+      if (!(await page.$('.cbtn'))) throw new Error('Befehlskarte leer');
       await g.shot('07-ausbildung');
+      await g.run(() => window.__frontline.session().controller.view.selection.clear());
+    });
+    await step('Bildrate 2D (10 s, 3×)', async () => {
+      await setSpeed(3);
+      fps.push({ view: '2D', ...(await measureFps(g)) });
+    });
+    await step('Bildrate Iso (10 s, 3×)', async () => {
+      await viaKey('v', '[data-act=view]');
+      await page.waitForTimeout(500);
+      fps.push({ view: 'Iso', ...(await measureFps(g)) });
+      await g.shot('08-iso-3x');
+      await viaKey('v', '[data-act=view]');
     });
     await step('10 s Spiel bei 10× Tempo', async () => {
-      await g.run(() => {
-        window.__frontline.session().loop.speed = 10;
-      });
-      await g.page.waitForTimeout(10000);
+      await setSpeed(10);
+      await page.waitForTimeout(10000);
       const t = await g.run(() => window.__frontline.session().game.time);
-      if (!(t > 20)) throw new Error(`Spielzeit steht (${t} s)`);
-      await g.shot('08-nach-100s');
+      if (!(t > 40)) throw new Error(`Spielzeit steht (${t} s)`);
+      await g.shot('09-nach-160s');
     });
   } finally {
     await g.close();
   }
-  return { steps, errors: g.errors };
+  return { steps, errors: g.errors, fps, notes };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -167,10 +255,20 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const i = process.argv.indexOf(`--${k}`);
     return i > 0 ? process.argv[i + 1] : d;
   };
-  const out = arg('out', '.smoke');
-  const { steps, errors } = await smoke({ seed: Number(arg('seed', 3)), out, scale: Number(arg('scale', 1)), query: arg('query', '') });
-  for (const s of steps) console.log(`${s.ok ? 'ok  ' : 'FEHL'} ${s.name}${s.ok ? '' : ': ' + s.error}`);
-  for (const e of errors) console.log(`Browserfehler: ${e}`);
-  console.log(`Bilder in ${out}/`);
-  process.exit(steps.every((s) => s.ok) && !errors.length ? 0 : 1);
+  const base = arg('out', '.smoke');
+  const dev = arg('device', 'desktop');
+  const list = dev === 'all' ? Object.keys(DEVICES) : [dev];
+  let fail = false;
+  for (const device of list) {
+    const out = join(base, device);
+    const { steps, errors, fps, notes } = await smoke({ seed: Number(arg('seed', 3)), out, scale: Number(arg('scale', 1)), query: arg('query', ''), device });
+    const p = device.padEnd(7);
+    for (const s of steps) console.log(`${p} ${s.ok ? 'ok  ' : 'FEHL'} ${s.name}${s.ok ? '' : ': ' + s.error}`);
+    for (const f of fps) console.log(`${p} fps  ${f.view.padEnd(3)} Mittel ${f.fps.toFixed(1)} fps, langsamstes Bild ${f.worst.toFixed(0)} ms`);
+    for (const n of notes) console.log(`${p} Hinweis: ${n}`);
+    for (const e of errors) console.log(`${p} Browserfehler: ${e}`);
+    fail ||= !steps.every((s) => s.ok) || errors.length > 0;
+  }
+  console.log(`Bilder in ${base}/<gerät>/`);
+  process.exit(fail ? 1 : 0);
 }

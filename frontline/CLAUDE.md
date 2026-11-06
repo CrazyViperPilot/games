@@ -51,7 +51,8 @@ npm run docs                      # Wertetabellen in docs/prd/ (§6, Forschung) 
 npm run test:fast                 # alle Tests ohne die langsamen „[langsam]“ (KI-gegen-KI-Läufe): zum Iterieren
 npm test                          # alle Tests (node --test, Node 22), einige Minuten: vor dem Push und in der CI
 node --test test/radio.test.js    # nur eine Datei
-npm run smoke                     # Browser-Rundgang (Playwright): Start, 2D, Iso, Hilfe, Pause, Baumodus, Ressourcen, Ausbildung; Fotos in .smoke/
+npm run smoke                     # Browser-Rundgang (Playwright): Start, 2D, Iso, Hilfe, Pause, Baumodus, Ressourcen, Ausbildung, Bildrate; Fotos in .smoke/<gerät>/
+npm run smoke -- --device all     # dasselbe als desktop, tablet (iPad quer, Tippen) und phone (Android quer); einzeln: --device phone
 npm run release                   # Versionen vergeben (nur beim Zusammenführen auf main, siehe „Zusammenarbeit“)
 npm run metrics                   # KI-Kennzahlen: 3 Seeds × 15 min KI gegen KI (~30 s), warnt bei groben Ausreißern; auch in der CI
 ```
@@ -61,6 +62,9 @@ npm run metrics                   # KI-Kennzahlen: 3 Seeds × 15 min KI gegen KI
   Änderung gewollt, Referenzwerte neu setzen: `npm run metrics -- --update` (wie die Prüfsummen in `test/golden.test.js`).
 - Fehler im Browser nachstellen: `tools/smoke.mjs` exportiert `openGame({ seed, query })` → `run(fn)` wertet im Browser aus (mit `?debug=1`
   ist die Partie unter `window.__frontline.session()` erreichbar), `shot(name)` macht ein Foto. Vorlage für eigene Prüfskripte.
+  Mit `device: 'tablet'` bzw. `'phone'` öffnet es das Spiel mit Bildschirm, Pixeldichte und Touch des Geräts; `press(sel)` tippt dort
+  (sonst Klick), `measureFps(g, ms)` misst Bildrate und langsamstes Bild. Die Bildraten der Ausgabe schwanken je Rechner (ohne GPU
+  ist Iso deutlich langsamer) und sind kein Fehler.
 
 - URL-Parameter: `?debug=1` (kein Nebel, Taste M = +1000 Geld, bis 10× Tempo), `?seed=N`, `?speed=N`, `?river=0|1`,
   `?gl=0` (ohne WebGL-Boden), `?debug=1&fog=1`, `?debug=1&weather=winter&wx=snow`.
