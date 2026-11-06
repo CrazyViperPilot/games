@@ -31,7 +31,7 @@ export const GROUND_LIFT = 4;
 export const JET_LIFT = BALANCE.jets.lift; // Flughöhe der Jets (höher als Hubschrauber)
 /** Höhe einer Einheit über dem Boden: Jets je nach Flughöhe (am Boden, beim Start steigend, beim Landen sinkend), dann Hubschrauber. */
 /** Wird die Einheit über allem gezeichnet (fliegt)? Jets am Boden (abgestellt, rollend, Startlauf, Ausrollen) nicht. */
-export const flying = (u) => !!u.def.air && !u.parked && !jetGrounded(u) && !(u.heli && u.heli.phase !== 'air'); // seit v5.42: Hubschrauber auf dem Heliport stehen am Boden
+export const flying = (u) => !!u.def.air && !u.parked && !jetGrounded(u) && !(u.heli && u.heli.phase !== 'air'); // seit v5.50: Hubschrauber auf dem Heliport stehen am Boden
 export const unitLift = (u) => (u.parked ? GROUND_LIFT : u.def.jet ? GROUND_LIFT + (JET_LIFT - GROUND_LIFT) * jetAlt(u) : u.def.air ? GROUND_LIFT + (AIR_LIFT - GROUND_LIFT) * (u.heli ? u.heli.alt : 1) : GROUND_LIFT);
 /** Hauptstadt (Rathaus, cityhall.js): Höhe bis zum Turmdach. */
 export const CAPITAL_H = 107;

@@ -46,10 +46,12 @@ Die Reihenfolge ist Absicht; ein neues System kommt an die Stelle, deren Ergebni
 | 5 | `updateFormations` | `formation.js` | Tempo geschlossener Gruppen |
 | 6 | `updateMovement` | `movement.js` | Wege planen und fahren, Verfolgen (ohne Jets) |
 | 6a | `updateAircraft` | `aircraft.js` | Jets: fliegen, kreisen, Rückkehr, Landung, Rollen über Straßen und Bahn, Tanken und Nachladen am Stellplatz aus Kerosintank und Munitionslager (seit v5.35 Fliegerhorst), Absturz ohne Treibstoff (seit v5.03) |
+| 6b | `updateHelis` | `helipad.js` | Hubschrauber mit Heliport: senkrecht starten und landen, Luftraumsperre, gelandet tanken und nachladen aus Kerosintank und Munitionslager, Heimflug (seit v5.50) |
 | 7 | `updateCrates` | `crates.js` | Kisten aufheben, tragen, einlagern, Kistengeld |
 | 8 | `updateLogistics` | `logistics.js` | LKW laden, entladen, pendeln; Nachfüllen der Einheiten |
 | 9 | `updateConstruction` | `construction.js` | Baufortschritt, Reparatur, automatische Bauzuweisung |
-| 9a | `updateDig` | `excavator.js` | Bagger fahren zu ihrer Zelle und räumen sie (seit v5.35) |
+| 9a | `updateDig` | `helipad.js` | Heliport als Landeplatz (seit v5.50): `u.heli = { home, phase: landed/takeoff/air/landing, t, alt }`, Luftraumsperre `c.padBusy`, Ausbildungsprüfung `heliTrainCheck` (ein Hubschrauber je Heliport) |
+| `excavator.js` | Bagger fahren zu ihrer Zelle und räumen sie (seit v5.35) |
 | 10 | `updateBridges` | `river.js` | Brücken-Wiederaufbau |
 | 11 | `separate` | `movement.js` | Einheiten auseinanderschieben |
 | 12 | `updateCommanders` | `commander.js` | Aura, Heilung |
@@ -118,7 +120,7 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 | `route` | `ids, fromId, toId, preset?` | `logistics.js` `cmdRoute` | LKW pendeln lassen |
 | `setPreset` | `ids, preset` | `logistics.js` | Ladungsart (`mix`, `bm`, `mun`, `fuel`) |
 | `mortarTarget` | `ids, x, y` | `game.js` `cmdMortarTarget` | Mörser auf einen Punkt richten |
-| `land` | `ids, airportId` | `aircraft.js` `cmdLand` | Flugzeuge landen am Fliegerhorst des eigenen Stellplatzes `airportId` (seit v5.35; Anflug, Bahn, Ausrollen, Rollen zum Stellplatz; seit v5.15) |
+| `land` | `ids, airportId` | `aircraft.js` `cmdLand`, Heliport als Ziel `helipad.js` `cmdHeliLand` (seit v5.50) | Flugzeuge landen am Fliegerhorst des eigenen Stellplatzes `airportId` (seit v5.35; Anflug, Bahn, Ausrollen, Rollen zum Stellplatz; seit v5.15) |
 | `cityUpgrade` | `buildingId` | `city.js` `cmdCityUpgrade` | Stellplatz eine Stufe ausbauen (Überdachung, Stahlbeton-Shelter) gegen Geld, BM und Stahl (seit v5.39) |
 | `dig` | `ids, c0, r0, c1, r1, append?` | `excavator.js` `cmdDig` | Bagger räumen die Zellen des Rechtecks nacheinander (Zonenstraße, Bäume, Häuser, eigene Gebäude; seit v5.35) |
 | `board` | `ids, heliId` | `logistics.js` `cmdBoard` | in ein Fahrzeug oder einen Hubschrauber einsteigen |

@@ -1550,33 +1550,11 @@ function updateCare(game, c, dt) {
   const givers = [];
   for (const [i, e] of c.ents) {
     const spec = C.by[KINDS[c.kind[i] - 1]];
-    if (spec && e.alive) givers.push({ e, spec, r2: ((spec.radius + (c.part?.[i] ? sizeOf(KINDS[c.kind[i] - 1]) : 1) / 2) * c.cell) ** 2, rate: spec.rate * (C.levelMul[c.level[i]] ?? 1), heli: KINDS[c.kind[i] - 1] === 'heliport' });
+    if (spec && e.alive) givers.push({ e, spec, r2: ((spec.radius + (c.part?.[i] ? sizeOf(KINDS[c.kind[i] - 1]) : 1) / 2) * c.cell) ** 2, rate: spec.rate * (C.levelMul[c.level[i]] ?? 1) });
   }
   if (!givers.length) return;
   const power = c.stats.powerRatio ?? 1;
-  // Tanken (seit v5.20): Hubschrauber im Umkreis eines Heliports tanken Kerosin aus dem Stadtlager (1 Einheit je Treibstoffeinheit).
-  // Kampfflugzeuge tanken am Flughafen (aircraft.js), nicht hier. Auch bei leerem Stadtlager prüfen (Mangelmeldung, seit dem Review).
-  if (givers.some((g) => g.heli)) {
-    for (const u of game.units) {
-      if (!u.alive || u.team !== c.team || !u.def.fuelMax || u.def.jet || u.fuel >= u.def.fuelMax || careClass(u) !== 'air') continue;
-      let near = false;
-      for (const g of givers) {
-        if (!g.heli) continue;
-        const dx = u.x - g.e.x;
-        const dy = u.y - g.e.y;
-        if (dx * dx + dy * dy <= g.r2) {
-          near = true;
-          break;
-        }
-      }
-      if (!near) continue;
-      const want = Math.min(u.def.fuelMax - u.fuel, u.def.fuelMax * C.refuel * power * dt);
-      const got = Math.min(want, c.kero);
-      u.fuel += got;
-      c.kero -= got;
-      if (got < want - 1e-9) game.shortage(c.team, 'kero'); // Kerosin fehlt (eigene Meldung, seit dem Review)
-    }
-  }
+  // Tanken der Hubschrauber: seit v5.50 gelandet am Heliport aus dem Kerosintank (helipad.js), nicht mehr im Umkreis aus c.kero
   for (const u of game.units) {
     if (!u.alive || u.team !== c.team || u.hp >= u.maxHp || game.time - u.lastHitTime < C.delay) continue;
     const cls = careClass(u);

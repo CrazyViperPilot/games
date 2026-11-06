@@ -1,4 +1,4 @@
-// Heliport als Landeplatz der Hubschrauber (seit v5.42, PRD §15 „Heliport“, Daniels Wunsch „den Heliport an den Flughafen
+// Heliport als Landeplatz der Hubschrauber (seit v5.50, PRD §15 „Heliport“, Daniels Wunsch „den Heliport an den Flughafen
 // angleichen“): ein Hubschrauber je Heliport, dort ausgebildet; er startet und landet dort senkrecht, tankt gelandet Kerosin aus dem
 // nächsten Kerosintank und lädt aus dem Munitionslager (Umkreis CITY.air.supplyRadius, wie die Jets). Start und Landung sperren die
 // Heliports im Umkreis kurz (mit Tower kürzer). Heimflug bei knappem Treibstoff oder leeren Waffen. Kein DOM, deterministisch.
@@ -8,7 +8,7 @@
 import { CITY } from '../data/city.js';
 import { KINDS, KIND_ID } from './city.js';
 import { supplier } from './aircraft.js';
-import { driveTo, setIdle } from './movement.js';
+import { driveTo, setIdle, planPath } from './movement.js';
 import { modOf } from './research.js';
 
 const AIR = CITY.air;
@@ -159,7 +159,10 @@ export function updateHelis(game, dt) {
       hold(u, home);
       h.t += dt;
       h.alt = Math.min(1, h.t / H.liftTime);
-      if (h.t >= H.liftTime) h.phase = 'air';
+      if (h.t >= H.liftTime) {
+        h.phase = 'air';
+        if (Number.isFinite(u.order.x)) planPath(game, u, u.order.x, u.order.y); // Weg zum Befehlsziel (am Boden festgehalten, darum jetzt)
+      }
     } else if (h.phase === 'landing') {
       const pad = game.getEntity(u.order.targetId) ?? home;
       hold(u, pad);
@@ -189,7 +192,7 @@ export function updateHelis(game, dt) {
         setIdle(u);
         continue;
       }
-      if (driveTo(game, u, pad.x, pad.y, 6, dt) !== 'arrived') continue;
+      if (driveTo(game, u, pad.x, pad.y, 40, dt) !== 'arrived') continue; // über dem Heliport (Wegende liegt bis 32 px davor)
       if (!padFree(game, c, pad, u)) continue; // über dem Heliport warten, bis der Luftraum frei ist
       lockPad(game, c, pad, u);
       h.home = pad.id;
@@ -203,4 +206,37 @@ export function updateHelis(game, dt) {
 export function heliTrainCheck(game, b, unit) {
   if (!isHeliport(game, b)) return null;
   return helisAt(game, b) > 0 ? 'Heliport belegt (ein Hubschrauber je Heliport)' : null;
+}
+
+/**
+ * Befehl `{ type: 'land', ids, airportId }` mit einem Heliport als Ziel (seit v5.50; game.js wählt zwischen diesem und cmdLand der
+ * Jets): gewählte Hubschrauber fliegen hin und landen. Jeder Heliport nimmt einen Hubschrauber: seinen eigenen oder, wenn er frei
+ * ist, den ersten Gewählten (der damit dort zu Hause ist); die übrigen landen auf freien Heliports in der Nähe.
+ */
+export function cmdHeliLand(game, team, cmd) {
+  const e = game.getEntity(cmd.airportId);
+  if (!isHeliport(game, e) || e.team !== team) return { ok: false, reason: 'Eigenen fertigen Heliport wählen' };
+  const helis = game.ownUnits(team, cmd.ids).filter((u) => u.def.air && !u.def.jet);
+  if (!helis.length) return { ok: false, reason: 'Kein Hubschrauber gewählt' };
+  const c = game.city[team];
+  const pads = [...c.ents.entries()]
+    .filter(([i, p]) => p.alive && KINDS[c.kind[i] - 1] === 'heliport' && c.level[i])
+    .map(([, p]) => p)
+    .sort((a, b) => (a === e ? -1 : b === e ? 1 : dist(a.x, a.y, e.x, e.y) - dist(b.x, b.y, e.x, e.y)));
+  const taken = new Set();
+  let n = 0;
+  for (const u of helis) {
+    const own = u.heli && pads.find((p) => p.id === u.heli.home);
+    const pad = own && !taken.has(own.id) ? own : pads.find((p) => !taken.has(p.id) && helisAt(game, p) === 0);
+    if (!pad) continue;
+    taken.add(pad.id);
+    u.heli ??= { home: pad.id, phase: 'air', t: 0, alt: 1 }; // Hubschrauber ohne Heliport (alte Stände): bekommt diesen
+    u.order = { type: 'land', x: pad.x, y: pad.y, targetId: pad.id };
+    u.targetId = null;
+    u.path = [];
+    u.pathIndex = 0;
+    n++;
+  }
+  if (!n) return { ok: false, reason: 'Kein freier Heliport (ein Hubschrauber je Heliport)' };
+  return { ok: true, count: n };
 }

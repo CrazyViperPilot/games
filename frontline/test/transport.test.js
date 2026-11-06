@@ -459,31 +459,7 @@ test('Keine Ware aus dem Nichts: Lager-Zuwachs je Schritt ≤ Förderung über d
   assert.ok(take > 0, 'Gewerbe nimmt Baumaterial (die Prüfung greift)');
 });
 
-test('Heliport tankt Hubschrauber im Umkreis aus c.kero (CITY.care.refuel je s)', () => {
-  const g = new Game({ seed: 3, city: true, startMoney: 5000 });
-  const c = netBase(g);
-  put(g, 'heliport', 5, 1, 5, 1);
-  run(g, CITY.growTime + 2);
-  const h = c.ents.get(c.list.find((i) => c.kind[i] === KIND_ID.heliport));
-  assert.ok(h && h.alive, 'Heliport steht');
-  const u = g.spawnUnit('littlebird', 0, h.x, h.y);
-  u.fuel = 1;
-  c.kero = 300;
-  const kero0 = c.kero;
-  stepN(g, 1);
-  const want = Math.min(UNITS.littlebird.fuelMax - 1, UNITS.littlebird.fuelMax * CITY.care.refuel * 0.05);
-  assert.ok(Math.abs((kero0 - c.kero) - want) < 1e-6, `Kerosin verbraucht ${kero0 - c.kero} ≈ ${want}`);
-  assert.ok(u.fuel > 1, 'Hubschrauber getankt');
-  // leeres Stadtlager: kein Kerosin, aber eine Mangelmeldung (seit dem Review von v5.20)
-  c.kero = 0;
-  u.fuel = 1;
-  g.drainEvents();
-  g.teams[0].warnAt = {};
-  stepN(g, 1);
-  assert.equal(c.kero, 0, 'Stadtlager bleibt leer (Tanken an FOBs mit Treibstoff bleibt davon unberührt)');
-  assert.ok(g.drainEvents().some((e) => e.type === 'message' && e.team === 0 && /Kerosin/.test(e.text)), 'Mangelmeldung (Kerosin) bei leerem Stadtlager');
-});
-
+// Seit v5.50 tanken Hubschrauber gelandet auf ihrem Heliport aus dem Kerosintank (test/helipad.test.js), nicht mehr im Umkreis aus c.kero.
 test('Ohne Hauptstadt (zerstört): Werke liefern nichts ins Lager, Munitionswerk steht, Gewerbe unversorgt, keine ungültigen Zahlen', () => {
   const g = new Game({ seed: 3, city: true, startMoney: 5000 });
   const c = netBase(g);

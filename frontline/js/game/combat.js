@@ -26,7 +26,7 @@ export function weaponOf(e) {
   return e.kind === 'unit' ? null : (e.def.weapon ?? null);
 }
 
-const dmgKey = (e) => (e.kind === 'building' ? 'struct' : e.def.jet ? (jetGrounded(e) ? 'light' : 'jet') : e.heli && e.heli.phase !== 'air' ? 'light' : e.def.armor); // Jet am Boden (seit v5.35) und Hubschrauber auf dem Heliport (seit v5.42): wie ein leichtes Fahrzeug
+const dmgKey = (e) => (e.kind === 'building' ? 'struct' : e.def.jet ? (jetGrounded(e) ? 'light' : 'jet') : e.heli && e.heli.phase !== 'air' ? 'light' : e.def.armor); // Jet am Boden (seit v5.35) und Hubschrauber auf dem Heliport (seit v5.50): wie ein leichtes Fahrzeug
 
 /**
  * Schaden einer Schadenstabelle gegen e. Flugzeuge (def.jet, seit v5.15) haben die eigene Klasse 'jet'; fehlt sie in der

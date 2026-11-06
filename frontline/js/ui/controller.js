@@ -2,6 +2,7 @@
 // Hält den Ansichtszustand `view`, den renderer.render(view) liest. Befehle laufen nur über game.issue.
 import { cityEntityAt, freePop, crewOf, KINDS as CITY_KINDS } from '../game/city.js';
 import { trainCheck, isAirport, airportsOf, standRoute } from '../game/aircraft.js';
+import { heliTrainCheck, isHeliport } from '../game/helipad.js';
 import { CITY } from '../data/city.js';
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
@@ -585,6 +586,14 @@ export class Controller {
         if (!rest.length) return;
       }
     }
+    // Eigener Heliport: Hubschrauber landen dort (seit v5.50, die übrigen gehen hin)
+    const hp = rest.some((u) => u.def.air && !u.def.jet) ? this.pickHeliport(wx, wy) : null;
+    if (hp) {
+      const helis = rest.filter((u) => u.def.air && !u.def.jet);
+      if (this.issue({ type: 'land', ids: helis.map((u) => u.id), airportId: hp.id }).ok) this.moveMarker(hp.x, hp.y);
+      rest = rest.filter((u) => !helis.includes(u));
+      if (!rest.length) return;
+    }
     // Eigener Stellplatz: Flugzeuge landen dort (die übrigen gehen hin)
     const ap = rest.some((u) => u.def.jet) ? this.pickAirport(wx, wy) : null;
     if (ap) {
@@ -799,17 +808,32 @@ export class Controller {
     return e && isAirport(this.game, e) ? e : null;
   }
 
-  /** Landen (L): gewählte Flugzeuge landen und rollen zum angeklickten eigenen Stellplatz. */
+  /** Eigener fertiger Heliport an (wx, wy) oder null (seit v5.50). */
+  pickHeliport(wx, wy) {
+    const e = this.pickCity(wx, wy);
+    return e && isHeliport(this.game, e) ? e : null;
+  }
+
+  /** Landen (L): gewählte Flugzeuge landen am angeklickten Stellplatz, Hubschrauber am angeklickten Heliport (seit v5.50). */
   confirmLand(wx, wy) {
-    const ids = this.selectedUnits().filter((u) => u.def.jet).map((u) => u.id);
-    if (!ids.length) {
-      this.message('Kein Flugzeug gewählt');
+    const air = this.selectedUnits().filter((u) => u.def.air);
+    if (!air.length) {
+      this.message('Kein Flugzeug und kein Hubschrauber gewählt');
       this.setMode('normal');
       return;
     }
-    const ap = this.pickAirport(wx, wy);
-    if (!ap) {
-      this.message('Eigenen Stellplatz anklicken');
+    const hp = this.pickHeliport(wx, wy);
+    const ap = hp ? null : this.pickAirport(wx, wy);
+    const ids = air.filter((u) => (hp ? !u.def.jet : u.def.jet)).map((u) => u.id);
+    if ((!hp && !ap) || !ids.length) {
+      this.message(hp ? 'Kein Hubschrauber gewählt' : ap ? 'Kein Flugzeug gewählt' : 'Eigenen Stellplatz (Flugzeuge) oder Heliport (Hubschrauber) anklicken');
+      return;
+    }
+    if (hp) {
+      if (this.issue({ type: 'land', ids, airportId: hp.id }).ok) {
+        this.moveMarker(hp.x, hp.y);
+        this.setMode('normal');
+      }
       return;
     }
     if (this.issue({ type: 'land', ids, airportId: ap.id }).ok) {
@@ -1138,7 +1162,7 @@ export class Controller {
       case 'dropoff':
         return 'Absetzen: Zielpunkt anklicken · Esc bricht ab';
       case 'landAt':
-        return 'Landen: eigenen Stellplatz anklicken · Esc bricht ab';
+        return 'Landen: eigenen Stellplatz (Flugzeuge) oder Heliport (Hubschrauber) anklicken · Esc bricht ab';
       case 'dig':
         return 'Baggern: Zelle anklicken (Zonenstraße, Bäume, Haus, eigenes Gebäude) · Shift = weitere Zellen · Esc bricht ab';
       case 'storm':
@@ -1286,13 +1310,16 @@ export class Controller {
       );
     }
     const jets = units.filter((u) => u.def.jet);
-    if (jets.length) {
-      const any = airportsOf(this.game, this.team).length > 0;
+    const rotors = this.game.city ? units.filter((u) => u.def.air && !u.def.jet) : []; // Heliports gibt es nur mit Stadt
+    if (jets.length || rotors.length) {
+      const c = this.game.city?.[this.team];
+      const pads = c ? [...c.ents.values()].some((e) => isHeliport(this.game, e)) : false;
+      const any = (jets.length && airportsOf(this.game, this.team).length > 0) || (rotors.length && pads);
       card.push(
-        entry('Landen', 'L', {
-          tip: 'Landen (L): danach einen eigenen Stellplatz anklicken (oder Rechtsklick darauf). Das Flugzeug fliegt die Platzrunde, landet auf der Landebahn, rollt aus und rollt zu seinem Stellplatz; dort wird es betankt und munitioniert.',
-          enabled: any,
-          reason: 'Kein eigener Stellplatz',
+        entry('Landen', units.some(isCarrier) ? null : 'L', {
+          tip: 'Landen (L): Flugzeuge danach einen eigenen Stellplatz anklicken (Platzrunde, Landebahn, Rollen zum Stellplatz), Hubschrauber einen eigenen Heliport (senkrecht landen, seit v5.50); auch Rechtsklick darauf. Dort wird betankt und munitioniert (Kerosintank, Munitionslager in der Nähe).',
+          enabled: !!any,
+          reason: jets.length ? 'Kein eigener Stellplatz' : 'Kein eigener Heliport',
           action: () => this.setMode('landAt'),
         }),
       );
@@ -1422,6 +1449,21 @@ export class Controller {
         }),
       );
     }
+    if (CITY_KINDS[c.kind[i] - 1] === 'heliport') {
+      // Heliport (seit v5.50): sein Hubschrauber (gelandet oder in der Luft)
+      const helis = this.game.units.filter((u) => u.alive && u.team === this.team && u.heli?.home === b.id);
+      card.push(
+        entry('Hubschrauber', 'W', {
+          tip: 'Den Hubschrauber dieses Heliports wählen (W); ein Befehl lässt ihn senkrecht starten, Landen (L) oder Rechtsklick auf den Heliport holt ihn zurück',
+          enabled: helis.length > 0,
+          reason: 'Kein Hubschrauber stationiert',
+          action: () => {
+            this.view.selection.clear();
+            for (const u of helis) this.view.selection.add(u.id);
+          },
+        }),
+      );
+    }
     if (CITY_KINDS[c.kind[i] - 1] === 'stand') {
       // Ausbau (seit v5.39): nur auf Befehl, Stufe 2 Überdachung, Stufe 3 Stahlbeton-Shelter
       const lv = c.level[i];
@@ -1488,7 +1530,7 @@ export class Controller {
       else if (def.hero && hasCommander(this.game, ready.team)) reason = 'Nur ein Kommandeur je Team';
       else if (this.game.city && freePop(this.game, ready.team) < crewOf(u)) reason = 'Zu wenig freie Einwohner (Stadt: Wohnen ausbauen)';
       else if (this.game.city && this.game.city[ready.team].metal < (CITY.metalCost[u] ?? 0)) reason = 'Zu wenig Stahl (Stadt: Erzmine, Hütte und Stahlwerk oder Markt)';
-      else reason = trainCheck(this.game, ready, u) ?? this.trainReason(ready, def.cost); // Stellplatz: Platz für Flugzeuge
+      else reason = trainCheck(this.game, ready, u) ?? (def.air && !def.jet ? heliTrainCheck(this.game, ready, u) : null) ?? this.trainReason(ready, def.cost); // Stellplatz bzw. Heliport: ein Luftfahrzeug je Platz
       card.push(
         entry(def.short || def.name, def.hotkey, {
           cost: costText(def.cost),

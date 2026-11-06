@@ -4,6 +4,7 @@
 import { CITY } from '../data/city.js';
 import { aiCity, aiRaid, aiDefend, cityTrainers } from '../game/city.js';
 import { airportsOf, freeSpace } from '../game/aircraft.js';
+import { heliTrainCheck } from '../game/helipad.js';
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
@@ -623,6 +624,7 @@ export class AI {
     let bestKey = Infinity;
     for (const b of s.producers) {
       if (!b.built || !b.produces.includes(type) || b.queue.length >= qmax) continue;
+      if (UNITS[type]?.air && !UNITS[type].jet && heliTrainCheck(this.game, b, type)) continue; // Heliport belegt (ein Hubschrauber je Heliport, seit v5.50)
       const key = b.queue.length * 100000 + (towardZone ? dist(b.x, b.y, s.zone.x, s.zone.y) : b.id);
       if (key < bestKey) {
         bestKey = key;

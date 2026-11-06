@@ -13,6 +13,7 @@ import { CITY } from '../data/city.js';
 import { KINDS, DEPOSITS, DEPOSIT_NAME, hasMarket, hasRoad, careOf } from '../game/city.js';
 import { transportInfo, transportOf } from '../game/transport.js';
 import { jetsAt, standRoute, runwaysOf, runwayBusy } from '../game/aircraft.js';
+import { padBusy } from '../game/helipad.js';
 import { CITY_TIP } from './citypanel.js';
 
 // Wettersymbole (16 × 16, Strichfarbe = currentColor)
@@ -526,6 +527,19 @@ export class Hud {
     else if (k === 'dc') h += line(`Arbeitsplätze ${CITY.jobsDc[lv]}`);
     else if (b.produces) {
       h += line(`Bildet aus: ${b.produces.map((u) => UNITS[u].short || UNITS[u].name).join(', ')} · ${b.trainSlots} gleichzeitig (Stufe ${lv})`);
+      if (k === 'heliport') {
+        // Heliport als Landeplatz (seit v5.50): Hubschrauber, Luftraum, Kerosin und Munition in der Nähe
+        const heli = g.units.find((u) => u.alive && u.heli?.home === b.id);
+        const ph = { landed: 'gelandet', takeoff: 'startet', landing: 'landet', air: 'in der Luft' };
+        h += line(heli ? `${heli.def.name}: ${ph[heli.heli.phase] ?? ''}` : `Frei${b.queue?.length ? ' · Hubschrauber in Bau' : ''} · ein Hubschrauber je Heliport`);
+        const busy = padBusy(g, b);
+        if (busy > 0) h += line(`Luftraum belegt (${Math.ceil(busy)} s)`);
+        const R = CITY.air.supplyRadius * c.cell;
+        const near = (kind, r = R) => [...c.ents].some(([j, e]) => e.alive && KINDS[c.kind[j] - 1] === kind && c.level[j] && Math.hypot(e.x - b.x, e.y - b.y) <= r);
+        if (near('atc', CITY.air.atcRadius * c.cell)) h += line(`Tower in der Nähe: Luftraum nach Start oder Landung ${CITY.air.heli.sepAtc} statt ${CITY.air.heli.sep} s gesperrt`);
+        if (!near('ktank')) h += '<div class="warn small">Kein Kerosintank in der Nähe: der Hubschrauber tankt hier nicht</div>';
+        if (!near('mdepot')) h += '<div class="warn small">Kein Munitionslager in der Nähe: der Hubschrauber lädt hier nicht nach</div>';
+      }
       if (k === 'stand') {
         // Stellplatz (seit v5.35): Schutz, Flugzeug, Weg zur Bahn, Kerosin und Munition in der Nähe
         const jet = g.units.find((u) => u.alive && u.jet?.home === b.id);

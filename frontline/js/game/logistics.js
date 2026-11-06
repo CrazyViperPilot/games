@@ -304,7 +304,7 @@ function feed(game, u, k, passDt) {
 function resupply(game, passDt) {
   for (const t of game.teams) t.flow = { bm: 0, mun: 0, fuel: 0 };
   for (const u of game.units) {
-    if (!u.alive || u.def.jet) continue; // Jets tanken und laden nur am Stellplatz (aircraft.js)
+    if (!u.alive || u.def.jet || (u.heli && u.heli.phase !== 'air')) continue; // Jets tanken und laden nur am Stellplatz (aircraft.js), Hubschrauber auf dem Heliport nur dort (helipad.js, seit v5.50)
     if (u.def.ammoMax > 0) feed(game, u, 'mun', passDt);
     if (u.def.fuelMax > 0) feed(game, u, 'fuel', passDt);
     if (u.def.bmCap > 0) feed(game, u, 'bm', passDt);
