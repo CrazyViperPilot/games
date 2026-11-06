@@ -17,9 +17,10 @@ import { parkDeco, railList } from './terrain.js';
 import {
   acTop, acUnit, archWins, band, box, bush, cap, circle, cyl, disc, door, FACE, flat, frustum, G, gable, gableTop, GLASS, hip,
   hipTop, ledge, lit, OUTLINE, onFace, parapet, plinth, poly, rectF, rectS, ribs, roofSnowOn, shade, shadow, shadowTop, snowy,
-  stroke, tint, carTop, LEAF, LEAF_SNOW, vault, vaultTop, wallBand, winsAt, balcony, crate, fan, flatTop, k3,
+  stroke, tint, carTop, LEAF, LEAF_SNOW, vault, vaultTop, wallBand, winsAt, balcony, crate, fan, flatTop, k3, lineT, polyF,
 } from './isokit.js';
 import { gate, lorry, lorryTop, pipe } from './works.js';
+import { drawBenchTop, drawMapCarTop } from './props.js';
 
 const K = ISO_K;
 const hashXY = (x, y) => (Math.imul(Math.round(x) | 0, 73856093) ^ Math.imul(Math.round(y) | 0, 19349663)) >>> 0;
@@ -976,20 +977,319 @@ function bahnsteig(g, o) {
   box(g, su - 0.6, su + 0.6, sv - 0.6, sv + 0.6, H + 18, H + 22, '#2f5f9a');
 }
 
-// ---------- Wachturm von oben (Bild der Iso-Ansicht bleibt das eigene Modell) ----------
+// ---------- Wachturm der Karte (seit v5.43 gemalt; bis v5.42 ein vorgerendertes Bild) ----------
+// Stahlgerüst aus vier leicht geneigten Beinen auf Betonfüßen mit Kreuzstreben in zwei Feldern, Plattform mit Gitterrost und
+// Geländer, Kanzel mit Fensterband, grün umrandetes Flachdach mit Gerätehaus, Radar, zwei Antennen (rotes Licht) und
+// Suchscheinwerfer; außen eine Stahltreppe mit Podest auf der Seite, die von der Kartenmitte weg zeigt. Iso: je Drehung ein Bild,
+// Treppe und Dachaufbauten liegen fest in der Welt (wie in 2D). Grundfläche 80 × 80 (MAPGEN.town.towerSize), sonst skaliert.
 
-function towerTop(c, o) {
-  const { x0, x1, y0, y1 } = o;
-  const w = x1 - x0;
-  const h = y1 - y0;
-  rectF(c, x0 + 6, y0 + 6, x1 + 6, y1 + 6, 'rgba(0,0,0,0.25)');
-  rectS(c, x0, y0, x1, y1, '#4d565a');
-  rectF(c, x0 + w * 0.04, y0 + h * 0.04, x1 - w * 0.04, y1 - h * 0.04, '#8b9284');
-  c.strokeStyle = '#68854f';
-  c.lineWidth = 5;
-  c.strokeRect(x0 + w * 0.06, y0 + h * 0.06, w * 0.88, h * 0.88);
-  rectS(c, x0 + w * 0.2, y0 + h * 0.2, x0 + w * 0.58, y0 + h * 0.54, '#777e74');
-  circle(c, x0 + w * 0.75, y0 + h * 0.3, 3, '#3a3f42');
+const TW = { R0: 33, R1: 27.5, DK: 54, DT: 56.6, D: 38.5, C: 30.5, CH: 79, RO: 34, RT: 83.5, SI: 38.9, SO: 42.3, S0: -32, S1: 20, LD: 8 };
+// Beine unten/oben, Plattform unten/oben und halbe Breite, Kanzel, Dach; Treppe außen von SI bis SO, steigt von S0 bis S1, Podest LD
+const TW_LEG = '#4f585d';
+const TW_DECK = '#5b6266';
+const TW_GRATE = '#7a8186';
+const TW_WALL = '#8b9284';
+const TW_RIM = '#68854f';
+const TW_ROOF = '#a2a89d';
+const TW_GLASS = '#2c4152';
+const TW_RAIL = '#3d4448';
+const TW_SIDE = [[0, 1], [-1, 0], [0, -1], [1, 0]]; // Welt-Seite nach außen: Süd, West, Nord, Ost
+const VROT = [[1, 0, 0, 1], [0, -1, 1, 0], [-1, 0, 0, -1], [0, 1, -1, 0]]; // wie camera.js: Ansicht (u, v) aus Welt (x, y)
+// Dachaufbauten in der Welt (ab Turmmitte): Gerätehaus [x0, x1, y0, y1], Radar, Antennen [x, y, Spitze], Scheinwerfer
+const TW_HUT = [-15, 6, -21, -2];
+const TW_RADAR = [-4.5, -11.5];
+const TW_ANT = [[-29, -29, 112], [-29, 27, 101]];
+const TW_LAMP = [27, 27];
+
+/** Seite des Turms, die von der Kartenmitte weg zeigt (dort steht die Treppe): Index in TW_SIDE. */
+function towerSide(b) {
+  const dx = b.x - BALANCE.map.width / 2;
+  const dy = b.y - BALANCE.map.height / 2;
+  if (Math.abs(dx) > Math.abs(dy)) return dx > 0 ? 3 : 1;
+  return dy >= 0 ? 0 : 2;
+}
+
+/** Stahlträger (Bein, Stütze) als Linie mit heller Lichtkante links. */
+function beam(g, a, b, w, col) {
+  const { ctx, z } = g;
+  stroke(g, [a, b], shade(col, 0.2), w);
+  const off = w * z * 0.22;
+  ctx.beginPath();
+  ctx.moveTo(a[0] - off, a[1]);
+  ctx.lineTo(b[0] - off, b[1]);
+  ctx.strokeStyle = tint(col, 0.22);
+  ctx.lineWidth = Math.max(0.4, w * z * 0.38);
+  ctx.stroke();
+}
+
+/** Geländer an einer Kante der Plattform (Ansichtsseite 'n', 's', 'e', 'w'), mit Lücke gap = [a0, a1] für die Treppe. */
+function twRail(g, edge, gap) {
+  const { P } = g;
+  const E = TW.D - 0.6;
+  const h0 = TW.DT;
+  const pt = edge === 's' || edge === 'n' ? (a, h) => P(a, edge === 's' ? E : -E, h) : (a, h) => P(edge === 'e' ? E : -E, a, h);
+  const col = edge === 'n' || edge === 'w' ? 'rgba(50,56,60,0.7)' : TW_RAIL;
+  const runs = gap ? [[-E, gap[0]], [gap[1], E]] : [[-E, E]];
+  for (const [a0, a1] of runs) {
+    if (a1 - a0 < 0.5) continue;
+    for (const h of [h0 + 3.1, h0 + 6.2]) stroke(g, [pt(a0, h), pt(a1, h)], col, 0.42);
+    const n = Math.max(1, Math.round((a1 - a0) / 9));
+    for (let i = 0; i <= n; i++) {
+      const a = a0 + ((a1 - a0) * i) / n;
+      stroke(g, [pt(a, h0), pt(a, h0 + 6.2)], col, 0.45);
+    }
+  }
+}
+
+/** Außentreppe mit Podest auf der Ansichtsseite face ('s', 'e', 'n', 'w'); steigt entlang der Seite in Richtung dir (±1). */
+function twStairs(g, face, dir) {
+  const { P } = g;
+  const { DT } = TW;
+  const alongU = face === 's' || face === 'n';
+  const sb = face === 's' || face === 'e' ? 1 : -1;
+  const pt = alongU ? (a, b, h) => P(a, b, h) : (a, b, h) => P(b, a, h);
+  const nf = alongU ? FACE.s : FACE.e;
+  const bi = sb * TW.SI;
+  const bo = sb * TW.SO;
+  const bFar = Math.min(bi, bo);
+  const bNear = Math.max(bi, bo);
+  const a0 = dir * TW.S0; // Fuß der Treppe
+  const a1 = dir * TW.S1; // oben, am Podest
+  const hAt = (a) => (DT * (a - a0)) / (a1 - a0);
+  const steel = '#5d666b';
+  const stringer = (b) => poly(g, [pt(a0, b, 0), pt(a1, b, DT - 2.3), pt(a1, b, DT + 0.4), pt(a0, b, 0.6)], lit(steel, ...nf), OUTLINE);
+  const rail = (b) => {
+    for (const h of [4.4, 8.6]) stroke(g, [pt(a0, b, h), pt(a1, b, DT + h)], TW_RAIL, h > 5 ? 0.45 : 0.35);
+    for (const t of [0.02, 0.34, 0.67, 0.98]) {
+      const a = a0 + (a1 - a0) * t;
+      stroke(g, [pt(a, b, hAt(a)), pt(a, b, hAt(a) + 8.6)], TW_RAIL, 0.45);
+    }
+  };
+  const flight = () => {
+    rail(bFar);
+    stringer(bFar);
+    const N = 14;
+    const tread = lit('#8b9296', ...FACE.top);
+    const nose = lit('#6b7377', ...(alongU ? FACE.e : FACE.s));
+    for (let i = 1; i <= N; i++) {
+      const a = a0 + ((a1 - a0) * i) / (N + 1);
+      const h = hAt(a);
+      poly(g, [pt(a - 1.55, bFar, h), pt(a + 1.55, bFar, h), pt(a + 1.55, bNear, h), pt(a - 1.55, bNear, h)], tread, null);
+      poly(g, [pt(a + 1.55, bFar, h), pt(a + 1.55, bNear, h), pt(a + 1.55, bNear, h - 0.7), pt(a + 1.55, bFar, h - 0.7)], nose, null);
+    }
+    stringer(bNear);
+    rail(bNear);
+  };
+  const landing = () => {
+    const ae = a1 + dir * TW.LD;
+    const l0 = Math.min(a1, ae);
+    const l1 = Math.max(a1, ae);
+    const am = a1 + dir * (TW.LD - 2.5);
+    beam(g, pt(am, (bi + bo) / 2, 0), pt(am, (bi + bo) / 2, DT - 1.8), 1.5, TW_LEG); // Stütze
+    if (alongU) box(g, l0, l1, bFar, bNear, DT - 1.8, DT, TW_DECK, snowy(TW_GRATE));
+    else box(g, bFar, bNear, l0, l1, DT - 1.8, DT, TW_DECK, snowy(TW_GRATE));
+    for (const h of [DT + 4.4, DT + 8.6]) stroke(g, [pt(a1, bo, h), pt(ae, bo, h), pt(ae, bi, h)], TW_RAIL, 0.42);
+    for (const [a, b] of [[ae, bo], [ae, bi], [a1 + dir * 4, bo]]) stroke(g, [pt(a, b, DT), pt(a, b, DT + 8.6)], TW_RAIL, 0.45);
+  };
+  // die Seite mit größerem a liegt näher am Betrachter
+  if (dir > 0) {
+    flight();
+    landing();
+  } else {
+    landing();
+    flight();
+  }
+}
+
+/** Wachturm isometrisch; o.rot = Drehung der Ansicht, o.side = Treppenseite in der Welt (Index in TW_SIDE). */
+function wachturm(g, o) {
+  const { P } = g;
+  const { R0, R1, DK, DT, D, C, CH, RO, RT } = TW;
+  const [ra, rb, rc, rd] = VROT[o.rot];
+  const V = (x, y) => [ra * x + rb * y, rc * x + rd * y];
+  const VR = ([x0, x1, y0, y1]) => {
+    const [u0, v0] = V(x0, y0);
+    const [u1, v1] = V(x1, y1);
+    return [Math.min(u0, u1), Math.max(u0, u1), Math.min(v0, v1), Math.max(v0, v1)];
+  };
+  const [nx, ny] = TW_SIDE[o.side];
+  const [nu, nv] = V(nx, ny);
+  const [tu, tv] = V(ny, -nx); // Richtung, in der die Treppe steigt
+  const face = nv > 0 ? 's' : nu > 0 ? 'e' : nv < 0 ? 'n' : 'w';
+  const dir = face === 's' || face === 'n' ? tu : tv;
+  const front = face === 's' || face === 'e';
+  const g0 = dir * (TW.S1 - 0.5);
+  const g1 = dir * (TW.S1 + TW.LD + 0.5);
+  const gap = [Math.min(g0, g1), Math.max(g0, g1)];
+  shadow(g, -D, D, -D, D, 80, 0.2);
+  if (!front) twStairs(g, face, dir);
+  // Gerüst: hintere Seiten, Füße und hintere Beine, vordere Seiten, vorderes Bein
+  const rad = (h) => R0 + ((R1 - R0) * h) / DK;
+  const L = (su, sv, h) => P(su * rad(h), sv * rad(h), h);
+  const H0 = 2.6;
+  const HM = 28;
+  const braces = (a, b, back) => {
+    const col = back ? 'rgba(58,64,68,0.75)' : '#4a5357';
+    const w = back ? 0.6 : 0.85;
+    for (const [h0, h1] of [[H0, HM], [HM, DK]]) {
+      stroke(g, [L(...a, h0), L(...b, h1)], col, w);
+      stroke(g, [L(...b, h0), L(...a, h1)], col, w);
+    }
+    stroke(g, [L(...a, HM), L(...b, HM)], col, w + 0.3);
+  };
+  braces([-1, -1], [1, -1], true);
+  braces([-1, -1], [-1, 1], true);
+  for (const [su, sv] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) box(g, su * R0 - 3.8, su * R0 + 3.8, sv * R0 - 3.8, sv * R0 + 3.8, 0, H0, '#a9a69c', snowy('#b8b5ab'));
+  for (const [su, sv] of [[-1, -1], [1, -1], [-1, 1]]) beam(g, L(su, sv, H0), L(su, sv, DK), 3.1, TW_LEG);
+  braces([-1, 1], [1, 1], false);
+  braces([1, -1], [1, 1], false);
+  beam(g, L(1, 1, H0), L(1, 1, DK), 3.1, TW_LEG);
+  // Plattform mit Gitterrost, Geländer hinten
+  box(g, -D, D, -D, D, DK, DT, TW_DECK, snowy(TW_GRATE));
+  if (g.fine) {
+    for (let a = -D + 3; a < D; a += 3) {
+      stroke(g, [P(a, -D, DT), P(a, D, DT)], 'rgba(40,46,50,0.16)', 0.18);
+      stroke(g, [P(-D, a, DT), P(D, a, DT)], 'rgba(40,46,50,0.16)', 0.18);
+    }
+  }
+  twRail(g, 'n', face === 'n' ? gap : null);
+  twRail(g, 'w', face === 'w' ? gap : null);
+  // Kanzel: Sockelband, Brüstung, Fensterband, Tür zur Treppe
+  box(g, -C, C, -C, C, DT, CH, TW_WALL);
+  wallBand(g, -C, C, -C, C, DT, DT + 1.4, '#686e63');
+  wallBand(g, -C, C, -C, C, DT + 8.2, DT + 9, '#c9cec3');
+  const at = [0, 1, 2, 3, 4, 5].map((i) => -C + (C / 3) * (i + 0.5));
+  for (const f of ['s', 'e']) winsAt(g, f, C, at, [[DT + 9, CH - 2.6]], (C / 3) * 0.86, { glass: TW_GLASS, frame: '#5d6559', lit: 0 });
+  wallBand(g, -C, C, -C, C, CH - 1.2, CH, '#767c70');
+  if (front) {
+    const pt = onFace(g, face, C);
+    const a = dir * (TW.S1 + TW.LD / 2);
+    poly(g, [pt(a - 3, DT), pt(a + 3, DT), pt(a + 3, DT + 8.1), pt(a - 3, DT + 8.1)], lit('#454c45', ...FACE[face]), OUTLINE);
+    poly(g, [pt(a - 1.9, DT + 4.8), pt(a + 1.9, DT + 4.8), pt(a + 1.9, DT + 7.2), pt(a - 1.9, DT + 7.2)], lit(TW_GLASS, ...FACE[face]), null);
+  }
+  twRail(g, 's', face === 's' ? gap : null);
+  twRail(g, 'e', face === 'e' ? gap : null);
+  // Dach mit grünem Rand; Aufbauten nach Tiefe
+  box(g, -RO, RO, -RO, RO, CH, RT, TW_RIM);
+  parapet(g, -RO, RO, -RO, RO, RT, TW_RIM, TW_ROOF, 1.2);
+  const items = [];
+  for (const [su, sv] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    const cu = su * (RO - 1.2);
+    const cv = sv * (RO - 1.2);
+    items.push({ d: cu + cv, draw: () => box(g, cu - 1.2, cu + 1.2, cv - 1.2, cv + 1.2, RT, RT + 1.5, '#5e7847') });
+  }
+  const [h0, h1, h2, h3] = VR(TW_HUT);
+  items.push({
+    d: (h0 + h1 + h2 + h3) / 2,
+    draw: () => {
+      box(g, h0, h1, h2, h3, RT - 1.3, RT + 8.5, '#8e958a', snowy(TW_ROOF));
+      if (g.fine) {
+        for (const [f, pl, a0] of [['s', h3, h0], ['e', h1, h2]]) {
+          const pt = onFace(g, f, pl);
+          for (let k = 0; k < 4; k++) stroke(g, [pt(a0 + 2, RT + 2.4 + k * 1.1, 0.05), pt(a0 + 8, RT + 2.4 + k * 1.1, 0.05)], 'rgba(40,44,40,0.45)', 0.3); // Lüftung
+        }
+      }
+      const [ru, rv] = V(...TW_RADAR);
+      cyl(g, ru, rv, 1.4, RT + 8.5, RT + 11.1, '#5d6458');
+      const [b0, b1, b2, b3] = VR([TW_RADAR[0] - 8, TW_RADAR[0] + 8, TW_RADAR[1] - 0.8, TW_RADAR[1] + 0.8]);
+      box(g, b0, b1, b2, b3, RT + 11.1, RT + 13.3, '#d3d7d0', snowy('#dfe2dc'));
+    },
+  });
+  for (const [x, y, top] of TW_ANT) {
+    const [u, v] = V(x, y);
+    items.push({
+      d: u + v,
+      draw: () => {
+        box(g, u - 0.9, u + 0.9, v - 0.9, v + 0.9, RT - 1.3, RT + 0.8, '#4d5458');
+        stroke(g, [P(u, v, RT), P(u, v, top)], '#3a4044', 0.55);
+        if (g.fine) for (const h of [top - 9, top - 5]) stroke(g, [P(u - 2.2, v, h), P(u + 2.2, v, h)], '#3a4044', 0.35);
+        const [lx, ly] = P(u, v, top + 0.6);
+        circle(g.ctx, lx, ly, 1.1 * g.z, '#d8352b');
+      },
+    });
+  }
+  const [lu, lv] = V(...TW_LAMP);
+  items.push({
+    d: lu + lv,
+    draw: () => {
+      cyl(g, lu, lv, 1.2, RT - 1.3, RT + 2.2, '#4d5458');
+      cyl(g, lu, lv, 2.4, RT + 2.2, RT + 5.6, '#59616a');
+      const [ex, ey] = P(lu + 1.5, lv + 1.5, RT + 3.9);
+      g.ctx.fillStyle = '#f4ecc8';
+      g.ctx.beginPath();
+      g.ctx.ellipse(ex, ey, 1.5 * g.z, 1.3 * g.z, 0, 0, Math.PI * 2);
+      g.ctx.fill();
+    },
+  });
+  items.sort((p, q) => p.d - q.d);
+  for (const it of items) it.draw();
+  if (front) twStairs(g, face, dir);
+}
+
+/** Wachturm von oben (2D, Welt-Einheiten ab der Mitte): Schatten, Treppe, Plattform mit Geländer, Dach mit Aufbauten. */
+function towerTop(c, side) {
+  const { D, RO } = TW;
+  const [nx, ny] = TW_SIDE[side];
+  const W = (a, b) => [a * ny + b * nx, -a * nx + b * ny]; // a entlang der Seite (Richtung der Treppe), b nach außen
+  shadowTop(c, -D, -D, D, D, 80);
+  for (const [x, y, top] of TW_ANT) lineT(c, [[x, y], [x + (top - TW.RT) * 0.5, y + (top - TW.RT) * 0.5]], 'rgba(0,0,0,0.22)', 0.9);
+  // Treppe und Podest außen
+  const { SI, SO, S0, S1, LD } = TW;
+  polyF(c, [W(S0, SI), W(S1, SI), W(S1, SO), W(S0, SO)], '#5d666b');
+  for (let i = 1; i <= 14; i++) {
+    const a = S0 + ((S1 - S0) * i) / 15;
+    polyF(c, [W(a - 1.55, SI + 0.2), W(a + 1.55, SI + 0.2), W(a + 1.55, SO - 0.2), W(a - 1.55, SO - 0.2)], '#9aa1a5');
+  }
+  polyF(c, [W(S1 - 0.5, D - 1), W(S1 + LD + 0.5, D - 1), W(S1 + LD + 0.5, SO), W(S1 - 0.5, SO)], snowy(TW_GRATE));
+  lineT(c, [W(S0, SI), W(S1, SI)], TW_RAIL, 0.5);
+  lineT(c, [W(S0, SO), W(S1 + LD + 0.5, SO), W(S1 + LD + 0.5, D)], TW_RAIL, 0.6);
+  // Plattform mit Gitterrost und Geländer
+  rectF(c, -D, -D, D, D, snowy(TW_GRATE));
+  c.strokeStyle = 'rgba(40,46,50,0.18)';
+  c.lineWidth = 0.25;
+  c.beginPath();
+  for (let a = -D + 3; a < D; a += 3) {
+    c.moveTo(a, -D);
+    c.lineTo(a, D);
+    c.moveTo(-D, a);
+    c.lineTo(D, a);
+  }
+  c.stroke();
+  c.strokeStyle = TW_RAIL;
+  c.lineWidth = 0.6;
+  c.strokeRect(-D + 0.6, -D + 0.6, 2 * D - 1.2, 2 * D - 1.2);
+  polyF(c, [W(S1 - 0.5, D - 1.4), W(S1 + LD + 0.5, D - 1.4), W(S1 + LD + 0.5, SI), W(S1 - 0.5, SI)], snowy(TW_GRATE)); // Durchgang zum Podest
+  // Dach: Schatten auf dem Laufsteg, grüner Rand, helle Dachhaut mit Bahnen, Eckpfosten
+  rectF(c, -RO + 2.5, -RO + 2.5, RO + 2.5, RO + 2.5, 'rgba(0,0,0,0.22)');
+  rectS(c, -RO, -RO, RO, RO, TW_RIM, 'rgba(0,0,0,0.45)', 0.6);
+  rectF(c, -RO + 1.2, -RO + 1.2, RO - 1.2, RO - 1.2, snowy(TW_ROOF));
+  c.strokeStyle = 'rgba(0,0,0,0.08)';
+  c.lineWidth = 0.4;
+  c.beginPath();
+  for (let a = -RO + 9; a < RO - 2; a += 9) {
+    c.moveTo(a, -RO + 1.2);
+    c.lineTo(a, RO - 1.2);
+  }
+  c.stroke();
+  for (const [su, sv] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) rectF(c, su * (RO - 1.2) - 1.2, sv * (RO - 1.2) - 1.2, su * (RO - 1.2) + 1.2, sv * (RO - 1.2) + 1.2, shade(TW_RIM, 0.25));
+  // Gerätehaus mit Lüftung, Radar
+  const [x0, x1, y0, y1] = TW_HUT;
+  rectF(c, x0 + 3, y0 + 3, x1 + 3, y1 + 3, 'rgba(0,0,0,0.25)');
+  rectS(c, x0, y0, x1, y1, snowy(TW_ROOF), 'rgba(0,0,0,0.4)', 0.5);
+  rectF(c, x0 + 1, y0 + 1, x1 - 1, y0 + 2, 'rgba(255,255,255,0.18)');
+  const [rx, ry] = TW_RADAR;
+  rectF(c, rx - 7, ry + 0.4, rx + 9, ry + 2.4, 'rgba(0,0,0,0.25)');
+  rectS(c, rx - 8, ry - 0.8, rx + 8, ry + 0.8, snowy('#dfe2dc'), 'rgba(0,0,0,0.4)', 0.4);
+  circle(c, rx, ry, 1.4, '#5d6458');
+  // Antennen mit rotem Licht, Scheinwerfer
+  for (const [x, y] of TW_ANT) {
+    circle(c, x, y, 1.3, '#3a4044');
+    circle(c, x, y, 0.7, '#d8352b');
+  }
+  const [lx, ly] = TW_LAMP;
+  circle(c, lx + 1.5, ly + 1.5, 2.6, 'rgba(0,0,0,0.25)');
+  circle(c, lx, ly, 2.4, '#59616a');
+  circle(c, lx + 0.4, ly + 0.4, 1.3, '#f4ecc8');
 }
 
 
@@ -1073,12 +1373,20 @@ function putTop(ctx, x, y, zoom, key, bounds, paint) {
 const PAINTERS = { hall: halle, factory: fabrik, wall: mauer, station: bahnhof, platform: bahnsteig };
 const TALL = { hall: 44, factory: 122, wall: 22, station: 60, platform: 34 };
 
-/** Iso: Gebäude b der Karte gemalt; false = nicht hier (Wachturm, schräger Zug oder Bahnsteig). */
+/** Iso: Gebäude b der Karte gemalt; false = nicht hier (schräger Zug oder Bahnsteig). */
 export function drawMapIso(ctx, cam, b) {
-  if (b.kind === 'tower' || ((b.kind === 'train' || b.kind === 'platform') && b.angle)) return false;
+  if ((b.kind === 'train' || b.kind === 'platform') && b.angle) return false;
   const odd = cam.rot % 2 === 1;
   const info = infoOf(b);
   const snow = roofSnowOn() ? 1 : 0;
+  if (b.kind === 'tower') {
+    // Wachturm (seit v5.43): je Drehung ein Bild, Treppe auf der Seite weg von der Kartenmitte
+    const k = Math.round(((b.w || 80) / 80) * 20) / 20 || 1;
+    const rot = cam.rot | 0;
+    const side = towerSide(b);
+    const R = 43 * k;
+    return put(ctx, cam, b, `mtw|${rot}|${side}|${k}|${snow}`, isoBounds(-R, R, -R, R, 115 * k), (g) => wachturm(k === 1 ? g : sub(g, 0, 0, k), { rot, side }));
+  }
   if (b.kind === 'train') {
     const long = odd ? 'v' : 'u';
     const o = { ...info, long, part: b.part };
@@ -1112,12 +1420,20 @@ export function drawMapTop(ctx, b, zoom) {
   let W = b.w;
   let D = b.h;
   let paint;
+  if (b.kind === 'tower') {
+    const k = Math.round(((b.w || 80) / 80) * 20) / 20 || 1;
+    const side = towerSide(b);
+    return putTop(ctx, b.x, b.y, zoom, `mttw|${side}|${k}|${snow}`, [-45 * k, -45 * k, 60 * k, 60 * k], (c) => {
+      if (k !== 1) c.scale(k, k);
+      towerTop(c, side);
+    });
+  }
   if (b.kind === 'house') {
     W = q8(b.w);
     D = q8(b.h);
     paint = (c, o) => houseTop(c, o);
   } else if (b.kind === 'train') paint = (c, o) => trainTop(c, { ...o, part: b.part, long: 'u' });
-  else paint = { hall: hallTop, factory: factoryTop, wall: wallTop, tower: towerTop, station: stationTop, platform: platformTop }[b.kind];
+  else paint = { hall: hallTop, factory: factoryTop, wall: wallTop, station: stationTop, platform: platformTop }[b.kind];
   if (!paint) return false;
   const m = b.kind === 'hall' || b.kind === 'factory' || b.kind === 'station' ? 2 : 0;
   const o = { ...info, long: W >= D ? 'u' : 'v', x0: -W / 2 + m, x1: W / 2 - m, y0: -D / 2 + m, y1: D / 2 - m };
@@ -1362,16 +1678,16 @@ export function drawMapTown2D(ctx, town, inRect, zoom, season, gone, ruined) {
   for (const p of town.parks ?? []) {
     if (!inRect(p.x, p.y, p.r)) continue;
     const d = parkDecoOf(p);
-    for (const b of d.benches) benchTop(ctx, b);
+    for (const b of d.benches) if (!drawBenchTop(ctx, b, zoom, season)) benchTop(ctx, b); // gemalt (props.js, seit v5.43)
     for (const t of d.trees) if (!drawTreeTop(ctx, t, season, zoom)) townTree(ctx, t, season); // gemalt (nature.js, seit v5.28)
   }
   for (const t of town.trees ?? []) if (inRect(t.x, t.y, t.r) && !gone(t.x, t.y) && !drawTreeTop(ctx, t, season, zoom)) townTree(ctx, t, season);
 }
 
-/** 2D: parkende Autos der Karte, nach den Straßen der Stadt (sonst lägen sie darunter, wie bis v5.22). */
-export function drawMapCars2D(ctx, town, inRect) {
+/** 2D: parkende Autos der Karte, nach den Straßen der Stadt (sonst lägen sie darunter, wie bis v5.22); gemalt seit v5.43 (props.js). */
+export function drawMapCars2D(ctx, town, inRect, zoom = 1, season = 'summer') {
   for (const c of town?.cars ?? []) {
-    if (!inRect(c.x, c.y, 30)) continue;
+    if (!inRect(c.x, c.y, 30) || drawMapCarTop(ctx, c, zoom, season)) continue;
     ctx.save();
     ctx.translate(c.x, c.y);
     ctx.scale(4.2, 4.2);

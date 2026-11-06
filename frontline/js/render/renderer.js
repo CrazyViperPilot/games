@@ -35,7 +35,8 @@ import {
 import { drawCityHallTop } from './cityhall.js';
 import { drawTownBuilding, drawTeamBuilding, drawCar, drawBench, drawRubble, drawCrate, drawWreckBox } from './isobuild.js';
 import { parkDeco } from './terrain.js';
-import { drawCarSprite, drawUnitSprite, drawWreckSprite } from './isosprites.js';
+import { drawUnitSprite, drawWreckSprite } from './isosprites.js';
+import { drawMapCarIso, drawMapCarShadowIso, drawBenchIso, drawBenchShadowIso, drawCrateIso, drawCrateTop as drawCratePainted } from './props.js';
 import { drawTreeIso, drawTreeTop, drawBushIso, drawBushTop, drawRockIso, drawRockTop, natureShadowIso, drawAnimalIso, drawAnimalTopP, forestKind, forestSpecies } from './nature.js';
 import { drawMilTop, setMilWalls } from './milbuild.js';
 import { scarAlpha } from '../game/scars.js';
@@ -200,7 +201,7 @@ export class Renderer {
     this.drawRuins(ctx, R, known);
     this.drawScars(ctx, inRect, z);
     drawCityGround(this, ctx, team, known, inRect); // Stadt: Straßen und Grundstücke
-    drawMapCars2D(ctx, g.map.town, inRect); // Autos der Karte auf den Straßen (seit v5.23 sichtbar)
+    drawMapCars2D(ctx, g.map.town, inRect, z, this.season); // Autos der Karte auf den Straßen (seit v5.23 sichtbar, seit v5.43 gemalt)
     drawCityTop(this, ctx, team, known, inRect); // Stadt: Dächer
     this.drawNatureTop(ctx, inRect, z); // Felsen, Büsche und Bäume von oben (seit v5.28 gemalt, nicht mehr im Geländebild)
     drawCityBadges(this, ctx, team, known, inRect, false); // Stadt: Schilder (Funktion, privat/kommerziell)
@@ -220,7 +221,7 @@ export class Renderer {
     }
     const glow = 0.6 + 0.4 * Math.sin(now / 350);
     for (const m of this.crateMarks(seen, known)) {
-      if (inRect(m.x, m.y, 30)) drawCrateTop(ctx, m.x, m.y, m.ground ? 16 : 13, z, m.ground ? glow : 0);
+      if (inRect(m.x, m.y, 30) && !drawCratePainted(ctx, m.x, m.y, m.ground ? 16 : 13, z, m.ground ? glow : 0)) drawCrateTop(ctx, m.x, m.y, m.ground ? 16 : 13, z, m.ground ? glow : 0);
     }
     for (const a of g.animals ?? []) if (inRect(a.x, a.y, 20) && seen(a.x, a.y) && !drawAnimalTopP(ctx, a, z, now)) drawAnimalTop(ctx, a, z); // nur in Sicht
 
@@ -245,7 +246,7 @@ export class Renderer {
           if (t) aim = Math.atan2(t.y - u.y, t.x - u.x);
         }
         if (!drawUnitTop(ctx, u, z, aim, now)) drawUnit(ctx, u, g.teams[u.team].color, z, aim, now); // gemalt (seit v5.27), sonst einfache Form
-        if (u.crate) drawCrateTop(ctx, u.x + 4, u.y - 6, 10, z); // Kiste auf dem Rücken
+        if (u.crate && !drawCratePainted(ctx, u.x + 4, u.y - 6, 10, z)) drawCrateTop(ctx, u.x + 4, u.y - 6, 10, z); // Kiste auf dem Rücken
       }
     }
 
@@ -678,6 +679,14 @@ export class Renderer {
     }
     ctx.fillStyle = 'rgba(10,18,8,0.24)';
     ctx.fill();
+    // Schatten der geparkten Autos und Bänke: Umriss von oben am Boden (seit v5.43, props.js)
+    for (const it of items) {
+      if (it.t !== 6 && it.t !== 7) continue;
+      if (relief) cam.pin(this.baseHeight(it));
+      if (it.t === 6) drawMapCarShadowIso(ctx, cam, it.o, dpr);
+      else drawBenchShadowIso(ctx, cam, it.o, dpr);
+      cam.unpin();
+    }
     for (const it of items) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       // Jedes Objekt steht eben auf seiner Geländehöhe (Gebäude auf der tiefsten Ecke, damit nichts schwebt)
@@ -711,9 +720,12 @@ export class Renderer {
       }
       else if (it.t === 2) { if (!drawRockIso(ctx, cam, it.o, this.season)) drawRock(ctx, cam, it.o); }
       else if (it.t === 13) drawBushIso(ctx, cam, it.o, this.season);
-      else if (it.t === 6) { if (!drawCarSprite(ctx, cam, it.o)) drawCar(ctx, cam, it.o); }
-      else if (it.t === 7) drawBench(ctx, cam, it.o);
-      else if (it.t === 8) drawCrate(ctx, cam, it.o.x, it.o.y, it.o.ground ? 16 : 13, 0, it.o.ground ? glow : 0);
+      else if (it.t === 6) { if (!drawMapCarIso(ctx, cam, it.o, this.season)) drawCar(ctx, cam, it.o); } // gemalt (props.js, seit v5.43)
+      else if (it.t === 7) { if (!drawBenchIso(ctx, cam, it.o, this.season)) drawBench(ctx, cam, it.o); }
+      else if (it.t === 8) {
+        const s = it.o.ground ? 16 : 13;
+        if (!drawCrateIso(ctx, cam, it.o.x, it.o.y, s, 0, it.o.ground ? glow : 0)) drawCrate(ctx, cam, it.o.x, it.o.y, s, 0, it.o.ground ? glow : 0);
+      }
       else if (it.t === 12) drawFordPostIso(ctx, cam, it.o);
       else if (it.t === 11) {
         const a = it.o;
@@ -740,7 +752,7 @@ export class Renderer {
         drawU(it.o);
         if (it.o.crate) {
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-          drawCrate(ctx, cam, it.o.x, it.o.y, 10, unitLift(it.o) + 14); // Kiste auf dem Rücken
+          if (!drawCrateIso(ctx, cam, it.o.x, it.o.y, 10, unitLift(it.o) + 14)) drawCrate(ctx, cam, it.o.x, it.o.y, 10, unitLift(it.o) + 14); // Kiste auf dem Rücken
         }
       }
       cam.unpin();

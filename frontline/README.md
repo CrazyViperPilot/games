@@ -31,7 +31,7 @@ Spiel: `http://localhost:8765/frontline/` · Karteneditor: `http://localhost:876
 - `?seed=N`: feste Karte (gleicher Seed = gleiche Partie).
 - `?speed=N`: Startgeschwindigkeit.
 - `?river=0|1`: Fluss auf der Zufallskarte aus oder an (übersteuert das Startmenü).
-- `?gl=0`: Gelände der Iso-Ansicht ohne WebGL (flach, nur aufgemalt). `?sprites=0`: gemalte statt Bild-Sprites.
+- `?gl=0`: Gelände der Iso-Ansicht ohne WebGL (flach, nur aufgemalt).
 - `?debug=1&fog=1`: Debug, aber mit Nebel (Sicht im Gelände prüfen).
 - `?debug=1&weather=summer|autumn|winter&wx=clear|rain|fog|snow`: Jahreszeit und festes Wetter.
 
