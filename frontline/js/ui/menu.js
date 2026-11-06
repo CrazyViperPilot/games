@@ -4,7 +4,7 @@ import { BALANCE } from '../data/balance.js';
 import { listMaps, deleteMap, saveMap, normalizeMap, describeMap } from '../game/mapdata.js';
 import { WEATHER_SETTINGS } from '../game/weather.js';
 import { MOOD_SETTINGS } from '../render/mood.js';
-import { SOUND_KEY } from '../audio/sound.js';
+import { SOUND_KEY, loadLevel, saveLevel } from '../audio/sound.js';
 
 const DIFFS = [
   ['easy', 'Leicht'],
@@ -54,7 +54,7 @@ const KEYS = [
   ['Y', 'Baumodus der Stadt an/aus (nur mit Stadt im Startmenü): Werkzeug rechts wählen (gruppiert: Grundlagen, Wohnen & Gewerbe, Förderung, Ressourcen, Einheiten, Stadt, Fliegerhorst), auf der Karte ein Rechteck ziehen (überall, wo nichts im Weg steht; dunkle Zellen sind gesperrt; belegte Zellen werden nicht überbaut, erst räumen; Räumen fällt auch Bäume und Wald und reißt leere Häuser, Hallen und Fabriken der Karte ab, dort kann man danach bauen (Rohstoffvorkommen und Förderanlagen bleiben stehen, nur „Abreißen“ eines gewählten Gebäudes entfernt eine Förderanlage); die großen Blöcke der Konfliktzone (11 × 11 Zellen) bieten Platz für einen Fliegerhorst); zwei Finger schieben weiter; das Spiel läuft weiter · Ausgebildete Einheiten brauchen freie Einwohner (Soldat 1, Panzer 3, Hubschrauber 2) · Bewohner in der Konfliktzone fliehen bei Beschuss · Förderung nur auf Vorkommen (Wald, Fels, Erz, Öl), Werke verarbeiten das Geförderte, Fahrzeuge kosten Stahl · Eigenes Stadtgebäude antippen: Infos und Aktionen (Markt: Handel, T; Abreißen, Entf) · Mit fertigem Markt öffnet Tippen auf die Geldanzeige oben das Marktmenü · Gegnerische Stadtgebäude per Rechtsklick angreifen, Ruinen wachsen nach 30 s neu · Kraftwerk (2 × 2 Zellen): Strom für Werke und Forschung (oben Angebot/Verbrauch) · Die Straßen der Konfliktzone und die Brücken sind Stadtstraßen für beide Teams: dort gebaute Häuser und Läden haben Straßenanschluss, eigene Straßen schließen an · Werke (BM, Munition, Raffinerie, Stahl) sind Großbauten über 2 × 2 Zellen · Universität (Großbau 3 × 3 Zellen): ohne sie ruht jede Forschung · Rechenzentrum: jede Stufe jedes Rechenzentrums forscht 20 % schneller (höchstens dreifach) · Zufriedenheit (Gewerbe, Sicherheit, Strom) steigert Erträge · Truppen bilden mit Stadt nur Kaserne (4 × 4, Soldaten), Fabrikhalle (5 × 5, alle Fahrzeuge), Heliport (Hubschrauber) und Stellplätze des Fliegerhorsts (F-16 mit K, ein Flugzeug je Stellplatz) aus, bezahlt direkt aus der Stadt; das Startviertel hat Kaserne und Fabrikhalle · ✈ Fliegerhorst: Bahn (wie Straße ziehen; ein gerader Streifen 2 Zellen breit und mindestens 8 lang ist die Bahn, weitere Bahnzellen sind Rollfeld), Rollfeld (Beton zum Rollen, verbindet Stellplätze mit der Bahn, keine Straße nötig), Stellplätze 2 × 2 an Rollfeld, Bahn oder Straße (gebaut offen; Stellplatz wählen, „Ausbauen“ (U): Stufe 2 Überdachung 300 Geld + 150 BM, Stufe 3 Stahlbeton-Shelter 700 Geld + 300 BM + 150 Stahl; abgestellte Jets nehmen weniger Schaden und stehen sichtbar unter dem Dach), Tower (Bahn schneller wieder frei, sieht als Radar 360 px weit), Kerosintank und Munitionslager (füllen sich über die Straße, Jets im Umkreis von 12 Zellen tanken und laden daraus) · F-16: zwei Luft-Luft-Lenkraketen (nur Hubschrauber und Flugzeuge) und zwei Luft-Boden-Raketen (Panzer, Fahrzeuge, Gebäude), feuern unabhängig, 55 s Treibstoff, fliegt leer oder bei knappem Treibstoff selbst zurück; Befehl = Start, Rechtsklick auf einen eigenen Stellplatz = landen, Stellplatz oder Tower gewählt: W wählt die Staffel · Diese drei pflegen auch ihre Einheiten im Umkreis von 2 Feldern (Kaserne heilt Soldaten, Fabrikhalle und Heliport reparieren gegen Stahl); das ✚ Krankenhaus heilt Soldaten im Umkreis von 3 Feldern schneller · Schilder über den Gebäuden: großes Symbol = Funktionsgebäude (⚖ Markt, Förderung, Werke, ⚔ Kaserne, 🔧 Fabrikhalle, 🚁 Heliport, ✚ Krankenhaus …), grünes Haus = Wohnen (privat), blaues Bürohaus = Gewerbe (kommerziell)'],
   ['Straßen (Stadt)', 'Alles fährt über Straßen: Holz und Stein von Holzfäller und Steinbruch zum nächsten BM-Werk, Erz von der Erzmine zur Hütte (Roheisen), Roheisen zum Stahlwerk, Öl zur nächsten Raffinerie oder Kerosin-Raffinerie · Produkte (BM, Stahl, Treibstoff, Kerosin, Munition) fahren zum Lager der Hauptstadt · Ziel ist immer das nächste passende Werk bzw. das Lager, nur im selben Straßennetz · Ohne Weg geht die Ware verloren (Hinweis im Gebäude und in der Ressourcenanzeige) · Straßen tragen 12 Waren je s, Stadtstraßen der Karte 20 je s; Straßen direkt nebeneinander bilden eine mehrspurige Straße (2 nebeneinander = 2 Spuren je Richtung = doppelte Kapazität, bis 4) · Im Baumodus färben sich die Straßen nach Auslastung: grün unter 60 %, gelb unter 100 %, rot ab 100 % (Stau: Waren kommen langsamer) · Pendler (Arbeiter) fahren über die Straße zur nächsten Wohnung, bei Stau kommen sie zu spät · Ein großes rotes X am Schild: Lieferweg oder Pendlerweg fehlt · Gewerbe und Markt brauchen Baumaterial aus dem Lager über die Straße, sonst laufen Steuern und Zufriedenheit schlechter · Neue Werke: Hütte (2 × 2, Erz → Roheisen), Kerosin-Raffinerie (2 × 2, Öl → Kerosin, Vorrat im Stadtlager); F-16 tanken Kerosin am Kerosintank des Fliegerhorsts (der füllt sich über die Straße), Hubschrauber gelandet auf ihrem Heliport ebenfalls aus Kerosintank und Munitionslager in der Nähe · Heliport: ein Hubschrauber je Heliport, startet und landet dort senkrecht (Landen L, dann Heliport anklicken; Heliport gewählt: W wählt den Hubschrauber); nach jedem Start und jeder Landung ist der Luftraum 6 s gesperrt, mit Tower 2 s; bei knappem Treibstoff oder leeren Waffen fliegt er selbst heim'],
   ['📊', 'Ressourcen (nur mit Stadt): Knopf rechts oben unter „Forschung“ zeigt den Fluss von der Förderung (Gebäude, Rohstoff/s) über die Werke bis zu Lager und Verbrauch; Linienbreite = Menge je s, rot = Engpass, gelb = Werk wartet oder Rohstoff verfällt, unten die Engpässe mit Rat · Esc schließt'],
-  ['F2', 'Ton an/aus (auch der Lautsprecher-Knopf oben)'],
+  ['F2', 'Ton an/aus (auch der Lautsprecher-Knopf oben) · Lautstärke für Geräusche und Musik im Start- und Pausenmenü (P)'],
   ['Minimap', 'Linksklick = Kamera, Rechtsklick = Bewegen'],
 ];
 
@@ -82,6 +82,13 @@ if (typeof document !== 'undefined') {
   });
 }
 
+/** Lautstärke-Regler 0–100 % mit Prozentzahl; kind 'sfx' (Geräusche) oder 'music' (Musik), value 0–1 (seit v5.64). */
+const volRow = (kind, value) => {
+  const pct = Math.round(value * 100);
+  const name = kind === 'music' ? 'Musik' : 'Geräusche';
+  return `<div class="vol"><input type="range" min="0" max="100" step="5" value="${pct}" data-vol="${kind}" aria-label="Lautstärke ${name}"><output data-volout="${kind}">${pct} %</output></div>`;
+};
+
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 function fmtTime(s) {
@@ -97,6 +104,7 @@ function show(root, kind, html) {
 
 export function hideOverlay(root) {
   root.onclick = null;
+  root.oninput = null;
   root.innerHTML = '';
   delete root.dataset.kind;
   root.hidden = true;
@@ -217,6 +225,14 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
         <span class="flabel" title="Schüsse, Explosionen, Fahrzeuge, Wetter und Meldungen; selbst erzeugt, ohne Dateien. Im Spiel: Taste F2 oder der Lautsprecher-Knopf oben">Ton</span>
         <div class="seg"><button type="button" data-sound="1">An</button><button type="button" data-sound="0">Aus</button></div>
       </div>
+      <div class="field">
+        <span class="flabel" title="Lautstärke der Schüsse, Explosionen, Fahrzeuge und Meldungen; wirkt sofort">Geräusche</span>
+        ${volRow('sfx', loadLevel('sfx'))}
+      </div>
+      <div class="field">
+        <span class="flabel" title="Hintergrundmusik, selbst erzeugt: ruhig im Frieden, Trommeln und Bass im Gefecht; wirkt sofort">Musik</span>
+        ${volRow('music', loadLevel('music'))}
+      </div>
       <div class="field" data-fsbox hidden>
         <span class="flabel" title="Ohne Status- und Navigationsleiste spielen. Installiert startet Frontline von selbst im Vollbild">Vollbild</span>
         <div class="seg"><button type="button" data-fs="1">An</button><button type="button" data-fs="0">Aus</button></div>
@@ -326,6 +342,13 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
         });
     }
   };
+  root.oninput = (e) => {
+    const r = e.target.closest?.('[data-vol]');
+    if (!r) return;
+    const v = Number(r.value) / 100;
+    saveLevel(r.dataset.vol, v);
+    root.querySelector(`[data-volout="${r.dataset.vol}"]`).textContent = `${r.value} %`;
+  };
   root.onclick = (e) => {
     const b = e.target.closest('button');
     if (!b) return;
@@ -411,8 +434,11 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
   };
 }
 
-/** Pausenmenü: onResume() bei „Weiter“, onQuit() bei „Zum Startmenü“. */
-export function showPause(root, onResume, onQuit, onSave = null) {
+/**
+ * Pausenmenü: onResume() bei „Weiter“, onQuit() bei „Zum Startmenü“. `audio` (seit v5.64, optional): { get(kind) → 0–1, set(kind, v) }
+ * für die Regler Geräusche und Musik, die sofort wirken (kind 'sfx' | 'music').
+ */
+export function showPause(root, onResume, onQuit, onSave = null, audio = null) {
   show(
     root,
     'pause',
@@ -422,6 +448,8 @@ export function showPause(root, onResume, onQuit, onSave = null) {
         <button type="button" class="primary" data-act="resume">Weiter (P)</button>
         <button type="button" data-act="quit">Speichern und zum Startmenü</button>
       </div>
+      ${audio ? `<div class="field"><span class="flabel">Geräusche</span>${volRow('sfx', audio.get('sfx'))}</div>
+      <div class="field"><span class="flabel">Musik</span>${volRow('music', audio.get('music'))}</div>` : ''}
       <div class="field" data-fsbox hidden>
         <span class="flabel">Vollbild</span>
         <div class="seg"><button type="button" data-fs="1">An</button><button type="button" data-fs="0">Aus</button></div>
@@ -434,6 +462,14 @@ export function showPause(root, onResume, onQuit, onSave = null) {
     if (el) el.textContent = t;
   });
   markFullscreen(root);
+  if (audio) {
+    root.oninput = (e) => {
+      const r = e.target.closest?.('[data-vol]');
+      if (!r) return;
+      audio.set(r.dataset.vol, Number(r.value) / 100);
+      root.querySelector(`[data-volout="${r.dataset.vol}"]`).textContent = `${r.value} %`;
+    };
+  }
   root.onclick = (e) => {
     const f = e.target.closest('[data-fs]');
     if (f) return setFullscreen(f.dataset.fs === '1');

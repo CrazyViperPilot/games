@@ -351,6 +351,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   text-transform: uppercase;
 }
 .seg { display: flex; gap: 6px; }
+.vol { display: flex; align-items: center; gap: 10px; }
+.vol input { flex: 1; }
+.vol output { min-width: 3.5em; text-align: right; }
 .seg button {
   flex: 1;
   height: 38px;

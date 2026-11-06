@@ -2,7 +2,33 @@
 // und damit keine Lizenzfragen; offline sofort da. Reines Browser-Modul, nicht Teil der Simulation: liest game.effects,
 // Meldungen und das Wetter und ändert nichts am Spiel. Ein Schalter (HUD, Taste F2, Startmenü) schaltet alles ein oder aus.
 
+import { Music, BATTLE_TYPES } from './music.js';
+
 export const SOUND_KEY = 'frontline-ton';
+/** Lautstärke-Regler in Prozent (0–100) im Speicher: 'sfx' Geräusche, 'music' Musik (seit v5.64). */
+export const LEVEL_KEYS = { sfx: 'frontline-ton-laut', music: 'frontline-musik-laut' };
+const LEVEL_DEFAULT = { sfx: 0.8, music: 0.5 };
+const NEAR_OWN = 240; // Weltpunkte: Kampf nahe eigenen Einheiten oder Gebäuden zählt für die Musik auch außerhalb des Bilds
+
+/** Lautstärke-Regler 0–1 aus dem Speicher (Standard: Geräusche 80 %, Musik 50 %). */
+export function loadLevel(kind) {
+  try {
+    const raw = localStorage.getItem(LEVEL_KEYS[kind]);
+    if (raw === null) return LEVEL_DEFAULT[kind];
+    const v = Number(raw);
+    return Number.isFinite(v) ? Math.min(1, Math.max(0, v / 100)) : LEVEL_DEFAULT[kind];
+  } catch {
+    return LEVEL_DEFAULT[kind];
+  }
+}
+/** Regler 0–1 speichern (als Prozent). */
+export function saveLevel(kind, v) {
+  try {
+    localStorage.setItem(LEVEL_KEYS[kind], String(Math.round(Math.min(1, Math.max(0, v)) * 100)));
+  } catch {
+    /* ohne Speicher: gilt nur für diese Sitzung */
+  }
+}
 
 /** Ton an/aus aus dem Speicher (Standard an). */
 export function loadSoundOn() {
@@ -250,8 +276,10 @@ export class Sound {
   /** `ctx`: nur für Tests (fertiger AudioContext, z. B. OfflineAudioContext). */
   constructor({ ctx = null } = {}) {
     this.on = loadSoundOn();
+    this.levels = { sfx: loadLevel('sfx'), music: loadLevel('music') };
     this.ctx = ctx;
     this.master = null;
+    this.music = null;
     this.noiseBuf = null;
     this.amb = null;
     this.game = null;
@@ -293,6 +321,9 @@ export class Sound {
     this.team = team;
     this.seen = new WeakSet();
     this.thunderIn = rnd(15, 45);
+    this.levels = { sfx: loadLevel('sfx'), music: loadLevel('music') };
+    this.applyLevels();
+    this.music?.reset();
     this.setOn(loadSoundOn());
   }
 
@@ -300,6 +331,7 @@ export class Sound {
     this.game = null;
     this.camera = null;
     this.setLevels(0, 0, 0, 0);
+    this.music?.silence();
   }
 
   setOn(on, save = false) {
@@ -308,8 +340,26 @@ export class Sound {
     if (this.on) this.unlock();
     else {
       this.setLevels(0, 0, 0, 0);
+      this.music?.silence();
       this.ctx?.suspend?.().catch?.(() => {});
     }
+  }
+
+  /** Lautstärke-Regler 0–1: 'sfx' Geräusche, 'music' Musik. Wirkt sofort und wird gespeichert. */
+  setLevel(kind, v) {
+    this.levels[kind] = Math.min(1, Math.max(0, Number(v) || 0));
+    saveLevel(kind, this.levels[kind]);
+    this.applyLevels();
+  }
+
+  getLevel(kind) {
+    return this.levels[kind];
+  }
+
+  /** Regler auf die Ausgänge legen (Geräusche: Hauptpegel = MASTER × Regler; Musik: Regler des Musikmoduls). */
+  applyLevels() {
+    if (this.master) this.master.gain.setTargetAtTime(MASTER * this.levels.sfx, this.ctx.currentTime, 0.05);
+    this.music?.setLevel(this.levels.music);
   }
 
   toggle() {
@@ -322,7 +372,7 @@ export class Sound {
   build() {
     const ctx = this.ctx;
     this.master = ctx.createGain();
-    this.master.gain.value = MASTER;
+    this.master.gain.value = MASTER * this.levels.sfx;
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -12;
     comp.ratio.value = 6;
@@ -335,6 +385,7 @@ export class Sound {
     const data = buf.getChannelData(0);
     for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
     this.noiseBuf = buf;
+    this.music = new Music(ctx, buf, this.levels.music);
     this.buildAmbience();
   }
 
@@ -551,7 +602,10 @@ export class Sound {
     const text = ev.text ?? '';
     if (/ bereit$/.test(text)) this.play('ready');
     else if (/ fertig$/.test(text)) this.play('built');
-    else if (text === 'Basis wird angegriffen') this.play('alarm');
+    else if (text === 'Basis wird angegriffen') {
+      this.play('alarm');
+      if (this.game) this.music.alert(this.game.time);
+    }
     else if (text.startsWith('+')) this.play('coin');
     else if (!/zerstört|abgefangen|gefallen/.test(text)) this.play('note');
   }
@@ -578,16 +632,43 @@ export class Sound {
       this.held = paused;
       if (paused) this.setLevels(0, 0, 0, 0);
     }
+    this.music.update(dt, game, paused); // Musik läuft auch in der Pause, nur leiser
     if (paused) return;
     for (const e of game.effects) {
       if (this.seen.has(e)) continue;
       this.seen.add(e);
       this.effect(e);
+      if (BATTLE_TYPES.has(e.type) && this.nearBattle(e)) this.music.hit(game.time);
     }
     this.ambIn -= dt;
     if (this.ambIn > 0) return;
     this.ambIn = AMBIENCE_EVERY;
     this.ambience();
+  }
+
+  /** Kampfeffekt im Bild der Kamera oder nahe eigener Einheiten/Gebäude (nur für die Musik-Lage). */
+  nearBattle(e) {
+    const cam = this.camera;
+    if (!cam) return true;
+    const p = cam.worldToScreen(e.x, e.y);
+    const hw = (cam.viewW || 800) / 2;
+    const hh = (cam.viewH || 600) / 2;
+    if (Math.abs(p.x - hw) <= hw && Math.abs(p.y - hh) <= hh) return true;
+    const r2 = NEAR_OWN * NEAR_OWN;
+    const game = this.game;
+    for (const u of game.units) {
+      if (u.team !== this.team || !u.alive) continue;
+      const dx = u.x - e.x;
+      const dy = u.y - e.y;
+      if (dx * dx + dy * dy <= r2) return true;
+    }
+    for (const b of game.buildings) {
+      if (b.team !== this.team) continue;
+      const dx = b.x - e.x;
+      const dy = b.y - e.y;
+      if (dx * dx + dy * dy <= r2) return true;
+    }
+    return false;
   }
 
   ambience() {
