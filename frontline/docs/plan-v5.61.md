@@ -10,7 +10,7 @@ Für die Pakete ab P2 gilt PRD §13: erst ein Vorschlag zur Ausgestaltung (unten
 |---|---|---|---|---|
 | **P1** | Statistik am Spielende + Doku-Abgleich §1/§13 | §12 Could, §13 | klein | **gebaut (v5.61)** |
 | P2 | Häuserkampf I: Zonen-Nutzen besetzter Häuser (Punkte, Sicht), Ruinen als Deckung | §13 Häuserkampf | mittel | **gebaut (v5.62)** |
-| P3 | Häuserkampf II: KI stürmt Häuser und baut sie zur Stellung aus; Feuerbereich je Haus | §13 Häuserkampf | mittel | geparkt |
+| P3 | Häuserkampf II: KI stürmt Häuser und baut sie zur Stellung aus; Feuerbereich je Haus | §13 Häuserkampf | mittel | **in Arbeit (v5.63)** |
 | P4 | Musik (synthetisiert, je Lage ruhig/Gefecht) und Lautstärkeregler für Ton und Musik | §13 Musik | mittel | geparkt |
 | P5 | Stadt: LKW holen Material direkt an Werken statt nur aus dem Lager der Hauptstadt | §13 SimCity-Stadt | groß | geparkt |
 | P6 | KI-Lücken aus §10: KI baut Flak/SAM gegen Luft, Scharfschützen, Bagger | §10 „Nicht gebaut“ | mittel | geparkt |
@@ -79,9 +79,42 @@ Doku: PRD §7 „Häuserkampf“ (drei Punkte ergänzen, Satz „Weiter geparkt�
 Test `test/garrison.test.js` (erweitern) oder neu `test/housefight.test.js`: Zonengewicht mit/ohne besetztes Haus; Sichtradius des
 Besatzers größer; Infanterie an einer Ruine nimmt 70 % Schaden, weiter weg 100 %, Fahrzeug an der Ruine 100 %.
 
-## P3 – Häuserkampf II (Vorschlag)
-- KI stürmt besetzte Häuser in der Zone, wenn sie überlegen ist, und baut eigene besetzte Häuser aus (Werte in `js/data/ai.js`, `GARRISON_*`).
-- Feuerbereich: Besatzung schießt nur in die Richtungen mit Fenstern (Hausseiten zur Straße), sichtbar beim Wählen.
+## P3 – Häuserkampf II (v5.63, von Daniel bestätigt am 2026-11-06)
+
+### A. KI stürmt (Armee-KI `js/ai/ai.js`, Werte in `js/data/ai.js`, je Schwierigkeit in `BALANCE.difficulty`)
+- Neue Methode `stormHouses(s)`, aufgerufen in `think()` direkt nach `garrisonZone(s)`, Takt `STORM_EVERY` (8 s, über `this.once`).
+- Ziel: vom Gegner besetztes, lebendes Haus, das die KI sieht (`game.sees`) und dessen Mitte in der Konfliktzone liegt.
+- Stürmer: eigene freie Infanterie (nicht im Haus, nicht schon `storm`/`garrison`-Befehl, nicht Kommandeur) im Umkreis `STORM_RANGE` (450 px).
+- Nur wenn Zahl der Stürmer ≥ `STORM_RATIO` (2) × Besatzung des Hauses und ≥ `STORM_MIN` (3). Es gehen höchstens `STORM_MAX` (8), die nächsten zuerst.
+  Hat das Haus Stacheldraht, gilt `STORM_RATIO` × 1,5. Je Takt höchstens ein Haus.
+- Befehl nur über `game.issue(team, { type: 'storm', ids, houseId })`.
+- Schwierigkeit: `BALANCE.difficulty.<stufe>.houseStorm` (easy `false`, normal und hard `true`).
+
+### B. KI baut Häuser aus (Stadt-unabhängig, also Armee-KI)
+- Neue Methode `fortifyHouses(s)`, Takt `HOUSE_WORK_EVERY` (10 s). Für jedes eigene besetzte Haus ohne laufende Arbeit: nächste fehlende Arbeit
+  in der Reihenfolge `HOUSE_WORK_ORDER` (`['sandbags', 'wire', 'mgnest']`), nur wenn Geld ≥ Preis + `HOUSE_WORK_RESERVE` (400). Je Takt höchstens ein Auftrag.
+- Befehl `{ type: 'fortifyHouse', houseId, work }`. Schwierigkeit: `BALANCE.difficulty.<stufe>.houseWorks` (easy `false`, normal und hard `true`).
+
+### C. Feuerbereich (Fenster) für Besatzer in Stadthäusern (nicht Gefechtstürme)
+- Beim Anlegen der Häuser (`createHouses` in `js/game/garrison.js`) bekommt jedes Haus `h.windows = { n, e, s, w }` (true = Fensterseite).
+  Eine Seite ist **blind**, wenn ein anderes Stadtgebäude der Karte (`game.map.town.buildings`) höchstens `BALANCE.garrison.blindGap` (14 px)
+  vor dieser Seite liegt und sich mit ihr auf mindestens der halben Seitenlänge überdeckt. Sonst Fenster. Hat ein Haus keine Fensterseite (eingeklemmt): alle vier Seiten offen.
+- Richtung zum Ziel: dx, dy von der Hausmitte; ist |dx|/(pw/2) ≥ |dy|/(ph/2), dann Seite e (dx>0) bzw. w, sonst s (dy>0) bzw. n.
+- Besatzer dürfen nur Ziele beschießen und als Ziel wählen, deren Richtung durch eine Fensterseite geht. Eine Hilfsfunktion
+  `houseCanFire(game, u, target)` in garrison.js (true außerhalb von Stadthäusern), genutzt in der Zielsuche und vor dem Schuss in `js/game/combat.js`.
+  Keine Allokationen je Aufruf.
+- Spielstände: Häuser ohne `windows` (alte Stände) gelten als rundum offen.
+- Anzeige: Beim eigenen besetzten Haus zeichnet der Renderer an jeder Fensterseite einen kurzen Strich in Teamfarbe (2D und Iso, an der
+  Stelle, wo das Schild `drawGarrison` in `js/render/renderer.js` gezeichnet wird). Klein halten, nur Bild.
+
+### Doku und Test
+- PRD §7 „Häuserkampf“ (Sätze „Die KI stürmt nicht“ und „Die KI baut nichts aus“ ersetzen, Feuerbereich ergänzen), §10 KI (Häuserkampf-Zeile)
+  und Tabelle „KI-Konstanten“ (neue Konstanten), §13 „Weiter geparkt“ kürzen (bleibt: Kampf von Raum zu Raum), Hilfe (F1) in `js/ui/menu.js`,
+  Änderungsverlauf v5.63, `CACHE_VERSION` `frontline-v176`, `npm run docs`, Feature-Landkarte in `CLAUDE.md`.
+- Test `test/housefight2.test.js`: KI (Normal) stürmt ein Haus mit 1 Besatzer, wenn 4 eigene Schützen daneben stehen, nicht bei 1;
+  Leicht stürmt nicht; KI baut mit genug Geld Sandsäcke, ohne Geld nicht; blinde Seite zwischen zwei eng stehenden Häusern;
+  Besatzer schießt nicht durch die blinde Seite, wohl durch eine Fensterseite.
+- Gewollte Regeländerung: Golden-Werte dürfen sich ändern (dann neu setzen nach Anleitung im Testkopf, im Bericht nennen).
 
 ## P4 – Musik (Vorschlag)
 - Synthetisierte Musik (WebAudio, wie `js/audio/sound.js`), zwei Stimmungen: ruhig (Aufbau) und Gefecht (Kampf in Sicht), weich überblendet.
