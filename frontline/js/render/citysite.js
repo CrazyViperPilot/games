@@ -2,7 +2,8 @@
 // oder gesetzte Zelle, die noch wächst (Stufe 0, CITY.growTime), ist eine Baustelle, die mit dem Fortschritt sichtbar wächst:
 // Baugrube mit Bagger und Absteckpflöcken → Bodenplatte mit Anschlusseisen und Muldenkipper → Erdgeschoss mit Gerüst → Rohbau mit
 // Geschossdecke → Dachstuhl mit Richtkranz. Bauzaun mit Planen in der Farbe der Zellenart (Wohnen grün, Gewerbe blau …), Dixi-Klo,
-// Ziegel- und Sandhaufen; Großbauten mit Baukran und Baucontainern. Iso (für jede Drehung dasselbe Bild, wie die Stadtgebäude) und
+// Ziegel- und Sandhaufen; Großbauten mit Baukran und Baucontainern, seit v5.46 mit Stützen und Treppenkern im Rohbau, Kaserne und
+// Fabrikhalle mit Lagerplatz (Stahlträger, Steine, Lkw). Iso (für jede Drehung dasselbe Bild, wie die Stadtgebäude) und
 // 2D von oben, je Maßstab zwischengespeichert (spritecache.js). Den Boden (Erde, Rand in der Farbe der Zellenart) malt citylayer.js,
 // den Fortschrittsbalken drawCityBadges. Nur Zeichnen.
 import { sprite, blit, spriteDpr } from './spritecache.js';
@@ -61,21 +62,23 @@ export const siteStep = (f) => Math.max(0, Math.min(STEPS - 1, Math.floor((Numbe
 
 /**
  * Maße einer Baustelle mit n × n Zellen (Weltpixel ab der Mitte): e Bauzaun (0 = keiner), L Reichweite der Baustoffe und Geräte,
- * U0 … V1 Grundriss des Rohbaus, Hf Höhe des fertigen Rohbaus, crane Höhe des Krans (0 = keiner). Ab 4 × 4 Zellen bleibt alles um
- * die Mitte (sonst würde das Bild sehr groß), der Rest ist Erde.
+ * U0 … V1 Grundriss des Rohbaus, Hf Höhe des fertigen Rohbaus, crane Höhe des Krans (0 = keiner), yard Lagerplatz mit Stahlträgern,
+ * Steinen und Lkw (Kaserne, Fabrikhalle). Ab 4 × 4 Zellen ohne Bauzaun (sonst würde das Bild sehr groß), der Rest ist Erde.
  */
 function dims(n) {
-  if (n <= 1) return { e: 26, L: 26, U0: -15, U1: 11, V0: -12, V1: 8, Hf: 18, crane: 0 };
+  if (n <= 1) return { e: 26, L: 26, U0: -15, U1: 11, V0: -12, V1: 8, Hf: 18, crane: 0, yard: false };
   const half = n * 32 - 5;
-  const c = Math.min(Math.round(half * 0.55), 44);
-  return { e: n <= 3 ? half : 0, L: Math.min(half, 60), U0: -c, U1: c, V0: -c, V1: c - 2, Hf: n === 2 ? 24 : 28, crane: 50 + 8 * Math.min(2, n - 2) };
+  const yard = n >= 4;
+  const c = Math.min(Math.round(half * 0.55), yard ? 58 : 44);
+  return { e: yard ? 0 : half, L: yard ? 88 : Math.min(half, 60), U0: -c, U1: c, V0: -c, V1: c - 2, Hf: n === 2 ? 24 : 28, crane: 50 + 8 * Math.min(2, n - 2), yard };
 }
 
 /** Lage der Geräte und Baustoffe (Iso und 2D gleich): Aushub/Steine hinten, Dixi hinten rechts, vorn Palette und Sand. */
 function layout(d, flip) {
   const { L, U0, U1, V0, V1 } = d;
+  const big = !!d.crane;
   return {
-    back: [flip ? U1 + 6 : U0 - 3, V0 - 7],
+    back: big ? [flip ? U1 - 12 : U0 + 14, V0 - 9] : [flip ? U1 + 6 : U0 - 3, V0 - 7], // Großbau: neben dem Kran an der Hinterkante
     dixi: [L - 6, -L + 6],
     digger: [U0 - 6, (V0 + V1) / 2 + 2],
     truck: [U1 + 8, (V0 + V1) / 2],
@@ -83,13 +86,27 @@ function layout(d, flip) {
     office: [-L + 8, L - 6],
     pallet: [flip ? L - 7 : -L + 7, L - 13],
     sand: [flip ? -L + 9 : L - 9, L - 9],
+    // Lagerplatz (nur Kaserne, Fabrikhalle): Träger vorn links, Steine rechts neben dem Rohbau, Lkw vorn rechts
+    beams: [-L + 34, L - 12],
+    stock: [U1 + 15, V0 + 12],
+    lorry: [U1 + 16, V1 - 6],
   };
 }
 
-/** Höhe des Rohbaus in Bauabschnitt step (Weltpixel, ohne Kran; für den Fortschrittsbalken darüber). */
+/** Stahlträger gestapelt (Lagerplatz). */
+function beams(g, u, v) {
+  for (let k = 0; k < 3; k++) box(g, u - 13, u + 13, v - 3.6 + k * 2.4, v - 1.8 + k * 2.4, 0, 1.6, '#7c8288', snowy('#9aa0a5'));
+  for (let k = 0; k < 2; k++) box(g, u - 12, u + 12, v - 2.4 + k * 2.4, v - 0.6 + k * 2.4, 1.6, 3.2, '#8a9096', snowy('#a4aaaf'));
+}
+
+/**
+ * Höhe über der Mitte, über der der Fortschrittsbalken steht (Weltpixel, ohne Kran): Rohbau in Bauabschnitt step, bei Großbauten
+ * dazu die hintere Ecke des Rohbaus, die im Iso-Bild höher liegt als die Mitte.
+ */
 export function siteTall(n, step) {
   const d = dims(n);
-  return [9, 6, d.Hf * 0.42 + 3, d.Hf * 0.8 + 3, d.Hf + 14][step] ?? 10;
+  const back = d.crane ? Math.round(d.U1 * 0.6) : 0;
+  return ([9, 6, d.Hf * 0.42 + 3, d.Hf * 0.8 + 3, d.Hf + 14][step] ?? 10) + back;
 }
 
 const wallOf = (ck, v) => (WALLS[ck] ?? WALL_DEFAULT)[((v % 3) + 3) % 3];
@@ -155,13 +172,14 @@ function openings(g, face, plane, a0, a1, rows, door = null) {
 }
 
 /** Offener Rohbau: innen Boden (Höhe hF) und Innenseiten der hinteren Wände, außen die beiden sichtbaren Wände bis H, Mauerkrone. */
-function shell(g, U0, U1, V0, V1, H, wall, hF) {
+function shell(g, U0, U1, V0, V1, H, wall, hF, big) {
   const { P } = g;
   const t = 1.2;
   const inner = shade(wall, 0.2);
   poly(g, [P(U0 + t, V0 + t, hF), P(U1 - t, V0 + t, hF), P(U1 - t, V1 - t, hF), P(U0 + t, V1 - t, hF)], lit(INSIDE, ...FACE.top), null);
   poly(g, [P(U0 + t, V0 + t, hF), P(U1 - t, V0 + t, hF), P(U1 - t, V0 + t, H), P(U0 + t, V0 + t, H)], lit(inner, ...FACE.s), null);
   poly(g, [P(U0 + t, V0 + t, hF), P(U0 + t, V1 - t, hF), P(U0 + t, V1 - t, H), P(U0 + t, V0 + t, H)], lit(inner, ...FACE.e), null);
+  if (big) inside(g, U0, U1, V0, V1, hF, H);
   poly(g, [P(U0, V1, 1.6), P(U1, V1, 1.6), P(U1, V1, H), P(U0, V1, H)], lit(wall, ...FACE.s), OUTLINE);
   poly(g, [P(U1, V0, 1.6), P(U1, V1, 1.6), P(U1, V1, H), P(U1, V0, H)], lit(wall, ...FACE.e), OUTLINE);
   const crown = lit(tint(wall, 0.12), ...FACE.top);
@@ -169,6 +187,31 @@ function shell(g, U0, U1, V0, V1, H, wall, hF) {
   poly(g, [P(U0, V0, H), P(U0 + t, V0, H), P(U0 + t, V1, H), P(U0, V1, H)], crown, null);
   poly(g, [P(U0, V1 - t, H), P(U1, V1 - t, H), P(U1, V1, H), P(U0, V1, H)], crown, null);
   poly(g, [P(U1 - t, V0, H), P(U1, V0, H), P(U1, V1, H), P(U1 - t, V1, H)], crown, null);
+}
+
+/** Stützenraster eines großen Rohbaus (16 Weltpixel) und Lage seines Treppenkerns, für Iso und 2D gleich. */
+function insideLayout(U0, U1, V0, V1) {
+  const cu = U0 + (U1 - U0) * 0.3;
+  const cv = V0 + (V1 - V0) * 0.3;
+  const cols = [];
+  for (let u = U0 + 16; u < U1 - 6; u += 16) for (let v = V0 + 16; v < V1 - 6; v += 16) if (Math.abs(u - cu) > 9 || Math.abs(v - cv) > 8) cols.push([u, v]);
+  return { cols: cols.sort((a, b) => a[0] + a[1] - (b[0] + b[1])), core: [cu - 7, cu + 7, cv - 6, cv + 6] };
+}
+
+/** Innenleben eines großen Rohbaus (Iso): Stützen über der obersten Decke, Treppenkern ragt über die Wände (hinten nach vorn). */
+function inside(g, U0, U1, V0, V1, hF, H) {
+  const { cols, core } = insideLayout(U0, U1, V0, V1);
+  const [c0, c1, d0, d1] = core;
+  let done = false;
+  const coreBox = () => box(g, c0, c1, d0, d1, hF, H + 4, '#aaa69c', snowy('#bcb8ae'));
+  for (const [u, v] of cols) {
+    if (!done && u + v > c1 + d1) {
+      coreBox();
+      done = true;
+    }
+    box(g, u - 0.8, u + 0.8, v - 0.8, v + 0.8, hF, H - 0.6, '#a39f96', '#b5b1a8', null);
+  }
+  if (!done) coreBox();
 }
 
 /** Gerüst vor den beiden sichtbaren Wänden: Ständer, Beläge mit Bordbrett, Geländer, eine Diagonale. */
@@ -301,7 +344,7 @@ function paintIso(ctx, s, b) {
     if (step === 1) rebar(g, U0, U1, V0, V1, 1.6, big ? 4 : 3);
     else {
       const floors = [7.6, 14.6, 21.6].filter((h) => h < H - 1);
-      shell(g, U0, U1, V0, V1, H, wall, floors.length ? floors[floors.length - 1] + 0.8 : 1.6);
+      shell(g, U0, U1, V0, V1, H, wall, floors.length ? floors[floors.length - 1] + 0.8 : 1.6, big);
       const rows = [[2.8, 6.2], [9.8, 13.2], [16.8, 20.2], [23.8, 27]].filter(([, h1]) => h1 < H - 0.8);
       openings(g, 's', V1, U0 + 1, U1 - 1, rows, (U0 + U1) / 2 - (flip ? -3 : 3));
       openings(g, 'e', U1, V0 + 1, V1 - 1, rows);
@@ -314,6 +357,12 @@ function paintIso(ctx, s, b) {
   // vorn: Maschinen und Baustoffe
   if (step === 0) excavator(g, ...at.digger, 0);
   if (step === 1) truck(g, ...at.truck);
+  if (d.yard) {
+    pallet(g, ...at.stock, BLOCK);
+    pallet(g, at.stock[0], at.stock[1] + 6, BLOCK);
+    if (step >= 2) truck(g, ...at.lorry);
+    beams(g, ...at.beams);
+  }
   if (big) office(g, ...at.office);
   pallet(g, ...at.pallet, BRICK);
   heap(g, ...at.sand, 4.4, 3.2, snowy(SAND));
@@ -321,6 +370,14 @@ function paintIso(ctx, s, b) {
 }
 
 // ---------- Baustelle (2D von oben) ----------
+
+/** Muldenkipper von oben. */
+function truckTop(c, x, y) {
+  rectF(c, x - 5 + 0.8, y - 2.2 + 0.8, x + 5 + 0.8, y + 2.2 + 0.8, 'rgba(0,0,0,0.25)');
+  rectS(c, x - 5, y - 2.2, x + 1.6, y + 2.2, '#e2b021');
+  rectF(c, x - 4.4, y - 1.6, x + 1, y + 1.6, '#bdb6a8');
+  rectS(c, x + 1.8, y - 2, x + 5, y + 2, '#d4d0c6');
+}
 
 function paintTop(c, s, b) {
   c.scale(s, s);
@@ -371,6 +428,16 @@ function paintTop(c, s, b) {
       }
     } else {
       rectF(c, U0 + 1.2, V0 + 1.2, U1 - 1.2, V1 - 1.2, INSIDE);
+      if (big) {
+        // Stützen und Treppenkern mit Treppenlauf
+        const { cols, core } = insideLayout(U0, U1, V0, V1);
+        c.fillStyle = '#6f6b63';
+        for (const [u, v] of cols) c.fillRect(u - 0.8, v - 0.8, 1.6, 1.6);
+        const [c0, c1, d0, d1] = core;
+        rectF(c, c0 + 1, d0 + 1, c1 + 1.6, d1 + 1.6, 'rgba(0,0,0,0.2)');
+        rectS(c, c0, d0, c1, d1, '#b7b3a9', 'rgba(60,56,50,0.6)', 0.4);
+        for (let k = 1; k < 6; k++) lineT(c, [[c0 + 1.5, d0 + k * 2], [c0 + 6, d0 + k * 2]], 'rgba(60,56,50,0.45)', 0.3);
+      }
       c.strokeStyle = tint(b.wall, 0.08);
       c.lineWidth = 1.2;
       c.strokeRect(U0 + 0.6, V0 + 0.6, U1 - U0 - 1.2, V1 - V0 - 1.2);
@@ -393,13 +460,15 @@ function paintTop(c, s, b) {
       rectS(c, U0 + 1, V1 + 2.2, U0 + 1 + Math.min(10, (U1 - U0) * 0.4), V1 + 3, zone, 'rgba(30,30,30,0.35)', 0.3);
     }
   }
-  if (step === 1) {
-    // Muldenkipper
-    const [x, y] = at.truck;
-    rectF(c, x - 5 + 0.8, y - 2.2 + 0.8, x + 5 + 0.8, y + 2.2 + 0.8, 'rgba(0,0,0,0.25)');
-    rectS(c, x - 5, y - 2.2, x + 1.6, y + 2.2, '#e2b021');
-    rectF(c, x - 4.4, y - 1.6, x + 1, y + 1.6, '#bdb6a8');
-    rectS(c, x + 1.8, y - 2, x + 5, y + 2, '#d4d0c6');
+  if (step === 1) truckTop(c, ...at.truck);
+  if (d.yard) {
+    // Lagerplatz: Steine, Lkw, Stahlträger
+    const [sx, sy] = at.stock;
+    for (const dy of [0, 6]) rectS(c, sx - 2.5, sy + dy - 1.9, sx + 2.5, sy + dy + 1.9, BLOCK);
+    if (step >= 2) truckTop(c, ...at.lorry);
+    const [bx2, by2] = at.beams;
+    rectF(c, bx2 - 13 + 0.8, by2 - 3.6 + 0.8, bx2 + 13 + 0.8, by2 + 3.6 + 0.8, 'rgba(0,0,0,0.22)');
+    for (let k = 0; k < 3; k++) rectS(c, bx2 - 13, by2 - 3.6 + k * 2.4, bx2 + 13, by2 - 1.8 + k * 2.4, '#8a9096', 'rgba(40,44,48,0.5)', 0.3);
   }
   if (big && step >= 1) {
     // Kran von oben: Mast, Ausleger mit Laufkatze, Ballast

@@ -50,7 +50,7 @@ test('Bauabschnitt aus dem Fortschritt: fünf Stufen, Ränder und kaputte Werte'
   assert.equal(siteStep(7), 4);
   assert.equal(siteStep(-1), 0);
   assert.equal(siteStep(NaN), 0);
-  for (const n of [1, 2, 3, 4, 5]) for (let s = 0; s < 5; s++) assert.ok(siteTall(n, s) > 0 && siteTall(n, s) < 60, `${n} ${s}`);
+  for (const n of [1, 2, 3, 4, 5]) for (let s = 0; s < 5; s++) assert.ok(siteTall(n, s) > 0 && siteTall(n, s) < 90, `${n} ${s}`);
 });
 
 test('Baustellen zeichnen in jeder Größe, jedem Abschnitt, jeder Variante und Jahreszeit (Iso und 2D)', () => {
