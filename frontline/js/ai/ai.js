@@ -76,9 +76,13 @@ import {
   FALLBACK_HOLD,
   ENG_NEAR,
   SUPPLY_BEHIND,
-  GEPARD_PER_AIR,
-  GEPARD_MAX,
+  AIR_PER,
+  AIR_MAX,
+  AIR_SPLIT,
   AIR_MEMORY,
+  SNIPER_FROM,
+  SNIPER_ARMY,
+  SNIPER_SHARE,
   ART_SHARE,
   ART_FROM,
   ART_BEHIND,
@@ -763,20 +767,47 @@ export class AI {
   counterMix(s) {
     const base = this.counterBase(s);
     if (this.difficulty === 'easy') return base;
-    // Gepard (seit v5.26): gegen gesehene Luftfahrzeuge des Gegners (gemerkt AIR_MEMORY s), Panzerhaubitze ab ART_FROM Kampfeinheiten
-    const air = s.enemies.filter((e) => e.def.air).length;
-    if (air > 0) {
-      this.airSeen = Math.max(this.airSeen ?? 0, air);
-      this.airTime = this.game.time;
-    } else if (this.game.time - (this.airTime ?? -1e9) > AIR_MEMORY) this.airSeen = 0;
-    const gepard = Math.min(GEPARD_MAX, (this.airSeen ?? 0) * GEPARD_PER_AIR);
-    const pzh = (s.combat?.length ?? 0) >= ART_FROM ? ART_SHARE : 0;
-    if (!gepard && !pzh) return base;
+    const shares = {}; // Zielanteil je Sorte an den Kampfeinheiten; der Rest bleibt der Grundmischung
+    const add = (u, v) => {
+      if (v > 0) shares[u] = (shares[u] ?? 0) + v; // Luftarten ohne gesehene Ziele tragen nichts bei
+    };
+    // Luftabwehr (seit v5.67): Hubschrauber und Flugzeuge getrennt gemerkt (AIR_MEMORY s), Gepard, Flak und SAM nach AIR_SPLIT
+    const heli = this.rememberAir('heli', s.enemies.filter((e) => e.def.air && !e.def.jet).length);
+    const jet = this.rememberAir('jet', s.enemies.filter((e) => e.def.jet).length);
+    const total = Math.min(AIR_MAX, (heli + jet) * AIR_PER);
+    if (total > 0) {
+      const ph = heli / (heli + jet);
+      for (const [u, v] of Object.entries(AIR_SPLIT.heli)) add(u, total * ph * v);
+      for (const [u, v] of Object.entries(AIR_SPLIT.jet)) add(u, total * (1 - ph) * v);
+    }
+    // Scharfschützen (seit v5.67, Normal und Schwer): gegen viele sichtbare gegnerische Soldaten, wenn die KI selbst eine Armee hat
+    const foeInf = s.enemies.filter((e) => e.def.armor === 'inf' && !e.def.air).length;
+    if (foeInf >= SNIPER_FROM && (s.combat?.length ?? 0) >= SNIPER_ARMY) add('sniper', SNIPER_SHARE);
+    // Panzerhaubitze (seit v5.26): ab ART_FROM Kampfeinheiten
+    if ((s.combat?.length ?? 0) >= ART_FROM) add('pzh', ART_SHARE);
+    const extra = Object.values(shares).reduce((a, v) => a + v, 0);
+    if (extra <= 0) return base;
+    // Die Grundmischung schrumpft auf den Rest, damit jede Sorte genau ihren Zielanteil hat
     const sum = Object.values(base).reduce((a, v) => a + v, 0);
-    const out = { ...base };
-    if (gepard) out.gepard = sum * gepard;
-    if (pzh) out.pzh = sum * pzh;
+    const k = (1 - extra) / sum;
+    const out = {};
+    for (const [u, v] of Object.entries(base)) out[u] = v * k;
+    for (const [u, v] of Object.entries(shares)) out[u] = v;
     return out;
+  }
+
+  /**
+   * Gemerkte Zahl gesehener Luftziele einer Art (`heli` oder `jet`): die größte Zahl gleichzeitig gesehener Ziele,
+   * AIR_MEMORY s nach dem letzten Sehen vergessen (dann 0).
+   */
+  rememberAir(kind, n) {
+    const now = this.game.time;
+    const m = (this.airMemo ??= { heli: { n: 0, t: -1e9 }, jet: { n: 0, t: -1e9 } })[kind];
+    if (n > 0) {
+      m.n = Math.max(m.n, n);
+      m.t = now;
+    } else if (now - m.t > AIR_MEMORY) m.n = 0;
+    return m.n;
   }
 
   /** Grundmischung der Bodentruppen, gegen die gesehene Gegnerarmee angepasst (siehe counterMix). */

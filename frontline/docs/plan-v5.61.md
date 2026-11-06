@@ -14,7 +14,7 @@ Für die Pakete ab P2 gilt PRD §13: erst ein Vorschlag zur Ausgestaltung (unten
 | P4 | Musik (synthetisiert, je Lage ruhig/Gefecht) und Lautstärkeregler für Ton und Musik | §13 Musik | mittel | **gebaut (v5.64)** |
 | P5a | Stadt: Werkslager und LKW laden am Werk (Simulation, Befehle, Rechtsklick, Infofeld) | §13 SimCity-Stadt | mittel | **gebaut (v5.65)** |
 | P5b | Stadt: Route ab Werk in der Oberfläche, KI holt am Werk, Ressourcenanzeige | §13 SimCity-Stadt | mittel | **gebaut (v5.66)** |
-| P6 | KI-Lücken aus §10: KI baut Flak/SAM gegen Luft, Scharfschützen (Bagger bewusst nicht) | §10 „Nicht gebaut“ | mittel | **in Arbeit (v5.67)** |
+| P6 | KI-Lücken aus §10: KI baut Flak/SAM gegen Luft, Scharfschützen (Bagger bewusst nicht) | §10 „Nicht gebaut“ | mittel | **gebaut (v5.67)** |
 | – | LLM für Gegner und Dialoge | §13 | – | nicht paketiert: Grundsatzfragen offen (Modell, Gerät/Server, Offline-PWA, Kosten) |
 
 ## P1 – Statistik am Spielende (v5.61)

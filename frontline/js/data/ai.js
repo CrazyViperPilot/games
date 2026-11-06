@@ -57,11 +57,20 @@ export const QUEUE_LONG = 4; // so viele Aufträge mit genug Geld
 export const QUEUE_SHORT = 2; // sonst so viele
 // Soll-Lagerstand je FOB (Zonen-FOB, Hauptstadt, übrige FOBs); Pendler füllen darauf auf, Versorger laden dort (dazu FORT_WANT)
 export const FOB_WANT = { zone: { bm: 400, mun: 300, fuel: 150 }, home: { bm: 300, mun: 200, fuel: 200 }, other: { bm: 300, mun: 150, fuel: 80 } };
-// Gepard und Panzerhaubitze (seit v5.26, nicht auf Leicht): Gepard nach gesehenen gegnerischen Luftfahrzeugen, Haubitze ab einer
-// Armee von ART_FROM Kampfeinheiten; die Haubitze fährt nicht in den Wellen mit, sondern steht ART_BEHIND px hinter der Armee
-export const GEPARD_PER_AIR = 0.04; // Zielanteil Gepard je gesehenem Hubschrauber oder Flugzeug des Gegners
-export const GEPARD_MAX = 0.2; // höchstens dieser Anteil Gepard an den Kampfeinheiten
-export const AIR_MEMORY = 120; // s, so lange merkt sich die KI gesehene Luftziele (für den Gepard)
+// Luftabwehr (seit v5.67, nicht auf Leicht): nach gesehenen gegnerischen Hubschraubern und Flugzeugen (je Art gemerkt AIR_MEMORY s)
+// baut die KI Gepard, Flak (gegen Hubschrauber) und SAM (gegen Flugzeuge). Gesamtanteil = min(AIR_MAX, Luftziele × AIR_PER)
+// der Kampfeinheiten, aufgeteilt nach AIR_SPLIT und gewichtet mit dem Anteil der Luftart an den gesehenen Luftzielen.
+export const AIR_PER = 0.04; // Zielanteil Luftabwehr je gesehenem gegnerischen Hubschrauber oder Flugzeug
+export const AIR_MAX = 0.25; // höchstens dieser Anteil Luftabwehr an den Kampfeinheiten
+// Verteilung je Luftart (je Art Summe 1): Hubschrauber → Gepard und Flak, Flugzeuge → SAM und Gepard
+export const AIR_SPLIT = { heli: { gepard: 0.6, flak: 0.4 }, jet: { sam: 0.7, gepard: 0.3 } };
+export const AIR_MEMORY = 120; // s, so lange merkt sich die KI gesehene Luftziele je Art (für die Luftabwehr)
+// Scharfschützen (seit v5.67, Normal und Schwer): gegen viele gesehene gegnerische Soldaten, wenn die KI selbst eine Armee hat
+export const SNIPER_FROM = 10; // sichtbare gegnerische Soldaten, ab denen Scharfschützen in die Mischung kommen
+export const SNIPER_ARMY = 12; // und die KI selbst mindestens so viele Kampfeinheiten hat
+export const SNIPER_SHARE = 0.04; // Zielanteil Scharfschützen an den Kampfeinheiten (laufen mit der Armee)
+// Panzerhaubitze (seit v5.26, nicht auf Leicht): Haubitze ab einer Armee von ART_FROM Kampfeinheiten; sie fährt nicht in den Wellen mit,
+// sondern steht ART_BEHIND px hinter der Armee
 export const ART_SHARE = 0.06; // Zielanteil Panzerhaubitzen an den Kampfeinheiten
 export const ART_FROM = 15; // eigene Kampfeinheiten, ab denen sie Panzerhaubitzen ausbildet
 export const ART_BEHIND = 450; // px hinter dem Schwerpunkt der Armee (Richtung nächste eigene FOB)
