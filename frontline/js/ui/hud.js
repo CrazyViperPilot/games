@@ -15,6 +15,8 @@ import { transportInfo, transportOf } from '../game/transport.js';
 import { standRoute, runwaysOf, runwayBusy } from '../game/aircraft.js';
 import { padBusy } from '../game/helipad.js';
 import { CITY_TIP } from './citypanel.js';
+import { WORKS, SUPPLIER_KINDS, WORKPLACE_KINDS } from '../data/citykinds.js';
+import { GOOD_SHORT } from '../data/goods.js';
 
 // Wettersymbole (16 × 16, Strichfarbe = currentColor)
 const WX_ICON = {
@@ -513,11 +515,11 @@ export class Hud {
       `<div class="title">${esc(b.def.name)} <small class="muted">Stufe ${lv} von ${CITY.maxLevel}</small></div>${bar(f, 'hp', hpColor(f))}` +
       `<div class="muted small">${Math.ceil(b.hp)} / ${b.def.hp} HP</div>`;
     const line = (t) => `<div class="small">${esc(t)}</div>`;
-    const PRODUCT = { bm: ['bm', 'BM'], mun: ['mun', 'MUN'], fuel: ['fuel', 'TS'], steel: ['metal', 'Stahl'], smelter: ['iron', 'Roheisen'], kero: ['kero', 'Kerosin'] };
+    const made = WORKS.includes(k) ? CITY.chain[k].to : null; // Ware des Werks (Register: Werke, Kette CITY.chain)
     if (k === 'res') h += line(`Wohnplätze ${CITY.housing[lv]} · Stadt: ${Math.floor(s.pop)} / ${s.housing} Einwohner`);
     else if (k === 'com') h += line(`Arbeitsplätze ${CITY.jobsCom[lv]} · zahlt Steuern, macht die Stadt zufriedener`);
     else if (k === 'market') h += line(`Arbeitsplätze ${CITY.jobsCom[lv]} · Handel: Knopf „Handel“ oder Geldanzeige oben antippen`);
-    else if (PRODUCT[k]) h += line(`Arbeitsplätze ${CITY.jobs[lv]} · Stadt gesamt +${fmtRate(s[PRODUCT[k][0]])} ${PRODUCT[k][1]}/s`);
+    else if (made) h += line(`Arbeitsplätze ${CITY.jobs[lv]} · Stadt gesamt +${fmtRate(s[made])} ${GOOD_SHORT[made]}/s`);
     else if (k === 'mine') {
       const d = DEPOSITS[c.deposit[i] - 1];
       h += line(`Arbeitsplätze ${CITY.jobsMine[lv]}${d ? ` · ${DEPOSIT_NAME[d]} gesamt ${fmtRate(s.raw[d])}/s` : ''}`);
@@ -591,11 +593,9 @@ export class Hud {
     const warn = (t) => `<div class="warn small">${esc(t)}</div>`;
     const pct = (v) => `${Math.round(v * 100)} %`;
     let h = '';
-    const SUPPLIER = ['mine', 'smelter', 'bm', 'steel', 'fuel', 'kero', 'mun'];
-    const WORKPLACE = ['mine', 'smelter', 'bm', 'steel', 'fuel', 'kero', 'mun', 'com', 'market', 'power', 'uni', 'dc'];
     // Was ohne Weg fehlt: je Förderung die passende Verarbeitung, sonst das Lager
     const TO = { wood: 'zu einem BM-Werk', stone: 'zu einem BM-Werk', ore: 'zu einer Hütte', oil: 'zu einer Raffinerie oder Kerosin-Raffinerie', smelter: 'zu einem Stahlwerk' };
-    if (SUPPLIER.includes(k)) {
+    if (SUPPLIER_KINDS.includes(k)) {
       const T = transportInfo(g, c, i);
       if (T.to) {
         h += line(`Liefert an: ${T.to} (${T.dist} ${T.dist === 1 ? 'Feld' : 'Felder'}) · Weg ${pct(T.eff)}`);
@@ -604,7 +604,7 @@ export class Hud {
         h += warn(`Kein Straßenweg ${d ? TO[d] : 'zum Lager'}: die Ware geht verloren`);
       }
     }
-    if (WORKPLACE.includes(k)) {
+    if (WORKPLACE_KINDS.includes(k)) {
       const T = transportInfo(g, c, i);
       if (T.noHome) h += warn('Keine Wohnung über die Straße erreichbar: keine Arbeiter');
       else if (Math.round(T.commuteEff * 100) < 100) h += line(`Pendler: Stau ${pct(T.commuteEff)}`);

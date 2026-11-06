@@ -8,6 +8,7 @@ import { sprite, blit, spriteDpr, peek } from './spritecache.js';
 import { ISO_K } from './camera.js';
 import { jetAlt, jetGrounded } from '../game/aircraft.js';
 import { setIsoAt } from './iso.js';
+import { rgbOf, mix } from './color.js';
 
 const K = ISO_K;
 const TAU = Math.PI * 2;
@@ -17,13 +18,7 @@ const INF_SECT = 8; // Richtungen der Soldaten in Iso
 
 // ---------- Farben ----------
 
-const rgbOf = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
-const hexOf = (c) => '#' + c.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
-const mix = (a, b, t) => {
-  const A = rgbOf(a);
-  const B = rgbOf(b);
-  return hexOf(A.map((v, i) => v + (B[i] - v) * t));
-};
+// rgbOf, hexOf, mix aus color.js (seit v5.59)
 
 // Je Team: Lack (body), dunkel, hell, Tarnfleck, Teamfarbe (mark), Weste der Soldaten, Luftfahrzeuge
 const TEAM_PAINT = [

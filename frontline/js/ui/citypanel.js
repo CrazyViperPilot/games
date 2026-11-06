@@ -4,56 +4,22 @@
 // Dazu das Marktmenü (MarketPanel, seit v4.94): Fenster zum Handeln, geöffnet über Geldanzeige, Markt-Auswahl oder „Handel“.
 import { CITY } from '../data/city.js';
 import { BALANCE } from '../data/balance.js';
-import { KINDS, KIND_NAME, GOODS, CITY_STORE_GOODS, cellAt, hasMarket, sizeOf, bigAnchorAt } from '../game/city.js';
+import { GOODS, CITY_STORE_GOODS, cellAt, hasMarket, sizeOf, bigAnchorAt } from '../game/city.js';
+import { CITY_KINDS, KIND, KIND_COLOR, KIND_ICON, BUILD_MENU } from '../data/citykinds.js';
+import { GOOD_NAME as GOOD_LONG, GOOD_SHORT } from '../data/goods.js';
 
-// Farben je Zellenart (Werkzeug, Grundstück, Symbol auf der Karte): Wohnen grün (privat), Gewerbe blau (kommerziell), Werke erdig,
-// Markt gold, Militär (Kaserne, Fabrikhalle, Heliport) oliv. Symbole: Werkzeugleiste und Schilder über den Gebäuden (citylayer.js).
-export const CITY_COLORS = { road: '#8a8f86', res: '#4f9a5a', com: '#3f7fd0', bm: '#b0743c', mun: '#8b96a8', fuel: '#9b7bc4', steel: '#7f8c99', mine: '#c9a14a', market: '#e6b422', power: '#e0c040', uni: '#6fa8dc', dc: '#4fc3c7', barracks: '#7d8f45', factory: '#7d8f45', heliport: '#7d8f45', hospital: '#e8707e', runway: '#5b5f63', taxi: '#a9a89f', stand: '#6f7d4a', atc: '#4f7fa8', ktank: '#56b3e6', mdepot: '#b88a3a', smelter: '#a0522d', kero: '#56b3e6', erase: '#d05050' };
-export const CITY_ICON = { road: '▬', res: '⌂', com: '▣', bm: '⚒', mun: '✸', fuel: '⛽', steel: '⛓', mine: '⛏', market: '⚖', power: '⚡', uni: '🎓', dc: '🖥', barracks: '⚔', factory: '🔧', heliport: '🚁', hospital: '✚', runway: '🛫', taxi: '▦', stand: '✈', atc: '📡', ktank: '⛽', mdepot: '🚀', smelter: '🔥', kero: '🛢', erase: '✕' };
+// Werkzeuge, Farben, Symbole, Kurznamen, Tipps und Gruppen des Baumenüs kommen seit v5.59 aus dem Register js/data/citykinds.js
+// (Daniels Gruppen seit v5.36: Grundlagen, Wohnen & Gewerbe, Förderung, Ressourcen, Einheiten, Stadt, Fliegerhorst; eine Art ohne
+// Gruppe landet unter „Weitere“). Waren (Marktmenü) aus js/data/goods.js.
+export const CITY_COLORS = KIND_COLOR;
+export const CITY_ICON = KIND_ICON;
 const ICON = CITY_ICON;
-const CARE = CITY.care.by;
-const SHORT = { road: 'Straße', res: 'Wohnen', com: 'Gewerbe', bm: 'BM-Werk', mun: 'Mun.-Werk', fuel: 'Raffinerie', steel: 'Stahlwerk', smelter: 'Hütte', kero: 'Kerosin-Raf.', mine: 'Förderung', market: 'Markt', power: 'Kraftwerk', uni: 'Universität', dc: 'Rechenz.', barracks: 'Kaserne', factory: 'Fabrikhalle', heliport: 'Heliport', hospital: 'Krankenhaus', runway: 'Bahn', taxi: 'Rollfeld', stand: 'Stellplatz', atc: 'Tower', ktank: 'Kero-Tank', mdepot: 'Mun.-Lager', erase: 'Räumen' };
-export const CITY_TIP = {
-  taxi: 'Rollfeld (seit v5.37): Beton wie eine Straße ziehen, sofort fertig. Flugzeuge rollen darüber zwischen Stellplätzen und Bahn; ein Stellplatz braucht Rollfeld, Bahn oder Straße direkt daneben und darüber einen Weg zur Bahn',
-  runway: `Start-/Landebahn (seit v5.35): Zellen wie eine Straße ziehen; ein gerader Streifen ${CITY.air.runwayWidth} breit und mindestens ${CITY.air.runwayMin} lang (waagrecht oder senkrecht) ist die Bahn, weitere Bahnzellen daneben zählen als Rollfeld. Flugzeuge rollen über Bahn, Rollfeld und Straßen zu den Stellplätzen. Jeder Start und jede Landung sperrt die Bahn ${CITY.air.sep} s (mit Tower ${CITY.air.sepAtc} s); mehr Bahnen = mehr Flugbetrieb`,
-  stand: `Großbau 2 × 2 (seit v5.35): Stellplatz für ein Kampfflugzeug, baut es auch (F-16). Gebaut als offener Stellplatz; ausbauen nur am gewählten Stellplatz mit „Ausbauen“ (U): Stufe 2 Überdachung (${CITY.air.upgrade[2].money} G + ${CITY.air.upgrade[2].bm} BM, halber Schaden), Stufe 3 Stahlbeton-Shelter (${CITY.air.upgrade[3].money} G + ${CITY.air.upgrade[3].bm} BM + ${CITY.air.upgrade[3].steel} Stahl, ${Math.round(CITY.air.shelter[3] * 100)} % Schaden). Braucht eine Straße oder Bahn daneben, über die das Flugzeug zur Bahn rollt`,
-  atc: `Großbau 2 × 2 (seit v5.35): Tower mit Radar. Bahnen im Umkreis von ${CITY.air.atcRadius} Feldern sind nach jedem Start oder jeder Landung schon nach ${CITY.air.sepAtc} statt ${CITY.air.sep} s wieder frei; weite Sicht`,
-  ktank: `Großbau 2 × 2 (seit v5.35): Kerosintank. Wird über die Straße aus dem Kerosin des Stadtlagers befüllt; Flugzeuge auf Stellplätzen im Umkreis von ${CITY.air.supplyRadius} Feldern tanken daraus`,
-  mdepot: `Großbau 2 × 2 (seit v5.35): Munitionslager. Wird über die Straße aus dem Lager der Hauptstadt befüllt; Flugzeuge auf Stellplätzen im Umkreis von ${CITY.air.supplyRadius} Feldern laden daraus nach`,
-  bm: 'Großbau 2 × 2 (Ziegelei mit Holzlager): Baumaterial aus Holz und Stein (Holzfäller, Steinbruch)', mun: 'Großbau 2 × 2 (Bunker mit Riesenpatrone): Munition aus Stahl',
-  fuel: 'Großbau 2 × 2 (großer Öltank, Destillationstürme): Treibstoff aus Öl (Ölquelle)',
-  steel: 'Großbau 2 × 2 (Stahlwerk mit Walzstraße): Stahl aus Roheisen (Hütte)', smelter: `Großbau ${CITY.size.smelter} × ${CITY.size.smelter} Zellen (Hochofen mit Glut und Schornstein): Roheisen aus Erz (Erzmine); das Roheisen fährt zum Stahlwerk`,
-  kero: `Großbau ${CITY.size.kero} × ${CITY.size.kero} Zellen (Kugeltanks mit blauen Tankringen): Kerosin aus Öl (Ölquelle), Vorrat im Stadtlager; für den Kerosintank des Fliegerhorsts (F-16 und Hubschrauber)`, mine: 'Nur auf Rohstoffvorkommen: Holzfäller, Steinbruch, Erzmine oder Ölquelle; braucht eine Straße zum passenden Werk (Holz, Stein → BM-Werk, Erz → Hütte, Öl → Raffinerie)',
-  market: 'Handel: Überschuss verkaufen, Knappes teuer kaufen (Knopf Handel, Markt antippen oder Geldanzeige oben)', road: 'Kostet Baumaterial aus dem Lager der Hauptstadt',
-  power: `Großbau ${CITY.size.power} × ${CITY.size.power} Zellen: Strom für Werke, Förderung, Uni und Rechenzentrum (stadtweit); ohne genug Strom arbeiten sie langsamer`,
-  uni: 'Großbau 3 × 3 Zellen (antippen, das Quadrat folgt dem Finger; Straße an einer Seite); ohne fertige Universität ruht jede Forschung (eine reicht)',
-  dc: `Beschleunigt die Forschung: jede Stufe jedes Rechenzentrums +${Math.round(CITY.research.dcSpeed * 100)} % (höchstens ${CITY.research.maxSpeed}-fach)`,
-  barracks: `Großbau ${CITY.size.barracks} × ${CITY.size.barracks} Zellen: bildet Soldaten aus (Schützen, Panzerabwehr, Scharfschützen, Kommandeur); bezahlt direkt aus der Stadt. Heilt Soldaten im Umkreis von ${CARE.barracks.radius} Feldern`,
-  factory: `Großbau ${CITY.size.factory} × ${CITY.size.factory} Zellen: baut alle Fahrzeuge (LKW, Baufahrzeug, Schützen- und Kampfpanzer, Flak, SAM); bezahlt direkt aus der Stadt. Repariert Bodenfahrzeuge im Umkreis von ${CARE.factory.radius} Feldern (kostet Stahl)`,
-  heliport: `Landeplatz für einen Hubschrauber (seit v5.51): baut ihn (Little Bird, Transporter, AH-64, bezahlt aus der Stadt), er startet und landet hier senkrecht. Gelandet tankt und lädt er aus Kerosintank und Munitionslager im Umkreis von ${CITY.air.supplyRadius} Feldern; Tower in der Nähe: Luftraum nach Start/Landung ${CITY.air.heli.sepAtc} statt ${CITY.air.heli.sep} s gesperrt. Repariert Hubschrauber im Umkreis von ${CARE.heliport.radius} Feldern (kostet Stahl)`,
-  erase: 'Entfernt eigene Stadtzellen (ohne Erstattung), fällt Bäume und Wald und reißt leere Häuser, Hallen und Fabriken der Karte ab, damit dort gebaut werden kann (Fels, Wasser, Türme, besetzte Häuser bleiben)',
-  hospital: `Heilt eigene Soldaten im Umkreis von ${CARE.hospital.radius} Feldern, schneller als die Kaserne (${Math.round(CARE.hospital.rate * 100)} % HP/s auf Stufe 1)`,
-};
-const GOOD_NAME = { bm: 'BM', mun: 'MUN', fuel: 'TS', metal: 'Stahl', kero: 'Kerosin' };
-const GOOD_LONG = { bm: 'Baumaterial', mun: 'Munition', fuel: 'Treibstoff', metal: 'Stahl', kero: 'Kerosin' };
-/**
- * Werkzeuge in Gruppen (seit v5.36, Daniels Wunsch „Baumenü strukturieren“): Straße und Räumen, Wohnen und Gewerbe, Förderung,
- * Werke (Ressourcen), Einheiten, Stadtdienste, Fliegerhorst. Alte, nicht mehr baubare Arten (Flughafen) fehlen; eine neue Art ohne
- * Gruppe landet unter „Weitere“, damit sie nicht verloren geht.
- */
-const GROUPS = [
-  ['Grundlagen', ['road', 'erase']],
-  ['Wohnen & Gewerbe', ['res', 'com', 'market']],
-  ['Förderung', ['mine']],
-  ['Ressourcen', ['bm', 'smelter', 'steel', 'mun', 'fuel', 'kero', 'power']],
-  ['Einheiten', ['barracks', 'factory', 'heliport']],
-  ['Stadt', ['uni', 'dc', 'hospital']],
-  ['Fliegerhorst', ['runway', 'taxi', 'stand', 'atc', 'ktank', 'mdepot']],
-];
-const GROUPED = new Set(GROUPS.flatMap(([, ks]) => ks));
-const REST = KINDS.filter((k) => !GROUPED.has(k) && !CITY.retired?.includes(k));
-if (REST.length) GROUPS.push(['Weitere', REST]);
-export const TOOL_GROUPS = GROUPS.map(([name, ks]) => [name, ks.filter((k) => k === 'erase' || (KINDS.includes(k) && !CITY.retired?.includes(k)))]);
+const SHORT = Object.fromEntries(CITY_KINDS.map((e) => [e.key, e.short ?? e.name]));
+/** Tipp je Werkzeug (Text; Tipps mit Zahlen rechnet das Register aus CITY). */
+export const CITY_TIP = Object.fromEntries(CITY_KINDS.filter((e) => e.tip).map((e) => [e.key, typeof e.tip === 'function' ? e.tip(CITY) : e.tip]));
+const GOOD_NAME = GOOD_SHORT;
+/** Werkzeuge in Gruppen: [[Gruppe, [Werkzeug …]] …] (ohne nicht mehr baubare Arten). */
+export const TOOL_GROUPS = BUILD_MENU;
 const fmt = (v, d = 0) => v.toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d });
 
 export class CityPanel {
@@ -76,7 +42,7 @@ export class CityPanel {
       <div class="city-tools">${TOOL_GROUPS.map(([group, tools]) => `<div class="ctool-head">${group}</div>${tools.map((k) => {
         const n = k === 'erase' ? 1 : sizeOf(k);
         const price = k === 'erase' ? 'gratis' : [CITY.cost[k] ? `${CITY.cost[k]} G` : '', CITY.costBm[k] ? `${CITY.costBm[k]} BM` : '', n > 1 ? `${n}×${n}` : ''].filter(Boolean).join(' + ').replace(/ \+ (\d+×)/, ' · $1');
-        const name = k === 'erase' ? 'Räumen' : KIND_NAME[k];
+        const name = KIND[k].name;
         return `<button type="button" class="ctool" data-tool="${k}" title="${name}${CITY_TIP[k] ? `: ${CITY_TIP[k]}` : ''}" style="--c:${CITY_COLORS[k]}"><i>${ICON[k]}</i><span>${SHORT[k]}</span><small>${price}</small></button>`;
       }).join('')}`).join('')}</div>
       <div class="city-acts"><button type="button" class="btn-sm city-fold" data-fold title="Menü einklappen (Stadt-Knopf klappt es wieder auf)">▴ Einklappen</button><button type="button" class="btn-sm" data-tradeview title="Marktmenü: kaufen und verkaufen (braucht einen fertigen Markt)">Handel</button><button type="button" class="btn-sm" data-show>Zur Stadt</button><button type="button" class="btn-sm city-done" data-close>Fertig (Y)</button></div>`;

@@ -106,7 +106,7 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 
 | `cmd.type` | Felder | Handler (`js/game/`) | Wirkung |
 |---|---|---|---|
-| `city` | `kind` (Zellenart aus `KINDS` in `city.js`, z. B. `road`, `res`, `com`, `market`, `barracks`, `factory`, `heliport`, `smelter`, `kero`, oder `erase`), `c0, r0, c1, r1`, bei `erase` optional `demolish: true` | `city.js` `cmdCity` | Stadtzellen im Rechteck ausweisen oder räumen (nur mit Stadt). `erase` lässt Rohstoffvorkommen und Förderanlagen stehen (seit v5.20); nur mit `demolish: true` (Abreißen eines gewählten Gebäudes) entfernt es eine Förderanlage |
+| `city` | `kind` (Zellenart aus `KINDS`, Register `js/data/citykinds.js`, z. B. `road`, `res`, `com`, `market`, `barracks`, `factory`, `heliport`, `smelter`, `kero`, oder `erase`), `c0, r0, c1, r1`, bei `erase` optional `demolish: true` | `city.js` `cmdCity` | Stadtzellen im Rechteck ausweisen oder räumen (nur mit Stadt). `erase` lässt Rohstoffvorkommen und Förderanlagen stehen (seit v5.20); nur mit `demolish: true` (Abreißen eines gewählten Gebäudes) entfernt es eine Förderanlage |
 | `move`, `attackMove` | `ids, x, y, formation?` | `game.js` `cmdMove` | Marsch bzw. Angriffsmarsch, optional in Formation |
 | `attack` | `ids, targetId` | `game.js` `cmdAttack` | Ziel angreifen (auch Brücken) |
 | `stop` | `ids` | `game.js` | Anhalten |
@@ -144,7 +144,10 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 `js/core/` – `loop.js` feste Schrittweite und Frames, `rng.js` Zufall je Seed (mulberry32).
 
 `js/data/` – `balance.js` alle globalen Spielzahlen (oben `QUICK` = Schnelleinstellungen, darunter `BALANCE` mit Inhaltsverzeichnis),
-`units.js` Einheiten und Waffen (UNITS), `buildings.js` Gebäude (BUILDINGS), `ai.js` KI-Werte, `mapgen.js` Kartengenerator (MAPGEN).
+`units.js` Einheiten und Waffen (UNITS), `buildings.js` Gebäude (BUILDINGS), `ai.js` KI-Werte, `mapgen.js` Kartengenerator (MAPGEN),
+`city.js` Stadt (CITY), `citykinds.js` Register der Stadtzellenarten (`CITY_KINDS`: feste ID, Name, Werkzeug, Farbe, Symbol, Preis, Größe,
+Strom, Rolle; daraus `KINDS`, `CITY.cost` u. a.), `goods.js` Register der Waren (`GOODS`: Name, Kürzel, Farbe, Lager, Markt, Ertrag;
+seit v5.59). Die beiden Register importieren nichts; Simulation, UI und Darstellung lesen sie direkt (die Darstellung nicht über die UI).
 
 `js/game/` (Simulation, kein DOM)
 

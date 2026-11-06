@@ -1,6 +1,6 @@
 // Frontline Service Worker: network-first (immer die neueste Version), Cache nur als Offline-Fallback.
 // Bei Änderungen an Dateien CACHE_VERSION erhöhen, damit Clients die neue Version laden.
-const CACHE_VERSION = 'frontline-v171';
+const CACHE_VERSION = 'frontline-v172';
 const CACHE_PREFIX = 'frontline-';
 const CACHE_NAME = CACHE_VERSION;
 
@@ -50,11 +50,14 @@ const ASSETS = [
   './js/game/radio.js',
   './js/game/city.js',
   './js/data/city.js',
+  './js/data/citykinds.js',
+  './js/data/goods.js',
   './js/data/research.js',
   './js/ui/citypanel.js',
   './js/ui/researchpanel.js',
   './js/ui/flowpanel.js',
   './js/render/citylayer.js',
+  './js/render/color.js',
   './js/game/weather.js',
   './js/game/research.js',
   './js/game/flow.js',

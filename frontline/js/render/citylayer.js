@@ -5,7 +5,7 @@ import { KINDS, KIND_ID, DEPOSITS, cellRect, canZone, hasRoad, sizeOf, fitBig, b
 import { BIG_KINDS, bigPlan, drawBigGround, drawBigTop, partFoot, bigTop } from './bigbuild.js';
 import { drawWorksTop, worksLift, WORKS_GROUND, WORKS_KINDS } from './works.js';
 import { CITY } from '../data/city.js';
-import { CITY_COLORS, CITY_ICON } from '../ui/citypanel.js';
+import { KIND_COLOR as CITY_COLORS, KIND_ICON as CITY_ICON, FLAT_KINDS as FLAT_LIST, SUPPLIER_KINDS as SUPPLIERS } from '../data/citykinds.js'; // Register (seit v5.59), nicht mehr aus der UI
 import { drawUniversityTop, UNI_LAWNS } from './university.js';
 import { drawTownTop, townLift } from './townhouses.js';
 import { transportOf } from '../game/transport.js';
@@ -17,17 +17,13 @@ import { groundPattern, patternMatrix } from './ways.js';
 import { railList } from './terrain.js';
 import { drawSiteTop, siteStep, siteTall, siteWall } from './citysite.js';
 import { drawWreckRubble } from './fx.js';
+import { mix } from './color.js';
 
 // Grundstücke in der Farbe der Zellenart (wie die Werkzeugleiste): Wohnen grün, Gewerbe blau, Werke erdig, Markt gold, Militär oliv
 const LOT = CITY_COLORS;
-/** Hex-Farbe a mit b mischen (t = Anteil von a). */
-function mix(a, b, t) {
-  const p = (h, i) => parseInt(h.slice(1 + i * 2, 3 + i * 2), 16);
-  return `rgb(${[0, 1, 2].map((i) => Math.round(p(a, i) * t + p(b, i) * (1 - t))).join(',')})`;
-}
 const LOT_BUILT = Object.fromEntries(Object.entries(LOT).map(([k, c]) => [k, mix(c, '#8b8d84', 0.5)])); // Pflaster unter Gebäuden, getönt
-const LOT_SITE = Object.fromEntries(Object.entries(LOT).map(([k, c]) => [k, mix(c, '#8f7a5c', 0.16)])); // Baustelle: Erde, leicht getönt (seit v5.45)
-const FLAT_KINDS = new Set(['road', 'runway', 'taxi']); // sofort fertig, nie Baustelle
+const LOT_SITE = Object.fromEntries(Object.entries(LOT).map(([k, c]) => [k, mix(c, '#8f7a5c', 0.84)])); // Baustelle: Erde, leicht getönt (seit v5.45)
+const FLAT_KINDS = new Set(FLAT_LIST); // sofort fertig, nie Baustelle
 // Schilder über den Gebäuden (seit v4.96): Funktionsgebäude groß mit Symbol, Wohnen und Gewerbe klein (privat ⌂ grün, kommerziell ▣ blau)
 const MINE_ICON = { wood: '🌲', stone: '⛰', ore: '⛏', oil: '🛢' };
 const MINE_COLOR = { wood: '#3f8a3f', stone: '#8f8f88', ore: '#c4612f', oil: '#34343a' };
@@ -1387,7 +1383,7 @@ function siteBar(ren, ctx, c, i, r, n, iso) {
 }
 
 /** Arten, die etwas an ein Ziel liefern (Förderung, Werke, Munitionswerk). */
-const SUPPLIER_KINDS = new Set(['mine', 'smelter', 'bm', 'steel', 'fuel', 'kero', 'mun']);
+const SUPPLIER_KINDS = new Set(SUPPLIERS);
 /** Warnung am Schild: Lieferant ohne Lieferweg, oder Arbeitsstätte ohne erreichbare Wohnung (Pendlerweg fehlt). */
 function transportWarn(tr, k, i) {
   const r = tr.routes.get(i);

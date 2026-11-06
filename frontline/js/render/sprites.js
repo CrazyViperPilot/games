@@ -5,6 +5,7 @@ import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { jetAlt } from '../game/aircraft.js';
+import { rgbOf } from './color.js';
 
 const TILE = BALANCE.map.tile;
 const OUTLINE = 'rgba(0,0,0,0.65)';
@@ -15,11 +16,6 @@ const WALL_GREY = '#8c9089';
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
-function rgbOf(hex) {
-  if (hex.startsWith('rgb')) return hex.match(/\d+/g).slice(0, 3).map(Number); // Ergebnis von shade/tint
-  const n = parseInt(hex.slice(1), 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-}
 
 /** Farbe abdunkeln (f = 0 unverändert, 1 schwarz). */
 export function shade(hex, f) {

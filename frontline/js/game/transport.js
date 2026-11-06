@@ -5,17 +5,16 @@
 // geladener Spielstand genau so weiterläuft wie das Spiel ohne Unterbrechung.
 import { laneGrid } from './roads.js';
 import { CITY } from '../data/city.js';
+import { WORKS, WORKPLACE_KINDS } from '../data/citykinds.js'; // Arbeitsstätten mit Pendlerweg: alle Arten mit Arbeitsplätzen
+import { GOODS } from '../data/goods.js';
 import { KINDS, KIND_ID, KIND_NAME, DEPOSITS, isPart, roadAt, accessCells, cellRect } from './city.js';
 
 /** Ziel je Rohstoff der Förderung (Vorkommen) und je Zwischenprodukt: Gruppe der Zielwerke (Breitensuche-Feld, siehe groupOf). */
 const MINE_GROUP = { wood: 'bm', stone: 'bm', ore: 'smelter', oil: 'oil' };
 /** Werkart → Gruppe der Zielgebäude, an die ihr Rohstoff geliefert wird (Öl: Raffinerie oder Kerosin-Raffinerie). */
 const GROUP_OF_KIND = { bm: 'bm', smelter: 'smelter', steel: 'steel', fuel: 'oil', kero: 'oil' };
-/** Produkte fahren zum Lager der Hauptstadt (`'main'`). */
-const PRODUCT_KINDS = ['bm', 'steel', 'fuel', 'kero', 'mun'];
-/** Arbeitsstätten mit Pendlerweg: alle Werke, Förderung, Gewerbe, Markt, Kraftwerk, Uni und Rechenzentrum. */
-// Literal statt WORKS aus city.js: city.js importiert dieses Modul, ein Zugriff auf city.js-Exporte beim Laden gäbe einen Zyklusfehler.
-const WORKPLACE_KINDS = ['bm', 'mun', 'fuel', 'steel', 'smelter', 'kero', 'mine', 'com', 'market', 'power', 'uni', 'dc'];
+/** Produkte fahren zum Lager der Hauptstadt (`'main'`): Werke, deren Ware ein Lager hat (Register js/data/goods.js; Roheisen nicht). */
+const PRODUCT_KINDS = WORKS.filter((k) => GOODS[CITY.chain[k].to]?.store);
 /** Kennung des Lagers der Hauptstadt im Breitensuche-Feld (Besitzer). Gebäude haben als Besitzer ihren Anker (≥ 0). */
 const MAIN = -1;
 /** Breitensuche-Warteschlange, einmal angelegt und wiederverwendet (nur innerhalb von nearestField genutzt). */

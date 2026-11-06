@@ -3,20 +3,20 @@
 // Lager mit Erzeugung und Verbrauch. Markiert Engpässe und nennt sie in Worten. Die Kette kommt nur aus CITY.chain, die Zahlen
 // aus c.stats (updateCity), den Lagern und der LKW-Ladung. Liest nur. Kein DOM.
 // Neue Rohstoffe, Werke oder Waren: CITY.chain und die Felder cap/inp/gross/n in updateCity pflegen; test/flow.test.js prüft das.
+// Namen, Kürzel, Lager und Hinweise der Waren kommen seit v5.59 aus dem Warenregister js/data/goods.js.
 // Zwischenprodukte (Roheisen, seit v5.20) haben keinen Bestand: sie laufen direkt vom Werk zum nächsten (Knotentyp 'mid').
 import { CITY } from '../data/city.js';
 import { BALANCE } from '../data/balance.js';
+import { GOODS, GOOD_NAME, GOOD_SHORT, STORED_GOODS, MID_GOODS } from '../data/goods.js';
 import { DEPOSITS, DEPOSIT_NAME, MINE_NAME, KIND_NAME, CITY_STORE_GOODS } from './city.js';
 
-export const GOOD_NAME = { bm: 'Baumaterial', mun: 'Munition', fuel: 'Treibstoff', metal: 'Stahl', kero: 'Kerosin', iron: 'Roheisen' };
-const GOOD_SHORT = { bm: 'BM', mun: 'MUN', fuel: 'TS', metal: 'Stahl', kero: 'Kerosin', iron: 'Roheisen' };
+export { GOOD_NAME };
 const WORKS_SHORT = { bm: 'BM-Werk' };
 const RAW_NAME = { wood: 'Holz', stone: 'Stein', ore: 'Erz', oil: 'Öl' }; // Rohstoff (DEPOSIT_NAME nennt das Vorkommen)
 /** Waren mit Lager (BM, MUN, TS in den Lagern der Hauptstadt, Stahl und Kerosin im Stadtlager). */
-export const FLOW_GOODS = ['bm', 'mun', 'fuel', 'metal', 'kero'];
+export const FLOW_GOODS = STORED_GOODS;
 /** Zwischenprodukte ohne Lager (seit v5.20): Roheisen von der Hütte zum Stahlwerk. */
-export const FLOW_MIDS = ['iron'];
-const TIP_FULL = { metal: 'Mehr Fahrzeuge ausbilden oder am Markt verkaufen.', kero: 'Kerosin am Fliegerhorst (Kerosintank) oder bei Hubschraubern verbrauchen oder am Markt verkaufen.' };
+export const FLOW_MIDS = MID_GOODS;
 const isRaw = (x) => DEPOSITS.includes(x);
 const isMid = (x) => FLOW_MIDS.includes(x);
 const WORKS = Object.keys(CITY.chain);
@@ -283,7 +283,7 @@ export function resourceFlow(game, team, rates = null) {
     if (n.full) {
       n.status = 'warn';
       n.note = 'Hauptlager voll';
-      if (n.rate > EPS) issue(0.8, `${n.name}: Lager der Hauptstadt voll, Erzeugung verfällt.`, TIP_FULL[g] ?? 'Mit LKW zu den FOBs fahren oder am Markt verkaufen.');
+      if (n.rate > EPS) issue(0.8, `${n.name}: Lager der Hauptstadt voll, Erzeugung verfällt.`, GOODS[g]?.full ?? 'Mit LKW zu den FOBs fahren oder am Markt verkaufen.');
     } else if (r && r.net < -EPS) {
       const eta = n.stock / -r.net;
       n.status = eta < 600 ? 'bad' : 'warn';

@@ -1,5 +1,14 @@
 // Stadt (SimCity-Teil, seit v4.75): Werte der Zonenstadt (seit v4.82 auf der ganzen Karte, im eigenen Gebiet). Regeln: PRD §15. Kein DOM.
 // Alle Zahlen hier einstellbar; nach Änderungen PRD §15 und Hilfetexte prüfen.
+// Werte je Zellenart (Preis, Baumaterial, Größe, Strom, KI-Zielwert) stehen seit v5.59 im Register js/data/citykinds.js, Werte je Ware
+// (Ertrag, Umwandlung, Marktpreise) in js/data/goods.js; die Tabellen hier werden daraus abgeleitet (gleiche Schlüssel wie bisher).
+import { CITY_KINDS } from './citykinds.js';
+import { GOODS } from './goods.js';
+
+/** Tabelle Zellenart → Wert des Feldes `field` im Register (nur Arten mit Wert; Räumen ist keine Zellenart). */
+const byKind = (field) => Object.fromEntries(CITY_KINDS.filter((e) => e.id && e[field] !== undefined).map((e) => [e.key, e[field]]));
+/** Tabelle Ware → Wert des Feldes `field` im Warenregister. */
+const byGood = (field) => Object.fromEntries(Object.entries(GOODS).filter(([, d]) => d[field] !== undefined).map(([g, d]) => [g, d[field]]));
 
 export const CITY = {
   // ---- Schnelleinstellungen ----
@@ -12,7 +21,7 @@ export const CITY = {
   // Flucht (seit v4.82): Wohnzellen in der Konfliktzone leeren sich, wenn in ihnen oder den Nachbarzellen geschossen wird
   flee: { reach: 1, calm: 60 }, // Nachbarschaft (Zellen) und Ruhezeit (s), bis die Bewohner zurückziehen dürfen
   startStock: { bm: 1500, mun: 600, fuel: 1000 }, // Startlager der Hauptstadt bei eingeschalteter Stadt (sonst unendlich)
-  yield: { bm: 0.1, mun: 0.06, fuel: 0.05, metal: 0.05, iron: 0.06, kero: 0.04 }, // höchster Ertrag je Arbeiter und Sekunde in Werken (BM-Werk, Munitionswerk, Raffinerie, Kerosin-Raffinerie, Hütte, Stahlwerk), begrenzt durch Rohstoffe
+  yield: byGood('yield'), // Register js/data/goods.js: höchster Ertrag je Arbeiter und Sekunde in Werken (BM-Werk, Munitionswerk, Raffinerie, Kerosin-Raffinerie, Hütte, Stahlwerk), begrenzt durch Rohstoffe
   sight: 160, // Sichtradius (px) jedes fertigen Stadtgebäudes ab seinem Rand (seit v5.25; Großbauten + halbe Diagonale): hebt den Kriegsnebel um die eigene Stadt auf
   taxPop: 0.03, // Geld/s je Einwohner
   taxCom: 0.07, // Geld/s je Arbeiter im Gewerbe (seit v5.20 0,07, vorher 0,15); wirkt nur mit Versorgung, siehe CITY.shop
@@ -22,19 +31,19 @@ export const CITY = {
   shop: { need: 0.004, base: 0.3, per: 0.25 },
 
   // ---- Bau ----
-  cost: { road: 0, res: 20, com: 30, bm: 40, mun: 40, fuel: 40, steel: 50, smelter: 50, kero: 50, mine: 30, market: 60, power: 80, uni: 400, dc: 250, barracks: 80, factory: 150, heliport: 200, hospital: 120, runway: 10, stand: 120, atc: 150, ktank: 60, mdepot: 60, taxi: 5 }, // Geld je Zelle, bei Großbauten (size) je Gebäude (Abriss kostenlos, keine Erstattung)
+  cost: byKind('cost'), // Register js/data/citykinds.js (Feld cost): Geld je Zelle, bei Großbauten (size) je Gebäude (Abriss kostenlos, keine Erstattung)
   // Großbauten (seit v5.00): Kantenlänge in Zellen (fehlt = 1; seit v5.03 auch gerade). Ein Großbau ist ein Gebäude: eine Stufe, ein
   // Ziel mit Trefferpunkten hp × Kantenlänge, Arbeitsplätze und Strom wie eine Zelle; Straße an irgendeiner Außenzelle reicht.
   // Seit v5.08 sind auch die Werke (BM-Werk, Munitionswerk, Raffinerie, Stahlwerk) 2 × 2 groß, mit eigenem Aussehen (render/works.js).
-  size: { uni: 3, power: 2, barracks: 4, factory: 5, bm: 2, mun: 2, fuel: 2, steel: 2, smelter: 2, kero: 2, stand: 2, atc: 2, ktank: 2, mdepot: 2 },
+  size: byKind('size'), // Register js/data/citykinds.js (Feld size)
   // Nicht mehr baubar: der Flughafen 10 × 10 (bis v5.34), ersetzt durch den Fliegerhorst aus Bausteinen (seit v5.35: Bahn, Stellplatz,
   // Tower, Kerosintank, Munitionslager; CITY.air). Die Zellenart bleibt nur als Platzhalter in KINDS (Nummer 17), damit die Nummern
   // der späteren Arten gleich bleiben; Werkzeug, Bild und Daten gibt es seit v5.56 nicht mehr (alte Stände laden nicht, SAVE_FORMAT 3).
-  retired: ['airport'],
+  retired: CITY_KINDS.filter((e) => e.retired).map((e) => e.key), // Register js/data/citykinds.js (Feld retired): ['airport']
   // Räumen reißt seit v5.16 auch diese Gebäude der Karte ab (Häuser, Hallen, Fabriken der Zonenstadt und außerhalb), kostenlos wie das
   // übrige Räumen; besetzte Häuser nicht. Wachtürme, Zug, Mauern, Fels und Wasser bleiben.
   clearable: ['house', 'hall', 'factory'],
-  costBm: { road: 10, barracks: 100, factory: 200, heliport: 150, hospital: 80, runway: 15, stand: 80, atc: 60, ktank: 40, mdepot: 60, taxi: 8 }, // Baumaterial je Zelle aus dem Lager der Hauptstadt (seit v4.83: Straßen kosten Baumaterial statt Geld)
+  costBm: byKind('bm'), // Register js/data/citykinds.js (Feld bm): Baumaterial je Zelle aus dem Lager der Hauptstadt (seit v4.83: Straßen kosten Baumaterial statt Geld)
 
   // ---- Ausbildung (seit v4.96, PRD §15) ----
   // Mit Stadt bilden nur diese Stadtgebäude Truppen aus (die Hauptstadt nicht mehr). Sie bezahlen direkt aus der Stadt:
@@ -71,7 +80,7 @@ export const CITY = {
   jobsMine: [0, 6, 12, 20], // Arbeitsplätze je Stufe einer Förderanlage
   // Verarbeitung: so viel Rohstoff braucht eine Einheit Produkt (BM aus Holz oder Stein, Roheisen aus Erz, Stahl aus Roheisen, Treibstoff
   // und Kerosin aus Öl, Munition aus Stahl). Seit v5.20: Erz → Roheisen (Hütte), Roheisen → Stahl (Stahlwerk, bisher Erz → Metall)
-  convert: { bm: 1, iron: 2, metal: 1, fuel: 1, kero: 1.2, mun: 0.5 },
+  convert: byGood('convert'), // Register js/data/goods.js
   // Ressourcenkette (seit v5.08) für die Flussanzeige (Knopf „Ressourcen“, js/game/flow.js, PRD §15 „Ressourcenanzeige“):
   // Werk → aus welchen Rohstoffen (Vorkommen) oder Waren es was macht. Reihenfolge = Reihenfolge der Verarbeitung.
   // Bei jeder Änderung an Rohstoffen, Werken oder Waren hier und in updateCity (js/game/city.js) mitpflegen; test/flow.test.js prüft beides.
@@ -92,7 +101,7 @@ export const CITY = {
   // Metall je ausgebildeter Einheit (zusätzlich zum Geld); fehlt die Sorte, kostet sie kein Metall
   metalCost: { truck: 20, engineer: 20, fobTruck: 80, ifv: 60, tank: 120, flak: 60, sam: 80, gepard: 100, pzh: 140, excavator: 80, littlebird: 60, transporter: 80, gunship: 120, f16: 160 },
   // Markt: handelt in Losen; verkaufen bringt wenig, kaufen kostet viel (Geld je Los)
-  market: { lot: 100, sell: { bm: 20, mun: 30, fuel: 30, metal: 40, kero: 35 }, buy: { bm: 80, mun: 120, fuel: 120, metal: 160, kero: 140 } },
+  market: { lot: 100, sell: byGood('sell'), buy: byGood('buy') }, // Preise je Ware im Register js/data/goods.js
 
   // ---- Straßentransport (seit v5.20, Werte für AP2/AP3; PRD §15 „Straßentransport“) ----
   // cap: Einheiten je s, die eine eigene Straßenzelle trägt; mapCap: Stadtstraßen der Karte. commute: Last je Arbeiter zum Wohnen (je s).
@@ -115,7 +124,7 @@ export const CITY = {
   power: {
     base: 40,
     supply: [0, 60, 120, 200],
-    use: { res: 1, com: 3, market: 3, bm: 8, mun: 8, fuel: 8, kero: 8, smelter: 10, steel: 10, mine: 4, uni: 12, dc: 30, power: 0, barracks: 2, factory: 8, heliport: 6, hospital: 6, stand: 2, atc: 6, ktank: 2, mdepot: 2 },
+    use: byKind('power'), // je Zellenart im Register js/data/citykinds.js (Feld power)
   },
   // Zufriedenheit 0 … 1 = base + shops × Versorgung (Gewerbe-Arbeiter je Einwohner, voll ab shopPer) + safety × Sicherheit
   // (weniger Treffer auf die Stadt in den letzten hitWindow s, null ab hitsBad; gezählt werden höchstens CITY.ai.hitLog Treffer) + power × Strom.
@@ -211,7 +220,7 @@ export const CITY = {
     defendCooldown: 12, // s zwischen zwei Verteidigungsbefehlen
     // Angriffsziele: Wert je Zellenart geteilt durch (1 + Entfernung / raidDist); Werke und Förderung zuerst
     raidDist: 1000,
-    targetValue: { steel: 3, fuel: 3, mun: 3, power: 3, dc: 2.5, uni: 2, mine: 2.5, market: 2, bm: 2, com: 1, res: 0.5, barracks: 2.5, factory: 3, heliport: 3, hospital: 2, stand: 3, atc: 3, ktank: 2.5, mdepot: 2.5 },
+    targetValue: byKind('target'), // je Zellenart im Register js/data/citykinds.js (Feld target, fehlt = 1)
     // Ausbildungsgebäude (seit v4.96): so viele will sie haben; ab moreFrom Arbeitsstätten je eins mehr (Heliport erst, wenn Hubschrauber freigeschaltet sind)
     producers: { barracks: 1, factory: 1, heliport: 2 }, // seit v5.51 zwei Heliports: einer je Hubschrauber (Späher und Transporter)
     moreFrom: 14,

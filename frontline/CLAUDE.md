@@ -27,9 +27,12 @@ die genannten Dateien.
 9. Startmenü-Schalter (Sendemast, Wetter, Forschung, Fluss, Stadt) sind im Menü standardmäßig an, in `new Game()` ohne Angabe aus. Tests verlassen sich darauf.
 10. Texte im Spiel, Kommentare und Doku auf Deutsch, Bezeichner im Code englisch. Nach jeder Änderung in `js/data/`: `npm run docs`
     (erzeugt die Wertetabellen in PRD §6) und `npm run test:quick`. Vor dem Push `npm test` (alle grün).
-11. Ressourcen der Stadt (Rohstoffe, Werke, Waren, Förder- und Verarbeitungsformeln) ändern: die **Ressourcenanzeige** mitpflegen
-    (PRD §15 „Ressourcenanzeige“): Kette `CITY.chain` in `js/data/city.js`, Felder `cap`/`inp`/`gross`/`n` in `updateCity`
-    (`js/game/city.js`), neue Sorten mit Namen und Farbe in `js/game/flow.js` und `js/ui/flowpanel.js`. `test/flow.test.js` prüft das. Seit v5.20 fahren die Waren über Straßen: neue Werke oder Waren auch in `js/game/transport.js` eintragen (`MINE_GROUP`, `GROUP_OF_KIND`, `PRODUCT_KINDS`, `WORKPLACE_KINDS`) und die Anzeige (`citylayer.js`, `hud.js`, `citypanel.js`) mitpflegen; `test/transport.test.js` prüft die Wege.
+11. Ressourcen der Stadt (Rohstoffe, Werke, Waren, Förder- und Verarbeitungsformeln) ändern: Zellenarten stehen im Register
+    `js/data/citykinds.js`, Waren im Register `js/data/goods.js` (Namen, Farben, Lager, Markt, Rollen; alle Listen in Simulation, UI und
+    Darstellung leiten sich daraus ab, seit v5.59). Dazu die Kette `CITY.chain` in `js/data/city.js` (**Ressourcenanzeige**, PRD §15)
+    und die Logik in `updateCity` (`js/game/city.js`); bei neuen Rohstoffen bzw. Zielwerken die Wege in `js/game/transport.js`
+    (`MINE_GROUP`, `GROUP_OF_KIND`). `test/flow.test.js`, `test/transport.test.js` und `test/registry.test.js` prüfen das
+    (Rezepte „Neue Stadtzellenart“ und „Neue Ware“ unten).
 
 ## Starten und testen
 
@@ -96,19 +99,20 @@ Darunter listet ein Inhaltsverzeichnis alle weiteren Abschnitte.
 | Gewerbe-Absatz: Steuer je Arbeiter, Baumaterial-Bedarf, Anteil ohne Versorgung, eigene Nachfrage | js/data/city.js | `CITY.taxCom`, `CITY.shop` (`need`, `base`, `per`) |
 | Kerosin: Startvorrat im Stadtlager, Markt | js/data/city.js | `CITY.startKero`, `CITY.market` |
 | Heliport als Landeplatz: Start- und Landezeit, Luftraumsperre mit/ohne Tower, Heimflug-Reserve (Tanken aus Kerosintank/Munitionslager wie die Jets) | js/data/city.js | `CITY.air.heli` (Lager-Raten `CITY.air.tank`, `CITY.air.depot`) |
-| Hütte und Kerosin-Raffinerie: Größe, Preis, Strom, Ausbeute, Umwandlung | js/data/city.js | `CITY.size`, `CITY.cost`, `CITY.power.use`, `CITY.yield`, `CITY.convert` |
+| Preis, Baumaterial, Größe, Strom, KI-Zielwert, Name, Farbe, Symbol, Tipp, Baumenü-Gruppe einer Stadtzellenart (z. B. Hütte, Kerosin-Raffinerie) | js/data/citykinds.js | Eintrag in `CITY_KINDS` (`cost`, `bm`, `size`, `power`, `target`, …); `CITY.cost`, `CITY.costBm`, `CITY.size`, `CITY.power.use`, `CITY.ai.targetValue` werden daraus abgeleitet |
+| Ertrag, Umwandlung, Marktpreise, Name, Kürzel, Farbe einer Ware (Stahl, Kerosin, Roheisen …) | js/data/goods.js | Eintrag in `GOODS` (`yield`, `convert`, `sell`, `buy`, …); `CITY.yield`, `CITY.convert`, `CITY.market.sell/buy` werden daraus abgeleitet |
 | Wetter, Häuserkampf, Kisten, Kommandeur, Formationen, Fluss, Tiere, Wracks, Tarnung, Flugabwehr | balance.js | `weather`, `garrison`, `crates`, `commander`, `formation`, `river`, `animals`, `scars`, `stealth`, `airFire` |
 | Kartengröße | balance.js | `BALANCE.map` (Vorsicht: ändert alle Karten und Tests) |
 | Aufbau der Zufallskarte (Hügel, Seen, Fluss, Stadt, Häuser, Felder, Kisten-Abstände) | js/data/mapgen.js | `MAPGEN.<abschnitt>` (ändert alle Zufallskarten) |
 | Fliegerhorst: Bahnlänge/-breite, Sperrzeit mit/ohne Tower, Umkreise, Schutz der Stellplätze, Ausbaukosten der Stellplätze (`upgrade`, seit v5.39), Kerosintank/Munitionslager | js/data/city.js | `CITY.air` |
 | Bagger: Arbeitszeit je Zelle, Reichweite | balance.js | `BALANCE.excavator` (Einheit `UNITS.excavator`) |
 | Kampfflugzeuge: Wendigkeit, Kreisen, Heimweg-Reserve, Tanken/Nachladen, Flughöhe | balance.js | `BALANCE.jets` (Werte der F-16: `UNITS.f16`) |
-| Größe der Großbauten (Kraftwerk, Kaserne, Fabrikhalle, Universität, Fliegerhorst-Bausteine) | js/data/city.js | `CITY.size` |
+| Größe der Großbauten (Kraftwerk, Kaserne, Fabrikhalle, Universität, Fliegerhorst-Bausteine) | js/data/citykinds.js | Feld `size` (im Code `CITY.size`) |
 | Bauland um die Startpunkte (keine Bäume, Felsen, Gehöfte) | js/data/mapgen.js | `MAPGEN.general.buildLand`, `MAPGEN.terrain.spawnFlat` |
 | Kurznamen in der Befehlskarte | units.js, buildings.js | `short` |
 | Standards im Startmenü (Schwierigkeit, Schalter) | balance.js | `BALANCE.menuDefaults` |
 | Takt, Startaufstellung, Warnabstände (Basis, Engpass), Tempo leerer Fahrzeuge, Abrisserstattung, Zielsuche, Ressourcennamen | balance.js | `BALANCE.tickRate`, `startLayout`, `baseAttackWarn`, `shortageWarn`, `fuelSlowMul`, `demolishRefund`, `scanInterval`, `resNames` |
-| Weitere Stadt-Abschnitte (Gebiet, Einwohner, Wachstum, Vorkommen, Kosten, Nachfrage, Ruinen, Abriss, Startwerte) | js/data/city.js | `CITY.cell`, `territory`, `flee`, `happy`, `housing`, `jobs*`, `immigration`, `startPop`, `taxPop`, `growTime`, `upgradeTime`, `ruinTime`, `maxLevel`, `demand`, `deposits`, `extract`, `costBm`, `metalCost`, `bountyBm`, `startMetal`, `startStock`, `fobMargin`, `clearable`, `retired` |
+| Weitere Stadt-Abschnitte (Gebiet, Einwohner, Wachstum, Vorkommen, Kosten, Nachfrage, Ruinen, Abriss, Startwerte) | js/data/city.js | `CITY.cell`, `territory`, `flee`, `happy`, `housing`, `jobs*`, `immigration`, `startPop`, `taxPop`, `growTime`, `upgradeTime`, `ruinTime`, `maxLevel`, `demand`, `deposits`, `extract`, `metalCost`, `bountyBm`, `startMetal`, `startStock`, `fobMargin`, `clearable`, `retired` |
 | Teamnamen und -farben | balance.js | `BALANCE.teamNames`, `BALANCE.teamColors` |
 
 Danach: PRD-Text und Hilfetexte in `js/ui/menu.js` auf die alte Zahl durchsuchen und anpassen (Regel 7).
@@ -186,6 +190,30 @@ Wo jedes Feature liegt. „KI“ = Konstanten-Präfix in `js/data/ai.js`, Logik 
 3. Aussehen: Maler in `js/render/milbuild.js` (Typ in `MIL_TYPES` eintragen), Höhe in `js/render/iso.js` (`BUILD_H`), Kürzel in
    `js/render/sprites.js` (`BUILD_ABBR`, 2D-Ansicht).
 4. KI optional in `js/ai/ai.js`; Test, Baumenü-Zeile der Hilfe (`js/ui/menu.js`, Taste B), PRD §5 und Änderungsverlauf, `CACHE_VERSION`.
+
+### Neue Stadtzellenart
+1. `js/data/citykinds.js`: Eintrag in `CITY_KINDS` an der Stelle seiner Baumenü-Gruppe (`group`), mit der **nächsten freien `id`**
+   (höchste + 1; IDs stehen in Spielständen, nie umnummerieren) und `name`, `short`, `icon`, `color`, `tip`, `cost`, `power`, `target`,
+   optional `bm`, `size` (Großbau), `jobs` (Arbeitsplätze, Pendler), `works` (Werk), `supply` (liefert über die Straße), `flat`.
+   Damit stehen Werkzeug, Preis, Größe, Strom, Name, Schild, Tipp, KI-Zielwert und alle Rollenlisten (Straßentransport, Infofeld,
+   Warnschilder) fest. In `test/registry.test.js` die Art hinten an die feste `KINDS`-Liste hängen.
+2. Bild: Maler in `js/render/townhouses.js` (1 × 1, `TALL` und Maler), `js/render/works.js` (Werk 2 × 2, `WORKS_KINDS`) oder
+   `js/render/bigbuild.js` (Großbau, `BIG_KINDS` und Teile).
+3. Logik in `js/game/city.js`, wenn die Art mehr tut als Arbeitsplätze und Strom: z. B. `totals` (Wohnen, Strom, Forschung), Werk:
+   Kette `CITY.chain` (`js/data/city.js`) und `WORK_ORDER` in `updateCity`, bei neuem Zielwerk `GROUP_OF_KIND` in `js/game/transport.js`;
+   Ausbildung `CITY.produces`, Pflege `CITY.care.by`; Infozeilen in `js/ui/hud.js` (`cityInfo`); KI optional (`CITY.ai.mix`, `aiNeed`).
+4. Test, PRD §15 und Änderungsverlauf, `CACHE_VERSION`.
+
+### Neue Ware
+Für Waren, die ein Werk der Stadt erzeugt und die im Lager der Hauptstadt, im Stadtlager oder als Zwischenprodukt (ohne Lager) laufen.
+Neue Sorten der FOB-Lager und LKW (wie Baumaterial, Munition, Treibstoff) brauchen mehr (Lager, LKW, HUD) und sind nicht Teil dieses Rezepts.
+1. `js/data/goods.js`: Eintrag in `GOODS` mit `name`, `short`, `color`, `store` (`'main'`, `'city'` oder `null`), `yield`, `convert`,
+   für den Markt `sell` und `buy`, bei `store: 'city'` den Hinweis `full`. Markt, Marktmenü, Ressourcenanzeige (Knoten, Farbe,
+   Lager), Infofeld des Werks, Stadtzahlen (`cap`/`inp`/`gross`) und Straßentransport ins Lager folgen daraus.
+2. Werk: Zeile in `CITY.chain` (`js/data/city.js`), meist mit neuer Zellenart (Rezept oben).
+3. Logik in `updateCity` (`js/game/city.js`): Gutschrift ins Lager (`main.store` bzw. Feld `c.<Ware>` mit Startwert in `createCity`)
+   und Verbrauch; KI-Regeln (`aiNeed`, Markt) optional.
+4. `test/registry.test.js` und `test/flow.test.js` laufen lassen (sie prüfen Register, Kette und Stadtzahlen), PRD §15 und Änderungsverlauf, `CACHE_VERSION`.
 
 ### Neuer Befehl
 1. Handler im zuständigen Modul: `export function cmdX(game, team, cmd)` → `{ ok: true }` oder `{ ok: false, reason: 'deutscher Text' }`. Nur eigene, lebende Einheiten akzeptieren.

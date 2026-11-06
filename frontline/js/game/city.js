@@ -2,6 +2,8 @@
 // Konfliktzone, Arbeit, Steuern und Werke, die das Lager der Hauptstadt füllen.
 // Nur aktiv, wenn das Spiel mit `city: true` startet. Kein DOM, deterministisch.
 import { CITY } from '../data/city.js';
+import { KIND, KINDS, KIND_ID, KIND_NAME, WORKS, FLAT_KINDS, SUPPLIER_KINDS } from '../data/citykinds.js';
+import { STORED_GOODS, MARKET_GOODS, CITY_STORE_GOODS as STORE_GOODS } from '../data/goods.js';
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { nearestPassable } from './movement.js';
@@ -11,18 +13,12 @@ import { RELIEF } from './relief.js';
 import { bridgeUnder } from './river.js';
 import { transportOf, transportInfo, pathEff, addLoad, beginLoads, settleLoads, minFactor, mainAccess } from './transport.js';
 
-/** Zellenarten (Code im Raster): 0 leer. Neue Arten nur hinten anhängen (Code = Index + 1); 'airport' ist nur Platzhalter (CITY.retired). */
-export const KINDS = ['road', 'res', 'com', 'bm', 'mun', 'fuel', 'steel', 'mine', 'market', 'power', 'uni', 'dc', 'barracks', 'factory', 'heliport', 'hospital', 'airport', 'smelter', 'kero', 'runway', 'stand', 'atc', 'ktank', 'mdepot', 'taxi'];
-export const KIND_ID = Object.fromEntries(KINDS.map((k, i) => [k, i + 1]));
-export const KIND_NAME = {
-  road: 'Straße', res: 'Wohnen', com: 'Gewerbe', bm: 'Baumaterial-Werk', mun: 'Munitionswerk', fuel: 'Raffinerie',
-  steel: 'Stahlwerk', mine: 'Förderanlage', market: 'Markt', power: 'Kraftwerk', uni: 'Universität', dc: 'Rechenzentrum',
-  barracks: 'Kaserne', factory: 'Fabrikhalle', heliport: 'Heliport', hospital: 'Krankenhaus', airport: 'Flughafen',
-  smelter: 'Hütte', kero: 'Kerosin-Raffinerie',
-  runway: 'Start-/Landebahn', stand: 'Stellplatz', atc: 'Tower', ktank: 'Kerosintank', mdepot: 'Munitionslager', taxi: 'Rollfeld',
-};
-/** Flache Zellen (seit v5.35): Straße und Start-/Landebahn wachsen nicht, haben kein Gebäude und zählen als Straßenanschluss. */
-export const isFlat = (id) => id === KIND_ID.road || id === KIND_ID.runway || id === KIND_ID.taxi; // Straße, Bahn, Rollfeld (seit v5.37)
+/** Zellenarten (Code im Raster, 0 leer), Namen und Rollen: aus dem Register js/data/citykinds.js (seit v5.59; IDs dort fest). */
+export { KINDS, KIND_ID, KIND_NAME, WORKS } from '../data/citykinds.js';
+/** Flache Zellen (seit v5.35): Straße, Start-/Landebahn und Rollfeld (seit v5.37) wachsen nicht, haben kein Gebäude und zählen als Straßenanschluss. */
+const FLAT_ID = new Uint8Array(KINDS.length + 1);
+for (const k of FLAT_KINDS) FLAT_ID[KIND_ID[k]] = 1;
+export const isFlat = (id) => FLAT_ID[id] === 1;
 /** Ausbildungsgebäude der Stadt (seit v4.96): Zellenart → Einheiten (CITY.produces). */
 export const TRAINER_KINDS = Object.keys(CITY.produces);
 /** Welches Stadtgebäude bildet `unit` aus? (Zellenart oder null) */
@@ -36,18 +32,18 @@ export function careOf(game, e) {
 }
 /** Welche Pflege braucht die Einheit? 'inf' Soldaten, 'air' Hubschrauber, 'ground' Bodenfahrzeuge. */
 export const careClass = (u) => (u.def.air ? 'air' : u.def.armor === 'inf' ? 'inf' : 'ground');
-/** Werke (Verarbeitung in updateCity): BM-Werk, Munitionswerk, Raffinerie, Stahlwerk, Hütte (seit v5.20), Kerosin-Raffinerie (seit v5.20). */
-export const WORKS = ['bm', 'mun', 'fuel', 'steel', 'smelter', 'kero'];
 /** Rohstoffvorkommen (Code im Raster `deposit`): 0 keins. */
 export const DEPOSITS = ['wood', 'stone', 'ore', 'oil'];
 export const DEPOSIT_NAME = { wood: 'Wald', stone: 'Fels', ore: 'Erz', oil: 'Öl' };
 export const MINE_NAME = { wood: 'Holzfäller', stone: 'Steinbruch', ore: 'Erzmine', oil: 'Ölquelle' };
-/** Waren am Markt. */
-export const GOODS = ['bm', 'mun', 'fuel', 'metal', 'kero'];
-/** Waren im Stadtlager (Obergrenze BALANCE.logistics.storeCap); die übrigen liegen im Lager der Hauptstadt. Stahl heißt intern metal. */
-export const CITY_STORE_GOODS = ['metal', 'kero'];
+/** Waren am Markt und im Stadtlager (Obergrenze BALANCE.logistics.storeCap; die übrigen liegen im Lager der Hauptstadt): Register js/data/goods.js. */
+export const GOODS = MARKET_GOODS;
+export const CITY_STORE_GOODS = STORE_GOODS;
+/** Waren, die Werke erzeugen (Ertrag CITY.yield): je eine Rate in den Stadtzahlen und in cap/inp/gross. */
+const MADE_GOODS = Object.keys(CITY.yield);
+const zeroGoods = (list) => Object.fromEntries(list.map((g) => [g, 0]));
 
-const zeroStats = () => ({ powerSupply: 0, powerUse: 0, powerRatio: 1, happy: 1, shop: 0, shopSupply: 1, shopBm: 0, pop: 0, housing: 0, jobs: 0, jobsCom: 0, workers: 0, drafted: 0, free: 0, fled: 0, bm: 0, mun: 0, fuel: 0, kero: 0, iron: 0, metal: 0, money: 0, lost: 0, jam: 1, raw: { wood: 0, stone: 0, ore: 0, oil: 0 }, cap: { bm: 0, iron: 0, fuel: 0, kero: 0, metal: 0, mun: 0 }, inp: { bm: 0, iron: 0, fuel: 0, kero: 0, metal: 0, mun: 0 }, gross: { bm: 0, iron: 0, fuel: 0, kero: 0, metal: 0, mun: 0 } });
+const zeroStats = () => ({ powerSupply: 0, powerUse: 0, powerRatio: 1, happy: 1, shop: 0, shopSupply: 1, shopBm: 0, pop: 0, housing: 0, jobs: 0, jobsCom: 0, workers: 0, drafted: 0, free: 0, fled: 0, ...zeroGoods(MADE_GOODS), money: 0, lost: 0, jam: 1, raw: { wood: 0, stone: 0, ore: 0, oil: 0 }, cap: zeroGoods(MADE_GOODS), inp: zeroGoods(MADE_GOODS), gross: zeroGoods(MADE_GOODS) });
 
 /**
  * Gesperrte Zellen (für beide Teams gleich): unter und um jede Hauptstadt oder auf Hindernissen (Bäume, Wasser, Häuser, Gebäude).
@@ -900,8 +896,8 @@ export function accessCells(c, a) {
 
 /** Summen (Wohnplätze, Arbeitsplätze je Art) aus den gebauten Zellen; geflohene Wohnzellen zählen nicht. */
 function totals(c) {
-  const t = { housing: 0, fled: 0, jobsCom: 0, bm: 0, mun: 0, fuel: 0, steel: 0, smelter: 0, kero: 0, mine: { wood: 0, stone: 0, ore: 0, oil: 0 }, market: 0, power: 0, powerJobs: 0, uni: 0, dc: 0, jobsOther: 0, use: 0 };
-  t.n = { bm: 0, mun: 0, fuel: 0, steel: 0, smelter: 0, kero: 0, mine: { wood: 0, stone: 0, ore: 0, oil: 0 } }; // fertige Gebäude je Art (Flussanzeige)
+  const t = { housing: 0, fled: 0, jobsCom: 0, ...zeroGoods(WORKS), mine: { wood: 0, stone: 0, ore: 0, oil: 0 }, market: 0, power: 0, powerJobs: 0, uni: 0, dc: 0, jobsOther: 0, use: 0 }; // je Werk seine Arbeitsplätze
+  t.n = { ...zeroGoods(WORKS), mine: { wood: 0, stone: 0, ore: 0, oil: 0 } }; // fertige Gebäude je Art (Flussanzeige)
   for (const i of c.list) {
     const lv = c.level[i];
     if (!lv || isPart(c, i)) continue; // ein Großbau zählt einmal (über seine Mitte)
@@ -1020,11 +1016,8 @@ const WORK_ORDER = ['smelter', 'steel', 'bm', 'fuel', 'kero'];
 /** Arbeitsplätze eines fertigen Gebäudes (wie totals; Förderanlage nur mit Vorkommen). */
 function jobsOf(c, i, k, lv) {
   if (k === 'mine') return DEPOSITS[c.deposit[i] - 1] ? CITY.jobsMine[lv] : 0;
-  if (k === 'com' || k === 'market') return CITY.jobsCom[lv];
-  if (k === 'uni') return CITY.jobsUni[lv];
-  if (k === 'dc') return CITY.jobsDc[lv];
-  if (k === 'power' || WORKS.includes(k)) return CITY.jobs[lv];
-  return 0;
+  const table = KIND[k]?.jobs; // Register: Tabelle der Arbeitsplätze je Stufe
+  return table ? CITY[table][lv] : 0;
 }
 
 /** Ein Simulationsschritt der Stadt beider Teams. Nach updateEconomy aufrufen. */
@@ -1074,7 +1067,7 @@ export function updateCity(game, dt) {
     c.drafted = drafted;
 
     const t = totals(c);
-    const jobs = t.jobsCom + t.bm + t.mun + t.fuel + t.steel + t.smelter + t.kero + t.mineJobs + t.jobsOther;
+    const jobs = t.jobsCom + WORKS.reduce((n, w) => n + t[w], 0) + t.mineJobs + t.jobsOther; // ganze Zahlen: Reihenfolge egal
 
     // Einwohner ziehen ein oder ab, bis die Wohnplätze gefüllt sind (ohne Arbeit nur ein kleiner Anfang)
     const target = jobs > 0 ? t.housing : Math.min(t.housing, CITY.startPop);
@@ -1248,7 +1241,7 @@ export function updateCity(game, dt) {
     }
     s.iron = s.gross.iron;
     // Lager gutschreiben (vor den Munitionswerken, die den Stahl daraus ziehen)
-    const made = (c.made ??= { bm: 0, mun: 0, fuel: 0, metal: 0, kero: 0 }); // Summe, die wirklich ins Lager kam (Flussanzeige misst damit den Verbrauch)
+    const made = (c.made ??= zeroGoods(STORED_GOODS)); // Summe, die wirklich ins Lager kam (Flussanzeige misst damit den Verbrauch)
     const metal0 = c.metal;
     const kero0 = c.kero;
     if (credit) {
@@ -1462,7 +1455,7 @@ export function cmdTrade(game, team, cmd) {
   const add = (v) => {
     if (inCity) c[cmd.good] = Math.min(cap, c[cmd.good] + v);
     else main.store[cmd.good] = Math.min(cap, main.store[cmd.good] + v);
-    c.traded ??= { bm: 0, mun: 0, fuel: 0, metal: 0, kero: 0 }; // Summe der Käufe minus Verkäufe (Flussanzeige: zählt nicht als Verbrauch)
+    c.traded ??= zeroGoods(STORED_GOODS); // Summe der Käufe minus Verkäufe (Flussanzeige: zählt nicht als Verbrauch)
     c.traded[cmd.good] = (c.traded[cmd.good] ?? 0) + v;
   };
   if (cmd.dir === 'sell') {
@@ -2065,7 +2058,7 @@ function aiConnect(game, c, off) {
     if (isPart(c, i) || !c.kind[i]) continue;
     const k = KINDS[c.kind[i] - 1];
     const info = transportInfo(game, c, i);
-    const supplier = ['mine', 'bm', 'smelter', 'steel', 'fuel', 'kero', 'mun'].includes(k) && info.to === null;
+    const supplier = SUPPLIER_KINDS.includes(k) && info.to === null;
     if (!supplier && !info.noHome) continue;
     tried++;
     if (connectRoad(game, c, i, true, supplier ? goalOf(c, i, k) : null) > 0) return true;

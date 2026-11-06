@@ -3,6 +3,7 @@
 // die Lager mit Erzeugung und Verbrauch; Linienbreite = Menge je s. Rot = Engpass, gelb = Werk wartet oder Rohstoff verfällt.
 // Unten die Engpässe in Worten. Der Graph kommt aus js/game/flow.js (CITY.chain), hier wird er nur gezeichnet. Das Spiel läuft weiter.
 import { resourceFlow, FlowMeter, fmtFlow } from '../game/flow.js';
+import { GOOD_COLOR, GOOD_SHORT } from '../data/goods.js';
 
 const NW = 158; // Breite eines Knotens (SVG-Einheiten; seit v5.30 158 statt 140, damit Namen und Mengen ganz hineinpassen)
 const NH = 56; // Höhe
@@ -10,8 +11,9 @@ const PITCH = 66; // Abstand der Reihen
 const GAP = 40; // Mindestabstand zwischen zwei Spalten (Platz für die Linien und ihre Zahlen); die Breite des Graphen folgt aus der Spaltenzahl
 const MIN_W = 860; // kleinste Breite des Graphen (wenige Spalten: weiter auseinander)
 const TOP = 18; // Platz für die Spaltenköpfe
-const COLOR = { wood: '#7fa650', stone: '#a3a8ad', ore: '#c0714f', oil: '#7d6aa8', bm: '#b58248', iron: '#b9a48a', metal: '#8fb3c9', fuel: '#9b7bc4', kero: '#56b3e6', mun: '#d9b600' };
-const UNIT = { bm: 'BM', iron: 'Roheisen', metal: 'Stahl', fuel: 'TS', kero: 'Kerosin', mun: 'MUN' };
+// Farben: Rohstoffe hier, Waren aus dem Warenregister (js/data/goods.js)
+const COLOR = { wood: '#7fa650', stone: '#a3a8ad', ore: '#c0714f', oil: '#7d6aa8', ...GOOD_COLOR };
+const UNIT = GOOD_SHORT;
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const int = (v) => Math.floor(v).toLocaleString('de-DE');
 /** Text auf die Breite eines Knotens kürzen (… am Ende), damit nichts über den Rand läuft; size = Schriftgröße. */

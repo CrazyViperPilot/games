@@ -10,7 +10,7 @@ import { drawWreckRubble } from '../js/render/fx.js';
 import { Game } from '../js/game/game.js';
 import { CITY } from '../js/data/city.js';
 import { canZone, sizeOf } from '../js/game/city.js';
-import { CITY_COLORS } from '../js/ui/citypanel.js';
+import { KIND_COLOR as CITY_COLORS } from '../js/data/citykinds.js';
 
 /** Zeichenfläche, die jeden Aufruf annimmt und prüft, dass alle Zahlen endlich und alle Farben lesbar sind. */
 function fakeCtx() {

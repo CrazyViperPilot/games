@@ -7,6 +7,7 @@
 // Nadelbäume, Büsche und Felsen verschneit. Nur Darstellung, keine Spielregel.
 import { sprite, blit, spriteDpr } from './spritecache.js';
 import { PAINT } from './unitpaint.js';
+import { rgbOf, mix } from './color.js';
 
 const TAU = Math.PI * 2;
 const R = 16; // Bezugsradius der Bäume (Weltpixel); jedes Bild wird nach t.r skaliert
@@ -33,13 +34,6 @@ function rng(seed) {
 /** Eigener Zufall für Feinheiten: verbraucht immer genau einen Wert, damit die Form in allen Maßstäben gleich bleibt. */
 const sub = (r) => rng((r() * 4294967296) >>> 0);
 
-const rgbOf = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
-const hexOf = (c) => '#' + c.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
-const mix = (a, b, t) => {
-  const A = rgbOf(a);
-  const B = rgbOf(b);
-  return hexOf(A.map((v, i) => v + (B[i] - v) * t));
-};
 const rgba = (h, a) => {
   const [r, g, b] = rgbOf(h);
   return `rgba(${r},${g},${b},${a})`;
