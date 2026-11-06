@@ -218,7 +218,7 @@ test('Zwei F-16 nie zugleich im Startlauf; der Tower verkürzt die Sperrzeit der
   assert.ok(maxBusy <= CITY.air.sepAtc + 1e-6, `Sperrzeit mit Tower (${maxBusy})`);
 });
 
-test('Alte Stände: der Flughafen 10 × 10 wird beim Laden geräumt, Jets darauf gehen verloren', () => {
+test('Alte Stände: der Flughafen 10 × 10 wird beim Laden geräumt, Jets darauf gehen verloren (ohne Stellplatz als Heimat)', () => {
   const g = new Game({ seed: 3, city: true });
   const { c, m } = rich(g);
   const a = freeArea(g, c, m, 12, 12);
@@ -228,8 +228,15 @@ test('Alte Stände: der Flughafen 10 × 10 wird beim Laden geräumt, Jets darauf
   for (let dr = -4; dr <= 5; dr++) for (let dq = -4; dq <= 5; dq++) c.kind[i + dr * c.cols + dq] = AP;
   c.list.push(i);
   c.level[i] = 1;
+  // ein Jet, der dort stand: seine Heimat (das Ziel des Flughafens) gibt es nach dem Räumen nicht mehr
+  const jet = g.spawnUnit('f16', 0, (a.q + 5) * c.cell, (a.r + 5) * c.cell);
+  jet.parked = true;
+  jet.jet = { home: g.newId(), ready: true, phase: 'park', alt: 0 };
   migrateCity(g);
   for (let dr = -4; dr <= 5; dr++) for (let dq = -4; dq <= 5; dq++) assert.equal(c.kind[i + dr * c.cols + dq], 0);
+  g.update(DT);
+  assert.equal(jet.alive, false, 'Jet ohne Stellplatz geht verloren');
+  assert.ok(!g.units.includes(jet), 'und ist aus der Einheitenliste');
 });
 
 test('Bagger: räumt eine Zonenstraße (nicht die Brücke), reißt ein eigenes Gebäude ab; Gegner langsam per Schaufel', () => {

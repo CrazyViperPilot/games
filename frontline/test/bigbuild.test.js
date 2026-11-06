@@ -1,10 +1,12 @@
 // v5.03: Stadtstraßen der Karte (Zone, Brücken), Großbauten mit gerader Kante. Fliegerhorst und F-16: test/airbase.test.js.
+// Hieß bis v5.54 aircraft.test.js (enthielt nie Flugzeugtests).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
 import { CITY } from '../js/data/city.js';
 import { BALANCE } from '../js/data/balance.js';
 import { canZone, hasRoad, bigFits, bigCells, bigCenter, sizeOf, KIND_ID, migrateCity } from '../js/game/city.js';
+import { withValue } from './util.js';
 
 const DT = 0.05;
 const run = (g, s) => {
@@ -121,13 +123,7 @@ test('Großbauten mit gerader Kante: Kraftwerk 2 × 2, Kaserne 4 × 4, Fabrikhal
 // Flughafen-Tests (bis v5.33) ersetzt durch test/airbase.test.js (Fliegerhorst, seit v5.35)
 
 test('Alte Stände: eine Fabrikhalle über 8 × 8 Zellen wird beim Laden 5 × 5 (Straße bleibt dran, Rest frei, Ziel bleibt)', () => {
-  CITY.size.factory = 8; // so wurde sie bis v5.30 gebaut
-  let g;
-  try {
-    g = new Game({ seed: 3, city: true });
-  } finally {
-    CITY.size.factory = 5;
-  }
+  const g = withValue(CITY.size, 'factory', 8, () => new Game({ seed: 3, city: true })); // so wurde sie bis v5.30 gebaut
   const c = g.city[0];
   const anchorOld = [...c.ents.keys()].find((i) => c.kind[i] === KIND_ID.factory);
   const e = c.ents.get(anchorOld);

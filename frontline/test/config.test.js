@@ -1,11 +1,15 @@
 // Prüft die Config in js/data/ auf Tippfehler und Widersprüche (läuft in Sekunden: `npm run test:quick`).
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { BALANCE, QUICK } from '../js/data/balance.js';
 import { RESEARCH } from '../js/data/research.js';
 import { UNITS } from '../js/data/units.js';
 import { BUILDINGS } from '../js/data/buildings.js';
 import { MIX } from '../js/data/ai.js';
+import * as AI_DATA from '../js/data/ai.js';
 import { MAPGEN } from '../js/data/mapgen.js';
 import { WEATHER_SETTINGS } from '../js/game/weather.js';
 import { CITY } from '../js/data/city.js';
@@ -56,7 +60,8 @@ test('Gebäude: Werte und Kosten', () => {
   for (const [k, b] of Object.entries(BUILDINGS)) {
     for (const f of ['hp', 'w', 'h', 'buildTime']) assert.ok(positive(b[f]), `BUILDINGS.${k}.${f} = ${b[f]}`);
     for (const [r, v] of Object.entries(b.cost)) assert.ok(RES.includes(r) && v >= 0, `BUILDINGS.${k}.cost.${r}`);
-    for (const t of b.produces ?? []) assert.ok(UNITS[t], `BUILDINGS.${k}.produces: unbekannte Einheit '${t}'`);
+    assert.ok(Array.isArray(b.produces), `BUILDINGS.${k}.produces fehlt (die Simulation liest es ohne Ersatzwert)`);
+    for (const t of b.produces) assert.ok(UNITS[t], `BUILDINGS.${k}.produces: unbekannte Einheit '${t}'`);
   }
 });
 
@@ -65,6 +70,28 @@ test('Tasten doppeln sich nicht', () => {
   assert.equal(new Set(unitKeys).size, unitKeys.length, `Ausbildungstasten der Hauptstadt doppelt: ${unitKeys.join(' ')}`);
   const bldKeys = Object.values(BUILDINGS).map((b) => b.hotkey).filter(Boolean);
   assert.equal(new Set(bldKeys).size, bldKeys.length, `Baumenü-Tasten doppelt: ${bldKeys.join(' ')}`);
+  // Stadt-Ausbilder (Kaserne, Fabrikhalle, Heliport, Stellplatz): je Befehlskarte jede Taste einmal
+  for (const [k, list] of Object.entries(CITY.produces)) {
+    const keys = list.map((t) => UNITS[t]?.hotkey);
+    assert.ok(keys.every(Boolean), `CITY.produces.${k}: Einheit ohne Taste`);
+    assert.equal(new Set(keys).size, keys.length, `Ausbildungstasten ${k} doppelt: ${keys.join(' ')}`);
+  }
+  for (const r of Object.values(BUILDINGS.tower.roofs ?? {})) assert.ok(r.hotkey, `Dachaufbau ${r.name}: Taste fehlt`);
+  const roofKeys = Object.values(BUILDINGS.tower.roofs ?? {}).map((r) => r.hotkey);
+  assert.equal(new Set(roofKeys).size, roofKeys.length, `Dachaufbau-Tasten doppelt: ${roofKeys.join(' ')}`);
+});
+
+// Feste Tasten (js/ui/input.js, vor der Befehlskarte abgefangen): J Bauer, H Hauptstadt, V Ansicht, Y Stadt-Baumodus,
+// P Pause, M Geld (Debug). Eine Befehlskarten-Taste mit einem dieser Buchstaben ist nie erreichbar.
+const FIXED_KEYS = ['J', 'H', 'V', 'Y', 'P', 'M'];
+test('Befehlskarten-Tasten liegen nicht auf festen Tasten', { todo: 'Turm V, Flak J, Gepard P sind heute unerreichbar (Befund T-09)' }, () => {
+  const used = [
+    ...Object.entries(UNITS).map(([k, u]) => [`UNITS.${k}`, u.hotkey]),
+    ...Object.entries(BUILDINGS).map(([k, b]) => [`BUILDINGS.${k}`, b.hotkey]),
+    ...Object.entries(BUILDINGS.tower.roofs ?? {}).map(([k, r]) => [`BUILDINGS.tower.roofs.${k}`, r.hotkey]),
+  ];
+  const clash = used.filter(([, key]) => FIXED_KEYS.includes(key)).map(([w, key]) => `${w} (${key})`);
+  assert.deepEqual(clash, [], `auf festen Tasten: ${clash.join(', ')}`);
 });
 
 test('Startarmee, Nachschub und Einheitenlimit passen zusammen', () => {
@@ -126,4 +153,33 @@ test('Stadt (v5.20): Zellenarten stabil, Hütte und Kerosin-Raffinerie vollstän
   assert.ok(CITY.ai.lowKero > 0, 'ai.lowKero');
   const t = CITY.transport;
   for (const f of ['cap', 'mapCap', 'commute', 'maxDist', 'smooth']) assert.ok(positive(t[f]), `CITY.transport.${f}`);
+});
+
+// Tote Datenschlüssel (seit v5.55, Befunde K-04, U-03): jeder Schlüssel in js/data/ muss als Name irgendwo im Code außerhalb von
+// js/data/ vorkommen. Grob (ein gleichnamiges Wort anderswo genügt; `BALANCE.jets.rearm` rutscht so durch), findet aber Schlüssel,
+// die niemand mehr liest. Verzeichnisse mit erzeugten Schlüsseln (Forschungen je Ast) sind ausgenommen. UNUSED listet die heute
+// bekannten toten Schlüssel; wer einen löscht oder wieder liest, streicht ihn hier (der Test meldet das).
+const UNUSED = ['BALANCE.logistics.noFobWarn', 'CITY.care.refuel', 'CITY.air.atcSight', 'UNITS.rifleman.producedAt'];
+const SKIP = new Set(['RESEARCH.items', 'RESEARCH.lanes']);
+test('Datenschlüssel: jeder wird im Code gelesen (außer der Liste bekannter toter Schlüssel)', () => {
+  const root = fileURLToPath(new URL('../js/', import.meta.url));
+  const files = readdirSync(root, { recursive: true }).filter((f) => f.endsWith('.js') && !f.startsWith('data'));
+  const src = files.map((f) => readFileSync(join(root, f), 'utf8')).join('\n');
+  const dead = [];
+  const seen = new Set();
+  const walk = (o, path) => {
+    for (const [k, v] of Object.entries(o)) {
+      const p = `${path}.${k}`;
+      if (SKIP.has(p)) continue;
+      if (/^[A-Za-z_$][\w$]*$/.test(k) && !seen.has(k)) {
+        seen.add(k);
+        if (!new RegExp(`\\b${k.replace(/\$/g, '\\$')}\\b`).test(src)) dead.push(p);
+      }
+      if (v && typeof v === 'object' && !Array.isArray(v)) walk(v, p);
+    }
+  };
+  for (const [name, obj] of Object.entries({ BALANCE, CITY, MAPGEN, RESEARCH, UNITS, BUILDINGS })) walk(obj, name);
+  for (const k of Object.keys(AI_DATA)) if (!new RegExp(`\\b${k}\\b`).test(src)) dead.push(`ai.${k}`);
+  assert.deepEqual(dead.filter((p) => !UNUSED.includes(p)), [], 'Schlüssel, die kein Code liest: löschen oder lesen');
+  assert.deepEqual(UNUSED.filter((p) => !dead.includes(p)), [], 'wird jetzt gelesen oder ist gelöscht: aus UNUSED streichen');
 });

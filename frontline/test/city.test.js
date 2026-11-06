@@ -11,6 +11,7 @@ import { transportOf, transportInfo } from '../js/game/transport.js';
 import { snapshotGame, restoreGame } from '../js/game/savegame.js';
 import { RELIEF } from '../js/game/relief.js';
 import { bridgeUnder } from '../js/game/river.js';
+import { withValue } from './util.js';
 
 const run = (g, s) => { for (let t = 0; t < s * 20; t++) g.update(0.05); };
 // Ursprung (c, r) eines w × h großen, ganz bebaubaren Rechtecks im Gebiet des Teams, nahe der Hauptstadt
@@ -1114,11 +1115,9 @@ test('connectRoad (AP4): Förderanlage an das Lager anschließen, Baumaterial je
   const row = (i - col) / c.cols;
   assert.ok(g.issue(0, { type: 'city', kind: 'mine', c0: col, r0: row, c1: col, r1: row }).ok);
   const bm0 = m.store.bm;
-  CITY.transport.connectMax = 0;
-  assert.equal(connectRoad(g, c, i, true), -1, 'ohne erlaubte Länge kein Weg');
-  CITY.transport.connectMax = 30;
+  withValue(CITY.transport, 'connectMax', 0, () => assert.equal(connectRoad(g, c, i, true), -1, 'ohne erlaubte Länge kein Weg'));
   const n = connectRoad(g, c, i, true);
-  assert.ok(n > 0 && n <= 30, `gelegte Zellen ${n}`);
+  assert.ok(n > 0 && n <= CITY.transport.connectMax, `gelegte Zellen ${n}`);
   assert.equal(m.store.bm, bm0 - n * CITY.costBm.road, 'jede Straßenzelle kostet Baumaterial');
   assert.ok(accessCells(c, i).some((j) => roadAt(c, j)), 'Förderanlage hat jetzt eine Straße');
   assert.equal(connectRoad(g, c, i, true), 0, 'schon verbunden: nichts mehr');
