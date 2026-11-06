@@ -251,3 +251,39 @@ treffen Hubschrauber und Jets (ohne `jet`-Schaden gilt `air`).
   nach `AIR_MEMORY` ohne Sicht → keine Luftabwehr; Leicht → keine; Scharfschützen erst ab den Schwellen; eine KI mit Geld und
   gesehenen Hubschraubern gibt tatsächlich einen `train`-Befehl für Flak oder Gepard. `test/ai.test.js`, `test/aiart.test.js`,
   `test/golden.test.js` laufen lassen; Golden darf sich ändern (gewollte Regeländerung, im Bericht nennen).
+
+## A7 – Bauen nur im eigenen, sicheren Gebiet (v5.78, von Daniel bestätigt am 2026-11-06)
+
+Heute (seit v4.87) lassen sich Stadtzellen überall bauen, wo nichts im Weg steht (`canZone` in `js/game/city/cells.js`). Das Gebiet
+(`c.claim`, `updateClaim` in `js/game/city/state.js`, Radien `CITY.territory`) wird weiter berechnet, nutzt aber nur die KI.
+
+### Regel (Werte als neuer Abschnitt `CITY.build` in `js/data/city.js`, deutsch kommentiert)
+1. **Gebiet:** Stadtgebäude (alles außer Straße) nur auf Zellen im eigenen Gebiet (`c.claim[i]`). Großbauten: alle Zellen des Fußabdrucks.
+   Straßen dürfen auch außerhalb liegen (Anschlussstraßen zu FOBs und Vorkommen), aber Regel 2 gilt für sie.
+   Gebietsradien anpassen: `CITY.territory.fob` von 4 auf 6 Zellen (sonst passt an einer FOB kaum ein Werk mit Straße).
+2. **Sicher:** Keine Stadtzelle (auch keine Straße) auf einer Zelle, die das Team noch nie aufgedeckt hat (`game.fog[team].explored`),
+   und keine im Umkreis `CITY.build.enemyR` (500 px) um eine **sichtbare** gegnerische Einheit (keine Flugzeuge/Hubschrauber in der Luft)
+   oder ein gegnerisches Gebäude/Stadtgebäude, und keine in der Konfliktzone (`game.zone`, Schalter `CITY.build.noZone: true`).
+- Prüfung in einer Funktion `buildAllowed(game, c, i, kind)` (neben `canZone` in `cells.js`), benutzt von `cmdCity` (Befehl `city`, also Spieler
+  **und** KI) mit eigenen Fehlertexten in `failReason`: „Nur im eigenen Gebiet bauen (Gebiet wächst mit FOBs und Gebäuden)“, „Unerkundetes
+  Gelände: erst aufklären“, „Zu nah am Feind“, „Nicht in der Konfliktzone“. `canZone` selbst bleibt (Startviertel beim Spielstart nicht betroffen).
+- Abreißen/Räumen (`erase`) ist nicht betroffen. Fliegerhorst-Bausteine, Markt usw. folgen derselben Regel.
+- Schalter: Spieloption `buildRules` (Rezept „Neue Option im Startmenü“, Regel 9: im Menü Standard **an** unter dem Namen „Baugebiet“, in
+  `new Game()` ohne Angabe **aus**, damit die bestehenden Tests unverändert gelten). Wirkt nur mit Stadt.
+
+### Anzeige
+- Baumodus der Stadt (`js/render/citylayer.js`, dort wo heute unbebaubare Zellen dunkel getönt werden, Zeile mit `canZone`): mit Regel zusätzlich
+  Zellen außerhalb des Gebiets bzw. nicht erlaubte Zellen abdunkeln und die Gebietsgrenze als dünne Linie in Teamfarbe zeichnen. Nur lesen.
+- Hilfe (F1, `js/ui/helptext.js`, Taste Y) und Tipp im Baumodus nennen die Regel.
+
+### KI (`js/ai/cityai.js`, `js/game/city/roadnet.js`)
+- Kandidaten-Suchen der Stadt-KI filtern mit `buildAllowed`, damit sie keine Befehle verschwendet (Stellen: `canZone`-Aufrufe in cityai.js und
+  roadnet.js). Vorkommen außerhalb des Gebiets nutzt sie erst, wenn eine FOB dort Gebiet schafft (sie prüft heute schon `c.claim`).
+- Mit Regel an muss die KI weiter Stahl und Munition erzeugen: Test wie `test/cityprod.test.js` mit `buildRules: true`.
+
+### Doku und Test
+- PRD §15 („Überall bauen (seit v4.87)“ ersetzen durch die neue Regel, mit Schalter), §9 Startmenü, Änderungsverlauf v5.78, `CACHE_VERSION`
+  `frontline-v191`, `npm run docs`, Feature-Landkarte in `CLAUDE.md`, „Wo ändere ich was?“ (`CITY.build`).
+- Test `test/buildrules.test.js`: ohne Schalter überall wie heute; mit Schalter: außerhalb des Gebiets kein Gebäude, aber Straße; unerkundet nein;
+  nahe sichtbarer Feindeinheit nein, nach deren Abzug ja; Konfliktzone nein; Großbau mit einer Zelle außerhalb nein; FOB-Gebiet 6 Zellen;
+  Fehlertexte; KI mit Regel erzeugt Stahl und Munition (Seeds 3 und 11, 12 min wie cityprod). Golden: ohne Schalter unverändert.
