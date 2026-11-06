@@ -7,6 +7,7 @@
 // Heu- und Strohballen sind eigene 3D-Körper (props.js), ihre Lage liefert fieldBales. Pfade je Feld in der Kachel seiner Mitte,
 // gebaut zusammen mit den Feldwegen (bei anderer Drehung oder anderem Gelände), je Bild nur die sichtbaren Kacheln gefüllt.
 // Nur Darstellung, keine Spielregel.
+import { hashXY } from './color.js';
 
 const CHUNK = 1024; // Kachel der Pfade (Weltpixel), wie ways.js
 const STEP = 24; // Abtastung entlang (Gelände)
@@ -127,7 +128,7 @@ function rng32(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-const seedOf = (f) => (Math.imul(Math.round(f.x) | 0, 73856093) ^ Math.imul(Math.round(f.y) | 0, 19349663) ^ 0x5bd1e995) >>> 0;
+const seedOf = (f) => (hashXY(f.x, f.y) ^ 0x5bd1e995) >>> 0;
 
 /**
  * Rahmen eines Felds: a läuft entlang der Reihen (lange Seite, Länge len), b quer dazu (Breite span), W(a, b) ist der Weltpunkt.

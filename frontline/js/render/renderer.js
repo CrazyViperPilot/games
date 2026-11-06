@@ -20,7 +20,9 @@ import {
   drawAnimalSide,
   drawStar,
 } from './sprites.js';
-import { builderState } from '../ui/status.js';
+import { builderState } from '../game/construction.js';
+import { GOOD_COLOR } from '../data/goods.js';
+import { hashXY } from './color.js';
 import { makeRng } from '../core/rng.js';
 import {
   setIsoGround,
@@ -66,13 +68,14 @@ const BG_RGB = [13, 17, 13];
 const ACCENT = '#c9a227';
 const GOLD_RALLY = '#ffd65a'; // Ring am Sammelpunkt
 const ROUTE_COLOR = 'rgba(222,182,52,0.95)'; // Route gewählter LKW
-const CARGO_COLOR = { bm: '#a0703f', mun: '#d9b600', fuel: '#9b7bc4' }; // LKW-Ladung je Sorte
+const CARGO_COLOR = GOOD_COLOR; // LKW-Ladung je Sorte in der Farbe ihrer Ware (js/data/goods.js, seit v5.64)
 const AMMO_COLOR = '#7f93ad'; // Munitionsbalken (grau-blau)
-const FUEL_COLOR = '#9b7bc4'; // Treibstoffbalken (violett)
+const FUEL_COLOR = GOOD_COLOR.fuel; // Treibstoffbalken (violett, Farbe der Ware)
 const BAR_W = 24; // Balkenbreite über Einheiten (Welt-px)
 const HP_OFFSET = 14; // Abstand Lebensbalken-Oberkante zum Einheitenrand (Bildschirm-px); darunter Vorrat
 const STAR_UP = 8; // Stern des Kommandeurs: so weit über dem Lebensbalken (Bildschirm-px)
 const STAR_R = 8; // Radius des Sterns (Bildschirm-px)
+const ISO_PAD = 260; // Iso: Rand um den Ausschnitt, hohe Objekte ragen nach oben ins Bild (Welt-px)
 const ISO_STAR_UP = 0; // Iso: zusätzlich angehoben (Welt-px), über dem Kopf der Figur
 const MARKER_LIFE = 0.8; // s, Lebensdauer des Wegziel-Markers
 const SLOT_LIFE = 1.6; // s, so lange zeigen Punkte die Formationsplätze
@@ -253,40 +256,79 @@ export class Renderer {
     if (this.canvas.clientWidth && (this.canvas.clientWidth !== this.cssW || this.canvas.clientHeight !== this.cssH)) {
       this.resize();
     }
-    const ctx = this.ctx;
-    const g = this.game;
-    const cam = this.camera;
-    const team = this.team;
-    const dpr = this.dpr;
-    const z = cam.zoom;
-    const reveal = this.revealAll;
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-    const sel = v.selection instanceof Set ? v.selection : new Set(v.selection || []);
-    const hover = v.hoverId ? g.getEntity(v.hoverId) : null;
-
+    const g = this.game;
     this.syncRelief();
-    beginTownFrame(dpr); // Stadtgebäude: Maßstab der Bilder, Zeitbudget fürs Nachmalen (townhouses.js, spritecache.js)
+    beginTownFrame(this.dpr); // Stadtgebäude: Maßstab der Bilder, Zeitbudget fürs Nachmalen (townhouses.js, spritecache.js)
     setMapTown(g.map); // Kartenstadt: Felder für die Gehöfte (maptown.js)
     setMilWalls(g.buildings); // Mauern und Tore: Verbindungen zu den Nachbarn (milbuild.js)
     if (!this.deco) this.deco = this.buildDeco();
-    if (cam.iso) {
-      this.renderIso(v, now);
-      return;
-    }
-    const R = cam.visibleRect();
-    const inRect = (x, y, pad = 0) => x >= R.x0 - pad && x <= R.x1 + pad && y >= R.y0 - pad && y <= R.y1 + pad;
-    const seen = (x, y) => reveal || g.isVisible(team, x, y);
-    const known = (x, y) => reveal || g.isExplored(team, x, y);
-    const shown = (e) => e.team === team || reveal || (seen(e.x, e.y) && g.sees(team, e));
+    const f = this.frameOf(v, now);
+    if (this.camera.iso) this.renderIso(f);
+    else this.renderTop(f);
+  }
 
+  /**
+   * Gemeinsame Werte eines Bildes für alle Durchläufe (seit v5.64, Review-Paket P11): Ansicht v, Zeit, Kamera, Sichtregeln.
+   * inRect(x, y, pad): im sichtbaren Ausschnitt; seen/known: in Sicht bzw. erkundet; shown(e): Objekt für das eigene Team sichtbar.
+   */
+  frameOf(v, now) {
+    const g = this.game;
+    const cam = this.camera;
+    const team = this.team;
+    const reveal = this.revealAll;
+    const R = cam.visibleRect();
+    const seen = (x, y) => reveal || g.isVisible(team, x, y);
+    return {
+      v,
+      now,
+      ctx: this.ctx,
+      g,
+      cam,
+      team,
+      dpr: this.dpr,
+      z: cam.zoom,
+      reveal,
+      R,
+      sel: v.selection instanceof Set ? v.selection : new Set(v.selection || []),
+      hover: v.hoverId ? g.getEntity(v.hoverId) : null,
+      inRect: (x, y, pad = 0) => x >= R.x0 - pad && x <= R.x1 + pad && y >= R.y0 - pad && y <= R.y1 + pad,
+      seen,
+      known: (x, y) => reveal || g.isExplored(team, x, y),
+      shown: (e) => e.team === team || reveal || (seen(e.x, e.y) && g.sees(team, e)),
+    };
+  }
+
+  /** 2D: Welt-Transformation der Kamera (Weltkoordinaten → Canvas). */
+  worldTransform(f) {
+    const { ctx, cam, dpr, z } = f;
+    ctx.setTransform(dpr * z, 0, 0, dpr * z, (cam.viewW / 2 - cam.x * z) * dpr, (cam.viewH / 2 - cam.y * z) * dpr);
+  }
+
+  /** 2D-Ansicht von oben: Durchläufe Boden, Objekte, Effekte, Nebel und Wetter, Balken, Bildschirmanzeigen. */
+  renderTop(f) {
+    const { ctx, dpr } = f;
     // Bildschirm: Hintergrund; danach Welt-Transformation (Kamera)
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = BG;
     ctx.fillRect(0, 0, this.cssW, this.cssH);
-    ctx.setTransform(dpr * z, 0, 0, dpr * z, (cam.viewW / 2 - cam.x * z) * dpr, (cam.viewH / 2 - cam.y * z) * dpr);
+    this.worldTransform(f);
     ctx.imageSmoothingEnabled = true;
+    this.topGround(f);
+    this.topObjects(f);
+    this.topEffects(f);
+    this.topFog(f);
+    // Regen, Schnee und Nebel über der Welt (Bildschirmkoordinaten), danach wieder die Welt-Transformation
+    this.drawSky(f);
+    this.worldTransform(f);
+    this.topBars(f);
+    this.topScreen(f);
+  }
 
-    this.drawTerrain(ctx, R);
+  /** 2D, Boden: Gelände, Wege, Kartenstadt, Brücken, Krater, Stadt (Straßen, Dächer, Schilder), Natur, Zone und Hot Zone. */
+  topGround(f) {
+    const { ctx, g, team, z, now, inRect, known } = f;
+    this.drawTerrain(ctx, f.R);
     drawWays(this, ctx, this.season); // Feldwege und Gleise scharf über dem Geländebild (seit v5.31, ways.js)
     // Kartenstadt (seit v5.23 gemalt, nicht mehr im Geländebild): Parks, Gebäude, Bänke, Stadtbäume, Autos (maptown.js)
     setRoofSnow(this.season === 'winter');
@@ -304,7 +346,7 @@ export class Renderer {
     }
     for (const b of g.bridges ?? []) if (inRect(b.x, b.y, b.len / 2 + 40)) drawBridgeTop(ctx, b, this.season); // über dem Fluss, unter allem anderen
     for (const p of fordPosts(g.map, reliefOf(g.map))) if (inRect(p.x, p.y, 10)) drawFordPostTop(ctx, p); // Furtstangen
-    this.drawRuins(ctx, R, known);
+    this.drawRuins(ctx, f.R, known);
     this.drawScars(ctx, inRect, z);
     drawCityGround(this, ctx, team, known, inRect); // Stadt: Straßen und Grundstücke
     drawMapCars2D(ctx, g.map.town, inRect, z, this.season); // Autos der Karte auf den Straßen (seit v5.23 sichtbar, seit v5.43 gemalt)
@@ -313,7 +355,11 @@ export class Renderer {
     drawCityBadges(this, ctx, team, known, inRect, false); // Stadt: Schilder (Funktion, privat/kommerziell)
     this.drawZone(ctx, z);
     this.drawHot(ctx, z, now);
+  }
 
+  /** 2D, Objekte: Reichweiten und Routen, Gebäude, Kisten, Tiere, Auswahl, Sammelpunkte, Einheiten (Flieger zuletzt), Wegziel. */
+  topObjects(f) {
+    const { ctx, g, team, z, now, v, sel, hover, inRect, seen, known, shown } = f;
     if (v.placement) this.drawRadii(ctx, z);
     this.drawSelectedRadii(ctx, z, v);
     this.drawRoutes(ctx, sel, z);
@@ -334,43 +380,63 @@ export class Renderer {
     // Auswahl und Hover (unter den Einheiten); Besatzer eines Hauses: Rahmen ums Haus
     for (const e of this.ringed(sel)) if (shown(e)) this.drawSelectRing(ctx, e, '#f2f5f2', z, false);
     if (hover && !sel.has(hover.id) && shown(hover)) this.drawSelectRing(ctx, hover, 'rgba(255,255,255,0.5)', z, true);
-
-    // Sammelpunkte gewählter eigener Gebäude
-    for (const id of sel) {
-      const b = g.getEntity(id);
-      if (b && b.kind === 'building' && b.team === team) this.drawRally(ctx, b, z);
-    }
+    this.drawRallies(f);
 
     for (const air of [false, true]) {
       // Hubschrauber zuletzt: sie fliegen über allem
       if (air) drawCityRoofs(this, ctx, team, known, inRect); // Dächer der Stellplätze über den abgestellten Flugzeugen (seit v5.39)
       for (const u of g.units) {
         if (!u.alive || u.house || flying(u) !== air || !shown(u) || !inRect(u.x, u.y, 30)) continue; // Jets am Boden mit den Bodeneinheiten
-        let aim = null;
-        if (u.targetId && u.def.range > 0) {
-          const t = g.getEntity(u.targetId);
-          if (t) aim = Math.atan2(t.y - u.y, t.x - u.x);
-        }
+        const aim = this.aimOf(u);
         if (!drawUnitTop(ctx, u, z, aim, now)) drawUnit(ctx, u, g.teams[u.team].color, z, aim, now); // gemalt (seit v5.27), sonst einfache Form
         if (u.crate && !drawCratePainted(ctx, u.x + 4, u.y - 6, 10, z)) drawCrateTop(ctx, u.x + 4, u.y - 6, 10, z); // Kiste auf dem Rücken
       }
     }
 
     this.drawMoveMarker(ctx, v.moveMarker, now, z);
+  }
 
-    for (const p of g.projectiles) {
-      if (!p.alive || !shown(p)) continue;
-      if (!inRect(p.x, p.y, 80) && !inRect(p.tx, p.ty, 80)) continue;
-      drawShell(ctx, p, z);
+  /** Sammelpunkte gewählter eigener Gebäude. */
+  drawRallies(f) {
+    for (const id of f.sel) {
+      const b = f.g.getEntity(id);
+      if (b && b.kind === 'building' && b.team === f.team) this.drawRally(f.ctx, b, f.z);
     }
+  }
 
+  /** Blickrichtung einer Einheit zu ihrem Ziel (Bogenmaß) oder null. */
+  aimOf(u) {
+    if (!u.targetId || !(u.def.range > 0)) return null;
+    const t = this.game.getEntity(u.targetId);
+    return t ? Math.atan2(t.y - u.y, t.x - u.x) : null;
+  }
+
+  /** Effekte, die das eigene Team sieht (im Ausschnitt, eigene oder in Sicht). */
+  *visibleEffects(f) {
+    const { g, team, inRect, seen } = f;
     for (const e of g.effects) {
       if (!inRect(e.x, e.y, 120) && !inRect(e.x2 ?? e.x, e.y2 ?? e.y, 120)) continue;
       if (e.team !== -1 && e.team !== team && !seen(e.x, e.y) && !seen(e.x2 ?? e.x, e.y2 ?? e.y)) continue;
-      drawEffect(ctx, e, z);
+      yield e;
     }
+  }
+
+  /** Granaten, die das eigene Team sieht (Flug oder Ziel im Ausschnitt). */
+  *visibleShells(f) {
+    for (const p of f.g.projectiles) {
+      if (!p.alive || !f.shown(p)) continue;
+      if (!f.inRect(p.x, p.y, 80) && !f.inRect(p.tx, p.ty, 80)) continue;
+      yield p;
+    }
+  }
+
+  /** 2D, Effekte: Granaten, Einschläge und Mündungsfeuer, Rauch, Feuer, Nebelwände, Minen. */
+  topEffects(f) {
+    const { ctx, z, now } = f;
+    for (const p of this.visibleShells(f)) drawShell(ctx, p, z);
+    for (const e of this.visibleEffects(f)) drawEffect(ctx, e, z);
     const t = now / 1000;
-    for (const q of this.smokeSources(seen, shown, inRect, 120)) {
+    for (const q of this.smokeSources(f.seen, f.shown, f.inRect, 120)) {
       if (q.mine) {
         drawMine(ctx, q.x, q.y, 1);
         continue;
@@ -382,28 +448,42 @@ export class Renderer {
       if (q.fire) drawFire(ctx, q.x, q.y, q.s * 0.7, t, q.seed);
       drawSmoke(ctx, q.x, q.y, q.s, q.k, t, q.seed);
     }
+  }
 
-    if (!reveal) {
-      if (cam.relief && this.ground) {
-        // mit WebGL dieselben Wolken und glatten Ränder wie isometrisch, flach von oben (seit v5.49)
-        const img = this.ground.renderFog(cam, this.cssW, this.cssH, dpr, cam.relief, this.fogData(g.fog[team]), now / 1000, true);
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.drawImage(img, 0, 0);
-      } else {
-        updateFogLayer(this.fogLayer, g.fog[team], false);
-        ctx.drawImage(this.fogLayer.canvas, 0, 0, this.fogLayer.canvas.width, this.fogLayer.canvas.height, 0, 0, W, H);
-      }
+  /** 2D, Nebel des Krieges (nicht im Debug „alles zeigen“). */
+  topFog(f) {
+    const { ctx, g, cam, team, dpr, now } = f;
+    if (f.reveal) return;
+    if (cam.relief && this.ground) {
+      // mit WebGL dieselben Wolken und glatten Ränder wie isometrisch, flach von oben (seit v5.49)
+      const img = this.ground.renderFog(cam, this.cssW, this.cssH, dpr, cam.relief, this.fogData(g.fog[team]), now / 1000, true);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(img, 0, 0);
+    } else {
+      updateFogLayer(this.fogLayer, g.fog[team], false);
+      ctx.drawImage(this.fogLayer.canvas, 0, 0, this.fogLayer.canvas.width, this.fogLayer.canvas.height, 0, 0, W, H);
     }
-    // Regen, Schnee und Nebel über der Welt (Bildschirmkoordinaten), danach wieder die Welt-Transformation
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawWeather(ctx, g.weather, this.cssW, this.cssH, now, cam);
-    drawMood(ctx, this.mood, this.cssW, this.cssH); // Lichtstimmung (mood.js)
-    ctx.setTransform(dpr * z, 0, 0, dpr * z, (cam.viewW / 2 - cam.x * z) * dpr, (cam.viewH / 2 - cam.y * z) * dpr);
+  }
 
-    // Lebensbalken: bei Auswahl, Hover oder Schaden
+  /** Regen, Schnee und Nebel, dann die Lichtstimmung über der Welt (Bildschirmkoordinaten, beide Ansichten). */
+  drawSky(f) {
+    const { ctx, dpr } = f;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawWeather(ctx, f.g.weather, this.cssW, this.cssH, f.now, f.cam);
+    drawMood(ctx, this.mood, this.cssW, this.cssH); // Lichtstimmung (mood.js)
+  }
+
+  /** Lebensbalken bei Auswahl, Hover oder Schaden. */
+  barShown(f, e) {
+    return f.sel.has(e.id) || f.hover === e || e.hp < e.maxHp;
+  }
+
+  /** 2D, Balken: Lebensbalken, Heilkreuz, Kommandeursstern, Vorrat und Warnzeichen, Platzierung. */
+  topBars(f) {
+    const { ctx, g, team, z, sel, hover, inRect, shown } = f;
     for (const u of g.units) {
       if (!u.alive || u.house || !shown(u) || !inRect(u.x, u.y, 30)) continue;
-      if (!(sel.has(u.id) || hover === u || u.hp < u.maxHp)) continue;
+      if (!this.barShown(f, u)) continue;
       const bw = 24;
       this.drawHp(ctx, u.x - bw / 2, u.y - u.def.radius - HP_OFFSET / z, bw, u.hp / u.maxHp, z);
       if (g.time - (u.caredAt ?? -9) < 0.5) this.drawCare(ctx, u.x - bw / 2, u.y - u.def.radius - HP_OFFSET / z, z);
@@ -413,7 +493,7 @@ export class Renderer {
     }
     for (const b of g.buildings) {
       if (!b.alive || b.team !== team || !inRect(b.x, b.y, 40)) continue;
-      if (!(sel.has(b.id) || hover === b || b.hp < b.maxHp)) continue;
+      if (!this.barShown(f, b)) continue;
       const bw = b.w * TILE * 0.8;
       this.drawHp(ctx, b.x - bw / 2, b.cy * TILE - 8 / z, bw, b.hp / b.maxHp, z);
     }
@@ -424,9 +504,12 @@ export class Renderer {
       this.drawSupply(ctx, u, sel.has(u.id) || hover === u, z);
     }
 
-    if (v.placement) this.drawPlacement(ctx, v.placement, z);
+    if (f.v.placement) this.drawPlacement(ctx, f.v.placement, z);
+  }
 
-    // Bildschirmkoordinaten: Brückenbalken, Besatzung der Häuser, Auswahlrahmen, Hinweistext zur Platzierung
+  /** 2D, Bildschirmkoordinaten: Brückenbalken, Besatzung der Häuser, dann Auswahlrahmen und Hinweis (drawScreenNotes). */
+  topScreen(f) {
+    const { ctx, g, cam, team, dpr, inRect } = f;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     for (const b of g.bridges ?? []) {
       if (!bridgeBar(b) || !inRect(b.x, b.y, 60)) continue;
@@ -434,13 +517,19 @@ export class Renderer {
       drawBridgeBar(ctx, p.x, p.y - 34, b);
     }
     for (const h of g.garrisoned ?? []) {
-      if (!inRect(h.x, h.y, 200) || !(h.team === team || reveal || g.sees(team, h))) continue;
+      if (!inRect(h.x, h.y, 200) || !(h.team === team || f.reveal || g.sees(team, h))) continue;
       const p = cam.worldToScreen(h.x, h.y - h.ph / 2);
       this.drawGarrison(ctx, p.x, p.y - 12, h);
     }
+    this.drawScreenNotes(f);
+  }
+
+  /** Bildschirmkoordinaten (beide Ansichten): Auswahlrahmen und Hinweistext zur Platzierung. */
+  drawScreenNotes(f) {
+    const { ctx, v } = f;
     if (v.dragBox) this.drawDragBox(ctx, v.dragBox);
     if (v.placement && !v.placement.ok && v.placement.reason && Number.isFinite(v.placement.x)) {
-      this.drawNote(ctx, cam.worldToScreen(v.placement.x, v.placement.y), v.placement.reason);
+      this.drawNote(ctx, f.cam.worldToScreen(v.placement.x, v.placement.y), v.placement.reason);
     }
   }
 
@@ -614,7 +703,7 @@ export class Renderer {
     }
     // Einzelne Büsche neben verstreuten Bäumen (fest nach Lage des Baums)
     for (const t of this.game.map.trees ?? []) {
-      const h = (Math.imul(Math.round(t.x), 73856093) ^ Math.imul(Math.round(t.y), 19349663)) >>> 0;
+      const h = hashXY(t.x, t.y);
       if (h % 100 >= 30) continue;
       const a = ((h >>> 7) % 628) / 100;
       bushes.push({ x: t.x + Math.cos(a) * t.r * 1.5, y: t.y + Math.sin(a) * t.r * 1.5, r: 8 + ((h >>> 12) % 40) / 10 });
@@ -624,7 +713,7 @@ export class Renderer {
       // Geröll auf steilen Hängen und Gipfeln (nur Optik, dort ist es ohnehin unpassierbar), fest nach Lage
       for (let y = 24; y < H; y += 48) {
         for (let x = 24; x < W; x += 48) {
-          const h = (Math.imul(x, 73856093) ^ Math.imul(y, 19349663)) >>> 0;
+          const h = hashXY(x, y);
           if (h % 100 >= 12) continue;
           const px = x + ((h >>> 8) % 40) - 20;
           const py = y + ((h >>> 16) % 40) - 20;
@@ -642,26 +731,30 @@ export class Renderer {
   /**
    * Isometrische Ansicht: Boden schräg (mit Gelände als WebGL-Netz, sonst flaches Bild), Gebäude/Bäume/Einheiten mit Höhe,
    * nach Tiefe sortiert und auf ihrer Geländehöhe; der Nebel liegt zuletzt über allem (mit Gelände ebenfalls aus WebGL).
+   * Durchläufe (seit v5.64, Review-Paket P11): Boden, Bodenmarken, Objekte nach Tiefe, Flieger, Effekte, Nebel und Wetter, Balken,
+   * Bildschirmanzeigen.
    */
-  renderIso(v, now) {
-    const ctx = this.ctx;
-    const g = this.game;
-    const cam = this.camera;
-    const team = this.team;
-    const dpr = this.dpr;
-    const z = cam.zoom;
-    const reveal = this.revealAll;
-    const sel = v.selection instanceof Set ? v.selection : new Set(v.selection || []);
-    const hover = v.hoverId ? g.getEntity(v.hoverId) : null;
-    const R = cam.visibleRect();
-    const PAD = 260; // hohe Objekte ragen nach oben ins Bild
-    const inRect = (x, y, pad = 0) => x >= R.x0 - pad && x <= R.x1 + pad && y >= R.y0 - pad && y <= R.y1 + pad;
-    const seen = (x, y) => reveal || g.isVisible(team, x, y);
-    const known = (x, y) => reveal || g.isExplored(team, x, y);
-    const shown = (e) => e.team === team || reveal || (seen(e.x, e.y) && g.sees(team, e));
-    const relief = cam.relief; // gesetzt nur mit WebGL-Boden
-    if (!this.deco) this.deco = this.buildDeco();
+  renderIso(f) {
+    const { ctx, cam, dpr } = f;
+    f.relief = cam.relief; // gesetzt nur mit WebGL-Boden
+    this.isoGround(f);
+    this.isoMarks(f);
+    const { items, air } = this.isoItems(f);
+    this.isoShadows(f, items);
+    this.isoObjects(f, items);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawCityBadges(this, ctx, f.team, f.known, f.inRect, true); // Stadt: Schilder über den Dächern (über allen Gebäuden)
+    for (const u of air) this.drawUnitIsoAt(f, u);
+    this.isoEffects(f);
+    this.isoFog(f);
+    this.drawSky(f);
+    this.isoBars(f);
+    this.isoScreen(f);
+  }
 
+  /** Iso, Boden: Gelände (WebGL oder flaches Bild), Parks, Wege, Krater, Brücken, Stadtstraßen, Zone und Hot Zone. */
+  isoGround(f) {
+    const { ctx, g, cam, dpr, z, now, R, relief, inRect } = f;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = true;
     if (relief) {
@@ -703,12 +796,17 @@ export class Renderer {
       else setIsoGround(ctx, cam, dpr);
       drawCrater(ctx, c, scarAlpha(c, g.time, SC.craterLife, SC.craterFade));
     }
-    for (const b of g.bridges ?? []) if (inRect(b.x, b.y, b.len / 2 + PAD)) drawBridgeIso(ctx, cam, dpr, b, this.season); // Einheiten fahren darüber
+    for (const b of g.bridges ?? []) if (inRect(b.x, b.y, b.len / 2 + ISO_PAD)) drawBridgeIso(ctx, cam, dpr, b, this.season); // Einheiten fahren darüber
     setIsoGround(ctx, cam, dpr);
-    drawCityGround(this, ctx, team, known, inRect); // Stadt: Straßen und Grundstücke
+    drawCityGround(this, ctx, f.team, f.known, inRect); // Stadt: Straßen und Grundstücke
     setIsoGround(ctx, cam, dpr);
     this.drawZone(ctx, z);
     this.drawHot(ctx, z, now);
+  }
+
+  /** Iso, Bodenmarken: Reichweiten, Routen, Auswahl- und Hover-Ringe, Sammelpunkte. */
+  isoMarks(f) {
+    const { ctx, cam, dpr, z, v, sel, hover, relief, shown } = f;
     setIsoGround(ctx, cam, dpr);
     if (v.placement) this.drawRadii(ctx, z);
     this.drawSelectedRadii(ctx, z, v);
@@ -723,12 +821,17 @@ export class Renderer {
       if (relief) this.groundAt(ctx, hover.x, hover.y);
       this.drawSelectRing(ctx, hover, 'rgba(255,255,255,0.5)', z, true);
     }
-    for (const id of sel) {
-      const b = g.getEntity(id);
-      if (b && b.kind === 'building' && b.team === team) this.drawRally(ctx, b, z);
-    }
+    this.drawRallies(f);
+  }
 
-    // Objekte mit Höhe, nach Tiefe (x + y) sortiert
+  /**
+   * Iso: Objekte mit Höhe, nach Tiefe (x + y) sortiert → { items: [{ k, t, o }], air: fliegende Einheiten (zuletzt) }.
+   * t: 0 Stadtgebäude, 1 Baum, 2 Fels, 4 Militärgebäude, 5 Einheit, 6 Auto, 7 Bank, 8 Kiste, 9/10 Wrack (Fahrzeug/Gebäude),
+   * 11 Tier, 12 Furtstange, 13 Busch, 14 Ballen.
+   */
+  isoItems(f) {
+    const { g, cam, team, z, relief, inRect, seen, known, shown } = f;
+    const PAD = ISO_PAD;
     const items = [];
     const town = g.map.town;
     for (const b of town?.buildings ?? []) if (inRect(b.x, b.y, PAD)) items.push({ k: cam.depth(b.x, b.y), t: 0, o: b });
@@ -751,9 +854,9 @@ export class Renderer {
       for (const b of d.benches) items.push({ k: cam.depth(b.x, b.y), t: 7, o: b });
     }
     // Heu- und Strohballen auf Weiden und Stoppelfeldern (seit v5.44, fields.js / props.js)
-    for (const f of town?.fields ?? []) {
-      if (!inRect(f.x, f.y, Math.max(f.w, f.h) / 2 + 20)) continue;
-      for (const b of fieldBales(f)) {
+    for (const fl of town?.fields ?? []) {
+      if (!inRect(fl.x, fl.y, Math.max(fl.w, fl.h) / 2 + 20)) continue;
+      for (const b of fieldBales(fl)) {
         if ((!b.only || b.only === this.season) && inRect(b.x, b.y, 30) && !gone(b.x, b.y)) items.push({ k: cam.depth(b.x, b.y), t: 14, o: b });
       }
     }
@@ -770,8 +873,6 @@ export class Renderer {
     }
     for (const a of g.animals ?? []) if (inRect(a.x, a.y, 40) && seen(a.x, a.y)) items.push({ k: cam.depth(a.x, a.y), t: 11, o: a });
     for (const p of fordPosts(g.map, relief)) if (inRect(p.x, p.y, 30)) items.push({ k: cam.depth(p.x, p.y), t: 12, o: p });
-    const [ia, , ic] = cam.isoMatrix(1); // Blickrichtung der Tiere im Bild
-    const glow = 0.6 + 0.4 * Math.sin(now / 350);
     const air = [];
     for (const u of g.units) {
       if (!u.alive || u.house || !shown(u) || !inRect(u.x, u.y, PAD)) continue;
@@ -779,35 +880,12 @@ export class Renderer {
       else items.push({ k: cam.depth(u.x, u.y), t: 5, o: u });
     }
     items.sort((a, b) => a.k - b.k);
+    return { items, air };
+  }
 
-    const drawU = (u) => {
-      const p = cam.worldToScreen(u.x, u.y);
-      const lift = unitLift(u);
-      const sc = 1.35;
-      // Schatten am Boden: Umriss des Modells (seit v5.27, unitpaint.js), sonst Ellipse
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      if (!drawUnitShadowIso(ctx, cam, u, p, dpr, now)) {
-        ctx.fillStyle = 'rgba(0,0,0,0.28)';
-        ctx.beginPath();
-        ctx.ellipse(p.x, p.y + 1, u.def.radius * z * (u.def.air ? 1.5 : 1.2), u.def.radius * z * (u.def.air ? 0.7 : 0.5), 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      let aim0 = null;
-      if (u.targetId && u.def.range > 0) {
-        const t0 = g.getEntity(u.targetId);
-        if (t0) aim0 = Math.atan2(t0.y - u.y, t0.x - u.x);
-      }
-      if (drawUnitSprite(ctx, cam, u, { x: p.x, y: p.y }, aim0, lift, now)) return;
-      setIsoAt(ctx, cam, dpr, p.x, p.y - lift * z, u.x, u.y, sc);
-      let aim = null;
-      if (u.targetId && u.def.range > 0) {
-        const t = g.getEntity(u.targetId);
-        if (t) aim = Math.atan2(t.y - u.y, t.x - u.x);
-      }
-      drawUnit(ctx, u, g.teams[u.team].color, z * sc, aim, now, true);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    };
-
+  /** Iso, Schatten am Boden vor allen Objekten: Bäume, Büsche und Felsen in einem Zug, dann Autos, Bänke und Ballen. */
+  isoShadows(f, items) {
+    const { ctx, cam, dpr, relief } = f;
     // Schatten der Bäume, Büsche und Felsen in einem Zug auf den Boden (seit v5.28): fallen nie über andere Dinge
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.beginPath();
@@ -828,40 +906,17 @@ export class Renderer {
       else drawBaleShadowIso(ctx, cam, it.o, dpr);
       cam.unpin();
     }
+  }
+
+  /** Iso: die Objekte nach Tiefe, jedes eben auf seiner Geländehöhe (Gebäude auf der tiefsten Ecke, damit nichts schwebt). */
+  isoObjects(f, items) {
+    const { ctx, g, cam, team, dpr, z, now, relief } = f;
+    const [ia, , ic] = cam.isoMatrix(1); // Blickrichtung der Tiere im Bild
+    const glow = 0.6 + 0.4 * Math.sin(now / 350);
     for (const it of items) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      // Jedes Objekt steht eben auf seiner Geländehöhe (Gebäude auf der tiefsten Ecke, damit nichts schwebt)
       if (relief) cam.pin(this.baseHeight(it));
-      if (it.t === 0) {
-        const hs = g.houseBySrc?.get(it.o);
-        if (hs && hs.ruined && known(hs.x, hs.y)) drawRubble(ctx, cam, it.o);
-        else {
-          setRoofSnow(this.season === 'winter'); // Winter: Schnee auf den Dächern der Stadt
-          const fort = hs && this.fortShown(hs, known) ? hs : null; // besetztes oder ausgebautes Haus (seit v5.48, stronghold.js)
-          if (fort) drawHouseWorksIso(ctx, cam, fort, 'back'); // Draht hinter dem Haus
-          if (it.o.part?.t !== 'tree' || !drawTreeIso(ctx, cam, it.o.part, this.season)) drawTownBuilding(ctx, cam, it.o, this.season); // Bäume der Großbauten gemalt (nature.js)
-          if (fort) {
-            drawHouseWorksIso(ctx, cam, fort, 'front'); // Sandsäcke, MG-Nest, Draht davor
-            if (fort.occupants.length && fort.team >= 0) drawHouseFlagIso(ctx, cam, fort, g.teams[fort.team]?.color ?? '#888', now / 1000);
-          }
-          setRoofSnow(false);
-          if (it.o.damage > 0.25) {
-            // beschädigtes Stadtgebäude (Stadt-Teil): Rauch über dem Dach
-            const p = cam.worldToScreen(it.o.x, it.o.y);
-            const k = cam.zoom;
-            const up = it.o.kind === 'town' ? townLift(it.o.ck, it.o.level, it.o.dep) - 52 : 0; // 1 × 1: Rauch ab dem Dach (seit v5.14)
-            ctx.save();
-            ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-            ctx.fillStyle = `rgba(40,36,34,${Math.min(0.75, it.o.damage).toFixed(2)})`;
-            for (const [dx, dy, r] of [[0, -46, 10], [6, -60, 13], [-4, -76, 16]]) {
-              ctx.beginPath();
-              ctx.arc(p.x + dx * k, p.y + (dy - up) * k, r * k, 0, Math.PI * 2);
-              ctx.fill();
-            }
-            ctx.restore();
-          }
-        }
-      }
+      if (it.t === 0) this.drawTownItemIso(f, it.o);
       else if (it.t === 1) {
         if (!drawTreeIso(ctx, cam, it.o, this.season)) drawTree(ctx, cam, it.o, this.season); // gemalt (nature.js), sonst Ersatz
       }
@@ -897,7 +952,7 @@ export class Renderer {
           this.drawSiteMarks(ctx, b, z);
         }
       } else {
-        drawU(it.o);
+        this.drawUnitIsoAt(f, it.o);
         if (it.o.crate) {
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
           if (!drawCrateIso(ctx, cam, it.o.x, it.o.y, 10, unitLift(it.o) + 14)) drawCrate(ctx, cam, it.o.x, it.o.y, 10, unitLift(it.o) + 14); // Kiste auf dem Rücken
@@ -905,26 +960,79 @@ export class Renderer {
       }
       cam.unpin();
     }
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawCityBadges(this, ctx, team, known, inRect, true); // Stadt: Schilder über den Dächern (über allen Gebäuden)
-    for (const u of air) drawU(u);
+  }
 
-    // Effekte (seit v5.34, fx.js): Zielringe, Lichtschein und Druckringe in der Bodenebene, danach aufrecht Granaten im Bogen,
-    // Feuerbälle, Leuchtspuren und Mündungsfeuer
+  /** Iso: Gebäude der Stadt bzw. Kartenstadt (Ruine als Schutt, ausgebautes Haus mit Sandsäcken und Fahne, Rauch bei Schaden). */
+  drawTownItemIso(f, o) {
+    const { ctx, g, cam, known } = f;
+    const hs = g.houseBySrc?.get(o);
+    if (hs && hs.ruined && known(hs.x, hs.y)) {
+      drawRubble(ctx, cam, o);
+      return;
+    }
+    setRoofSnow(this.season === 'winter'); // Winter: Schnee auf den Dächern der Stadt
+    const fort = hs && this.fortShown(hs, known) ? hs : null; // besetztes oder ausgebautes Haus (seit v5.48, stronghold.js)
+    if (fort) drawHouseWorksIso(ctx, cam, fort, 'back'); // Draht hinter dem Haus
+    if (o.part?.t !== 'tree' || !drawTreeIso(ctx, cam, o.part, this.season)) drawTownBuilding(ctx, cam, o, this.season); // Bäume der Großbauten gemalt (nature.js)
+    if (fort) {
+      drawHouseWorksIso(ctx, cam, fort, 'front'); // Sandsäcke, MG-Nest, Draht davor
+      if (fort.occupants.length && fort.team >= 0) drawHouseFlagIso(ctx, cam, fort, g.teams[fort.team]?.color ?? '#888', f.now / 1000);
+    }
+    setRoofSnow(false);
+    if (o.damage > 0.25) {
+      // beschädigtes Stadtgebäude (Stadt-Teil): Rauch über dem Dach
+      const p = cam.worldToScreen(o.x, o.y);
+      const k = cam.zoom;
+      const up = o.kind === 'town' ? townLift(o.ck, o.level, o.dep) - 52 : 0; // 1 × 1: Rauch ab dem Dach (seit v5.14)
+      ctx.save();
+      ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      ctx.fillStyle = `rgba(40,36,34,${Math.min(0.75, o.damage).toFixed(2)})`;
+      for (const [dx, dy, r] of [[0, -46, 10], [6, -60, 13], [-4, -76, 16]]) {
+        ctx.beginPath();
+        ctx.arc(p.x + dx * k, p.y + (dy - up) * k, r * k, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+
+  /** Iso: eine Einheit mit Schatten am Boden (gemaltes Modell, sonst einfache Form aufrecht). */
+  drawUnitIsoAt(f, u) {
+    const { ctx, g, cam, dpr, z, now } = f;
+    const p = cam.worldToScreen(u.x, u.y);
+    const lift = unitLift(u);
+    const sc = 1.35;
+    // Schatten am Boden: Umriss des Modells (seit v5.27, unitpaint.js), sonst Ellipse
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (!drawUnitShadowIso(ctx, cam, u, p, dpr, now)) {
+      ctx.fillStyle = 'rgba(0,0,0,0.28)';
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y + 1, u.def.radius * z * (u.def.air ? 1.5 : 1.2), u.def.radius * z * (u.def.air ? 0.7 : 0.5), 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    const aim = this.aimOf(u);
+    if (drawUnitSprite(ctx, cam, u, { x: p.x, y: p.y }, aim, lift, now)) return;
+    setIsoAt(ctx, cam, dpr, p.x, p.y - lift * z, u.x, u.y, sc);
+    drawUnit(ctx, u, g.teams[u.team].color, z * sc, aim, now, true);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  /**
+   * Iso, Effekte (seit v5.34, fx.js): Zielringe, Lichtschein und Druckringe in der Bodenebene, danach aufrecht Granaten im Bogen,
+   * Feuerbälle, Leuchtspuren und Mündungsfeuer; Rauch, Feuer, Nebelwände und Minen; zuletzt das Wegziel.
+   */
+  isoEffects(f) {
+    const { ctx, cam, dpr, z, now, v, relief } = f;
     const at = (x, y) => this.screenAt(x, y);
     const shells = [];
     setIsoGround(ctx, cam, dpr);
-    for (const p of g.projectiles) {
-      if (!p.alive || !shown(p)) continue;
-      if (!inRect(p.x, p.y, 80) && !inRect(p.tx, p.ty, 80)) continue;
+    for (const p of this.visibleShells(f)) {
       if (relief) this.groundAt(ctx, p.tx, p.ty);
       drawShellTarget(ctx, p, z);
       shells.push(p);
     }
     const ups = [];
-    for (const e of g.effects) {
-      if (!inRect(e.x, e.y, 120) && !inRect(e.x2 ?? e.x, e.y2 ?? e.y, 120)) continue;
-      if (e.team !== -1 && e.team !== team && !seen(e.x, e.y) && !seen(e.x2 ?? e.x, e.y2 ?? e.y)) continue;
+    for (const e of this.visibleEffects(f)) {
       if (e.type === 'explosion' || e.type === 'muzzle') {
         if (relief) this.groundAt(ctx, e.x, e.y);
         else setIsoGround(ctx, cam, dpr);
@@ -936,7 +1044,7 @@ export class Renderer {
     for (const p of shells) drawShellIso(ctx, cam, p, at);
     for (const e of ups) drawEffectUp(ctx, e, cam, at);
     const t = now / 1000;
-    for (const q of this.smokeSources(seen, shown, inRect, PAD)) {
+    for (const q of this.smokeSources(f.seen, f.shown, f.inRect, ISO_PAD)) {
       const p = cam.worldToScreen(q.x, q.y);
       const y = p.y - q.lift * z;
       if (q.mine) {
@@ -953,30 +1061,34 @@ export class Renderer {
     if (relief && v.moveMarker) this.groundAt(ctx, v.moveMarker.x, v.moveMarker.y);
     else setIsoGround(ctx, cam, dpr); // ohne Gelände: flache Bodenebene
     this.drawMoveMarker(ctx, v.moveMarker, now, z, relief ? (x, y) => this.groundAt(ctx, x, y) : null);
+  }
 
-    if (!reveal) {
-      if (relief) {
-        const img = this.ground.renderFog(cam, this.cssW, this.cssH, dpr, relief, this.fogData(g.fog[team]), now / 1000); // Wolken ziehen (seit v5.49)
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.drawImage(img, 0, 0);
-      } else {
-        setIsoGround(ctx, cam, dpr);
-        updateFogLayer(this.fogLayer, g.fog[team], false);
-        ctx.drawImage(this.fogLayer.canvas, 0, 0, this.fogLayer.canvas.width, this.fogLayer.canvas.height, 0, 0, W, H);
-      }
+  /** Iso, Nebel des Krieges über allem (mit Gelände aus WebGL, Wolken ziehen seit v5.49). */
+  isoFog(f) {
+    const { ctx, g, cam, team, dpr, now, relief } = f;
+    if (f.reveal) return;
+    if (relief) {
+      const img = this.ground.renderFog(cam, this.cssW, this.cssH, dpr, relief, this.fogData(g.fog[team]), now / 1000);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(img, 0, 0);
+    } else {
+      setIsoGround(ctx, cam, dpr);
+      updateFogLayer(this.fogLayer, g.fog[team], false);
+      ctx.drawImage(this.fogLayer.canvas, 0, 0, this.fogLayer.canvas.width, this.fogLayer.canvas.height, 0, 0, W, H);
     }
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawWeather(ctx, g.weather, this.cssW, this.cssH, now, cam); // Regen, Schnee und Nebel über der Welt
-    drawMood(ctx, this.mood, this.cssW, this.cssH); // Lichtstimmung (mood.js)
+  }
 
-    // Balken und Warnzeichen aufrecht über den Objekten
+  /** Iso, Balken und Warnzeichen aufrecht über den Objekten. */
+  isoBars(f) {
+    const { ctx, g, cam, team, dpr, z, sel, hover, relief, inRect, shown } = f;
+    const PAD = ISO_PAD;
     const upright = (wx, wy, lift) => {
       const p = cam.worldToScreen(wx, wy);
       setUprightAt(ctx, cam, dpr, p.x, p.y - lift * z, wx, wy);
     };
     for (const u of g.units) {
       if (!u.alive || u.house || !shown(u) || !inRect(u.x, u.y, PAD)) continue;
-      if (!(sel.has(u.id) || hover === u || u.hp < u.maxHp)) continue;
+      if (!this.barShown(f, u)) continue;
       upright(u.x, u.y, unitLift(u));
       this.drawHp(ctx, u.x - 12, u.y - u.def.radius - HP_OFFSET / z, 24, u.hp / u.maxHp, z);
       if (g.time - (u.caredAt ?? -9) < 0.5) this.drawCare(ctx, u.x - 12, u.y - u.def.radius - HP_OFFSET / z, z);
@@ -988,7 +1100,7 @@ export class Renderer {
     }
     for (const b of g.buildings) {
       if (!b.alive || b.team !== team || !inRect(b.x, b.y, PAD)) continue;
-      if (!(sel.has(b.id) || hover === b || b.hp < b.maxHp)) continue;
+      if (!this.barShown(f, b)) continue;
       const bw = b.w * TILE * 0.8;
       if (relief) cam.pin(this.baseHeight({ t: 4, o: b }));
       upright(b.x, b.cy * TILE, buildingHeight(b) + 8);
@@ -1000,6 +1112,12 @@ export class Renderer {
       upright(u.x, u.y, unitLift(u));
       this.drawSupply(ctx, u, sel.has(u.id) || hover === u, z);
     }
+  }
+
+  /** Iso, Bildschirmkoordinaten: Brückenbalken, Besatzung der Häuser, Platzierung (in der Bodenebene), Rahmen und Hinweis. */
+  isoScreen(f) {
+    const { ctx, g, cam, team, dpr, z, v, relief, inRect } = f;
+    const PAD = ISO_PAD;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     for (const b of g.bridges ?? []) {
       if (!bridgeBar(b) || !inRect(b.x, b.y, PAD)) continue;
@@ -1009,7 +1127,7 @@ export class Renderer {
       drawBridgeBar(ctx, p.x, p.y - 34 * Math.max(0.6, z), b);
     }
     for (const h of g.garrisoned ?? []) {
-      if (!inRect(h.x, h.y, PAD) || !(h.team === team || reveal || g.sees(team, h))) continue;
+      if (!inRect(h.x, h.y, PAD) || !(h.team === team || f.reveal || g.sees(team, h))) continue;
       if (relief) cam.pin(this.baseHeight({ t: 0, o: h.src }));
       const p = cam.worldToScreen(h.x, h.y);
       cam.unpin();
@@ -1022,10 +1140,7 @@ export class Renderer {
       this.drawPlacement(ctx, v.placement, z);
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    if (v.dragBox) this.drawDragBox(ctx, v.dragBox);
-    if (v.placement && !v.placement.ok && v.placement.reason && Number.isFinite(v.placement.x)) {
-      this.drawNote(ctx, cam.worldToScreen(v.placement.x, v.placement.y), v.placement.reason);
-    }
+    this.drawScreenNotes(f);
   }
 
   /**

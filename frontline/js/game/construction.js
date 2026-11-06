@@ -212,3 +212,21 @@ export function updateConstruction(game, dt) {
     if (b.alive && !b.built) progressSite(game, b, dt);
   }
 }
+
+/**
+ * Bauzustand einer Baustelle: 'near' (Bauer steht daneben oder arbeitet), 'assigned' (Bauer unterwegs),
+ * 'none' (kein passender Bauer in Sicht). Nur lesend (HUD und Renderer). Spiegelt die Regeln dieses Moduls (helperRange, Auftrag build).
+ */
+export function builderState(game, b) {
+  let state = 'none';
+  for (const u of game.units) {
+    if (!u.alive || u.house || !canBuild(u.def, b.type)) continue;
+    if (u.order.type === 'build' && u.order.targetId === b.id) {
+      if (footDist(u.x, u.y, b) <= BALANCE.construction.helperRange) return 'near';
+      state = 'assigned';
+    } else if (u.order.type === 'idle' && footDist(u.x, u.y, b) <= BALANCE.construction.helperRange) {
+      return 'near';
+    }
+  }
+  return state;
+}

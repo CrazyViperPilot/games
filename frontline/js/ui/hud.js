@@ -18,7 +18,7 @@ import { standRoute, runwaysOf, runwayBusy } from '../game/aircraft.js';
 import { padBusy } from '../game/helipad.js';
 import { CITY_TIP } from './citypanel.js';
 import { WORKS, SUPPLIER_KINDS, WORKPLACE_KINDS, KINDS } from '../data/citykinds.js';
-import { GOOD_SHORT } from '../data/goods.js';
+import { GOOD_SHORT, GOOD_COLOR } from '../data/goods.js';
 
 // Wettersymbole (16 × 16, Strichfarbe = currentColor)
 const WX_ICON = {
@@ -28,7 +28,8 @@ const WX_ICON = {
   snow: '<path d="M8 1.8v12.4M2.6 4.9l10.8 6.2M2.6 11.1l10.8-6.2M6.6 2.6L8 4l1.4-1.4M6.6 13.4L8 12l1.4 1.4"/>',
 };
 const WX_COLOR = { clear: '#f2c94c', rain: '#8fb3d9', fog: '#c8ccc4', snow: '#e8f1fb' };
-import { builderState, fobLabel, orderText } from './status.js';
+import { fobLabel, orderText } from './status.js';
+import { builderState } from '../game/construction.js';
 
 const RES_KEYS = ['money', 'bm', 'mun', 'fuel'];
 const SHORT_RES = { bm: 'BM', mun: 'MUN', fuel: 'TS' }; // Front-Lager: Summe der FOB-Lager ohne Hauptstadt
@@ -36,7 +37,9 @@ const MSG_LIFE = 6000; // ms
 const MSG_MAX = 5;
 const DOM_EVERY = 200; // ms
 const NEG_COLOR = '#e5484d'; // Verbrauch (negative Netto-Rate)
-const COLOR = { bm: '#a0703f', mun: '#7f93ad', fuel: '#9b7bc4', cargo: '#c9a227' };
+// Balken der Lager- und LKW-Sorten in der Farbe ihrer Ware (Register js/data/goods.js, seit v5.64); Munition der Waffen grau-blau
+// wie der Munitionsbalken über den Einheiten (renderer.js), Ladung und Passagiere im Akzentgelb
+const COLOR = { bm: GOOD_COLOR.bm, mun: GOOD_COLOR.mun, fuel: GOOD_COLOR.fuel, ammo: '#7f93ad', cargo: '#c9a227' };
 const PRESET_NAME = { mix: 'Gemischt', bm: 'Baumaterial', mun: 'Munition', fuel: 'Treibstoff' };
 const STORE_CAP = BALANCE.logistics.storeCap;
 const CAPITAL_CAP = BALANCE.logistics.capitalCap;
@@ -379,7 +382,7 @@ export class Hud {
     if (u.crate) h += `<div class="muted small">Trägt eine Versorgungskiste: ${Math.round(BALANCE.crates.carrySpeed * 100)} % Tempo, schießt nicht · K = ablegen</div>`;
     if (this.game.relief && !u.def.air) h += this.heightInfo(u);
     if (u.weapons.length) {
-      for (const w of u.weapons) h += gauge(w.spec.name, Math.floor(w.rounds), w.spec.rounds, COLOR.mun);
+      for (const w of u.weapons) h += gauge(w.spec.name, Math.floor(w.rounds), w.spec.rounds, COLOR.ammo);
       h += `<div class="muted small">Nachladen in der FOB: ${Math.ceil(u.def.ammoMax - u.ammo)} Munition fehlen</div>`;
       if (lacksAmmo(u)) h += `<div class="warn small">Keine Munition – feuert nicht</div>`;
     }

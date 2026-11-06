@@ -21,9 +21,9 @@ import {
 } from './isokit.js';
 import { gate, lorry, lorryTop, pipe } from './works.js';
 import { drawBenchTop, drawMapCarTop } from './props.js';
+import { hashXY } from './color.js';
 
 const K = ISO_K;
-const hashXY = (x, y) => (Math.imul(Math.round(x) | 0, 73856093) ^ Math.imul(Math.round(y) | 0, 19349663)) >>> 0;
 
 // ---------- Farben ----------
 

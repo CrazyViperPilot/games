@@ -1,4 +1,5 @@
 // Kamera: Weltausschnitt, Zoom und Umrechnung Welt <-> Bildschirm (docs/verlauf.md §5 render/camera.js). Kein DOM.
+import { clamp } from './color.js';
 
 const ZOOM_MIN = 0.35;
 const ZOOM_MAX = 1.6;
@@ -14,7 +15,6 @@ const ROT = [
   [0, 1, -1, 0],
 ];
 
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 export class Camera {
   constructor(mapW, mapH) {

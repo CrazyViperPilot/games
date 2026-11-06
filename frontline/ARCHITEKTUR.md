@@ -185,8 +185,9 @@ seit v5.59). Die beiden Register importieren nichts; Simulation, UI und Darstell
 
 | Datei | Inhalt |
 |---|---|
-| `renderer.js` | Klasse `Renderer`: zeichnet alles in 2D oder isometrisch, Nebel, Overlays. Nebel seit v5.49: `fogData` liefert dem WebGL-Nebel je Zelle Sicht und Erkundet weichgezeichnet (`blur121`), Iso und 2D zeichnen ihn über `ground.renderFog`; ohne WebGL und für die Minimap `updateFogLayer` (weich, Wolkentöne `fogTone` über eine Farbtabelle, Minimap ohne Wolken) |
+| `renderer.js` | Klasse `Renderer`: zeichnet alles in 2D oder isometrisch, Nebel, Overlays. Seit v5.64 in Durchläufen: `render` baut mit `frameOf` die Werte eines Bildes (Kamera, Ausschnitt `inRect`, Sichtregeln `seen`/`known`/`shown`, Auswahl), 2D `renderTop` → `topGround`, `topObjects`, `topEffects`, `topFog`, `drawSky`, `topBars`, `topScreen`; Iso `renderIso` → `isoGround`, `isoMarks`, `isoItems` (Objekte nach Tiefe), `isoShadows`, `isoObjects`, Flieger, `isoEffects`, `isoFog`, `drawSky`, `isoBars`, `isoScreen`. Nebel seit v5.49: `fogData` liefert dem WebGL-Nebel je Zelle Sicht und Erkundet weichgezeichnet (`blur121`), Iso und 2D zeichnen ihn über `ground.renderFog`; ohne WebGL und für die Minimap `updateFogLayer` (weich, Wolkentöne `fogTone` über eine Farbtabelle, Minimap ohne Wolken) |
 | `camera.js` | Ausschnitt, Zoom, Welt ↔ Bildschirm, Iso-Umrechnung |
+| `color.js` | Farb- und Rechenhilfen aller Malmodule (seit v5.59/v5.64): `rgbOf`, `hexOf`, `mix`, `clamp`, `hashXY` (fester Streuwert je Lage) |
 | `sprites.js` | einfache Formen von oben: Einheiten, Gebäude, Kisten, Tiere (Ersatz, wenn ein gemaltes Modell fehlt); Farbhilfen `shade`, `tint`, `hexA` |
 | `fx.js` | Effekte (seit v5.34): Explosion (Blitz, Feuerball aus Flammenwolken, Rauch, Funken, Brocken; Iso Bodenteil in `drawEffect(…, true)`, aufrecht in `drawEffectUp`), Leuchtspur, Geschoss mit Rauchspur, Mündungsfeuer, Abfangen, Mörsergranate (`drawShell` 2D, `drawShellIso`, Zielring `drawShellTarget`), Rauch, Feuer, Nebelwand, Mine, Krater, Trümmer von oben (`drawWreckRubble`, auch eingestürzte Häuser mit `ruin`), Ersatz-Wrack; weiche Flecken als einmal gemalte 64-px-Bilder (`dot`: weich, Schwade, Wolke) |
 | `iso.js`, `isobuild.js`, `isosprites.js` | Iso-Grundkörper, Iso-Gebäude (einfache Ersatzformen, solange ein gemaltes Bild fehlt), `isosprites.js` nur noch Hülle um Einheiten und Wracks aus `unitpaint.js` (Bilddateien gibt es seit v5.43 keine mehr); Trümmer `drawRubble` seit v5.34 mit Schutthügeln, abgebrochener Mauerecke, Platten und Balken |
@@ -211,7 +212,7 @@ seit v5.59). Die beiden Register importieren nichts; Simulation, UI und Darstell
 | `minimap.js` | Minimap |
 
 `js/ui/` – `controller.js` Auswahl, Modi (Tabelle `MODES`: Hinweis, Klick, Vorschau je Modus), Befehlskarte (kein DOM, ruft `game.issue`), `input.js` Maus/Tastatur/Touch,
-`hud.js` DOM-Anzeige, `menu.js` Start-, Pause-, Hilfe- und Endbildschirm, `helptext.js` Tastenliste der Hilfe mit Zahlen aus den Daten (kein DOM), `status.js` lesende Texthilfen.
+`hud.js` DOM-Anzeige, `menu.js` Start-, Pause-, Hilfe- und Endbildschirm, `helptext.js` Tastenliste der Hilfe mit Zahlen aus den Daten (kein DOM), `status.js` lesende Texthilfen (Auftragstext, FOB-Namen; den Bauzustand `builderState` liest die UI wie der Renderer aus `js/game/construction.js`).
 
 `js/audio/sound.js` – Ton (PRD §14): synthetisiert per WebAudio, liest `game.effects` (Hinweis `snd`), Meldungen und Wetter; `main.js` hält ein `Sound` für alle Partien.
 

@@ -17,7 +17,7 @@ import { groundPattern, patternMatrix } from './ways.js';
 import { railList } from './terrain.js';
 import { drawSiteTop, siteStep, siteTall, siteWall } from './citysite.js';
 import { drawWreckRubble } from './fx.js';
-import { mix } from './color.js';
+import { mix, hashXY } from './color.js';
 
 // Grundstücke in der Farbe der Zellenart (wie die Werkzeugleiste): Wohnen grün, Gewerbe blau, Werke erdig, Markt gold, Militär oliv
 const LOT = CITY_COLORS;
@@ -785,7 +785,7 @@ function roadDetail(rim, lid, drain, m, S, col, row) {
   const vert = n === (RN | RS);
   const hori = n === (RE | RW);
   if (!vert && !hori) return;
-  const h = (Math.imul(col, 73856093) ^ Math.imul(row, 19349663)) >>> 0;
+  const h = hashXY(col, row);
   if (h % 5 === 0 && !(m & (ZN | ZS | ZE | ZW))) {
     const a = S * (0.3 + ((h >>> 5) % 5) * 0.1);
     const b = S / 2 + ((h >>> 3) % 2 ? 13 : -13);
@@ -1044,7 +1044,7 @@ function drawDeposits(ren, ctx, known) {
       const d = DEPOSITS[c.deposit[i] - 1];
       if (!d || !known((q + 0.5) * S, (r + 0.5) * S)) continue;
       if (g.city.some((o) => o.level[i])) continue;
-      const e = depositSprite(d, (Math.imul(q + 7, 73856093) ^ Math.imul(r + 3, 19349663)) >>> 0 & 3, ren.season, scale * (S / 64));
+      const e = depositSprite(d, hashXY(q + 7, r + 3) & 3, ren.season, scale * (S / 64));
       if (e) {
         if (drape) {
           // Bild auf die Zelle legen: Ecken mit Gelände (drei Ecken bestimmen die Lage, die vierte folgt)
