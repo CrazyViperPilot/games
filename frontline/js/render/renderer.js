@@ -35,18 +35,21 @@ import {
 import { drawCityHallTop } from './cityhall.js';
 import { drawTownBuilding, drawTeamBuilding, drawCar, drawBench, drawRubble, drawCrate, drawWreckBox } from './isobuild.js';
 import { parkDeco } from './terrain.js';
-import { drawCarSprite, drawUnitSprite, drawWreckSprite } from './isosprites.js';
+import { drawUnitSprite, drawWreckSprite } from './isosprites.js';
+import { drawMapCarIso, drawMapCarShadowIso, drawBenchIso, drawBenchShadowIso, drawCrateIso, drawCrateTop as drawCratePainted, drawBaleIso, drawBaleShadowIso, drawBaleTop } from './props.js';
+import { fieldBales } from './fields.js';
 import { drawTreeIso, drawTreeTop, drawBushIso, drawBushTop, drawRockIso, drawRockTop, natureShadowIso, drawAnimalIso, drawAnimalTopP, forestKind, forestSpecies } from './nature.js';
 import { drawMilTop, setMilWalls } from './milbuild.js';
 import { scarAlpha } from '../game/scars.js';
 import { reliefOf, RELIEF } from '../game/relief.js';
-import { getGround, LIGHT_ELEV } from './ground.js';
+import { getGround, LIGHT_ELEV, FOG_EXPLORED_ALPHA } from './ground.js';
 import { seasonal, setRoofSnow } from './season.js';
 import { drawWeather } from './weatherfx.js';
 import { drawMood } from './mood.js';
 import { drawBridgeTop, drawBridgeIso, drawBridgeBar, bridgeBar, fordPosts, drawFordPostTop, drawFordPostIso } from './bridge.js';
 import { bridgeUnder } from '../game/river.js';
 import { setMapTown, drawMapTown2D, drawMapCars2D, drawPark } from './maptown.js';
+import { drawHouseWorksIso, drawHouseWorksTop, drawHouseFlagIso, drawHouseFlagTop, worksMask } from './stronghold.js';
 import { drawUnitTop, drawUnitShadowIso, drawWreckTop } from './unitpaint.js';
 import { drawShell, drawShellIso, drawShellTarget, drawEffect, drawEffectUp, drawCrater, drawWreck, drawWreckRubble, drawSmoke, drawSmokeScreen, drawFire, drawMine } from './fx.js';
 import { drawCityGround, drawCityTop, drawCityRoofs, cityBuildings, drawCityBadges } from './citylayer.js';
@@ -67,7 +70,6 @@ const HP_OFFSET = 14; // Abstand Lebensbalken-Oberkante zum Einheitenrand (Bilds
 const STAR_UP = 8; // Stern des Kommandeurs: so weit über dem Lebensbalken (Bildschirm-px)
 const STAR_R = 8; // Radius des Sterns (Bildschirm-px)
 const ISO_STAR_UP = 0; // Iso: zusätzlich angehoben (Welt-px), über dem Kopf der Figur
-const FOG_EXPLORED_ALPHA = 150; // erkundet: abgedunkelt, nicht schwarz
 const MARKER_LIFE = 0.8; // s, Lebensdauer des Wegziel-Markers
 const SLOT_LIFE = 1.6; // s, so lange zeigen Punkte die Formationsplätze
 const SC = BALANCE.scars;
@@ -77,31 +79,126 @@ const FIRE_AT = 0.3; // darunter brennt es (Fahrzeuge: halber Wert)
 const WRECK_SMOKE = 60; // s: so lange raucht ein Wrack, die ersten WRECK_FIRE s brennt es
 const WRECK_FIRE = 20;
 
-/** Off-screen-Canvas in Nebelzellen-Größe (75 × 75) mit ImageData. */
-export function makeFogLayer(fog) {
+/** Off-screen-Canvas in Nebelzellen-Größe (173 × 173) mit ImageData; clouds = false: ohne Wolken (Minimap, dort wäre es Rauschen). */
+export function makeFogLayer(fog, clouds = true) {
   const canvas = document.createElement('canvas');
   canvas.width = fog.cols;
   canvas.height = fog.rows;
   const ctx = canvas.getContext('2d');
-  return { canvas, ctx, image: ctx.createImageData(fog.cols, fog.rows) };
+  return { canvas, ctx, image: ctx.createImageData(fog.cols, fog.rows), clouds };
 }
 
-/** Füllt die Nebelschicht aus fog.visible / fog.explored. reveal = alles sichtbar. */
+// Kriegsnebel (seit v5.49 gemalt, Daniels Wunsch „schaue welche Assets noch nicht verbessert wurden“): Unerforschtes liegt unter einer
+// dunklen Wolkendecke mit weichen hellen und dunklen Flecken statt flach schwarz, Erkundetes ist kühl abgedunkelt, am Übergang ein
+// heller Wolkensaum; der Rand ist weichgezeichnet, damit keine Treppen aus 64-px-Zellen bleiben. Mit WebGL zeichnet ground.js (FS_FOG)
+// den Nebel in Iso und 2D (ziehende Wolken); hier der Canvas-Weg für die Minimap und Geräte ohne WebGL (feste Wolkenflecken).
+const FOG_DIM = [8, 12, 20]; // erkundet
+const FOG_DEEP = [5, 7, 9]; // Wolken dunkel …
+const FOG_LIGHT = [24, 27, 33]; // … und hell
+const FOG_RIM = [15, 17, 18]; // heller Saum am Rand des Unerforschten
+
+/** Wolken je Nebelzelle (Stufe 0 … 15, fest): weiches Wertrauschen über zwei Maßstäbe. */
+export function fogTone(cols, rows) {
+  const out = new Uint8Array(cols * rows);
+  const h = (x, y) => {
+    const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+    return s - Math.floor(s);
+  };
+  const vn = (x, y) => {
+    const xi = Math.floor(x);
+    const yi = Math.floor(y);
+    const fx = x - xi;
+    const fy = y - yi;
+    const sx = fx * fx * (3 - 2 * fx);
+    const sy = fy * fy * (3 - 2 * fy);
+    const a = h(xi, yi);
+    const b = h(xi + 1, yi);
+    const c = h(xi, yi + 1);
+    const d = h(xi + 1, yi + 1);
+    return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
+  };
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) out[r * cols + c] = Math.min(15, Math.floor((vn(c / 6, r / 6) * 0.65 + vn(c / 2.5 + 17, r / 2.5 + 5) * 0.35) * 16));
+  }
+  return out;
+}
+
+let fogStamp = 0; // zählt jeden neu gerechneten WebGL-Nebel (über alle Renderer), ground.js lädt die Textur nur dann neu
+
+/** Weichzeichnen 1-2-1 waagrecht (nach tmp), dann senkrecht (zurück nach a); k Werte je Zelle, verschachtelt. Liefert a. */
+export function blur121(a, tmp, cols, rows, k = 1) {
+  const line = cols * k;
+  for (let r = 0; r < rows; r++) {
+    const o = r * line;
+    for (let j = 0; j < line; j++) {
+      const i = o + j;
+      tmp[i] = (a[j < k ? i : i - k] + 2 * a[i] + a[j >= line - k ? i : i + k] + 2) >> 2;
+    }
+  }
+  for (let r = 0; r < rows; r++) {
+    const o = r * line;
+    const up = r > 0 ? -line : 0;
+    const dn = r < rows - 1 ? line : 0;
+    for (let j = 0; j < line; j++) {
+      const i = o + j;
+      a[i] = (tmp[i + up] + 2 * tmp[i] + tmp[i + dn] + 2) >> 2;
+    }
+  }
+  return a;
+}
+
+/**
+ * Füllt die Nebelschicht aus fog.visible / fog.explored (Canvas-Weg: Minimap und ohne WebGL; seit v5.49 weicher Rand, Wolken,
+ * heller Saum). reveal = alles sichtbar.
+ */
 export function updateFogLayer(layer, fog, reveal) {
   const d = layer.image.data;
-  const n = fog.cols * fog.rows;
-  for (let i = 0; i < n; i++) {
-    let a;
-    if (reveal || fog.visible[i]) a = 0;
-    else if (fog.explored[i]) a = FOG_EXPLORED_ALPHA;
-    else a = 255;
-    const o = i * 4;
-    d[o] = 6;
-    d[o + 1] = 8;
-    d[o + 2] = 10;
-    d[o + 3] = a;
+  const cols = fog.cols;
+  const rows = fog.rows;
+  const n = cols * rows;
+  if (!layer.a || layer.a.length !== n) {
+    layer.a = new Uint8Array(n);
+    layer.b = new Uint8Array(n);
+    layer.tone = layer.clouds === false ? new Uint8Array(n).fill(5) : fogTone(cols, rows);
+    layer.lut = fogLut();
+  }
+  // nur neu malen, wenn sich der Nebel geändert hat (fog.version zählt jede Neuberechnung, alle 0,25 s Spielzeit)
+  if (fog.version !== undefined && layer.src === fog && layer.ver === fog.version && layer.rev === reveal) return;
+  layer.src = fog;
+  layer.ver = fog.version;
+  layer.rev = reveal;
+  const A = layer.a;
+  const vis = fog.visible;
+  const exp = fog.explored;
+  for (let i = 0; i < n; i++) A[i] = reveal || vis[i] ? 0 : exp[i] ? FOG_EXPLORED_ALPHA : 255;
+  blur121(A, layer.b, cols, rows, 1);
+  const T = layer.tone;
+  const L = layer.lut;
+  for (let i = 0, p = 0; i < n; i++, p += 4) {
+    const q = (A[i] * 16 + T[i]) * 3; // Tabelle: Nebelstufe × 16 Wolkentöne
+    d[p] = L[q];
+    d[p + 1] = L[q + 1];
+    d[p + 2] = L[q + 2];
+    d[p + 3] = A[i];
   }
   layer.ctx.putImageData(layer.image, 0, 0);
+}
+
+/** Farbtabelle für updateFogLayer: je Nebelstufe (0 … 255) und Wolkenton (0 … 15) r, g, b wie FS_FOG in ground.js. */
+function fogLut() {
+  const L = new Uint8ClampedArray(256 * 16 * 3);
+  const span = 255 - FOG_EXPLORED_ALPHA;
+  for (let a = 0; a < 256; a++) {
+    const u = a <= FOG_EXPLORED_ALPHA ? 0 : (a - FOG_EXPLORED_ALPHA) / span; // 0 erkundet … 1 unerforscht
+    for (let s = 0; s < 16; s++) {
+      const t = s / 15;
+      const w = Math.min(1, t * t * 1.3);
+      const rim = 4 * u * (1 - u) * (0.35 + 0.65 * t); // heller Saum am Übergang
+      const q = (a * 16 + s) * 3;
+      for (let k = 0; k < 3; k++) L[q + k] = FOG_DIM[k] + (FOG_DEEP[k] + (FOG_LIGHT[k] - FOG_DEEP[k]) * w - FOG_DIM[k]) * u + FOG_RIM[k] * rim;
+    }
+  }
+  return L;
 }
 
 export class Renderer {
@@ -195,12 +292,18 @@ export class Renderer {
     };
     drawMapTown2D(ctx, g.map.town, inRect, z, this.season, (x, y) => g.city && treeGone(g, x, y), ruined);
     setRoofSnow(false);
+    // besetzte und ausgebaute Häuser (seit v5.48, stronghold.js): Sandsäcke, MG-Nest, Stacheldraht und Fahne in Teamfarbe
+    for (const h of g.houses ?? []) {
+      if (h.ruined || !inRect(h.x, h.y, (h.pw + h.ph) / 2) || !this.fortShown(h, known)) continue;
+      drawHouseWorksTop(ctx, h, z);
+      if (h.occupants.length && h.team >= 0) drawHouseFlagTop(ctx, h, g.teams[h.team]?.color ?? '#888', now / 1000);
+    }
     for (const b of g.bridges ?? []) if (inRect(b.x, b.y, b.len / 2 + 40)) drawBridgeTop(ctx, b, this.season); // über dem Fluss, unter allem anderen
     for (const p of fordPosts(g.map, reliefOf(g.map))) if (inRect(p.x, p.y, 10)) drawFordPostTop(ctx, p); // Furtstangen
     this.drawRuins(ctx, R, known);
     this.drawScars(ctx, inRect, z);
     drawCityGround(this, ctx, team, known, inRect); // Stadt: Straßen und Grundstücke
-    drawMapCars2D(ctx, g.map.town, inRect); // Autos der Karte auf den Straßen (seit v5.23 sichtbar)
+    drawMapCars2D(ctx, g.map.town, inRect, z, this.season); // Autos der Karte auf den Straßen (seit v5.23 sichtbar, seit v5.43 gemalt)
     drawCityTop(this, ctx, team, known, inRect); // Stadt: Dächer
     this.drawNatureTop(ctx, inRect, z); // Felsen, Büsche und Bäume von oben (seit v5.28 gemalt, nicht mehr im Geländebild)
     drawCityBadges(this, ctx, team, known, inRect, false); // Stadt: Schilder (Funktion, privat/kommerziell)
@@ -220,7 +323,7 @@ export class Renderer {
     }
     const glow = 0.6 + 0.4 * Math.sin(now / 350);
     for (const m of this.crateMarks(seen, known)) {
-      if (inRect(m.x, m.y, 30)) drawCrateTop(ctx, m.x, m.y, m.ground ? 16 : 13, z, m.ground ? glow : 0);
+      if (inRect(m.x, m.y, 30) && !drawCratePainted(ctx, m.x, m.y, m.ground ? 16 : 13, z, m.ground ? glow : 0)) drawCrateTop(ctx, m.x, m.y, m.ground ? 16 : 13, z, m.ground ? glow : 0);
     }
     for (const a of g.animals ?? []) if (inRect(a.x, a.y, 20) && seen(a.x, a.y) && !drawAnimalTopP(ctx, a, z, now)) drawAnimalTop(ctx, a, z); // nur in Sicht
 
@@ -245,7 +348,7 @@ export class Renderer {
           if (t) aim = Math.atan2(t.y - u.y, t.x - u.x);
         }
         if (!drawUnitTop(ctx, u, z, aim, now)) drawUnit(ctx, u, g.teams[u.team].color, z, aim, now); // gemalt (seit v5.27), sonst einfache Form
-        if (u.crate) drawCrateTop(ctx, u.x + 4, u.y - 6, 10, z); // Kiste auf dem Rücken
+        if (u.crate && !drawCratePainted(ctx, u.x + 4, u.y - 6, 10, z)) drawCrateTop(ctx, u.x + 4, u.y - 6, 10, z); // Kiste auf dem Rücken
       }
     }
 
@@ -277,8 +380,15 @@ export class Renderer {
     }
 
     if (!reveal) {
-      updateFogLayer(this.fogLayer, g.fog[team], false);
-      ctx.drawImage(this.fogLayer.canvas, 0, 0, this.fogLayer.canvas.width, this.fogLayer.canvas.height, 0, 0, W, H);
+      if (cam.relief && this.ground) {
+        // mit WebGL dieselben Wolken und glatten Ränder wie isometrisch, flach von oben (seit v5.49)
+        const img = this.ground.renderFog(cam, this.cssW, this.cssH, dpr, cam.relief, this.fogData(g.fog[team]), now / 1000, true);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.drawImage(img, 0, 0);
+      } else {
+        updateFogLayer(this.fogLayer, g.fog[team], false);
+        ctx.drawImage(this.fogLayer.canvas, 0, 0, this.fogLayer.canvas.width, this.fogLayer.canvas.height, 0, 0, W, H);
+      }
     }
     // Regen, Schnee und Nebel über der Welt (Bildschirmkoordinaten), danach wieder die Welt-Transformation
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -409,13 +519,29 @@ export class Renderer {
     return [Math.cos(a) * k, Math.sin(a) * k, LIGHT_ELEV];
   }
 
-  /** Nebel als Bytes je Zelle für den WebGL-Nebel (gleiche Stufen wie updateFogLayer). */
+  /**
+   * Nebel für den WebGL-Nebel: je Zelle zwei Bytes (in Sicht, erkundet: 0 oder 255), weichgezeichnet (seit v5.49). Der Shader macht
+   * daraus glatte Ränder ohne die Treppen der 64-px-Zellen; Sicht und Erkundet getrennt, damit am Rand zum Unerforschten kein Streifen
+   * „erkundet“ entsteht.
+   */
   fogData(fog) {
     const n = fog.cols * fog.rows;
-    if (!this.fogBytes || this.fogBytes.length !== n) this.fogBytes = new Uint8Array(n);
+    const out = this.fogOut;
+    if (out && fog.version !== undefined && out.src === fog && out.ver === fog.version) return out; // unverändert: kein Neuladen
+    if (!this.fogBytes || this.fogBytes.length !== 2 * n) {
+      this.fogBytes = new Uint8Array(2 * n);
+      this.fogTmp = new Uint8Array(2 * n);
+    }
     const d = this.fogBytes;
-    for (let i = 0; i < n; i++) d[i] = fog.visible[i] ? 0 : fog.explored[i] ? FOG_EXPLORED_ALPHA : 255;
-    return { cols: fog.cols, rows: fog.rows, data: d };
+    const vis = fog.visible;
+    const exp = fog.explored;
+    for (let i = 0; i < n; i++) {
+      d[2 * i] = vis[i] ? 255 : 0;
+      d[2 * i + 1] = exp[i] ? 255 : 0;
+    }
+    blur121(d, this.fogTmp, fog.cols, fog.rows, 2);
+    this.fogOut = { cols: fog.cols, rows: fog.rows, data: d, src: fog, ver: fog.version, stamp: ++fogStamp };
+    return this.fogOut;
   }
 
   /** Isometrisch: danach zeichnen Weltkoordinaten (x, y) aufrecht um den Bildschirmpunkt dieses Weltpunkts, `lift` Pixel höher. */
@@ -431,6 +557,10 @@ export class Renderer {
     const g = this.game;
     const season = this.season;
     const gone = (x, y) => g.city && treeGone(g, x, y);
+    for (const f of g.map.town?.fields ?? []) {
+      if (!inRect(f.x, f.y, Math.max(f.w, f.h) / 2 + 20)) continue;
+      for (const b of fieldBales(f)) if ((!b.only || b.only === season) && inRect(b.x, b.y, 20) && !gone(b.x, b.y)) drawBaleTop(ctx, b, z, season); // Ballen (seit v5.44)
+    }
     for (const o of this.deco.rocks) if (inRect(o.x, o.y, o.r + 30)) drawRockTop(ctx, o, season, z);
     for (const b of this.deco.bushes) if (inRect(b.x, b.y, 24) && !gone(b.x, b.y)) drawBushTop(ctx, b, season, z);
     for (const list of [g.map.trees ?? [], this.deco.trees]) {
@@ -616,6 +746,13 @@ export class Renderer {
       for (const t of d.trees) items.push({ k: cam.depth(t.x, t.y), t: 1, o: t });
       for (const b of d.benches) items.push({ k: cam.depth(b.x, b.y), t: 7, o: b });
     }
+    // Heu- und Strohballen auf Weiden und Stoppelfeldern (seit v5.44, fields.js / props.js)
+    for (const f of town?.fields ?? []) {
+      if (!inRect(f.x, f.y, Math.max(f.w, f.h) / 2 + 20)) continue;
+      for (const b of fieldBales(f)) {
+        if ((!b.only || b.only === this.season) && inRect(b.x, b.y, 30) && !gone(b.x, b.y)) items.push({ k: cam.depth(b.x, b.y), t: 14, o: b });
+      }
+    }
     for (const o of this.deco.rocks) if (inRect(o.x, o.y, PAD)) items.push({ k: cam.depth(o.x, o.y), t: 2, o });
     const small = z < 0.6; // weit herausgezoomt: Unterholz im Wald weglassen (winzig, unter den Kronen)
     for (const b of this.deco.bushes) if (inRect(b.x, b.y, 40) && !(small && b.under) && !gone(b.x, b.y)) items.push({ k: cam.depth(b.x, b.y), t: 13, o: b });
@@ -678,6 +815,15 @@ export class Renderer {
     }
     ctx.fillStyle = 'rgba(10,18,8,0.24)';
     ctx.fill();
+    // Schatten der geparkten Autos, Bänke (seit v5.43) und Ballen (seit v5.44): Umriss von oben am Boden (props.js)
+    for (const it of items) {
+      if (it.t !== 6 && it.t !== 7 && it.t !== 14) continue;
+      if (relief) cam.pin(this.baseHeight(it));
+      if (it.t === 6) drawMapCarShadowIso(ctx, cam, it.o, dpr);
+      else if (it.t === 7) drawBenchShadowIso(ctx, cam, it.o, dpr);
+      else drawBaleShadowIso(ctx, cam, it.o, dpr);
+      cam.unpin();
+    }
     for (const it of items) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       // Jedes Objekt steht eben auf seiner Geländehöhe (Gebäude auf der tiefsten Ecke, damit nichts schwebt)
@@ -687,7 +833,13 @@ export class Renderer {
         if (hs && hs.ruined && known(hs.x, hs.y)) drawRubble(ctx, cam, it.o);
         else {
           setRoofSnow(this.season === 'winter'); // Winter: Schnee auf den Dächern der Stadt
+          const fort = hs && this.fortShown(hs, known) ? hs : null; // besetztes oder ausgebautes Haus (seit v5.48, stronghold.js)
+          if (fort) drawHouseWorksIso(ctx, cam, fort, 'back'); // Draht hinter dem Haus
           if (it.o.part?.t !== 'tree' || !drawTreeIso(ctx, cam, it.o.part, this.season)) drawTownBuilding(ctx, cam, it.o, this.season); // Bäume der Großbauten gemalt (nature.js)
+          if (fort) {
+            drawHouseWorksIso(ctx, cam, fort, 'front'); // Sandsäcke, MG-Nest, Draht davor
+            if (fort.occupants.length && fort.team >= 0) drawHouseFlagIso(ctx, cam, fort, g.teams[fort.team]?.color ?? '#888', now / 1000);
+          }
           setRoofSnow(false);
           if (it.o.damage > 0.25) {
             // beschädigtes Stadtgebäude (Stadt-Teil): Rauch über dem Dach
@@ -711,9 +863,13 @@ export class Renderer {
       }
       else if (it.t === 2) { if (!drawRockIso(ctx, cam, it.o, this.season)) drawRock(ctx, cam, it.o); }
       else if (it.t === 13) drawBushIso(ctx, cam, it.o, this.season);
-      else if (it.t === 6) { if (!drawCarSprite(ctx, cam, it.o)) drawCar(ctx, cam, it.o); }
-      else if (it.t === 7) drawBench(ctx, cam, it.o);
-      else if (it.t === 8) drawCrate(ctx, cam, it.o.x, it.o.y, it.o.ground ? 16 : 13, 0, it.o.ground ? glow : 0);
+      else if (it.t === 6) { if (!drawMapCarIso(ctx, cam, it.o, this.season)) drawCar(ctx, cam, it.o); } // gemalt (props.js, seit v5.43)
+      else if (it.t === 7) { if (!drawBenchIso(ctx, cam, it.o, this.season)) drawBench(ctx, cam, it.o); }
+      else if (it.t === 14) drawBaleIso(ctx, cam, it.o, this.season);
+      else if (it.t === 8) {
+        const s = it.o.ground ? 16 : 13;
+        if (!drawCrateIso(ctx, cam, it.o.x, it.o.y, s, 0, it.o.ground ? glow : 0)) drawCrate(ctx, cam, it.o.x, it.o.y, s, 0, it.o.ground ? glow : 0);
+      }
       else if (it.t === 12) drawFordPostIso(ctx, cam, it.o);
       else if (it.t === 11) {
         const a = it.o;
@@ -740,7 +896,7 @@ export class Renderer {
         drawU(it.o);
         if (it.o.crate) {
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-          drawCrate(ctx, cam, it.o.x, it.o.y, 10, unitLift(it.o) + 14); // Kiste auf dem Rücken
+          if (!drawCrateIso(ctx, cam, it.o.x, it.o.y, 10, unitLift(it.o) + 14)) drawCrate(ctx, cam, it.o.x, it.o.y, 10, unitLift(it.o) + 14); // Kiste auf dem Rücken
         }
       }
       cam.unpin();
@@ -795,7 +951,7 @@ export class Renderer {
 
     if (!reveal) {
       if (relief) {
-        const img = this.ground.renderFog(cam, this.cssW, this.cssH, dpr, relief, this.fogData(g.fog[team]));
+        const img = this.ground.renderFog(cam, this.cssW, this.cssH, dpr, relief, this.fogData(g.fog[team]), now / 1000); // Wolken ziehen (seit v5.49)
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.drawImage(img, 0, 0);
       } else {
@@ -1166,6 +1322,17 @@ export class Renderer {
       if (x0 > R.x1 || y0 > R.y1 || x0 + h.pw < R.x0 || y0 + h.ph < R.y0) continue;
       drawWreckRubble(ctx, { id: h.id, x: h.x, y: h.y, w: h.pw, h: h.ph, small: false, ruin: true, wall: '#c9bfae' });
     }
+  }
+
+  /**
+   * Besetztes oder ausgebautes Haus sichtbar machen (seit v5.48)? Eigene immer; ein besetztes fremdes, wenn ein Besatzer erkannt ist (wie
+   * das Schild, ein getarnter Scharfschütze verrät sein Haus nicht); ein leeres mit Ausbauten, wenn die Stelle erkundet ist.
+   */
+  fortShown(h, known) {
+    const occupied = h.occupants.length > 0;
+    if (!occupied && !worksMask(h)) return false;
+    if (h.team === this.team || this.revealAll) return true;
+    return occupied ? this.game.sees(this.team, h) : known(h.x, h.y);
   }
 
   /** Besatzung eines Hauses (Bildschirmkoordinaten, Transformation auf DPR): Schild in Teamfarbe „n/Plätze“, darunter der Zustand. */

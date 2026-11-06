@@ -15,6 +15,8 @@ import { depositSprite } from './nature.js';
 import { blit, spriteDpr } from './spritecache.js';
 import { groundPattern, patternMatrix } from './ways.js';
 import { railList } from './terrain.js';
+import { drawSiteTop, siteStep, siteTall, siteWall } from './citysite.js';
+import { drawWreckRubble } from './fx.js';
 
 // Grundstücke in der Farbe der Zellenart (wie die Werkzeugleiste): Wohnen grün, Gewerbe blau, Werke erdig, Markt gold, Militär oliv
 const LOT = CITY_COLORS;
@@ -24,6 +26,8 @@ function mix(a, b, t) {
   return `rgb(${[0, 1, 2].map((i) => Math.round(p(a, i) * t + p(b, i) * (1 - t))).join(',')})`;
 }
 const LOT_BUILT = Object.fromEntries(Object.entries(LOT).map(([k, c]) => [k, mix(c, '#8b8d84', 0.5)])); // Pflaster unter Gebäuden, getönt
+const LOT_SITE = Object.fromEntries(Object.entries(LOT).map(([k, c]) => [k, mix(c, '#8f7a5c', 0.16)])); // Baustelle: Erde, leicht getönt (seit v5.45)
+const FLAT_KINDS = new Set(['road', 'runway', 'taxi']); // sofort fertig, nie Baustelle
 // Schilder über den Gebäuden (seit v4.96): Funktionsgebäude groß mit Symbol, Wohnen und Gewerbe klein (privat ⌂ grün, kommerziell ▣ blau)
 const MINE_ICON = { wood: '🌲', stone: '⛰', ore: '⛏', oil: '🛢' };
 const MINE_COLOR = { wood: '#3f8a3f', stone: '#8f8f88', ore: '#c4612f', oil: '#34343a' };
@@ -73,11 +77,45 @@ const townObj = (c, k, lv, r, i, color, damage) => ({
   damage,
 });
 
+/** Fortschritt 0 … 1 einer wachsenden Zelle (Zeitgeber der Zelle bzw. der Mitte eines Großbaus). */
+const growOf = (c, i) => Math.max(0, Math.min(1, c.timer[i] / CITY.growTime));
+
+/** Baustelle (Stufe 0, wächst noch; seit v5.45 gemalt in citysite.js): Lage, Größe, Bauabschnitt, Farben. */
+const siteObj = (c, k, i, ctr, n) => ({
+  x: ctr.x,
+  y: ctr.y,
+  w: n * c.cell - 8,
+  h: n * c.cell - 8,
+  kind: 'site',
+  ck: k,
+  n,
+  step: siteStep(growOf(c, i)),
+  variant: variantOf(i),
+  zone: LOT[k] ?? '#8a8f86',
+  wall: siteWall(k, variantOf(i)),
+});
+
+/**
+ * Ruine (zerstört, wächst nach CITY.ruinTime neu; seit v5.45 als Schutt wie eingestürzte Häuser der Karte): Iso drawRubble mit den
+ * Wandfarben eines Wohnhauses, einer Halle oder Fabrik (as), 2D drawWreckRubble staubig mit Mauerecke (wall).
+ */
+const RUIN_AS = { res: ['house', '#d8cfbd'], com: ['hall', '#b9bec2'] };
+const ruinObj = (c, k, i, ctr, n) => {
+  const [as, wall] = RUIN_AS[k] ?? ['factory', '#b3aea4'];
+  return { x: ctr.x, y: ctr.y, w: n * c.cell - 8, h: n * c.cell - 8, kind: 'cityruin', as, wall, ruin: true, small: false, n, hgt: n > 1 ? 44 : 34, id: (c.team + 1) * 1e6 + i };
+};
+
 /** Gebäude als Stadthaus-Objekte { x, y, w, h, kind, … } für die Iso-Ansicht (1 × 1: kind 'town', gezeichnet in townhouses.js). */
 export function cityBuildings(game, team, known, inRect) {
   const out = [];
-  for (const { c, k, lv, r, i, big, ctr } of cells(game, team, known)) {
-    if (k === 'road' || !lv || big === 'part' || !inRect(ctr.x, ctr.y, big ? (sizeOf(k) * c.cell) / 2 : 0)) continue;
+  for (const { c, k, lv, r, i, big, ctr, ruin } of cells(game, team, known)) {
+    if (FLAT_KINDS.has(k) || big === 'part' || !inRect(ctr.x, ctr.y, big ? (sizeOf(k) * c.cell) / 2 : 0)) continue;
+    if (!lv) {
+      // noch nicht fertig: Ruine (Schutt) oder Baustelle (seit v5.45)
+      const n = big ? sizeOf(k) : 1;
+      out.push(ruin ? ruinObj(c, k, i, ctr, n) : siteObj(c, k, i, ctr, n));
+      continue;
+    }
     const e = c.ents.get(i);
     const color = c.team < 2 ? game.teams[c.team].color : '#888';
     const damage = e ? 1 - e.hp / e.def.hp : 0;
@@ -134,14 +172,7 @@ export function drawCityGround(ren, ctx, team, known, inRect) {
   drawClearings(ren, ctx, known);
   for (const { c, k, lv, r, ruin, big, ctr } of cells(g, team, known)) {
     if (!inRect(ctr.x, ctr.y, big ? (sizeOf(k) * c.cell) / 2 + 32 : 64)) continue;
-    if (ruin) {
-      // Ruine: Schutt, bis die Zelle neu wächst
-      groundRect(ren, ctx, r.x0 + 4, r.y0 + 4, r.x1 - 4, r.y1 - 4);
-      ctx.fillStyle = '#4a4540';
-      ctx.fill();
-      for (const [fx, fy, fr] of DOTS) groundDot(ren, ctx, r.x0 + fx * 64, r.y0 + fy * 64, fr * 40, '#2b2826');
-      continue;
-    }
+    if (ruin) continue; // Ruine: Schutt mit eigenem Boden (seit v5.45: Iso drawRubble, 2D drawWreckRubble), bis die Zelle neu wächst
     if (k === 'runway' || k === 'taxi') continue; // Bahn und Rollfeld danach in einem Zug (drawAirfield, seit v5.37)
     if (k === 'road' || big === 'part') continue; // Straßen danach in einem Zug (drawRoads); Großbau zeichnet seine Mitte
     if (big) {
@@ -149,21 +180,11 @@ export function drawCityGround(ren, ctx, team, known, inRect) {
       continue;
     }
     groundRect(ren, ctx, r.x0 + 3, r.y0 + 3, r.x1 - 3, r.y1 - 3);
-    ctx.fillStyle = lv ? LOT_BUILT[k] : LOT[k] + '55';
+    ctx.fillStyle = lv ? LOT_BUILT[k] : LOT_SITE[k]; // noch nicht gebaut: Baustelle auf Erde (Bild citysite.js, Balken drawCityBadges)
     ctx.fill();
     ctx.strokeStyle = LOT[k];
     ctx.lineWidth = ren.draping() ? Math.max(2, 4 * ren.camera.zoom) : 5;
     ctx.stroke();
-    if (!lv && k !== 'mine' && c.team === team) {
-      // ausgewiesen, aber noch nicht gebaut: Fortschritt als Balken, rot ohne Straße daneben
-      const col = Math.floor(r.x0 / c.cell);
-      const row = Math.floor(r.y0 / c.cell);
-      const linked = hasRoad(c, col, row);
-      const f = linked ? Math.max(0, Math.min(1, c.timer[row * c.cols + col] / CITY.growTime)) : 1;
-      groundRect(ren, ctx, r.x0 + 8, r.y + 4, r.x0 + 8 + (r.x1 - r.x0 - 16) * f, r.y + 12);
-      ctx.fillStyle = linked ? '#e8e2a0' : '#e0553a';
-      ctx.fill();
-    }
   }
   drawAirfield(ren, ctx, team, known, inRect);
   drawRoads(ren, ctx, team, known);
@@ -420,7 +441,7 @@ function drawBigLot(ren, ctx, c, k, lv, r, team, m) {
     return;
   }
   groundRect(ren, ctx, x0 + 3, y0 + 3, m.x + h - 3, m.y + h - 3);
-  ctx.fillStyle = lv ? WORKS_GROUND[k] ?? '#d3cbb6' : LOT[k] + '55'; // Werke (seit v5.08): Pflaster, Schotter oder Erde je Werk
+  ctx.fillStyle = lv ? WORKS_GROUND[k] ?? '#d3cbb6' : LOT_SITE[k]; // Werke (seit v5.08): Pflaster, Schotter oder Erde je Werk; Baustelle: Erde
   ctx.fill();
   ctx.strokeStyle = LOT[k];
   ctx.lineWidth = ren.draping() ? Math.max(2, 4 * ren.camera.zoom) : 5;
@@ -437,13 +458,6 @@ function drawBigLot(ren, ctx, c, k, lv, r, team, m) {
     }
     return;
   }
-  if (c.team !== team) return;
-  const i = Math.floor(r.y0 / c.cell) * c.cols + Math.floor(r.x0 / c.cell);
-  const linked = hasRoad(c, i % c.cols, Math.floor(i / c.cols));
-  const f = linked ? Math.max(0, Math.min(1, c.timer[i] / CITY.growTime)) : 1;
-  groundRect(ren, ctx, x0 + 16, m.y - 6, x0 + 16 + (2 * h - 32) * f, m.y + 6);
-  ctx.fillStyle = linked ? '#e8e2a0' : '#e0553a';
-  ctx.fill();
 }
 
 // Straßen (v4.97): je Zelle nach den Straßennachbarn Gerade, Kurve, Sackgasse, T-Stück oder Kreuzung. Gehweg an Seiten ohne
@@ -1177,8 +1191,15 @@ export function drawCityRoofs(ren, ctx, team, known, inRect) {
 export function drawCityTop(ren, ctx, team, known, inRect) {
   const g = ren.game;
   if (!g.city) return;
-  for (const { c, k, lv, r, i, big, ctr } of cells(g, team, known)) {
-    if (k === 'road' || !lv || big === 'part' || !inRect(ctr.x, ctr.y, big ? (sizeOf(k) * c.cell) / 2 + 32 : 64)) continue;
+  for (const { c, k, lv, r, i, big, ctr, ruin } of cells(g, team, known)) {
+    if (FLAT_KINDS.has(k) || big === 'part' || !inRect(ctr.x, ctr.y, big ? (sizeOf(k) * c.cell) / 2 + 32 : 64)) continue;
+    if (!lv) {
+      // noch nicht fertig (seit v5.45): Ruine als Schutt, sonst Baustelle
+      const n = big ? sizeOf(k) : 1;
+      if (ruin) drawWreckRubble(ctx, ruinObj(c, k, i, ctr, n));
+      else drawSiteTop(ctx, siteObj(c, k, i, ctr, n), ren.camera.zoom);
+      continue;
+    }
     const e = c.ents.get(i);
     const color = c.team < 2 ? g.teams[c.team].color : '#888';
     if (big && BIG_KINDS.has(k)) {
@@ -1296,8 +1317,9 @@ export function drawCityBadges(ren, ctx, team, known, inRect, iso) {
   // Baumodus: Warnzeichen (rotes X) an Gebäuden ohne Lieferweg oder Pendlerweg der eigenen Stadt
   const tr = ren.cityUi?.open && g.city[team] ? transportOf(g, g.city[team]) : null;
   const warnImg = tr ? warnImage() : null;
-  for (const { c, k, lv, r: cell, i, big: whole, ctr } of cells(g, team, known)) {
+  for (const { c, k, lv, r: cell, i, big: whole, ctr, ruin } of cells(g, team, known)) {
     const r = whole ? ctr : cell; // Großbau: Schild über der Mitte
+    if (!lv && !ruin && c.team === team && k !== 'mine' && !FLAT_KINDS.has(k) && whole !== 'part' && inRect(r.x, r.y, 64)) siteBar(ren, ctx, c, i, r, whole ? sizeOf(k) : 1, iso);
     if (k === 'road' || !lv || whole === 'part' || !inRect(r.x, r.y, 64)) continue;
     const sm = !!SMALL[k];
     const d = k === 'mine' ? DEPOSITS[c.deposit[i] - 1] : null;
@@ -1324,6 +1346,43 @@ export function drawCityBadges(ren, ctx, team, known, inRect, iso) {
       ctx.drawImage(warnImg, bx + bw - ws * 0.55, by - ws * 0.45, ws, ws);
     }
   }
+}
+
+/**
+ * Fortschrittsbalken einer eigenen Baustelle (seit v5.45 über dem Bild statt am Boden, wo die Baustelle ihn verdecken würde): dunkle
+ * Spur, hell gefüllt nach Fortschritt; ohne Straße daneben ganz rot (wächst nicht).
+ */
+function siteBar(ren, ctx, c, i, r, n, iso) {
+  const at = c.part?.[i] ? c.part[i] - 1 : i; // Großbau: Zeitgeber und Anschluss der Mitte
+  const linked = hasRoad(c, at % c.cols, Math.floor(at / c.cols));
+  const grow = growOf(c, at);
+  const f = linked ? grow : 1;
+  let x;
+  let y;
+  let w;
+  let h;
+  let pad;
+  if (iso) {
+    const cam = ren.camera;
+    const z = cam.zoom;
+    const p = cam.worldToScreen(r.x, r.y);
+    w = Math.max(22, Math.min(46, 34 * z)) * (n > 1 ? 1.5 : 1);
+    h = Math.max(3, Math.min(6, 4.2 * z));
+    x = p.x - w / 2;
+    y = p.y - (siteTall(n, siteStep(grow)) + 5) * z - h;
+    pad = 1;
+  } else {
+    const z = ren.camera.zoom;
+    w = n * c.cell - 30;
+    h = Math.max(2.6, 3.2 / z);
+    x = r.x - w / 2;
+    y = r.y + (n * c.cell) / 2 - 11 - h;
+    pad = 0.9 / z;
+  }
+  ctx.fillStyle = 'rgba(20,20,18,0.72)';
+  ctx.fillRect(x - pad, y - pad, w + 2 * pad, h + 2 * pad);
+  ctx.fillStyle = linked ? '#e8e2a0' : '#e0553a';
+  ctx.fillRect(x, y, w * f, h);
 }
 
 /** Arten, die etwas an ein Ziel liefern (Förderung, Werke, Munitionswerk). */

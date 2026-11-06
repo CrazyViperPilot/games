@@ -426,7 +426,7 @@ function cab(g, u, v, r0, r1, h0, h1) {
 }
 
 /** Tower: zweigeschossiger Betriebsbau, runder Schaft, Kanzel mit Umgang, Dach mit Antennen und Radarschüssel. */
-function tower(g, team) {
+export function tower(g, team) {
   const { P } = g;
   walls(g, -24, 24, -24, 24, 14, CONCW, { band: team });
   strip(g, 's', 24, -20, -6, 3.2, 6.4, 3);
@@ -573,7 +573,7 @@ function fire(g, team) {
 }
 
 /** Radar: umzäunter Platz, Gerätecontainer, Gitterturm mit Plattform; die Antenne dreht sich (drawRadarAntenna, jedes Bild). */
-function radar(g) {
+export function radar(g) {
   flat(g, -16, 16, -16, 16, '#a39d90');
   fence(g, -16, 16, -16, 16, 'back');
   walls(g, 4, 14, 2, 14, 7, '#d3d0c6');
@@ -587,7 +587,7 @@ function radar(g) {
 }
 
 /** Drehende Radarantenne über dem Turm (jedes Bild neu): Reflektor als gebogene Fläche, Winkel t. */
-function radarAntenna(g, t) {
+export function radarAntenna(g, t) {
   const { P, ctx, z } = g;
   const u = -5;
   const v = -5;
@@ -633,7 +633,7 @@ function park(g, lv) {
 }
 
 /** Flutlichtmast am Vorfeld. */
-function flood(g) {
+export function flood(g) {
   const { P } = g;
   stroke(g, [P(0, 0, 0), P(0, 0, 37)], '#6b7177', 1.4);
   box(g, -3.2, 3.2, -1.2, 1.2, 36, 38.6, '#d4d6d2', '#9aa0a5');
@@ -642,7 +642,7 @@ function flood(g) {
 }
 
 /** Windsack auf einem Mast (rot-weiß gestreift, nach Osten). */
-function sock(g) {
+export function sock(g) {
   const { P } = g;
   stroke(g, [P(0, 0, 0), P(0, 0, 15)], '#d9d6cc', 0.9);
   const seg = 4;
@@ -676,7 +676,7 @@ function hangarTop(c, team, n) {
   } else lorryTop(c, 0, 48, 'v', OLIVE, 'tank', { tank: '#8c9466', band: team });
 }
 
-function towerTop(c, team) {
+export function towerTop(c, team) {
   shadowTop(c, -24, -24, 24, 24, 14);
   flatTop(c, -24, -24, 24, 24, CONCW);
   rectF(c, -24, 22.6, 24, 24, team);
@@ -741,7 +741,7 @@ function fireTop(c, team) {
   fireTruckTop(c, 2, 22, false);
 }
 
-function radarTop(c) {
+export function radarTop(c) {
   rectS(c, -16, -16, 16, 16, '#a39d90', 'rgba(66,72,78,0.8)', 0.6);
   blockTop(c, 4, 2, 14, 14, 7, '#d3d0c6');
   latticeTop(c, -5, -5, 4, 38, '#c9cdd0');
@@ -760,12 +760,12 @@ function parkTop(c, lv) {
   for (const x of [-42, 0, 40]) circle(c, x, 0, 1.1, '#f1df9a');
 }
 
-function floodTop(c) {
+export function floodTop(c) {
   lineT(c, [[0, 0], [8, 8]], 'rgba(0,0,0,0.25)', 1.4);
   rectS(c, -3.2, -1.2, 3.2, 1.2, '#d4d6d2', 'rgba(0,0,0,0.4)', 0.3);
 }
 
-function sockTop(c) {
+export function sockTop(c) {
   lineT(c, [[0, 0], [3, 3]], 'rgba(0,0,0,0.25)', 0.8);
   for (let k = 0; k < 4; k++) rectF(c, 1 + k * 2.6, -1.2 + k * 0.15, 3.6 + k * 2.6, 1.2 - k * 0.15, k % 2 ? '#f2efe6' : '#e2572f');
   circle(c, 0, 0, 0.9, '#d9d6cc');

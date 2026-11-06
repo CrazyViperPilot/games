@@ -21,7 +21,7 @@ export class Minimap {
     this.team = team;
     this.revealAll = false; // wie Renderer.revealAll, von main.js mitsetzen
     this.terrain = seasonal(buildTerrain(game.map), game.weather?.season ?? 'summer'); // Herbst- und Winterfarben
-    this.fogLayer = makeFogLayer(game.fog[team]);
+    this.fogLayer = makeFogLayer(game.fog[team], false); // ohne Wolken, weicher Rand wie im Bild
     this.dpr = 1;
     this.cssW = DEFAULT_SIZE;
     this.cssH = DEFAULT_SIZE;

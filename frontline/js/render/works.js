@@ -546,7 +546,7 @@ export function lorry(g, u, v, along, cabCol, load, o = {}) {
 }
 
 /** Palette mit Ziegeln (oder anderer Ware), Kantenlänge 2s, Höhe h. */
-function pallet(g, u, v, s = 2.2, h = 3.2, col = BRICKS) {
+export function pallet(g, u, v, s = 2.2, h = 3.2, col = BRICKS) {
   box(g, u - s, u + s, v - s, v + s, 0, 0.6, '#9c7a52');
   box(g, u - s + 0.2, u + s - 0.2, v - s + 0.2, v + s - 0.2, 0.6, h, col, tint(col, 0.1));
   if (!g.fine) return;
@@ -556,7 +556,7 @@ function pallet(g, u, v, s = 2.2, h = 3.2, col = BRICKS) {
 }
 
 /** Gabelstapler (orange) mit Palette auf der Gabel nach +u. */
-function forklift(g, u, v, col = BRICKS) {
+export function forklift(g, u, v, col = BRICKS) {
   const { P } = g;
   flat(g, u - 2.6, u + 5, v - 1.8, v + 2.8, 'rgba(0,0,0,0.18)');
   box(g, u - 2.4, u + 1.6, v - 1.5, v + 1.5, 0.5, 2.8, '#e08a1e', '#eea040');
@@ -1520,7 +1520,7 @@ function bunkerTop(c, x0, y0, x1, y1) {
 }
 
 /** Palette von oben (Holzrand, Ware). */
-function palletTop(c, x, y, s, col = BRICKS) {
+export function palletTop(c, x, y, s, col = BRICKS) {
   rectF(c, x - s + 0.7, y - s + 0.7, x + s + 0.7, y + s + 0.7, 'rgba(0,0,0,0.25)');
   rectS(c, x - s, y - s, x + s, y + s, '#9c7a52', 'rgba(0,0,0,0.3)', 0.25);
   rectS(c, x - s + 0.3, y - s + 0.3, x + s - 0.3, y + s - 0.3, tint(col, 0.08), 'rgba(0,0,0,0.25)', 0.25);
@@ -1555,7 +1555,7 @@ export function lorryTop(c, x, y, along, cabCol, load, o = {}) {
 }
 
 /** Gabelstapler von oben mit Palette vorn (+x). */
-function forkliftTop(c, x, y, col = BRICKS) {
+export function forkliftTop(c, x, y, col = BRICKS) {
   rectF(c, x - 1.6, y - 0.7, x + 2.4, y + 2.3, 'rgba(0,0,0,0.22)');
   rectS(c, x - 2.4, y - 1.5, x + 1.6, y + 1.5, '#eea040', 'rgba(0,0,0,0.4)', 0.3);
   rectS(c, x - 1.8, y - 1.6, x + 1.2, y + 1.6, '#3a3d40', 'rgba(0,0,0,0.4)', 0.2);

@@ -1234,4 +1234,4 @@ export function unitModelTypes() {
 export { modelOf as unitModel };
 
 /** Malwerkzeug für andere gemalte Modelle (Tiere und Felsen in nature.js, seit v5.28): Körper, Renderer, Bildgrenzen, Richtungen. */
-export const PAINT = { solid, box, cyl, ball, loft, prZ, on, fine, paintSolids, boundsOf, getSprite, viewAngle, nearKeys, sectorOf, mix };
+export const PAINT = { solid, box, cyl, ball, loft, prX, prY, prZ, on, fine, paintSolids, boundsOf, getSprite, viewAngle, nearKeys, sectorOf, mix };
