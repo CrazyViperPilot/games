@@ -124,7 +124,7 @@ Wo jedes Feature liegt. „KI“ = Konstanten-Präfix in `js/data/ai.js`, Logik 
 
 | Feature | PRD | Werte | Logik (`js/game/`) | KI | Darstellung / UI | Test |
 |---|---|---|---|---|---|---|
-| Spielzustand, Befehle, Platzierung, Sieg | §2, §4 | `fob`, `winPoints` | `game.js` | – | – | `game.test.js` |
+| Spielzustand, Befehle, Platzierung, Sieg, Statistik am Spielende | §2, §4, §9 „Endbildschirm“ | `fob`, `winPoints` | `game.js` (`newStats`, `sampleArmy`, Zählung in `cleanup`), `economy.js` (Ausbildung) | – | `menu.js` (`showEnd`) | `game.test.js`, `stats.test.js` |
 | Ausbildung, Einheitenlimit, Nachschub, Einkommen | §2, §3, §5 | `slotCap`, `trainSlots`, `reinforce`, `startRes` | `economy.js`, `game.js` (`cmdTrain`) | `MIX`, `COUNTER_*` | `controller.js`, `hud.js` | `economy.test.js` |
 | Konfliktzone, Punkte, Zonengeld | §7 | `zone`, `pointInterval` | `zone.js` | `WAVE_*`, `THREAT_*` | `renderer.js`, `hud.js` | `economy.test.js`, `game.test.js` |
 | Hot Zone und Bohrer | §7 „Hot Zone“, „Bohrer“ | `hot`, `BUILDINGS.drill` | `hotzone.js` | – | `renderer.js`, `hud.js` | `game.test.js` |

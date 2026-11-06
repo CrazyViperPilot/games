@@ -462,7 +462,9 @@ export function showHelp(root) {
 }
 
 /**
- * Endbildschirm. info = { winner, team (eigenes Team), reason ('points' | 'eliminated' | 'radio'), stats: { time, points: [a, b], winPoints } }.
+ * Endbildschirm. info = { winner, team (eigenes Team), reason ('points' | 'eliminated' | 'radio'),
+ * stats: { time, points: [a, b], winPoints, teams? } }. `teams` (seit v5.61): je Team die Zähler aus game.js (newStats),
+ * earned und used; fehlt es, bleiben nur Spielzeit und Siegpunkte.
  */
 export function showEnd(root, { winner, team, reason, stats }, onRestart) {
   const won = winner === team;
@@ -472,16 +474,40 @@ export function showEnd(root, { winner, team, reason, stats }, onRestart) {
   else if (reason === 'radio') why = `${who} hat den Sendemast ${Math.round(BALANCE.radio.hold / 60)} Minuten gehalten.`;
   else if (won) why = 'Die Hauptstadt des Gegners ist zerstört.';
   else why = 'Deine Hauptstadt ist zerstört.';
+  const rows = [
+    ['Einheiten ausgebildet', 'trained'],
+    ['Einheiten verloren', 'lost'],
+    ['Abschüsse', 'kills'],
+    ['Gebäude zerstört', 'buildingsKilled'],
+    ['Gebäude verloren', 'buildingsLost'],
+    ['Höchste Armeegröße', 'peakUnits'],
+    ['Geld aus Prämien', 'earned'],
+    ['Munition verbraucht', 'mun'],
+    ['Treibstoff verbraucht', 'fuel'],
+  ];
+  const num = (v) => Math.round(v || 0).toLocaleString('de-DE');
+  const val = (t, key) => (key === 'mun' || key === 'fuel' ? num(t.used?.[key]) : num(t[key]));
+  const names = BALANCE.teamNames;
+  const table = stats.teams
+    ? `<table class="keys end-stats">
+        <tr class="head"><th></th>${names.map((n, i) => `<td class="${i === team ? 'mine' : ''}">${esc(n)}${i === team ? ' (du)' : ''}</td>`).join('')}</tr>
+        <tr><th>Spielzeit</th><td colspan="2" class="center">${fmtTime(stats.time)}</td></tr>
+        <tr><th>Siegpunkte</th>${names.map((n, i) => `<td class="${i === team ? 'mine' : ''}">${num(stats.points[i])}</td>`).join('')}</tr>
+        ${rows
+          .map(([label, key]) => `<tr><th>${label}</th>${stats.teams.map((t, i) => `<td class="${i === team ? 'mine' : ''}">${val(t, key)}</td>`).join('')}</tr>`)
+          .join('')}
+      </table>`
+    : `<table class="keys">
+        <tr><th>Spielzeit</th><td>${fmtTime(stats.time)}</td></tr>
+        <tr><th>Siegpunkte</th><td>${BALANCE.teamNames[0]} ${stats.points[0]} : ${stats.points[1]} ${BALANCE.teamNames[1]}</td></tr>
+      </table>`;
   show(
     root,
     'end',
     `<section class="menu end">
       <h2 class="end-title ${won ? 'win' : 'lose'}">${won ? 'Sieg' : 'Niederlage'}</h2>
       <p class="center">${esc(why)}</p>
-      <table class="keys">
-        <tr><th>Spielzeit</th><td>${fmtTime(stats.time)}</td></tr>
-        <tr><th>Siegpunkte</th><td>${BALANCE.teamNames[0]} ${stats.points[0]} : ${stats.points[1]} ${BALANCE.teamNames[1]}</td></tr>
-      </table>
+      ${table}
       <div class="stack"><button type="button" class="primary" data-act="again">Nochmal</button></div>
     </section>`,
   );

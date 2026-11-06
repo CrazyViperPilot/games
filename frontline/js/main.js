@@ -393,7 +393,12 @@ function frame(s) {
         winner: g.winner,
         team: HUMAN,
         reason: g.winReason,
-        stats: { time: g.time, points: [g.teams[0].points, g.teams[1].points], winPoints: g.winPoints },
+        stats: {
+          time: g.time,
+          points: [g.teams[0].points, g.teams[1].points],
+          winPoints: g.winPoints,
+          teams: g.teams.map((t) => ({ ...t.stats, earned: t.earned || 0, used: { ...t.used } })), // Statistik je Team (seit v5.61)
+        },
       },
       () => startGame(settings),
     );

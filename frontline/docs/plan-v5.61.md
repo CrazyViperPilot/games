@@ -8,7 +8,7 @@ Für die Pakete ab P2 gilt PRD §13: erst ein Vorschlag zur Ausgestaltung (unten
 
 | Paket | Inhalt | Quelle | Größe | Stand |
 |---|---|---|---|---|
-| **P1** | Statistik am Spielende + Doku-Abgleich §1/§13 | §12 Could, §13 | klein | **in Arbeit (v5.61)** |
+| **P1** | Statistik am Spielende + Doku-Abgleich §1/§13 | §12 Could, §13 | klein | **gebaut (v5.61)** |
 | P2 | Häuserkampf I: Zonen-Nutzen besetzter Häuser (Punkte, Sicht), Ruinen als Deckung | §13 Häuserkampf | mittel | geparkt |
 | P3 | Häuserkampf II: KI stürmt Häuser und baut sie zur Stellung aus; Feuerbereich je Haus | §13 Häuserkampf | mittel | geparkt |
 | P4 | Musik (synthetisiert, je Lage ruhig/Gefecht) und Lautstärkeregler für Ton und Musik | §13 Musik | mittel | geparkt |

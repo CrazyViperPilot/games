@@ -71,6 +71,7 @@ export function updateEconomy(game, dt) {
       b.queue.splice(i, 1);
       b.queueTimes.splice(i, 1);
       const u = game.spawnUnit(type, b.team, spot.x, spot.y);
+      game.teams[b.team].stats.trained++; // Statistik: ausgebildet (Startarmee und Nachschub zählen nicht)
       if (game.city) u.crew = crewOf(type); // Stadt: die Einheit belegt Einwohner, solange sie lebt
       if (u.def.jet) {
         parkNew(game, u, b); // Flugzeug: steht auf seinem Stellplatz (aircraft.js)
