@@ -13,7 +13,7 @@ Für die Pakete ab P2 gilt PRD §13: erst ein Vorschlag zur Ausgestaltung (unten
 | P3 | Häuserkampf II: KI stürmt Häuser und baut sie zur Stellung aus; Feuerbereich je Haus | §13 Häuserkampf | mittel | **gebaut (v5.63)** |
 | P4 | Musik (synthetisiert, je Lage ruhig/Gefecht) und Lautstärkeregler für Ton und Musik | §13 Musik | mittel | **gebaut (v5.64)** |
 | P5a | Stadt: Werkslager und LKW laden am Werk (Simulation, Befehle, Rechtsklick, Infofeld) | §13 SimCity-Stadt | mittel | **gebaut (v5.65)** |
-| P5b | Stadt: Route ab Werk in der Oberfläche, KI holt am Werk, Ressourcenanzeige | §13 SimCity-Stadt | mittel | geparkt |
+| P5b | Stadt: Route ab Werk in der Oberfläche, KI holt am Werk, Ressourcenanzeige | §13 SimCity-Stadt | mittel | **in Arbeit (v5.66)** |
 | P6 | KI-Lücken aus §10: KI baut Flak/SAM gegen Luft, Scharfschützen, Bagger | §10 „Nicht gebaut“ | mittel | geparkt |
 | – | LLM für Gegner und Dialoge | §13 | – | nicht paketiert: Grundsatzfragen offen (Modell, Gerät/Server, Offline-PWA, Kosten) |
 
@@ -186,9 +186,36 @@ Heute fließt der Ausstoß von BM-Werk (`bm`), Munitionswerk (`mun`) und Raffine
   Route Werk → FOB bringt Ware in die FOB; abgerissenes Werk beendet den Auftrag; Spielstand ohne `c.out` lädt.
 - Gewollte Regeländerung: Golden-Werte dürfen sich ändern (Läufe mit Stadt); dann nach Anleitung im Testkopf neu setzen und im Bericht nennen.
 
-## P5b – Werk als Quelle in Oberfläche und KI (Vorschlag)
-- Routen-Modus der Oberfläche akzeptiert ein Werk als Start; Ressourcenanzeige zeigt die Ausgangslager.
-- Armee-KI lässt LKW für eine vordere FOB am Werk laden, wenn das Werk deutlich näher liegt als die Hauptstadt und genug abholbereit ist.
+## P5b – Werk als Quelle in Oberfläche und KI (v5.66, von Daniel bestätigt am 2026-11-06)
+
+Grundlage P5a (v5.65): `CITY.pickup`, `c.out`, `c.pickClaim`, Befehle `load` mit `work`, `route` mit `fromWork`, `ownWork`/`pickWork`.
+
+### Oberfläche (`js/ui/controller.js`)
+- Pendeln (Taste T, Modus `routeFrom`): Als Start darf statt einer eigenen fertigen FOB auch ein eigenes Werk der Arten `CITY.pickup.kinds`
+  angeklickt werden (`pickWork`). Dann merkt sich der Controller `routeFromWork` (Zellindex) statt `routeFromId`; Schritt 2 (Ziel-FOB) gibt
+  `{ type: 'route', ids, fromWork, toId }`. Meldetexte anpassen („Start: eigene FOB oder Werk anklicken“). Hilfe (F1) ergänzen.
+- Statuszeile/Routenlinie (`drawRoutes` in `js/render/renderer.js` bzw. `marks.js`): Route ab Werk zeichnet die Linie ab der Werksmitte
+  (heute vermutlich ab `fromId`; Stelle per grep finden). Nur lesen, nichts an der Simulation ändern.
+
+### KI (`js/ai/ai.js`, Werte in `js/data/ai.js`)
+- `pendlerPlan`: Für eine Bedarfs-FOB `to` (nicht die Hauptstadt) und Sorte k kommt zusätzlich jedes eigene fertige Werk in Frage, dessen
+  Ware k ist (`CITY.chain[Art].to`, Art in `CITY.pickup.kinds`). Ein Werk wird gewählt, wenn es keine FOB-Quelle mit Überschuss gibt oder
+  wenn seine Entfernung zu `to` höchstens `WORK_SOURCE_NEAR` (0,5) × Entfernung der besten FOB-Quelle zu `to` ist. Plan bekommt `fromWork`
+  statt `from`. Höchstens `WORK_SOURCE_TRUCKS` (1) KI-LKW je Werk.
+- `managePendler`: Routen ab Werk richtig behandeln (Quelle ist keine FOB: kein `from.store`; gültig, solange das Werk da ist
+  (`ownWork`), Bedarf > 0,1 und Route aktiv; `this.routes` speichert `fromWork`). Befehle nur über `game.issue`.
+- Nur mit Stadt (ohne Stadt gibt es keine Werke) – sonst unverändert.
+
+### Ressourcenanzeige (`js/ui/flowpanel.js`, Zahlen aus `js/game/flow.js`)
+- Am Lagerknoten von BM, MUN, TS eine Zeile „davon an Werken: N“, wenn N > 0 (Summe `c.out` der Werke dieser Ware; `teamStock` zählt sie schon).
+
+### Doku und Test
+- PRD §15 (Werkslager: Oberfläche und KI), §10 KI (Pendler) und Tabelle „KI-Konstanten“, §8 Steuerung (T), Änderungsverlauf v5.66,
+  `CACHE_VERSION` `frontline-v179`, `npm run docs`, Feature-Landkarte in `CLAUDE.md`, Plan P5b auf „gebaut (v5.66)“.
+- Test in `test/pickup.test.js` (oder neu `test/pickupai.test.js`): KI plant eine Route ab Werk, wenn ein passendes Werk nah an einer
+  bedürftigen vorderen FOB liegt und keine FOB Überschuss hat; nicht ohne Stadt; die Route bringt Ware in die FOB.
+  `test/ai.test.js`, `test/cityprod.test.js`, `test/golden.test.js` laufen lassen. Ändern sich Golden-Werte, ist das als gewollte
+  Regeländerung erlaubt (Anleitung im Testkopf), im Bericht nennen.
 
 ## P6 – KI-Lücken (Vorschlag)
 - KI baut Flak/SAM, sobald der Gegner Hubschrauber oder Jets hat; Scharfschützen in kleiner Zahl; Bagger nur für Straßen der Stadt.
