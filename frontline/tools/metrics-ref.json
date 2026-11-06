@@ -1,0 +1,86 @@
+{
+ "3": [
+  {
+   "steel": 683,
+   "mun": 1695,
+   "trained": 69,
+   "kills": 75,
+   "fobs": 4,
+   "cells": 325,
+   "houses": 3,
+   "storms": 0,
+   "workRoutes": 1,
+   "airDef": 0,
+   "points": 17
+  },
+  {
+   "steel": 1047,
+   "mun": 1158,
+   "trained": 46,
+   "kills": 80,
+   "fobs": 5,
+   "cells": 446,
+   "houses": 3,
+   "storms": 0,
+   "workRoutes": 0,
+   "airDef": 0,
+   "points": 3
+  }
+ ],
+ "7": [
+  {
+   "steel": 1041,
+   "mun": 1111,
+   "trained": 40,
+   "kills": 44,
+   "fobs": 2,
+   "cells": 284,
+   "houses": 2,
+   "storms": 0,
+   "workRoutes": 1,
+   "airDef": 0,
+   "points": 0
+  },
+  {
+   "steel": 738,
+   "mun": 1219,
+   "trained": 73,
+   "kills": 104,
+   "fobs": 5,
+   "cells": 367,
+   "houses": 11,
+   "storms": 0,
+   "workRoutes": 1,
+   "airDef": 3,
+   "points": 26
+  }
+ ],
+ "11": [
+  {
+   "steel": 1022,
+   "mun": 1547,
+   "trained": 55,
+   "kills": 54,
+   "fobs": 3,
+   "cells": 385,
+   "houses": 2,
+   "storms": 0,
+   "workRoutes": 1,
+   "airDef": 0,
+   "points": 3
+  },
+  {
+   "steel": 628,
+   "mun": 1353,
+   "trained": 48,
+   "kills": 90,
+   "fobs": 5,
+   "cells": 370,
+   "houses": 4,
+   "storms": 0,
+   "workRoutes": 1,
+   "airDef": 1,
+   "points": 19
+  }
+ ]
+}

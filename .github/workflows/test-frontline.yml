@@ -24,3 +24,5 @@ jobs:
         with:
           node-version: 22
       - run: npm test
+      # KI-Kennzahlen (tools/metrics.mjs): lange Läufe KI gegen KI, warnt bei groben Ausreißern gegenüber tools/metrics-ref.json
+      - run: npm run metrics

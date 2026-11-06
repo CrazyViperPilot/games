@@ -8,6 +8,7 @@
     "test:fast": "node --test --test-skip-pattern=\"\\[langsam\\]\"",
     "smoke": "node tools/smoke.mjs",
     "release": "node tools/release.mjs",
+    "metrics": "node tools/metrics.mjs",
     "docs": "node tools/doc-tables.mjs"
   }
 }

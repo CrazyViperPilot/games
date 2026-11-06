@@ -53,9 +53,12 @@ npm test                          # alle Tests (node --test, Node 22), einige Mi
 node --test test/radio.test.js    # nur eine Datei
 npm run smoke                     # Browser-Rundgang (Playwright): Start, 2D, Iso, Hilfe, Pause, Baumodus, Ressourcen, Ausbildung; Fotos in .smoke/
 npm run release                   # Versionen vergeben (nur beim Zusammenführen auf main, siehe „Zusammenarbeit“)
+npm run metrics                   # KI-Kennzahlen: 3 Seeds × 15 min KI gegen KI (~30 s), warnt bei groben Ausreißern; auch in der CI
 ```
 
 - Tests, die länger als etwa 5 s laufen, tragen „[langsam]“ im Namen (`test:fast` lässt sie aus). Neue lange Tests ebenso markieren.
+- **KI-Kennzahlen:** Bei Paketen, die KI, Stadt-Wirtschaft oder Kampf ändern, `npm run metrics` laufen lassen. Warnt es und ist die
+  Änderung gewollt, Referenzwerte neu setzen: `npm run metrics -- --update` (wie die Prüfsummen in `test/golden.test.js`).
 - Fehler im Browser nachstellen: `tools/smoke.mjs` exportiert `openGame({ seed, query })` → `run(fn)` wertet im Browser aus (mit `?debug=1`
   ist die Partie unter `window.__frontline.session()` erreichbar), `shot(name)` macht ein Foto. Vorlage für eigene Prüfskripte.
 
