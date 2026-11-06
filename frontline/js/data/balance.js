@@ -123,6 +123,7 @@ export const BALANCE = {
     repairCostShare: 0.5, // Baumaterial-Kosten = cost.bm × geheilt/maxHp × 0.5
     siteHpGrow: 0.9, // Baustellen-HP wächst um 90 % über die Bauzeit (Start 10 %)
     siteSight: 150, // Baustellen sehen weniger
+    wallMax: 40, // höchstens so viele Zellen je Mauerzug (Befehl buildWall; die Vorschau kürzt darauf, längere Befehle werden abgelehnt)
   },
   difficulty: {
     // Schwierigkeit über Verhalten: ab normal Späher und Konter-Mix, ab schwer Überfälle und Gruppen-Rückzug; hart ohne Einkommensbonus.

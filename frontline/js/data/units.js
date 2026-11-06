@@ -311,7 +311,7 @@ export const UNITS = {
     buildTime: 40,
     fuelPerSec: 1,
     fuelMax: 55, // seit v5.14 55 statt 45: die Zone liegt auf der größeren Karte weiter vom Flughafen, die Zeit über ihr bleibt gleich
-    hotkey: 'K', // V, J und H sind feste Tasten (Ansicht, Bauer, Hauptstadt)
+    hotkey: 'K', // feste Tasten (J, H, V, Y, P, M; js/ui/input.js) sind tabu, test/config.test.js prüft das
   },
   // Flugabwehrpanzer (Flak): Schnellfeuer-Flak gegen Hubschrauber, Munition je Schuss 20. hitChance × speedRef: schnelle Ziele trifft sie selten
   // (Tempo-Faktor speedRef/(speedRef + Zielgeschwindigkeit), siehe BALANCE.airFire). Schießt nur auf Luftziele.
@@ -331,7 +331,7 @@ export const UNITS = {
     buildTime: 10,
     fuelPerSec: 0.4,
     fuelMax: 40,
-    hotkey: 'J',
+    hotkey: 'Z', // Z wie Flugabwehr im Baumenü (seit v5.57; J ist die feste Taste „Bauer“)
   },
   // Flugabwehrrakete (SAM): Wärmesuchende Raketen, 250 Munition je Rakete, 10 s Nachladezeit. Die Rakete folgt der Wärme des Ziels,
   // darum kein Tempo-Abzug (nur die Entfernung). Schießt nur auf Luftziele.
@@ -371,7 +371,7 @@ export const UNITS = {
     buildTime: 16,
     fuelPerSec: 0.35,
     fuelMax: 45,
-    hotkey: 'P',
+    hotkey: 'L', // seit v5.57 (P ist Pause)
   },
   // Panzerhaubitze (seit v5.19, nach der Panzerhaubitze 2000): Artillerie. Schießt Granaten (shell) weit über das Gefecht, nicht näher als
   // minRange; Ziele muss das Team sehen (eigene Einheiten oder Gebäude). Splash-Schaden um den Einschlag, Streuung spread px

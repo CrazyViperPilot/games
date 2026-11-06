@@ -60,8 +60,8 @@ test('Gebäude: Werte und Kosten', () => {
   for (const [k, b] of Object.entries(BUILDINGS)) {
     for (const f of ['hp', 'w', 'h', 'buildTime']) assert.ok(positive(b[f]), `BUILDINGS.${k}.${f} = ${b[f]}`);
     for (const [r, v] of Object.entries(b.cost)) assert.ok(RES.includes(r) && v >= 0, `BUILDINGS.${k}.cost.${r}`);
-    assert.ok(Array.isArray(b.produces), `BUILDINGS.${k}.produces fehlt (die Simulation liest es ohne Ersatzwert)`);
-    for (const t of b.produces) assert.ok(UNITS[t], `BUILDINGS.${k}.produces: unbekannte Einheit '${t}'`);
+    assert.ok(b.produces === undefined || Array.isArray(b.produces), `BUILDINGS.${k}.produces: Liste erwartet (fehlt = bildet nichts aus)`);
+    for (const t of b.produces ?? []) assert.ok(UNITS[t], `BUILDINGS.${k}.produces: unbekannte Einheit '${t}'`);
   }
 });
 
@@ -84,12 +84,15 @@ test('Tasten doppeln sich nicht', () => {
 // Feste Tasten (js/ui/input.js, vor der Befehlskarte abgefangen): J Bauer, H Hauptstadt, V Ansicht, Y Stadt-Baumodus,
 // P Pause, M Geld (Debug). Eine Befehlskarten-Taste mit einem dieser Buchstaben ist nie erreichbar.
 const FIXED_KEYS = ['J', 'H', 'V', 'Y', 'P', 'M'];
-test('Befehlskarten-Tasten liegen nicht auf festen Tasten', { todo: 'Turm V, Flak J, Gepard P sind heute unerreichbar (Befund T-09)' }, () => {
+test('Befehlskarten-Tasten liegen nicht auf festen Tasten', () => {
   const used = [
     ...Object.entries(UNITS).map(([k, u]) => [`UNITS.${k}`, u.hotkey]),
     ...Object.entries(BUILDINGS).map(([k, b]) => [`BUILDINGS.${k}`, b.hotkey]),
     ...Object.entries(BUILDINGS.tower.roofs ?? {}).map(([k, r]) => [`BUILDINGS.tower.roofs.${k}`, r.hotkey]),
   ];
+  // Einträge der Befehlskarte mit fester Taste im Code (entry('Name', 'X', …)); Y „Baumodus“ ist gewollt (die feste Taste tut dasselbe)
+  const ctl = readFileSync(fileURLToPath(new URL('../js/ui/controller.js', import.meta.url)), 'utf8');
+  for (const m of ctl.matchAll(/entry\('([^']*)', '([A-Z])'/g)) if (m[2] !== 'Y' || m[1] !== 'Baumodus') used.push([`controller.js ${m[1]}`, m[2]]);
   const clash = used.filter(([, key]) => FIXED_KEYS.includes(key)).map(([w, key]) => `${w} (${key})`);
   assert.deepEqual(clash, [], `auf festen Tasten: ${clash.join(', ')}`);
 });
@@ -159,7 +162,7 @@ test('Stadt (v5.20): Zellenarten stabil, Hütte und Kerosin-Raffinerie vollstän
 // js/data/ vorkommen. Grob (ein gleichnamiges Wort anderswo genügt; so rutschte `BALANCE.jets.rearm` bis v5.55 durch), findet aber Schlüssel,
 // die niemand mehr liest. Verzeichnisse mit erzeugten Schlüsseln (Forschungen je Ast) sind ausgenommen. UNUSED listet die heute
 // bekannten toten Schlüssel; wer einen löscht oder wieder liest, streicht ihn hier (der Test meldet das).
-const UNUSED = ['CITY.air.atcSight']; // P4 setzt die Tower-Sicht um
+const UNUSED = [];
 const SKIP = new Set(['RESEARCH.items', 'RESEARCH.lanes']);
 test('Datenschlüssel: jeder wird im Code gelesen (außer der Liste bekannter toter Schlüssel)', () => {
   const root = fileURLToPath(new URL('../js/', import.meta.url));

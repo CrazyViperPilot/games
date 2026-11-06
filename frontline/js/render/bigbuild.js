@@ -29,13 +29,11 @@ export function drawShowIso(ctx, cam, p) {
 /** Großbauten, die hier gezeichnet werden (die Universität hat ihr eigenes Bild, university.js). */
 export const BIG_KINDS = new Set(['barracks', 'factory', 'stand', 'atc', 'ktank', 'mdepot']); // seit v5.35 auch der Fliegerhorst (2 × 2)
 
-const CONCRETE = '#b3afa4';
 /** Bausteine des Fliegerhorsts (seit v5.42 gemalt, airbase.js). */
 const AIRBASE = new Set(['stand', 'atc', 'ktank', 'mdepot']);
 /** Fahrzeuge auf Höfen (seit v5.11): Länge, Breite, Höhe der Wanne (Weltpixel). */
 export const VEH = { tank: { l: 32, w: 17, h: 7 }, apc: { l: 28, w: 15, h: 10 }, truck: { l: 30, w: 13, h: 15 }, jeep: { l: 19, w: 11, h: 9 } };
 export const VEH_COLOR = '#5f6b3e';
-const GLASS = '#6f93ad';
 
 // ---- Anlagen: Boden und Körper je Art und Stufe (lokal, Mitte 0/0) ----
 

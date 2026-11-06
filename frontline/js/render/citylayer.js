@@ -889,7 +889,8 @@ function drawRoads(ren, ctx, team, known) {
     u2x = (e2.x - o.x) / (1000 * z);
     u2y = (e2.y - o.y) / (1000 * z);
   }
-  // Fingerabdruck: alle Straßenzellen der Städte mit Sichtbarkeit, dazu die Ansicht (Stadtstraßen der Karte ändern sich nur durch den Bagger)
+  // Fingerabdruck: alle Straßenzellen der Städte mit Sichtbarkeit, die Version der Kartenstraßen (roads.ver, zählt der Bagger hoch)
+  // und die Ansicht
   let h = 0;
   let n = g.roads ? 1 : 0;
   for (const c of g.city ?? []) {
@@ -904,7 +905,7 @@ function drawRoads(ren, ctx, team, known) {
   if (!n || typeof Path2D === 'undefined') return;
   const season = ren.season ?? 'summer';
   const view = drape ? `${u1x.toFixed(5)},${u1y.toFixed(5)},${u2x.toFixed(5)},${u2y.toFixed(5)}` : 'flat';
-  const key = `${h}|${n}|${view}|${season}`;
+  const key = `${h}|${n}|${g.roads?.ver ?? 0}|${view}|${season}`;
   if (key !== cache.key || cache.game !== g || cache.relief !== (drape ? cam.relief : null)) {
     cache.key = key;
     cache.game = g;

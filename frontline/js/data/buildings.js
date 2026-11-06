@@ -144,7 +144,7 @@ export const BUILDINGS = {
     sight: 380,
     cost: { bm: 220 },
     buildTime: 25,
-    hotkey: 'V',
+    hotkey: 'F', // F wie Festungsturm (seit v5.57; V ist die feste Taste „Ansicht“)
     produces: [],
     cap: 3,
     reach: 60,

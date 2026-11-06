@@ -361,3 +361,25 @@ test('F-16: zwei Luft-Luft-Raketen nur gegen Luftziele, zwei Luft-Boden-Raketen 
   assert.equal(u.weapons[1].rounds, 0, 'Luft-Boden verschossen');
   assert.ok(heli.hp < 1e6 && tank.hp < 1e6, 'Hubschrauber und Panzer getroffen');
 });
+
+// Review-Paket P4 (Daniels Entscheidung 2, D-03): der Tower sieht als Radar CITY.air.atcSight weit statt CITY.sight.
+test('Tower: weite Sicht (CITY.air.atcSight) statt der Sicht der übrigen Stadtgebäude', () => {
+  const g = new Game({ seed: 3, city: true });
+  const { atc } = airbase(g);
+  assert.ok(atc, 'Tower steht');
+  assert.ok(CITY.air.atcSight > CITY.sight);
+  const seen = () => {
+    g.fog[0].update(g, 0);
+    return g.fog[0].visible.reduce((s, v) => s + v, 0);
+  };
+  const wide = seen();
+  const old = CITY.air.atcSight;
+  CITY.air.atcSight = CITY.sight;
+  let narrow;
+  try {
+    narrow = seen();
+  } finally {
+    CITY.air.atcSight = old;
+  }
+  assert.ok(wide > narrow, `Tower lichtet mehr Nebel (${wide} > ${narrow} Felder)`);
+});

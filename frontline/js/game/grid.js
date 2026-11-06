@@ -5,6 +5,32 @@ import { RELIEF } from './relief.js';
 const RELIEF_WATER = RELIEF.water;
 const RELIEF_STEEP = RELIEF.steep;
 
+/** Zellen einer Geraden zwischen zwei Zellen (Bresenham, inklusive Endpunkte). */
+export function lineCells(c0, r0, c1, r1) {
+  const out = [];
+  const dc = Math.abs(c1 - c0);
+  const sc = c0 < c1 ? 1 : -1;
+  const dr = -Math.abs(r1 - r0);
+  const sr = r0 < r1 ? 1 : -1;
+  let err = dc + dr;
+  let c = c0;
+  let r = r0;
+  for (;;) {
+    out.push([c, r]);
+    if (c === c1 && r === r1) break;
+    const e2 = 2 * err;
+    if (e2 >= dr) {
+      err += dr;
+      c += sc;
+    }
+    if (e2 <= dc) {
+      err += dc;
+      r += sr;
+    }
+  }
+  return out;
+}
+
 export class Grid {
   constructor(cols, rows, tile) {
     this.cols = cols;

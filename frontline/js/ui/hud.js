@@ -576,7 +576,7 @@ export class Hud {
     }
     if (CITY_TIP[k] && k !== 'market' && !b.produces && !care) h += `<div class="muted small">${esc(CITY_TIP[k])}</div>`;
     const col = i % c.cols;
-    if (k !== 'mine' && !hasRoad(c, col, (i - col) / c.cols)) h += '<div class="warn small">Keine Straße daneben: wächst nicht weiter</div>';
+    if (!hasRoad(c, col, (i - col) / c.cols)) h += '<div class="warn small">Keine Straße daneben: wächst nicht weiter</div>';
     if (s.powerRatio < 1 && CITY.power.use[k] && k !== 'res' && k !== 'com') h += `<div class="warn small">Strommangel: arbeitet mit ${Math.round(s.powerRatio * 100)} %</div>`;
     if (k === 'res' && c.flee[i] > 0) h += `<div class="warn small">Bewohner geflohen (Beschuss), Rückkehr frühestens in ${Math.ceil(c.flee[i])} s</div>`;
     if (b.produces) h += this.queueInfo(b);

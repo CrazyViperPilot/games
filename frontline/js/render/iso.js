@@ -5,7 +5,6 @@ import { shade, tint, hexA, fitText } from './sprites.js';
 import { snowy } from './season.js';
 import { jetAlt, jetGrounded } from '../game/aircraft.js';
 
-const TILE = BALANCE.map.tile;
 const OUTLINE = 'rgba(0,0,0,0.55)';
 
 /** Höhe (Bildschirm-Pixel bei Zoom 1) der Stadtgebäude und der Spielgebäude je Typ. */

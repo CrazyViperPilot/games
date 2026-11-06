@@ -134,7 +134,7 @@ export const CITY = {
     sep: 14,
     sepAtc: 7,
     atcRadius: 14,
-    atcSight: 520, // Sicht (px) des Towers (Radar)
+    atcSight: 360, // Sicht (px) des Towers ab seinem Rand statt CITY.sight (Radar, seit v5.57): überblickt Bahn und Anflug, nicht die Front
     supplyRadius: 12,
     shelter: [1, 1, 0.5, 0.15],
     // Ausbau der Stellplätze (seit v5.39, Daniels Wunsch): nicht mehr von selbst, nur über „Ausbauen“ am gewählten Stellplatz.

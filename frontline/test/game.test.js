@@ -986,3 +986,32 @@ test('Abschussprämie: Fahrzeuge viel, Soldaten wenig, Mauern nichts; fertiger B
   hit(g, rifle, 5);
   assert.equal(g.teams[0].res.money, afterTank, 'Tote zählen nicht doppelt');
 });
+
+// Review-Paket P4 (Q-01, Q-11, E-03): der Befehl prüft die Mauerlänge selbst, Stopp ohne eigene Einheit scheitert,
+// ein Gebäude ohne `produces` in js/data/buildings.js bildet nichts aus und bringt die KI nicht zum Absturz.
+test('Befehle: Mauerzug über wallMax abgelehnt, Stopp ohne Einheit scheitert, Gebäude ohne produces', async () => {
+  const { AI } = await import('../js/ai/ai.js');
+  const { withValue } = await import('./util.js');
+  const g = new Game({ seed: 7 });
+  const m = g.mainFob(0);
+  const max = BALANCE.construction.wallMax;
+  const T = g.grid.tile;
+  const long = g.issue(0, { type: 'buildWall', building: 'wall', x1: m.x, y1: m.y + 6 * T, x2: m.x + max * T, y2: m.y + 6 * T });
+  assert.equal(long.ok, false);
+  assert.match(long.reason, /zu lang/);
+  assert.equal(g.issue(0, { type: 'stop', ids: [] }).ok, false);
+  const foe = g.units.find((u) => u.alive && u.team === 1);
+  assert.equal(g.issue(0, { type: 'stop', ids: [foe.id] }).ok, false, 'fremde Einheit');
+  const own = g.units.find((u) => u.alive && u.team === 0);
+  assert.equal(g.issue(0, { type: 'stop', ids: [own.id] }).ok, true);
+  withValue(BUILDINGS.drill, 'produces', undefined, () => {
+    const m1 = g.mainFob(1);
+    const b = g.spawnBuilding('drill', 1, m1.x + 6 * T, m1.y + 6 * T, { built: true });
+    assert.deepEqual(b.produces, []);
+    const ai = new AI(g, 1, 'normal');
+    for (let i = 0; i < 100; i++) {
+      ai.update(0.1);
+      g.update(0.1);
+    }
+  });
+});

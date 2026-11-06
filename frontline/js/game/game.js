@@ -5,9 +5,9 @@ import { BUILDINGS } from '../data/buildings.js';
 import { makeRng } from '../core/rng.js';
 import { generateMap } from './map.js';
 import { blockers } from './mapdata.js';
-import { Grid } from './grid.js';
+import { Grid, lineCells } from './grid.js';
 import { reliefOf } from './relief.js';
-import { createUnit, createBuilding, defineAmmo, isFoe, canAttack, inRange } from './entities.js';
+import { createUnit, createBuilding, defineAmmo, canAttack, inRange } from './entities.js';
 import { Fog } from './fog.js';
 import { updateEconomy, smoothIncome } from './economy.js';
 import { createCity, updateCity, cmdCity, cmdCityUpgrade, cmdTrade, cityNoise, freePop, crewOf, payMetal, cityTrainers, trainerKind, KIND_NAME } from './city.js';
@@ -121,32 +121,6 @@ function takeCarried(list, bm) {
 }
 const NO_CARRIED = 'Zu wenig getragenes Baumaterial (Soldaten laden es in einer FOB)';
 const ONE_COMMANDER = 'Nur ein Kommandeur je Team';
-
-/** Zellen einer Geraden zwischen zwei Zellen (Bresenham, inklusive Endpunkte). */
-function lineCells(c0, r0, c1, r1) {
-  const out = [];
-  const dc = Math.abs(c1 - c0);
-  const sc = c0 < c1 ? 1 : -1;
-  const dr = -Math.abs(r1 - r0);
-  const sr = r0 < r1 ? 1 : -1;
-  let err = dc + dr;
-  let c = c0;
-  let r = r0;
-  for (;;) {
-    out.push([c, r]);
-    if (c === c1 && r === r1) break;
-    const e2 = 2 * err;
-    if (e2 >= dr) {
-      err += dr;
-      c += sc;
-    }
-    if (e2 <= dc) {
-      err += dc;
-      r += sr;
-    }
-  }
-  return out;
-}
 
 export class Game {
   /** `map`: fertige Karte (Editor/gespeichert, siehe mapdata.js); ohne sie wird sie aus dem Seed erzeugt. */
@@ -606,12 +580,15 @@ export class Game {
         return this.cmdMove(team, cmd);
       case 'attack':
         return this.cmdAttack(team, cmd);
-      case 'stop':
-        for (const u of this.ownUnits(team, cmd.ids)) {
+      case 'stop': {
+        const units = this.ownUnits(team, cmd.ids);
+        if (!units.length) return fail('Keine eigenen Einheiten gewählt');
+        for (const u of units) {
           setIdle(u);
           u.fireTarget = null; // Stopp beendet auch das Feuer der Artillerie auf einen Punkt
         }
         return { ok: true };
+      }
       case 'build':
         return this.cmdBuild(team, cmd);
       case 'buildWall':
@@ -834,6 +811,7 @@ export class Game {
     if (pick.reason) return fail(pick.reason);
     const g = this.grid;
     const cells = lineCells(g.toCell(cmd.x1), g.toCell(cmd.y1), g.toCell(cmd.x2), g.toCell(cmd.y2));
+    if (cells.length > BALANCE.construction.wallMax) return fail(`Mauerzug zu lang (höchstens ${BALANCE.construction.wallMax} Zellen)`);
     const sites = [];
     const carried = paysCarried(pick.list);
     let lastReason = 'Keine Zelle baubar';
@@ -932,7 +910,6 @@ export class Game {
       if (d > max) reason = `Ziel außer Reichweite (max. ${Math.round(max)} px)`;
       else if (d < w.minRange) reason = `Ziel zu nah (min. ${w.minRange} px)`;
       else {
-        u.fireTarget = { x: cmd.x, y: cmd.y };
         setIdle(u);
         u.fireTarget = { x: cmd.x, y: cmd.y };
         n++;

@@ -5,6 +5,7 @@ import { trainCheck, isStand, standsOf, standRoute } from '../game/aircraft.js';
 import { heliTrainCheck, isHeliport } from '../game/helipad.js';
 import { CITY } from '../data/city.js';
 import { BALANCE } from '../data/balance.js';
+import { lineCells } from '../game/grid.js';
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { canBuild } from '../game/construction.js';
@@ -18,7 +19,7 @@ import { RESEARCH } from '../data/research.js';
 import { deckDist } from '../game/river.js';
 import { unitLift, buildingHeight, TOWN_H } from '../render/iso.js';
 
-const WALL_MAX = 40; // max. Zellen je Mauerzug (Vorschau und Befehl)
+const WALL_MAX = BALANCE.construction.wallMax; // max. Zellen je Mauerzug (Vorschau; der Befehl prüft dasselbe)
 const DOUBLE_MS = 350; // Doppelklick auf einen Typ = alle dieses Typs im Bild
 const GROUP_DOUBLE_MS = 500; // Gruppentaste zweimal = Kamera hin
 const PICK_PX = 16; // Trefferradius in Bildschirm-Pixeln
@@ -50,35 +51,11 @@ const PRESET_BTN = [
 ];
 const LOADED = 0.5; // ab dieser Ladung gilt ein LKW als beladen
 
-/** Zellen einer Geraden zwischen zwei Zellen (Bresenham, inklusive Endpunkte). */
-function lineCells(c0, r0, c1, r1) {
-  const out = [];
-  const dc = Math.abs(c1 - c0);
-  const sc = c0 < c1 ? 1 : -1;
-  const dr = -Math.abs(r1 - r0);
-  const sr = r0 < r1 ? 1 : -1;
-  let err = dc + dr;
-  let c = c0;
-  let r = r0;
-  for (;;) {
-    out.push({ c, r });
-    if (c === c1 && r === r1) break;
-    const e2 = 2 * err;
-    if (e2 >= dr) {
-      err += dr;
-      c += sc;
-    }
-    if (e2 <= dc) {
-      err += dc;
-      r += sr;
-    }
-  }
-  return out;
-}
-
 /** Mauerzug von Start- zu Endzelle, höchstens WALL_MAX Zellen. */
 function wallLine(a, b) {
-  return lineCells(a.c, a.r, b.c, b.r).slice(0, WALL_MAX);
+  return lineCells(a.c, a.r, b.c, b.r)
+    .slice(0, WALL_MAX)
+    .map(([c, r]) => ({ c, r }));
 }
 
 /** Lager (FOB oder LKW) deckt die Kosten (nur Sorten bm/mun/fuel). */
@@ -1590,8 +1567,8 @@ export class Controller {
     const fobs = blds.filter((b) => b.type === 'fob' && b.built);
     if (fobs.length) {
       card.push(
-        entry('Festung', 'H', {
-          tip: `FOB zur Festung ausbauen (H): Mauerring mit vier Toren und ${BALANCE.fortress.towers} Gefechtstürmen an den Ecken zum Gegner. Material aus dem FOB-Lager, Baufahrzeuge und Soldaten bauen selbst. Erneut drücken ergänzt, was fehlt.`,
+        entry('Festung', 'I', {
+          tip: `FOB zur Festung ausbauen (I): Mauerring mit vier Toren und ${BALANCE.fortress.towers} Gefechtstürmen an den Ecken zum Gegner. Material aus dem FOB-Lager, Baufahrzeuge und Soldaten bauen selbst. Erneut drücken ergänzt, was fehlt.`,
           action: () => {
             for (const f of fobs) this.issue({ type: 'fortify', buildingId: f.id });
           },

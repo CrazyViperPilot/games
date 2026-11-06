@@ -23,7 +23,7 @@ test('Einheitenlimit: 300 Plätze, Flak und SAM belegen je 2', () => {
   assert.equal(BALANCE.slotCap, 300);
   assert.equal(UNITS.flak.slots, 2);
   assert.equal(UNITS.sam.slots, 2);
-  assert.equal(UNITS.flak.hotkey, 'J');
+  assert.equal(UNITS.flak.hotkey, 'Z'); // seit v5.57 (J ist die feste Taste „Bauer“)
   assert.equal(UNITS.sam.hotkey, 'N');
 });
 

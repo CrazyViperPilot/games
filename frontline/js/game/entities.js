@@ -128,7 +128,7 @@ export function createBuilding(id, type, team, cx, cy, tile) {
     scanTimer: (id % 5) * 0.05,
     main: false,
     infinite: false,
-    produces: type === 'fob' ? [] : def.produces,
+    produces: type === 'fob' ? [] : (def.produces ?? []), // ohne Eintrag: bildet nichts aus (KI und Befehlskarte lesen .length)
     lastHitTime: -1e9,
     demolished: false,
     store: { bm: 0, mun: 0, fuel: 0 },

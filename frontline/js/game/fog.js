@@ -5,6 +5,7 @@ import { RELIEF, FINE_N } from './relief.js';
 import { weatherSight } from './weather.js';
 import { sightMul } from './research.js';
 import { CITY } from '../data/city.js';
+import { KIND_ID } from './city.js';
 
 const CONSTRUCTION_SIGHT = BALANCE.construction.siteSight; // Baustellen sehen weniger
 const RAY_GAP = 44; // Abstand benachbarter Sichtstrahlen am Rand (px), kleiner als eine Nebelzelle
@@ -161,7 +162,8 @@ export class Fog {
       for (const e of cc.ents.values()) {
         if (!e.alive) continue;
         const half = ((e.w ?? 0) * BALANCE.map.tile) / 2;
-        this.markEntity(relief, e, CITY.sight * m + half * Math.SQRT2);
+        const sight = cc.kind[e.cityCell] === KIND_ID.atc ? CITY.air.atcSight : CITY.sight; // Tower sieht weiter (Radar, seit v5.57)
+        this.markEntity(relief, e, sight * m + half * Math.SQRT2);
       }
     }
   }

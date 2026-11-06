@@ -177,11 +177,13 @@ Wo jedes Feature liegt. „KI“ = Konstanten-Präfix in `js/data/ai.js`, Logik 
 6. Test in `test/` (Ausbildung über `game.issue(team, { type: 'train', … })`), Hilfe in `js/ui/menu.js`, `npm run docs` (Tabellen), PRD §6 (Rolle) und Änderungsverlauf, `CACHE_VERSION`.
 
 ### Neues Gebäude
-1. `js/data/buildings.js`: Eintrag mit `name`, `w`, `h` (Zellen), `hp`, `sight`, `cost`, `buildTime`, `hotkey`; optional `weapon`, `aa`.
-   Mit `hotkey` erscheint es automatisch im Baumenü des Baufahrzeugs.
+1. `js/data/buildings.js`: Eintrag mit `name`, `short` (Kurzname in der Befehlskarte), `w`, `h` (Zellen), `hp`, `sight`, `cost`, `buildTime`,
+   `hotkey`; optional `weapon`, `aa`, `produces` (ausbildbare Einheiten, fehlt = keine). Mit `hotkey` erscheint es automatisch im Baumenü
+   des Baufahrzeugs; die Taste darf keine feste Taste sein (J, H, V, Y, P, M; `test/config.test.js` prüft das).
 2. Sonderregeln beim Setzen in `game.js` (`canPlace`), Wirkung im passenden Modul oder in einem neuen Modul (Rezept „Neues Spielsystem“).
-3. Kurzname als `short` im Eintrag. Aussehen: `js/render/sprites.js` (`drawBuilding`) und `js/render/isobuild.js`.
-4. KI optional in `js/ai/ai.js`; Test, Hilfe, PRD §5 und Änderungsverlauf, `CACHE_VERSION`.
+3. Aussehen: Maler in `js/render/milbuild.js` (Typ in `MIL_TYPES` eintragen), Höhe in `js/render/iso.js` (`BUILD_H`), Kürzel in
+   `js/render/sprites.js` (`BUILD_ABBR`, 2D-Ansicht).
+4. KI optional in `js/ai/ai.js`; Test, Baumenü-Zeile der Hilfe (`js/ui/menu.js`, Taste B), PRD §5 und Änderungsverlauf, `CACHE_VERSION`.
 
 ### Neuer Befehl
 1. Handler im zuständigen Modul: `export function cmdX(game, team, cmd)` → `{ ok: true }` oder `{ ok: false, reason: 'deutscher Text' }`. Nur eigene, lebende Einheiten akzeptieren.
