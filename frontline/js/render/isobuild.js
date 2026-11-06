@@ -9,6 +9,7 @@ import { drawCityHallIso } from './cityhall.js';
 import { drawTownIso } from './townhouses.js';
 import { drawMilIso } from './milbuild.js';
 import { drawMapIso } from './maptown.js';
+import { drawSiteIso } from './citysite.js';
 import { drawBox, drawRotBox, wallPoint, wallQuad, buildingHeight, TOWN_H, drawTree } from './iso.js';
 import { shade, tint, hexA } from './sprites.js';
 import { snowy } from './season.js';
@@ -302,6 +303,14 @@ export function drawBench(ctx, cam, b) {
 
 /** Gebäude der Stadt (Haus, Halle, Fabrik) mit Fenstern, Türen, Toren, Balkonen und Dachaufbauten. */
 export function drawTownBuilding(ctx, cam, b, season = 'summer') {
+  if (b.kind === 'site') {
+    drawSiteIso(ctx, cam, b, season); // Baustelle der Stadt (seit v5.45, citysite.js)
+    return;
+  }
+  if (b.kind === 'cityruin') {
+    drawRubble(ctx, cam, { x: b.x, y: b.y, w: b.w, h: b.h, kind: b.as, hgt: b.hgt }); // zerstörtes Stadtgebäude: Schutt wie eingestürzte Häuser (seit v5.45)
+    return;
+  }
   if (b.kind === 'bigpart') {
     drawBigBody(ctx, cam, b, season); // Körper eines Großbaus (Kaserne, Fabrikhalle, Flughafen; bigbuild.js)
     return;
