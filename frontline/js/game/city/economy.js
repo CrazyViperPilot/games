@@ -324,6 +324,7 @@ function runWorks(x) {
       const cap = CITY.jobs[lv] * eff[i] * Y[prod]; // Leistung je s
       const inp = arr[i] / K[prod]; // Produkt je s, das der Eingang hergibt
       const out = Math.min(cap, inp);
+      c.workOut[i] = out; // Ausstoß je s am Anker (seit v5.66, Pendlerquelle der KI)
       s.cap[prod] += cap;
       s.inp[prod] += inp;
       s.gross[prod] += out;
@@ -370,6 +371,7 @@ function storeAndMunitions(x) {
     if (c.kind[i] !== MUN) continue;
     const lv = c.level[i];
     const cap = CITY.jobs[lv] * eff[i] * Y.mun; // Munition je s
+    c.workOut[i] = 0; // Ausstoß je s am Anker (seit v5.66); unten gesetzt, wenn Munition fließt
     s.cap.mun += cap;
     const p = tr.mun.get(i) ?? null;
     if (!p || !credit) continue; // ohne Weg zum Lager (oder ohne fertiges Lager): kein Stahl, keine Munition
@@ -377,6 +379,7 @@ function storeAndMunitions(x) {
     const w = pathEff(tr, p);
     addLoad(tr, p, steelUse);
     const mun = (steelUse * w) / K.mun; // Munition je s am Werk
+    c.workOut[i] = mun;
     const kept = PICKUP.has('mun') ? stockAtWork(c, i, 'mun', mun, dt) : 0; // Ausgangslager (seit v5.65)
     addLoad(tr, p, mun - kept);
     s.gross.mun += mun;

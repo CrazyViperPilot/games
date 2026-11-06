@@ -268,6 +268,15 @@ export function resourceFlow(game, team, rates = null) {
   const main = game.mainFob(team);
   const cap = BALANCE.logistics.storeCap;
   const stock = teamStock(game, team);
+  // Ausgangslager der Werke je Ware (CITY.pickup, seit v5.66): „davon an Werken“ am Lagerknoten
+  const atWorks = {};
+  if (c.out) {
+    for (const i of c.list) {
+      if (!c.out[i]) continue;
+      const w = CITY.chain[KINDS[c.kind[i] - 1]].to;
+      atWorks[w] = (atWorks[w] ?? 0) + c.out[i];
+    }
+  }
   for (const n of Object.values(nodes)) {
     if (n.type !== 'store') continue;
     const g = n.key;
@@ -276,6 +285,7 @@ export function resourceFlow(game, team, rates = null) {
     n.unit = GOOD_SHORT[g] ?? g;
     n.where = inCity ? 'Stadtlager' : 'alle Lager';
     n.stock = stock[g];
+    n.atWorks = atWorks[g] ?? 0;
     const here = inCity ? c[g] : main?.store?.[g] ?? 0;
     n.full = here >= (inCity ? cap : BALANCE.logistics.capitalCap ?? cap) - 1; // Stadtlager bzw. Lager der Hauptstadt (seit v5.06 größer)
     n.rate = s.gross?.[g] ?? 0;

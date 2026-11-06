@@ -102,6 +102,7 @@ export class Controller {
     this.placeType = null; // Gebäudetyp im Modus place
     this.wall = null; // Startzelle {c, r} eines Mauerzugs (während der Maus gedrückt ist)
     this.routeFromId = null; // Start-FOB beim Pendeln (Modus routeTo)
+    this.routeFromWork = null; // Start-Werk beim Pendeln ab einem Werk mit Ausgangslager (Zellindex, seit v5.66; sonst null)
     this.pointer = null; // letzte Weltposition des Mauszeigers
     this.lastClick = null;
     this.lastGroup = null;
@@ -130,7 +131,10 @@ export class Controller {
     this.placeType = null;
     this.wall = null;
     this.view.placement = null;
-    if (mode !== 'routeTo') this.routeFromId = null;
+    if (mode !== 'routeTo') {
+      this.routeFromId = null;
+      this.routeFromWork = null;
+    }
   }
 
   setDragBox(rect) {
@@ -758,7 +762,7 @@ export class Controller {
     if (this.issue({ type: kind, ids, fobId: fob.id }).ok) this.setMode('normal');
   }
 
-  /** Pendeln, Schritt 1: Start-FOB (fertig). */
+  /** Pendeln, Schritt 1: Start = eigene fertige FOB oder eigenes Werk mit Ausgangslager (seit v5.66, pickWork). */
   confirmRouteFrom(wx, wy) {
     const ids = this.selectedUnits().filter(isCarrier);
     if (!ids.length) {
@@ -767,11 +771,13 @@ export class Controller {
       return;
     }
     const fob = this.pickB(wx, wy, (e) => e.team === this.team && e.type === 'fob' && e.built);
-    if (!fob) {
-      this.message('Start: eigene fertige FOB anklicken');
+    const work = fob ? null : this.pickWork(wx, wy);
+    if (!fob && !work) {
+      this.message('Start: eigene FOB oder Werk anklicken');
       return;
     }
-    this.routeFromId = fob.id; // setMode('routeTo') behält die Start-FOB
+    this.routeFromId = fob ? fob.id : null; // setMode('routeTo') behält den Start
+    this.routeFromWork = work ? work.cityCell : null;
     this.setMode('routeTo');
   }
 
@@ -787,7 +793,8 @@ export class Controller {
       this.message('Start und Ziel sind gleich');
       return;
     }
-    if (this.issue({ type: 'route', ids, fromId: this.routeFromId, toId: fob.id }).ok) this.setMode('normal');
+    const cmd = this.routeFromWork != null ? { type: 'route', ids, fromWork: this.routeFromWork, toId: fob.id } : { type: 'route', ids, fromId: this.routeFromId, toId: fob.id };
+    if (this.issue(cmd).ok) this.setMode('normal');
   }
 
   /** Eigenes fertiges Werk mit Ausgangslager (CITY.pickup) unter dem Weltpunkt oder null (seit v5.65). */
@@ -1048,7 +1055,7 @@ export class Controller {
     this.setMode('attackMove');
   }
 
-  /** LKW-Modi: 'loadFob' (L), 'unloadFob' (U), 'routeFrom' (T, Start-FOB). */
+  /** LKW-Modi: 'loadFob' (L), 'unloadFob' (U), 'routeFrom' (T, Start-FOB oder Werk). */
   startTruckMode(mode) {
     if (!this.selectedUnits().some(isCarrier)) {
       this.message('Kein LKW oder Transporthubschrauber gewählt');
@@ -1148,7 +1155,7 @@ export class Controller {
       case 'unloadFob':
         return 'LKW entladen: eigene FOB anklicken · Esc bricht ab';
       case 'routeFrom':
-        return 'Pendeln: Start-FOB (fertig) anklicken · Esc bricht ab';
+        return 'Pendeln: Start eigene fertige FOB oder Werk (Ausgangslager) anklicken · Esc bricht ab';
       case 'routeTo':
         return 'Pendeln: Ziel-FOB anklicken · Esc bricht ab';
       case 'mortarTarget':
@@ -1347,7 +1354,7 @@ export class Controller {
           action: () => this.startTruckMode('unloadFob'),
         }),
         entry('Pendeln', 'T', {
-          tip: 'Pendeln (T): Start-FOB, dann Ziel-FOB anklicken',
+          tip: 'Pendeln (T): Start eigene FOB oder Werk, dann Ziel-FOB anklicken',
           action: () => this.startTruckMode('routeFrom'),
         }),
       );

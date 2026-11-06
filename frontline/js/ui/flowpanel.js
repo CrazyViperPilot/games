@@ -6,8 +6,8 @@ import { resourceFlow, FlowMeter, fmtFlow } from '../game/flow.js';
 import { GOOD_COLOR, GOOD_SHORT } from '../data/goods.js';
 
 const NW = 158; // Breite eines Knotens (SVG-Einheiten; seit v5.30 158 statt 140, damit Namen und Mengen ganz hineinpassen)
-const NH = 56; // Höhe
-const PITCH = 66; // Abstand der Reihen
+const NH = 68; // Höhe (seit v5.66 mit Zeile „davon an Werken“ unter dem Hinweis, 68 statt 56)
+const PITCH = 78; // Abstand der Reihen
 const GAP = 40; // Mindestabstand zwischen zwei Spalten (Platz für die Linien und ihre Zahlen); die Breite des Graphen folgt aus der Spaltenzahl
 const MIN_W = 860; // kleinste Breite des Graphen (wenige Spalten: weiter auseinander)
 const TOP = 18; // Platz für die Spaltenköpfe
@@ -137,12 +137,14 @@ export class FlowPanel {
         where = n.where;
         t2 = n.made === null ? int(n.stock) : `${int(n.stock)} · +${fmtFlow(n.made)} −${fmtFlow(n.use)}/s`;
       }
+      // Lagerknoten mit Ausgangslager der Werke (seit v5.66): Zeile „davon an Werken: N“
+      const atWorks = n.type === 'store' && n.atWorks > 0.005 ? `<text class="fl-t4" x="11" y="61">${esc(fit(`davon an Werken: ${fmtFlow(n.atWorks)}`, 10))}</text>` : '';
       h +=
         `<g class="fl-node ${n.status}" transform="translate(${x.toFixed(1)} ${y})"><rect class="fl-box" width="${NW}" height="${NH}" rx="7"/>` +
         `<rect x="0" y="0" width="5" height="${NH}" rx="2" fill="${COLOR[n.type === 'works' ? n.good : n.key] ?? '#9aa596'}"/>` +
         `<text class="fl-t1" x="11" y="17">${esc(fit(t1, 12, NW - 16 - (where ? Math.min(60, where.length * 5.6 + 4) : 0)))}${where ? `<tspan class="fl-where"> ${esc(where)}</tspan>` : ''}</text>` +
         `<text class="fl-t2" x="11" y="33">${esc(fit(t2, 11))}</text>` +
-        `<text class="fl-t3" x="11" y="47">${esc(fit(n.note ?? '', 10))}<title>${esc(n.note ?? '')}</title></text>${bar}</g>`;
+        `<text class="fl-t3" x="11" y="47">${esc(fit(n.note ?? '', 10))}<title>${esc(n.note ?? '')}</title></text>${atWorks}${bar}</g>`;
     }
     return h + labels;
   }

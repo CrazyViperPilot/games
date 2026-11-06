@@ -2,6 +2,8 @@
 // Reihenfolge je Denkschritt: Baustellen pflegen, Verteidigung, Rückzug, Expansion (FOB-Baustellen: Zone, Relais, Flanken),
 // Forschung, Produktion (nur Hauptstadt), Verteidigungsgebäude und Mauer, Brücken, Baufahrzeuge, LKW (Lieferant/Pendler/Versorger), Sammelpunkte, Armee.
 import { CITY } from '../data/city.js';
+import { KINDS } from '../data/citykinds.js';
+import { ownWork } from '../game/logistics.js';
 import { cityAiMemory, aiCity, aiRaid, aiDefend } from './cityai.js';
 import { cityTrainers } from '../game/city/query.js';
 import { standsOf, freeSpace } from '../game/aircraft.js';
@@ -84,6 +86,9 @@ import {
   SUPPLY_MIN,
   SURPLUS_MIN,
   ROUTE_HOLD,
+  WORK_SOURCE_NEAR,
+  WORK_SOURCE_TRUCKS,
+  WORK_SOURCE_MIN_RATE,
   GARRISON_SHARE,
   GARRISON_RANGE,
   GARRISON_EVERY,
@@ -133,12 +138,18 @@ const TWO_PI = Math.PI * 2;
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 const TILE = BALANCE.map.tile;
 
+/** Eigene LKW und Hubschrauber außer `except`, die ab dem Werk mit Anker `a` pendeln (Route mit fromWork, seit v5.66). */
+function workTrucks(s, a, except) {
+  let n = 0;
+  for (const u of s.units) if (u !== except && u.order.type === 'route' && u.order.work === a) n++;
+  return n;
+}
+
 function unitVec(dx, dy) {
   const len = Math.hypot(dx, dy);
   if (len < 1e-6) return { x: 1, y: 0 };
   return { x: dx / len, y: dy / len };
 }
-
 
 /** Summe der Ladung eines LKW. */
 const cargoTotal = (u) => u.cargo.bm + u.cargo.mun + u.cargo.fuel;
@@ -157,7 +168,7 @@ export class AI {
     this.fobGoal = new Map(); // FOB-Fahrzeug-ID -> { x, y, tries } Ziel, an dem es aufbaut
     this.rallyAt = new Map(); // Gebäude-ID -> zuletzt gesetzter Sammelpunkt
     this.roles = new Map(); // LKW-ID -> 'pend' | 'vers'
-    this.routes = new Map(); // LKW-ID -> { fromId, toId, k, t0 } (Pendler)
+    this.routes = new Map(); // LKW-ID -> { fromId, toId, k, t0 } (Pendler; fromId = Quelle, eine FOB oder ein eigenes Werk, seit v5.66)
     this.engTarget = new Map(); // Baufahrzeug-ID -> Baustelle, zu der es geschickt wurde
     this.supplyAt = new Map(); // Versorger-ID -> letzter Zielpunkt
     this.memo = new Map(); // Befehlsschlüssel -> Zeitpunkt (gegen Befehls-Spam)
@@ -271,12 +282,23 @@ export class AI {
       artillery: units.filter((u) => u.def.indirect).sort((a, b) => a.id - b.id),
       combatN: combat.length + queuedCombat,
       commander: units.find((u) => u.def.hero) ?? null,
+      pickupWorks: this.pickupWorks(), // eigene fertige Werke mit Ausgangslager (seit v5.66)
       trucks: units.filter((u) => u.type === 'truck').sort((a, b) => a.id - b.id),
       helis: units.filter((u) => u.type === 'transporter').sort((a, b) => a.id - b.id),
       engineers: units.filter((u) => u.type === 'engineer').sort((a, b) => a.id - b.id),
       fobTrucks: units.filter((u) => u.def.deploys).sort((a, b) => a.id - b.id),
       alarm,
     };
+  }
+
+  /** Eigene fertige Werke mit Ausgangslager (CITY.pickup, seit v5.66), nach Id sortiert; ohne Stadt leer. */
+  pickupWorks() {
+    const g = this.game;
+    const c = g.city?.[this.team];
+    if (!c) return [];
+    const out = [];
+    for (const [i, e] of c.ents) if (e.alive && ownWork(g, this.team, i) === e) out.push(e);
+    return out.sort((a, b) => a.id - b.id);
   }
 
   /**
@@ -1054,9 +1076,10 @@ export class AI {
 
   /**
    * Bester Transport: Ziel-FOB und Sorte mit dem größten Bedarf (Zonen-FOB bevorzugt), Quelle = FOB mit dem
-   * größten Überschuss dieser Sorte (mindestens SURPLUS_MIN).
+   * größten Überschuss dieser Sorte (mindestens SURPLUS_MIN) oder seit v5.66 ein eigenes Werk mit Ausgangslager, dessen Ware die Sorte ist
+   * (workSource). `tr` ist der LKW, der die Route plant (er zählt nicht als Pendler am Werk mit).
    */
-  pendlerPlan(s, taken) {
+  pendlerPlan(s, taken, tr = null) {
     let best = null;
     for (const to of s.builtFobs) {
       const wTo = this.wantOf(s, to);
@@ -1076,13 +1099,46 @@ export class AI {
             src = f;
           }
         }
-        if (src) best = { from: src, to, k, score };
+        // Eigenes Werk (seit v5.66, nie für die Hauptstadt): wenn keine FOB Überschuss hat oder das Werk nah genug liegt
+        const near = to === s.home ? null : this.workSource(s, to, k, tr);
+        if (near && (!src || near.d <= WORK_SOURCE_NEAR * dist(src.x, src.y, to.x, to.y))) best = { from: null, work: near.work, to, k, score };
+        else if (src) best = { from: src, work: null, to, k, score };
       }
     }
     return best;
   }
 
-  /** Pendler: Route von der Überschuss-FOB zur Bedarfs-FOB, Ladungsart nach Engpass. */
+  /**
+   * Nächstes eigenes Werk mit Ausgangslager (CITY.pickup), dessen Ware k ist, für die Bedarfs-FOB `to` (seit v5.66). Höchstens
+   * WORK_SOURCE_TRUCKS LKW je Werk gleichzeitig (ohne `tr`). Liefert { work, d } oder null.
+   */
+  workSource(s, to, k, tr) {
+    const c = this.game.city?.[this.team];
+    let best = null;
+    let bd = Infinity;
+    for (const w of s.pickupWorks) {
+      if (CITY.chain[KINDS[c.kind[w.cityCell] - 1]].to !== k) continue;
+      if (workTrucks(s, w.cityCell, tr) >= WORK_SOURCE_TRUCKS) continue;
+      if (!this.workRuns(w)) continue;
+      const d = dist(w.x, w.y, to.x, to.y);
+      if (d < bd) {
+        bd = d;
+        best = w;
+      }
+    }
+    return best ? { work: best, d: bd } : null;
+  }
+
+  /** Liefert das Werk gerade? Ausstoß je s ab WORK_SOURCE_MIN_RATE oder Ausgangslager ab SURPLUS_MIN (seit v5.66). */
+  workRuns(w) {
+    const c = this.game.city[this.team];
+    return c.workOut[w.cityCell] >= WORK_SOURCE_MIN_RATE || c.out[w.cityCell] >= SURPLUS_MIN;
+  }
+
+  /**
+   * Pendler: Route von der Überschuss-FOB oder vom eigenen Werk (seit v5.66) zur Bedarfs-FOB, Ladungsart nach Engpass.
+   * Ab einem Werk gilt die Route, solange das Werk steht und die Bedarfs-FOB Bedarf hat; der LKW wartet dort auf Ware.
+   */
   managePendler(s, tr, taken) {
     const g = this.game;
     const cur = this.routes.get(tr.id);
@@ -1093,14 +1149,15 @@ export class AI {
       const active = o.type === 'route' && o.fromId === cur.fromId && o.toId === cur.toId;
       if (active && from && to && to.built) {
         const need = (this.wantOf(s, to)[cur.k] - to.store[cur.k]) / this.wantOf(s, to)[cur.k];
-        const valid = (tr.cargo[cur.k] > 50 || from.store[cur.k] >= 60) && need > 0.1;
+        // Quelle Werk (type 'city', kein Lager der FOB): gilt, solange es liefert oder der LKW schon über 50 geladen hat; Quelle FOB wie bisher
+        const valid = from.type === 'city' ? (this.workRuns(from) || tr.cargo[cur.k] > 50) && need > 0.1 : (tr.cargo[cur.k] > 50 || from.store[cur.k] >= 60) && need > 0.1;
         if (valid || g.time - cur.t0 < ROUTE_HOLD) {
           taken.add(cur.toId + cur.k);
           return;
         }
       }
     }
-    const plan = this.pendlerPlan(s, taken);
+    const plan = this.pendlerPlan(s, taken, tr);
     if (!plan) {
       if (o.type === 'route' && cur) {
         // nichts mehr zu tun: Ladung (falls vorhanden) abliefern, sonst anhalten
@@ -1110,9 +1167,12 @@ export class AI {
       }
       return;
     }
-    const r = g.issue(this.team, { type: 'route', ids: [tr.id], fromId: plan.from.id, toId: plan.to.id, preset: plan.k });
+    const r = plan.work
+      ? g.issue(this.team, { type: 'route', ids: [tr.id], fromWork: plan.work.cityCell, toId: plan.to.id, preset: plan.k })
+      : g.issue(this.team, { type: 'route', ids: [tr.id], fromId: plan.from.id, toId: plan.to.id, preset: plan.k });
     if (r.ok) {
-      this.routes.set(tr.id, { fromId: plan.from.id, toId: plan.to.id, k: plan.k, t0: g.time });
+      const src = plan.work ?? plan.from;
+      this.routes.set(tr.id, { fromId: src.id, toId: plan.to.id, k: plan.k, t0: g.time });
       taken.add(plan.to.id + plan.k);
     }
   }

@@ -243,6 +243,7 @@ export class Game {
     // anderen SAVE_FORMAT laden nicht (savegame.js). Ausnahme: das Ausgangslager der Werke (seit v5.65) fehlt in Ständen davor, leer ergänzen.
     for (const c of this.city ?? []) {
       c.out ??= new Float32Array(c.kind.length);
+      c.workOut ??= new Float32Array(c.kind.length); // seit v5.66: Ausstoß je s am Anker (leer in älteren Ständen)
       c.pickClaim ??= new Uint8Array(c.kind.length);
     }
   }
