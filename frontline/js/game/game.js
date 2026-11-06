@@ -31,6 +31,7 @@ import { createResearch, updateResearch, cmdResearch, cmdCancelResearch, rangeMu
 import { createBridges, updateBridges, cmdRepairBridge, bridgeUnder } from './river.js';
 import { createRoads } from './roads.js';
 import { updateAircraft, trainCheck, cmdLand } from './aircraft.js';
+import { updateHelis, heliTrainCheck } from './helipad.js';
 import { cmdDig, updateDig } from './excavator.js';
 
 const TILE = BALANCE.map.tile;
@@ -973,7 +974,7 @@ export class Game {
       const k = this.city && trainerKind(cmd.unit);
       return fail(k ? `${UNITS[cmd.unit]?.name ?? 'Einheit'}: nur in der ${KIND_NAME[k]} der Stadt` : 'Nur die Hauptstadt bildet Einheiten aus');
     }
-    const jetNo = trainCheck(this, b, cmd.unit); // Stellplatz: ein Flugzeug je Stellplatz
+    const jetNo = trainCheck(this, b, cmd.unit) ?? (UNITS[cmd.unit].air && !UNITS[cmd.unit].jet ? heliTrainCheck(this, b, cmd.unit) : null); // Stellplatz bzw. Heliport: ein Luftfahrzeug je Platz
     if (jetNo) return fail(jetNo);
     if (b.queue.length >= BALANCE.queueMax) return fail('Warteschlange ist voll');
     if (this.slotsUsed(team) + (UNITS[cmd.unit].slots ?? 1) > BALANCE.slotCap) return fail('Einheitenlimit erreicht');
@@ -1179,6 +1180,7 @@ export class Game {
     updateFormations(this);
     updateMovement(this, dt);
     updateAircraft(this, dt); // Jets: Flug, Rückkehr, Landung, Rollen, Tanken am Stellplatz (seit v5.03, Fliegerhorst seit v5.35)
+    updateHelis(this, dt); // Hubschrauber: Start, Landung, Tanken am Heliport (seit v5.42)
     updateCrates(this, dt);
     updateLogistics(this, dt);
     updateConstruction(this, dt);

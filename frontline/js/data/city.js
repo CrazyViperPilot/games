@@ -54,7 +54,7 @@ export const CITY = {
     delay: 6, // s ohne Treffer, bevor geheilt oder repariert wird
     levelMul: [0, 1, 1.5, 2], // Tempo × je Stufe des Gebäudes
     metalShare: 0.5, // Reparatur kostet Metall aus dem Stadtlager: metalCost der Einheit × repariert/maxHp × metalShare (Soldaten gratis)
-    refuel: 0.05, // seit v5.20: Anteil des Treibstofftanks je s, den ein Heliport seinen Hubschraubern im Umkreis gibt; Kerosin kommt aus dem Stadtlager (c.kero), 1 Einheit je Treibstoffeinheit
+    refuel: 0.05, // v5.20 bis v5.41: Heliport tankte Hubschrauber im Umkreis aus c.kero; seit v5.42 tanken sie gelandet am Kerosintank (CITY.air.heli, helipad.js). Nicht mehr benutzt
     by: {
       barracks: { units: 'inf', radius: 2, rate: 0.02 }, // Soldaten, Anteil maxHp je s (Stufe 1: 50 s von 0 auf voll)
       factory: { units: 'ground', radius: 2, rate: 0.02 }, // Bodenfahrzeuge
@@ -143,6 +143,12 @@ export const CITY = {
     upgrade: { 2: { money: 300, bm: 150, steel: 0 }, 3: { money: 700, bm: 300, steel: 150 } },
     upgradeAiReserve: 1200,
     standName: ['', 'Offener Stellplatz', 'Überdachter Stellplatz', 'Stahlbeton-Shelter'],
+    // Heliport als Landeplatz (seit v5.42, Daniels Wunsch, Logik js/game/helipad.js): ein Hubschrauber je Heliport, dort ausgebildet,
+    // startet und landet senkrecht (liftTime s), tankt und lädt gelandet aus Kerosintank und Munitionslager im Umkreis supplyRadius
+    // (Raten wie bei den Jets, tank.rate/depot.rate je Stufe des Lagers). Start und Landung sperren alle Heliports im Umkreis sepRadius
+    // Zellen sep s, mit Tower (atcRadius) sepAtc s. Heimflug, wenn der Treibstoff nur noch für den Heimweg × home + reserve s reicht
+    // oder die Bordwaffen leer sind.
+    heli: { liftTime: 2.5, sep: 6, sepAtc: 2, sepRadius: 6, home: 1.3, reserve: 6 },
     tank: { cap: [0, 300, 600, 1000], rate: [0, 3, 6, 10], fill: [0, 6, 12, 20] }, // Kerosin: Lager, Tanken je s, Befüllen je s
     depot: { cap: [0, 400, 800, 1400], rate: [0, 6, 12, 20], fill: [0, 10, 20, 32] }, // Munition: Lager, Nachladen je s, Befüllen je s
   },

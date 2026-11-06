@@ -390,8 +390,8 @@ function lostWithStand(game, u) {
   return true;
 }
 
-/** Nächster eigener Lager-Bau (Kerosintank oder Munitionslager) mit Bestand im Umkreis des Stellplatzes e. */
-function supplier(game, e, kind) {
+/** Nächster eigener Lager-Bau (Kerosintank oder Munitionslager) mit Bestand im Umkreis des Stellplatzes oder Heliports e (auch helipad.js). */
+export function supplier(game, e, kind) {
   const c = game.city[e.team];
   const R = AIR.supplyRadius * c.cell;
   let best = null;

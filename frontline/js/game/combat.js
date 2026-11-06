@@ -26,7 +26,7 @@ export function weaponOf(e) {
   return e.kind === 'unit' ? null : (e.def.weapon ?? null);
 }
 
-const dmgKey = (e) => (e.kind === 'building' ? 'struct' : e.def.jet ? (jetGrounded(e) ? 'light' : 'jet') : e.def.armor); // Jet am Boden (seit v5.35): wie ein leichtes Fahrzeug
+const dmgKey = (e) => (e.kind === 'building' ? 'struct' : e.def.jet ? (jetGrounded(e) ? 'light' : 'jet') : e.heli && e.heli.phase !== 'air' ? 'light' : e.def.armor); // Jet am Boden (seit v5.35) und Hubschrauber auf dem Heliport (seit v5.42): wie ein leichtes Fahrzeug
 
 /**
  * Schaden einer Schadenstabelle gegen e. Flugzeuge (def.jet, seit v5.15) haben die eigene Klasse 'jet'; fehlt sie in der
@@ -473,7 +473,7 @@ export function updateCombat(game, dt) {
   const wx = weatherSight(game); // Regen, Nebel und Schnee verkürzen die Zielsuche (Forschung: Optik, Drohnen verlängern sie)
 
   for (const u of units) {
-    if (!u.alive || !u.weapons.length || u.crate || u.parked || jetGrounded(u)) continue; // Kistenträger haben die Hände voll, Jets am Boden (Hangar, Rollen, Start, Ausrollen) schießen nicht
+    if (!u.alive || !u.weapons.length || u.crate || u.parked || jetGrounded(u) || (u.heli && u.heli.phase !== 'air')) continue; // Kistenträger haben die Hände voll, Jets am Boden (Hangar, Rollen, Start, Ausrollen) schießen nicht
     const o = u.order.type;
     if (NO_FIRE.has(o)) continue;
     if (u.fireTarget && o !== 'attack') {

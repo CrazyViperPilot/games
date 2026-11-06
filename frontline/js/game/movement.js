@@ -16,7 +16,7 @@ export const HASH_CELL = 128; // räumliches Hash-Gitter
 const TILE = BALANCE.map.tile;
 
 /** Aufträge, die logistics.js, construction.js, garrison.js und crates.js selbst fahren (updateMovement lässt sie aus). */
-export const OWN_DRIVERS = new Set(['load', 'unload', 'route', 'build', 'repair', 'board', 'dropoff', 'garrison', 'storm', 'pickup', 'deliver', 'repairBridge', 'dig']);
+export const OWN_DRIVERS = new Set(['load', 'unload', 'route', 'build', 'repair', 'board', 'dropoff', 'garrison', 'storm', 'pickup', 'deliver', 'repairBridge', 'dig', 'land']);
 
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 
@@ -429,7 +429,7 @@ export function updateMovement(game, dt) {
     if (dt > 0) u.speedNow = Math.hypot(u.x - u.prevX, u.y - u.prevY) / dt;
     u.prevX = u.x;
     u.prevY = u.y;
-    if (u.house || u.def.jet || OWN_DRIVERS.has(u.order.type)) continue; // Besatzer eines Hauses bewegen sich nicht; Jets fliegt aircraft.js
+    if (u.house || u.def.jet || OWN_DRIVERS.has(u.order.type) || (u.heli && u.heli.phase !== 'air')) continue; // Besatzer eines Hauses bewegen sich nicht; Jets fliegt aircraft.js, Hubschrauber am Heliport helipad.js
     stepUnit(game, u, dt);
   }
 }

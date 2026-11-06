@@ -5,6 +5,7 @@ import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { planPath, setIdle } from './movement.js';
 import { parkNew } from './aircraft.js';
+import { isHeliport, landHeliNew } from './helipad.js';
 
 const STOCK_KEYS = ['bm', 'mun', 'fuel'];
 const INCOME_TAU = 2; // Glättungszeitkonstante des angezeigten Einkommens (s)
@@ -73,6 +74,11 @@ export function updateEconomy(game, dt) {
       if (game.city) u.crew = crewOf(type); // Stadt: die Einheit belegt Einwohner, solange sie lebt
       if (u.def.jet) {
         parkNew(game, u, b); // Flugzeug: steht auf seinem Stellplatz (aircraft.js)
+        game.message(b.team, `${ut.name} bereit`, u.x, u.y);
+        continue;
+      }
+      if (u.def.air && isHeliport(game, b)) {
+        landHeliNew(game, u, b); // Hubschrauber: steht gelandet auf seinem Heliport (helipad.js, seit v5.42)
         game.message(b.team, `${ut.name} bereit`, u.x, u.y);
         continue;
       }
