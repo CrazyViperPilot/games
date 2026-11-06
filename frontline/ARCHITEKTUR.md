@@ -136,6 +136,8 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 | `smoke`, `mine` | `ids` | `abilities.js` | Nebelwand (Fahrzeuge) / Mine (Baufahrzeug) |
 | `rally` | `buildingId, x, y` | `game.js` `cmdRally` | Sammelpunkt |
 | `demolish` | `buildingId` | `game.js` `cmdDemolish` | Gebäude abreißen |
+| `setDifficulty` | `difficulty` (`easy`, `normal`, `hard`) | `game.js` | KI meldet ihr Team an (seit v5.58, aus dem Konstruktor von `AI`): `isAI`, `incomeMult` aus `BALANCE.difficulty` |
+| `debug` | `money?`, `weather?`, `season?`, `hold?` | `game.js` `cmdDebug` | Nur mit `new Game({ debug: true })` (`?debug=1`, seit v5.58): Geld dazu (Taste M) / Wetter setzen, mit `hold` bleibt es |
 
 ## 7. Dateien
 

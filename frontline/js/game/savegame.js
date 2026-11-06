@@ -19,7 +19,8 @@ const CLASSES = { Game, Grid, Fog, Relief, AI };
 /** Version des Abbilds; bei inkompatibler Änderung der Spielzustände erhöhen (alte Stände werden dann nicht geladen). */
 // 2 seit v5.14: größere Karte (11072 px). 3 seit v5.56: Migrationen alter Stände entfernt (Flughafen, Universität und Werke als
 // Einzelzellen, alter Forschungsbaum, FOB-Baustellen, F-16 mit einer Waffe); Daniels Entscheidung: alte Stände müssen nicht laden.
-export const SAVE_FORMAT = 3;
+// 4 seit v5.58: Buchhaltung der Stadt-KI in der KI-Instanz (AI.cityMem) statt im Stadtzustand.
+export const SAVE_FORMAT = 4;
 
 export function snapshotGame(game, ai) {
   return encode({ game, ai }, STATICS, CLASSES);

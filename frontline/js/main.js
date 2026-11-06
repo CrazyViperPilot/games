@@ -21,7 +21,7 @@ import { pickMood, MOOD_SETTINGS } from './render/mood.js';
 import { snapshotGame, restoreGame, SAVE_FORMAT } from './game/savegame.js';
 import { pack, unpack } from './core/snapshot.js';
 import * as saves from './ui/saves.js';
-import { setWeather, WEATHER_NAMES, WEATHER_SETTINGS } from './game/weather.js';
+import { WEATHER_NAMES, WEATHER_SETTINGS } from './game/weather.js';
 
 const params = new URLSearchParams(location.search);
 const DEBUG = params.get('debug') === '1';
@@ -349,9 +349,7 @@ const app = {
   debugMoney() {
     const s = session;
     if (!DEBUG || !s) return;
-    const team = s.game.teams[HUMAN];
-    team.res.money += 1000;
-    s.hud.pushMessage('Debug: +1000 Geld');
+    if (s.game.issue(HUMAN, { type: 'debug', money: 1000 }).ok) s.hud.pushMessage('Debug: +1000 Geld');
   },
 };
 
@@ -411,10 +409,10 @@ function startGame(opts) {
   const map = opts.mapId && opts.mapId !== 'random' ? loadMap(opts.mapId) : null; // gespeicherte Karte, sonst aus dem Seed
   const weather = DEBUG && WEATHER_SETTINGS.includes(params.get('weather')) ? params.get('weather') : opts.weather ?? 'off';
   const river = params.has('river') ? params.get('river') === '1' : opts.river !== false; // ?river=0|1 übersteuert das Startmenü
-  const game = new Game({ seed, winPoints: opts.winPoints, startMoney: loadWallet(), map, radio: opts.radio !== false, weather, research: opts.research !== false, river, city: !!opts.city });
+  const game = new Game({ seed, winPoints: opts.winPoints, startMoney: loadWallet(), map, radio: opts.radio !== false, weather, research: opts.research !== false, river, city: !!opts.city, debug: DEBUG });
   if (DEBUG && WEATHER_NAMES[params.get('wx')]) {
-    setWeather(game, params.get('wx'), params.get('wx') === 'snow' ? 'winter' : game.weather.season); // Schnee nur im Winter
-    game.weather.next = Infinity; // bleibt so (Grafik prüfen)
+    const wx = params.get('wx');
+    game.issue(HUMAN, { type: 'debug', weather: wx, season: wx === 'snow' ? 'winter' : game.weather.season, hold: true }); // Schnee nur im Winter; bleibt so (Grafik prüfen)
   }
   const ai = new AI(game, AI_TEAM, opts.difficulty);
   buildSession(game, ai, opts, null);

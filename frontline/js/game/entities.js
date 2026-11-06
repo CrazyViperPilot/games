@@ -113,7 +113,7 @@ export function createBuilding(id, type, team, cx, cy, tile) {
     cy,
     w,
     h,
-    hp: def.hp * 0.1,
+    hp: def.hp * BALANCE.construction.siteHp,
     maxHp: def.hp,
     alive: true,
     built: false,

@@ -90,10 +90,9 @@ function groundOf(k, lv, half) {
  * gates = { e: Wände, n, w, h } Rolltore, door = Wände mit Tür, stripe = Band in Teamfarbe, ribs = Wellblech-Rippen.
  * Wände: 0 Norden (y0), 1 Osten (x1), 2 Süden (y1), 3 Westen (x0).
  */
-function bodiesOf(k, lv, half) {
+function bodiesOf(k, lv) {
   const b = [];
   const box = (x0, y0, x1, y1, h, c, roof, base = 0, deco = null) => b.push({ t: 'box', x0, y0, x1, y1, h, base, c, roof, ...deco });
-  const veh = (v, x, y, ax) => b.push({ t: 'veh', v, x, y, ax, h: VEH[v].h }); // Fahrzeug, Front nach +ax
   const cyl = (x, y, r, h, c, o = {}) => b.push({ t: 'cyl', x, y, r, r1: o.r1 ?? r, h, base: o.base ?? 0, c, band: o.band ?? null });
   const show = (unit, x, y, angle) => UNITS[unit] && b.push({ t: 'unit', unit, x, y, angle, h: 10 }); // Ausstellungsstück (seit v5.40)
   if (k === 'barracks') {
@@ -178,7 +177,7 @@ export function bigPlan(k, lv, cx, cy, size) {
     if (p.pts) p.pts = p.pts.map(([x, y]) => [x + cx, y + cy]);
     return p;
   };
-  const bodies = bodiesOf(k, Math.max(1, lv), half).map(mv);
+  const bodies = bodiesOf(k, Math.max(1, lv)).map(mv);
   if (k === 'barracks' || k === 'factory') for (const p of bodies) p.fine = true; // seit v5.11: weichere Wände und Schmuck (isobuild.js)
   const plan = { ground: groundOf(k, Math.max(1, lv), half).map(mv), bodies };
   if (plans.size > 48) plans.clear();
@@ -188,7 +187,7 @@ export function bigPlan(k, lv, cx, cy, size) {
 
 /** Höchster Punkt einer Anlage (Weltpixel): Schild darüber. */
 export function bigTop(k, lv) {
-  return Math.max(30, ...bodiesOf(k, Math.max(1, lv), 0).map((p) => (p.base ?? 0) + (p.h ?? 0) + (p.gable ?? p.saw?.rh ?? 0)));
+  return Math.max(30, ...bodiesOf(k, Math.max(1, lv)).map((p) => (p.base ?? 0) + (p.h ?? 0) + (p.gable ?? p.saw?.rh ?? 0)));
 }
 
 // ---- Boden (citylayer.js stellt die Zeichenhilfen: Fläche, Linie, Kreis auf dem Gelände) ----

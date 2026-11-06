@@ -15,6 +15,19 @@ import { weatherSight } from '../game/weather.js';
 import { researchBlock, RESEARCH_KEYS } from '../game/research.js';
 import { RESEARCH } from '../data/research.js';
 import {
+  RESERVE_FROM,
+  ZONE_BAN,
+  ZONE_REACH,
+  WAVE_NEUTRAL,
+  SCOUT_EVERY,
+  SCOUT_MOVE,
+  COUNTER_FLOOR,
+  WALL_RETRY,
+  SUPPLY_FROM,
+  QUEUE_RICH,
+  QUEUE_LONG,
+  QUEUE_SHORT,
+  FOB_WANT,
   JET_GROUP,
   JET_EVERY,
   JET_QUEUE,
@@ -148,10 +161,10 @@ export class AI {
     this.raid = null; // laufender Flankenangriff { ids, targetId }
     this.lastWave = 0; // Zeitpunkt der letzten Angriffswelle
     this.zoneBan = 0; // bis dahin keine neue Zonen-FOB (nach Verlust, gegen Nachschub in den Tod)
+    // Buchhaltung der Stadt-KI (seit v5.58 hier statt im Stadtzustand): Ausbautakte, Zeit seit dem letzten Überfall, letzter Verteidigungsbefehl
+    this.cityMem = { turn: 0, raidTimer: 0, defendAt: -1e9 };
 
-    const t = game.teams[team];
-    t.isAI = true;
-    t.incomeMult = this.cfg.incomeMult;
+    game.issue(team, { type: 'setDifficulty', difficulty: this.difficulty }); // Team als KI markieren, Einkommensfaktor (Regel 2)
   }
 
   update(dt) {
@@ -165,16 +178,16 @@ export class AI {
   think() {
     this.cityTimer = (this.cityTimer ?? 0) + this.cfg.think;
     if (this.game.city) {
-      aiRaid(this.game, this.team, this.difficulty, this.cfg.think); // Angriffe auf die gegnerische Stadt (Werke zuerst)
-      aiDefend(this.game, this.team); // eigene Stadt verteidigen
+      aiRaid(this.game, this.team, this.difficulty, this.cfg.think, this.cityMem); // Angriffe auf die gegnerische Stadt (Werke zuerst)
+      aiDefend(this.game, this.team, this.cityMem); // eigene Stadt verteidigen
     }
     if (this.game.city && this.cityTimer >= CITY.ai.interval[this.difficulty]) {
       this.cityTimer = 0;
-      aiCity(this.game, this.team, this.difficulty); // Stadt ausbauen: Ringe, Viertel, Förderung, Markt (city.js)
+      aiCity(this.game, this.team, this.difficulty, this.cityMem); // Stadt ausbauen: Ringe, Viertel, Förderung, Markt (city.js)
     }
     const s = this.snapshot();
     this.budget = MAX_PLACE;
-    if (this.hadZoneFob && !s.zoneFob) this.zoneBan = this.game.time + 150;
+    if (this.hadZoneFob && !s.zoneFob) this.zoneBan = this.game.time + ZONE_BAN;
     this.hadZoneFob = !!s.zoneFob;
     this.defend(s);
     this.retreat(s);
@@ -601,7 +614,7 @@ export class AI {
       }
     }
     for (const an of anchors) {
-      if (dist(an.x, an.y, s.zone.x, s.zone.y) > s.zone.r + 900) continue;
+      if (dist(an.x, an.y, s.zone.x, s.zone.y) > s.zone.r + ZONE_REACH) continue;
       for (const r of [0, 120, 240]) {
         for (const o of [0, 60, -60, 120, -120, 180]) {
           if (this.budget <= 0) return null;
@@ -642,7 +655,7 @@ export class AI {
     const g = this.game;
     const t = this.team;
     const res = g.teams[t].res;
-    const qmax = res.money > 900 ? 4 : 2;
+    const qmax = res.money > QUEUE_RICH ? QUEUE_LONG : QUEUE_SHORT;
 
     // Baufahrzeuge: 1 (2 ab 3 FOBs)
     const engWant = s.fobs.length >= 3 ? 2 : 1;
@@ -738,7 +751,7 @@ export class AI {
     const armored = foes.filter((e) => e.def.armor !== 'inf').length / foes.length;
     // Gepanzerte Gegner: PAK und Panzer rauf (doppelt gewichtet), Schützen und Schützenpanzer runter; bei Infanterie umgekehrt.
     const shift = COUNTER_WEIGHT * (2 * armored - 1);
-    const f = (u, k) => Math.max(0.05, MIX[u] * (1 + k * shift));
+    const f = (u, k) => Math.max(COUNTER_FLOOR, MIX[u] * (1 + k * shift));
     return { rifleman: f('rifleman', -1), at: f('at', 2), ifv: f('ifv', -1), tank: f('tank', 2) };
   }
 
@@ -834,7 +847,7 @@ export class AI {
     // Tor zuerst; danach die Linie – das Torfeld ist dann belegt und wird übersprungen (idempotent)
     g.issue(t, { type: 'buildWall', building: 'gate', ids, x1: grid.center(gc), y1: grid.center(gr), x2: grid.center(gc), y2: grid.center(gr) });
     const r = g.issue(t, { type: 'buildWall', building: 'wall', ids, x1, y1, x2, y2 });
-    if (!r.ok) this.memo.set('wall', g.time + 110); // Linie steht bereits (oder nichts baubar): lange nicht erneut versuchen
+    if (!r.ok) this.memo.set('wall', g.time + WALL_RETRY); // Linie steht bereits (oder nichts baubar): lange nicht erneut versuchen
   }
 
   // ---- Festung ---------------------------------------------------------------------
@@ -957,7 +970,7 @@ export class AI {
   /** Soll-Zahl der LKW je Rolle: Pendler je 2 Außen-FOBs (max. 3), Versorger (seit v5.03 kein Lieferant für FOB-Baustellen). */
   truckQuota(s) {
     const pend = Math.min(3, Math.ceil(Math.max(0, s.fobs.length - 1) / 2));
-    const vers = s.combat.length >= 15 ? 1 : 0;
+    const vers = s.combat.length >= SUPPLY_FROM ? 1 : 0;
     return { pend, vers, total: pend + vers };
   }
 
@@ -983,7 +996,7 @@ export class AI {
 
   /** Soll-Lagerstand einer FOB je Sorte: die Zonen-FOB braucht am meisten (Mörser, Flak, Nachladen); die Hauptstadt ist unendlich. */
   wantOf(s, f) {
-    const w = f === s.zoneFob ? { bm: 400, mun: 300, fuel: 150 } : f === s.home ? { bm: 300, mun: 200, fuel: 200 } : { bm: 300, mun: 150, fuel: 80 };
+    const w = { ...(f === s.zoneFob ? FOB_WANT.zone : f === s.home ? FOB_WANT.home : FOB_WANT.other) }; // Kopie: FORT_WANT kommt dazu
     if (s.own.some((b) => b.type === 'tower' && dist(b.x, b.y, f.x, f.y) <= DEF_RANGE)) {
       w.bm += FORT_WANT.bm; // Festung: Türme und Mauern brauchen Material und Munition
       w.mun += FORT_WANT.mun;
@@ -1211,7 +1224,7 @@ export class AI {
     const v = unitVec(foe.x - z.x, foe.y - z.y);
     const x = z.x + v.x * z.r * 0.8;
     const y = z.y + v.y * z.r * 0.8;
-    if (dist(bird.x, bird.y, x, y) > 120 && this.once('scout-go', 8)) g.issue(t, { type: 'move', ids: [bird.id], x, y });
+    if (dist(bird.x, bird.y, x, y) > SCOUT_MOVE && this.once('scout-go', SCOUT_EVERY)) g.issue(t, { type: 'move', ids: [bird.id], x, y });
   }
 
   /** Merkt sich gesehene gegnerische FOBs (Standort bleibt bekannt, bis man ihn einsieht und dort nichts mehr steht). */
@@ -1518,11 +1531,11 @@ export class AI {
       // Nur wer noch nicht in der Zone steht, zählt zur Welle (sonst gehen Nachrücker einzeln los, weil die Zonenbesatzung mitzählt).
       const strength = idle.filter((u) => !inZone(u)).reduce((sum, u) => sum + (UNITS[u.type].cost.money || 0), 0);
       const need = this.waveNeed(inside);
-      const ready = strength >= need || (z.owner === -1 && strength >= 0.6 * need);
+      const ready = strength >= need || (z.owner === -1 && strength >= WAVE_NEUTRAL * need);
       if (ready) {
         let go = idle.filter((u) => !inZone(u));
         // Reserve: die Einheiten nahe der Hauptstadt bleiben zur Verteidigung zurück (die große Startarmee rückt trotzdem aus)
-        if (s.home && go.length >= 5) {
+        if (s.home && go.length >= RESERVE_FROM) {
           go.sort((a, b) => dist(a.x, a.y, s.ax, s.ay) - dist(b.x, b.y, s.ax, s.ay));
           go = go.slice(Math.ceil(go.length * RESERVE));
         }

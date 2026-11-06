@@ -25,7 +25,7 @@ import { createAnimals, updateAnimals } from './animals.js';
 import { FORMATIONS, formationSlots, updateFormations } from './formation.js';
 import { hasCommander, updateCommanders, commanderFallen } from './commander.js';
 import { updateRadio, radioStarted, radioLost } from './radio.js';
-import { createWeather, updateWeather } from './weather.js';
+import { createWeather, updateWeather, setWeather, WEATHER_NAMES } from './weather.js';
 import { updateAbilities, cmdAbility } from './abilities.js';
 import { createResearch, updateResearch, cmdResearch, cmdCancelResearch, rangeMul } from './research.js';
 import { createBridges, updateBridges, cmdRepairBridge, bridgeUnder } from './river.js';
@@ -129,8 +129,9 @@ export class Game {
   /** research: Forschungsstufen (research.js; ohne Angabe aus: alle Einheiten frei, keine Verbesserungen). */
   /** city: Zonenstadt hinter der Hauptstadt (city.js; ohne Angabe aus: Hauptstadt hat unendlich Material). */
   /** river: Zufallskarte mit Flüssen, Brücken und Furten (river.js; ohne Angabe aus). Fertige Karten bringen ihre eigenen mit. */
-  constructor({ seed = 1, winPoints = BALANCE.winPoints, startMoney = BALANCE.startRes.money, map = null, radio = false, weather = 'off', research = false, river = false, city = false } = {}) {
+  constructor({ seed = 1, winPoints = BALANCE.winPoints, startMoney = BALANCE.startRes.money, map = null, radio = false, weather = 'off', research = false, river = false, city = false, debug = false } = {}) {
     this.seed = seed;
+    this.debug = !!debug; // ?debug=1: erlaubt den Befehl `debug` (Geld, festes Wetter), seit v5.58
     this.rng = makeRng(seed);
     this.map = map ?? generateMap(seed, { river });
     this.grid = new Grid(W / TILE, H / TILE, TILE);
@@ -660,9 +661,31 @@ export class Game {
         return this.cmdRally(team, cmd);
       case 'demolish':
         return this.cmdDemolish(team, cmd);
+      case 'setDifficulty': {
+        // KI meldet sich an (seit v5.58, Regel 2): Team als KI markieren, Einkommensfaktor der Schwierigkeit
+        const d = BALANCE.difficulty[cmd.difficulty];
+        if (!d) return fail('Unbekannte Schwierigkeit');
+        this.teams[team].isAI = true;
+        this.teams[team].incomeMult = d.incomeMult;
+        return { ok: true };
+      }
+      case 'debug':
+        return this.cmdDebug(team, cmd);
       default:
         return fail('Unbekannter Befehl');
     }
+  }
+
+  /** Debug-Befehl (nur mit `debug` im Spiel, ?debug=1): money = Geld dazu; weather (+ season) = Wetter setzen, hold = es bleibt so. */
+  cmdDebug(team, cmd) {
+    if (!this.debug) return fail('Nur im Debug-Modus');
+    if (cmd.weather && !WEATHER_NAMES[cmd.weather]) return fail('Unbekanntes Wetter');
+    if (cmd.money) this.teams[team].res.money += cmd.money;
+    if (cmd.weather) {
+      setWeather(this, cmd.weather, cmd.season);
+      if (cmd.hold) this.weather.next = Infinity;
+    }
+    return { ok: true };
   }
 
   ownUnits(team, ids = []) {

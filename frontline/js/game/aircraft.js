@@ -540,7 +540,7 @@ function circle(u, ox, oy, dt, tf) {
  * Liefert { tx, ty (Schwelle), dx, dy (Landerichtung), ex, ey (Bahnende) }.
  */
 function landPlan(rw) {
-  const need = J.final + J.base + 600;
+  const need = J.final + J.base + J.planRoom;
   const room = (p, q) => {
     // Platz vor der Schwelle p, entgegen der Landerichtung p → q
     const dx = Math.sign(q.x - p.x);
@@ -579,15 +579,15 @@ function approach(game, u, e, dt) {
   const head = Math.cos(hd); // 1 = Nase in Landerichtung
   const full = u.jet.speed;
   const near = dist(u.x, u.y, P.tx, P.ty) < J.final * 2.5;
-  const aligned = head > 0.95 && Math.abs(cross) < 30;
-  let onFinal = head > 0.85 && Math.abs(cross) < 80 && along < J.touch + J.zone && along > -J.final * 2;
+  const aligned = head > 0.95 && Math.abs(cross) < J.alignCross;
+  let onFinal = head > 0.85 && Math.abs(cross) < J.finalCross && along < J.touch + J.zone && along > -J.final * 2;
   // Bahn für die Landung belegen, sobald der Gleitpfad beginnt; belegt: weiter Platzrunde
   if (onFinal && along > -J.glide - 60 && !lockRunway(game, c, route.rw, u)) onFinal = false;
-  const room = J.touch - along >= Math.abs(cross) * 1.5 + J.glide * 0.6; // genug Strecke, um auf die Mittellinie einzudrehen
+  const room = J.touch - along >= Math.abs(cross) * J.turnIn + J.glide * J.turnGlide; // genug Strecke, um auf die Mittellinie einzudrehen
   const clamp = (p) => ({ x: Math.min(BALANCE.map.width - 100, Math.max(100, p.x)), y: Math.min(BALANCE.map.height - 100, Math.max(100, p.y)) });
   let want = full;
   if (onFinal || (along < -J.base && room && !u.jet.goAround)) {
-    const t = W(Math.min(along + 300, J.touch + 300), 0);
+    const t = W(Math.min(along + J.lead, J.touch + J.lead), 0);
     fly(u, t.x, t.y, dt);
     const glide = onFinal && aligned ? Math.max(0, (J.touch - along) / J.glide) : 1;
     u.jet.alt = glide < u.jet.alt ? Math.max(glide, u.jet.alt - (2 * dt) / J.climb) : Math.min(1, u.jet.alt + dt / J.climb);
@@ -603,12 +603,12 @@ function approach(game, u, e, dt) {
     // Gegenanflug: seitlich der Bahn (Seite, auf der er ankommt) hinaus, bis Platz zum Eindrehen ist
     u.jet.side ??= cross >= 0 ? 1 : -1;
     const off = along < -J.base ? Math.max(J.pattern, Math.min(Math.abs(cross), J.pattern * 2)) : J.pattern;
-    let t = W(-(J.final + J.base + 400), u.jet.side * off);
+    let t = W(-(J.final + J.base + J.outbound), u.jet.side * off);
     const tc = clamp(t);
     if (tc.x !== t.x || tc.y !== t.y) {
-      const t2 = W(-(J.final + J.base + 400), -u.jet.side * off); // Kartenrand: andere Seite
+      const t2 = W(-(J.final + J.base + J.outbound), -u.jet.side * off); // Kartenrand: andere Seite
       if (clamp(t2).x === t2.x && clamp(t2).y === t2.y) u.jet.side = -u.jet.side;
-      t = clamp(W(-(J.final + J.base + 400), u.jet.side * off));
+      t = clamp(W(-(J.final + J.base + J.outbound), u.jet.side * off));
     }
     fly(u, t.x, t.y, dt);
     u.jet.alt = Math.min(1, u.jet.alt + dt / J.climb);
@@ -664,7 +664,7 @@ function stepAirborne(game, u, dt) {
     u.jet.home = home.id; // der Stellplatz ist für ihn reserviert
     u.jet.rtb = why;
     if (u.jet.lift) {
-      fly(u, u.x + Math.cos(u.angle) * 300, u.y + Math.sin(u.angle) * 300, dt, tf); // erst steigen
+      fly(u, u.x + Math.cos(u.angle) * J.lead, u.y + Math.sin(u.angle) * J.lead, dt, tf); // erst steigen
       u.jet.alt = Math.min(1, u.jet.alt + dt / J.climb);
       return;
     }

@@ -181,3 +181,32 @@ test('KI-Schwierigkeit über Verhalten: leicht ohne Späher/Konter/Überfall/Rü
   assert.deepEqual([d.hard.scout, d.hard.counter, d.hard.raid, d.hard.fallback], [true, true, true, true]);
   assert.equal(d.hard.incomeMult, 1);
 });
+
+test('KI meldet ihr Team über game.issue an (setDifficulty) und führt die Stadt-Buchhaltung selbst (seit v5.58)', () => {
+  const g = new Game({ seed: 3, city: true });
+  assert.equal(g.teams[1].isAI, false);
+  const ai = new AI(g, 1, 'easy');
+  assert.equal(g.teams[1].isAI, true);
+  assert.equal(g.teams[1].incomeMult, BALANCE.difficulty.easy.incomeMult);
+  assert.equal(g.issue(0, { type: 'setDifficulty', difficulty: 'unbekannt' }).ok, false);
+  for (let i = 0; i < 20 * 60; i++) {
+    g.update(DT);
+    ai.update(DT);
+  }
+  assert.ok(ai.cityMem.turn > 0, 'Ausbautakte zählen in der KI');
+  for (const k of ['aiTurn', 'raidTimer', 'defendAt']) assert.equal(g.city[1][k], undefined, `${k} nicht im Stadtzustand`);
+});
+
+test('Debug-Befehl nur mit debug im Spiel: Geld und festes Wetter (seit v5.58)', () => {
+  const off = new Game({ seed: 3 });
+  const m0 = off.teams[0].res.money;
+  assert.equal(off.issue(0, { type: 'debug', money: 1000 }).ok, false);
+  assert.equal(off.teams[0].res.money, m0);
+  const g = new Game({ seed: 3, debug: true, weather: 'summer' });
+  assert.ok(g.issue(0, { type: 'debug', money: 1000 }).ok);
+  assert.equal(g.teams[0].res.money, m0 + 1000);
+  assert.equal(g.issue(0, { type: 'debug', weather: 'hagel' }).ok, false);
+  assert.ok(g.issue(0, { type: 'debug', weather: 'fog', hold: true }).ok);
+  assert.equal(g.weather.kind, 'fog');
+  assert.equal(g.weather.next, Infinity);
+});

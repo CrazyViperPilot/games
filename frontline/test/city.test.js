@@ -6,7 +6,7 @@ import { CITY } from '../js/data/city.js';
 import { BALANCE } from '../js/data/balance.js';
 import { AI } from '../js/ai/ai.js';
 import { treeGone } from '../js/game/city.js';
-import { KINDS, canZone, cityNoise, freePop, aiCity, aiDefend, aiRaid, hasRoad, hasMarket, cityEntityAt, cityTrainers, KIND_ID, sizeOf, cellsOf, isPart, forEnemyCity, cityLevel, accessCells, roadAt, cellRect, connectRoad, DEPOSITS, cellAt } from '../js/game/city.js';
+import { KINDS, canZone, cityNoise, freePop, cityAiMemory, aiCity, aiDefend, aiRaid, hasRoad, hasMarket, cityEntityAt, cityTrainers, KIND_ID, sizeOf, cellsOf, isPart, forEnemyCity, cityLevel, accessCells, roadAt, cellRect, connectRoad, DEPOSITS, cellAt } from '../js/game/city.js';
 import { transportOf, transportInfo } from '../js/game/transport.js';
 import { snapshotGame, restoreGame } from '../js/game/savegame.js';
 import { RELIEF } from '../js/game/relief.js';
@@ -541,11 +541,12 @@ test('Freie Planung: knapper Treibstoff mit Öl im Überfluss → KI weist Raffi
   const c = g.city[1];
   run(g, 20);
   const fuel0 = c.list.filter((i) => c.kind[i] === KIND_ID.fuel).length;
+  const mem = cityAiMemory();
   for (let n = 0; n < 30; n++) {
     g.mainFob(1).store.fuel = 100;
     c.stats.raw.oil = 50; // reichlich Öl, zu wenig Raffinerie
     c.stats.free = 50; // genug freie Einwohner
-    aiCity(g, 1, 'normal');
+    aiCity(g, 1, 'normal', mem);
   }
   const fuel1 = c.list.filter((i) => c.kind[i] === KIND_ID.fuel).length;
   const steel = c.list.filter((i) => c.kind[i] === KIND_ID.steel).length;
@@ -583,9 +584,7 @@ test('KI verteidigt beschossene Stadtgebäude und greift gegnerische Werke zuers
   const own = g.city[0];
   g.fog[1].revealAll?.();
   for (const u of g.units) if (u.team === 1) u.order = { type: 'idle' };
-  own.raidTimer = 0;
-  c.raidTimer = 1e9;
-  aiRaid(g, 1, 'normal', 1);
+  aiRaid(g, 1, 'normal', 1, { ...cityAiMemory(), raidTimer: 1e9 }); // Überfall fällig
   const raiders = g.units.filter((u) => u.team === 1 && u.order.type === 'attackMove');
   assert.ok(raiders.length > 0, 'Angreifer unterwegs');
   // Ziel ist ein wertvolles Gebäude (Werk, Kraftwerk, Fabrikhalle; seit v5.03 Großbauten mit eigener Mitte), kein Wohnhaus
@@ -803,7 +802,7 @@ test('KI baut die Universität als 3 × 3-Großbau', () => {
   g.teams[1].res.money = 50000;
   let a = -1;
   for (let k = 0; k < 120 && a < 0; k++) {
-    aiCity(g, 1, 'normal');
+    aiCity(g, 1, 'normal', ai.cityMem);
     run(g, 1);
     const c = g.city[1];
     a = c.list.find((j) => c.kind[j] === KIND_ID.uni && c.part[j] - 1 === j) ?? -1;
@@ -942,8 +941,9 @@ test('KI baut Werke als 2 × 2-Großbauten', () => {
   const c = g.city[1];
   const isWork = (j) => ['bm', 'mun', 'steel'].includes(KINDS[c.kind[j] - 1]);
   let works = [];
+  const mem = cityAiMemory();
   for (let k = 0; k < 90 && works.length < 8; k++) {
-    aiCity(g, 1, 'normal');
+    aiCity(g, 1, 'normal', mem);
     run(g, 1);
     works = c.list.filter(isWork);
   }

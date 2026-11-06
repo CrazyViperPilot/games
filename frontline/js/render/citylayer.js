@@ -189,7 +189,7 @@ export function drawCityGround(ren, ctx, team, known, inRect) {
   drawAirfield(ren, ctx, team, known, inRect);
   drawRoads(ren, ctx, team, known);
   if (ren.cityUi?.open) drawLoads(ren, ctx, team, known, inRect); // Baumodus: Auslastung der Straßen
-  drawTerritory(ren, ctx, team, known);
+  drawTerritory(ren, ctx, team);
   ctx.restore();
 }
 
@@ -1118,7 +1118,7 @@ function groundLine(ren, ctx, x0, y0, x1, y1) {
  * Gebietsgrenzen (eigene immer, fremde wo erkundet) als Linie in Teamfarbe; im Baumodus dazu bebaubare Zellen hell,
  * gesperrte dunkel und das gezogene Rechteck in der Farbe des Werkzeugs.
  */
-function drawTerritory(ren, ctx, team, known) {
+function drawTerritory(ren, ctx, team) {
   const g = ren.game;
   const ui = ren.cityUi?.open ? ren.cityUi : null;
   const V = ren.camera.visibleRect();

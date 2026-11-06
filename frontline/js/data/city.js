@@ -118,9 +118,9 @@ export const CITY = {
     use: { res: 1, com: 3, market: 3, bm: 8, mun: 8, fuel: 8, kero: 8, smelter: 10, steel: 10, mine: 4, uni: 12, dc: 30, power: 0, barracks: 2, factory: 8, heliport: 6, hospital: 6, stand: 2, atc: 6, ktank: 2, mdepot: 2 },
   },
   // Zufriedenheit 0 … 1 = base + shops × Versorgung (Gewerbe-Arbeiter je Einwohner, voll ab shopPer) + safety × Sicherheit
-  // (weniger Treffer auf die Stadt in den letzten 60 s, null ab hitsBad) + power × Strom. Wirkung: Erträge und Steuern × (lo + span × Zufriedenheit),
-  // Zuzug × (0,5 + Zufriedenheit).
-  happy: { base: 0.2, shops: 0.35, shopPer: 0.1, safety: 0.25, hitsBad: 10, power: 0.2, lo: 0.7, span: 0.4 },
+  // (weniger Treffer auf die Stadt in den letzten hitWindow s, null ab hitsBad; gezählt werden höchstens CITY.ai.hitLog Treffer) + power × Strom.
+  // Wirkung: Erträge und Steuern × (lo + span × Zufriedenheit), Zuzug × (0,5 + Zufriedenheit).
+  happy: { base: 0.2, shops: 0.35, shopPer: 0.1, safety: 0.25, hitsBad: 10, hitWindow: 60, power: 0.2, lo: 0.7, span: 0.4 },
 
   // ---- Fliegerhorst (seit v5.35, PRD §15 „Fliegerhorst“; Logik js/game/aircraft.js) ----
   // Start-/Landebahn: Zellen wie Straßen (sofort fertig); in jeder Gruppe Bahnzellen ist der längste gerade Streifen runwayWidth breit die
@@ -139,7 +139,8 @@ export const CITY = {
     shelter: [1, 1, 0.5, 0.15],
     // Ausbau der Stellplätze (seit v5.39, Daniels Wunsch): nicht mehr von selbst, nur über „Ausbauen“ am gewählten Stellplatz.
     // Stufe 2 Überdachung (Stahldach auf Stützen), Stufe 3 Stahlbeton-Shelter (Hardened Aircraft Shelter); Kosten je Stufe
-    // (Geld, Baumaterial aus dem Lager der Hauptstadt, Stahl aus dem Stadtlager). Die KI baut aus, wenn danach aiReserve Geld bleibt.
+    // (Geld, Baumaterial aus dem Lager der Hauptstadt, Stahl aus dem Stadtlager). Die KI baut aus, wenn danach upgradeAiReserve Geld
+    // und CITY.ai.upgradeBuffer Baumaterial und Stahl bleiben.
     upgrade: { 2: { money: 300, bm: 150, steel: 0 }, 3: { money: 700, bm: 300, steel: 150 } },
     upgradeAiReserve: 1200,
     standName: ['', 'Offener Stellplatz', 'Überdachter Stellplatz', 'Stahlbeton-Shelter'],
@@ -178,7 +179,14 @@ export const CITY = {
     quarter: 3, // Radius (Zellen) der kleinen Viertel an vorderen FOBs
     quarterEvery: 3, // jeder so vielte Takt baut an einer vorderen FOB statt an der Hauptstadt
     mix: { com: 2, bm: 3, mun: 2, fuel: 2, kero: 1, smelter: 2, steel: 2, market: 0.3 }, // Verhältnis der Arbeitsstätten (Kraftwerk, Uni, Rechenzentrum nach Bedarf)
-    powerMargin: 1.15, // baut ein Kraftwerk, wenn das Stromangebot unter Bedarf × powerMargin fällt
+    powerMargin: 1.15, // baut ein Kraftwerk, wenn das Stromangebot unter Bedarf × powerMargin + powerSpare fällt
+    powerSpare: 10, // fester Strompuffer dazu
+    // Wohnen: weist Wohnzellen aus, solange es weniger als resPerWork je Arbeitsstätte gibt, oder (bis höchstens resMax je Arbeitsstätte),
+    // wenn Wohnplätze für die eingezogenen Soldaten + draftSpare fehlen oder freie Einwohner knapp sind (lowFree, lowFill)
+    resPerWork: 1.2,
+    resMax: 2,
+    draftSpare: 20,
+    munMetal: 50, // Munitionswerk gilt nur als knapp, wenn mehr Stahl als das im Stadtlager liegt
     uniFrom: 6, // Arbeitsstätten, ab denen sie eine Universität baut
     dcFrom: 16, // … ein Rechenzentrum (nach der Uni)
     sellAbove: 2700, // verkauft am Markt, wenn eine Sorte im Hauptlager darüber liegt
@@ -196,17 +204,25 @@ export const CITY = {
     boost: 4, // so viel stärker zählt eine knappe Zone
     dangerTime: 90, // s, so lange meidet sie Zellen nahe einem Treffer auf ihre Stadt
     dangerRadius: 3, // Zellen um den Treffer
+    hitLog: 20, // so viele Treffer auf die eigene Stadt merkt sie sich (auch für die Zufriedenheit, CITY.happy.hitWindow)
+    hitRecent: 4, // s: ein Stadtgebäude, das so kurz vorher getroffen wurde, gilt als angegriffen (Verteidigung)
     defendSize: 6, // so viele Einheiten schickt sie zu einem angegriffenen Stadtgebäude
     defendRange: 2500, // px, nur Einheiten in diesem Abstand
     defendCooldown: 12, // s zwischen zwei Verteidigungsbefehlen
-    // Angriffsziele: Wert je Zellenart (geteilt durch Entfernung); Werke und Förderung zuerst
+    // Angriffsziele: Wert je Zellenart geteilt durch (1 + Entfernung / raidDist); Werke und Förderung zuerst
+    raidDist: 1000,
     targetValue: { steel: 3, fuel: 3, mun: 3, power: 3, dc: 2.5, uni: 2, mine: 2.5, market: 2, bm: 2, com: 1, res: 0.5, barracks: 2.5, factory: 3, heliport: 3, hospital: 2, stand: 3, atc: 3, ktank: 2.5, mdepot: 2.5 },
     // Ausbildungsgebäude (seit v4.96): so viele will sie haben; ab moreFrom Arbeitsstätten je eins mehr (Heliport erst, wenn Hubschrauber freigeschaltet sind)
     producers: { barracks: 1, factory: 1, heliport: 2 }, // seit v5.51 zwei Heliports: einer je Hubschrauber (Späher und Transporter)
     moreFrom: 14,
     hospitalFrom: 10, // Arbeitsstätten, ab denen sie ein Krankenhaus baut (seit v5.01, eins reicht)
     airportFrom: 14, // Arbeitsstätten, ab denen sie einen Fliegerhorst baut (seit v5.35 aus Bahn, Stellplätzen, Tower, Kerosintank, Munitionslager; einer reicht)
-    airportReach: 60, // so viele Zellen um die Hauptstadt sucht sie Platz für die Bahn mit ihren Bauten (10 × 4 Zellen plus Rand)
+    airportReach: 60, // so viele Zellen um die Hauptstadt sucht sie Platz für die Bahn mit ihren Bauten (runwayLen × 4 Zellen plus Rand)
+    airportMoney: 900, // Geld über der Reserve, ab dem sie den Fliegerhorst anlegt
+    airportBm: 800, // … und Baumaterial im Lager der Hauptstadt
+    runwayLen: 10, // Länge (Zellen) der Bahn, die sie anlegt
+    standBuffer: 100, // Baumaterial, das nach einem weiteren Stellplatz im Lager der Hauptstadt bleiben muss
+    upgradeBuffer: { bm: 200, steel: 200 }, // Baumaterial und Stahl, die nach dem Ausbau eines Stellplatzes bleiben müssen (Geld: CITY.air.upgradeAiReserve)
     jets: { easy: 2, normal: 4, hard: 6 }, // so viele F-16 hält sie (seit v5.03; seit v5.35 je ein Stellplatz, die KI baut so viele)
     jetReserve: 400, // Geld, das nach dem Kauf einer F-16 übrig bleiben muss
     // seit v5.20 (Review): höchstens so viele Förderanlagen je Werk, das ihren Rohstoff nimmt (Holz und Stein zusammen je BM-Werk, Erz je

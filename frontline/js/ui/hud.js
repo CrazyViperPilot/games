@@ -12,7 +12,7 @@ import { RESEARCH } from '../data/research.js';
 import { CITY } from '../data/city.js';
 import { KINDS, DEPOSITS, DEPOSIT_NAME, hasMarket, hasRoad, careOf } from '../game/city.js';
 import { transportInfo, transportOf } from '../game/transport.js';
-import { jetsAt, standRoute, runwaysOf, runwayBusy } from '../game/aircraft.js';
+import { standRoute, runwaysOf, runwayBusy } from '../game/aircraft.js';
 import { padBusy } from '../game/helipad.js';
 import { CITY_TIP } from './citypanel.js';
 
@@ -36,7 +36,6 @@ const COLOR = { bm: '#a0703f', mun: '#7f93ad', fuel: '#9b7bc4', cargo: '#c9a227'
 const PRESET_NAME = { mix: 'Gemischt', bm: 'Baumaterial', mun: 'Munition', fuel: 'Treibstoff' };
 const STORE_CAP = BALANCE.logistics.storeCap;
 const CAPITAL_CAP = BALANCE.logistics.capitalCap;
-const TRUCK_CAP = BALANCE.logistics.truckCapacity;
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const pct = (f) => `${Math.max(0, Math.min(1, f)) * 100}%`;

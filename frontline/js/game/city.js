@@ -1063,7 +1063,7 @@ export function updateCity(game, dt) {
     // Treffer merken (KI meidet die Gegend beim Bauen und schickt Verteidiger)
     for (const e of c.ents.values()) {
       if (e.lastHitTime > game.time - dt * 1.5) {
-        c.hitLog = (c.hitLog ?? []).filter((h) => h.t > game.time - CITY.ai.dangerTime).slice(-19);
+        c.hitLog = (c.hitLog ?? []).filter((h) => h.t > game.time - CITY.ai.dangerTime).slice(1 - CITY.ai.hitLog);
         c.hitLog.push({ x: e.x, y: e.y, t: game.time });
       }
     }
@@ -1183,7 +1183,7 @@ export function updateCity(game, dt) {
     const H = CITY.happy;
     const shop = pool > 0 ? Math.min(1, shopW / (pool * H.shopPer)) : 0;
     s.shop = shop;
-    const hits = (c.hitLog ?? []).filter((h) => h.t > game.time - 60).length;
+    const hits = (c.hitLog ?? []).filter((h) => h.t > game.time - CITY.happy.hitWindow).length;
     const safe = 1 - Math.min(1, hits / H.hitsBad);
     s.happy = pop > 0 ? Math.min(1, H.base + H.shops * shop + H.safety * safe + H.power * s.powerRatio) : 1;
     const mood = H.lo + H.span * s.happy;
@@ -1835,9 +1835,9 @@ function aiNeed(game, c, add, skip = null) {
   const st = c.stats;
   // Seit v5.20: Angebot bei voller Besetzung (fehlen nur Arbeiter, hilft ein weiteres Kraftwerk nicht, es braucht selbst welche)
   const supplyFull = CITY.power.base + t.power;
-  if (supplyFull + (add.power ?? 0) * CITY.power.supply[1] < st.powerUse * A.powerMargin + 10 && (add.power ?? 0) < 1 && !skip?.has('power')) return 'power';
+  if (supplyFull + (add.power ?? 0) * CITY.power.supply[1] < st.powerUse * A.powerMargin + A.powerSpare && (add.power ?? 0) < 1 && !skip?.has('power')) return 'power';
   // Wohnen zuerst (seit v5.20), wenn Arbeitsstätten keine Wohnung über die Straße erreichen (Pendler) oder Arbeiter fehlen
-  if (!skip?.has('res') && count.res <= work * 2 && ((st.fill ?? 1) < A.lowFill || homeless(game, c))) return 'res';
+  if (!skip?.has('res') && count.res <= work * A.resMax && ((st.fill ?? 1) < A.lowFill || homeless(game, c))) return 'res';
   // Ausbildungsgebäude (seit v4.96): ohne sie keine Truppen; Heliport erst mit einer Arbeitsstätte
   const more = work >= A.moreFrom ? 1 : 0;
   for (const [k, n] of Object.entries(A.producers)) {
@@ -1858,12 +1858,12 @@ function aiNeed(game, c, add, skip = null) {
   if (!count.hospital && work >= A.hospitalFrom && !skip?.has('hospital')) return 'hospital';
   if (!count.uni && work >= A.uniFrom && !skip?.has('uni')) return 'uni';
   if (!count.dc && count.uni && work >= A.dcFrom && !skip?.has('dc')) return 'dc';
-  if (count.res < work * 1.2 || (t.housing + t.fled < c.drafted + 20 && count.res <= work * 2) || (free < A.lowFree && count.res <= work * 2)) return 'res';
+  if (count.res < work * A.resPerWork || (t.housing + t.fled < c.drafted + A.draftSpare && count.res <= work * A.resMax) || (free < A.lowFree && count.res <= work * A.resMax)) return 'res';
   const main = game.mainFob(c.team);
   const s = c.stats;
   const low = {
     bm: main && main.store.bm < A.lowStock && s.raw.wood + s.raw.stone > s.bm, // Rohstoff da, Werk fehlt
-    mun: main && main.store.mun < A.lowStock && c.metal > 50,
+    mun: main && main.store.mun < A.lowStock && c.metal > A.munMetal,
     fuel: main && main.store.fuel < A.lowStock && s.raw.oil > s.fuel,
     kero: c.kero < A.lowKero && s.raw.oil > 0, // Kerosin knapp, Öl wird gefördert (seit v5.20)
     smelter: c.metal < A.lowMetal && s.raw.ore > s.gross.iron * CITY.convert.iron, // Erz bleibt ungenutzt: es fehlt eine Hütte
@@ -1937,14 +1937,19 @@ function aiCandidates(game, c, x, y, rad, reach) {
   return out;
 }
 
-/** KI-Schritt (alle ai.interval s von ai.js): weist die nächsten Zellen aus, solange Geld über der Reserve bleibt. */
-export function aiCity(game, team, difficulty) {
+/** Neue Buchhaltung der Stadt-KI (liegt seit v5.58 in der KI-Instanz, ai.js `cityMem`): Ausbautakte, Zeit seit dem letzten Überfall, letzter Verteidigungsbefehl. */
+export function cityAiMemory() {
+  return { turn: 0, raidTimer: 0, defendAt: -1e9 };
+}
+
+/** KI-Schritt (alle ai.interval s von ai.js): weist die nächsten Zellen aus, solange Geld über der Reserve bleibt. mem: cityAiMemory() der KI. */
+export function aiCity(game, team, difficulty, mem = cityAiMemory()) {
   const city = game.city?.[team];
   if (!city) return;
   const reserve = CITY.ai.reserve[difficulty] ?? CITY.ai.reserve.normal;
   const money = () => game.teams[team].res.money;
   aiMarket(game, team, reserve);
-  city.aiTurn = (city.aiTurn ?? 0) + 1;
+  mem.turn++;
   let n = 0;
   // Förderanlagen zuerst: jedes Vorkommen im Gebiet nutzen
   for (const i of city.list.length < 4 ? [] : depositCells(game, city)) {
@@ -1957,13 +1962,13 @@ export function aiCity(game, team, difficulty) {
   const fobs = game.buildings.filter((b) => b.alive && b.built && b.team === team && b.type === 'fob' && !b.main);
   let anchor = main;
   let rad = CITY.territory.main + CITY.territory.building * 4;
-  if (fobs.length && (city.aiTurn % CITY.ai.quarterEvery === 0 || !main)) {
-    anchor = fobs[Math.floor(city.aiTurn / CITY.ai.quarterEvery) % fobs.length];
+  if (fobs.length && (mem.turn % CITY.ai.quarterEvery === 0 || !main)) {
+    anchor = fobs[Math.floor(mem.turn / CITY.ai.quarterEvery) % fobs.length];
     rad = CITY.ai.quarter;
   }
   if (!anchor) return;
   if (aiAirport(game, city, main, reserve, CITY.ai.jets[difficulty] ?? CITY.ai.jets.normal)) n++;
-  if (n < CITY.ai.perStep && aiConnect(game, city)) n++;
+  if (n < CITY.ai.perStep && aiConnect(game, city, mem.turn)) n++;
   const add = {};
   const skip = new Set(); // Großbauten, für die in diesem Takt kein Platz war
   // Ausbau: Zellen an Straßen, die mit dem Lager verbunden sind, kommen vor (aiCandidates, seit v5.20 AP4)
@@ -2051,10 +2056,10 @@ function goalOf(c, a, k) {
  * Straßenanschluss der KI (seit v5.20, AP4): höchstens ein Gebäude je Takt, dem der Weg fehlt (Förderanlage ohne Lieferweg zum
  * Werk, Werk ohne Lieferweg zum Lager, Arbeitsstätte ohne Pendlerweg). Prüft höchstens CITY.ai.roadTries Gebäude. true, wenn gebaut.
  */
-function aiConnect(game, c) {
+function aiConnect(game, c, off) {
   let tried = 0;
   const list = c.list;
-  const off = c.aiTurn ?? 0; // der Anfang wandert mit jedem Takt, damit auch hintere Gebäude drankommen
+  // off: Ausbautakt der KI; der Anfang wandert mit jedem Takt, damit auch hintere Gebäude drankommen
   for (let s = 0; s < list.length && tried < CITY.ai.roadTries; s++) {
     const i = list[(s + off) % list.length];
     if (isPart(c, i) || !c.kind[i]) continue;
@@ -2092,12 +2097,12 @@ export function aiAirport(game, c, main, reserve, want = 2) {
     // Stellplätze ausbauen (seit v5.39 nur per Befehl): den ersten fertigen unter Stufe 3, wenn genug übrig bleibt
     const up = stands.length >= want ? stands.find((i) => c.level[i] && c.level[i] < CITY.maxLevel) : null; // erst genug Stellplätze
     const cost = up != null ? CITY.air.upgrade[c.level[up] + 1] : null;
-    if (cost && money >= cost.money + Math.max(reserve, CITY.air.upgradeAiReserve) && main.store.bm >= cost.bm + 200 && c.metal >= (cost.steel ?? 0) + 200) {
+    if (cost && money >= cost.money + Math.max(reserve, CITY.air.upgradeAiReserve) && main.store.bm >= cost.bm + A.upgradeBuffer.bm && c.metal >= (cost.steel ?? 0) + A.upgradeBuffer.steel) {
       const e = c.ents.get(up);
-      if (e && cmdCityUpgrade(game, c.team, { buildingId: e.id }).ok) return true;
+      if (e && game.issue(c.team, { type: 'cityUpgrade', buildingId: e.id }).ok) return true;
     }
     // weitere Stellplätze an der Bahn (beide Längsseiten)
-    if (stands.length >= want || money < CITY.cost.stand + reserve || main.store.bm < CITY.costBm.stand + 100) return false;
+    if (stands.length >= want || money < CITY.cost.stand + reserve || main.store.bm < CITY.costBm.stand + A.standBuffer) return false;
     const rw = c.list.filter((i) => c.kind[i] === KIND_ID.runway);
     for (const i of rw) {
       const q = i % c.cols;
@@ -2111,10 +2116,10 @@ export function aiAirport(game, c, main, reserve, want = 2) {
     return false;
   }
   if (work < A.airportFrom || stands.length) return false;
-  if (money < 900 + reserve || main.store.bm < 800) return false;
+  if (money < A.airportMoney + reserve || main.store.bm < A.airportBm) return false;
   const [fc, fr] = cellAt(c, main.x, main.y);
   const R = A.airportReach;
-  const L = 10; // Länge der Bahn
+  const L = A.runwayLen; // Länge der Bahn
   const fits = (q, r, w, h) => {
     for (let y = r - 1; y <= r + h; y++) for (let x = q - 1; x <= q + w; x++) if (x < 0 || y < 0 || x >= c.cols || y >= c.rows || !free(y * c.cols + x)) return false;
     return true;
@@ -2202,13 +2207,13 @@ function aiMarket(game, team, reserve) {
  * Angriff auf die gegnerische Stadt (von ai.js jede Sekunde): alle raidEvery s schicken bis zu raidSize untätige Fahrzeuge
  * mit Angriffsmarsch zum nächsten erkundeten gegnerischen Stadtgebäude.
  */
-export function aiRaid(game, team, difficulty, dt) {
+export function aiRaid(game, team, difficulty, dt, mem = cityAiMemory()) {
   const c = game.city?.[team];
   const every = CITY.ai.raidEvery[difficulty] ?? 0;
   if (!c || !every) return;
-  c.raidTimer = (c.raidTimer ?? 0) + dt;
-  if (c.raidTimer < every) return;
-  c.raidTimer = 0;
+  mem.raidTimer += dt;
+  if (mem.raidTimer < every) return;
+  mem.raidTimer = 0;
   const foe = game.city[1 - team];
   const main = game.mainFob(team);
   if (!foe || !main) return;
@@ -2218,7 +2223,7 @@ export function aiRaid(game, team, difficulty, dt) {
   for (const e of foe.ents.values()) {
     if (!e.alive || !game.isExplored(team, e.x, e.y)) continue;
     const k = KINDS[foe.kind[e.cityCell] - 1];
-    const v = (CITY.ai.targetValue[k] ?? 1) / (1 + Math.hypot(e.x - main.x, e.y - main.y) / 1000);
+    const v = (CITY.ai.targetValue[k] ?? 1) / (1 + Math.hypot(e.x - main.x, e.y - main.y) / CITY.ai.raidDist);
     if (v > best) {
       best = v;
       target = e;
@@ -2236,15 +2241,15 @@ export function aiRaid(game, team, difficulty, dt) {
  * Verteidigung (von ai.js jede Denkrunde): Wird ein eigenes Stadtgebäude beschossen, schickt die KI bis zu defendSize
  * bewaffnete Bodeneinheiten aus der Nähe mit Angriffsmarsch dorthin; Förderanlagen und Werke zuerst.
  */
-export function aiDefend(game, team) {
+export function aiDefend(game, team, mem = cityAiMemory()) {
   const c = game.city?.[team];
   if (!c) return;
   const A = CITY.ai;
-  if (game.time - (c.defendAt ?? -1e9) < A.defendCooldown) return;
+  if (game.time - mem.defendAt < A.defendCooldown) return;
   let spot = null;
   let best = -1;
   for (const e of c.ents.values()) {
-    if (!e.alive || e.lastHitTime < game.time - 4) continue;
+    if (!e.alive || e.lastHitTime < game.time - A.hitRecent) continue;
     const v = A.targetValue[KINDS[c.kind[e.cityCell] - 1]] ?? 1;
     if (v > best) {
       best = v;
@@ -2257,6 +2262,6 @@ export function aiDefend(game, team) {
     .sort((a, b) => Math.hypot(a.x - spot.x, a.y - spot.y) - Math.hypot(b.x - spot.x, b.y - spot.y) || a.id - b.id)
     .slice(0, A.defendSize);
   if (!near.length) return;
-  c.defendAt = game.time;
+  mem.defendAt = game.time;
   game.issue(team, { type: 'attackMove', ids: near.map((u) => u.id), x: spot.x, y: spot.y });
 }

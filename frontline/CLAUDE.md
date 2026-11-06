@@ -14,6 +14,8 @@ die genannten Dateien.
 2. Spieler und KI ändern das Spiel **nur** über `game.issue(team, cmd)`. Renderer, HUD und Minimap lesen nur.
 3. Spielwerte gehören nach `js/data/` (`balance.js` mit den Schnelleinstellungen `QUICK` ganz oben, `units.js`, `buildings.js`, `ai.js`, `mapgen.js`),
    mit deutschem Kommentar, was sie bewirken. Keine neuen Balance-Zahlen als Konstanten in `js/game` oder `js/ai`.
+   KI-Werte liegen an drei festen Orten: Armee-KI in `js/data/ai.js`, Stadt-KI (Ausbau, Markt, Überfälle, Verteidigung, Fliegerhorst) in
+   `CITY.ai` (`js/data/city.js`), alles, was je Schwierigkeit verschieden ist, in `BALANCE.difficulty`.
 4. Zufall in der Simulation nur über `game.rng` bzw. `makeRng(seed)` (`js/core/rng.js`), nie `Math.random()`. Gleicher Seed = gleiche Partie.
    Zufallskarten ohne Fluss müssen je Seed unverändert bleiben (gespeicherte Seeds, Tests).
 5. Imports immer mit Endung (`'./zone.js'`), nie über den Ordner `frontline/` hinaus, keine CDNs oder externen Dateien.
