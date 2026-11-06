@@ -14,7 +14,7 @@ Für die Pakete ab P2 gilt PRD §13: erst ein Vorschlag zur Ausgestaltung (unten
 | P4 | Musik (synthetisiert, je Lage ruhig/Gefecht) und Lautstärkeregler für Ton und Musik | §13 Musik | mittel | **gebaut (v5.64)** |
 | P5a | Stadt: Werkslager und LKW laden am Werk (Simulation, Befehle, Rechtsklick, Infofeld) | §13 SimCity-Stadt | mittel | **gebaut (v5.65)** |
 | P5b | Stadt: Route ab Werk in der Oberfläche, KI holt am Werk, Ressourcenanzeige | §13 SimCity-Stadt | mittel | **gebaut (v5.66)** |
-| P6 | KI-Lücken aus §10: KI baut Flak/SAM gegen Luft, Scharfschützen, Bagger | §10 „Nicht gebaut“ | mittel | geparkt |
+| P6 | KI-Lücken aus §10: KI baut Flak/SAM gegen Luft, Scharfschützen (Bagger bewusst nicht) | §10 „Nicht gebaut“ | mittel | **in Arbeit (v5.67)** |
 | – | LLM für Gegner und Dialoge | §13 | – | nicht paketiert: Grundsatzfragen offen (Modell, Gerät/Server, Offline-PWA, Kosten) |
 
 ## P1 – Statistik am Spielende (v5.61)
@@ -217,5 +217,33 @@ Grundlage P5a (v5.65): `CITY.pickup`, `c.out`, `c.pickClaim`, Befehle `load` mit
   `test/ai.test.js`, `test/cityprod.test.js`, `test/golden.test.js` laufen lassen. Ändern sich Golden-Werte, ist das als gewollte
   Regeländerung erlaubt (Anleitung im Testkopf), im Bericht nennen.
 
-## P6 – KI-Lücken (Vorschlag)
-- KI baut Flak/SAM, sobald der Gegner Hubschrauber oder Jets hat; Scharfschützen in kleiner Zahl; Bagger nur für Straßen der Stadt.
+## P6 – KI-Lücken (v5.67, von Daniel bestätigt am 2026-11-06)
+
+Heute: `counterMix` in `js/ai/ai.js` mischt nur den Gepard gegen gesehene Luftfahrzeuge (`GEPARD_PER_AIR`, `GEPARD_MAX`, `AIR_MEMORY`)
+und die Panzerhaubitze ein. Flak, SAM und Scharfschütze baut die KI nie, den Bagger auch nicht (PRD §10 „Nicht gebaut“).
+Alle drei werden in der Hauptstadt ausgebildet (`BUILDINGS.fob.produces`; mit Stadt die Stellen in `CITY.produces` prüfen). Flak und SAM
+treffen Hubschrauber und Jets (ohne `jet`-Schaden gilt `air`).
+
+### Luftabwehr nach Art der Luftgegner
+- `counterMix` merkt sich getrennt gesehene **Hubschrauber** (`def.air && !def.jet`) und **Flugzeuge** (`def.jet`), je `AIR_MEMORY` s.
+- Gesamtanteil Luftabwehr = min(`AIR_MAX` 0,25, (Hubschrauber + Flugzeuge) × `AIR_PER` 0,04) der Kampfeinheiten, aufgeteilt nach
+  `AIR_SPLIT = { heli: { gepard: 0.6, flak: 0.4 }, jet: { sam: 0.7, gepard: 0.3 } }`, gewichtet mit dem Anteil Hubschrauber bzw. Flugzeuge.
+  `GEPARD_PER_AIR`/`GEPARD_MAX` entfallen (durch `AIR_PER`/`AIR_MAX` ersetzen, überall nachziehen, auch PRD-Tabelle „KI-Konstanten“).
+- Leicht: unverändert ohne Konter (wie heute `easy` → Grundmischung).
+
+### Scharfschützen
+- Normal und Schwer: Sieht die KI mindestens `SNIPER_FROM` (10) gegnerische Soldaten (`armor === 'inf'`) und hat sie selbst mindestens
+  `SNIPER_ARMY` (12) Kampfeinheiten, kommt `SNIPER_SHARE` (0,04) Scharfschützen in die Mischung. Sie laufen mit der Armee wie die anderen.
+
+### Bagger
+- Die KI baut weiter keinen Bagger: Ihre Stadt plant auf freiem Bauland, und Straßen der Zone zu zerstören hilft ihr nicht. Im PRD §10
+  die Zeile „Nicht gebaut“ entsprechend umformulieren (mit Begründung).
+
+### Doku und Test
+- Werte in `js/data/ai.js` mit deutschem Kommentar; PRD §10 (Konter-Mix, Nicht gebaut) und Tabelle „KI-Konstanten“, Änderungsverlauf v5.67,
+  `CACHE_VERSION` `frontline-v180`, `npm run docs`; Feature-Landkarte in `CLAUDE.md` (Zeilen Flugabwehr „baut Flak/SAM noch nicht“ und
+  Scharfschütze „baut ihn nicht“ anpassen).
+- Test `test/aiair.test.js`: `counterMix` mit gesehenen Hubschraubern → Gepard und Flak > 0, SAM 0; mit gesehenen Jets → SAM > 0;
+  nach `AIR_MEMORY` ohne Sicht → keine Luftabwehr; Leicht → keine; Scharfschützen erst ab den Schwellen; eine KI mit Geld und
+  gesehenen Hubschraubern gibt tatsächlich einen `train`-Befehl für Flak oder Gepard. `test/ai.test.js`, `test/aiart.test.js`,
+  `test/golden.test.js` laufen lassen; Golden darf sich ändern (gewollte Regeländerung, im Bericht nennen).
