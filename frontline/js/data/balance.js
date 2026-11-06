@@ -182,6 +182,14 @@ export const BALANCE = {
       mgnest: { name: 'MG-Nest', cost: { money: 200 }, time: 18, fire: 1.35 },
       wire: { name: 'Stacheldraht', cost: { money: 80 }, time: 10, stormMult: 0.6 },
     },
+    // Besetztes Haus in der Konfliktzone (seit v5.62): zusätzlich zu den Besatzern zählt es zoneWeight Gewicht für die Zonenkontrolle
+    // (je Zone und je Hot Zone, die die Hausmitte erreicht; in der Hot Zone also doppelt). Keine Stimme, kein Geld.
+    zoneWeight: 2,
+    // Ausguck (seit v5.62): Besatzer sehen sightMul-mal so weit (nur Nebel aufdecken; Waffenreichweite bleibt).
+    sightMul: 1.25,
+    // Deckung an Ruinen (seit v5.62): Infanterie außerhalb von Häusern, höchstens r px vom Rand einer eingestürzten Stadthausruine,
+    // nimmt nur mul des Schadens (direkte Treffer und Granaten, nicht Splitter und nicht Fahrzeuge).
+    ruinCover: { r: 40, mul: 0.7 },
   },
   // Festung (§5a): Befehl 'fortify' an einer FOB baut einen Mauerring mit je einem Tor in der Mitte jeder Seite und `towers` Gefechtstürme
   // an den Ecken, die zum Gegner zeigen. ring = Abstand der Mauer von der FOB-Mitte (Zellen); floor = Höhenvorteil der Turmbesatzung (px);

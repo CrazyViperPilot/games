@@ -237,6 +237,8 @@ export class Game {
       team.earned = team.earned || 0;
     }
     this.statTimer = this.statTimer || 0;
+    // Ruinenliste fehlt in Ständen vor v5.62: aus den eingestürzten Häusern neu aufbauen
+    if (!this.ruins) this.ruins = (this.houses || []).filter((h) => h.ruined);
     // Nachrüstungen für ältere Stände (Straßen, Forschungsbaum, Stadt, FOB-Baustellen) gibt es seit v5.56 nicht mehr: Stände eines
     // anderen SAVE_FORMAT laden nicht (savegame.js).
   }

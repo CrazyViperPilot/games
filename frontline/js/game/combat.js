@@ -2,7 +2,7 @@
 import { BALANCE } from '../data/balance.js';
 import { createShell, inRange, radiusOf, isFoe, canAttack, resolveTarget } from './entities.js';
 import { buildHash, nearby } from './movement.js';
-import { damageHouse, houseFire } from './garrison.js';
+import { damageHouse, houseFire, ruinCoverMul } from './garrison.js';
 import { addCrater } from './scars.js';
 import { auraCooldown } from './commander.js';
 import { weatherSight } from './weather.js';
@@ -126,7 +126,7 @@ function warnBase(game, target) {
   game.message(target.team, 'Basis wird angegriffen', target.x, target.y);
 }
 
-/** Fügt Schaden zu, setzt lastHitTime und markiert Tote. Stadthäuser: garrison.damageHouse, Brücken: river.damageBridge. Einheiten: erforschte Panzerung. */
+/** Fügt Schaden zu, setzt lastHitTime und markiert Tote. Stadthäuser: garrison.damageHouse, Brücken: river.damageBridge. Einheiten: erforschte Panzerung, Deckung an Ruinen (seit v5.62). */
 export function hit(game, target, amount) {
   if (!target.alive || !(amount > 0)) return;
   if (target.kind === 'house') {
@@ -137,7 +137,7 @@ export function hit(game, target, amount) {
     damageBridge(game, target, amount);
     return;
   }
-  if (target.kind === 'unit') amount *= armorMul(game, target, amount) * smokeMul(game, target) * parkedArmor(game, target); // abgestellter Jet: Schutz des Stellplatzes (seit v5.35)
+  if (target.kind === 'unit') amount *= armorMul(game, target, amount) * smokeMul(game, target) * parkedArmor(game, target) * ruinCoverMul(game, target); // abgestellter Jet: Schutz des Stellplatzes (seit v5.35); Infanterie an einer Ruine: Deckung (seit v5.62)
   else if (target.kind === 'building') amount *= armorMul(game, target, amount); // Militärgebäude: Sandsäcke, Beton (Forschung)
   target.hp -= amount;
   target.lastHitTime = game.time;

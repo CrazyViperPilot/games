@@ -81,6 +81,7 @@ export function demolish(game, b, scan) {
     game.houseBySrc.delete(b);
     game.entities.delete(h.id);
     game.garrisoned = game.garrisoned.filter((o) => o !== h);
+    game.ruins = game.ruins.filter((o) => o !== h);
   }
   const g = game.grid;
   const T = g.tile;

@@ -147,8 +147,9 @@ export class Fog {
     const mu = m;
     for (const u of game.units) {
       if (!u.alive || u.team !== team || !(u.def.sight > 0)) continue;
-      // aus einem Haus: Sichtweite ab der Hauswand
-      this.markEntity(relief, u, u.def.sight * mu * sightMul(game, u) + (u.house ? (game.entities.get(u.house)?.reach ?? 0) : 0));
+      // aus einem Haus: Sichtweite ab der Hauswand, Besatzer sehen weiter (Ausguck, seit v5.62: sightMul der Häuserkampf-Werte)
+      const ausguck = u.house ? BALANCE.garrison.sightMul : 1;
+      this.markEntity(relief, u, u.def.sight * mu * sightMul(game, u) * ausguck + (u.house ? (game.entities.get(u.house)?.reach ?? 0) : 0));
     }
     for (const b of game.buildings) {
       if (!b.alive || b.team !== team) continue;

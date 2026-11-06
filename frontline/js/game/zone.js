@@ -3,6 +3,7 @@ import { BALANCE } from '../data/balance.js';
 
 const Z = BALANCE.zone;
 const H = BALANCE.hot;
+const G = BALANCE.garrison;
 
 /** Ein Schritt: Zählung der Einheiten in der Zone, Kontrolle, Zonengeld und Punkte. */
 export function updateZone(game, dt) {
@@ -21,6 +22,13 @@ export function updateZone(game, dt) {
     // Geld: je Einheit in der Zone; in der Hot Zone das Doppelte statt zusätzlich
     if (inHot) money[u.team] += H.unitIncome;
     else if (inZone) money[u.team] += Z.unitIncome;
+  }
+  // Besetzte Häuser (seit v5.62): Hausmitte in der Zone bzw. Hot Zone zählt zoneWeight Gewicht je Stufe, zusätzlich zu den Besatzern
+  for (const h of game.garrisoned ?? []) {
+    if (!h.alive || h.team < 0) continue;
+    const inZone = Math.hypot(h.x - z.x, h.y - z.y) <= z.r;
+    const inHot = !!hot && Math.hypot(h.x - hot.x, h.y - hot.y) <= hot.r;
+    weight[h.team] += G.zoneWeight * ((inZone ? 1 : 0) + (inHot ? 1 : 0));
   }
   z.counts = counts;
   z.weight = weight;

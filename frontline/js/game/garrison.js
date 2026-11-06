@@ -22,6 +22,7 @@ export function createHouses(game) {
   game.houses = [];
   game.houseBySrc = new Map(); // Stadtgebäude der Karte → Haus (Renderer)
   game.garrisoned = []; // besetzte Häuser (Zielsuche)
+  game.ruins = []; // eingestürzte Häuser (Deckung an Ruinen, ruinCoverMul)
   let id = -1;
   for (const b of game.map.town?.buildings ?? []) {
     const k = G.kinds[b.kind];
@@ -245,6 +246,7 @@ export function damageHouse(game, h, amount) {
   h.hp = 0;
   h.alive = false;
   h.ruined = true;
+  game.ruins.push(h);
   h.works = {};
   h.building = null;
   const team = h.team;
@@ -294,6 +296,22 @@ function woundInOrder(game, list, amount) {
 export function houseFire(game, u) {
   const h = houseOf(game, u);
   return h?.works?.mgnest ? G.works.mgnest.fire : 1; // Gefechtsturm (tower.js) hat keine Ausbauten
+}
+
+/**
+ * Deckung an Ruinen (seit v5.62): Schadensfaktor für einen Treffer auf u. Infanterie außerhalb von Häusern, die höchstens
+ * ruinCover.r px vom Rand einer eingestürzten Stadthausruine steht, nimmt ruinCover.mul des Schadens; sonst 1.
+ * Läuft nur über game.ruins (beim Einsturz gefüllt, beim Abriss geleert). Keine Allokation.
+ */
+export function ruinCoverMul(game, u) {
+  if (u.house || u.def.armor !== 'inf') return 1;
+  const r = G.ruinCover.r;
+  for (const h of game.ruins) {
+    const dx = Math.max(0, Math.abs(u.x - h.x) - h.pw / 2);
+    const dy = Math.max(0, Math.abs(u.y - h.y) - h.ph / 2);
+    if (dx * dx + dy * dy <= r * r) return G.ruinCover.mul;
+  }
+  return 1;
 }
 
 /** Tote Einheit aus ihrem Haus streichen (Game.cleanup). */

@@ -9,7 +9,7 @@ Für die Pakete ab P2 gilt PRD §13: erst ein Vorschlag zur Ausgestaltung (unten
 | Paket | Inhalt | Quelle | Größe | Stand |
 |---|---|---|---|---|
 | **P1** | Statistik am Spielende + Doku-Abgleich §1/§13 | §12 Could, §13 | klein | **gebaut (v5.61)** |
-| P2 | Häuserkampf I: Zonen-Nutzen besetzter Häuser (Punkte, Sicht), Ruinen als Deckung | §13 Häuserkampf | mittel | **in Arbeit (v5.62)** |
+| P2 | Häuserkampf I: Zonen-Nutzen besetzter Häuser (Punkte, Sicht), Ruinen als Deckung | §13 Häuserkampf | mittel | **gebaut (v5.62)** |
 | P3 | Häuserkampf II: KI stürmt Häuser und baut sie zur Stellung aus; Feuerbereich je Haus | §13 Häuserkampf | mittel | geparkt |
 | P4 | Musik (synthetisiert, je Lage ruhig/Gefecht) und Lautstärkeregler für Ton und Musik | §13 Musik | mittel | geparkt |
 | P5 | Stadt: LKW holen Material direkt an Werken statt nur aus dem Lager der Hauptstadt | §13 SimCity-Stadt | groß | geparkt |
@@ -54,7 +54,7 @@ Ziel: Der Endbildschirm zeigt für **beide Teams nebeneinander** eine kleine Bil
   mit `hp = 0` versehen, `game.update(dt)` → `lost`/`kills` stimmen; Gebäude ebenso; ein Spielstand ohne `stats` lädt ohne Fehler (Snapshot aus `test/save.test.js` als Vorbild).
 - `npm run test:quick` und `npm test` grün, `test/golden.test.js` unverändert.
 
-## P2 – Häuserkampf I (v5.62, von Daniel bestätigt am 2026-11-06)
+## P2 – Häuserkampf I (v5.62, von Daniel bestätigt am 2026-11-06, gebaut in v5.62)
 
 Heute (v5.61) zählen Besatzer schon wie Einheiten für Zone, Hot Zone, Punkte und Limit und sehen mit Gebäude-Augenhöhe.
 Neu kommt dazu (alle Werte in `BALANCE.garrison`, `js/data/balance.js`, mit deutschem Kommentar):
