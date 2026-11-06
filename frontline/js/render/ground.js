@@ -9,6 +9,7 @@ const STEP = RELIEF.step;
 const SKIRT_BOTTOM = -190; // Unterkante des Erdschnitts am Kartenrand
 const DEPTH_K = 1 / 26000; // Tiefe → Clip-Raum (Karte samt Höhen passt hinein)
 export const LIGHT_ELEV = 0.62; // Lichthöhe (z-Anteil des Lichtvektors)
+export const FOG_EXPLORED_ALPHA = 150; // Nebel über Erkundetem: abgedunkelt, nicht schwarz (0 … 255)
 
 const VS = `
 attribute vec2 aPos;
@@ -113,15 +114,30 @@ void main() {
   gl_FragColor = vec4(col, 1.0);
 }`;
 
+// Kriegsnebel (seit v5.49 gemalt): Unerforschtes unter einer dunklen Wolkendecke aus zwei langsam ziehenden Lagen Rauschen, Erkundetes
+// kühl abgedunkelt, am Rand des Unerforschten ein heller Wolkensaum (Farben wie updateFogLayer in renderer.js). uFog: r = in Sicht,
+// a = erkundet, je Zelle weichgezeichnet; smoothstep macht daraus glatte, schmale Ränder ohne die Treppen der Zellen. uDrift: Versatz
+// der Lagen (xy, zw), auf der CPU genommen (fract), damit die Koordinaten klein und genau bleiben.
 const FS_FOG = `
 precision mediump float;
 uniform sampler2D uFog;
+uniform sampler2D uNoise;
+uniform vec4 uDrift;
 varying vec2 vPos;
 varying float vH;
 varying vec2 vG;
 void main() {
-  float a = texture2D(uFog, vPos / ${W.toFixed(1)}).r;
-  gl_FragColor = vec4(vec3(0.024, 0.031, 0.039) * a, a);
+  vec4 f = texture2D(uFog, vPos / ${W.toFixed(1)});
+  float vis = smoothstep(0.3, 0.7, f.r);
+  float unk = 1.0 - smoothstep(0.3, 0.7, f.a);
+  float a = (1.0 - vis) * (${(FOG_EXPLORED_ALPHA / 255).toFixed(4)} + ${(1 - FOG_EXPLORED_ALPHA / 255).toFixed(4)} * unk);
+  float n1 = texture2D(uNoise, vPos / 4200.0 + uDrift.xy).a;
+  float n2 = texture2D(uNoise, vPos / 1900.0 + uDrift.zw).a;
+  float n = n1 * 0.62 + n2 * 0.38;
+  vec3 deep = mix(vec3(0.020, 0.027, 0.035), vec3(0.094, 0.106, 0.129), min(1.0, n * n * 1.3));
+  vec3 col = mix(vec3(0.031, 0.047, 0.078), deep, unk);
+  col += vec3(0.060, 0.067, 0.071) * (4.0 * unk * (1.0 - unk)) * (0.35 + 0.65 * n);
+  gl_FragColor = vec4(col * a, a);
 }`;
 
 const NOISE_N = 256;
@@ -471,10 +487,18 @@ class Ground {
     return this.canvas;
   }
 
-  /** Nebel des Krieges auf dem Gelände: fog = { cols, rows, data: Uint8Array (0 frei … 255 schwarz) }. Liefert das Canvas. */
-  renderFog(cam, cssW, cssH, dpr, relief, fog) {
+  /**
+   * Nebel des Krieges: fog = { cols, rows, data: Uint8Array, je Zelle zwei Bytes (in Sicht, erkundet), weichgezeichnet }.
+   * Isometrisch auf dem Gelände, mit top = true flach von oben für die 2D-Ansicht (ein Viereck über die Karte). Liefert das Canvas.
+   */
+  renderFog(cam, cssW, cssH, dpr, relief, fog, t = 0, top = false) {
     const gl = this.gl;
     const u = this.begin(cam, cssW, cssH, dpr, relief, this.fogProg);
+    if (top) {
+      gl.uniform4f(u.uM, cam.zoom, 0, 0, cam.zoom);
+      gl.uniform1f(u.uZoom, 0);
+      gl.uniform2f(u.uDepthDir, 0, 0);
+    }
     gl.clearColor(0, 0, 0, 0);
     gl.clearDepth(1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -482,16 +506,44 @@ class Ground {
     gl.bindTexture(gl.TEXTURE_2D, this.fogTex);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     if (this.fogSize !== fog.cols * 10000 + fog.rows) {
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, fog.cols, fog.rows, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, fog.data);
+      this.fogStamp = fog.stamp;
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE_ALPHA, fog.cols, fog.rows, 0, gl.LUMINANCE_ALPHA, gl.UNSIGNED_BYTE, fog.data);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
       this.fogSize = fog.cols * 10000 + fog.rows;
-    } else gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, fog.cols, fog.rows, gl.LUMINANCE, gl.UNSIGNED_BYTE, fog.data);
+    } else if (fog.stamp === undefined || fog.stamp !== this.fogStamp) {
+      this.fogStamp = fog.stamp; // nur bei geändertem Nebel neu laden
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, fog.cols, fog.rows, gl.LUMINANCE_ALPHA, gl.UNSIGNED_BYTE, fog.data);
+    }
     gl.uniform1i(u.uFog, 1);
-    this.bindMesh(this.posBuf, this.hBuf, this.idxBuf);
-    gl.drawElements(gl.TRIANGLES, this.count, gl.UNSIGNED_INT, 0);
+    // Wolken (seit v5.49): Rauschen wie beim Boden, zwei Lagen ziehen langsam in verschiedene Richtungen
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, this.noiseTex);
+    gl.uniform1i(u.uNoise, 2);
+    const fr = (x) => x - Math.floor(x);
+    gl.uniform4f(u.uDrift, fr(t * 0.0016), fr(t * 0.0006), fr(0.37 - t * 0.0022), fr(0.71 + t * 0.0009));
+    if (top) {
+      if (!this.quadPos) {
+        this.quadPos = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.quadPos);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, W, 0, 0, W, W, W]), gl.STATIC_DRAW);
+        this.quadH = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.quadH);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(12), gl.STATIC_DRAW);
+      }
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.quadPos);
+      gl.enableVertexAttribArray(0);
+      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.quadH);
+      gl.enableVertexAttribArray(1);
+      gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    } else {
+      this.bindMesh(this.posBuf, this.hBuf, this.idxBuf);
+      gl.drawElements(gl.TRIANGLES, this.count, gl.UNSIGNED_INT, 0);
+    }
     return this.canvas;
   }
 }

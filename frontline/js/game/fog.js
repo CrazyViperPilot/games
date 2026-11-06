@@ -31,6 +31,7 @@ export class Fog {
     this.rows = Math.ceil(height / cell);
     this.visible = new Uint8Array(this.cols * this.rows);
     this.explored = new Uint8Array(this.cols * this.rows);
+    this.version = 0; // zählt jede Neuberechnung; die Darstellung malt den Nebel nur dann neu (seit v5.49)
   }
 
   /** Markiert alle Zellen, deren Mittelpunkt (plus halbe Zelle Toleranz) im Kreis liegt. */
@@ -139,6 +140,7 @@ export class Fog {
    */
   update(game, team) {
     this.visible.fill(0);
+    this.version = (this.version ?? 0) + 1; // alte Spielstände kennen den Zähler nicht
     const relief = game.relief ?? null;
     const m = weatherSight(game);
     const mu = m;
@@ -184,5 +186,6 @@ export class Fog {
   revealAll() {
     this.visible.fill(1);
     this.explored.fill(1);
+    this.version = (this.version ?? 0) + 1;
   }
 }

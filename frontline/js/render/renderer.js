@@ -42,7 +42,7 @@ import { drawTreeIso, drawTreeTop, drawBushIso, drawBushTop, drawRockIso, drawRo
 import { drawMilTop, setMilWalls } from './milbuild.js';
 import { scarAlpha } from '../game/scars.js';
 import { reliefOf, RELIEF } from '../game/relief.js';
-import { getGround, LIGHT_ELEV } from './ground.js';
+import { getGround, LIGHT_ELEV, FOG_EXPLORED_ALPHA } from './ground.js';
 import { seasonal, setRoofSnow } from './season.js';
 import { drawWeather } from './weatherfx.js';
 import { drawMood } from './mood.js';
@@ -70,7 +70,6 @@ const HP_OFFSET = 14; // Abstand Lebensbalken-Oberkante zum Einheitenrand (Bilds
 const STAR_UP = 8; // Stern des Kommandeurs: so weit über dem Lebensbalken (Bildschirm-px)
 const STAR_R = 8; // Radius des Sterns (Bildschirm-px)
 const ISO_STAR_UP = 0; // Iso: zusätzlich angehoben (Welt-px), über dem Kopf der Figur
-const FOG_EXPLORED_ALPHA = 150; // erkundet: abgedunkelt, nicht schwarz
 const MARKER_LIFE = 0.8; // s, Lebensdauer des Wegziel-Markers
 const SLOT_LIFE = 1.6; // s, so lange zeigen Punkte die Formationsplätze
 const SC = BALANCE.scars;
@@ -80,31 +79,126 @@ const FIRE_AT = 0.3; // darunter brennt es (Fahrzeuge: halber Wert)
 const WRECK_SMOKE = 60; // s: so lange raucht ein Wrack, die ersten WRECK_FIRE s brennt es
 const WRECK_FIRE = 20;
 
-/** Off-screen-Canvas in Nebelzellen-Größe (75 × 75) mit ImageData. */
-export function makeFogLayer(fog) {
+/** Off-screen-Canvas in Nebelzellen-Größe (173 × 173) mit ImageData; clouds = false: ohne Wolken (Minimap, dort wäre es Rauschen). */
+export function makeFogLayer(fog, clouds = true) {
   const canvas = document.createElement('canvas');
   canvas.width = fog.cols;
   canvas.height = fog.rows;
   const ctx = canvas.getContext('2d');
-  return { canvas, ctx, image: ctx.createImageData(fog.cols, fog.rows) };
+  return { canvas, ctx, image: ctx.createImageData(fog.cols, fog.rows), clouds };
 }
 
-/** Füllt die Nebelschicht aus fog.visible / fog.explored. reveal = alles sichtbar. */
+// Kriegsnebel (seit v5.49 gemalt, Daniels Wunsch „schaue welche Assets noch nicht verbessert wurden“): Unerforschtes liegt unter einer
+// dunklen Wolkendecke mit weichen hellen und dunklen Flecken statt flach schwarz, Erkundetes ist kühl abgedunkelt, am Übergang ein
+// heller Wolkensaum; der Rand ist weichgezeichnet, damit keine Treppen aus 64-px-Zellen bleiben. Mit WebGL zeichnet ground.js (FS_FOG)
+// den Nebel in Iso und 2D (ziehende Wolken); hier der Canvas-Weg für die Minimap und Geräte ohne WebGL (feste Wolkenflecken).
+const FOG_DIM = [8, 12, 20]; // erkundet
+const FOG_DEEP = [5, 7, 9]; // Wolken dunkel …
+const FOG_LIGHT = [24, 27, 33]; // … und hell
+const FOG_RIM = [15, 17, 18]; // heller Saum am Rand des Unerforschten
+
+/** Wolken je Nebelzelle (Stufe 0 … 15, fest): weiches Wertrauschen über zwei Maßstäbe. */
+export function fogTone(cols, rows) {
+  const out = new Uint8Array(cols * rows);
+  const h = (x, y) => {
+    const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+    return s - Math.floor(s);
+  };
+  const vn = (x, y) => {
+    const xi = Math.floor(x);
+    const yi = Math.floor(y);
+    const fx = x - xi;
+    const fy = y - yi;
+    const sx = fx * fx * (3 - 2 * fx);
+    const sy = fy * fy * (3 - 2 * fy);
+    const a = h(xi, yi);
+    const b = h(xi + 1, yi);
+    const c = h(xi, yi + 1);
+    const d = h(xi + 1, yi + 1);
+    return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
+  };
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) out[r * cols + c] = Math.min(15, Math.floor((vn(c / 6, r / 6) * 0.65 + vn(c / 2.5 + 17, r / 2.5 + 5) * 0.35) * 16));
+  }
+  return out;
+}
+
+let fogStamp = 0; // zählt jeden neu gerechneten WebGL-Nebel (über alle Renderer), ground.js lädt die Textur nur dann neu
+
+/** Weichzeichnen 1-2-1 waagrecht (nach tmp), dann senkrecht (zurück nach a); k Werte je Zelle, verschachtelt. Liefert a. */
+export function blur121(a, tmp, cols, rows, k = 1) {
+  const line = cols * k;
+  for (let r = 0; r < rows; r++) {
+    const o = r * line;
+    for (let j = 0; j < line; j++) {
+      const i = o + j;
+      tmp[i] = (a[j < k ? i : i - k] + 2 * a[i] + a[j >= line - k ? i : i + k] + 2) >> 2;
+    }
+  }
+  for (let r = 0; r < rows; r++) {
+    const o = r * line;
+    const up = r > 0 ? -line : 0;
+    const dn = r < rows - 1 ? line : 0;
+    for (let j = 0; j < line; j++) {
+      const i = o + j;
+      a[i] = (tmp[i + up] + 2 * tmp[i] + tmp[i + dn] + 2) >> 2;
+    }
+  }
+  return a;
+}
+
+/**
+ * Füllt die Nebelschicht aus fog.visible / fog.explored (Canvas-Weg: Minimap und ohne WebGL; seit v5.49 weicher Rand, Wolken,
+ * heller Saum). reveal = alles sichtbar.
+ */
 export function updateFogLayer(layer, fog, reveal) {
   const d = layer.image.data;
-  const n = fog.cols * fog.rows;
-  for (let i = 0; i < n; i++) {
-    let a;
-    if (reveal || fog.visible[i]) a = 0;
-    else if (fog.explored[i]) a = FOG_EXPLORED_ALPHA;
-    else a = 255;
-    const o = i * 4;
-    d[o] = 6;
-    d[o + 1] = 8;
-    d[o + 2] = 10;
-    d[o + 3] = a;
+  const cols = fog.cols;
+  const rows = fog.rows;
+  const n = cols * rows;
+  if (!layer.a || layer.a.length !== n) {
+    layer.a = new Uint8Array(n);
+    layer.b = new Uint8Array(n);
+    layer.tone = layer.clouds === false ? new Uint8Array(n).fill(5) : fogTone(cols, rows);
+    layer.lut = fogLut();
+  }
+  // nur neu malen, wenn sich der Nebel geändert hat (fog.version zählt jede Neuberechnung, alle 0,25 s Spielzeit)
+  if (fog.version !== undefined && layer.src === fog && layer.ver === fog.version && layer.rev === reveal) return;
+  layer.src = fog;
+  layer.ver = fog.version;
+  layer.rev = reveal;
+  const A = layer.a;
+  const vis = fog.visible;
+  const exp = fog.explored;
+  for (let i = 0; i < n; i++) A[i] = reveal || vis[i] ? 0 : exp[i] ? FOG_EXPLORED_ALPHA : 255;
+  blur121(A, layer.b, cols, rows, 1);
+  const T = layer.tone;
+  const L = layer.lut;
+  for (let i = 0, p = 0; i < n; i++, p += 4) {
+    const q = (A[i] * 16 + T[i]) * 3; // Tabelle: Nebelstufe × 16 Wolkentöne
+    d[p] = L[q];
+    d[p + 1] = L[q + 1];
+    d[p + 2] = L[q + 2];
+    d[p + 3] = A[i];
   }
   layer.ctx.putImageData(layer.image, 0, 0);
+}
+
+/** Farbtabelle für updateFogLayer: je Nebelstufe (0 … 255) und Wolkenton (0 … 15) r, g, b wie FS_FOG in ground.js. */
+function fogLut() {
+  const L = new Uint8ClampedArray(256 * 16 * 3);
+  const span = 255 - FOG_EXPLORED_ALPHA;
+  for (let a = 0; a < 256; a++) {
+    const u = a <= FOG_EXPLORED_ALPHA ? 0 : (a - FOG_EXPLORED_ALPHA) / span; // 0 erkundet … 1 unerforscht
+    for (let s = 0; s < 16; s++) {
+      const t = s / 15;
+      const w = Math.min(1, t * t * 1.3);
+      const rim = 4 * u * (1 - u) * (0.35 + 0.65 * t); // heller Saum am Übergang
+      const q = (a * 16 + s) * 3;
+      for (let k = 0; k < 3; k++) L[q + k] = FOG_DIM[k] + (FOG_DEEP[k] + (FOG_LIGHT[k] - FOG_DEEP[k]) * w - FOG_DIM[k]) * u + FOG_RIM[k] * rim;
+    }
+  }
+  return L;
 }
 
 export class Renderer {
@@ -286,8 +380,15 @@ export class Renderer {
     }
 
     if (!reveal) {
-      updateFogLayer(this.fogLayer, g.fog[team], false);
-      ctx.drawImage(this.fogLayer.canvas, 0, 0, this.fogLayer.canvas.width, this.fogLayer.canvas.height, 0, 0, W, H);
+      if (cam.relief && this.ground) {
+        // mit WebGL dieselben Wolken und glatten Ränder wie isometrisch, flach von oben (seit v5.49)
+        const img = this.ground.renderFog(cam, this.cssW, this.cssH, dpr, cam.relief, this.fogData(g.fog[team]), now / 1000, true);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.drawImage(img, 0, 0);
+      } else {
+        updateFogLayer(this.fogLayer, g.fog[team], false);
+        ctx.drawImage(this.fogLayer.canvas, 0, 0, this.fogLayer.canvas.width, this.fogLayer.canvas.height, 0, 0, W, H);
+      }
     }
     // Regen, Schnee und Nebel über der Welt (Bildschirmkoordinaten), danach wieder die Welt-Transformation
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -418,13 +519,29 @@ export class Renderer {
     return [Math.cos(a) * k, Math.sin(a) * k, LIGHT_ELEV];
   }
 
-  /** Nebel als Bytes je Zelle für den WebGL-Nebel (gleiche Stufen wie updateFogLayer). */
+  /**
+   * Nebel für den WebGL-Nebel: je Zelle zwei Bytes (in Sicht, erkundet: 0 oder 255), weichgezeichnet (seit v5.49). Der Shader macht
+   * daraus glatte Ränder ohne die Treppen der 64-px-Zellen; Sicht und Erkundet getrennt, damit am Rand zum Unerforschten kein Streifen
+   * „erkundet“ entsteht.
+   */
   fogData(fog) {
     const n = fog.cols * fog.rows;
-    if (!this.fogBytes || this.fogBytes.length !== n) this.fogBytes = new Uint8Array(n);
+    const out = this.fogOut;
+    if (out && fog.version !== undefined && out.src === fog && out.ver === fog.version) return out; // unverändert: kein Neuladen
+    if (!this.fogBytes || this.fogBytes.length !== 2 * n) {
+      this.fogBytes = new Uint8Array(2 * n);
+      this.fogTmp = new Uint8Array(2 * n);
+    }
     const d = this.fogBytes;
-    for (let i = 0; i < n; i++) d[i] = fog.visible[i] ? 0 : fog.explored[i] ? FOG_EXPLORED_ALPHA : 255;
-    return { cols: fog.cols, rows: fog.rows, data: d };
+    const vis = fog.visible;
+    const exp = fog.explored;
+    for (let i = 0; i < n; i++) {
+      d[2 * i] = vis[i] ? 255 : 0;
+      d[2 * i + 1] = exp[i] ? 255 : 0;
+    }
+    blur121(d, this.fogTmp, fog.cols, fog.rows, 2);
+    this.fogOut = { cols: fog.cols, rows: fog.rows, data: d, src: fog, ver: fog.version, stamp: ++fogStamp };
+    return this.fogOut;
   }
 
   /** Isometrisch: danach zeichnen Weltkoordinaten (x, y) aufrecht um den Bildschirmpunkt dieses Weltpunkts, `lift` Pixel höher. */
@@ -834,7 +951,7 @@ export class Renderer {
 
     if (!reveal) {
       if (relief) {
-        const img = this.ground.renderFog(cam, this.cssW, this.cssH, dpr, relief, this.fogData(g.fog[team]));
+        const img = this.ground.renderFog(cam, this.cssW, this.cssH, dpr, relief, this.fogData(g.fog[team]), now / 1000); // Wolken ziehen (seit v5.49)
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.drawImage(img, 0, 0);
       } else {
