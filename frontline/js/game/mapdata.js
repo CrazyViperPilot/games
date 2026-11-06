@@ -246,14 +246,23 @@ export function checkMap(map) {
   return problems;
 }
 
+/**
+ * Raster einer Karte vor jedem Spielgeschehen: Hindernisse, Stadthäuser, Bäume, Gelände (Hänge, Seen, Furten). Damit beginnt jede
+ * Partie (Game); der Spielstand speichert nur den Unterschied dazu (savegame.js).
+ */
+export function terrainGrid(map, relief = reliefOf(map)) {
+  const grid = new Grid(W / TILE, H / TILE, TILE);
+  grid.rasterizeObstacles(map.obstacles);
+  grid.rasterizeRects(blockers(map.town?.buildings ?? []));
+  grid.rasterizeTrees([...(map.town?.trees ?? []), ...(map.trees ?? [])]);
+  grid.rasterizeRelief(relief, map.fords ?? []);
+  return grid;
+}
+
 /** Raster mit allen Hindernissen der Karte (Gelände eingeschlossen, Furten passierbar, Brücken offen), wie im Spiel. */
 function mapGrid(map) {
-  const grid = new Grid(W / TILE, H / TILE, TILE);
   const relief = reliefOf(map);
-  grid.rasterizeObstacles(map.obstacles);
-  grid.rasterizeRects(blockers(map.town.buildings));
-  grid.rasterizeTrees([...map.town.trees, ...map.trees]);
-  grid.rasterizeRelief(relief, map.fords ?? []);
+  const grid = terrainGrid(map, relief);
   openBridges(grid, map.bridges ?? [], relief);
   return grid;
 }

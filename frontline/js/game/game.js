@@ -4,8 +4,8 @@ import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { makeRng } from '../core/rng.js';
 import { generateMap } from './map.js';
-import { blockers } from './mapdata.js';
-import { Grid, lineCells } from './grid.js';
+import { terrainGrid } from './mapdata.js';
+import { lineCells } from './grid.js';
 import { reliefOf } from './relief.js';
 import { createUnit, createBuilding, defineAmmo, canAttack, inRange } from './entities.js';
 import { Fog } from './fog.js';
@@ -139,12 +139,9 @@ export class Game {
     this.debug = !!debug; // ?debug=1: erlaubt den Befehl `debug` (Geld, festes Wetter), seit v5.58
     this.rng = makeRng(seed);
     this.map = map ?? generateMap(seed, { river });
-    this.grid = new Grid(W / TILE, H / TILE, TILE);
-    this.grid.rasterizeObstacles(this.map.obstacles);
-    this.grid.rasterizeRects(blockers(this.map.town?.buildings ?? []));
-    this.grid.rasterizeTrees([...(this.map.town?.trees ?? []), ...(this.map.trees ?? [])]);
-    this.relief = reliefOf(this.map); // Höhengelände oder null (flache Karte)
-    this.grid.rasterizeRelief(this.relief, this.map.fords ?? []); // steile Hänge, Seen und Flüsse (Furten passierbar), Hangkosten
+    this.relief = reliefOf(this.map); // Höhengelände oder null (flache Karte); im Spielstand nur das Grobraster (savegame.js)
+    // Raster: Hindernisse, Häuser, Bäume, steile Hänge, Seen und Flüsse (Furten passierbar), Hangkosten; im Spielstand nur der Unterschied dazu
+    this.grid = terrainGrid(this.map, this.relief);
 
     this.time = 0;
     this.nextId = 1;

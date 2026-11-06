@@ -4,7 +4,7 @@ import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 
 /**
- * Einheit. Zusätzliche Felder: goalX/goalY (Ziel der letzten Planung), repathTimer, needPath.
+ * Einheit. Zusätzliche Felder: goalX/goalY (Ziel der letzten Planung), repathTimer.
  * Vorrat: ammo/fuel (voll beim Spawn), cargo/preset (LKW-Ladung und Ladungsart).
  */
 export function createUnit(id, type, team, x, y) {
@@ -33,7 +33,6 @@ export function createUnit(id, type, team, x, y) {
     goalX: x,
     goalY: y,
     repathTimer: 0,
-    needPath: false,
     speedMul: 1, // 0.25 bei Fahrzeugen ohne Treibstoff (movement.js)
     speedNow: 0, // tatsächliches Tempo (px/s) aus der Verschiebung seit dem letzten Schritt (movement.js); bestimmt die Trefferchance der Flak
     prevX: x, // Position am Anfang des letzten Bewegungsschritts

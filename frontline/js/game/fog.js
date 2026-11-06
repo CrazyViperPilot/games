@@ -25,6 +25,10 @@ function eyeOf(e) {
   return e.def.armor === 'inf' ? SH.eye.inf : SH.eye.veh;
 }
 
+// Zwischenspeicher, nicht im Spielstand (seit v5.62, Review-Paket P9):
+const scratch = new WeakMap(); // Fog → { seen: Uint32Array, tick } (Doppelte in losCells erkennen)
+const sightCells = new WeakMap(); // Entity → { key, relief, version, cells } (Sichtfeld aus markEntity)
+
 export class Fog {
   constructor(width, height, cell = 64) {
     this.cell = cell;
@@ -82,9 +86,10 @@ export class Fog {
     };
     const h0 = relief.displayAt(x, y) + eye;
     const out = [];
-    const seen = this.stamp ?? (this.stamp = new Uint32Array(cols * rows));
-    this.tick = (this.tick ?? 0) + 1;
-    const tick = this.tick;
+    let w = scratch.get(this);
+    if (!w) scratch.set(this, (w = { seen: new Uint32Array(cols * rows), tick: 0 }));
+    const seen = w.seen;
+    const tick = ++w.tick;
     const add = (px, py) => {
       const c = Math.floor(px / cell);
       const rr = Math.floor(py / cell);
@@ -114,7 +119,11 @@ export class Fog {
     return out;
   }
 
-  /** Markiert die Zellen eines Beobachters; mit Gelände über Sichtstrahlen (zwischengespeichert, solange er am selben Ort steht). */
+  /**
+   * Markiert die Zellen eines Beobachters; mit Gelände über Sichtstrahlen, zwischengespeichert, solange er am selben Ort steht
+   * (gleicher Schlüssel e.fogKey). Die Zellen selbst liegen nicht auf der Entity (nicht im Spielstand), nur der genaue Ort ihrer
+   * Berechnung e.fogAt = [x, y, Sichtweite]: nach dem Laden entstehen daraus genau dieselben Zellen wie vor dem Speichern.
+   */
   markEntity(relief, e, sight) {
     if (!relief || (e.kind === 'unit' && e.def.air)) {
       this.mark(e.x, e.y, sight);
@@ -122,13 +131,18 @@ export class Fog {
     }
     const r = sightAt(relief, e.x, e.y, sight);
     const key = `${Math.round(e.x / 8)},${Math.round(e.y / 8)},${Math.round(r)},${e.house ? 1 : 0}`;
-    let cells = e.fogKey === key && e.fogRelief === relief.version ? e.fogCells : null;
+    const hit = sightCells.get(e);
+    let cells = null;
+    if (e.fogKey === key && e.fogAt) {
+      if (!hit) cells = this.losCells(relief, e.fogAt[0], e.fogAt[1], eyeOf(e), e.fogAt[2]); // nach dem Laden: am gemerkten Ort
+      else if (hit.key === key && hit.relief === relief && hit.version === relief.version) cells = hit.cells;
+    }
     if (!cells) {
       cells = this.losCells(relief, e.x, e.y, eyeOf(e), r);
       e.fogKey = key;
-      e.fogCells = cells;
-      e.fogRelief = relief.version;
+      e.fogAt = [e.x, e.y, r];
     }
+    if (cells !== hit?.cells) sightCells.set(e, { key, relief, version: relief.version, cells });
     for (const i of cells) {
       this.visible[i] = 1;
       this.explored[i] = 1;

@@ -287,11 +287,14 @@ function tryFireUnit(game, u, t) {
   fireWeapon(game, u, pick, t);
 }
 
+const bestClass = new WeakMap(); // Waffe (feste Daten) → Zielklasse mit dem höchsten Schaden; nicht in UNITS/BUILDINGS geschrieben
+
 /** Bevorzugt die Waffe diese Zielklasse? Mit targets: diese Klassen; sonst die Klasse mit ihrem höchsten Schaden (MG: Infanterie). */
 function prefers(spec, e) {
   if (spec.targets) return meant(spec, e);
-  spec.bestKey ??= Object.entries(spec.damage).reduce((a, b) => (b[1] > a[1] ? b : a))[0];
-  return dmgKey(e) === spec.bestKey;
+  let best = bestClass.get(spec);
+  if (best === undefined) bestClass.set(spec, (best = Object.entries(spec.damage).reduce((a, b) => (b[1] > a[1] ? b : a))[0]));
+  return dmgKey(e) === best;
 }
 
 /**
