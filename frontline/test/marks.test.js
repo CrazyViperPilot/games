@@ -2,7 +2,7 @@
 // nur mit endlichen Zahlen und lesbaren Farben. Ohne Canvas (Node) malt marks.js direkt, darum sieht der Fake-Canvas jeden Strich.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { drawSelectMark, drawDragFrame, drawGauge, drawCargoGauge, drawStarMark, drawCareMark, drawNoAmmoMark } from '../js/render/marks.js';
+import { drawSelectMark, drawDragFrame, drawGauge, drawCargoGauge, drawStarMark, drawCareMark, drawNoAmmoMark, drawMoveRing, drawSlotMark, strokeTrail, drawArrowHead, drawFootRing, drawRallyFlag } from '../js/render/marks.js';
 import { drawBar, drawStar } from '../js/render/sprites.js';
 
 /** Zeichenfläche, die jeden Aufruf annimmt und prüft, dass alle Zahlen endlich und alle Farben lesbar sind. */
@@ -85,5 +85,34 @@ test('Stern, Heilkreuz und Warnzeichen: jede Größe und jeder Zoom endlich und 
       assert.ok(f.calls.includes('fill'), 'gefüllt');
       assert.ok(f.colors.some((c) => /rgba\((8,12,10|30,20,0)/.test(c)), 'dunkler Saum');
     }
+  }
+});
+
+test('Befehle: Wegziel über die ganze Lebensdauer, Formationspunkte, Linien mit Saum, Pfeil, Sammelpunkt-Fahne', () => {
+  for (const z of ZOOMS) {
+    for (const iso of [false, true]) {
+      for (const k of [0, 0.3, 0.99, 1, 1.5]) {
+        const f = fakeCtx();
+        drawMoveRing(f.ctx, 100, 200, k, z, iso);
+        if (k < 1) assert.ok(f.calls.includes('stroke'), `Ring k=${k}`);
+        else assert.equal(f.calls.length, 0, 'verblasst: nichts');
+      }
+    }
+    for (const a of [0.9, 0.2, 0, -1]) {
+      const f = fakeCtx();
+      drawSlotMark(f.ctx, 10, 10, z, a);
+      if (a > 0) assert.ok(f.calls.includes('fill'));
+    }
+    const f = fakeCtx();
+    f.ctx.beginPath();
+    f.ctx.moveTo(0, 0);
+    f.ctx.lineTo(300, 100);
+    strokeTrail(f.ctx, 'rgba(222,182,52,0.95)', 2 / z, [10 / z, 7 / z]);
+    drawArrowHead(f.ctx, 300, 100, 0.3, 6.5 / z, 'rgba(222,182,52,0.95)', 1 / z);
+    drawFootRing(f.ctx, 300, 100, 5 / z, '#ffd65a', 1 / z);
+    drawRallyFlag(f.ctx, 300, 100, 1 / z);
+    drawRallyFlag(f.ctx, 300, 100, 1);
+    assert.ok(f.calls.filter((c) => c === 'stroke').length >= 6);
+    assert.ok(f.colors.some((c) => /rgba\(8,12,10/.test(c)), 'Saum');
   }
 });
