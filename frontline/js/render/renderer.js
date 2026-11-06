@@ -49,6 +49,7 @@ import { drawMood } from './mood.js';
 import { drawBridgeTop, drawBridgeIso, drawBridgeBar, bridgeBar, fordPosts, drawFordPostTop, drawFordPostIso } from './bridge.js';
 import { bridgeUnder } from '../game/river.js';
 import { setMapTown, drawMapTown2D, drawMapCars2D, drawPark } from './maptown.js';
+import { drawHouseWorksIso, drawHouseWorksTop, drawHouseFlagIso, drawHouseFlagTop, worksMask } from './stronghold.js';
 import { drawUnitTop, drawUnitShadowIso, drawWreckTop } from './unitpaint.js';
 import { drawShell, drawShellIso, drawShellTarget, drawEffect, drawEffectUp, drawCrater, drawWreck, drawWreckRubble, drawSmoke, drawSmokeScreen, drawFire, drawMine } from './fx.js';
 import { drawCityGround, drawCityTop, drawCityRoofs, cityBuildings, drawCityBadges } from './citylayer.js';
@@ -197,6 +198,12 @@ export class Renderer {
     };
     drawMapTown2D(ctx, g.map.town, inRect, z, this.season, (x, y) => g.city && treeGone(g, x, y), ruined);
     setRoofSnow(false);
+    // besetzte und ausgebaute Häuser (seit v5.48, stronghold.js): Sandsäcke, MG-Nest, Stacheldraht und Fahne in Teamfarbe
+    for (const h of g.houses ?? []) {
+      if (h.ruined || !inRect(h.x, h.y, (h.pw + h.ph) / 2) || !this.fortShown(h, known)) continue;
+      drawHouseWorksTop(ctx, h, z);
+      if (h.occupants.length && h.team >= 0) drawHouseFlagTop(ctx, h, g.teams[h.team]?.color ?? '#888', now / 1000);
+    }
     for (const b of g.bridges ?? []) if (inRect(b.x, b.y, b.len / 2 + 40)) drawBridgeTop(ctx, b, this.season); // über dem Fluss, unter allem anderen
     for (const p of fordPosts(g.map, reliefOf(g.map))) if (inRect(p.x, p.y, 10)) drawFordPostTop(ctx, p); // Furtstangen
     this.drawRuins(ctx, R, known);
@@ -709,7 +716,13 @@ export class Renderer {
         if (hs && hs.ruined && known(hs.x, hs.y)) drawRubble(ctx, cam, it.o);
         else {
           setRoofSnow(this.season === 'winter'); // Winter: Schnee auf den Dächern der Stadt
+          const fort = hs && this.fortShown(hs, known) ? hs : null; // besetztes oder ausgebautes Haus (seit v5.48, stronghold.js)
+          if (fort) drawHouseWorksIso(ctx, cam, fort, 'back'); // Draht hinter dem Haus
           if (it.o.part?.t !== 'tree' || !drawTreeIso(ctx, cam, it.o.part, this.season)) drawTownBuilding(ctx, cam, it.o, this.season); // Bäume der Großbauten gemalt (nature.js)
+          if (fort) {
+            drawHouseWorksIso(ctx, cam, fort, 'front'); // Sandsäcke, MG-Nest, Draht davor
+            if (fort.occupants.length && fort.team >= 0) drawHouseFlagIso(ctx, cam, fort, g.teams[fort.team]?.color ?? '#888', now / 1000);
+          }
           setRoofSnow(false);
           if (it.o.damage > 0.25) {
             // beschädigtes Stadtgebäude (Stadt-Teil): Rauch über dem Dach
@@ -1192,6 +1205,17 @@ export class Renderer {
       if (x0 > R.x1 || y0 > R.y1 || x0 + h.pw < R.x0 || y0 + h.ph < R.y0) continue;
       drawWreckRubble(ctx, { id: h.id, x: h.x, y: h.y, w: h.pw, h: h.ph, small: false, ruin: true, wall: '#c9bfae' });
     }
+  }
+
+  /**
+   * Besetztes oder ausgebautes Haus sichtbar machen (seit v5.48)? Eigene immer; ein besetztes fremdes, wenn ein Besatzer erkannt ist (wie
+   * das Schild, ein getarnter Scharfschütze verrät sein Haus nicht); ein leeres mit Ausbauten, wenn die Stelle erkundet ist.
+   */
+  fortShown(h, known) {
+    const occupied = h.occupants.length > 0;
+    if (!occupied && !worksMask(h)) return false;
+    if (h.team === this.team || this.revealAll) return true;
+    return occupied ? this.game.sees(this.team, h) : known(h.x, h.y);
   }
 
   /** Besatzung eines Hauses (Bildschirmkoordinaten, Transformation auf DPR): Schild in Teamfarbe „n/Plätze“, darunter der Zustand. */

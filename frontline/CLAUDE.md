@@ -124,7 +124,7 @@ Wo jedes Feature liegt. „KI“ = Konstanten-Präfix in `js/data/ai.js`, Logik 
 | Nebel und Sicht | §7, §9 | `fogInterval`, `sightHeight` | `fog.js` | – | `renderer.js`, `minimap.js` | `terrain.test.js` |
 | Gelände: Höhe, Hänge, Seen | §7 „Gelände“ | `height`, `slope`, `sightHeight` | `relief.js`, `landscape.js` | – | `ground.js` (WebGL), `reliefimg.js` | `relief.test.js`, `terrain.test.js` |
 | Fluss, Brücken, Furten | §7 „Fluss“ | `river` | `river.js`, `landscape.js` | `BRIDGE_*` | `bridge.js` | `river.test.js` |
-| Häuserkampf | §7 „Häuserkampf“ | `garrison` | `garrison.js` | `GARRISON_*` | `renderer.js`, `status.js` | `garrison.test.js` |
+| Häuserkampf | §7 „Häuserkampf“ | `garrison` | `garrison.js` | `GARRISON_*` | `renderer.js` (Schild `drawGarrison`, Sichtregel `fortShown`), `stronghold.js` (Fahne und Ausbauten am Haus, seit v5.48), `status.js` | `garrison.test.js`, `stronghold.test.js` |
 | Festung: Gefechtsturm, Dachaufbau, Ausbau-Befehl | §5a | `fortress`, `BUILDINGS.tower` (`cap`, `reach`, `roofs`) | `tower.js` (Besatzung über `garrison.js`) | `FORT_*`, `difficulty.<stufe>.fort` | `controller.js` (Karte von FOB und Turm), `hud.js`, `sprites.js` (Besatzung), `milbuild.js` (Bild mit Dachaufbau, seit v5.21) | `tower.test.js`, `fortress-ai.test.js` |
 | Versorgungskisten | §7 „Versorgungskisten“ | `crates` | `crates.js` | `CRATE_*`, `difficulty.cratePickers` | `props.js` (gemalt seit v5.43: `drawCrateIso`, `drawCrateTop`), Ersatz und Editor `sprites.js` (`drawCrate`), `minimap.js` | `crates.test.js`, `props.test.js` |
 | Kommandeur | §6 | `commander`, `UNITS.commander` | `commander.js` | `CMD_*` | `sprites.js` (`drawStar`), `renderer.js` | `commander.test.js` |
