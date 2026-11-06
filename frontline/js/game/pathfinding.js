@@ -1,5 +1,6 @@
 // Pfadsuche (A*, 8 Nachbarn) und Sichtlinie. Kein DOM.
-// Die Arbeitsspeicher (Typed Arrays, Binärheap) werden pro Grid-Größe wiederverwendet.
+// Die Arbeitsspeicher (Typed Arrays, Binärheap) werden pro Grid-Größe wiederverwendet. Einheiten planen über findUnitPath
+// (unerreichbare Ziele billig, lange Suchen über mehrere Schritte, seit v5.61), Kartenbau über findPath.
 
 const SQRT2 = Math.SQRT2;
 const H_WEIGHT = 1.05; // Gewicht der Heuristik bei Hangkosten
@@ -8,31 +9,53 @@ const DIAG_EXTRA = SQRT2 - 1;
 const DX = [1, -1, 0, 0, 1, 1, -1, -1];
 const DY = [0, 0, 1, -1, 1, -1, 1, -1];
 
-let ws = null; // Arbeitsspeicher, wird bei gleicher Größe wiederverwendet
+/** Arbeitsspeicher einer Suche für `size` Zellen (Typed Arrays, Binärheap, Stempel statt Löschen). */
+function makeWorkspace(size) {
+  const cap = Math.max(1024, size);
+  return {
+    size,
+    g: new Float32Array(size),
+    parent: new Int32Array(size),
+    seen: new Uint32Array(size), // Zellen-Stempel: gültig, wenn === stamp
+    closed: new Uint32Array(size),
+    hCell: new Int32Array(cap), // Binärheap: Zellenindex
+    hKey: new Float32Array(cap), // Binärheap: f-Wert
+    hSize: 0,
+    stamp: 0,
+    fseen: new Uint32Array(size), // Taschenprüfung (findUnitPath): Stempel der gefluteten Zellen
+    queue: new Int32Array(size),
+    fstamp: 0,
+  };
+}
+
+// Zwei Arbeitsspeicher, je bei gleicher Größe wiederverwendet: `ws` für Suchen am Stück, `wsLong` für die eine lange Suche, die
+// über mehrere Simulationsschritte läuft (startLong/stepLong)
+let ws = null;
+let wsLong = null;
 
 function getWorkspace(size) {
-  if (!ws || ws.size !== size) {
-    const cap = Math.max(1024, size * 4);
-    ws = {
-      size,
-      g: new Float32Array(size),
-      parent: new Int32Array(size),
-      seen: new Uint32Array(size), // Zellen-Stempel: gültig, wenn === stamp
-      closed: new Uint32Array(size),
-      hCell: new Int32Array(cap), // Binärheap: Zellenindex
-      hKey: new Float32Array(cap), // Binärheap: f-Wert
-      hSize: 0,
-      stamp: 0,
-    };
-  }
-  ws.hSize = 0;
-  ws.stamp++;
-  if (ws.stamp >= 0xfffffff0) {
-    ws.seen.fill(0);
-    ws.closed.fill(0);
-    ws.stamp = 1;
-  }
+  if (!ws || ws.size !== size) ws = makeWorkspace(size);
   return ws;
+}
+
+function getLongWorkspace(size) {
+  if (!wsLong || wsLong.size !== size) wsLong = makeWorkspace(size);
+  return wsLong;
+}
+
+/** Neue Suche im Arbeitsspeicher: leerer Heap, neuer Stempel. */
+function reset(w) {
+  w.hSize = 0;
+  w.stamp++;
+  if (w.stamp >= 0xfffffff0) {
+    w.seen.fill(0);
+    w.closed.fill(0);
+    w.stamp = 1;
+  }
+  if (w.fstamp >= 0xfffffff0) {
+    w.fseen.fill(0);
+    w.fstamp = 1;
+  }
 }
 
 function heapGrow(w) {
@@ -93,6 +116,9 @@ function heuristic(c, r, tc, tr) {
   return dx > dy ? dx + DIAG_EXTRA * dy : dy + DIAG_EXTRA * dx;
 }
 
+/** Gezählte Arbeit aller Suchen (untersuchte Zellen plus Zellen der Taschenprüfung); movement.js misst daran das Wegbudget je Schritt. */
+export const pathStats = { nodes: 0 };
+
 /**
  * Sucht einen Weg von (sx, sy) nach (tx, ty) in Weltkoordinaten.
  * Ergebnis: Wegpunkte {x, y} ohne Start. Letzter Punkt = exaktes Ziel, wenn das Ziel erreicht wurde.
@@ -100,54 +126,253 @@ function heuristic(c, r, tc, tr) {
  * [] wenn Start- und Zielzelle gleich sind oder nichts erreichbar ist.
  * maxNodes: höchstens so viele untersuchte Zellen; Standard 20000, auf großen Rastern ein Viertel der Zellen (seit v5.14: die Grenze
  * wächst mit der Karte mit, 346 × 346 Kacheln → 29929, damit lange Umwege über Brücken weiter gefunden werden).
+ * Kartenbau und Kartenprüfung nutzen diese Suche (Ergebnis je Seed unverändert); Einheiten planen über findUnitPath.
  */
-export function findPath(grid, sx, sy, tx, ty, team, maxNodes = Math.max(20000, Math.ceil((grid.cols * grid.rows) / 4))) {
+export function findPath(grid, sx, sy, tx, ty, team, maxNodes = defaultMax(grid)) {
+  const q = query(grid, sx, sy, tx, ty, team);
+  if (!q) return [];
+  const w = getWorkspace(grid.cols * grid.rows);
+  const st = begin(w, grid, q, maxNodes, q.goalOpen, -1);
+  advance(st, Infinity);
+  return finish(st);
+}
+
+function defaultMax(grid) {
+  return Math.max(20000, Math.ceil((grid.cols * grid.rows) / 4));
+}
+
+/** Start- und Zielzelle (ins Feld geklemmt); null, wenn beide gleich sind. goalOpen: Ziel im Feld und passierbar. */
+function query(grid, sx, sy, tx, ty, team) {
+  const clamp = (v, n) => Math.min(Math.max(v, 0), n - 1);
+  const sc = clamp(grid.toCell(sx), grid.cols);
+  const sr = clamp(grid.toCell(sy), grid.rows);
+  const tc = clamp(grid.toCell(tx), grid.cols);
+  const tr = clamp(grid.toCell(ty), grid.rows);
+  if (sc === tc && sr === tr) return null;
+  const goalOpen = grid.inBounds(grid.toCell(tx), grid.toCell(ty)) && grid.passable(tc, tr, team);
+  return { sx, sy, tx, ty, sc, sr, tc, tr, team, goalOpen };
+}
+
+/**
+ * Weg für eine Einheit (seit v5.61, Review-Paket P8). Wie findPath, aber
+ * - ein unerreichbares Ziel kostet keine volle Suche mehr: Ist die Zielzelle versperrt (Gebäude, Wasser) oder liegt sie in einer
+ *   abgeschlossenen Tasche (Flutung von dort endet nach höchstens P.pocket Zellen, ohne den Start zu finden, z. B. hinter fremden
+ *   Mauern), gilt die nächste passierbare Zelle außerhalb solcher Taschen (Ringsuche bis P.ring Zellen); die Suche endet, sobald sie
+ *   eine Zelle in diesem Abstand zum Ziel erreicht. Der Weg endet dann wie bei findPath an der erreichbaren Zelle nahe dem Ziel.
+ * - die Suche untersucht hier höchstens P.slice Zellen. Reicht das nicht, liefert sie null: dann sucht startLong/stepLong den Weg
+ *   über mehrere Schritte (movement.js).
+ */
+export function findUnitPath(grid, sx, sy, tx, ty, team, P) {
+  const q = query(grid, sx, sy, tx, ty, team);
+  if (!q) return [];
+  const w = getWorkspace(grid.cols * grid.rows);
+  const stopDD = unitGoal(grid, w, q, P);
+  const st = begin(w, grid, q, defaultMax(grid), q.goalOpen && stopDD < 0, stopDD);
+  if (advance(st, P.slice)) return finish(st);
+  lastCut = st;
+  return null;
+}
+
+let lastCut = null; // zuletzt nach P.slice abgebrochene Suche (adoptLong)
+
+/**
+ * Übernimmt die zuletzt von findUnitPath abgebrochene Suche als lange Suche (tauscht die Arbeitsspeicher, nichts wird doppelt
+ * gerechnet). null, wenn der Arbeitsspeicher inzwischen eine andere Suche begonnen hat.
+ */
+export function adoptLong() {
+  const st = lastCut;
+  lastCut = null;
+  if (!st || st.w !== ws || ws.stamp !== st.stamp) return null;
+  const t = wsLong;
+  wsLong = ws;
+  ws = t;
+  return st;
+}
+
+/** Prüfsumme der Passierbarkeit (Terrain, Gebäude, Tore): eine lange Suche beginnt neu, wenn sie sich ändert. */
+export function gridHash(grid) {
+  let h = 0x811c9dc5 | 0;
+  const mix = (a) => {
+    const words = a.byteOffset % 4 === 0 ? new Int32Array(a.buffer, a.byteOffset, a.byteLength >> 2) : null;
+    const n = words ? words.length : 0;
+    for (let i = 0; i < n; i++) h = Math.imul(h ^ words[i], 16777619);
+    const bytes = new Uint8Array(a.buffer, a.byteOffset, a.byteLength);
+    for (let i = n * 4; i < bytes.length; i++) h = Math.imul(h ^ bytes[i], 16777619);
+  };
+  mix(grid.terrain);
+  mix(grid.struct);
+  mix(grid.gateTeam);
+  return h >>> 0;
+}
+
+/** Lange Suche (findUnitPath reichte P.slice nicht) im eigenen Arbeitsspeicher; weiter mit stepLong, Weg mit longPath. */
+export function startLong(grid, sx, sy, tx, ty, team, P) {
+  const q = query(grid, sx, sy, tx, ty, team);
+  if (!q) return { over: true, path: [] };
+  const w = getLongWorkspace(grid.cols * grid.rows);
+  reset(w); // eigener Stempel für die Taschenprüfung
+  const stopDD = unitGoal(grid, w, q, P);
+  return begin(w, grid, q, defaultMax(grid), q.goalOpen && stopDD < 0, stopDD);
+}
+
+/** Rechnet die lange Suche um höchstens n Zellen weiter; true, wenn sie fertig ist. */
+export function stepLong(st, n) {
+  return advance(st, n);
+}
+
+/** Gehört der Arbeitsspeicher noch dieser langen Suche (keine andere hat seitdem begonnen)? */
+export function longValid(st) {
+  return st.path !== undefined || st.w.stamp === st.stamp;
+}
+
+/** Weg der fertigen langen Suche. */
+export function longPath(st) {
+  return st.path ?? finish(st);
+}
+
+/**
+ * Ziel einer Einheitensuche: -1, wenn die Zielzelle frei und erreichbar scheint (Suche bis dorthin); sonst der quadrierte
+ * Zellenabstand der nächsten freien Zelle außerhalb abgeschlossener Taschen (Suche endet in diesem Abstand), -1 ohne solche Zelle.
+ */
+function unitGoal(grid, w, q, P) {
+  const cols = grid.cols;
+  const startI = q.sr * cols + q.sc;
+  const ex = ++w.fstamp; // Stempel der gefundenen Taschen
+  const flood = { left: P.pocket * 2 }; // Flutungen je Suche zusammen höchstens so viele Zellen
+  if (q.goalOpen && !pocket(grid, w, q.tr * cols + q.tc, startI, q.team, P.pocket, ex, flood)) return -1;
+  for (;;) {
+    const near = nearestFree(grid, w, q.tc, q.tr, q.team, P.ring, ex);
+    if (!near) return -1;
+    if (near.i === startI || !pocket(grid, w, near.i, startI, q.team, P.pocket, ex, flood)) return near.dd;
+    if (flood.left <= 0) return -1;
+  }
+}
+
+/**
+ * Flutet (4 Nachbarn) von Zelle `from` über passierbare Zellen. true, wenn die Fläche abgeschlossen ist (höchstens `limit` Zellen)
+ * und den Start nicht enthält; ihre Zellen tragen dann den Stempel `ex` (nearestFree lässt sie aus). flood.left zählt die Zellen
+ * aller Flutungen einer Suche herunter; ist es aufgebraucht, gilt die Fläche als offen.
+ */
+function pocket(grid, w, from, startI, team, limit, ex, flood) {
+  const cols = grid.cols;
+  const n = cols * grid.rows;
+  const { terrain, struct, gateTeam } = grid;
+  const fseen = w.fseen;
+  const q = w.queue;
+  const tmp = ++w.fstamp; // eigener Stempel je Flutung
+  const max = Math.min(limit, flood.left);
+  let head = 0;
+  let tail = 0;
+  q[tail++] = from;
+  fseen[from] = tmp;
+  let open = false;
+  while (head < tail) {
+    const i = q[head++];
+    if (i === startI) {
+      open = true;
+      break;
+    }
+    const c = i % cols;
+    for (let k = 0; k < 4 && !open; k++) {
+      if ((k === 0 && c === cols - 1) || (k === 1 && c === 0)) continue;
+      const j = k === 0 ? i + 1 : k === 1 ? i - 1 : k === 2 ? i + cols : i - cols;
+      if (j < 0 || j >= n || fseen[j] === tmp || fseen[j] === ex) continue;
+      if (terrain[j] !== 0 || (struct[j] !== 0 && gateTeam[j] !== team)) continue;
+      if (tail >= max) open = true;
+      else {
+        fseen[j] = tmp;
+        q[tail++] = j;
+      }
+    }
+    if (open) break;
+  }
+  pathStats.nodes += tail;
+  flood.left -= tail;
+  if (open) return false;
+  for (let k = 0; k < tail; k++) fseen[q[k]] = ex; // abgeschlossene Tasche: bleibt ausgeschlossen
+  return true;
+}
+
+/** Nächste passierbare Zelle (Abstand zur Zielzelle, gleich weit: zuerst kleinere Zeile, dann Spalte) außerhalb der Taschen; null, wenn keine. */
+function nearestFree(grid, w, tc, tr, team, maxRad, ex) {
+  const cols = grid.cols;
+  const fseen = w.fseen;
+  let best = -1;
+  let bestD = Infinity;
+  let until = maxRad;
+  for (let rad = 1; rad <= until; rad++) {
+    for (let r = tr - rad; r <= tr + rad; r++) {
+      const edge = r === tr - rad || r === tr + rad;
+      for (let c = tc - rad; c <= tc + rad; c += edge ? 1 : 2 * rad) {
+        if (!grid.inBounds(c, r)) continue;
+        const i = r * cols + c;
+        if (fseen[i] === ex || !grid.passable(c, r, team)) continue;
+        const d = (c - tc) * (c - tc) + (r - tr) * (r - tr);
+        if (d < bestD || (d === bestD && i < best)) {
+          best = i;
+          bestD = d;
+        }
+      }
+    }
+    // weiter außen liegt nichts Näheres mehr, sobald rad² ≥ bestD
+    if (best >= 0) until = Math.min(until, Math.ceil(Math.sqrt(bestD)));
+  }
+  return best >= 0 ? { i: best, dd: bestD } : null;
+}
+
+/**
+ * Beginnt eine A*-Suche im Arbeitsspeicher w. goalExact: die Zielzelle ist passierbar und beendet die Suche. stopDD ≥ 0: die Suche
+ * endet an der ersten untersuchten Zelle mit quadriertem Zellenabstand ≤ stopDD zum Ziel (findUnitPath). Sonst endet der Weg an der
+ * untersuchten Zelle nächst dem Ziel.
+ */
+function begin(w, grid, q, maxNodes, goalExact, stopDD) {
+  reset(w);
+  const cols = grid.cols;
+  const startI = q.sr * cols + q.sc;
+  // Mit Hangkosten leicht gewichtete Heuristik: kaum längere Wege, aber viel weniger untersuchte Zellen (sonst reicht maxNodes nicht)
+  const st = { w, grid, q, stamp: w.stamp, startI, goalI: q.tr * cols + q.tc, goalExact, stopDD, hw: grid.cost ? H_WEIGHT : 1 };
+  st.maxNodes = grid.cost ? maxNodes * 2 : maxNodes; // variable Kosten: die Suche untersucht mehr Zellen
+  w.g[startI] = 0;
+  w.parent[startI] = -1;
+  w.seen[startI] = w.stamp;
+  heapPush(w, startI, heuristic(q.sc, q.sr, q.tc, q.tr));
+  // Bester Näherungspunkt, falls das Ziel nicht erreicht wird
+  st.best = startI;
+  st.bestD = (q.sc - q.tc) * (q.sc - q.tc) + (q.sr - q.tr) * (q.sr - q.tr);
+  st.found = false;
+  st.over = false; // fertig (Ziel, Abstand stopDD, Heap leer oder maxNodes)
+  st.expanded = 0;
+  return st;
+}
+
+/** Untersucht höchstens n weitere Zellen; true, wenn die Suche fertig ist. */
+function advance(st, n) {
+  if (st.over) return true;
+  const { w, grid, q, stamp, startI, goalI, goalExact, stopDD, hw, maxNodes } = st;
+  if (w.stamp !== stamp) throw new Error('Wegsuche: Arbeitsspeicher wurde von einer anderen Suche benutzt');
   const cols = grid.cols;
   const rows = grid.rows;
-  const clampC = (v) => Math.min(Math.max(v, 0), cols - 1);
-  const clampR = (v) => Math.min(Math.max(v, 0), rows - 1);
-
-  const sc = clampC(grid.toCell(sx));
-  const sr = clampR(grid.toCell(sy));
-  const tc = clampC(grid.toCell(tx));
-  const tr = clampR(grid.toCell(ty));
-  if (sc === tc && sr === tr) return [];
-
-  // Das exakte Ziel gilt nur, wenn es im Feld liegt und passierbar ist
-  const goalExact = grid.inBounds(grid.toCell(tx), grid.toCell(ty)) && grid.passable(tc, tr, team);
-
-  const w = getWorkspace(cols * rows);
-  const stamp = w.stamp;
+  const { tc, tr, team } = q;
   const cost = grid.cost; // Hänge kosten mehr (Zehntel je Zelle)
-  // Mit Hangkosten leicht gewichtete Heuristik: kaum längere Wege, aber viel weniger untersuchte Zellen (sonst reicht maxNodes nicht)
-  const hw = cost ? H_WEIGHT : 1;
-  if (cost) maxNodes *= 2; // variable Kosten: die Suche untersucht mehr Zellen
   const { g, parent, seen, closed } = w;
+  const { terrain, struct, gateTeam } = grid;
+  // Passierbar für das Team; die Startzelle gilt immer als passierbar (wie grid.passable, ohne Feldprüfung)
+  const isOpen = (j) => j === startI || (terrain[j] === 0 && (struct[j] === 0 || gateTeam[j] === team));
+  let best = st.best;
+  let bestD = st.bestD;
+  let expanded = st.expanded;
+  const stopAt = Math.min(maxNodes, expanded + n);
+  let over = false;
 
-  // Die Startzelle gilt immer als passierbar
-  const isOpen = (c, r) => (c === sc && r === sr) || grid.passable(c, r, team);
-
-  const startI = sr * cols + sc;
-  const goalI = tr * cols + tc;
-  g[startI] = 0;
-  parent[startI] = -1;
-  seen[startI] = stamp;
-  heapPush(w, startI, heuristic(sc, sr, tc, tr));
-
-  // Bester Näherungspunkt, falls das Ziel nicht erreicht wird
-  let best = startI;
-  let bestD = (sc - tc) * (sc - tc) + (sr - tr) * (sr - tr);
-  let found = false;
-  let expanded = 0;
-
-  while (w.hSize > 0 && expanded < maxNodes) {
+  while (w.hSize > 0 && expanded < stopAt) {
     const i = heapPop(w);
     if (closed[i] === stamp) continue;
     closed[i] = stamp;
     expanded++;
 
     if (i === goalI && goalExact) {
-      found = true;
+      st.found = true;
+      over = true;
       break;
     }
 
@@ -158,17 +383,23 @@ export function findPath(grid, sx, sy, tx, ty, team, maxNodes = Math.max(20000, 
       best = i;
       bestD = dd;
     }
+    if (dd <= stopDD) {
+      best = i;
+      over = true;
+      break;
+    }
 
+    const gi = g[i];
     for (let k = 0; k < 8; k++) {
       const nc = c + DX[k];
       const nr = r + DY[k];
-      if (!grid.inBounds(nc, nr) || !isOpen(nc, nr)) continue;
-      // Diagonal nur, wenn beide Orthogonalen passierbar sind
-      if (k >= 4 && (!isOpen(c + DX[k], r) || !isOpen(c, r + DY[k]))) continue;
-
+      if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue;
       const ni = nr * cols + nc;
+      if (!isOpen(ni)) continue;
+      // Diagonal nur, wenn beide Orthogonalen passierbar sind
+      if (k >= 4 && (!isOpen(r * cols + nc) || !isOpen(nr * cols + c))) continue;
       if (closed[ni] === stamp) continue;
-      const ng = g[i] + (k < 4 ? 1 : SQRT2) * (cost ? 1 + cost[ni] / 10 : 1);
+      const ng = gi + (k < 4 ? 1 : SQRT2) * (cost ? 1 + cost[ni] / 10 : 1);
       if (seen[ni] === stamp && g[ni] <= ng) continue;
 
       seen[ni] = stamp;
@@ -177,8 +408,24 @@ export function findPath(grid, sx, sy, tx, ty, team, maxNodes = Math.max(20000, 
       heapPush(w, ni, ng + hw * heuristic(nc, nr, tc, tr));
     }
   }
+  pathStats.nodes += expanded - st.expanded;
+  st.best = best;
+  st.bestD = bestD;
+  st.expanded = expanded;
+  st.over = over || w.hSize === 0 || expanded >= maxNodes;
+  return st.over;
+}
 
-  const endI = found ? goalI : best;
+/** Weg einer fertigen Suche: Zellen zurück zum Start, dann String-Pulling. */
+function finish(st) {
+  const { w, grid, q, startI, goalI } = st;
+  const { sx, sy, tx, ty, team } = q;
+  const cols = grid.cols;
+  const cost = grid.cost;
+  const g = w.g;
+  const parent = w.parent;
+  const found = st.found;
+  const endI = found ? goalI : st.best;
   if (endI === startI) return [];
 
   // Zellen vom Ziel zurück zum Start, dann umdrehen

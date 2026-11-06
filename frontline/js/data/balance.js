@@ -149,6 +149,14 @@ export const BALANCE = {
   sightHeight: { base: 40, per: 350, max: 0.4, eye: { inf: 16, veh: 20, bld: 30 }, target: 12, near: 72 },
   // Tempo am Hang: Faktor = 1 − Steigung × up (bergab: 1 + Gefälle × down), begrenzt auf min … max; Fahrzeuge spüren es stärker
   slope: { upVeh: 1.5, upInf: 0.8, downVeh: 0.6, downInf: 0.3, min: 0.55, max: 1.2, pathCost: 1.2 },
+  // Wegsuche der Einheiten (movement.js, pathfinding.js findUnitPath, seit v5.61), in untersuchten Zellen:
+  // budget: je Simulationsschritt; ist es aufgebraucht, warten weitere Einheiten einen oder wenige Schritte auf ihren Weg.
+  // slice: so viel darf eine Suche am Stück; braucht sie mehr, läuft sie als lange Suche (eine zur Zeit) je Schritt um slice weiter.
+  // pocket: so viele Zellen flutet die Prüfung, ob ein Ziel in einer abgeschlossenen Tasche liegt (dann gilt die nächste freie
+  // Zelle außerhalb); ring: so weit (Zellen) sucht sie um ein versperrtes Ziel nach der nächsten freien Zelle.
+  // Geteilte Wege (pathplan.js): Start höchstens shareStart px und Ziel höchstens shareGoal px von einem eben gefundenen Weg entfernt
+  // → die Einheit übernimmt ihn; shareKeep Wege bleiben je Schritt gemerkt.
+  path: { budget: 8000, slice: 8000, pocket: 4096, ring: 64, shareStart: 320, shareGoal: 256, shareKeep: 16 },
   // Häuserkampf (§7): Infanterie besetzt Stadthäuser (cap Plätze, hp hält das Haus aus), schießt von dort mit Reichweite ab Hauswand
   // und steht `floor` px höher (Höhenvorteil). Schwere Waffen (Schaden gegen Gebäude ab `heavy`: Kanone, RPG, Granaten, Mörser)
   // treffen Häuser × heavyMult, Handwaffen nur × lightMult. Stürzt ein Haus ein, fallen die Besatzer mit ejectDamage (Anteil der

@@ -1,6 +1,7 @@
 // Bewegung: Wegfolgen, Verfolgung, Fahrhelfer für LKW/Bauer und Trennung (docs/verlauf.md §5, §11). Kein DOM.
 import { BALANCE } from '../data/balance.js';
-import { findPath, lineOfSight } from './pathfinding.js';
+import { lineOfSight } from './pathfinding.js';
+import { planUnitPath, pathPending, planPending } from './pathplan.js';
 import { inRange, resolveTarget, isFoe, canAttack } from './entities.js';
 import { weatherSpeed } from './weather.js';
 import { rangeMul, modOf } from './research.js';
@@ -57,8 +58,7 @@ export function planPath(game, u, x, y) {
     u.pathIndex = 0;
     return;
   }
-  u.path = findPath(game.grid, u.x, u.y, x, y, u.team);
-  u.pathIndex = 0;
+  planUnitPath(game, u, x, y); // Bodeneinheiten: Wegbudget, Warteschlange, lange Suchen, geteilte Wege (pathplan.js)
 }
 
 /** Setzt eine Einheit auf idle; Ankerpunkt = aktuelle Position. */
@@ -241,6 +241,7 @@ function replanBlocked(game, u) {
  * wenn sie sich wirklich bewegen; leer → Meldung (Tempo wird in updateMovement gesetzt).
  */
 export function drive(game, u, dt) {
+  if (pathPending(u)) return true; // wartet auf den Weg (Wegbudget)
   const x0 = u.x;
   const y0 = u.y;
   const ok = followPath(game, u, dt);
@@ -414,6 +415,7 @@ function onRoad(game, x, y) {
  */
 export function updateMovement(game, dt) {
   const grid = game.grid;
+  planPending(game);
   for (const u of game.units) {
     if (!u.alive) continue;
     u.repathTimer = Math.max(0, u.repathTimer - dt);

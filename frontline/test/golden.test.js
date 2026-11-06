@@ -35,10 +35,11 @@ const CLASSIC_S = 90; // Länge des Laufs ohne Schalter
 const FULL = { radio: true, weather: 'random', research: true, river: true, city: true }; // wie BALANCE.menuDefaults
 
 // prettier-ignore
+// Läufe (play, classic) neu gesetzt mit v5.61 (Review-Paket P8: Wegsuche mit Budget je Schritt, unerreichbare Ziele, lange Suchen)
 const GOLDEN = {
-  2: { map: '894406ba81d0', river: '533ace5a08d3', start: 'fc78e7cb5f07', play: ['b77a8a0a52f9', '9656d32db25a', '2bdbf4f51b9a', '01ac2108e2ba'], classic: ['4435fa2148e1', 'a974dea28e48', 'c37ea8ae1e9e'] },
-  3: { map: 'b8095c497a39', river: 'de3f5da9bcba', start: '90317789c157', play: ['5418bf4d2f62', '89a64ddc2ef3', '53fa3a08082a', 'aef52bb313bd'], classic: ['0f113f431a5e', '9d71ecb4ab33', 'b11c85d8eb00'] },
-  7: { map: 'e6c2e69a3dc6', river: 'b5fa8dc32b8a', start: '286eed3aa049', play: ['5885c487faf0', '8f8962796fe3', '437267223bfa', '7a65cce70eb9'], classic: ['d32048e19cae', 'c856e36234e4', '251f2c8c413e'] },
+  2: { map: '894406ba81d0', river: '533ace5a08d3', start: 'fc78e7cb5f07', play: ['1d752859e173', '3f3af329c6d3', '27eeb7a75ffb', '0b524c32691d'], classic: ['2d17c9167b5e', 'ca328aa0e9a0', '0d9dbd9dd954'] },
+  3: { map: 'b8095c497a39', river: 'de3f5da9bcba', start: '90317789c157', play: ['bc8a9829927d', 'b23ce9f73e78', 'a6632aba089d', 'a8b4d59eaebf'], classic: ['27d31eb0bfd5', 'e1adcc24df92', '866c736cc9ff'] },
+  7: { map: 'e6c2e69a3dc6', river: 'b5fa8dc32b8a', start: '286eed3aa049', play: ['bc93fea0f71b', '74c32a0f6c36', '12af23a60737', 'ef48cd59fed8'], classic: ['4d513f0435c2', 'f8a785177438', '085a727f992a'] },
 };
 
 /** Prüfsumme (12 Hex-Zeichen) über einen Wert: Zahlen exakt (String), Typed Arrays als Bytes, Objekte mit sortierten Schlüsseln. */

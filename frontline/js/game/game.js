@@ -164,6 +164,11 @@ export class Game {
     this.winPoints = winPoints;
     this.radioWin = !!radio;
     this.fogTimer = 0;
+    this.pathWork = 0; // untersuchte Zellen der Wegsuche seit dem letzten Schritt (Wegbudget, pathplan.js)
+    this.pathBacklog = false; // warten Einheiten auf ihren Weg (neue Anfragen stellen sich dann an)? (pathplan.js)
+    this.pathSeq = 0; // Reihenfolge der wartenden Wege
+    this.pathLong = null; // laufende lange Wegsuche einer Einheit { id, sx, sy, x, y, done, hash } (pathplan.js)
+    this.pathShare = []; // in diesem Schritt gefundene Wege zum Teilen (pathplan.js)
     this.logiTimer = 0; // Takt des Nachfüllens (logistics.js)
     this.consTimer = 0; // Takt der automatischen Bauzuweisung (construction.js)
     this.teams = [0, 1].map((id) => {
@@ -1201,5 +1206,7 @@ export class Game {
     this.cleanup();
     updateScars(this);
     if (this.winner === null) this.checkElimination();
+    this.pathWork = 0; // Wegbudget (pathplan.js): gilt für KI-Befehle und Simulation bis zum Ende des nächsten Schritts
+    this.pathShare = [];
   }
 }
