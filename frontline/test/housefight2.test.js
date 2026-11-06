@@ -200,6 +200,30 @@ test('KI stürmt: höchstens 8 Stürmer, das Haus bleibt bis zum Angriff beim Ge
   assert.equal(h.team, 1, 'das Haus gehört noch dem Gegner');
 });
 
+test('KI stürmt: Schützen im Angriffsmarsch mit Ziel in der Zone stürmen ein nahes besetztes Haus, Leicht nicht', () => {
+  for (const difficulty of ['normal', 'easy']) {
+    const { g, h, own, ai } = stormSetup(4, difficulty);
+    g.issue(0, { type: 'attackMove', ids: own.map((u) => u.id), x: Z.x + 300, y: Z.y - 300 }); // Welle durch die Zone
+    run(g, 0.2);
+    assert.ok(own.every((u) => u.order.type === 'attackMove'), 'alle im Angriffsmarsch');
+    ai.stormHouses(ai.snapshot());
+    const storming = own.filter((u) => u.order.type === 'storm');
+    if (difficulty === 'easy') assert.equal(storming.length, 0, 'Leicht stürmt nicht');
+    else {
+      assert.equal(storming.length, 4, 'alle vier stürmen statt weiterzumarschieren');
+      assert.ok(storming.every((u) => u.order.targetId === h.id));
+    }
+  }
+});
+
+test('KI stürmt nicht mit Schützen, deren Angriffsmarsch aus der Zone hinausführt', () => {
+  const { g, own, ai } = stormSetup(4);
+  g.issue(0, { type: 'attackMove', ids: own.map((u) => u.id), x: 300, y: 300 }); // Ziel weit außerhalb der Zone
+  run(g, 0.2);
+  ai.stormHouses(ai.snapshot());
+  assert.ok(own.every((u) => u.order.type === 'attackMove'), 'sie marschieren weiter');
+});
+
 // ---- KI baut Besatzungshäuser aus -------------------------------------------------------------------
 
 /** Eigenes besetztes Haus (Team 0) in einem Spiel ohne Gegner. */

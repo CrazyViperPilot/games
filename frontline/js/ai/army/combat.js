@@ -8,7 +8,7 @@ import { UNITS } from '../../data/units.js';
 import { canGarrison } from '../../game/garrison.js';
 import { radioEta } from '../../game/radio.js';
 import { weatherSight } from '../../game/weather.js';
-import { RESERVE_FROM, WAVE_NEUTRAL, SCOUT_EVERY, SCOUT_MOVE, JET_GROUP, JET_EVERY, JET_QUEUE, THREAT_RANGE, THREAT_DANGER, GATHER_DIST, ZONE_GATHER_DIST, RALLY_MOVE, RESERVE, DRY, THREAT_PER_UNIT, WAVE_ODDS, WAVE_PATIENCE, WAVE_MIN, SCOUT_MIN_ARMY, SCOUT_FROM, SCOUT_FUEL, SCOUT_REFILL, WX_SCOUT_SIGHT, WX_SCOUT_ARMY, WX_SCOUT_FROM, WX_FOG_SIGHT, WX_FOG_WAVE, RAID_MIN, RAID_SHARE, FALLBACK_ODDS, FALLBACK_MIN_FOES, FALLBACK_DIST, FALLBACK_HOLD, ART_BEHIND, ART_EVERY, GARRISON_SHARE, GARRISON_RANGE, GARRISON_EVERY, STORM_EVERY, STORM_RANGE, STORM_RATIO, STORM_WIRE, STORM_MIN, STORM_MAX, HOUSE_WORK_EVERY, HOUSE_WORK_ORDER, HOUSE_WORK_RESERVE, CMD_BEHIND, CMD_DANGER, CMD_MOVE, RADIO_NEAR, RADIO_EVERY, RADIO_GATHER, RADIO_GATHER_R, RADIO_GATHER_SHARE } from '../../data/ai.js';
+import { RESERVE_FROM, WAVE_NEUTRAL, SCOUT_EVERY, SCOUT_MOVE, JET_GROUP, JET_EVERY, JET_QUEUE, THREAT_RANGE, THREAT_DANGER, GATHER_DIST, ZONE_GATHER_DIST, RALLY_MOVE, RESERVE, DRY, THREAT_PER_UNIT, WAVE_ODDS, WAVE_PATIENCE, WAVE_MIN, SCOUT_MIN_ARMY, SCOUT_FROM, SCOUT_FUEL, SCOUT_REFILL, WX_SCOUT_SIGHT, WX_SCOUT_ARMY, WX_SCOUT_FROM, WX_FOG_SIGHT, WX_FOG_WAVE, RAID_MIN, RAID_SHARE, FALLBACK_ODDS, FALLBACK_MIN_FOES, FALLBACK_DIST, FALLBACK_HOLD, ART_BEHIND, ART_EVERY, GARRISON_SHARE, GARRISON_RANGE, GARRISON_EVERY, STORM_EVERY, STORM_RANGE, STORM_RATIO, STORM_WIRE, STORM_MIN, STORM_MAX, STORM_MARCH, HOUSE_WORK_EVERY, HOUSE_WORK_ORDER, HOUSE_WORK_RESERVE, CMD_BEHIND, CMD_DANGER, CMD_MOVE, RADIO_NEAR, RADIO_EVERY, RADIO_GATHER, RADIO_GATHER_R, RADIO_GATHER_SHARE } from '../../data/ai.js';
 import { DEF_RANGE, ZONE_FOB_R, TWO_PI, dist, unitVec } from './util.js';
 
 const SCOUT_MONEY = UNITS.littlebird.cost.money; // Geld, ab dem ein Späher ausgebildet wird
@@ -326,7 +326,8 @@ export const combatMethods = {
 
   /**
    * Häuser stürmen (Häuserkampf II, seit v5.67): ein vom Gegner besetztes, von der KI gesehenes Haus in der Konfliktzone bekommt einen
-   * Sturm, wenn genug freie Infanterie in STORM_RANGE daneben steht: mindestens STORM_RATIO je Besatzer (× STORM_WIRE mit Stacheldraht)
+   * Sturm, wenn genug freie Infanterie (mit STORM_MARCH auch im Angriffsmarsch mit Ziel in der Zone, so steht sie meist dort) in
+   * STORM_RANGE daneben steht: mindestens STORM_RATIO je Besatzer (× STORM_WIRE mit Stacheldraht)
    * und mindestens STORM_MIN. Es gehen höchstens STORM_MAX, die nächsten zuerst. Je Takt höchstens ein Haus. Nur Schwierigkeiten mit houseStorm.
    */
   stormHouses(s) {
@@ -339,7 +340,8 @@ export const combatMethods = {
       .sort((a, b) => dist(a.x, a.y, z.x, z.y) - dist(b.x, b.y, z.x, z.y) || a.id - b.id);
     if (!foes.length) return;
     const raiding = this.raid ? this.raid.ids : null;
-    const free = s.units.filter((u) => canGarrison(u) && u.def.range > 0 && !u.def.hero && !u.house && u.order.type === 'idle' && !(raiding && raiding.has(u.id)));
+    const ready = (o) => o.type === 'idle' || (STORM_MARCH && o.type === 'attackMove' && dist(o.x, o.y, z.x, z.y) <= z.r);
+    const free = s.units.filter((u) => canGarrison(u) && u.def.range > 0 && !u.def.hero && !u.house && ready(u.order) && !(raiding && raiding.has(u.id)));
     for (const h of foes) {
       const near = free.filter((u) => dist(u.x, u.y, h.x, h.y) <= STORM_RANGE).sort((a, b) => dist(a.x, a.y, h.x, h.y) - dist(b.x, b.y, h.x, h.y) || a.id - b.id);
       const need = STORM_RATIO * h.occupants.length * (h.works.wire ? STORM_WIRE : 1);

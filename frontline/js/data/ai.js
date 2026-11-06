@@ -92,6 +92,7 @@ export const STORM_RATIO = 2; // so viele Stürmer je Besatzer braucht die KI mi
 export const STORM_WIRE = 1.5; // hat das Haus Stacheldraht, steigt dieses Verhältnis um diesen Faktor
 export const STORM_MIN = 3; // und mindestens so viele Stürmer insgesamt
 export const STORM_MAX = 8; // höchstens so viele Stürmer gehen los (die nächsten zuerst)
+export const STORM_MARCH = true; // auch Infanterie im Angriffsmarsch mit Ziel in der Konfliktzone darf stürmen (seit „KI stürmt Häuser wirklich“; sonst nur freie)
 export const HOUSE_WORK_EVERY = 10; // s zwischen zwei Ausbau-Runden für die eigenen Besatzungshäuser
 export const HOUSE_WORK_ORDER = ['sandbags', 'wire', 'mgnest']; // Reihenfolge, in der die KI ein Haus ausbaut (Schlüssel aus BALANCE.garrison.works)
 export const HOUSE_WORK_RESERVE = 400; // Geld, das nach dem Preis eines Ausbaus übrig bleiben soll
