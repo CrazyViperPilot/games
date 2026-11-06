@@ -111,6 +111,15 @@ export const CITY = {
   // maxLanes (seit v5.38): Straßen nebeneinander bilden ein mehrspuriges Band; Kapazität je Zelle × Spuren je Richtung, höchstens so viele
   transport: { cap: 12, mapCap: 20, maxLanes: 4, commute: 0.05, maxDist: 160, smooth: 2, connectMax: 30 },
 
+  // ---- Werkslager (seit v5.65, PRD §15 „Werke und LKW am Werk“) ----
+  // Jedes Werk der Arten in `kinds` (Zellenart-Schlüssel; Ware aus CITY.chain[Art].to) hat ein kleines Ausgangslager für seine Ware.
+  // share: Anteil des Ausstoßes, der dorthin geht, solange es nicht voll ist (ohne Straßenweg, ohne Verlust) und dem Werk gerade ein
+  // eigener LKW zugeteilt ist (Ladeauftrag oder Route ab dem Werk). Ohne LKW läuft der ganze Ausstoß wie bisher zur Hauptstadt; was im
+  // Ausgangslager liegt, bleibt bis zur nächsten Abholung. cap: Obergrenze je Werk. LKW holen die Ware dort ab (Rechtsklick auf das Werk,
+  // Befehl load mit work). wait: s, die ein LKW auf einer Route ab dem Werk mit Teilladung am leeren Werk wartet, bevor er abfährt
+  // (voll fährt er sofort).
+  pickup: { cap: 400, share: 0.5, kinds: ['bm', 'mun', 'fuel'], wait: 60 },
+
   // ---- Wissen (seit v4.88, Stufe 5) ----
   // Seit v5.04: ohne fertige Universität ruht jede Forschung (eine reicht, ihre Stufe zählt nicht). Rechenzentren beschleunigen sie:
   // Tempo × (1 + dcSpeed × Summe der Stufen aller Rechenzentren), höchstens maxSpeed; Strommangel bremst (js/data/research.js).

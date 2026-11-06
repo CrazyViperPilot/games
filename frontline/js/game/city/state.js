@@ -203,6 +203,7 @@ export function refundQueue(game, team, e) {
 }
 
 export function dropEntity(game, c, i) {
+  if (c.out) c.out[i] = 0; // Werk weg (abgerissen, zerstört, überbaut): sein Ausgangslager ist verloren (seit v5.65)
   const e = c.ents.get(i);
   if (!e) return;
   e.alive = false;

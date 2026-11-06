@@ -240,7 +240,11 @@ export class Game {
     // Ruinenliste fehlt in Ständen vor v5.62: aus den eingestürzten Häusern neu aufbauen
     if (!this.ruins) this.ruins = (this.houses || []).filter((h) => h.ruined);
     // Nachrüstungen für ältere Stände (Straßen, Forschungsbaum, Stadt, FOB-Baustellen) gibt es seit v5.56 nicht mehr: Stände eines
-    // anderen SAVE_FORMAT laden nicht (savegame.js).
+    // anderen SAVE_FORMAT laden nicht (savegame.js). Ausnahme: das Ausgangslager der Werke (seit v5.65) fehlt in Ständen davor, leer ergänzen.
+    for (const c of this.city ?? []) {
+      c.out ??= new Float32Array(c.kind.length);
+      c.pickClaim ??= new Uint8Array(c.kind.length);
+    }
   }
 
   newId() {

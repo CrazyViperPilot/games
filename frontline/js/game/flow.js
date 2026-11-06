@@ -9,7 +9,7 @@ import { CITY } from '../data/city.js';
 import { BALANCE } from '../data/balance.js';
 import { GOODS, GOOD_NAME, GOOD_SHORT, STORED_GOODS, MID_GOODS, CITY_STORE_GOODS } from '../data/goods.js';
 import { DEPOSITS, DEPOSIT_NAME, MINE_NAME } from './city/cells.js';
-import { KIND_NAME } from '../data/citykinds.js';
+import { KIND_NAME, KINDS } from '../data/citykinds.js';
 
 export { GOOD_NAME };
 const WORKS_SHORT = { bm: 'BM-Werk' };
@@ -61,7 +61,7 @@ export function flowLayout() {
   return LAYOUT;
 }
 
-/** Bestand je Ware: alle eigenen Lager (ohne unendliche Hauptstadt), Ladung der LKW, Stahl und Kerosin im Stadtlager. */
+/** Bestand je Ware: alle eigenen Lager (ohne unendliche Hauptstadt), Ausgangslager der Werke (seit v5.65), Ladung der LKW, Stahl und Kerosin im Stadtlager. */
 export function teamStock(game, team) {
   const c = game.city?.[team];
   const st = { bm: 0, mun: 0, fuel: 0, metal: c?.metal ?? 0, kero: c?.kero ?? 0 };
@@ -73,6 +73,8 @@ export function teamStock(game, team) {
     if (u.team !== team || !u.alive || !(u.def?.cargoCap > 0)) continue;
     for (const k of ['bm', 'mun', 'fuel']) st[k] += u.cargo?.[k] ?? 0;
   }
+  // Ausgangslager der Werke (CITY.pickup, seit v5.65) zählen wie das Lager, aus dem LKW holen (c.made zählt die Einlagerung mit)
+  if (c?.out) for (const i of c.list) if (c.out[i]) st[CITY.chain[KINDS[c.kind[i] - 1]].to] += c.out[i];
   return st;
 }
 

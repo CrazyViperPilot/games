@@ -10,7 +10,7 @@ import { lineCells } from '../game/grid.js';
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { canBuild } from '../game/construction.js';
-import { cargoSum, canSeat } from '../game/logistics.js';
+import { cargoSum, canSeat, ownWork } from '../game/logistics.js';
 import { canGarrison, canEnter } from '../game/garrison.js';
 import { canCarry } from '../game/crates.js';
 import { FORMATIONS, FORMATION_NAMES } from '../game/formation.js';
@@ -592,6 +592,16 @@ export class Controller {
       rest = units.filter((u) => !done.has(u.id));
       if (!rest.length) return;
     }
+    // Eigenes Werk der Stadt (seit v5.65): LKW holen dort die Ware aus dem Ausgangslager
+    const work = this.pickWork(wx, wy);
+    if (work) {
+      const trucks = rest.filter(isCarrier);
+      if (trucks.length && this.issue({ type: 'load', ids: trucks.map((u) => u.id), work: work.cityCell }).ok) {
+        this.moveMarker(work.x, work.y);
+        rest = rest.filter((u) => !trucks.includes(u));
+        if (!rest.length) return;
+      }
+    }
     // Zerstörte Brücke: Baufahrzeuge bauen sie wieder auf (die übrigen gehen hin)
     const broken = this.pickBridge(wx, wy, (b) => b.broken);
     if (broken) {
@@ -778,6 +788,12 @@ export class Controller {
       return;
     }
     if (this.issue({ type: 'route', ids, fromId: this.routeFromId, toId: fob.id }).ok) this.setMode('normal');
+  }
+
+  /** Eigenes fertiges Werk mit Ausgangslager (CITY.pickup) unter dem Weltpunkt oder null (seit v5.65). */
+  pickWork(wx, wy) {
+    const e = this.pickCity(wx, wy);
+    return e && ownWork(this.game, this.team, e.cityCell) ? e : null;
   }
 
   /** Eigener fertiger Stellplatz an (wx, y) oder null. */
