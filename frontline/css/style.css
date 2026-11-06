@@ -351,6 +351,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   text-transform: uppercase;
 }
 .seg { display: flex; gap: 6px; }
+.vol { display: flex; align-items: center; gap: 10px; }
+.vol input { flex: 1; }
+.vol output { min-width: 3.5em; text-align: right; }
 .seg button {
   flex: 1;
   height: 38px;
@@ -402,6 +405,10 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .end-title.win { color: #7dd38b; }
 .end-title.lose { color: var(--bad); }
 .end p { color: var(--muted); }
+.end-stats td { text-align: right; font-variant-numeric: tabular-nums; }
+.end-stats td.center { text-align: center; }
+.end-stats tr.head td { font-weight: 700; text-align: center; }
+.end-stats td.mine { color: var(--accent); font-weight: 700; }
 
 /* ---- Logistik und Bau (L2) ------------------------------------------------------ */
 .cbtn.on { border-color: var(--accent); background: #3a3520; color: #f5e6b0; }
@@ -664,6 +671,7 @@ body.flow-open .flow-fab { background: #2e372e; }
 .fl-where { fill: var(--muted); font-size: 10px; font-weight: 500; }
 .fl-t2 { fill: var(--text); font-size: 11px; font-variant-numeric: tabular-nums; }
 .fl-t3 { fill: #8fd18f; font-size: 10px; }
+.fl-t4 { fill: var(--muted); font-size: 10px; } /* davon an Werken (seit v5.70) */
 .fl-bar { fill: #8fd18f; }
 .fl-node.warn .fl-box { stroke: #d6b84a; }
 .fl-node.warn .fl-t3, .fl-node.warn .fl-bar { fill: #e2c65a; }

@@ -9,7 +9,7 @@ import { CITY } from '../data/city.js';
 import { BALANCE } from '../data/balance.js';
 import { GOODS, GOOD_NAME, GOOD_SHORT, STORED_GOODS, MID_GOODS, CITY_STORE_GOODS } from '../data/goods.js';
 import { DEPOSITS, DEPOSIT_NAME, MINE_NAME } from './city/cells.js';
-import { KIND_NAME } from '../data/citykinds.js';
+import { KIND_NAME, KINDS } from '../data/citykinds.js';
 
 export { GOOD_NAME };
 const WORKS_SHORT = { bm: 'BM-Werk' };
@@ -61,7 +61,7 @@ export function flowLayout() {
   return LAYOUT;
 }
 
-/** Bestand je Ware: alle eigenen Lager (ohne unendliche Hauptstadt), Ladung der LKW, Stahl und Kerosin im Stadtlager. */
+/** Bestand je Ware: alle eigenen Lager (ohne unendliche Hauptstadt), Ausgangslager der Werke (seit v5.69), Ladung der LKW, Stahl und Kerosin im Stadtlager. */
 export function teamStock(game, team) {
   const c = game.city?.[team];
   const st = { bm: 0, mun: 0, fuel: 0, metal: c?.metal ?? 0, kero: c?.kero ?? 0 };
@@ -73,6 +73,8 @@ export function teamStock(game, team) {
     if (u.team !== team || !u.alive || !(u.def?.cargoCap > 0)) continue;
     for (const k of ['bm', 'mun', 'fuel']) st[k] += u.cargo?.[k] ?? 0;
   }
+  // Ausgangslager der Werke (CITY.pickup, seit v5.69) zählen wie das Lager, aus dem LKW holen (c.made zählt die Einlagerung mit)
+  if (c?.out) for (const i of c.list) if (c.out[i]) st[CITY.chain[KINDS[c.kind[i] - 1]].to] += c.out[i];
   return st;
 }
 
@@ -266,6 +268,15 @@ export function resourceFlow(game, team, rates = null) {
   const main = game.mainFob(team);
   const cap = BALANCE.logistics.storeCap;
   const stock = teamStock(game, team);
+  // Ausgangslager der Werke je Ware (CITY.pickup, seit v5.70): „davon an Werken“ am Lagerknoten
+  const atWorks = {};
+  if (c.out) {
+    for (const i of c.list) {
+      if (!c.out[i]) continue;
+      const w = CITY.chain[KINDS[c.kind[i] - 1]].to;
+      atWorks[w] = (atWorks[w] ?? 0) + c.out[i];
+    }
+  }
   for (const n of Object.values(nodes)) {
     if (n.type !== 'store') continue;
     const g = n.key;
@@ -274,6 +285,7 @@ export function resourceFlow(game, team, rates = null) {
     n.unit = GOOD_SHORT[g] ?? g;
     n.where = inCity ? 'Stadtlager' : 'alle Lager';
     n.stock = stock[g];
+    n.atWorks = atWorks[g] ?? 0;
     const here = inCity ? c[g] : main?.store?.[g] ?? 0;
     n.full = here >= (inCity ? cap : BALANCE.logistics.capitalCap ?? cap) - 1; // Stadtlager bzw. Lager der Hauptstadt (seit v5.06 größer)
     n.rate = s.gross?.[g] ?? 0;

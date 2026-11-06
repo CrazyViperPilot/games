@@ -5,30 +5,10 @@ import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
 import { BALANCE } from '../js/data/balance.js';
 import { Sound } from '../js/audio/sound.js';
+import { node, fakeCtx } from './audiofake.js';
 
 const DT = 1 / BALANCE.tickRate;
 
-/** Knoten, der jede Methode und jedes Feld schluckt (AudioParam, GainNode …). */
-function node() {
-  const fn = () => proxy;
-  const proxy = new Proxy(fn, {
-    get: (t, k) => (k === Symbol.toPrimitive ? () => 0 : k === 'then' ? undefined : proxy),
-    set: () => true,
-    apply: () => proxy,
-  });
-  return proxy;
-}
-function fakeCtx() {
-  const ctx = {
-    sampleRate: 8000,
-    currentTime: 0,
-    state: 'running',
-    destination: node(),
-    createBuffer: (c, n) => ({ getChannelData: () => new Float32Array(n) }),
-  };
-  for (const m of ['createGain', 'createDynamicsCompressor', 'createBufferSource', 'createBiquadFilter', 'createOscillator', 'createStereoPanner']) ctx[m] = () => node();
-  return ctx;
-}
 const cam = { viewW: 800, viewH: 600, zoom: 1, worldToScreen: (x, y) => ({ x, y }) };
 function make() {
   const g = new Game({ seed: 3 });

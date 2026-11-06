@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
 import { AI } from '../js/ai/ai.js';
-import { GEPARD_PER_AIR, ART_FROM, ART_BEHIND } from '../js/data/ai.js';
+import { AIR_PER, ART_FROM, ART_BEHIND } from '../js/data/ai.js';
 
 const DT = 0.1;
 function run(g, ai, s) {
@@ -27,7 +27,7 @@ test('KI bildet Gepard aus, sobald sie gegnerische Luftfahrzeuge sieht', () => {
     h.hp = 1e6;
     h.weapons.forEach((w) => (w.rounds = 0));
   }
-  assert.ok(4 * GEPARD_PER_AIR > 0);
+  assert.ok(4 * AIR_PER > 0);
   for (let s = 0; s < 120 && !has(g, 1, 'gepard'); s += 5) {
     g.teams[1].res.money = 20000;
     run(g, ai, 5);

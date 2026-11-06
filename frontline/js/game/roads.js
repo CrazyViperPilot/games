@@ -9,7 +9,7 @@ export const MAP_ROAD = 1;
 export const BRIDGE_ROAD = 2;
 
 /** Abstand eines Punkts zur Strecke (x1, y1)–(x2, y2). */
-function segDist(px, py, x1, y1, x2, y2) {
+export function segDist(px, py, x1, y1, x2, y2) {
   const dx = x2 - x1;
   const dy = y2 - y1;
   const l2 = dx * dx + dy * dy || 1;

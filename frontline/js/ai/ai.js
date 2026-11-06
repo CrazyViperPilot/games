@@ -2,6 +2,8 @@
 // Reihenfolge je Denkschritt: Baustellen pflegen, Verteidigung, Rückzug, Expansion (FOB-Baustellen: Zone, Relais, Flanken),
 // Forschung, Produktion (nur Hauptstadt), Verteidigungsgebäude und Mauer, Brücken, Baufahrzeuge, LKW (Lieferant/Pendler/Versorger), Sammelpunkte, Armee.
 import { CITY } from '../data/city.js';
+import { KINDS } from '../data/citykinds.js';
+import { ownWork } from '../game/logistics.js';
 import { cityAiMemory, aiCity, aiRaid, aiDefend } from './cityai.js';
 import { cityTrainers } from '../game/city/query.js';
 import { standsOf, freeSpace } from '../game/aircraft.js';
@@ -11,6 +13,7 @@ import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
 import { makeRng } from '../core/rng.js';
 import { hasCommander } from '../game/commander.js';
+import { canGarrison } from '../game/garrison.js';
 import { radioEta } from '../game/radio.js';
 import { weatherSight } from '../game/weather.js';
 import { researchBlock, RESEARCH_KEYS } from '../game/research.js';
@@ -75,9 +78,13 @@ import {
   FALLBACK_HOLD,
   ENG_NEAR,
   SUPPLY_BEHIND,
-  GEPARD_PER_AIR,
-  GEPARD_MAX,
+  AIR_PER,
+  AIR_MAX,
+  AIR_SPLIT,
   AIR_MEMORY,
+  SNIPER_FROM,
+  SNIPER_ARMY,
+  SNIPER_SHARE,
   ART_SHARE,
   ART_FROM,
   ART_BEHIND,
@@ -85,9 +92,21 @@ import {
   SUPPLY_MIN,
   SURPLUS_MIN,
   ROUTE_HOLD,
+  WORK_SOURCE_NEAR,
+  WORK_SOURCE_TRUCKS,
+  WORK_SOURCE_MIN_RATE,
   GARRISON_SHARE,
   GARRISON_RANGE,
   GARRISON_EVERY,
+  STORM_EVERY,
+  STORM_RANGE,
+  STORM_RATIO,
+  STORM_WIRE,
+  STORM_MIN,
+  STORM_MAX,
+  HOUSE_WORK_EVERY,
+  HOUSE_WORK_ORDER,
+  HOUSE_WORK_RESERVE,
   CRATE_EVERY,
   CRATE_RANGE,
   CMD_BEHIND,
@@ -125,12 +144,18 @@ const TWO_PI = Math.PI * 2;
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 const TILE = BALANCE.map.tile;
 
+/** Eigene LKW und Hubschrauber außer `except`, die ab dem Werk mit Anker `a` pendeln (Route mit fromWork, seit v5.70). */
+function workTrucks(s, a, except) {
+  let n = 0;
+  for (const u of s.units) if (u !== except && u.order.type === 'route' && u.order.work === a) n++;
+  return n;
+}
+
 function unitVec(dx, dy) {
   const len = Math.hypot(dx, dy);
   if (len < 1e-6) return { x: 1, y: 0 };
   return { x: dx / len, y: dy / len };
 }
-
 
 /** Summe der Ladung eines LKW. */
 const cargoTotal = (u) => u.cargo.bm + u.cargo.mun + u.cargo.fuel;
@@ -149,7 +174,7 @@ export class AI {
     this.fobGoal = new Map(); // FOB-Fahrzeug-ID -> { x, y, tries } Ziel, an dem es aufbaut
     this.rallyAt = new Map(); // Gebäude-ID -> zuletzt gesetzter Sammelpunkt
     this.roles = new Map(); // LKW-ID -> 'pend' | 'vers'
-    this.routes = new Map(); // LKW-ID -> { fromId, toId, k, t0 } (Pendler)
+    this.routes = new Map(); // LKW-ID -> { fromId, toId, k, t0 } (Pendler; fromId = Quelle, eine FOB oder ein eigenes Werk, seit v5.70)
     this.engTarget = new Map(); // Baufahrzeug-ID -> Baustelle, zu der es geschickt wurde
     this.supplyAt = new Map(); // Versorger-ID -> letzter Zielpunkt
     this.memo = new Map(); // Befehlsschlüssel -> Zeitpunkt (gegen Befehls-Spam)
@@ -211,6 +236,8 @@ export class AI {
     this.manageTrucks(s);
     this.rally(s);
     this.garrisonZone(s);
+    this.stormHouses(s); // Häuser stürmen (seit v5.67)
+    this.fortifyHouses(s); // eigene Besatzungshäuser ausbauen (seit v5.67)
     if (!this.attackRadio(s)) this.army(s); // steht ein gegnerischer Sendemast, gilt ihm der ganze Angriff
     this.guardCommander(s);
     this.collectCrates(s); // nach der Welle: Kisten holen nur, die zurückbleiben (Reserve, Nachschub)
@@ -261,12 +288,23 @@ export class AI {
       artillery: units.filter((u) => u.def.indirect).sort((a, b) => a.id - b.id),
       combatN: combat.length + queuedCombat,
       commander: units.find((u) => u.def.hero) ?? null,
+      pickupWorks: this.pickupWorks(), // eigene fertige Werke mit Ausgangslager (seit v5.70)
       trucks: units.filter((u) => u.type === 'truck').sort((a, b) => a.id - b.id),
       helis: units.filter((u) => u.type === 'transporter').sort((a, b) => a.id - b.id),
       engineers: units.filter((u) => u.type === 'engineer').sort((a, b) => a.id - b.id),
       fobTrucks: units.filter((u) => u.def.deploys).sort((a, b) => a.id - b.id),
       alarm,
     };
+  }
+
+  /** Eigene fertige Werke mit Ausgangslager (CITY.pickup, seit v5.70), nach Id sortiert; ohne Stadt leer. */
+  pickupWorks() {
+    const g = this.game;
+    const c = g.city?.[this.team];
+    if (!c) return [];
+    const out = [];
+    for (const [i, e] of c.ents) if (e.alive && ownWork(g, this.team, i) === e) out.push(e);
+    return out.sort((a, b) => a.id - b.id);
   }
 
   /**
@@ -731,20 +769,47 @@ export class AI {
   counterMix(s) {
     const base = this.counterBase(s);
     if (this.difficulty === 'easy') return base;
-    // Gepard (seit v5.26): gegen gesehene Luftfahrzeuge des Gegners (gemerkt AIR_MEMORY s), Panzerhaubitze ab ART_FROM Kampfeinheiten
-    const air = s.enemies.filter((e) => e.def.air).length;
-    if (air > 0) {
-      this.airSeen = Math.max(this.airSeen ?? 0, air);
-      this.airTime = this.game.time;
-    } else if (this.game.time - (this.airTime ?? -1e9) > AIR_MEMORY) this.airSeen = 0;
-    const gepard = Math.min(GEPARD_MAX, (this.airSeen ?? 0) * GEPARD_PER_AIR);
-    const pzh = (s.combat?.length ?? 0) >= ART_FROM ? ART_SHARE : 0;
-    if (!gepard && !pzh) return base;
+    const shares = {}; // Zielanteil je Sorte an den Kampfeinheiten; der Rest bleibt der Grundmischung
+    const add = (u, v) => {
+      if (v > 0) shares[u] = (shares[u] ?? 0) + v; // Luftarten ohne gesehene Ziele tragen nichts bei
+    };
+    // Luftabwehr (seit v5.71): Hubschrauber und Flugzeuge getrennt gemerkt (AIR_MEMORY s), Gepard, Flak und SAM nach AIR_SPLIT
+    const heli = this.rememberAir('heli', s.enemies.filter((e) => e.def.air && !e.def.jet).length);
+    const jet = this.rememberAir('jet', s.enemies.filter((e) => e.def.jet).length);
+    const total = Math.min(AIR_MAX, (heli + jet) * AIR_PER);
+    if (total > 0) {
+      const ph = heli / (heli + jet);
+      for (const [u, v] of Object.entries(AIR_SPLIT.heli)) add(u, total * ph * v);
+      for (const [u, v] of Object.entries(AIR_SPLIT.jet)) add(u, total * (1 - ph) * v);
+    }
+    // Scharfschützen (seit v5.71, Normal und Schwer): gegen viele sichtbare gegnerische Soldaten, wenn die KI selbst eine Armee hat
+    const foeInf = s.enemies.filter((e) => e.def.armor === 'inf' && !e.def.air).length;
+    if (foeInf >= SNIPER_FROM && (s.combat?.length ?? 0) >= SNIPER_ARMY) add('sniper', SNIPER_SHARE);
+    // Panzerhaubitze (seit v5.26): ab ART_FROM Kampfeinheiten
+    if ((s.combat?.length ?? 0) >= ART_FROM) add('pzh', ART_SHARE);
+    const extra = Object.values(shares).reduce((a, v) => a + v, 0);
+    if (extra <= 0) return base;
+    // Die Grundmischung schrumpft auf den Rest, damit jede Sorte genau ihren Zielanteil hat
     const sum = Object.values(base).reduce((a, v) => a + v, 0);
-    const out = { ...base };
-    if (gepard) out.gepard = sum * gepard;
-    if (pzh) out.pzh = sum * pzh;
+    const k = (1 - extra) / sum;
+    const out = {};
+    for (const [u, v] of Object.entries(base)) out[u] = v * k;
+    for (const [u, v] of Object.entries(shares)) out[u] = v;
     return out;
+  }
+
+  /**
+   * Gemerkte Zahl gesehener Luftziele einer Art (`heli` oder `jet`): die größte Zahl gleichzeitig gesehener Ziele,
+   * AIR_MEMORY s nach dem letzten Sehen vergessen (dann 0).
+   */
+  rememberAir(kind, n) {
+    const now = this.game.time;
+    const m = (this.airMemo ??= { heli: { n: 0, t: -1e9 }, jet: { n: 0, t: -1e9 } })[kind];
+    if (n > 0) {
+      m.n = Math.max(m.n, n);
+      m.t = now;
+    } else if (now - m.t > AIR_MEMORY) m.n = 0;
+    return m.n;
   }
 
   /** Grundmischung der Bodentruppen, gegen die gesehene Gegnerarmee angepasst (siehe counterMix). */
@@ -1044,9 +1109,10 @@ export class AI {
 
   /**
    * Bester Transport: Ziel-FOB und Sorte mit dem größten Bedarf (Zonen-FOB bevorzugt), Quelle = FOB mit dem
-   * größten Überschuss dieser Sorte (mindestens SURPLUS_MIN).
+   * größten Überschuss dieser Sorte (mindestens SURPLUS_MIN) oder seit v5.70 ein eigenes Werk mit Ausgangslager, dessen Ware die Sorte ist
+   * (workSource). `tr` ist der LKW, der die Route plant (er zählt nicht als Pendler am Werk mit).
    */
-  pendlerPlan(s, taken) {
+  pendlerPlan(s, taken, tr = null) {
     let best = null;
     for (const to of s.builtFobs) {
       const wTo = this.wantOf(s, to);
@@ -1066,13 +1132,46 @@ export class AI {
             src = f;
           }
         }
-        if (src) best = { from: src, to, k, score };
+        // Eigenes Werk (seit v5.70, nie für die Hauptstadt): wenn keine FOB Überschuss hat oder das Werk nah genug liegt
+        const near = to === s.home ? null : this.workSource(s, to, k, tr);
+        if (near && (!src || near.d <= WORK_SOURCE_NEAR * dist(src.x, src.y, to.x, to.y))) best = { from: null, work: near.work, to, k, score };
+        else if (src) best = { from: src, work: null, to, k, score };
       }
     }
     return best;
   }
 
-  /** Pendler: Route von der Überschuss-FOB zur Bedarfs-FOB, Ladungsart nach Engpass. */
+  /**
+   * Nächstes eigenes Werk mit Ausgangslager (CITY.pickup), dessen Ware k ist, für die Bedarfs-FOB `to` (seit v5.70). Höchstens
+   * WORK_SOURCE_TRUCKS LKW je Werk gleichzeitig (ohne `tr`). Liefert { work, d } oder null.
+   */
+  workSource(s, to, k, tr) {
+    const c = this.game.city?.[this.team];
+    let best = null;
+    let bd = Infinity;
+    for (const w of s.pickupWorks) {
+      if (CITY.chain[KINDS[c.kind[w.cityCell] - 1]].to !== k) continue;
+      if (workTrucks(s, w.cityCell, tr) >= WORK_SOURCE_TRUCKS) continue;
+      if (!this.workRuns(w)) continue;
+      const d = dist(w.x, w.y, to.x, to.y);
+      if (d < bd) {
+        bd = d;
+        best = w;
+      }
+    }
+    return best ? { work: best, d: bd } : null;
+  }
+
+  /** Liefert das Werk gerade? Ausstoß je s ab WORK_SOURCE_MIN_RATE oder Ausgangslager ab SURPLUS_MIN (seit v5.70). */
+  workRuns(w) {
+    const c = this.game.city[this.team];
+    return c.workOut[w.cityCell] >= WORK_SOURCE_MIN_RATE || c.out[w.cityCell] >= SURPLUS_MIN;
+  }
+
+  /**
+   * Pendler: Route von der Überschuss-FOB oder vom eigenen Werk (seit v5.70) zur Bedarfs-FOB, Ladungsart nach Engpass.
+   * Ab einem Werk gilt die Route, solange das Werk steht und die Bedarfs-FOB Bedarf hat; der LKW wartet dort auf Ware.
+   */
   managePendler(s, tr, taken) {
     const g = this.game;
     const cur = this.routes.get(tr.id);
@@ -1083,14 +1182,15 @@ export class AI {
       const active = o.type === 'route' && o.fromId === cur.fromId && o.toId === cur.toId;
       if (active && from && to && to.built) {
         const need = (this.wantOf(s, to)[cur.k] - to.store[cur.k]) / this.wantOf(s, to)[cur.k];
-        const valid = (tr.cargo[cur.k] > 50 || from.store[cur.k] >= 60) && need > 0.1;
+        // Quelle Werk (type 'city', kein Lager der FOB): gilt, solange es liefert oder der LKW schon über 50 geladen hat; Quelle FOB wie bisher
+        const valid = from.type === 'city' ? (this.workRuns(from) || tr.cargo[cur.k] > 50) && need > 0.1 : (tr.cargo[cur.k] > 50 || from.store[cur.k] >= 60) && need > 0.1;
         if (valid || g.time - cur.t0 < ROUTE_HOLD) {
           taken.add(cur.toId + cur.k);
           return;
         }
       }
     }
-    const plan = this.pendlerPlan(s, taken);
+    const plan = this.pendlerPlan(s, taken, tr);
     if (!plan) {
       if (o.type === 'route' && cur) {
         // nichts mehr zu tun: Ladung (falls vorhanden) abliefern, sonst anhalten
@@ -1100,9 +1200,12 @@ export class AI {
       }
       return;
     }
-    const r = g.issue(this.team, { type: 'route', ids: [tr.id], fromId: plan.from.id, toId: plan.to.id, preset: plan.k });
+    const r = plan.work
+      ? g.issue(this.team, { type: 'route', ids: [tr.id], fromWork: plan.work.cityCell, toId: plan.to.id, preset: plan.k })
+      : g.issue(this.team, { type: 'route', ids: [tr.id], fromId: plan.from.id, toId: plan.to.id, preset: plan.k });
     if (r.ok) {
-      this.routes.set(tr.id, { fromId: plan.from.id, toId: plan.to.id, k: plan.k, t0: g.time });
+      const src = plan.work ?? plan.from;
+      this.routes.set(tr.id, { fromId: src.id, toId: plan.to.id, k: plan.k, t0: g.time });
       taken.add(plan.to.id + plan.k);
     }
   }
@@ -1307,6 +1410,48 @@ export class AI {
       if (!best || !g.issue(t, { type: 'garrison', ids: [u.id], houseId: best.id }).ok) continue;
       pending.set(best.id, (pending.get(best.id) || 0) + 1);
       want--;
+    }
+  }
+
+  /**
+   * Häuser stürmen (Häuserkampf II, seit v5.67): ein vom Gegner besetztes, von der KI gesehenes Haus in der Konfliktzone bekommt einen
+   * Sturm, wenn genug freie Infanterie in STORM_RANGE daneben steht: mindestens STORM_RATIO je Besatzer (× STORM_WIRE mit Stacheldraht)
+   * und mindestens STORM_MIN. Es gehen höchstens STORM_MAX, die nächsten zuerst. Je Takt höchstens ein Haus. Nur Schwierigkeiten mit houseStorm.
+   */
+  stormHouses(s) {
+    const g = this.game;
+    const t = this.team;
+    if (!this.cfg.houseStorm || !g.houses?.length || !this.once('storm', STORM_EVERY)) return;
+    const z = s.zone;
+    const foes = g.houses
+      .filter((h) => h.alive && h.team >= 0 && h.team !== t && h.occupants.length > 0 && dist(h.x, h.y, z.x, z.y) <= z.r && g.sees(t, h))
+      .sort((a, b) => dist(a.x, a.y, z.x, z.y) - dist(b.x, b.y, z.x, z.y) || a.id - b.id);
+    if (!foes.length) return;
+    const raiding = this.raid ? this.raid.ids : null;
+    const free = s.units.filter((u) => canGarrison(u) && u.def.range > 0 && !u.def.hero && !u.house && u.order.type === 'idle' && !(raiding && raiding.has(u.id)));
+    for (const h of foes) {
+      const near = free.filter((u) => dist(u.x, u.y, h.x, h.y) <= STORM_RANGE).sort((a, b) => dist(a.x, a.y, h.x, h.y) - dist(b.x, b.y, h.x, h.y) || a.id - b.id);
+      const need = STORM_RATIO * h.occupants.length * (h.works.wire ? STORM_WIRE : 1);
+      if (near.length < STORM_MIN || near.length < need) continue;
+      if (g.issue(t, { type: 'storm', ids: near.slice(0, STORM_MAX).map((u) => u.id), houseId: h.id }).ok) return;
+    }
+  }
+
+  /**
+   * Eigene Besatzungshäuser ausbauen (Häuserkampf II, seit v5.67): je besetztem eigenem Haus ohne laufende Arbeit die nächste fehlende
+   * Arbeit aus HOUSE_WORK_ORDER, wenn das Geld nach dem Preis noch HOUSE_WORK_RESERVE lässt. Je Takt höchstens ein Auftrag.
+   * Nur Schwierigkeiten mit houseWorks.
+   */
+  fortifyHouses(s) {
+    const g = this.game;
+    const t = this.team;
+    if (!this.cfg.houseWorks || !g.houses?.length || !this.once('houseWork', HOUSE_WORK_EVERY)) return;
+    const money = g.teams[t].res.money;
+    for (const h of g.houses) {
+      if (!h.alive || h.team !== t || !h.occupants.length || h.building) continue;
+      const work = HOUSE_WORK_ORDER.find((w) => !h.works[w]);
+      if (!work || money < BALANCE.garrison.works[work].cost.money + HOUSE_WORK_RESERVE) continue;
+      if (g.issue(t, { type: 'fortifyHouse', houseId: h.id, work }).ok) return;
     }
   }
 

@@ -2,7 +2,7 @@
 import { BALANCE } from '../data/balance.js';
 import { createShell, inRange, radiusOf, isFoe, canAttack, resolveTarget } from './entities.js';
 import { buildHash, nearby } from './movement.js';
-import { damageHouse, houseFire } from './garrison.js';
+import { damageHouse, houseFire, ruinCoverMul, houseCanFire } from './garrison.js';
 import { addCrater } from './scars.js';
 import { auraCooldown } from './commander.js';
 import { weatherSight } from './weather.js';
@@ -126,7 +126,7 @@ function warnBase(game, target) {
   game.message(target.team, 'Basis wird angegriffen', target.x, target.y);
 }
 
-/** Fügt Schaden zu, setzt lastHitTime und markiert Tote. Stadthäuser: garrison.damageHouse, Brücken: river.damageBridge. Einheiten: erforschte Panzerung. */
+/** Fügt Schaden zu, setzt lastHitTime und markiert Tote. Stadthäuser: garrison.damageHouse, Brücken: river.damageBridge. Einheiten: erforschte Panzerung, Deckung an Ruinen (seit v5.66). */
 export function hit(game, target, amount) {
   if (!target.alive || !(amount > 0)) return;
   if (target.kind === 'house') {
@@ -137,7 +137,7 @@ export function hit(game, target, amount) {
     damageBridge(game, target, amount);
     return;
   }
-  if (target.kind === 'unit') amount *= armorMul(game, target, amount) * smokeMul(game, target) * parkedArmor(game, target); // abgestellter Jet: Schutz des Stellplatzes (seit v5.35)
+  if (target.kind === 'unit') amount *= armorMul(game, target, amount) * smokeMul(game, target) * parkedArmor(game, target) * ruinCoverMul(game, target); // abgestellter Jet: Schutz des Stellplatzes (seit v5.35); Infanterie an einer Ruine: Deckung (seit v5.66)
   else if (target.kind === 'building') amount *= armorMul(game, target, amount); // Militärgebäude: Sandsäcke, Beton (Forschung)
   target.hp -= amount;
   target.lastHitTime = game.time;
@@ -163,6 +163,7 @@ function searchTarget(game, hash, s, R, dmg, { minRange = 0, prefer = null, unit
   const consider = (e) => {
     if (!e.alive || !isFoe(team, e) || e.house) return;
     if (!(dmgVs(dmg, e) > 0)) return; // z. B. Mörser und Panzer können keine Hubschrauber treffen, Soldaten keine Flugzeuge
+    if (s.house && !houseCanFire(game, s, e)) return; // Besatzer sehen und zielen nur durch Fensterseiten (seit v5.67)
     if (leashed && Math.hypot(e.x - s.anchorX, e.y - s.anchorY) > Math.max(BALANCE.leash, R) + radiusOf(e)) return;
     const d = Math.hypot(e.x - s.x, e.y - s.y);
     if (d < minRange || d > R + radiusOf(e)) return;
@@ -247,7 +248,9 @@ function fireWeapon(game, u, w, t) {
 
 /** Reichweite der Waffe w von u gegen t (Forschung, Hauswand; Artillerie nicht unter minRange)? */
 const weaponReaches = (game, u, w, t) =>
-  inRange(u, t, w.spec.range * rangeMul(game, u) + reachBonus(game, u)) && !(w.spec.minRange && Math.hypot(t.x - u.x, t.y - u.y) < w.spec.minRange);
+  inRange(u, t, w.spec.range * rangeMul(game, u) + reachBonus(game, u)) &&
+  !(w.spec.minRange && Math.hypot(t.x - u.x, t.y - u.y) < w.spec.minRange) &&
+  houseCanFire(game, u, t); // Besatzer schießen nur durch eine Fensterseite (seit v5.67)
 
 /** Artillerie mit gewähltem Punkt (u.fireTarget, Befehl mortarTarget): feuert dorthin, solange Vorrat und Reichweite reichen. */
 function unitFireAtGround(game, u) {

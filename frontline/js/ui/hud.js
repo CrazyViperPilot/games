@@ -524,7 +524,11 @@ export class Hud {
     if (k === 'res') h += line(`Wohnplätze ${CITY.housing[lv]} · Stadt: ${Math.floor(s.pop)} / ${s.housing} Einwohner`);
     else if (k === 'com') h += line(`Arbeitsplätze ${CITY.jobsCom[lv]} · zahlt Steuern, macht die Stadt zufriedener`);
     else if (k === 'market') h += line(`Arbeitsplätze ${CITY.jobsCom[lv]} · Handel: Knopf „Handel“ oder Geldanzeige oben antippen`);
-    else if (made) h += line(`Arbeitsplätze ${CITY.jobs[lv]} · Stadt gesamt +${fmtRate(s[made])} ${GOOD_SHORT[made]}/s`);
+    else if (made) {
+      h += line(`Arbeitsplätze ${CITY.jobs[lv]} · Stadt gesamt +${fmtRate(s[made])} ${GOOD_SHORT[made]}/s`);
+      // Ausgangslager (seit v5.69): LKW holen die Ware hier ab
+      if (CITY.pickup.kinds.includes(k)) h += line(`Abholbereit: ${Math.floor(c.out?.[i] ?? 0)} / ${CITY.pickup.cap} ${GOOD_SHORT[made]} (LKW: Rechtsklick)`);
+    }
     else if (k === 'mine') {
       const d = DEPOSITS[c.deposit[i] - 1];
       h += line(`Arbeitsplätze ${CITY.jobsMine[lv]}${d ? ` · ${DEPOSIT_NAME[d]} gesamt ${fmtRate(s.raw[d])}/s` : ''}`);

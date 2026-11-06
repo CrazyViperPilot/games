@@ -118,8 +118,8 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 | `deploy` | `ids`, optional `x, y` (≤ `fob.deploySnap` vom Fahrzeug) | `game.js` `cmdDeploy` | FOB-Fahrzeug wird an seiner Stelle (oder der nächsten freien) zur fertigen FOB (seit v5.09; `buildFob` antwortet nur noch mit einem Fehler) |
 | `repair` | `ids, targetId` | `construction.js` `cmdRepair` | Gebäude reparieren |
 | `repairBridge` | `ids, bridgeId` | `river.js` `cmdRepairBridge` | Brücke wieder aufbauen |
-| `load`, `unload` | `ids, fobId, preset?` | `logistics.js` | LKW an einer FOB laden / entladen |
-| `route` | `ids, fromId, toId, preset?` | `logistics.js` `cmdRoute` | LKW pendeln lassen |
+| `load`, `unload` | `ids, fobId, preset?`; `load` auch `work` statt `fobId` (seit v5.69) | `logistics.js` | LKW an einer FOB laden / entladen; `work` (Zellindex eines eigenen Werks mit Ausgangslager, `CITY.pickup.kinds`) lädt dort nur die Ware des Werks |
+| `route` | `ids, fromId, toId, preset?`; `fromWork` statt `fromId` (seit v5.69) | `logistics.js` `cmdRoute` | LKW pendeln lassen, Start an einer FOB oder einem Werk |
 | `setPreset` | `ids, preset` | `logistics.js` | Ladungsart (`mix`, `bm`, `mun`, `fuel`) |
 | `mortarTarget` | `ids, x, y` | `game.js` `cmdMortarTarget` | Mörser auf einen Punkt richten |
 | `land` | `ids, airportId` | `aircraft.js` `cmdLand`, Heliport als Ziel `helipad.js` `cmdHeliLand` (seit v5.51) | Flugzeuge landen am Fliegerhorst des eigenen Stellplatzes `airportId` (seit v5.35; Anflug, Bahn, Ausrollen, Rollen zum Stellplatz; seit v5.15) |
@@ -214,7 +214,7 @@ seit v5.59). Die beiden Register importieren nichts; Simulation, UI und Darstell
 `js/ui/` – `controller.js` Auswahl, Modi (Tabelle `MODES`: Hinweis, Klick, Vorschau je Modus), Befehlskarte (kein DOM, ruft `game.issue`), `input.js` Maus/Tastatur/Touch,
 `hud.js` DOM-Anzeige, `menu.js` Start-, Pause-, Hilfe- und Endbildschirm, `helptext.js` Tastenliste der Hilfe mit Zahlen aus den Daten (kein DOM), `status.js` lesende Texthilfen (Auftragstext, FOB-Namen; den Bauzustand `builderState` liest die UI wie der Renderer aus `js/game/construction.js`).
 
-`js/audio/sound.js` – Ton (PRD §14): synthetisiert per WebAudio, liest `game.effects` (Hinweis `snd`), Meldungen und Wetter; `main.js` hält ein `Sound` für alle Partien.
+`js/audio/sound.js` – Ton (PRD §14): synthetisiert per WebAudio, liest `game.effects` (Hinweis `snd`), Meldungen und Wetter; `main.js` hält ein `Sound` für alle Partien. `js/audio/music.js` (seit v5.68): Hintergrundmusik, von `Sound` erzeugt und mit ihr gesteuert; liest Lage und Spielzeit, ändert nichts an der Partie.
 
 `js/editor/editor.js` + `editor.html` – Karteneditor; speichert Karten über `js/game/mapdata.js` im `localStorage`.
 

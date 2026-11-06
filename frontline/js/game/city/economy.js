@@ -26,6 +26,23 @@ function scratchOf(c) {
 /** Werke in der Reihenfolge der Verarbeitung (Hütte liefert Roheisen ans Stahlwerk, bevor dieses rechnet). */
 const WORK_ORDER = ['smelter', 'steel', 'bm', 'fuel', 'kero'];
 
+/** Werke mit Ausgangslager (CITY.pickup, seit v5.69): Art-Schlüssel. */
+const PICKUP = new Set(CITY.pickup.kinds);
+
+/**
+ * Ausgangslager eines Werks (seit v5.69): share des Ausstoßes dieses Schritts geht ohne Straßenweg ins Lager des Werks, höchstens bis
+ * cap, nur solange dem Werk ein eigener LKW zugeteilt ist (pickClaim). Liefert die Menge je s, die dort landet (0 ohne Ausstoß oder bei vollem Lager). Zählt als Erzeugung der Ware.
+ */
+function stockAtWork(c, i, prod, out, dt) {
+  if (!c.pickClaim[i] || !(dt > 0) || !(out > 0)) return 0; // ohne zugeteilten LKW zweigt das Werk nichts ab (seit v5.69)
+  const put = Math.min(out * CITY.pickup.share * dt, Math.max(0, CITY.pickup.cap - c.out[i]));
+  if (!(put > 0)) return 0;
+  c.out[i] += put;
+  const made = (c.made ??= zeroGoods(STORED_GOODS));
+  made[prod] += put;
+  return put / dt;
+}
+
 /** Arbeitsplätze eines fertigen Gebäudes (wie totals; Förderanlage nur mit Vorkommen). */
 function jobsOf(c, i, k, lv) {
   if (k === 'mine') return DEPOSITS[c.deposit[i] - 1] ? CITY.jobsMine[lv] : 0;
@@ -294,7 +311,7 @@ function extract(x) {
 
 /** Werke in Kettenfolge (Hütte → Stahlwerk, dann BM, Raffinerien): Ausstoß = min(Leistung, Eingang / Verbrauch), Fluss zum Ziel. */
 function runWorks(x) {
-  const { c, s, tr, eff, arr, anchors, nA, credit } = x;
+  const { c, s, tr, dt, eff, arr, anchors, nA, credit } = x;
   const Y = CITY.yield;
   const K = CITY.convert;
   for (const k of WORK_ORDER) {
@@ -307,15 +324,19 @@ function runWorks(x) {
       const cap = CITY.jobs[lv] * eff[i] * Y[prod]; // Leistung je s
       const inp = arr[i] / K[prod]; // Produkt je s, das der Eingang hergibt
       const out = Math.min(cap, inp);
+      c.workOut[i] = out; // Ausstoß je s am Anker (seit v5.70, Pendlerquelle der KI)
       s.cap[prod] += cap;
       s.inp[prod] += inp;
       s.gross[prod] += out;
+      // Ausgangslager (seit v5.69): ein Anteil geht ohne Straßenweg dorthin, der Rest läuft wie bisher
+      const kept = PICKUP.has(k) ? stockAtWork(c, i, prod, out, dt) : 0;
+      const rest = out - kept;
       const r = tr.routes.get(i);
       const p = r && (r.to !== 'main' || credit) ? r.path : null;
-      addLoad(tr, p, out);
-      if (!p) s.lost += out;
-      else if (r.to === 'main') s[prod] += out * pathEff(tr, p); // Ankunft im Lager (bm, fuel, kero, metal = Stahl)
-      else arr[r.to] += out * pathEff(tr, p); // Roheisen zum Stahlwerk
+      addLoad(tr, p, rest);
+      if (!p) s.lost += rest;
+      else if (r.to === 'main') s[prod] += rest * pathEff(tr, p); // Ankunft im Lager (bm, fuel, kero, metal = Stahl)
+      else arr[r.to] += rest * pathEff(tr, p); // Roheisen zum Stahlwerk
     }
   }
 }
@@ -350,6 +371,7 @@ function storeAndMunitions(x) {
     if (c.kind[i] !== MUN) continue;
     const lv = c.level[i];
     const cap = CITY.jobs[lv] * eff[i] * Y.mun; // Munition je s
+    c.workOut[i] = 0; // Ausstoß je s am Anker (seit v5.70); unten gesetzt, wenn Munition fließt
     s.cap.mun += cap;
     const p = tr.mun.get(i) ?? null;
     if (!p || !credit) continue; // ohne Weg zum Lager (oder ohne fertiges Lager): kein Stahl, keine Munition
@@ -357,9 +379,11 @@ function storeAndMunitions(x) {
     const w = pathEff(tr, p);
     addLoad(tr, p, steelUse);
     const mun = (steelUse * w) / K.mun; // Munition je s am Werk
-    addLoad(tr, p, mun);
+    c.workOut[i] = mun;
+    const kept = PICKUP.has('mun') ? stockAtWork(c, i, 'mun', mun, dt) : 0; // Ausgangslager (seit v5.69)
+    addLoad(tr, p, mun - kept);
     s.gross.mun += mun;
-    s.mun += mun * w; // Ankunft im Lager
+    s.mun += (mun - kept) * w; // Ankunft im Lager
     drawn += steelUse;
   }
   s.metal -= drawn; // Stahl je s: Zugang der Stahlwerke minus Munitionswerke

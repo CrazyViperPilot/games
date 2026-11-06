@@ -1,7 +1,10 @@
 // Logistik: LKW laden, entladen, pendeln und das Nachfüllen der Einheiten (docs/verlauf.md §11.2, §11.3). Kein DOM.
 import { BALANCE } from '../data/balance.js';
+import { CITY } from '../data/city.js';
+import { KINDS } from '../data/citykinds.js';
 import { driveTo, setIdle, nearestPassable } from './movement.js';
 import { addAmmo } from './entities.js';
+import { anchorOf, sizeOf } from './city/cells.js';
 
 const L = BALANCE.logistics;
 const CARGO = ['bm', 'mun', 'fuel'];
@@ -10,11 +13,15 @@ const TRUCK_ORDERS = new Set(['load', 'unload', 'route']);
 const BOARD_REACH = BALANCE.logistics.boardReach; // Infanterie steigt ein, wenn sie so nah am Hubschrauber ist
 const DROP_RING = BALANCE.logistics.dropRing; // Absetzen: Abstand der Passagiere um den Hubschrauber
 const EPS = 1e-9;
+const PICKUP_KINDS = new Set(CITY.pickup.kinds); // Werke mit Ausgangslager (CITY.pickup, seit v5.69)
 
 const fail = (reason) => ({ ok: false, reason });
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 
 export const cargoSum = (c) => c.bm + c.mun + c.fuel;
+
+/** Auftrag mit Werk als Ladequelle (order.work = Anker im Stadtraster) statt FOB? */
+const atWork = (o) => o.work != null;
 
 /** Auftrag setzen; alter Weg und Ziel der Einheit verwerfen. */
 function giveOrder(u, order) {
@@ -45,18 +52,47 @@ function ownFob(game, team, id, needBuilt) {
   return f;
 }
 
+/**
+ * Eigenes fertiges Werk der Stadt mit Ausgangslager (CITY.pickup.kinds) an Zelle i (Anker oder ein Teil des Großbaus) oder null.
+ * Seit v5.69: Ladequelle für LKW, auch für die Oberfläche (Rechtsklick).
+ */
+export function ownWork(game, team, i) {
+  const c = game.city?.[team];
+  if (!c || !Number.isInteger(i) || i < 0 || i >= c.kind.length) return null;
+  const a = anchorOf(c, i);
+  if (!c.level[a] || !PICKUP_KINDS.has(KINDS[c.kind[a] - 1])) return null;
+  return game.getEntity(c.ents.get(a)?.id);
+}
+
+/** Ankunftsabstand am Werk: wie an der FOB plus halbe Kantenlänge des Werks (Mitte). */
+function workReach(game, u, a) {
+  const c = game.city[u.team];
+  return L.transferReach + (c.cell * sizeOf(KINDS[c.kind[a] - 1])) / 2;
+}
+
 // ---- Befehle --------------------------------------------------------------------
 
-/** { type: 'load', ids, fobId, preset? }: LKW fährt zur fertigen FOB und lädt. */
+/**
+ * { type: 'load', ids, fobId, preset? } oder { type: 'load', ids, work, preset? }: LKW fährt zur fertigen FOB und lädt; mit `work`
+ * (Zellindex eines eigenen Werks, seit v5.69) fährt er zum Werk und holt dessen Ware aus dem Ausgangslager.
+ */
 export function cmdLoad(game, team, cmd) {
   const trucks = trucksOf(game, team, cmd.ids);
   if (!trucks.length) return fail('Kein eigener LKW gewählt');
-  const fob = ownFob(game, team, cmd.fobId, true);
-  if (!fob) return fail('Keine fertige eigene FOB gewählt');
   if (cmd.preset !== undefined && !PRESETS.includes(cmd.preset)) return fail('Unbekannte Ladungsart');
+  let src;
+  let work = null;
+  if (cmd.work != null) {
+    src = ownWork(game, team, cmd.work);
+    if (!src) return fail('Kein eigenes fertiges Werk mit Ausgangslager gewählt');
+    work = anchorOf(game.city[team], cmd.work);
+  } else {
+    src = ownFob(game, team, cmd.fobId, true);
+    if (!src) return fail('Keine fertige eigene FOB gewählt');
+  }
   for (const u of trucks) {
     applyPreset(u, cmd.preset);
-    giveOrder(u, { type: 'load', x: fob.x, y: fob.y, targetId: fob.id });
+    giveOrder(u, { type: 'load', x: src.x, y: src.y, targetId: src.id, work });
   }
   return { ok: true, count: trucks.length };
 }
@@ -71,18 +107,26 @@ export function cmdUnload(game, team, cmd) {
   return { ok: true, count: trucks.length };
 }
 
-/** { type: 'route', ids, fromId, toId, preset? }: pendelt zwischen zwei eigenen FOBs. */
+/**
+ * { type: 'route', ids, fromId, toId, preset? } oder { type: 'route', ids, fromWork, toId, preset? }: pendelt zwischen zwei eigenen FOBs,
+ * mit `fromWork` (Zellindex eines Werks, seit v5.69) startet die Fahrt am Ausgangslager des Werks.
+ */
 export function cmdRoute(game, team, cmd) {
   const trucks = trucksOf(game, team, cmd.ids);
   if (!trucks.length) return fail('Kein eigener LKW gewählt');
-  const from = ownFob(game, team, cmd.fromId, true);
+  let from;
+  let work = null;
+  if (cmd.fromWork != null) {
+    from = ownWork(game, team, cmd.fromWork);
+    if (from) work = anchorOf(game.city[team], cmd.fromWork);
+  } else from = ownFob(game, team, cmd.fromId, true);
   const to = ownFob(game, team, cmd.toId, false);
-  if (!from || !to) return fail('Route braucht zwei eigene FOBs (Start fertig)');
+  if (!from || !to) return fail('Route braucht einen eigenen Start (fertige FOB oder Werk) und eine eigene FOB als Ziel');
   if (from === to) return fail('Start und Ziel sind gleich');
   if (cmd.preset !== undefined && !PRESETS.includes(cmd.preset)) return fail('Unbekannte Ladungsart');
   for (const u of trucks) {
     applyPreset(u, cmd.preset);
-    giveOrder(u, { type: 'route', x: from.x, y: from.y, fromId: from.id, toId: to.id, phase: 'load', targetId: from.id });
+    giveOrder(u, { type: 'route', x: from.x, y: from.y, fromId: from.id, toId: to.id, phase: 'load', targetId: from.id, work });
   }
   return { ok: true, count: trucks.length };
 }
@@ -139,6 +183,42 @@ function unloadStep(u, fob, dt) {
   return moved ? 'busy' : 'done';
 }
 
+/**
+ * Merker je Werk (seit v5.69, c.pickClaim): 1 am Anker, wenn ihm gerade ein eigener LKW zugeteilt ist (Ladeauftrag oder Route ab
+ * diesem Werk, egal in welcher Phase). Nur darüber zweigt das Werk Ware in sein Ausgangslager ab (economy.js).
+ */
+function claimWorks(game) {
+  for (const c of game.city ?? []) c.pickClaim.fill(0);
+  for (const u of game.units) {
+    if (!u.alive || !TRUCK_ORDERS.has(u.order.type) || !atWork(u.order)) continue;
+    const c = game.city?.[u.team];
+    if (c) c.pickClaim[u.order.work] = 1;
+  }
+}
+
+/**
+ * Ein Ladeschritt am Ausgangslager eines Werks (seit v5.69): nur die Ware dieses Werks, die Ladungsart des LKW gilt hier nicht.
+ * Lädt, bis der LKW voll ist oder das Werkslager leer (dann 'empty', ohne zu warten). Gleiche Rückgabe wie loadStep.
+ */
+function loadWork(game, u, a, dt) {
+  const c = game.city?.[u.team];
+  if (!c) return 'empty';
+  const cap = u.def.cargoCap;
+  const total = cargoSum(u.cargo);
+  if (total >= cap - EPS) return 'full';
+  if (c.out[a] <= EPS) return 'empty';
+  const k = CITY.chain[KINDS[c.kind[a] - 1]].to; // Ware des Werks (Kette CITY.chain)
+  const amt = Math.min(L.transferRate * dt, c.out[a], cap - total);
+  c.out[a] -= amt;
+  u.cargo[k] += amt;
+  return c.out[a] <= EPS ? 'empty' : 'busy';
+}
+
+/** Ein Ladeschritt an der Quelle des Auftrags: Werk (order.work) oder FOB. */
+function loadFrom(game, u, dest, dt) {
+  return atWork(u.order) ? loadWork(game, u, u.order.work, dt) : loadStep(u, dest, dt);
+}
+
 /** Ein LKW-Schritt: fahren zum Ziel, dann laden/entladen gemäß Auftrag. */
 function stepTruck(game, u, dt) {
   const o = u.order;
@@ -147,7 +227,7 @@ function stepTruck(game, u, dt) {
     const from = game.getEntity(o.fromId);
     const to = game.getEntity(o.toId);
     if (!from || !to) {
-      game.message(u.team, 'Route unterbrochen', u.x, u.y);
+      game.message(u.team, atWork(o) && !from ? 'Werk nicht mehr da' : 'Route unterbrochen', u.x, u.y);
       setIdle(u);
       return;
     }
@@ -155,32 +235,42 @@ function stepTruck(game, u, dt) {
   } else {
     dest = game.getEntity(o.targetId);
     if (!dest) {
+      if (atWork(o)) game.message(u.team, 'Werk nicht mehr da', u.x, u.y);
       setIdle(u);
       return;
     }
   }
-
-  const st = driveTo(game, u, dest.x, dest.y, L.transferReach, dt);
+  // Ladestelle Werk: Ankunft an der Werksmitte (plus halbe Kantenlänge), sonst wie an der FOB
+  const loadsHere = o.type === 'load' || (o.type === 'route' && o.phase === 'load');
+  const reach = loadsHere && atWork(o) ? workReach(game, u, o.work) : L.transferReach;
+  const st = driveTo(game, u, dest.x, dest.y, reach, dt);
   if (st === 'stuck') {
     if (o.type === 'route') game.message(u.team, 'Route unterbrochen', u.x, u.y);
-    else game.message(u.team, 'LKW kommt nicht zur FOB', u.x, u.y);
+    else game.message(u.team, atWork(o) ? 'LKW kommt nicht zum Werk' : 'LKW kommt nicht zur FOB', u.x, u.y);
     setIdle(u);
     return;
   }
   if (st !== 'arrived') return;
 
   if (o.type === 'load') {
-    if (loadStep(u, dest, dt) !== 'busy') setIdle(u);
+    if (loadFrom(game, u, dest, dt) !== 'busy') setIdle(u);
     return;
   }
   if (o.type === 'unload') {
     if (unloadStep(u, dest, dt) === 'done') setIdle(u);
     return;
   }
-  // Pendeln: laden am Start, abladen am Ziel, wieder laden
+  // Pendeln: laden am Start (FOB oder Werk), abladen am Ziel, wieder laden
   if (o.phase === 'load') {
-    const r = loadStep(u, dest, dt);
-    if (r === 'full' || (r === 'empty' && cargoSum(u.cargo) > EPS)) o.phase = 'unload';
+    const r = loadFrom(game, u, dest, dt);
+    // Am Werk füllt sich das Lager nur langsam (der LKW lädt laufend nach): dort mit Teilladung erst nach CITY.pickup.wait s am Werk
+    // abfahren (sonst Kleinstfuhren); an einer FOB sofort, sobald ihr Lager leer ist
+    const loaded = cargoSum(u.cargo) > EPS;
+    const leave = atWork(o) ? loaded && (o.waited = (o.waited || 0) + dt) >= CITY.pickup.wait : r === 'empty' && loaded;
+    if (r === 'full' || leave) {
+      o.phase = 'unload';
+      o.waited = 0;
+    }
   } else if (unloadStep(u, dest, dt) === 'done') {
     o.phase = 'load';
   }
@@ -319,6 +409,7 @@ function resupply(game, passDt) {
  * team.flow (Verbrauch aus Lagern je s) wird bis zum nächsten Nachfüllen in team.rate abgezogen.
  */
 export function updateLogistics(game, dt) {
+  claimWorks(game);
   for (const u of game.units) {
     if (!u.alive) continue;
     const o = u.order.type;

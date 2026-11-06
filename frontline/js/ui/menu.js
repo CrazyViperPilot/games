@@ -4,7 +4,7 @@ import { BALANCE } from '../data/balance.js';
 import { listMaps, deleteMap, saveMap, normalizeMap, describeMap } from '../game/mapdata.js';
 import { WEATHER_SETTINGS } from '../game/weather.js';
 import { MOOD_SETTINGS } from '../render/mood.js';
-import { SOUND_KEY } from '../audio/sound.js';
+import { SOUND_KEY, loadLevel, saveLevel } from '../audio/sound.js';
 import { KEYS } from './helptext.js';
 
 const DIFFS = [
@@ -39,6 +39,13 @@ if (typeof document !== 'undefined') {
   });
 }
 
+/** Lautstärke-Regler 0–100 % mit Prozentzahl; kind 'sfx' (Geräusche) oder 'music' (Musik), value 0–1 (seit v5.68). */
+const volRow = (kind, value) => {
+  const pct = Math.round(value * 100);
+  const name = kind === 'music' ? 'Musik' : 'Geräusche';
+  return `<div class="vol"><input type="range" min="0" max="100" step="5" value="${pct}" data-vol="${kind}" aria-label="Lautstärke ${name}"><output data-volout="${kind}">${pct} %</output></div>`;
+};
+
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 function fmtTime(s) {
@@ -54,6 +61,7 @@ function show(root, kind, html) {
 
 export function hideOverlay(root) {
   root.onclick = null;
+  root.oninput = null;
   root.innerHTML = '';
   delete root.dataset.kind;
   root.hidden = true;
@@ -174,6 +182,14 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
         <span class="flabel" title="Schüsse, Explosionen, Fahrzeuge, Wetter und Meldungen; selbst erzeugt, ohne Dateien. Im Spiel: Taste F2 oder der Lautsprecher-Knopf oben">Ton</span>
         <div class="seg"><button type="button" data-sound="1">An</button><button type="button" data-sound="0">Aus</button></div>
       </div>
+      <div class="field">
+        <span class="flabel" title="Lautstärke der Schüsse, Explosionen, Fahrzeuge und Meldungen; wirkt sofort">Geräusche</span>
+        ${volRow('sfx', loadLevel('sfx'))}
+      </div>
+      <div class="field">
+        <span class="flabel" title="Hintergrundmusik, selbst erzeugt: ruhig im Frieden, Trommeln und Bass im Gefecht; wirkt sofort">Musik</span>
+        ${volRow('music', loadLevel('music'))}
+      </div>
       <div class="field" data-fsbox hidden>
         <span class="flabel" title="Ohne Status- und Navigationsleiste spielen. Installiert startet Frontline von selbst im Vollbild">Vollbild</span>
         <div class="seg"><button type="button" data-fs="1">An</button><button type="button" data-fs="0">Aus</button></div>
@@ -283,6 +299,13 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
         });
     }
   };
+  root.oninput = (e) => {
+    const r = e.target.closest?.('[data-vol]');
+    if (!r) return;
+    const v = Number(r.value) / 100;
+    saveLevel(r.dataset.vol, v);
+    root.querySelector(`[data-volout="${r.dataset.vol}"]`).textContent = `${r.value} %`;
+  };
   root.onclick = (e) => {
     const b = e.target.closest('button');
     if (!b) return;
@@ -368,8 +391,11 @@ export function showStartMenu(root, onStart, { wallet = () => BALANCE.startRes.m
   };
 }
 
-/** Pausenmenü: onResume() bei „Weiter“, onQuit() bei „Zum Startmenü“. */
-export function showPause(root, onResume, onQuit, onSave = null) {
+/**
+ * Pausenmenü: onResume() bei „Weiter“, onQuit() bei „Zum Startmenü“. `audio` (seit v5.68, optional): { get(kind) → 0–1, set(kind, v) }
+ * für die Regler Geräusche und Musik, die sofort wirken (kind 'sfx' | 'music').
+ */
+export function showPause(root, onResume, onQuit, onSave = null, audio = null) {
   show(
     root,
     'pause',
@@ -379,6 +405,8 @@ export function showPause(root, onResume, onQuit, onSave = null) {
         <button type="button" class="primary" data-act="resume">Weiter (P)</button>
         <button type="button" data-act="quit">Speichern und zum Startmenü</button>
       </div>
+      ${audio ? `<div class="field"><span class="flabel">Geräusche</span>${volRow('sfx', audio.get('sfx'))}</div>
+      <div class="field"><span class="flabel">Musik</span>${volRow('music', audio.get('music'))}</div>` : ''}
       <div class="field" data-fsbox hidden>
         <span class="flabel">Vollbild</span>
         <div class="seg"><button type="button" data-fs="1">An</button><button type="button" data-fs="0">Aus</button></div>
@@ -391,6 +419,14 @@ export function showPause(root, onResume, onQuit, onSave = null) {
     if (el) el.textContent = t;
   });
   markFullscreen(root);
+  if (audio) {
+    root.oninput = (e) => {
+      const r = e.target.closest?.('[data-vol]');
+      if (!r) return;
+      audio.set(r.dataset.vol, Number(r.value) / 100);
+      root.querySelector(`[data-volout="${r.dataset.vol}"]`).textContent = `${r.value} %`;
+    };
+  }
   root.onclick = (e) => {
     const f = e.target.closest('[data-fs]');
     if (f) return setFullscreen(f.dataset.fs === '1');
@@ -419,7 +455,9 @@ export function showHelp(root) {
 }
 
 /**
- * Endbildschirm. info = { winner, team (eigenes Team), reason ('points' | 'eliminated' | 'radio'), stats: { time, points: [a, b], winPoints } }.
+ * Endbildschirm. info = { winner, team (eigenes Team), reason ('points' | 'eliminated' | 'radio'),
+ * stats: { time, points: [a, b], winPoints, teams? } }. `teams` (seit v5.65): je Team die Zähler aus game.js (newStats),
+ * earned und used; fehlt es, bleiben nur Spielzeit und Siegpunkte.
  */
 export function showEnd(root, { winner, team, reason, stats }, onRestart) {
   const won = winner === team;
@@ -429,16 +467,40 @@ export function showEnd(root, { winner, team, reason, stats }, onRestart) {
   else if (reason === 'radio') why = `${who} hat den Sendemast ${Math.round(BALANCE.radio.hold / 60)} Minuten gehalten.`;
   else if (won) why = 'Die Hauptstadt des Gegners ist zerstört.';
   else why = 'Deine Hauptstadt ist zerstört.';
+  const rows = [
+    ['Einheiten ausgebildet', 'trained'],
+    ['Einheiten verloren', 'lost'],
+    ['Abschüsse', 'kills'],
+    ['Gebäude zerstört', 'buildingsKilled'],
+    ['Gebäude verloren', 'buildingsLost'],
+    ['Höchste Armeegröße', 'peakUnits'],
+    ['Geld aus Prämien', 'earned'],
+    ['Munition verbraucht', 'mun'],
+    ['Treibstoff verbraucht', 'fuel'],
+  ];
+  const num = (v) => Math.round(v || 0).toLocaleString('de-DE');
+  const val = (t, key) => (key === 'mun' || key === 'fuel' ? num(t.used?.[key]) : num(t[key]));
+  const names = BALANCE.teamNames;
+  const table = stats.teams
+    ? `<table class="keys end-stats">
+        <tr class="head"><th></th>${names.map((n, i) => `<td class="${i === team ? 'mine' : ''}">${esc(n)}${i === team ? ' (du)' : ''}</td>`).join('')}</tr>
+        <tr><th>Spielzeit</th><td colspan="2" class="center">${fmtTime(stats.time)}</td></tr>
+        <tr><th>Siegpunkte</th>${names.map((n, i) => `<td class="${i === team ? 'mine' : ''}">${num(stats.points[i])}</td>`).join('')}</tr>
+        ${rows
+          .map(([label, key]) => `<tr><th>${label}</th>${stats.teams.map((t, i) => `<td class="${i === team ? 'mine' : ''}">${val(t, key)}</td>`).join('')}</tr>`)
+          .join('')}
+      </table>`
+    : `<table class="keys">
+        <tr><th>Spielzeit</th><td>${fmtTime(stats.time)}</td></tr>
+        <tr><th>Siegpunkte</th><td>${BALANCE.teamNames[0]} ${stats.points[0]} : ${stats.points[1]} ${BALANCE.teamNames[1]}</td></tr>
+      </table>`;
   show(
     root,
     'end',
     `<section class="menu end">
       <h2 class="end-title ${won ? 'win' : 'lose'}">${won ? 'Sieg' : 'Niederlage'}</h2>
       <p class="center">${esc(why)}</p>
-      <table class="keys">
-        <tr><th>Spielzeit</th><td>${fmtTime(stats.time)}</td></tr>
-        <tr><th>Siegpunkte</th><td>${BALANCE.teamNames[0]} ${stats.points[0]} : ${stats.points[1]} ${BALANCE.teamNames[1]}</td></tr>
-      </table>
+      ${table}
       <div class="stack"><button type="button" class="primary" data-act="again">Nochmal</button></div>
     </section>`,
   );

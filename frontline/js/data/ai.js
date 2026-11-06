@@ -59,11 +59,20 @@ export const QUEUE_LONG = 4; // so viele Aufträge mit genug Geld
 export const QUEUE_SHORT = 2; // sonst so viele
 // Soll-Lagerstand je FOB (Zonen-FOB, Hauptstadt, übrige FOBs); Pendler füllen darauf auf, Versorger laden dort (dazu FORT_WANT)
 export const FOB_WANT = { zone: { bm: 400, mun: 300, fuel: 150 }, home: { bm: 300, mun: 200, fuel: 200 }, other: { bm: 300, mun: 150, fuel: 80 } };
-// Gepard und Panzerhaubitze (seit v5.26, nicht auf Leicht): Gepard nach gesehenen gegnerischen Luftfahrzeugen, Haubitze ab einer
-// Armee von ART_FROM Kampfeinheiten; die Haubitze fährt nicht in den Wellen mit, sondern steht ART_BEHIND px hinter der Armee
-export const GEPARD_PER_AIR = 0.04; // Zielanteil Gepard je gesehenem Hubschrauber oder Flugzeug des Gegners
-export const GEPARD_MAX = 0.2; // höchstens dieser Anteil Gepard an den Kampfeinheiten
-export const AIR_MEMORY = 120; // s, so lange merkt sich die KI gesehene Luftziele (für den Gepard)
+// Luftabwehr (seit v5.71, nicht auf Leicht): nach gesehenen gegnerischen Hubschraubern und Flugzeugen (je Art gemerkt AIR_MEMORY s)
+// baut die KI Gepard, Flak (gegen Hubschrauber) und SAM (gegen Flugzeuge). Gesamtanteil = min(AIR_MAX, Luftziele × AIR_PER)
+// der Kampfeinheiten, aufgeteilt nach AIR_SPLIT und gewichtet mit dem Anteil der Luftart an den gesehenen Luftzielen.
+export const AIR_PER = 0.04; // Zielanteil Luftabwehr je gesehenem gegnerischen Hubschrauber oder Flugzeug
+export const AIR_MAX = 0.25; // höchstens dieser Anteil Luftabwehr an den Kampfeinheiten
+// Verteilung je Luftart (je Art Summe 1): Hubschrauber → Gepard und Flak, Flugzeuge → SAM und Gepard
+export const AIR_SPLIT = { heli: { gepard: 0.6, flak: 0.4 }, jet: { sam: 0.7, gepard: 0.3 } };
+export const AIR_MEMORY = 120; // s, so lange merkt sich die KI gesehene Luftziele je Art (für die Luftabwehr)
+// Scharfschützen (seit v5.71, Normal und Schwer): gegen viele gesehene gegnerische Soldaten, wenn die KI selbst eine Armee hat
+export const SNIPER_FROM = 10; // sichtbare gegnerische Soldaten, ab denen Scharfschützen in die Mischung kommen
+export const SNIPER_ARMY = 12; // und die KI selbst mindestens so viele Kampfeinheiten hat
+export const SNIPER_SHARE = 0.04; // Zielanteil Scharfschützen an den Kampfeinheiten (laufen mit der Armee)
+// Panzerhaubitze (seit v5.26, nicht auf Leicht): Haubitze ab einer Armee von ART_FROM Kampfeinheiten; sie fährt nicht in den Wellen mit,
+// sondern steht ART_BEHIND px hinter der Armee
 export const ART_SHARE = 0.06; // Zielanteil Panzerhaubitzen an den Kampfeinheiten
 export const ART_FROM = 15; // eigene Kampfeinheiten, ab denen sie Panzerhaubitzen ausbildet
 export const ART_BEHIND = 450; // px hinter dem Schwerpunkt der Armee (Richtung nächste eigene FOB)
@@ -71,9 +80,21 @@ export const ART_EVERY = 5; // s zwischen zwei Stellungswechseln einer Haubitze
 export const SUPPLY_MIN = 0.25; // Versorger lädt nach, wenn die Ladung unter diesem Anteil liegt
 export const SURPLUS_MIN = 120; // Pendler fährt nur, wenn die Quelle so viel Überschuss hat
 export const ROUTE_HOLD = 20; // s, früheste Neuplanung einer Pendler-Route
+export const WORK_SOURCE_NEAR = 0.5; // Pendler holt am eigenen Werk (Ausgangslager, seit v5.70), wenn es höchstens so weit von der Bedarfs-FOB liegt wie die beste FOB-Quelle mal diesen Faktor (oder keine FOB Überschuss hat)
+export const WORK_SOURCE_TRUCKS = 1; // so viele KI-LKW pendeln höchstens gleichzeitig ab demselben Werk
+export const WORK_SOURCE_MIN_RATE = 0.2; // Ware je s: ein Werk taugt als Quelle für Pendler nur, wenn es gerade mindestens so viel erzeugt (sonst zählt nur sein Ausgangslager ab SURPLUS_MIN)
 export const GARRISON_SHARE = 0.4; // Anteil der Infanterie in der Zone, der Stadthäuser besetzt (Häuserkampf)
 export const GARRISON_RANGE = 500; // ein Soldat geht nur in ein Haus in diesem Umkreis
 export const GARRISON_EVERY = 8; // s zwischen zwei Besetzungsrunden
+export const STORM_EVERY = 8; // s zwischen zwei Prüfungen, ob die KI ein vom Gegner besetztes Haus stürmt (Häuserkampf II, seit v5.67)
+export const STORM_RANGE = 450; // px: freie Infanterie in diesem Umkreis um das Haus zählt als Sturmtruppe
+export const STORM_RATIO = 2; // so viele Stürmer je Besatzer braucht die KI mindestens
+export const STORM_WIRE = 1.5; // hat das Haus Stacheldraht, steigt dieses Verhältnis um diesen Faktor
+export const STORM_MIN = 3; // und mindestens so viele Stürmer insgesamt
+export const STORM_MAX = 8; // höchstens so viele Stürmer gehen los (die nächsten zuerst)
+export const HOUSE_WORK_EVERY = 10; // s zwischen zwei Ausbau-Runden für die eigenen Besatzungshäuser
+export const HOUSE_WORK_ORDER = ['sandbags', 'wire', 'mgnest']; // Reihenfolge, in der die KI ein Haus ausbaut (Schlüssel aus BALANCE.garrison.works)
+export const HOUSE_WORK_RESERVE = 400; // Geld, das nach dem Preis eines Ausbaus übrig bleiben soll
 export const CRATE_EVERY = 6; // s zwischen zwei Runden der Kistensuche
 export const CRATE_RANGE = 5500; // ein Soldat holt nur Kisten in diesem Umkreis (seit v5.14 mit der größeren Karte 5500 statt 4500)
 export const CMD_BEHIND = 220; // Kommandeur steht so weit hinter dem Schwerpunkt der Armee (seine Aura reicht 300 px)

@@ -22,7 +22,7 @@ import { createHot, updateHot } from './hotzone.js';
 import { updateLogistics, cargoSum, storeCapOf } from './logistics.js';
 import { updateConstruction, canBuild, orderBuild, orderBuildSeq } from './construction.js';
 import { updateTowers, ejectCrew } from './tower.js';
-import { createHouses, updateGarrison, dropOccupant } from './garrison.js';
+import { createHouses, updateGarrison, dropOccupant, houseCanFire } from './garrison.js';
 import { createCrates, updateCrates, updateCrateIntel } from './crates.js';
 import { createScars, updateScars, updateScarIntel, addUnitWreck, addBuildingWreck, clearWrecksUnder } from './scars.js';
 import { createAnimals, updateAnimals } from './animals.js';
@@ -124,6 +124,11 @@ function takeCarried(list, bm) {
     if (left <= 1e-9) break;
   }
 }
+/** Zähler je Team für den Endbildschirm (seit v5.65). Reine Anzeige: die Simulation liest sie nicht. */
+export function newStats() {
+  return { trained: 0, lost: 0, kills: 0, buildingsLost: 0, buildingsKilled: 0, peakUnits: 0 };
+}
+
 const NO_CARRIED = 'Zu wenig getragenes Baumaterial (Soldaten laden es in einer FOB)';
 const ONE_COMMANDER = 'Nur ein Kommandeur je Team';
 
@@ -161,6 +166,7 @@ export class Game {
     this.winPoints = winPoints;
     this.radioWin = !!radio;
     this.fogTimer = 0;
+    this.statTimer = 0; // Takt der Heeresgröße für die Statistik (sampleArmy, einmal je s)
     this.pathWork = 0; // untersuchte Zellen der Wegsuche seit dem letzten Schritt (Wegbudget, pathplan.js)
     this.pathBacklog = false; // warten Einheiten auf ihren Weg (neue Anfragen stellen sich dann an)? (pathplan.js)
     this.pathSeq = 0; // Reihenfolge der wartenden Wege
@@ -180,6 +186,8 @@ export class Game {
         points: 0,
         pointProgress: 0,
         used: { mun: 0, fuel: 0 }, // Summe des Verbrauchs (Statistik)
+        earned: 0, // Geld aus Prämien und Bau (reward)
+        stats: newStats(), // Zähler für den Endbildschirm (Statistik, seit v5.65)
         warnAt: {}, // Zeitpunkt der letzten Meldung je Schlüssel (notify)
         incomeMult: 1,
         isAI: false,
@@ -225,8 +233,21 @@ export class Game {
   restoreAccessors() {
     for (const team of this.teams) this.bindStocks(team);
     for (const u of this.units) defineAmmo(u, u.def);
+    // Statistik fehlt in Ständen vor v5.65: Felder mit 0 ergänzen (SAVE_FORMAT unverändert)
+    for (const team of this.teams) {
+      team.stats = { ...newStats(), ...team.stats };
+      team.earned = team.earned || 0;
+    }
+    this.statTimer = this.statTimer || 0;
+    // Ruinenliste fehlt in Ständen vor v5.66: aus den eingestürzten Häusern neu aufbauen
+    if (!this.ruins) this.ruins = (this.houses || []).filter((h) => h.ruined);
     // Nachrüstungen für ältere Stände (Straßen, Forschungsbaum, Stadt, FOB-Baustellen) gibt es seit v5.56 nicht mehr: Stände eines
-    // anderen SAVE_FORMAT laden nicht (savegame.js).
+    // anderen SAVE_FORMAT laden nicht (savegame.js). Ausnahme: das Ausgangslager der Werke (seit v5.69) fehlt in Ständen davor, leer ergänzen.
+    for (const c of this.city ?? []) {
+      c.out ??= new Float32Array(c.kind.length);
+      c.workOut ??= new Float32Array(c.kind.length); // seit v5.70: Ausstoß je s am Anker (leer in älteren Ständen)
+      c.pickClaim ??= new Uint8Array(c.kind.length);
+    }
   }
 
   newId() {
@@ -705,9 +726,10 @@ export class Game {
     if (!units.length) return fail(armed.length ? 'Kistenträger schießen nicht' : 'Keine bewaffnete Einheit gewählt');
     const aim = t.house ? this.getEntity(t.house) : t;
     for (const u of units) {
-      // Besatzer bleiben im Haus, solange das Ziel aus den Fenstern erreichbar ist; sonst gehen sie hinaus und verfolgen es
+      // Besatzer bleiben im Haus, solange das Ziel aus den Fenstern erreichbar ist und durch eine Fensterseite liegt (houseCanFire, seit v5.67);
+      // sonst gehen sie hinaus und verfolgen es
       const h = u.house ? this.getEntity(u.house) : null;
-      if (u.house && !(h && aim && inRange(u, aim, u.def.range * rangeMul(this, u) + h.reach))) exitHouse(this, u, t.x, t.y);
+      if (u.house && !(h && aim && inRange(u, aim, u.def.range * rangeMul(this, u) + h.reach) && houseCanFire(this, u, aim))) exitHouse(this, u, t.x, t.y);
       u.order = { type: 'attack', x: t.x, y: t.y, targetId: t.id };
       u.targetId = t.id;
       u.path = [];
@@ -1027,6 +1049,13 @@ export class Game {
     }
   }
 
+  /** Höchste Zahl lebender Einheiten je Team (Statistik „Höchste Armeegröße“); von update() einmal je s Spielzeit aufgerufen. */
+  sampleArmy() {
+    const n = [0, 0];
+    for (const u of this.units) if (u.alive) n[u.team] += 1 + (u.passengers?.length || 0); // wie slotsUsed: Passagiere zählen mit
+    for (const t of this.teams) if (n[t.id] > t.stats.peakUnits) t.stats.peakUnits = n[t.id];
+  }
+
   /** Tote entfernen; Gebäude geben ihren Fußabdruck frei. */
   cleanup() {
     const units = this.units;
@@ -1038,6 +1067,9 @@ export class Game {
         this.entities.delete(u.id);
         if (u.house) dropOccupant(this, u);
         if (u.hp <= 0) {
+          const fallen = 1 + (u.passengers?.length || 0); // Passagiere sterben mit dem Fahrzeug
+          this.teams[u.team].stats.lost += fallen;
+          this.teams[1 - u.team].stats.kills += fallen;
           this.addEffect('death', u.x, u.y, u.team, u.x, u.y, u.def.armor);
           addUnitWreck(this, u); // eingestiegene Passagiere (alive = false, hp > 0) hinterlassen nichts
           // gefallener Kommandeur, auch als Passagier eines zerstörten Fahrzeugs
@@ -1059,6 +1091,10 @@ export class Game {
       if (b.occupants?.length) ejectCrew(this, b);
       this.entities.delete(b.id);
       if (!b.demolished) {
+        if (b.type !== 'wall' && b.type !== 'gate') {
+          this.teams[b.team].stats.buildingsLost++;
+          this.teams[1 - b.team].stats.buildingsKilled++;
+        }
         this.addEffect('explosion', b.x, b.y, b.team, b.x, b.y, 'building');
         addBuildingWreck(this, b);
         this.message(b.team, `${b.def.name} zerstört`, b.x, b.y);
@@ -1100,6 +1136,12 @@ export class Game {
     updateHot(this, dt);
     updateRadio(this, dt);
     smoothIncome(this, dt);
+
+    this.statTimer += dt;
+    if (this.statTimer >= 1) {
+      this.statTimer -= 1;
+      this.sampleArmy();
+    }
 
     this.fogTimer += dt;
     if (this.fogTimer >= BALANCE.fogInterval) {

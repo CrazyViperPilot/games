@@ -46,6 +46,7 @@ export function orderText(game, u) {
       return b ? `Repariert ${b.def.name}` : 'Reparatur beendet';
     }
     case 'load': {
+      if (o.work != null) return 'Lädt am Werk';
       const f = game.getEntity(o.targetId);
       return `Lädt an ${fobLabel(game, f)}`;
     }
@@ -54,7 +55,7 @@ export function orderText(game, u) {
       return `Entlädt an ${fobLabel(game, f)}`;
     }
     case 'route': {
-      const from = fobLabel(game, game.getEntity(o.fromId));
+      const from = o.work != null ? 'Werk' : fobLabel(game, game.getEntity(o.fromId));
       const to = fobLabel(game, game.getEntity(o.toId));
       return o.phase === 'load' ? `Pendelt ${from} → ${to} (lädt)` : `Pendelt ${from} → ${to} (liefert)`;
     }

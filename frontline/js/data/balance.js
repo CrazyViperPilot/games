@@ -133,9 +133,10 @@ export const BALANCE = {
     // fobCap: FOBs mit Hauptstadt (höchstens fob.max); radioFrom: Spielzeit (s), ab der sie einen Sendemast baut (Infinity = nie);
     // cratePickers: so viele Soldaten holen oder tragen gleichzeitig Versorgungskisten;
     // fort: baut ab Spielzeit `from` (s) bis zu `fobs` FOBs zur Festung aus (Mauerring, Tore, `towers` Türme mit Besatzung und Dachaufbau). Weitere KI-Werte: js/data/ai.js
-    easy: { think: 3.0, incomeMult: 0.8, attackStrength: 2500, scout: false, counter: false, raid: false, fallback: false, weather: false, research: [240, 720], upgrades: false, fobCap: 3, radioFrom: Infinity, cratePickers: 1, fort: { from: Infinity, fobs: 0, towers: 0 } },
-    normal: { think: 2.0, incomeMult: 1.0, attackStrength: 2000, scout: true, counter: true, raid: false, fallback: false, weather: true, research: [150, 540], upgrades: true, fobCap: 5, radioFrom: 720, cratePickers: 2, fort: { from: 600, fobs: 1, towers: 1 } },
-    hard: { think: 1.0, incomeMult: 1.0, attackStrength: 1600, scout: true, counter: true, raid: true, fallback: true, weather: true, research: [90, 420], upgrades: true, fobCap: 7, radioFrom: 540, cratePickers: 3, fort: { from: 420, fobs: 2, towers: 2 } },
+    // houseStorm: stürmt vom Gegner besetzte Häuser in der Konfliktzone, wenn genug freie Infanterie daneben steht; houseWorks: baut eigene Besatzungshäuser aus (Sandsäcke, MG-Nest, Stacheldraht), seit v5.67
+    easy: { think: 3.0, incomeMult: 0.8, attackStrength: 2500, scout: false, counter: false, raid: false, fallback: false, weather: false, research: [240, 720], upgrades: false, fobCap: 3, radioFrom: Infinity, cratePickers: 1, fort: { from: Infinity, fobs: 0, towers: 0 }, houseStorm: false, houseWorks: false },
+    normal: { think: 2.0, incomeMult: 1.0, attackStrength: 2000, scout: true, counter: true, raid: false, fallback: false, weather: true, research: [150, 540], upgrades: true, fobCap: 5, radioFrom: 720, cratePickers: 2, fort: { from: 600, fobs: 1, towers: 1 }, houseStorm: true, houseWorks: true },
+    hard: { think: 1.0, incomeMult: 1.0, attackStrength: 1600, scout: true, counter: true, raid: true, fallback: true, weather: true, research: [90, 420], upgrades: true, fobCap: 7, radioFrom: 540, cratePickers: 3, fort: { from: 420, fobs: 2, towers: 2 }, houseStorm: true, houseWorks: true },
   },
   // Gelände (§7): wer höher steht, trifft härter (Direktfeuer, ab `dead` Höhenunterschied, voll ab `full`), tiefer stehend schwächer
   height: { bonus: 0.25, dead: 6, full: 36 },
@@ -190,6 +191,17 @@ export const BALANCE = {
       mgnest: { name: 'MG-Nest', cost: { money: 200 }, time: 18, fire: 1.35 },
       wire: { name: 'Stacheldraht', cost: { money: 80 }, time: 10, stormMult: 0.6 },
     },
+    // Besetztes Haus in der Konfliktzone (seit v5.66): zusätzlich zu den Besatzern zählt es zoneWeight Gewicht für die Zonenkontrolle
+    // (je Zone und je Hot Zone, die die Hausmitte erreicht; in der Hot Zone also doppelt). Keine Stimme, kein Geld.
+    zoneWeight: 2,
+    // Ausguck (seit v5.66): Besatzer sehen sightMul-mal so weit (nur Nebel aufdecken; Waffenreichweite bleibt).
+    sightMul: 1.25,
+    // Deckung an Ruinen (seit v5.66): Infanterie außerhalb von Häusern, höchstens r px vom Rand einer eingestürzten Stadthausruine,
+    // nimmt nur mul des Schadens (direkte Treffer und Granaten, nicht Splitter und nicht Fahrzeuge).
+    ruinCover: { r: 40, mul: 0.7 },
+    // Feuerbereich (seit v5.67): Fensterseite = Seite, deren Mittelpunkt höchstens streetReach px von einer Stadtstraße entfernt ist
+    // (game.map.town.roads ohne Feldwege). Besatzer schießen und zielen nur durch Fensterseiten; ein Haus ohne Straße in der Nähe ist rundum offen.
+    streetReach: 60,
   },
   // Festung (§5a): Befehl 'fortify' an einer FOB baut einen Mauerring mit je einem Tor in der Mitte jeder Seite und `towers` Gefechtstürme
   // an den Ecken, die zum Gegner zeigen. ring = Abstand der Mauer von der FOB-Mitte (Zellen); floor = Höhenvorteil der Turmbesatzung (px);
