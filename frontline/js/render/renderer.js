@@ -54,6 +54,7 @@ import { drawUnitTop, drawUnitShadowIso, drawWreckTop } from './unitpaint.js';
 import { drawShell, drawShellIso, drawShellTarget, drawEffect, drawEffectUp, drawCrater, drawWreck, drawWreckRubble, drawSmoke, drawSmokeScreen, drawFire, drawMine } from './fx.js';
 import { drawCityGround, drawCityTop, drawCityRoofs, cityBuildings, drawCityBadges } from './citylayer.js';
 import { drawWays } from './ways.js';
+import { drawSelectMark, drawDragFrame } from './marks.js';
 import { beginTownFrame, townLift } from './townhouses.js';
 
 const TILE = BALANCE.map.tile;
@@ -1366,26 +1367,9 @@ export class Renderer {
     ctx.restore();
   }
 
+  /** Auswahl (dashed = nur überfahren): gemalter Ring bzw. Rahmen am Boden (seit v5.50, marks.js). */
   drawSelectRing(ctx, e, color, z, dashed) {
-    ctx.save();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2 / z;
-    if (dashed) ctx.setLineDash([6 / z, 4 / z]);
-    if (e.kind === 'unit') {
-      ctx.beginPath();
-      ctx.arc(e.x, e.y, e.def.radius + 4, 0, Math.PI * 2);
-      ctx.stroke();
-    } else if (e.kind === 'house') {
-      ctx.strokeRect(e.x - e.pw / 2 - 3, e.y - e.ph / 2 - 3, e.pw + 6, e.ph + 6);
-    } else if (e.kind === 'crate') {
-      ctx.beginPath();
-      ctx.arc(e.x, e.y, 15, 0, Math.PI * 2);
-      ctx.stroke();
-    } else {
-      const half = (Math.max(e.w, e.h) * TILE) / 2 + 3;
-      ctx.strokeRect(e.x - half, e.y - half, half * 2, half * 2);
-    }
-    ctx.restore();
+    drawSelectMark(ctx, e, z, dashed, this.camera.iso, z * this.dpr);
   }
 
   /** Gestrichelte Routenlinie gewählter LKW von Start-FOB nach Ziel-FOB, mit Pfeilspitze am Ziel. */
@@ -1599,19 +1583,9 @@ export class Renderer {
     ctx.fillRect(cx - t, cy - a, t * 2, a * 2);
   }
 
-  /** Auswahlrahmen (Bildschirmkoordinaten, Transformation bereits auf DPR gesetzt). */
+  /** Auswahlrahmen (Bildschirmkoordinaten, Transformation bereits auf DPR gesetzt; gemalt seit v5.50, marks.js). */
   drawDragBox(ctx, d) {
-    const x = Math.min(d.x1, d.x2);
-    const y = Math.min(d.y1, d.y2);
-    const w = Math.abs(d.x2 - d.x1);
-    const h = Math.abs(d.y2 - d.y1);
-    ctx.save();
-    ctx.fillStyle = 'rgba(201,162,39,0.08)';
-    ctx.fillRect(x, y, w, h);
-    ctx.strokeStyle = ACCENT;
-    ctx.lineWidth = 1;
-    ctx.strokeRect(x + 0.5, y + 0.5, w, h);
-    ctx.restore();
+    drawDragFrame(ctx, d);
   }
 
   /** Grund für ungültige Platzierung, über dem Mauszeiger (Bildschirmkoordinaten). */
