@@ -147,7 +147,7 @@ Wo jedes Feature liegt. „KI“ = Konstanten-Präfix in `js/data/ai.js`, Logik 
 | KI allgemein | §10 | `difficulty` | – | `js/ai/ai.js` | – | `ai.test.js` |
 | Karteneditor, gespeicherte Karten | §9a | – | `mapdata.js` | – | `js/editor/editor.js`, `editor.html`, `css/editor.css` | `mapdata.test.js` |
 | Steuerung, Befehlskarte, HUD, Menüs, Hilfe | §8, §9 | – | – | – | `controller.js`, `input.js`, `hud.js`, `menu.js`, `status.js` | – |
-| Anzeigen auf der Karte (Auswahlring, Hover, Auswahlrahmen; nur Bild) | §9 „Aussehen der Anzeigen auf der Karte“ | – | – | – | `marks.js` (gemalt seit v5.50, Bilder über `spritecache.js`), aufgerufen aus `renderer.js` (`drawSelectRing`, `drawDragBox`) | `marks.test.js` |
+| Anzeigen auf der Karte (Auswahlring, Hover, Auswahlrahmen, Balken über den Einheiten, Heilkreuz, Kommandeursstern, Warnzeichen; nur Bild) | §9 „Aussehen der Anzeigen auf der Karte“ | – | – | – | `marks.js` (gemalt seit v5.50, Bilder über `spritecache.js`), aufgerufen aus `renderer.js` (`drawSelectRing`, `drawDragBox`, `drawHp`, `drawSupply`, `drawCare`) und `sprites.js` (`drawBar`, `drawStar`) | `marks.test.js` |
 | Kamera, Iso-Ansicht, Minimap | §9 | – | – | – | `camera.js`, `iso.js`, `renderer.js`, `minimap.js` | – |
 | Ton (Waffen, Einschläge, Wetter, Meldungen; synthetisiert, Schalter) | §14 | – | – (liest `game.effects`, Hinweis `snd` aus `addEffect`) | – | `js/audio/sound.js`, `main.js`, `hud.js` (Knopf), `menu.js` | `sound.test.js` |
 | Offline, Installation | §11 | – | – | – | `sw.js`, `manifest.json`, `icons/` | – |

@@ -54,7 +54,7 @@ import { drawUnitTop, drawUnitShadowIso, drawWreckTop } from './unitpaint.js';
 import { drawShell, drawShellIso, drawShellTarget, drawEffect, drawEffectUp, drawCrater, drawWreck, drawWreckRubble, drawSmoke, drawSmokeScreen, drawFire, drawMine } from './fx.js';
 import { drawCityGround, drawCityTop, drawCityRoofs, cityBuildings, drawCityBadges } from './citylayer.js';
 import { drawWays } from './ways.js';
-import { drawSelectMark, drawDragFrame } from './marks.js';
+import { drawSelectMark, drawDragFrame, drawCargoGauge, drawCareMark, drawNoAmmoMark } from './marks.js';
 import { beginTownFrame, townLift } from './townhouses.js';
 
 const TILE = BALANCE.map.tile;
@@ -1363,7 +1363,7 @@ export class Renderer {
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.fillText(text, x0 + 15, y + 0.5);
-    if (h.hp < h.maxHp) drawBar(ctx, x0, y0 + bh + 2, w, 3, h.hp / h.maxHp, hpColor(h.hp / h.maxHp));
+    if (h.hp < h.maxHp) drawBar(ctx, x0, y0 + bh + 2, w, 3, h.hp / h.maxHp, hpColor(h.hp / h.maxHp), 1);
     ctx.restore();
   }
 
@@ -1451,32 +1451,16 @@ export class Renderer {
     const x = u.x - BAR_W / 2;
     if (u.type === 'truck' && u.cargo) {
       const cap = BALANCE.logistics.truckCapacity;
-      const y = u.y + r + 4 / z;
-      ctx.fillStyle = 'rgba(0,0,0,0.7)';
-      ctx.fillRect(x, y, BAR_W, 3 / z);
-      let x0 = x;
-      for (const k of ['bm', 'mun', 'fuel']) {
-        const w = (BAR_W * u.cargo[k]) / cap;
-        if (w <= 0) continue;
-        ctx.fillStyle = CARGO_COLOR[k];
-        ctx.fillRect(x0, y, w, 3 / z);
-        x0 += w;
-      }
+      const parts = ['bm', 'mun', 'fuel'].map((k) => [u.cargo[k] / cap, CARGO_COLOR[k]]);
+      drawCargoGauge(ctx, x, u.y + r + 4 / z, BAR_W, 3 / z, parts, 1 / z);
     }
     if (picked) {
-      // unter dem Lebensbalken: Munition, dann Treibstoff (beide oberhalb des Sprites)
+      // unter dem Lebensbalken: Munition, dann Treibstoff (beide oberhalb des Sprites); die Platten schließen lückenlos an
       const y = u.y - r - HP_OFFSET / z;
-      if (u.def.ammoMax) drawBar(ctx, x, y + 5 / z, BAR_W, 3 / z, u.ammo / u.def.ammoMax, AMMO_COLOR);
-      if (u.def.fuelMax) drawBar(ctx, x, y + 9 / z, BAR_W, 3 / z, u.fuel / u.def.fuelMax, FUEL_COLOR);
+      if (u.def.ammoMax) drawBar(ctx, x, y + 5 / z, BAR_W, 3 / z, u.ammo / u.def.ammoMax, AMMO_COLOR, 1 / z);
+      if (u.def.fuelMax) drawBar(ctx, x, y + 9 / z, BAR_W, 3 / z, u.fuel / u.def.fuelMax, FUEL_COLOR, 1 / z);
     }
-    if (lacksAmmo(u)) {
-      ctx.save();
-      ctx.fillStyle = '#ff4d4d';
-      ctx.strokeStyle = 'rgba(0,0,0,0.7)';
-      ctx.lineWidth = 2 / z;
-      fitText(ctx, '!', u.x + r + 5 / z, u.y - r - 3 / z, 14, z);
-      ctx.restore();
-    }
+    if (lacksAmmo(u)) drawNoAmmoMark(ctx, u.x + r + 5 / z, u.y - r - 3 / z, z);
   }
 
   /** Sammelpunkt-Linie mit kleiner Flagge. */
@@ -1569,18 +1553,12 @@ export class Renderer {
   }
 
   drawHp(ctx, x, y, w, frac, z) {
-    drawBar(ctx, x, y, w, 4 / z, frac, hpColor(frac));
+    drawBar(ctx, x, y, w, 4 / z, frac, hpColor(frac), 1 / z, true);
   }
 
   /** Grünes Kreuz links neben dem Lebensbalken: die Einheit wird gerade geheilt oder repariert (Stadtgebäude, seit v5.01). */
   drawCare(ctx, x, y, z) {
-    const a = 4 / z;
-    const t = 1.4 / z;
-    const cx = x - a - 2 / z;
-    const cy = y + 2 / z;
-    ctx.fillStyle = '#3fd46a';
-    ctx.fillRect(cx - a, cy - t, a * 2, t * 2);
-    ctx.fillRect(cx - t, cy - a, t * 2, a * 2);
+    drawCareMark(ctx, x - 6 / z, y + 2 / z, z); // gemalt seit v5.52 (marks.js)
   }
 
   /** Auswahlrahmen (Bildschirmkoordinaten, Transformation bereits auf DPR gesetzt; gemalt seit v5.50, marks.js). */

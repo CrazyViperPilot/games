@@ -2,7 +2,8 @@
 // nur mit endlichen Zahlen und lesbaren Farben. Ohne Canvas (Node) malt marks.js direkt, darum sieht der Fake-Canvas jeden Strich.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { drawSelectMark, drawDragFrame } from '../js/render/marks.js';
+import { drawSelectMark, drawDragFrame, drawGauge, drawCargoGauge, drawStarMark, drawCareMark, drawNoAmmoMark } from '../js/render/marks.js';
+import { drawBar, drawStar } from '../js/render/sprites.js';
 
 /** Zeichenfläche, die jeden Aufruf annimmt und prüft, dass alle Zahlen endlich und alle Farben lesbar sind. */
 function fakeCtx() {
@@ -59,5 +60,30 @@ test('Auswahlrahmen beim Aufziehen: jede Richtung, auch winzig und leer', () => 
     const f = fakeCtx();
     drawDragFrame(f.ctx, d);
     if (d.x1 !== d.x2) assert.ok(f.calls.includes('strokeRect'));
+  }
+});
+
+test('Balken über den Einheiten: Leben mit Vierteln, Munition, Treibstoff, Ladung; jeder Anteil, auch kaputte Werte', () => {
+  for (const z of ZOOMS) {
+    for (const frac of [0, 0.25, 0.5, 1, -1, 7, NaN]) {
+      const f = fakeCtx();
+      drawGauge(f.ctx, 100, 50, 24, 4 / z, frac, '#6fd16a', 1 / z, true);
+      assert.ok(f.calls.filter((k) => k === 'fillRect').length >= 2, 'Platte und Füllung bzw. leerer Teil');
+      assert.ok(f.colors.some((c) => /rgba\(10,12,10/.test(c)), 'dunkle Platte');
+      const g = fakeCtx();
+      drawBar(g.ctx, 0, 0, 24, 3 / z, frac, '#7f93ad', 1 / z);
+      drawCargoGauge(g.ctx, 0, 0, 24, 3 / z, [[frac, '#a0703f'], [0.4, '#d9b600'], [0.9, '#9b7bc4']], 1 / z);
+    }
+  }
+});
+
+test('Stern, Heilkreuz und Warnzeichen: jede Größe und jeder Zoom endlich und lesbar', () => {
+  for (const z of ZOOMS) {
+    for (const draw of [(c) => drawStarMark(c, 10, 20, 8 / z, z), (c) => drawStar(c, 10, 20, 8 / z, z), (c) => drawCareMark(c, 10, 20, z), (c) => drawNoAmmoMark(c, 10, 20, z)]) {
+      const f = fakeCtx();
+      draw(f.ctx);
+      assert.ok(f.calls.includes('fill'), 'gefüllt');
+      assert.ok(f.colors.some((c) => /rgba\((8,12,10|30,20,0)/.test(c)), 'dunkler Saum');
+    }
   }
 });

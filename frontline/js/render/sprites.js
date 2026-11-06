@@ -1,5 +1,6 @@
 // Prozedurale Zeichnung von oben (docs/verlauf.md §5 render/sprites.js). Alle Funktionen zeichnen in Weltkoordinaten;
 // der Renderer setzt die Kamera-Transformation. `zoom` dient nur dazu, Linien und Schrift bildschirmstabil zu halten.
+import { drawGauge, drawStarMark } from './marks.js';
 import { BALANCE } from '../data/balance.js';
 import { UNITS } from '../data/units.js';
 import { BUILDINGS } from '../data/buildings.js';
@@ -59,13 +60,9 @@ export function fitText(ctx, text, x, y, px, zoom, maxW = Infinity) {
   ctx.fillText(text, x, y);
 }
 
-/** Lebensbalken (Welt-Maße). frac 0..1. */
-export function drawBar(ctx, x, y, w, h, frac, color) {
-  const f = clamp(frac, 0, 1);
-  ctx.fillStyle = 'rgba(0,0,0,0.7)';
-  ctx.fillRect(x, y, w, h);
-  ctx.fillStyle = color;
-  ctx.fillRect(x, y, w * f, h);
+/** Lebensbalken (Welt-Maße). frac 0..1; px = Weltlänge eines Bildschirmpixels, ticks = Viertel zeigen (gemalt seit v5.52, marks.js). */
+export function drawBar(ctx, x, y, w, h, frac, color, px = h / 3, ticks = false) {
+  drawGauge(ctx, x, y, w, h, frac, color, px, ticks);
 }
 
 /**
@@ -585,22 +582,9 @@ export function drawCrate(ctx, x, y, s = 16, zoom = 1, glow = 0) {
   ctx.restore();
 }
 
-/** Goldener Stern (Kommandeur) mit Mittelpunkt (x, y), Radius r (Welt-Maße). */
+/** Goldener Stern (Kommandeur) mit Mittelpunkt (x, y), Radius r (Welt-Maße); gemalt seit v5.52 (marks.js). */
 export function drawStar(ctx, x, y, r, zoom = 1) {
-  ctx.save();
-  ctx.beginPath();
-  for (let i = 0; i < 10; i++) {
-    const a = -Math.PI / 2 + (i * Math.PI) / 5;
-    const k = i % 2 ? r * 0.45 : r;
-    ctx.lineTo(x + Math.cos(a) * k, y + Math.sin(a) * k);
-  }
-  ctx.closePath();
-  ctx.fillStyle = GOLD;
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(60,40,0,0.85)';
-  ctx.lineWidth = 1 / zoom;
-  ctx.stroke();
-  ctx.restore();
+  drawStarMark(ctx, x, y, r, zoom);
 }
 
 // Granaten, Effekte, Rauch, Feuer, Krater und Trümmer: fx.js (seit v5.34)

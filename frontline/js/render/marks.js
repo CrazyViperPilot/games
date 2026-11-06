@@ -180,3 +180,191 @@ export function drawDragFrame(ctx, d) {
   }
   ctx.restore();
 }
+
+// ---------- Über den Einheiten (Gruppe 2, v5.52) ----------
+
+const clamp01 = (v) => (v > 0 ? (v < 1 ? v : 1) : 0);
+const PLATE = 'rgba(10,12,10,0.84)'; // dunkle Platte unter jedem Balken
+const TROUGH = '#3b4039'; // leerer Teil des Balkens
+const SHINE = 'rgba(255,255,255,0.3)'; // Glanz oben auf der Füllung
+
+/**
+ * Balken mit dunkler Platte (1 Bildschirmpixel Rand), dunkelgrauem leerem Teil, Füllung mit Glanzkante und auf Wunsch Vierteln
+ * (Lebensbalken). Weltmaße; px = Weltlänge eines Bildschirmpixels. Gestapelte Balken (Leben, Munition, Treibstoff) mit 1 px Abstand
+ * ergeben eine gemeinsame Platte. Nur Rechtecke, keine Verläufe (viele Einheiten je Bild).
+ */
+export function drawGauge(ctx, x, y, w, h, frac, color, px = h / 3, ticks = false) {
+  const f = clamp01(frac);
+  ctx.fillStyle = PLATE;
+  ctx.fillRect(x - px, y - px, w + 2 * px, h + 2 * px);
+  const fw = w * f;
+  if (f < 1) {
+    ctx.fillStyle = TROUGH;
+    ctx.fillRect(x + fw, y, w - fw, h);
+  }
+  if (fw > 0) {
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, fw, h);
+    ctx.fillStyle = SHINE;
+    ctx.fillRect(x, y, fw, h * 0.4);
+  }
+  if (ticks && w >= 20 * px) {
+    ctx.fillStyle = 'rgba(10,12,10,0.5)';
+    ctx.beginPath();
+    for (let k = 1; k < 4; k++) ctx.rect(x + (w * k) / 4 - px * 0.5, y, px, h);
+    ctx.fill();
+  }
+}
+
+/** LKW-Ladung: ein Balken mit den Sorten nebeneinander (parts = [[Anteil 0..1, Farbe], …]), gleiche Platte und Glanz. */
+export function drawCargoGauge(ctx, x, y, w, h, parts, px) {
+  ctx.fillStyle = PLATE;
+  ctx.fillRect(x - px, y - px, w + 2 * px, h + 2 * px);
+  ctx.fillStyle = TROUGH;
+  ctx.fillRect(x, y, w, h);
+  let x0 = x;
+  for (const [f, color] of parts) {
+    const pw = w * clamp01(f);
+    if (pw <= 0) continue;
+    ctx.fillStyle = color;
+    ctx.fillRect(x0, y, Math.min(pw, x + w - x0), h);
+    x0 += pw;
+    if (x0 >= x + w) break;
+  }
+  if (x0 > x) {
+    ctx.fillStyle = SHINE;
+    ctx.fillRect(x, y, Math.min(x0, x + w) - x, h * 0.4);
+  }
+}
+
+/** Kleines Zeichen in Bildschirmpixeln (einmal gemalt, Maßstab = Gerätepixel), mit Mittelpunkt bei Welt (x, y); z = Zoom. */
+function icon(ctx, key, r, x, y, z, paint) {
+  const dpr = spriteDpr();
+  const e = sprite(key, dpr, [-r, -r, r, r], (c, s) => {
+    c.scale(s, s);
+    paint(c);
+  });
+  if (e) {
+    blit(ctx, e, x, y, 1 / z);
+    return;
+  }
+  if (e === false) return;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(1 / z, 1 / z);
+  paint(ctx);
+  ctx.restore();
+}
+
+function starPath(c, r) {
+  c.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5;
+    const k = i % 2 ? r * 0.46 : r;
+    c.lineTo(Math.cos(a) * k, Math.sin(a) * k);
+  }
+  c.closePath();
+}
+
+/** Kommandeursstern: dunkler Saum, goldene Füllung, geschliffene Zacken (Licht von links oben), feiner Rand. r in Bildschirmpixeln. */
+function paintStar(c, r) {
+  c.lineJoin = 'round';
+  starPath(c, r);
+  c.strokeStyle = 'rgba(30,20,0,0.75)';
+  c.lineWidth = 3;
+  c.stroke();
+  c.fillStyle = '#e0ac2a';
+  c.fill();
+  // je Zacke die dem Licht zugewandte Hälfte heller
+  c.fillStyle = '#ffe489';
+  c.beginPath();
+  for (let i = 0; i < 5; i++) {
+    const a = -Math.PI / 2 + (i * 2 * Math.PI) / 5;
+    const lit = (k) => Math.cos(a + (k * Math.PI) / 10 + (Math.PI * 3) / 4); // Lichtrichtung links oben
+    const b = a + ((lit(-1) > lit(1) ? -1 : 1) * Math.PI) / 5; // Hälfte zur Lichtseite
+    c.moveTo(0, 0);
+    c.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    c.lineTo(Math.cos(b) * r * 0.46, Math.sin(b) * r * 0.46);
+    c.closePath();
+  }
+  c.fill();
+  starPath(c, r);
+  c.strokeStyle = '#7a5200';
+  c.lineWidth = 1;
+  c.stroke();
+  c.fillStyle = 'rgba(255,255,255,0.85)';
+  c.beginPath();
+  c.arc(-r * 0.12, -r * 0.18, Math.max(0.8, r * 0.12), 0, TAU);
+  c.fill();
+}
+
+/** Kommandeursstern mit Mittelpunkt (x, y) in Welt, r = Radius in Weltmaßen, zoom = Zoom (seit v5.52 gemalt). */
+export function drawStarMark(ctx, x, y, r, zoom = 1) {
+  const z = zoom || 1;
+  const rp = Math.round(r * z * 2) / 2;
+  icon(ctx, `star|${rp}`, rp + 3, x, y, z, (c) => paintStar(c, rp));
+}
+
+/** Grünes Kreuz mit weißem Rand und dunklem Saum: wird geheilt oder repariert. Mitte (x, y) in Welt. */
+export function drawCareMark(ctx, x, y, z) {
+  icon(ctx, 'care', 8, x, y, z, (c) => {
+    const a = 4.6;
+    const t = 1.8;
+    c.beginPath();
+    c.moveTo(-t, -a);
+    c.lineTo(t, -a);
+    c.lineTo(t, -t);
+    c.lineTo(a, -t);
+    c.lineTo(a, t);
+    c.lineTo(t, t);
+    c.lineTo(t, a);
+    c.lineTo(-t, a);
+    c.lineTo(-t, t);
+    c.lineTo(-a, t);
+    c.lineTo(-a, -t);
+    c.lineTo(-t, -t);
+    c.closePath();
+    c.lineJoin = 'round';
+    c.strokeStyle = 'rgba(8,12,10,0.7)';
+    c.lineWidth = 3.2;
+    c.stroke();
+    c.strokeStyle = '#f4fff6';
+    c.lineWidth = 1.4;
+    c.stroke();
+    c.fillStyle = '#3fd46a';
+    c.fill();
+  });
+}
+
+/** Warnzeichen „ohne Munition“: rotes Dreieck mit dunklem Saum und weißem Ausrufezeichen. Mitte (x, y) in Welt. */
+export function drawNoAmmoMark(ctx, x, y, z) {
+  icon(ctx, 'noammo', 11, x, y, z, (c) => {
+    const s = 7.6;
+    c.beginPath();
+    c.moveTo(0, -s);
+    c.lineTo(s * 0.98, s * 0.72);
+    c.lineTo(-s * 0.98, s * 0.72);
+    c.closePath();
+    c.lineJoin = 'round';
+    c.strokeStyle = 'rgba(8,12,10,0.8)';
+    c.lineWidth = 4;
+    c.stroke();
+    c.strokeStyle = '#ff4d4d';
+    c.lineWidth = 2;
+    c.stroke();
+    c.fillStyle = '#ff4d4d';
+    c.fill();
+    c.fillStyle = 'rgba(255,255,255,0.22)';
+    c.beginPath();
+    c.moveTo(0, -s);
+    c.lineTo(-s * 0.98, s * 0.72);
+    c.lineTo(0, s * 0.72);
+    c.closePath();
+    c.fill();
+    c.fillStyle = '#ffffff';
+    c.fillRect(-0.95, -s * 0.42, 1.9, s * 0.62);
+    c.beginPath();
+    c.arc(0, s * 0.42, 1.1, 0, TAU);
+    c.fill();
+  });
+}
