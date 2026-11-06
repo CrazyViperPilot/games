@@ -172,7 +172,7 @@ export function drawCityGround(ren, ctx, team, known, inRect) {
     if (k === 'runway' || k === 'taxi') continue; // Bahn und Rollfeld danach in einem Zug (drawAirfield, seit v5.37)
     if (k === 'road' || big === 'part') continue; // Straßen danach in einem Zug (drawRoads); Großbau zeichnet seine Mitte
     if (big) {
-      drawBigLot(ren, ctx, c, k, lv, r, team, ctr);
+      drawBigLot(ren, ctx, c, k, lv, r, ctr);
       continue;
     }
     groundRect(ren, ctx, r.x0 + 3, r.y0 + 3, r.x1 - 3, r.y1 - 3);
@@ -404,7 +404,7 @@ function drawLoads(ren, ctx, team, known, inRect) {
  * Grundstück eines Großbaus: ausgewiesen blass mit Fortschritt; gebaut die Universität als Pflaster mit vier Rasenflächen, die
  * anderen (Kraftwerk, Kaserne, Fabrikhalle, Fliegerhorst) mit ihrem Boden aus bigbuild.js (Bahnen, Höfe, Plätze). r: Ankerzelle, m: Mitte.
  */
-function drawBigLot(ren, ctx, c, k, lv, r, team, m) {
+function drawBigLot(ren, ctx, c, k, lv, r, m) {
   const h = (sizeOf(k) * c.cell) / 2;
   const x0 = m.x - h;
   const y0 = m.y - h;

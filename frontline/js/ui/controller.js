@@ -1161,7 +1161,7 @@ export class Controller {
   }
 
   /** Grund für Ausbildung in der Hauptstadt: Geld oder Einheitenlimit. */
-  trainReason(b, cost) {
+  trainReason(cost) {
     const money = this.moneyReason(cost);
     if (money) return money;
     return '';
@@ -1530,7 +1530,7 @@ export class Controller {
       else if (def.hero && hasCommander(this.game, ready.team)) reason = 'Nur ein Kommandeur je Team';
       else if (this.game.city && freePop(this.game, ready.team) < crewOf(u)) reason = 'Zu wenig freie Einwohner (Stadt: Wohnen ausbauen)';
       else if (this.game.city && this.game.city[ready.team].metal < (CITY.metalCost[u] ?? 0)) reason = 'Zu wenig Stahl (Stadt: Erzmine, Hütte und Stahlwerk oder Markt)';
-      else reason = trainCheck(this.game, ready, u) ?? (def.air && !def.jet ? heliTrainCheck(this.game, ready, u) : null) ?? this.trainReason(ready, def.cost); // Stellplatz bzw. Heliport: ein Luftfahrzeug je Platz
+      else reason = trainCheck(this.game, ready, u) ?? (def.air && !def.jet ? heliTrainCheck(this.game, ready) : null) ?? this.trainReason(def.cost); // Stellplatz bzw. Heliport: ein Luftfahrzeug je Platz
       card.push(
         entry(def.short || def.name, def.hotkey, {
           cost: costText(def.cost),

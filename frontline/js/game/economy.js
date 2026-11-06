@@ -74,12 +74,12 @@ export function updateEconomy(game, dt) {
       game.teams[b.team].stats.trained++; // Statistik: ausgebildet (Startarmee und Nachschub zählen nicht)
       if (game.city) u.crew = crewOf(type); // Stadt: die Einheit belegt Einwohner, solange sie lebt
       if (u.def.jet) {
-        parkNew(game, u, b); // Flugzeug: steht auf seinem Stellplatz (aircraft.js)
+        parkNew(u, b); // Flugzeug: steht auf seinem Stellplatz (aircraft.js)
         game.message(b.team, `${ut.name} bereit`, u.x, u.y);
         continue;
       }
       if (u.def.air && isHeliport(game, b)) {
-        landHeliNew(game, u, b); // Hubschrauber: steht gelandet auf seinem Heliport (helipad.js, seit v5.51)
+        landHeliNew(u, b); // Hubschrauber: steht gelandet auf seinem Heliport (helipad.js, seit v5.51)
         game.message(b.team, `${ut.name} bereit`, u.x, u.y);
         continue;
       }

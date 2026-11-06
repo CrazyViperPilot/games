@@ -903,7 +903,7 @@ export class Game {
       const k = this.city && trainerKind(cmd.unit);
       return fail(k ? `${UNITS[cmd.unit]?.name ?? 'Einheit'}: nur in der ${KIND_NAME[k]} der Stadt` : 'Nur die Hauptstadt bildet Einheiten aus');
     }
-    const jetNo = trainCheck(this, b, cmd.unit) ?? (UNITS[cmd.unit].air && !UNITS[cmd.unit].jet ? heliTrainCheck(this, b, cmd.unit) : null); // Stellplatz bzw. Heliport: ein Luftfahrzeug je Platz
+    const jetNo = trainCheck(this, b, cmd.unit) ?? (UNITS[cmd.unit].air && !UNITS[cmd.unit].jet ? heliTrainCheck(this, b) : null); // Stellplatz bzw. Heliport: ein Luftfahrzeug je Platz
     if (jetNo) return fail(jetNo);
     if (b.queue.length >= BALANCE.queueMax) return fail('Warteschlange ist voll');
     if (this.slotsUsed(team) + (UNITS[cmd.unit].slots ?? 1) > BALANCE.slotCap) return fail('Einheitenlimit erreicht');

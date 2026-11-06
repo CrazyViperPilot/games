@@ -336,7 +336,7 @@ function place(tool, x, y) {
   const py = clamp(snap(y), 0, H);
   if (BUILD_DEF[tool]) {
     const o = { x: px, y: py, ...BUILD_DEF[tool] };
-    placeAlongRail(o, tool, x, y);
+    placeAlongRail(o, x, y);
     m.town.buildings.push(o);
     return { k: 'building', o };
   }
@@ -441,7 +441,7 @@ function nearestRail(x, y, maxDist) {
 }
 
 /** Zugteile, Bahnsteige und Bahnhof richten sich nach dem nächsten Gleis aus. */
-function placeAlongRail(o, tool, x, y) {
+function placeAlongRail(o, x, y) {
   const lim = o.kind === 'train' ? 70 : o.kind === 'platform' ? 150 : 280;
   const r = nearestRail(x, y, lim);
   if (!r) return;

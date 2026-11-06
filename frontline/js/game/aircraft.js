@@ -65,10 +65,10 @@ const cellCenter = (c, i) => {
 
 /** Bahnen und Wege einer Stadt, neu bei jeder Änderung der Stadt (c.ver); Sperrzeiten in c.runwayBusy (gehören zum Spielstand). */
 const CACHE = new WeakMap();
-export function airOf(game, c) {
+export function airOf(c) {
   let st = CACHE.get(c);
   if (st && st.ver === c.ver) return st;
-  st = buildAir(game, c);
+  st = buildAir(c);
   CACHE.set(c, st);
   return st;
 }
@@ -115,7 +115,7 @@ function bestStrip(c, inG, q0, q1, r0, r1) {
  * runwayWidth × (≥ runwayMin) enthält (der längste ist die Bahn); die übrigen Zellen der Gruppe sind Rollfeld (apron) wie die
  * Zellen des Werkzeugs „Rollfeld“. Vorher musste die ganze Gruppe ein Rechteck genau runwayWidth breit sein.
  */
-function buildAir(game, c) {
+function buildAir(c) {
   const RW = KIND_ID.runway;
   const n = c.cols * c.rows;
   const seen = new Uint8Array(n);
@@ -177,7 +177,7 @@ function buildAir(game, c) {
 /** Bahnen eines Teams (gültige und ungültige, für Anzeige und KI). */
 export function runwaysOf(game, team) {
   const c = game.city?.[team];
-  return c ? airOf(game, c).runways : [];
+  return c ? airOf(c).runways : [];
 }
 
 /** Breitensuche über Straßen- und Bahnzellen von `starts` bis zur ersten Zelle mit goal(i); Weg als Zellenliste oder null. */
@@ -214,7 +214,7 @@ function cellPath(c, starts, goal) {
 export function standRoute(game, e) {
   const c = game.city?.[e.team];
   if (!c) return null;
-  const st = airOf(game, c);
+  const st = airOf(c);
   if (st.paths.has(e.id)) return st.paths.get(e.id);
   const cells = cellPath(c, accessCells(c, e.cityCell), (i) => st.byCell[i] > 0);
   const res = cells ? { cells, rw: st.runways[st.byCell[cells[cells.length - 1]] - 1] } : null;
@@ -267,7 +267,7 @@ function homeFor(game, u) {
 }
 
 /** Abgestellt: auf Stellplatz e (Mitte), Nase nach Norden. */
-function park(game, u, e) {
+function park(u, e) {
   u.x = e.x;
   u.y = e.y;
   u.prevX = e.x;
@@ -288,9 +288,9 @@ function park(game, u, e) {
 }
 
 /** Neue F-16 aus der Ausbildung (economy.js): steht gleich auf ihrem Stellplatz. */
-export function parkNew(game, u, e) {
+export function parkNew(u, e) {
   u.jet = { home: e.id, ready: false, warned: false };
-  park(game, u, e);
+  park(u, e);
   u.jet.ready = isFull(u);
 }
 
@@ -341,7 +341,7 @@ function taxi(game, u, dt) {
   if (p.enter && !u.jet.locked) {
     // Rand der Bahn: warten, bis sie frei ist, dann für den Start sperren
     const c = game.city[u.team];
-    const rw = airOf(game, c).runways.find((x) => x.key === p.enter);
+    const rw = airOf(c).runways.find((x) => x.key === p.enter);
     if (!rw || !lockRunway(game, c, rw, u)) return false;
     u.jet.locked = true;
   }
@@ -519,7 +519,7 @@ function stepRollout(game, u, dt) {
 /** Rollen zum Stellplatz; dort abstellen (tanken, nachladen). */
 function stepTaxiIn(game, u, dt) {
   if (lostWithStand(game, u)) return;
-  if (taxi(game, u, dt)) park(game, u, game.getEntity(u.jet.home));
+  if (taxi(game, u, dt)) park(u, game.getEntity(u.jet.home));
 }
 
 /** Ein Flugschritt Richtung (tx, ty): Nase höchstens turn × dt × tf drehen, dann mit dem Tempo des Jets geradeaus. */

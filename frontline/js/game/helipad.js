@@ -36,7 +36,7 @@ export function helisAt(game, e) {
 }
 
 /** Neuer Hubschrauber aus der Ausbildung (economy.js): steht gelandet auf seinem Heliport. */
-export function landHeliNew(game, u, e) {
+export function landHeliNew(u, e) {
   u.heli = { home: e.id, phase: 'landed', t: 0, alt: 0 };
   u.x = e.x;
   u.y = e.y;
@@ -46,7 +46,7 @@ export function landHeliNew(game, u, e) {
 }
 
 /** Sperrzeit nach Start oder Landung an Heliport e: mit Tower im Umkreis kürzer. */
-function sepOf(game, c, e) {
+function sepOf(c, e) {
   for (const [i, t] of c.ents) {
     if (t.alive && c.kind[i] === KIND_ID.atc && c.level[i] && dist(t.x, t.y, e.x, e.y) <= AIR.atcRadius * c.cell) return H.sepAtc;
   }
@@ -79,7 +79,7 @@ export function padBusy(game, e) {
 
 function lockPad(game, c, e, u) {
   c.padBusy ??= {};
-  c.padBusy[e.id] = { until: game.time + sepOf(game, c, e), by: u.id };
+  c.padBusy[e.id] = { until: game.time + sepOf(c, e), by: u.id };
 }
 
 /** Will der Befehl den gelandeten Hubschrauber in die Luft? (Landen auf dem eigenen Heliport nicht.) */
@@ -203,7 +203,7 @@ export function updateHelis(game, dt) {
 }
 
 /** Zusatzprüfung der Ausbildung am Heliport: ein Hubschrauber je Heliport. Fehlertext oder null. */
-export function heliTrainCheck(game, b, unit) {
+export function heliTrainCheck(game, b) {
   if (!isHeliport(game, b)) return null;
   return helisAt(game, b) > 0 ? 'Heliport belegt (ein Hubschrauber je Heliport)' : null;
 }

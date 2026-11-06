@@ -237,7 +237,7 @@ export class AI {
     this.rally(s);
     this.garrisonZone(s);
     this.stormHouses(s); // Häuser stürmen (seit v5.67)
-    this.fortifyHouses(s); // eigene Besatzungshäuser ausbauen (seit v5.67)
+    this.fortifyHouses(); // eigene Besatzungshäuser ausbauen (seit v5.67)
     if (!this.attackRadio(s)) this.army(s); // steht ein gegnerischer Sendemast, gilt ihm der ganze Angriff
     this.guardCommander(s);
     this.collectCrates(s); // nach der Welle: Kisten holen nur, die zurückbleiben (Reserve, Nachschub)
@@ -678,7 +678,7 @@ export class AI {
     let bestKey = Infinity;
     for (const b of s.producers) {
       if (!b.built || !b.produces.includes(type) || b.queue.length >= qmax) continue;
-      if (UNITS[type]?.air && !UNITS[type].jet && heliTrainCheck(this.game, b, type)) continue; // Heliport belegt (ein Hubschrauber je Heliport, seit v5.51)
+      if (UNITS[type]?.air && !UNITS[type].jet && heliTrainCheck(this.game, b)) continue; // Heliport belegt (ein Hubschrauber je Heliport, seit v5.51)
       const key = b.queue.length * 100000 + (towardZone ? dist(b.x, b.y, s.zone.x, s.zone.y) : b.id);
       if (key < bestKey) {
         bestKey = key;
@@ -1442,7 +1442,7 @@ export class AI {
    * Arbeit aus HOUSE_WORK_ORDER, wenn das Geld nach dem Preis noch HOUSE_WORK_RESERVE lässt. Je Takt höchstens ein Auftrag.
    * Nur Schwierigkeiten mit houseWorks.
    */
-  fortifyHouses(s) {
+  fortifyHouses() {
     const g = this.game;
     const t = this.team;
     if (!this.cfg.houseWorks || !g.houses?.length || !this.once('houseWork', HOUSE_WORK_EVERY)) return;

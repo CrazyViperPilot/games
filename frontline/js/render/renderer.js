@@ -380,8 +380,8 @@ export class Renderer {
     for (const a of g.animals ?? []) if (inRect(a.x, a.y, 20) && seen(a.x, a.y) && !drawAnimalTopP(ctx, a, z, now)) drawAnimalTop(ctx, a, z); // nur in Sicht
 
     // Auswahl und Hover (unter den Einheiten); Besatzer eines Hauses: Rahmen ums Haus
-    for (const e of this.ringed(sel)) if (shown(e)) this.drawSelectRing(ctx, e, '#f2f5f2', z, false);
-    if (hover && !sel.has(hover.id) && shown(hover)) this.drawSelectRing(ctx, hover, 'rgba(255,255,255,0.5)', z, true);
+    for (const e of this.ringed(sel)) if (shown(e)) this.drawSelectRing(ctx, e, z, false);
+    if (hover && !sel.has(hover.id) && shown(hover)) this.drawSelectRing(ctx, hover, z, true);
     this.drawRallies(f);
 
     for (const air of [false, true]) {
@@ -818,11 +818,11 @@ export class Renderer {
     for (const e of this.ringed(sel)) {
       if (!shown(e)) continue;
       if (relief) this.groundAt(ctx, e.x, e.y);
-      this.drawSelectRing(ctx, e, '#f2f5f2', z, false);
+      this.drawSelectRing(ctx, e, z, false);
     }
     if (hover && !sel.has(hover.id) && shown(hover)) {
       if (relief) this.groundAt(ctx, hover.x, hover.y);
-      this.drawSelectRing(ctx, hover, 'rgba(255,255,255,0.5)', z, true);
+      this.drawSelectRing(ctx, hover, z, true);
     }
     this.drawRallies(f);
   }
@@ -1525,7 +1525,7 @@ export class Renderer {
   }
 
   /** Auswahl (dashed = nur überfahren): gemalter Ring bzw. Rahmen am Boden (seit v5.50, marks.js). */
-  drawSelectRing(ctx, e, color, z, dashed) {
+  drawSelectRing(ctx, e, z, dashed) {
     drawSelectMark(ctx, e, z, dashed, this.camera.iso, z * this.dpr);
   }
 

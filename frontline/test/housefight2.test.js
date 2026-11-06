@@ -219,18 +219,18 @@ test('KI baut aus: Sandsäcke nur mit Geld für Preis und Reserve, Stacheldraht 
   // Die KI denkt je Takt einmal (memo): für jeden Schritt eine frische KI
   g.teams[0].res.money = sand + 400 - 1; // eine Münze zu wenig
   let ai = new AI(g, 0, 'normal');
-  ai.fortifyHouses(ai.snapshot());
+  ai.fortifyHouses();
   assert.equal(h.building, null, 'ohne Reserve kein Ausbau');
   g.teams[0].res.money = sand + 400;
   ai = new AI(g, 0, 'normal');
-  ai.fortifyHouses(ai.snapshot());
+  ai.fortifyHouses();
   assert.equal(h.building?.work, 'sandbags', 'mit Reserve: Sandsäcke');
   assert.equal(g.teams[0].res.money, 400, 'bezahlt');
   run(g, G.works.sandbags.time + 1);
   assert.equal(h.works.sandbags, true);
   g.teams[0].res.money = G.works.wire.cost.money + 400;
   ai = new AI(g, 0, 'normal');
-  ai.fortifyHouses(ai.snapshot());
+  ai.fortifyHouses();
   assert.equal(h.building?.work, 'wire', 'nächste fehlende Arbeit: Stacheldraht');
 });
 
@@ -239,7 +239,7 @@ test('KI baut aus: Leicht baut nie aus, auch mit Geld', () => {
   g.teams[0].res.money = 5000;
   const ai = new AI(g, 0, 'easy');
   assert.equal(ai.cfg.houseWorks, false);
-  ai.fortifyHouses(ai.snapshot());
+  ai.fortifyHouses();
   assert.equal(h.building, null);
 });
 
