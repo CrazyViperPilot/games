@@ -3,9 +3,9 @@
 // optional targets (Klassen, gegen die diese Waffe bevorzugt wird). Daraus entstehen range, damage (bester Wert je Klasse) und ammoMax.
 // Schadensklasse jet (seit v5.15) = Flugzeuge (F-16); fehlt sie, gilt air (Hubschrauber). Soldaten treffen keine Flugzeuge (jet: 0),
 // Panzer-MGs sehr wenig, Kampfhubschrauber mittel. parallel: true = alle Waffen feuern unabhängig, jede auf ihr eigenes Ziel (combat.js).
-// cost: fehlende Schlüssel = 0. Alle Einheiten entstehen in der Hauptstadt; hotkey: Taste im Ausbildungsmenü.
-// buildTime: Ausbildungsrate der Hauptstadt in Sekunden (eine Ausbildung nach der anderen).
-// fuelMax: Treibstoffvorrat. Alle Einheiten kosten nur Geld und starten voll munitioniert und betankt.
+// cost: fehlende Schlüssel = 0. Ausbildung in der Hauptstadt (ohne Stadt) oder in Kaserne, Fabrikhalle, Heliport (mit Stadt); hotkey: Taste im Ausbildungsmenü.
+// buildTime: Ausbildungszeit in Sekunden je Ausbildungsplatz (QUICK.trainSlots).
+// fuelMax: Treibstoffvorrat. Die Kosten sind Geld, mit Stadt zusätzlich Metall (CITY.metalCost); alle Einheiten starten voll munitioniert und betankt.
 // builder: 'all' = darf alle Gebäude bauen und reparieren, 'fort' = nur Mauer und Tor, fehlt = kein Bauen.
 // Treffer bis zum Abschuss je Ziel (Einheitentyp, sonst Panzerklasse): Zahl oder SIDES(vorn, seitlich, hinten).
 const SIDES = (front, side, rear) => ({ front, side, rear });

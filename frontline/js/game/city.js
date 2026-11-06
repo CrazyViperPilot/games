@@ -1296,7 +1296,7 @@ export function updateCity(game, dt) {
     const pop = c.popF;
     const pool = Math.max(0, pop - drafted); // Einwohner, die arbeiten können
 
-    // Wachstum der Zellen: Gebäude entstehen nur mit Straßenanschluss (Förderanlagen ohne), Ausbau nur bei Bedarf
+    // Wachstum der Zellen: Gebäude entstehen nur mit Straßenanschluss (auch Förderanlagen), Ausbau nur bei Bedarf
     let built = false;
     for (const i of c.list) {
       if (isPart(c, i)) continue; // Großbau wächst über seine Mitte
@@ -1853,7 +1853,7 @@ export function cmdCity(game, team, cmd) {
     return { ok: false, reason };
   }
   rebuildList(city);
-  // Zonen ohne Straße daneben wachsen nicht (Förderanlagen schon): melden
+  // Zonen ohne Straße daneben wachsen nicht (auch Förderanlagen): melden
   let noRoad = false;
   if (!erase && !isFlat(KIND_ID[cmd.kind])) {
     for (let row = r0; row <= r1 && !noRoad; row++) for (let col = c0; col <= c1; col++) if (city.kind[idx(city, col, row)] === id && !hasRoad(city, col, row)) noRoad = true;

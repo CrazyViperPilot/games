@@ -9,6 +9,7 @@ Spieler (Blau) gegen Computer (Rot). Vanilla JS, Canvas 2D und WebGL, kein Build
 | [ARCHITEKTUR.md](ARCHITEKTUR.md) | Aufbau des Codes: Schichten, Simulationsschritt, Datenmodelle, Befehle, Dateien |
 | [PRD.md](PRD.md) | Spielregeln, Steuerung (§8), KI (§10), Änderungsverlauf |
 | [docs/verlauf.md](docs/verlauf.md) | Ursprünglicher Umsetzungsplan (v1 bis v4.23), nur zum Nachlesen |
+| [docs/plan-v5.20.md](docs/plan-v5.20.md) | Umsetzungsplan Straßentransport (v5.20), historisch |
 
 Alle Spielwerte (Einheitenlimit, Geld pro Sekunde, Preise, Schaden …) stehen in `js/data/`; wo genau, sagt [CLAUDE.md](CLAUDE.md).
 Im Spiel zeigt **F1** oder **?** alle Tasten.
@@ -26,7 +27,7 @@ Spiel: `http://localhost:8765/frontline/` · Karteneditor: `http://localhost:876
 
 Über die URL:
 
-- `?debug=1`: Karte ist aufgedeckt (kein Nebel), Taste **M** gibt Team Blau +1000 aller Ressourcen,
+- `?debug=1`: Karte ist aufgedeckt (kein Nebel), Taste **M** gibt Team Blau +1000 Geld,
   Geschwindigkeit bis 10×.
 - `?seed=N`: feste Karte (gleicher Seed = gleiche Partie).
 - `?speed=N`: Startgeschwindigkeit.

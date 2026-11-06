@@ -83,4 +83,4 @@ export const FORT_WANT = { bm: 150, mun: 150 }; // zusätzlicher Soll-Lagerstand
 export const HELI_MIN_MONEY = 300; // seit v5.26: so viel über seinem Preis spart die KI auf den Transporthubschrauber (erst bei einer Festung), keine Kampfeinheiten bis dahin; gekauft wird ab seinem Preis
 export const JET_GROUP = 2; // so viele startbereite F-16 fliegen zusammen los (seit v5.03; Zahl der Jets und Reserve: CITY.ai.jets/jetReserve)
 export const JET_EVERY = 6; // s zwischen zwei Startbefehlen an die Jets
-export const JET_QUEUE = 2; // so viele F-16 höchstens in der Warteschlange eines Flughafens
+export const JET_QUEUE = 2; // so viele F-16 höchstens in der Warteschlange eines Fliegerhorsts

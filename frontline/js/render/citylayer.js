@@ -889,7 +889,7 @@ function drawRoads(ren, ctx, team, known) {
     u2x = (e2.x - o.x) / (1000 * z);
     u2y = (e2.y - o.y) / (1000 * z);
   }
-  // Fingerabdruck: alle Straßenzellen der Städte mit Sichtbarkeit, dazu die Ansicht (Stadtstraßen der Karte ändern sich nicht)
+  // Fingerabdruck: alle Straßenzellen der Städte mit Sichtbarkeit, dazu die Ansicht (Stadtstraßen der Karte ändern sich nur durch den Bagger)
   let h = 0;
   let n = g.roads ? 1 : 0;
   for (const c of g.city ?? []) {

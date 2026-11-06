@@ -230,7 +230,7 @@ export const BALANCE = {
   // Kampfflugzeuge (seit v5.03, PRD §6 „F-16“, §15 „Flughafen“): ein Flughafen bietet capacity Plätze. In der Luft dreht ein Jet
   // höchstens turn rad/s und kreist im Abstand orbit (px) um seinen Befehlspunkt. Er fliegt zurück, wenn der Treibstoff für den
   // Heimweg × reserve plus margin s nicht mehr reicht oder keine Rakete mehr da ist; landet über eine Platzrunde auf Bahn 2 (Werte unten).
-  // Am Boden in rearm s voll betankt und munitioniert (aus dem Lager der Hauptstadt) und repair × maxHp je s repariert.
+  // Am Boden tanken und munitionieren sie nach den Raten in CITY.air (Tank, Munitionslager); repair × maxHp je s wird repariert. Der Schlüssel rearm wird nicht gelesen.
   jets: {
     capacity: 20,
     turn: 2.4,

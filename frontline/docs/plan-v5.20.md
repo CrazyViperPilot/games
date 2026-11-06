@@ -1,6 +1,6 @@
 # Frontline – Umsetzungsplan v5.20: Straßentransport und Warenketten
 
-> **Umgesetzt in v5.20** (AP1 bis AP6). Dieser Plan bleibt als Nachweis; die Regeln stehen in [PRD.md](PRD.md) §15 „Straßentransport (seit v5.20)“, der Aufbau in [ARCHITEKTUR.md](ARCHITEKTUR.md). Wo Plan und Code abweichen, gilt der Code.
+> **Historisch, nicht mehr maßgeblich.** Umgesetzt in v5.20 (AP1 bis AP6). Die Regeln stehen in [../PRD.md](../PRD.md) §15 „Straßentransport (seit v5.20)“, der Aufbau in [../ARCHITEKTUR.md](../ARCHITEKTUR.md). Wo Plan und Code abweichen, gilt der Code; Abweichungen (z. B. Neuberechnung der Wege nur bei Änderung, gespeicherter Stau-Zustand, Tanken des F-16 am Flughafen) sind hier nicht nachgeführt.
 
 Daniels Wunsch: Die Straßen verbinden alles. Rohstoffe fahren über angeschlossene Straßen zum nächsten Werk und von dort weiter
 bis ins Lager. Neue Kette Erz → Roheisen → Stahl → Munition, zwei Raffinerien (Treibstoff für Fahrzeuge, Kerosin für Luftfahrzeuge),
