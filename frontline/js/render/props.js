@@ -1,5 +1,5 @@
 // Kleinkram der Karte gemalt (seit v5.43, Daniels Wunsch „eine Gruppe nach der anderen“): geparkte Autos (Limousine, Kombi,
-// Kleinwagen, Transporter), Parkbänke und Versorgungskisten. Autos und Bänke sind kleine 3D-Modelle aus Körpern wie die Einheiten
+// Kleinwagen, Transporter), Parkbänke und Versorgungskisten, seit v5.44 auch Heu- und Strohballen auf Weiden und Stoppelfeldern. Autos und Bänke sind kleine 3D-Modelle aus Körpern wie die Einheiten
 // (Mini-Renderer PAINT aus unitpaint.js, Licht der Gebäude), die Kiste ist mit den Bauteilen der Gebäude gemalt (isokit.js).
 // Jede Variante wird je Maßstab und Blickrichtung einmal in ein Bild gemalt (spritecache.js) und danach nur kopiert.
 // Iso: Autos in 4 Richtungen (sie stehen an x oder y ausgerichtet), Bänke in 16 Richtungen (folgen dem Rundweg), Kisten je Drehung.
@@ -13,7 +13,7 @@ import { box as kbox, FACE, flat, G, lit, onFace, OUTLINE, poly, rectF, stroke }
 
 const TAU = Math.PI * 2;
 const K = Math.SQRT1_2;
-const { box, cyl, loft, prX, prY, fine, paintSolids, boundsOf, viewAngle, sectorOf, nearKeys, getSprite, mix } = PAINT;
+const { box, cyl, loft, prX, prY, on, fine, paintSolids, boundsOf, viewAngle, sectorOf, nearKeys, getSprite, mix } = PAINT;
 const hashXY = (x, y) => (Math.imul(Math.round(x) | 0, 73856093) ^ Math.imul(Math.round(y) | 0, 19349663)) >>> 0;
 const SNOW = '#eef2f4';
 const seasonKey = (season) => (season === 'winter' ? 'w' : 's');
@@ -371,6 +371,85 @@ export function drawBenchTop(ctx, b, zoom = 1, season = 'summer') {
   const ms = benchModel('top', 's');
   const sh = sprite('bks', sc, boundsOf(ms, ms.S, 0, false), (cx, s) => paintSolids(cx, ms.S, 0, { iso: false, s, shadow: true }));
   placeTop(ctx, e, sh, b.x, b.y, benchYaw(b), 1, 1.6, (cx) => paintSolids(cx, m.S, 0, { iso: false, s: zoom }));
+  return true;
+}
+
+// ---------- Heu- und Strohballen (seit v5.44) ----------
+// Rundballen liegend, Achse entlang x (Modelleinheiten = Welt-Pixel), Lage und Richtung aus fields.js (fieldBales).
+
+const HAY = '#c2a65a';
+const STRAW = '#dcc88a';
+const BALE_R = 6.2;
+const BALE_L = 10.5;
+const BALE_N = 8; // Richtungen in Iso (der Ballen sieht von beiden Enden gleich aus)
+
+const baleModels = new Map();
+
+/**
+ * Ballen: glatter Zylinder mit gewickelten Ringen an der Stirnseite. v: 'top' (2D, ohne Stirnseiten) oder '+' / '-' (welches Ende
+ * im Iso-Bild vorn liegt: nur dort die Ringe, sonst schienen sie durch). season 'w': Schnee oben.
+ */
+function baleModel(kind, v, season) {
+  const key = `${kind}|${v}|${season}`;
+  let m = baleModels.get(key);
+  if (m) return m;
+  const col = kind === 'straw' ? STRAW : HAY;
+  const snow = season === 'w' ? { top: { col: SNOW, at: 0.55 } } : {};
+  const z = BALE_R;
+  const body = cyl([-BALE_L / 2, 0, z], [BALE_L / 2, 0, z], BALE_R, BALE_R, 16, col, snow);
+  const S = [body];
+  if (v !== 'top') {
+    const e = v === '+' ? 1 : -1;
+    const x = (e * BALE_L) / 2;
+    S.push(on(body, cyl([x, 0, z], [x + e * 0.05, 0, z], BALE_R * 0.78, BALE_R * 0.78, 16, mix(col, '#000000', 0.1))));
+    S.push(on(body, cyl([x + e * 0.05, 0, z], [x + e * 0.1, 0, z], BALE_R * 0.5, BALE_R * 0.5, 14, mix(col, '#ffffff', 0.08))));
+    S.push(on(body, cyl([x + e * 0.1, 0, z], [x + e * 0.15, 0, z], BALE_R * 0.22, BALE_R * 0.22, 10, mix(col, '#000000', 0.18))));
+  }
+  m = { S };
+  baleModels.set(key, m);
+  return m;
+}
+
+/** Ballen in Iso (Fuß am Weltpunkt) in 8 Richtungen. false = noch kein Bild. */
+export function drawBaleIso(ctx, cam, b, season = 'summer') {
+  const sec = sectorOf(viewAngle(cam, b.a), BALE_N);
+  const yaw = (sec / BALE_N) * TAU;
+  const sn = seasonKey(season);
+  const m = baleModel(b.kind, nearEnd(yaw) > 0 ? '+' : '-', sn);
+  const f = cam.zoom;
+  const make = (k) => `bl|${b.kind}|${sn}|${k}`;
+  const e = getSprite(make(sec), f * spriteDpr(), boundsOf(m, m.S, yaw, true), (cx, s) => paintSolids(cx, m.S, yaw, { iso: true, s }), nearKeys(make, sec, BALE_N));
+  if (e === false) return false;
+  const p = cam.worldToScreen(b.x, b.y);
+  if (e) blit(ctx, e, p.x, p.y, f);
+  else {
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    paintSolids(ctx, m.S, yaw, { iso: true, s: f });
+    ctx.restore();
+  }
+  return true;
+}
+
+/** Iso: Schatten eines Ballens (Umriss von oben am Boden). false = noch kein Bild. */
+export function drawBaleShadowIso(ctx, cam, b, dpr) {
+  const m = baleModel('hay', 'top', 's');
+  const e = sprite('bls', cam.zoom * spriteDpr(), boundsOf(m, m.S, 0, false), (cx, s) => paintSolids(cx, m.S, 0, { iso: false, s, shadow: true }));
+  if (!e) return false;
+  groundShadow(ctx, cam, dpr, e, b.x, b.y, b.a, 1, 0.3);
+  return true;
+}
+
+/** Ballen von oben (2D, Weltkoordinaten). false = noch kein Bild. */
+export function drawBaleTop(ctx, b, zoom = 1, season = 'summer') {
+  const sn = seasonKey(season);
+  const m = baleModel(b.kind, 'top', sn);
+  const sc = zoom * spriteDpr();
+  const e = sprite(`blt|${b.kind}|${sn}`, sc, boundsOf(m, m.S, 0, false), (cx, s) => paintSolids(cx, m.S, 0, { iso: false, s }));
+  if (e === false) return false;
+  const ms = baleModel('hay', 'top', 's');
+  const sh = sprite('bls', sc, boundsOf(ms, ms.S, 0, false), (cx, s) => paintSolids(cx, ms.S, 0, { iso: false, s, shadow: true }));
+  placeTop(ctx, e, sh, b.x, b.y, b.a, 1, 2.2, (cx) => paintSolids(cx, m.S, 0, { iso: false, s: zoom }));
   return true;
 }
 

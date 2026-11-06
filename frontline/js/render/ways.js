@@ -5,8 +5,9 @@
 // kreuzt, liegt der Weg über den Schwellen und die Schienen bleiben sichtbar. Herbst etwas dunkler mit Laub, Winter verschneit
 // (Spuren matschig, Schienen blank). Die Muster Asphalt und Gehwegplatten (groundPattern) nutzen auch Stadtstraßen und Brücken.
 // Pfade je Kachel (1024 px) zwischengespeichert und je Bild nur die sichtbaren Kacheln gefüllt; neu gebaut, wenn sich Drehung oder
-// Gelände ändern (wie die Stadtstraßen in citylayer.js). Nur Darstellung.
+// Gelände ändern (wie die Stadtstraßen in citylayer.js). Seit v5.44 kommen davor die Äcker und Weiden (fields.js). Nur Darstellung.
 import { railList, roadJunctions } from './terrain.js';
+import { buildFields, drawFieldLayers } from './fields.js';
 
 const CHUNK = 1024; // Kachel der Pfade (Weltpixel)
 const STEP = 24; // Abtastung entlang der Wege (unregelmäßige Ränder, Gelände)
@@ -488,7 +489,7 @@ export function buildWays(map, relief, u) {
 
 // ---------- Zeichnen ----------
 
-const cache = { key: '', map: null, relief: null, chunks: null };
+const cache = { key: '', map: null, relief: null, chunks: null, fields: null };
 
 /** Füllfarbe einer Ebene: Muster (an die Bodenebene angepasst) oder einfache Farbe. */
 function fillOf(ctx, layer, season, mat, z) {
@@ -531,7 +532,7 @@ export function drawWays(ren, ctx, season = 'summer') {
   const g = ren.game;
   const map = g.map;
   if (typeof Path2D === 'undefined') return;
-  if (!map.town?.roads?.some((r) => r.dirt) && !railList(map.town).length) return;
+  if (!map.town?.roads?.some((r) => r.dirt) && !railList(map.town).length && !map.town?.fields?.length) return;
   const cam = ren.camera;
   const drape = ren.draping();
   const z = cam.zoom;
@@ -552,6 +553,7 @@ export function drawWays(ren, ctx, season = 'summer') {
     cache.map = map;
     cache.relief = drape ? cam.relief : null;
     cache.chunks = buildWays(map, drape ? cam.relief : null, u);
+    cache.fields = buildFields(map, drape ? cam.relief : null, u);
   }
   const R = cam.visibleRect();
   const pad = 64;
@@ -561,11 +563,15 @@ export function drawWays(ren, ctx, season = 'summer') {
   const r1 = Math.floor((R.y1 + pad) / CHUNK);
   const shown = [];
   for (const c of cache.chunks.values()) if (c.cx >= c0 && c.cx <= c1 && c.cy >= r0 && c.cy <= r1) shown.push(c);
-  if (!shown.length) return;
   ctx.save();
   if (drape) ctx.setTransform(ren.dpr * z, 0, 0, ren.dpr * z, ren.dpr * ax, ren.dpr * ay);
   const sc = TEX / TEX_PX;
   const mat = typeof DOMMatrix !== 'undefined' ? (u ? new DOMMatrix([u[0] * sc, u[1] * sc, u[2] * sc, u[3] * sc, 0, 0]) : new DOMMatrix([sc, 0, 0, sc, 0, 0])) : null;
+  drawFieldLayers(ctx, cache.fields, R, season, mat, z); // Äcker und Weiden unter den Wegen (seit v5.44)
+  if (!shown.length) {
+    ctx.restore();
+    return;
+  }
   const fine = z >= 0.45; // Schwellen und Glanz nur nah genug
   for (const layer of ORDER) {
     if (!fine && (layer === 'sleeper' || layer === 'sleeperShade' || layer === 'railTop' || layer === 'crown')) continue;

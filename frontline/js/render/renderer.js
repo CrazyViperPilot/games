@@ -36,7 +36,8 @@ import { drawCityHallTop } from './cityhall.js';
 import { drawTownBuilding, drawTeamBuilding, drawCar, drawBench, drawRubble, drawCrate, drawWreckBox } from './isobuild.js';
 import { parkDeco } from './terrain.js';
 import { drawUnitSprite, drawWreckSprite } from './isosprites.js';
-import { drawMapCarIso, drawMapCarShadowIso, drawBenchIso, drawBenchShadowIso, drawCrateIso, drawCrateTop as drawCratePainted } from './props.js';
+import { drawMapCarIso, drawMapCarShadowIso, drawBenchIso, drawBenchShadowIso, drawCrateIso, drawCrateTop as drawCratePainted, drawBaleIso, drawBaleShadowIso, drawBaleTop } from './props.js';
+import { fieldBales } from './fields.js';
 import { drawTreeIso, drawTreeTop, drawBushIso, drawBushTop, drawRockIso, drawRockTop, natureShadowIso, drawAnimalIso, drawAnimalTopP, forestKind, forestSpecies } from './nature.js';
 import { drawMilTop, setMilWalls } from './milbuild.js';
 import { scarAlpha } from '../game/scars.js';
@@ -432,6 +433,10 @@ export class Renderer {
     const g = this.game;
     const season = this.season;
     const gone = (x, y) => g.city && treeGone(g, x, y);
+    for (const f of g.map.town?.fields ?? []) {
+      if (!inRect(f.x, f.y, Math.max(f.w, f.h) / 2 + 20)) continue;
+      for (const b of fieldBales(f)) if ((!b.only || b.only === season) && inRect(b.x, b.y, 20) && !gone(b.x, b.y)) drawBaleTop(ctx, b, z, season); // Ballen (seit v5.44)
+    }
     for (const o of this.deco.rocks) if (inRect(o.x, o.y, o.r + 30)) drawRockTop(ctx, o, season, z);
     for (const b of this.deco.bushes) if (inRect(b.x, b.y, 24) && !gone(b.x, b.y)) drawBushTop(ctx, b, season, z);
     for (const list of [g.map.trees ?? [], this.deco.trees]) {
@@ -617,6 +622,13 @@ export class Renderer {
       for (const t of d.trees) items.push({ k: cam.depth(t.x, t.y), t: 1, o: t });
       for (const b of d.benches) items.push({ k: cam.depth(b.x, b.y), t: 7, o: b });
     }
+    // Heu- und Strohballen auf Weiden und Stoppelfeldern (seit v5.44, fields.js / props.js)
+    for (const f of town?.fields ?? []) {
+      if (!inRect(f.x, f.y, Math.max(f.w, f.h) / 2 + 20)) continue;
+      for (const b of fieldBales(f)) {
+        if ((!b.only || b.only === this.season) && inRect(b.x, b.y, 30) && !gone(b.x, b.y)) items.push({ k: cam.depth(b.x, b.y), t: 14, o: b });
+      }
+    }
     for (const o of this.deco.rocks) if (inRect(o.x, o.y, PAD)) items.push({ k: cam.depth(o.x, o.y), t: 2, o });
     const small = z < 0.6; // weit herausgezoomt: Unterholz im Wald weglassen (winzig, unter den Kronen)
     for (const b of this.deco.bushes) if (inRect(b.x, b.y, 40) && !(small && b.under) && !gone(b.x, b.y)) items.push({ k: cam.depth(b.x, b.y), t: 13, o: b });
@@ -679,12 +691,13 @@ export class Renderer {
     }
     ctx.fillStyle = 'rgba(10,18,8,0.24)';
     ctx.fill();
-    // Schatten der geparkten Autos und Bänke: Umriss von oben am Boden (seit v5.43, props.js)
+    // Schatten der geparkten Autos, Bänke (seit v5.43) und Ballen (seit v5.44): Umriss von oben am Boden (props.js)
     for (const it of items) {
-      if (it.t !== 6 && it.t !== 7) continue;
+      if (it.t !== 6 && it.t !== 7 && it.t !== 14) continue;
       if (relief) cam.pin(this.baseHeight(it));
       if (it.t === 6) drawMapCarShadowIso(ctx, cam, it.o, dpr);
-      else drawBenchShadowIso(ctx, cam, it.o, dpr);
+      else if (it.t === 7) drawBenchShadowIso(ctx, cam, it.o, dpr);
+      else drawBaleShadowIso(ctx, cam, it.o, dpr);
       cam.unpin();
     }
     for (const it of items) {
@@ -722,6 +735,7 @@ export class Renderer {
       else if (it.t === 13) drawBushIso(ctx, cam, it.o, this.season);
       else if (it.t === 6) { if (!drawMapCarIso(ctx, cam, it.o, this.season)) drawCar(ctx, cam, it.o); } // gemalt (props.js, seit v5.43)
       else if (it.t === 7) { if (!drawBenchIso(ctx, cam, it.o, this.season)) drawBench(ctx, cam, it.o); }
+      else if (it.t === 14) drawBaleIso(ctx, cam, it.o, this.season);
       else if (it.t === 8) {
         const s = it.o.ground ? 16 : 13;
         if (!drawCrateIso(ctx, cam, it.o.x, it.o.y, s, 0, it.o.ground ? glow : 0)) drawCrate(ctx, cam, it.o.x, it.o.y, s, 0, it.o.ground ? glow : 0);
