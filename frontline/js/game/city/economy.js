@@ -17,7 +17,7 @@ function scratchOf(c) {
   let w = SCRATCH.get(c);
   if (!w) {
     const n = c.cols * c.rows;
-    w = { arr: new Float64Array(n), eff: new Float64Array(n), anchors: new Int32Array(n) };
+    w = { arr: new Float64Array(n), eff: new Float64Array(n), room: new Float64Array(n), anchors: new Int32Array(n) };
     SCRATCH.set(c, w);
   }
   return w;
@@ -196,7 +196,7 @@ function produce(game, c, id, P, dt) {
   const W = scratchOf(c);
   // Arbeitsstand des Schritts für die Phasen unten: eff je Gebäude, arr = Ankunft am Eingang je Gebäude (Rate je s, nur für Werke und
   // Förderung gelesen), anchors = fertige Gebäude (Anker, ohne Straßen und Teile von Großbauten), einmal gesammelt
-  const x = { c, s, tr, dt, fill, eff: W.eff, arr: W.arr, anchors: W.anchors, nA: 0, main: null, credit: false };
+  const x = { c, s, tr, dt, fill, eff: W.eff, arr: W.arr, room: W.room, anchors: W.anchors, nA: 0, main: null, credit: false };
   for (const i of c.list) {
     if (!c.level[i] || isPart(c, i) || isFlat(c.kind[i])) continue;
     x.anchors[x.nA++] = i;
@@ -218,6 +218,7 @@ function produce(game, c, id, P, dt) {
   s.uni = t.uni;
   s.dc = t.dc;
   workEffect(x, fill * s.powerRatio * mood);
+  intakeRoom(x);
   extract(x);
   runWorks(x);
   s.iron = s.gross.iron;
@@ -289,9 +290,53 @@ function workEffect(x, base) {
   }
 }
 
-/** Förderung: Rohstoff je Förderanlage, Fluss zum nächsten Ziel (Werk); ohne Weg geht er verloren. */
+/** Freie Abnahme je Werk (seit v5.75): Rohstoff bzw. Roheisen je s, den es bei voller Leistung verarbeitet (vor der Förderung). */
+function intakeRoom(x) {
+  const { c, eff, room, anchors, nA } = x;
+  for (let m = 0; m < nA; m++) {
+    const i = anchors[m];
+    const k = KINDS[c.kind[i] - 1];
+    if (!WORK_ORDER.includes(k)) continue;
+    const prod = CITY.chain[k].to;
+    room[i] = CITY.jobs[c.level[i]] * eff[i] * CITY.yield[prod] * CITY.convert[prod];
+  }
+}
+
+/**
+ * Lieferung auf die Zielwerke verteilen (seit v5.75, Daniels Wunsch „nach vorhandener Abnahmekapazität“): rate je s des Lieferanten a
+ * geht anteilig nach freier Abnahme (room) an alle erreichbaren Zielwerke, höchstens so viel, wie jedes noch nimmt; was alle voll
+ * übrig lassen, fährt wie bisher zum nächsten. Last auf jedem benutzten Weg. Rückgabe: verlorene Menge (ohne erreichbares Werk alles).
+ */
+function distribute(x, a, rate) {
+  const { tr, arr, room } = x;
+  const list = tr.alts?.get(a) ?? [];
+  if (!list.length) return rate;
+  if (rate <= 0) return 0;
+  let free = 0;
+  for (const r of list) free += room[r.to];
+  let left = rate;
+  if (free > 1e-9) {
+    const part = Math.min(1, rate / free);
+    for (const r of list) {
+      const amt = room[r.to] * part;
+      if (amt <= 0) continue;
+      room[r.to] -= amt;
+      left -= amt;
+      addLoad(tr, r.path, amt);
+      arr[r.to] += amt * pathEff(tr, r.path);
+    }
+  }
+  if (left > 1e-12) {
+    const r = list[0]; // Überschuss: zum nächsten Werk (es staut sich dort wie bisher)
+    addLoad(tr, r.path, left);
+    arr[r.to] += left * pathEff(tr, r.path);
+  }
+  return 0;
+}
+
+/** Förderung: Rohstoff je Förderanlage, verteilt auf die erreichbaren Zielwerke (distribute); ohne Weg geht er verloren. */
 function extract(x) {
-  const { c, s, tr, eff, arr, anchors, nA } = x;
+  const { c, s, eff, anchors, nA } = x;
   const MINE = KIND_ID.mine;
   for (let m = 0; m < nA; m++) {
     const i = anchors[m];
@@ -301,11 +346,7 @@ function extract(x) {
     if (!d) continue;
     const rawRate = CITY.jobsMine[lv] * eff[i] * CITY.extract[d];
     s.raw[d] += rawRate;
-    const r = tr.routes.get(i);
-    const p = r ? r.path : null;
-    addLoad(tr, p, rawRate);
-    if (!p) s.lost += rawRate;
-    else arr[r.to] += rawRate * pathEff(tr, p);
+    s.lost += distribute(x, i, rawRate);
   }
 }
 
@@ -332,11 +373,14 @@ function runWorks(x) {
       const kept = PICKUP.has(k) ? stockAtWork(c, i, prod, out, dt) : 0;
       const rest = out - kept;
       const r = tr.routes.get(i);
+      if (r && r.to !== 'main' && r.to !== null) {
+        s.lost += distribute(x, i, rest); // Roheisen auf die Stahlwerke verteilt (seit v5.75)
+        continue;
+      }
       const p = r && (r.to !== 'main' || credit) ? r.path : null;
       addLoad(tr, p, rest);
       if (!p) s.lost += rest;
-      else if (r.to === 'main') s[prod] += rest * pathEff(tr, p); // Ankunft im Lager (bm, fuel, kero, metal = Stahl)
-      else arr[r.to] += rest * pathEff(tr, p); // Roheisen zum Stahlwerk
+      else s[prod] += rest * pathEff(tr, p); // Ankunft im Lager (bm, fuel, kero, metal = Stahl)
     }
   }
 }

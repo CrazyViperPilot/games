@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
 import { CITY } from '../js/data/city.js';
-import { cellsOf, anchorOf, canZone, roadAt, accessCells, cellRect, isPart } from '../js/game/city/cells.js';
+import { cellsOf, anchorOf, canZone, roadAt, accessCells, cellRect, isPart, DEPOSITS } from '../js/game/city/cells.js';
 import { KIND_ID } from '../js/data/citykinds.js';
 import { UNITS } from '../js/data/units.js';
 import { transportOf, transportInfo, mainAccess, pathEff, addLoad, beginLoads, settleLoads } from '../js/game/transport.js';
@@ -488,4 +488,29 @@ test('Ohne Hauptstadt (zerstört): Werke liefern nichts ins Lager, Munitionswerk
   assert.equal(c.metal, metal0, 'Stadtlager unverändert');
   assert.equal(s.shopSupply, 0, 'Gewerbe ohne Waren');
   for (const v of [s.money, s.jam, s.lost, s.shop, s.happy]) assert.ok(Number.isFinite(v), `Zahl ${v}`);
+});
+
+test('Öl wird nach freier Abnahme auf Raffinerie und Kerosin-Raffinerie verteilt (seit v5.75), nicht nur an die nächste', () => {
+  const g = new Game({ seed: 3, city: true, startMoney: 5000 });
+  const c = netBase(g);
+  put(g, 'fuel', 5, 1, 6, 2); // Raffinerie nah an der Ölquelle
+  put(g, 'kero', 7, 1, 8, 2); // Kerosin-Raffinerie daneben, etwas weiter weg
+  c.deposit[at(g, 5, 4)] = DEPOSITS.indexOf('oil') + 1; // Öl (Test)
+  put(g, 'mine', 5, 4, 5, 4);
+  linkRoad(g, at(g, 5, 4));
+  run(g, CITY.growTime + 20);
+  const fuel = finishKind(g, 'fuel');
+  const kero = finishKind(g, 'kero');
+  const alts = transportOf(g, c).alts;
+  const mine = anchorOf(c, at(g, 5, 4));
+  assert.ok(mine != null, 'Ölquelle mit Lieferwegen');
+  assert.deepEqual(alts.get(mine).map((r) => r.to).sort(), [fuel, kero].sort(), 'beide Raffinerien erreichbar');
+  run(g, 3);
+  assert.ok(c.stats.raw.oil > 0, 'Öl gefördert');
+  assert.ok(c.stats.inp.fuel > 0, 'Raffinerie bekommt Öl');
+  assert.ok(c.stats.inp.kero > 0, 'Kerosin-Raffinerie bekommt auch Öl');
+  // vorher ging alles an die nähere Raffinerie; jetzt bekommt die Kerosin-Raffinerie einen spürbaren Anteil
+  const f = c.stats.inp.fuel * CITY.convert.fuel;
+  const k = c.stats.inp.kero * CITY.convert.kero;
+  assert.ok(k / (f + k) > 0.15, `Verteilung Treibstoff ${f.toFixed(2)} / Kerosin ${k.toFixed(2)}`);
 });

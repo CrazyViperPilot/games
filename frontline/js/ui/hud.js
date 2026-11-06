@@ -608,6 +608,7 @@ export class Hud {
       const T = transportInfo(g, c, i);
       if (T.to) {
         h += line(`Liefert an: ${T.to} (${T.dist} ${T.dist === 1 ? 'Feld' : 'Felder'}) · Weg ${pct(T.eff)}`);
+        if (T.targets?.length > 1) h += line(`Verteilt auf ${T.targets.length} Werke nach freier Abnahme: ${T.targets.join(', ')}`);
       } else {
         const d = k === 'mine' ? DEPOSITS[c.deposit[i] - 1] : k === 'smelter' ? 'smelter' : null;
         h += warn(`Kein Straßenweg ${d ? TO[d] : 'zum Lager'}: die Ware geht verloren`);

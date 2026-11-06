@@ -280,9 +280,14 @@ function build(game, c, tr) {
   }
   const mainSrc = { cells: mainAccess(game, c), owner: MAIN };
   for (const g of ['bm', 'smelter', 'steel', 'oil', 'res']) nearestField(c, src[g], tr.cap, tr.fields[g]);
+  // Alle erreichbaren Zielwerke je Lieferant (seit v5.75): ein Breitensuche-Feld je Werk; die Lieferung wird in updateCity nach freier
+  // Abnahme aufgeteilt (Öl auf Raffinerie und Kerosin-Raffinerie, Holz und Stein auf alle BM-Werke …)
+  const perWork = {};
+  for (const g of ['bm', 'smelter', 'steel', 'oil']) perWork[g] = src[g].map((s) => ({ owner: s.owner, field: nearestField(c, [s], tr.cap) }));
   nearestField(c, [mainSrc], tr.cap, tr.fields.main);
 
   const routes = new Map();
+  const alts = new Map();
   const commute = new Map();
   const mun = new Map();
   const shop = new Map();
@@ -291,12 +296,23 @@ function build(game, c, tr) {
     const k = KINDS[c.kind[a] - 1];
     const g = groupOf(c, a);
     if (g) routes.set(a, routeOf(c, tr, a, g));
+    if (g && perWork[g]) {
+      const acc = accessCells(c, a);
+      const list = [];
+      for (const w of perWork[g]) {
+        const hit = pathFrom(w.field, acc);
+        if (hit) list.push({ to: w.owner, path: hit.path, dist: hit.path.length });
+      }
+      list.sort((p, q) => p.dist - q.dist || p.to - q.to); // nächstes zuerst, bei Gleichstand nach Anker (fest)
+      alts.set(a, list);
+    }
     if (WORKPLACE_KINDS.includes(k)) commute.set(a, pathFrom(tr.fields.res, accessCells(c, a))?.path ?? null);
     if (k === 'mun') mun.set(a, pathFrom(tr.fields.main, accessCells(c, a))?.path ?? null);
     if (k === 'com' || k === 'market') shop.set(a, pathFrom(tr.fields.main, accessCells(c, a))?.path ?? null);
     if (k === 'ktank' || k === 'mdepot') depot.set(a, pathFrom(tr.fields.main, accessCells(c, a))?.path ?? null); // Fliegerhorst (seit v5.35)
   }
   tr.routes = routes;
+  tr.alts = alts;
   tr.commute = commute;
   tr.mun = mun;
   tr.shop = shop;
@@ -308,7 +324,8 @@ function build(game, c, tr) {
  * Ruinen, seit v5.20 auch Flucht und Rückkehr der Bewohner), die Hauptstadt oder c.mapRoads ändern. Die Wege hängen nur vom Stand der
  * Stadt ab: ein geladener Spielstand ergibt dieselben Wege, und Aufrufe der Anzeige ändern nichts am Spiel.
  * Liefert { routes, commute, mun, shop, load, factor, cap, list, active, nActive }:
- *   routes:  Map<Anker, { to: Anker | 'main' | null, path: Int32Array | null, dist }>  Lieferweg je Förderung und Werk
+ *   routes:  Map<Anker, { to: Anker | 'main' | null, path: Int32Array | null, dist }>  Lieferweg je Förderung und Werk (zum nächsten Ziel)
+ *   alts:    Map<Anker, [{ to, path, dist }]>  alle erreichbaren Zielwerke je Förderung bzw. Hütte, nächstes zuerst (seit v5.75)
  *   commute: Map<Anker, Int32Array | null>  Pendlerweg je Arbeitsstätte (null = kein Wohnen erreichbar)
  *   mun:     Map<Anker, Int32Array | null>  Weg Munitionswerk → Lager
  *   shop:    Map<Anker, Int32Array | null>  Weg Gewerbe/Markt → Lager
@@ -358,6 +375,8 @@ export function transportInfo(game, c, anker) {
     noHome = p === null;
     commuteEff = pathEff(tr, p);
   }
-  return { to, dist, eff, commuteEff, noHome };
+  // Alle erreichbaren Zielwerke (seit v5.75): die Lieferung wird nach freier Abnahme auf sie verteilt
+  const targets = (tr.alts?.get(anker) ?? []).map((x) => KIND_NAME[KINDS[c.kind[x.to] - 1]]);
+  return { to, dist, eff, commuteEff, noHome, targets };
 }
 
