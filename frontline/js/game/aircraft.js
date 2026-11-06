@@ -580,8 +580,8 @@ function approach(game, u, e, dt) {
   const head = Math.cos(hd); // 1 = Nase in Landerichtung
   const full = u.jet.speed;
   const near = dist(u.x, u.y, P.tx, P.ty) < J.final * 2.5;
-  const aligned = head > 0.95 && Math.abs(cross) < J.alignCross;
-  let onFinal = head > 0.85 && Math.abs(cross) < J.finalCross && along < J.touch + J.zone && along > -J.final * 2;
+  const aligned = head > J.alignHead && Math.abs(cross) < J.alignCross;
+  let onFinal = head > J.finalHead && Math.abs(cross) < J.finalCross && along < J.touch + J.zone && along > -J.final * 2;
   // Bahn für die Landung belegen, sobald der Gleitpfad beginnt; belegt: weiter Platzrunde
   if (onFinal && along > -J.glide - 60 && !lockRunway(game, c, route.rw, u)) onFinal = false;
   const room = J.touch - along >= Math.abs(cross) * J.turnIn + J.glide * J.turnGlide; // genug Strecke, um auf die Mittellinie einzudrehen

@@ -21,7 +21,6 @@ const DIRT = '#9b9480';
 const GRAVEL = '#a8a294';
 const PAD = '#b3b0a6'; // Betonplatte
 const CONC = '#b9bab2'; // Beton der Mauern
-const STEEL = '#7d8287';
 const GUN = '#2c302b';
 const RED = '#c0392b';
 const MAST_H = 170; // Höhe des Sendemasts über dem Fundament (wie vorher)

@@ -877,7 +877,7 @@ export class Game {
     const b = this.getEntity(cmd.buildingId);
     if (!b || b.kind !== 'building' || b.team !== team) return fail('Kein eigenes Gebäude gewählt');
     if (!b.built) return fail('Gebäude ist noch im Bau');
-    if (!UNITS[cmd.unit] || !b.produces.includes(cmd.unit)) {
+    if (!UNITS[cmd.unit] || !b.produces?.includes(cmd.unit)) { // Stadtgebäude ohne Ausbildung haben kein produces
       const k = this.city && trainerKind(cmd.unit);
       return fail(k ? `${UNITS[cmd.unit]?.name ?? 'Einheit'}: nur in der ${KIND_NAME[k]} der Stadt` : 'Nur die Hauptstadt bildet Einheiten aus');
     }

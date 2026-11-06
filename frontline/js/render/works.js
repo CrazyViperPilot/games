@@ -14,7 +14,7 @@ import {
   ASPH, CAR_COLORS, DECK, FACE, G, GLASS, OUTLINE, SILL, acTop, acUnit, ball, band, box, cap, car, carTop, circle, clampLv,
   coneRoof, conveyor, cyl, door, excavator, fan, flagpole, flame, flat, flatTop, frustum, gable, gableTop, heap, heapTop, hip,
   hipTop, lamp, latticeTop, lineT, lit, loader, logPile, logsTop, mast, onFace, parapet, planks, planksTop, plinth, poly,
-  rails, railsTop, rectF, rectS, ribs, ring, rnd, seam, shade, shadow, shadowTop, shed, snowy, stroke, tint, tree, treeTop,
+  rails, railsTop, rectF, rectS, ribs, rnd, seam, shade, shadow, shadowTop, shed, snowy, stroke, tint, tree, treeTop,
   vault, vaultTop, wallBand, wins, yellowTop,
 } from './isokit.js';
 import { sprite, blit, spriteDpr } from './spritecache.js';
@@ -29,7 +29,6 @@ const GRAVEL = '#a39d90';
 const BRICK = '#a9523b';
 const BRICKS = '#b9583d'; // Ziegel auf Paletten
 const RAW = '#9c9a8c'; // ungebrannte Rohlinge
-const STEEL = '#5b6570';
 const RUST = '#7a4b37';
 const TANK = '#e9ecef';
 const PIPE = '#9aa1a8';

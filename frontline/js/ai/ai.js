@@ -25,6 +25,8 @@ import {
   COUNTER_FLOOR,
   WALL_RETRY,
   SUPPLY_FROM,
+  PEND_PER,
+  PEND_MAX,
   QUEUE_RICH,
   QUEUE_LONG,
   QUEUE_SHORT,
@@ -968,9 +970,9 @@ export class AI {
 
   // ---- LKW ---------------------------------------------------------------------------
 
-  /** Soll-Zahl der LKW je Rolle: Pendler je 2 Außen-FOBs (max. 3), Versorger (seit v5.03 kein Lieferant für FOB-Baustellen). */
+  /** Soll-Zahl der LKW je Rolle: Pendler je PEND_PER Außen-FOBs (höchstens PEND_MAX), Versorger (seit v5.03 kein Lieferant für FOB-Baustellen). */
   truckQuota(s) {
-    const pend = Math.min(3, Math.ceil(Math.max(0, s.fobs.length - 1) / 2));
+    const pend = Math.min(PEND_MAX, Math.ceil(Math.max(0, s.fobs.length - 1) / PEND_PER));
     const vers = s.combat.length >= SUPPLY_FROM ? 1 : 0;
     return { pend, vers, total: pend + vers };
   }

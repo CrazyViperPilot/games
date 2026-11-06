@@ -706,6 +706,16 @@ test('Ausbildung mit Stadt (v4.96): Hauptstadt nicht, Kaserne Soldaten, Fabrikha
   assert.ok(near(fresh.find((u) => u.type === 'rifleman'), kas), 'Schütze erscheint an der Kaserne');
 });
 
+test('Ausbildung an einem Stadtgebäude ohne Ausbildung (z. B. Wohnen): sauber abgelehnt statt TypeError', () => {
+  const g = new Game({ seed: 3, city: true, startMoney: 20000 });
+  const e = [...g.entities.values()].find((x) => x.type === 'city' && x.team === 0 && !x.produces);
+  assert.ok(e, 'Startviertel hat ein Stadtgebäude ohne Ausbildung');
+  const r = g.issue(0, { type: 'train', buildingId: e.id, unit: 'rifleman' });
+  assert.equal(r.ok, false);
+  assert.match(r.reason, /Kaserne/);
+  assert.equal(g.issue(0, { type: 'train', buildingId: e.id, unit: 'gibtsnicht' }).ok, false);
+});
+
 test('Ausbildungsgebäude abreißen erstattet die Warteschlange, zerstört verfällt sie', () => {
   const g = new Game({ seed: 3, city: true, startMoney: 5000 });
   const c = g.city[0];

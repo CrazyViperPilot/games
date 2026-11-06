@@ -179,7 +179,7 @@ export function aiCity(game, team, difficulty, mem = cityAiMemory()) {
   mem.turn++;
   let n = 0;
   // Förderanlagen zuerst: jedes Vorkommen im Gebiet nutzen
-  for (const i of city.list.length < 4 ? [] : depositCells(game, city)) {
+  for (const i of city.list.length < CITY.ai.mineFrom ? [] : depositCells(game, city)) {
     if (money() < CITY.cost.mine + reserve) break; // Geldmangel stoppt nur die Förderung, nicht den übrigen Ausbau (seit v5.20)
     const col = i % city.cols;
     const row = (i - col) / city.cols;

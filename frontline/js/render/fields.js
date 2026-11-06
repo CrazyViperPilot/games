@@ -22,7 +22,6 @@ const POST_GAP = 30; // Pfostenabstand am Zaun
 const GATE = 24; // Torbreite
 const POST_H = 8.5; // Pfostenhöhe
 const RAILS = [3.4, 6.4]; // Höhe der Latten
-const TEX = 64; // Weltpixel je Musterkachel
 const TEX_PX = 256; // Bildpunkte je Musterkachel
 const PAD = 300; // mehr als die halbe Diagonale des größten Felds (Auswahl der Kacheln nach der Feldmitte)
 const CROPS = ['wheat', 'green', 'soil', 'rape'];

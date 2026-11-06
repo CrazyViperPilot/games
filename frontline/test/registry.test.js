@@ -112,9 +112,8 @@ test('Rollen: Werke, Lieferanten, Arbeitsstätten, flache Zellen passen zu Kette
   for (const k of KINDS) assert.equal(isFlat(KIND_ID[k]), FLAT_KINDS.includes(k), `isFlat(${k})`);
 });
 
-// Bekannte Lücke (P2): Hütte und Kerosin-Raffinerie haben keinen Zielwert, die KI rechnet mit 1. Nachtragen ändert das KI-Verhalten
-// (Referenzwerte in test/golden.test.js neu setzen); dann `todo` entfernen.
-test('Jede Zellenart mit Gebäude: Zielwert der KI (CITY.ai.targetValue)', { todo: 'smelter und kero fehlen (Befund Q-10)' }, () => {
+// Q-10 (P12): Hütte und Kerosin-Raffinerie hatten keinen Zielwert, die KI rechnete still mit 1.
+test('Jede Zellenart mit Gebäude: Zielwert der KI (CITY.ai.targetValue)', () => {
   const miss = LIVE.filter((k) => !flat(k) && !num(CITY.ai.targetValue[k]));
   assert.deepEqual(miss, [], `ohne Zielwert (KI rechnet still mit 1): ${miss.join(', ')}`);
 });

@@ -27,10 +27,12 @@ const GROUP_DOUBLE_MS = 500; // Gruppentaste zweimal = Kamera hin
 const PICK_PX = 16; // Trefferradius in Bildschirm-Pixeln
 const BUILD_MENU = Object.keys(BUILDINGS).filter((k) => BUILDINGS[k].hotkey && BUILDINGS[k].buildable !== false);
 const FORTIFY_KEYS = [['sandbags', 'Z'], ['mgnest', 'N'], ['wire', 'W']];
+const FW = BALANCE.garrison.works; // Wirkung der Ausbauten aus den Daten (Prozente)
+const pct = (x) => Math.round(x * 100);
 const FORTIFY_TIPS = {
-  sandbags: 'Das Haus hält 50 % mehr aus, Splitter treffen die Besatzung nur halb so stark.',
-  mgnest: 'Die Besatzer schießen schneller.',
-  wire: 'Stürmer machen nur 60 % Schaden.',
+  sandbags: `Das Haus hält ${pct(FW.sandbags.hpMult - 1)} % mehr aus, Splitter treffen die Besatzung nur mit ${pct(FW.sandbags.spillMult)} %.`,
+  mgnest: `Die Besatzer schießen ${pct(FW.mgnest.fire - 1)} % schneller.`,
+  wire: `Stürmer machen nur ${pct(FW.wire.stormMult)} % Schaden.`,
 };
 const RES_KEYS = ['money', 'bm', 'mun', 'fuel'];
 const CARGO_KEYS = ['bm', 'mun', 'fuel']; // Lagersorten (FOB-Lager, LKW-Ladung)

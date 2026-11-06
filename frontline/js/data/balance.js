@@ -268,7 +268,9 @@ export const BALANCE = {
     planRoom: 600, // Landerichtung: vor der Schwelle braucht die Platzrunde final + base + planRoom px bis zum Kartenrand
     outbound: 400, // Gegenanflug: so weit über den Eindrehpunkt (Schwelle − final − base) hinaus fliegt er (px)
     lead: 300, // Zielpunkt so weit voraus im Endanflug und im Steigflug nach dem Start (px)
+    alignHead: 0.95, // ausgerichtet: Kosinus des Winkels zwischen Nase und Landerichtung mindestens so groß (1 = genau in Landerichtung)
     alignCross: 30, // ausgerichtet: höchstens so weit seitlich der Mittellinie (px), dann sinkt er im Gleitpfad
+    finalHead: 0.85, // im Endanflug: Kosinus des Winkels zwischen Nase und Landerichtung mindestens so groß
     finalCross: 80, // im Endanflug: höchstens so weit seitlich der Mittellinie (px)
     turnIn: 1.5, // Eindrehen: vor der Aufsetzmarke braucht er Seitenablage × turnIn + Gleitpfad × turnGlide px
     turnGlide: 0.6,

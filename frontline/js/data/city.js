@@ -184,6 +184,7 @@ export const CITY = {
     interval: { easy: 12, normal: 8, hard: 5 }, // Takt (s)
     reserve: { easy: 500, normal: 300, hard: 200 }, // Geld, das sie für die Armee übrig lässt
     perStep: 4, // so viele Zellen je Takt
+    mineFrom: 4, // Förderanlagen setzt sie erst, wenn die Stadt mindestens so viele Zellen hat
     roadEvery: 3, // jede so vielte Zeile (vom Anker aus) wird Straße, dazu eine Straßenspalte durch den Anker
     quarter: 3, // Radius (Zellen) der kleinen Viertel an vorderen FOBs
     quarterEvery: 3, // jeder so vielte Takt baut an einer vorderen FOB statt an der Hauptstadt

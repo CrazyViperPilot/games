@@ -1210,7 +1210,7 @@ function oreDep(c, r, season, fine) {
   }
 }
 
-function oilDep(c, r, season, fine) {
+function oilDep(c, r, season) {
   // ölige, dunkle Erde mit Schlieren, darin eine flache, unregelmäßige Pfütze mit Regenbogenschimmer und Himmelsspiegelung
   for (let i = 0; i < 5; i++) ell(c, 8 + r() * 48, 8 + r() * 48, 6 + r() * 9, 3 + r() * 5, 'rgba(18,14,10,0.3)', r() * 3);
   const x = 22 + r() * 20;

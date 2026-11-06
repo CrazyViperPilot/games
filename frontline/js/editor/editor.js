@@ -4,7 +4,7 @@
 import { BALANCE } from '../data/balance.js';
 import { makeRng } from '../core/rng.js';
 import { generateMap } from '../game/map.js';
-import { drawMapObjects, invalidateTerrain, roadJunctions } from '../render/terrain.js';
+import { drawMapObjects, invalidateTerrain } from '../render/terrain.js';
 import { Camera } from '../render/camera.js';
 import { Renderer } from '../render/renderer.js';
 import { setIsoGround, TOWN_H } from '../render/iso.js';
@@ -115,7 +115,6 @@ const st = {
 
 const snap = (v) => Math.round(v / SNAP) * SNAP;
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-const dpr = () => window.devicePixelRatio || 1;
 
 function resize() {
   const cam = st.cam;

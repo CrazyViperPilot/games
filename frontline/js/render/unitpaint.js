@@ -159,7 +159,6 @@ function ball(c, rx, ry, rz, col, o = {}) {
 /** Aufgesetztes Teil (Luke, Gitter, Tarnfleck, Scheibe): wird immer direkt nach seinem Träger gemalt. */
 const on = (parent, s) => ((s.on = parent), s);
 const fine = (s) => ((s.fine = true), s);
-const mirror = (fn) => [fn(-1), fn(1)];
 
 // ---------- Renderer ----------
 
