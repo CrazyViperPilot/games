@@ -1,1 +1,0 @@
-**Direkte Lieferung zwischen angrenzenden Gebäuden** (§15 „Straßentransport“): Grenzt eine Förderanlage oder Hütte an ein passendes Werk, fließt die Ware ohne Straße dorthin; die Info zeigt „direkt angrenzend“.
