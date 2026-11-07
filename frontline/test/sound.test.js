@@ -83,6 +83,21 @@ test('alle Geräusche laufen durch (Attrappe), Meldungen wählen den passenden T
   assert.deepEqual(played, ['ready', 'built', 'alarm', 'coin', 'note']);
 });
 
+test('Dauergeräusche: ein fliegender Jet klingt nach Düse (eigener Kanal), nicht nach Hubschrauber', () => {
+  const { g, s } = make();
+  let lv = null;
+  s.setLevels = (...a) => (lv = a);
+  for (const u of g.units) u.speedNow = 0;
+  const jet = g.spawnUnit('f16', 0, 500, 500);
+  jet.speedNow = jet.def.speed;
+  cam.worldToScreen = () => ({ x: 400, y: 300 });
+  s.ambience();
+  cam.worldToScreen = (x, y) => ({ x, y });
+  assert.equal(lv[2], 0, 'kein Hubschrauberklang');
+  assert.ok(lv[4] > 0, 'Düsenklang');
+  assert.ok(lv[5] > 0.9, 'Pfeifton hoch im Flug');
+});
+
 test('Dauergeräusche: Regen und Fahrzeuge in Bildnähe heben den Pegel, Pause senkt ihn', () => {
   const { g, s } = make();
   let lv = null;

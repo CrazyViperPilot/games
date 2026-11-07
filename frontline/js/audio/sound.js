@@ -389,7 +389,7 @@ export class Sound {
     this.buildAmbience();
   }
 
-  /** Dauergeräusche (Regen, Wind, Hubschrauber, Fahrzeuge): laufen immer, nur die Pegel ändern sich. */
+  /** Dauergeräusche (Regen, Wind, Hubschrauber, Fahrzeuge, Düsenjets): laufen immer, nur die Pegel ändern sich. */
   buildAmbience() {
     const ctx = this.ctx;
     const loop = (type, freq, q = 0.7) => {
@@ -461,11 +461,39 @@ export class Sound {
     vAm.connect(veh);
     lfo(8, 0.35, vAm.gain);
     vOsc.start();
-    this.amb = { rain, wind, heli, veh };
+    // Düsenjets (F-16, F-22, U-2): kein Rotortakt, sondern gleichmäßiges Strahltriebwerk. Tiefes Grollen (breites Rauschen bis
+    // 260 Hz), fauchender Schubstrahl (Bandpass um 1,1 kHz, langsam wandernd), dazu ein leiser Turbinenpfeifton (zwei leicht
+    // verstimmte Sinustöne, Höhe folgt dem Tempo, siehe setLevels).
+    const jet = level();
+    const jLow = ctx.createGain();
+    jLow.gain.value = 0.7;
+    loop('lowpass', 260).connect(jLow);
+    jLow.connect(jet);
+    const jHiss = loop('bandpass', 1100, 0.6);
+    const jHg = ctx.createGain();
+    jHg.gain.value = 0.55;
+    jHiss.connect(jHg);
+    jHg.connect(jet);
+    lfo(0.21, 180, jHiss.frequency); // Schub schwankt leicht, wirkt wie ein vorbeiziehender Strahl
+    const whine = [];
+    for (const f of [2600, 2614]) {
+      const o = ctx.createOscillator();
+      o.frequency.value = f;
+      const g = ctx.createGain();
+      g.gain.value = 0.035;
+      o.connect(g);
+      g.connect(jet);
+      o.start();
+      whine.push(o);
+    }
+    this.amb = { rain, wind, heli, veh, jet, whine };
   }
 
-  /** Pegel der Dauergeräusche (0–1 je Art), weich überblendet. */
-  setLevels(rain, wind, heli, veh) {
+  /**
+   * Pegel der Dauergeräusche (0–1 je Art), weich überblendet. jet: Düsenjets; pitch (0–1): Anteil des Höchsttempos, hebt den
+   * Turbinenpfeifton (Rollen tief, Flug hoch).
+   */
+  setLevels(rain, wind, heli, veh, jet = 0, pitch = 0) {
     if (!this.amb) return;
     const t = this.ctx.currentTime;
     const set = (g, v) => g.gain.setTargetAtTime(v, t, 0.4);
@@ -473,6 +501,10 @@ export class Sound {
     set(this.amb.wind, wind);
     set(this.amb.heli, heli);
     set(this.amb.veh, veh);
+    if (this.amb.jet) {
+      set(this.amb.jet, jet);
+      this.amb.whine.forEach((o, k) => o.frequency.setTargetAtTime(1700 + 1300 * pitch + k * 14, t, 0.8));
+    }
   }
 
   rv() {
@@ -689,16 +721,22 @@ export class Sound {
         }
       }
     }
-    // Hubschrauber und Fahrzeuge in Bildnähe, die sich bewegen
+    // Hubschrauber, Düsenjets und Fahrzeuge in Bildnähe, die sich bewegen (Jets rollend leiser als im Flug)
     let heli = 0;
     let veh = 0;
+    let jet = 0;
+    let pitch = 0;
     for (const u of game.units) {
       if (!u.alive || u.def.armor === 'inf' || !(u.speedNow > 4)) continue;
       const loc = this.where(u.x, u.y, u.team);
       if (!loc) continue;
-      if (u.def.air) heli += loc.vol;
+      if (u.def.jet) {
+        const p = Math.min(1, u.speedNow / u.def.speed);
+        jet += loc.vol * (0.35 + 0.65 * p);
+        pitch = Math.max(pitch, p);
+      } else if (u.def.air) heli += loc.vol;
       else veh += loc.vol;
     }
-    this.setLevels(rain * 0.2, wind * 0.16, Math.min(1, heli * 0.6) * 0.3, Math.min(1, veh * 0.25) * 0.28);
+    this.setLevels(rain * 0.2, wind * 0.16, Math.min(1, heli * 0.6) * 0.3, Math.min(1, veh * 0.25) * 0.28, Math.min(1, jet * 0.6) * 0.32, pitch);
   }
 }

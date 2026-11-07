@@ -1,0 +1,1 @@
+**Düsenklang der Jets** (§14 „Ton“): F-16, F-22 und U-2 klingen nicht mehr wie Hubschrauber, sondern haben ein eigenes Dauergeräusch: tiefes Grollen, fauchender Schubstrahl und ein leiser Turbinenpfeifton, der mit dem Tempo steigt; rollend leiser als im Flug.
