@@ -313,6 +313,30 @@ export const UNITS = {
     fuelMax: 55, // seit v5.14 55 statt 45: die Zone liegt auf der größeren Karte weiter vom Flughafen, die Zeit über ihr bleibt gleich
     hotkey: 'K', // feste Tasten (J, H, V, Y, P, M; js/ui/input.js) sind tabu, test/config.test.js prüft das
   },
+  // Kampfflugzeug F-22 (seit v5.82, PRD §6 „F-22“): reines Luftüberlegenheitsjet, nur mit Stadt, am selben Stellplatz wie die F-16
+  // (CITY.produces.stand, Plätze CITY.air.standJets teilen sich beide). Sechs Luft-Luft-Lenkraketen, keine Luft-Boden-Raketen:
+  // greift keine Boden- und Gebäudeziele an. Leer geschossen fliegt sie heim und lädt am Munitionslager nach wie die F-16.
+  f22: {
+    name: 'F-22',
+    short: 'F-22', // Kurzname in der Befehlskarte
+    slots: 3,
+    armor: 'air',
+    air: true,
+    jet: true,
+    hp: 500,
+    speed: 460,
+    radius: 15,
+    sight: 600,
+    // Eine Waffe (kein parallel nötig): sechs Luft-Luft-Lenkraketen, nur gegen Hubschrauber und Flugzeuge
+    weapons: [
+      { id: 'aim', name: 'Luft-Luft-Lenkrakete', range: 700, cooldown: 2.2, rounds: 6, munCost: 150, hitChance: 0.94, targets: ['air'], damage: { air: 700 } },
+    ],
+    cost: { money: 1900 },
+    buildTime: 55,
+    fuelPerSec: 1,
+    fuelMax: 55, // Sekunden Flug wie die F-16 (Reichweite ≈ speed × fuelMax)
+    hotkey: 'I', // im Stellplatz-Menü frei (I = Einsteigen nur bei gewählten Soldaten, U Ausbauen, K F-16)
+  },
   // Flugabwehrpanzer (Flak): Schnellfeuer-Flak gegen Hubschrauber, Munition je Schuss 20. hitChance × speedRef: schnelle Ziele trifft sie selten
   // (Tempo-Faktor speedRef/(speedRef + Zielgeschwindigkeit), siehe BALANCE.airFire). Schießt nur auf Luftziele.
   flak: {

@@ -503,3 +503,54 @@ test('Rechtsverkehr am Boden: nach der Landung rollt der Jet um keepRight rechts
   for (const d of offs) assert.ok(Math.abs(d - BALANCE.jets.keepRight) < 1e-6, `Versatz ${d}`);
   assert.ok(u.parked, 'steht wieder auf dem Stellplatz');
 });
+
+test('F-22: Stellplatz bildet sie aus; eine Waffe mit sechs Luft-Luft-Raketen, sonst keine; greift nur Luftziele an', () => {
+  // Waffenprofil (seit v5.82): genau eine Luft-Luft-Lenkrakete, keine Luft-Boden-Raketen
+  assert.equal(UNITS.f22.weapons.length, 1);
+  const [aim] = UNITS.f22.weapons;
+  assert.deepEqual([aim.id, aim.rounds], ['aim', 6]);
+  assert.deepEqual(aim.targets, ['air'], 'nur Luftziele');
+  assert.ok(!aim.damage.heavy && !aim.damage.light && !aim.damage.struct && !aim.damage.inf, 'kein Schaden an Boden und Gebäuden');
+  assert.equal(UNITS.f22.jet, true);
+  const g = new Game({ seed: 3, city: true });
+  const { stands } = airbase(g);
+  const [s] = stands;
+  assert.ok(g.issue(0, { type: 'train', buildingId: s.id, unit: 'f22' }).ok, 'F-22 ausbildbar am Stellplatz');
+  for (let k = 0; k < 600 && !g.units.some((x) => x.def === UNITS.f22); k++) run(g, 1); // Stahl und Weg zum Lager wie bei der F-16
+  const [u] = g.units.filter((x) => x.def === UNITS.f22);
+  assert.ok(u, 'F-22 gebaut');
+  assert.ok(u.parked && u.jet.home === s.id, 'steht auf dem Stellplatz');
+  assert.equal(u.weapons.length, 1);
+  // Gegen einen Panzer feuert sie nicht, gegen einen Hubschrauber schon
+  const z = g.zone;
+  const tank = g.spawnUnit('tank', 1, z.x + 120, z.y);
+  const heli = g.spawnUnit('gunship', 1, z.x + 200, z.y);
+  tank.hp = heli.hp = 1e6;
+  u.jet = { ...u.jet, ready: true, phase: 'air', alt: 1 };
+  u.parked = false;
+  u.x = z.x - 300;
+  u.y = z.y;
+  g.fog[0].revealAll?.();
+  assert.ok(g.issue(0, { type: 'attackMove', ids: [u.id], x: z.x, y: z.y }).ok);
+  for (let t = 0; t < 30 && u.weapons[0].rounds > 0; t++) {
+    run(g, 1);
+    g.fog[0].revealAll?.();
+  }
+  assert.ok(u.weapons[0].rounds < 6, 'Lenkraketen gegen den Hubschrauber verschossen');
+  assert.equal(tank.hp, 1e6, 'Panzer am Boden nicht angegriffen');
+});
+
+test('F-16 und F-22 teilen sich die Plätze eines Stellplatzes: zusammen höchstens CITY.air.standJets', () => {
+  const g = new Game({ seed: 3, city: true });
+  const { stands } = airbase(g);
+  const [s] = stands;
+  assert.equal(CITY.air.standJets, 2, 'Annahme dieses Tests: zwei Plätze je Stellplatz');
+  assert.ok(g.issue(0, { type: 'train', buildingId: s.id, unit: 'f16' }).ok, 'erste F-16');
+  assert.ok(g.issue(0, { type: 'train', buildingId: s.id, unit: 'f22' }).ok, 'F-22 teilt sich den Stellplatz');
+  const r = g.issue(0, { type: 'train', buildingId: s.id, unit: 'f22' });
+  assert.equal(r.ok, false, 'dritter Jet auf dem Stellplatz abgelehnt');
+  assert.match(r.reason, /Stellplatz belegt/);
+  const r2 = g.issue(0, { type: 'train', buildingId: s.id, unit: 'f16' });
+  assert.equal(r2.ok, false, 'auch eine F-16 passt nicht mehr dazu');
+  assert.equal(freeSpace(g, s), 0);
+});
