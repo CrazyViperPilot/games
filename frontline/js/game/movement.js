@@ -397,13 +397,44 @@ function onRoad(game, x, y) {
     const i = Math.floor(y / R.cell) * R.cols + Math.floor(x / R.cell);
     if (R.dug[i]) return false; // vom Bagger abgetragen (excavator.js)
   }
-  for (const r of game.map.town?.roads ?? []) {
+  const idx = roadIndex(game);
+  if (!idx) return false;
+  const q = Math.floor(x / ROAD_BUCKET);
+  const rr = Math.floor(y / ROAD_BUCKET);
+  if (q < 0 || rr < 0 || q >= idx.cols || rr >= idx.rows) return false;
+  for (const r of idx.cells[rr * idx.cols + q]) {
     const dx = r.x2 - r.x1;
     const dy = r.y2 - r.y1;
     const t = Math.max(0, Math.min(1, ((x - r.x1) * dx + (y - r.y1) * dy) / (dx * dx + dy * dy || 1)));
     if (Math.hypot(x - (r.x1 + dx * t), y - (r.y1 + dy * t)) <= (r.w ?? 40) / 2) return true;
   }
   return false;
+}
+
+// Rasterindex der Straßen und Feldwege der Karte für onRoad (seit v5.92, reine Rechenhilfe): je Feld von ROAD_BUCKET px die Strecken,
+// deren Band (halbe Breite) das Feld berührt, in der Reihenfolge der Karte. onRoad prüft nur diese statt aller Strecken – gleiches
+// Ergebnis (die Karte ändert ihre Straßen nicht; vom Bagger abgetragene Zellen prüft onRoad vorher über roads.dug). Nicht im Spielstand.
+const ROAD_BUCKET = 256;
+const ROAD_INDEX = new WeakMap(); // Liste der Kartenstraßen → Index
+function roadIndex(game) {
+  const list = game.map.town?.roads;
+  if (!list?.length) return null;
+  let idx = ROAD_INDEX.get(list);
+  if (idx) return idx;
+  const cols = Math.ceil(game.map.width / ROAD_BUCKET) + 1;
+  const rows = Math.ceil(game.map.height / ROAD_BUCKET) + 1;
+  const cells = Array.from({ length: cols * rows }, () => []);
+  for (const r of list) {
+    const h = (r.w ?? 40) / 2 + 1;
+    const q0 = Math.max(0, Math.floor((Math.min(r.x1, r.x2) - h) / ROAD_BUCKET));
+    const q1 = Math.min(cols - 1, Math.floor((Math.max(r.x1, r.x2) + h) / ROAD_BUCKET));
+    const r0 = Math.max(0, Math.floor((Math.min(r.y1, r.y2) - h) / ROAD_BUCKET));
+    const r1 = Math.min(rows - 1, Math.floor((Math.max(r.y1, r.y2) + h) / ROAD_BUCKET));
+    for (let rr = r0; rr <= r1; rr++) for (let q = q0; q <= q1; q++) cells[rr * cols + q].push(r);
+  }
+  idx = { cols, rows, cells };
+  ROAD_INDEX.set(list, idx);
+  return idx;
 }
 
 /**
