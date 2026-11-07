@@ -20,6 +20,7 @@ export const CITY = {
   // Stadtgebäude nur im eigenen Gebiet, nur auf erkundetem Gelände, nicht nahe sichtbarem Feind, nicht in der Konfliktzone.
   build: {
     fobClaim: 6, // Gebietsradius (Zellen) einer FOB mit dieser Regel; ohne sie gilt territory.fob (4), damit die KI ohne Regel gleich bleibt
+    buildingClaim: 3, // Gebietsradius (Zellen) um jedes fertige Stadtgebäude mit dieser Regel, bei Großbauten ab ihrem Rand (seit v5.90; ohne Regel territory.building = 2 ab der Ankerzelle)
     enemyR: 500, // Abstand (px), in dem keine Stadtzelle an sichtbare gegnerische Bodeneinheiten oder gegnerische Gebäude grenzt
     noZone: true, // Schalter: Stadtzellen nicht in der Konfliktzone (Kreis game.zone)
     // Anschlusspflicht (Paket „Straßen“, Teil 1): Stadtgebäude nur auf Zellen, die an eine Straße mit Verbindung zum Lager der

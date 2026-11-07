@@ -3,6 +3,7 @@
 // Konfliktzone. Straßen dürfen außerhalb des Gebiets liegen. Ohne Schalter bleibt alles wie bisher; die KI erzeugt mit Regel weiter
 // Stahl und Munition.
 import test from 'node:test';
+import { KINDS } from '../js/data/citykinds.js';
 import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
 import { AI } from '../js/ai/ai.js';
@@ -138,7 +139,7 @@ test('mit Schalter: Konfliktzone sperrt, ohne CITY.build.noZone nicht', () => {
   assert.equal(buildWhy(g, c, i, 'res'), 'zone', 'Schalter zurückgestellt');
 });
 
-test('mit Schalter: Großbau nur, wenn jede Zelle des Quadrats im Gebiet liegt', () => withValue(CITY.build, 'needRoad', false, () => {
+test('mit Schalter: Großbau am Gebietsrand darf höchstens ⌊n/2⌋ Zellen über die Grenze ragen (seit v5.91)', () => withValue(CITY.build, 'needRoad', false, () => {
   const g = rules();
   reveal(g);
   rich(g);
@@ -154,7 +155,7 @@ test('mit Schalter: Großbau nur, wenn jede Zelle des Quadrats im Gebiet liegt',
     if (!cmd(g, 0, 'bm', i).ok) continue;
     placed++;
     for (let j = 0; j < c.kind.length; j++) {
-      if (c.kind[j] === KIND_ID.bm) assert.ok(c.claim[j], `Werkzelle ${j} liegt außerhalb des Gebiets`);
+      if (c.kind[j] === KIND_ID.bm) assert.ok(near(c, j, 1), `Werkzelle ${j} liegt mehr als 1 Zelle außerhalb des Gebiets`);
     }
   }
   assert.ok(placed > 0, 'mindestens ein Werk am Rand gebaut');
@@ -162,8 +163,35 @@ test('mit Schalter: Großbau nur, wenn jede Zelle des Quadrats im Gebiet liegt',
   for (const i of border.slice(0, 20)) {
     const a = fitBig(g, c, i % c.cols, Math.floor(i / c.cols), 'bm', undefined, (j) => buildAllowed(g, c, j, 'bm'));
     if (a < 0) continue;
-    for (const j of bigCells(c, a, 2)) assert.ok(c.claim[j], 'Quadrat ganz im Gebiet');
+    for (const j of bigCells(c, a, 2)) assert.ok(near(c, j, 1), 'Quadrat höchstens 1 Zelle über die Grenze');
+    assert.ok(bigCells(c, a, 2).some((j) => c.claim[j]), 'mindestens eine Zelle im Gebiet');
   }
+}));
+
+/** Liegt höchstens d Zellen von Zelle j entfernt (Schachbrettabstand) Gebiet? */
+function near(c, j, d) {
+  const q = j % c.cols;
+  const r = (j - q) / c.cols;
+  for (let rr = r - d; rr <= r + d; rr++) for (let qq = q - d; qq <= q + d; qq++) if (c.claim[rr * c.cols + qq]) return true;
+  return false;
+}
+
+test('mit Schalter (seit v5.91): Fabrikhalle 5 × 5 passt an den Gebietsrand, Bahn darf außerhalb liegen', () => withValue(CITY.build, 'needRoad', false, () => {
+  const g = rules();
+  reveal(g);
+  rich(g);
+  const c = g.city[0];
+  // Randzellen des Gebiets: dort hätte eine 5 × 5-Halle früher fast nie Platz gehabt
+  let fits = 0;
+  for (let i = 0; i < c.kind.length && fits === 0; i++) {
+    if (!c.claim[i] || c.claim[i + 1] || c.kind[i]) continue; // Zelle im Gebiet, rechts davon nicht mehr
+    const a = fitBig(g, c, (i % c.cols) + 1, Math.floor(i / c.cols), 'factory', undefined, (j) => buildAllowed(g, c, j, 'factory'));
+    if (a >= 0 && bigCells(c, a, 5).some((j) => !c.claim[j])) fits++;
+  }
+  assert.ok(fits > 0, 'eine Fabrikhalle ragt am Rand über die Grenze');
+  const out = c.claim.findIndex((v, i) => !v && canZone(g, c, i) && !c.kind[i] && !c.deposit[i]);
+  assert.equal(buildWhy(g, c, out, 'runway'), null, 'Bahn außerhalb des Gebiets erlaubt');
+  assert.equal(buildWhy(g, c, out, 'res'), 'territory', 'Wohnen außerhalb nicht');
 }));
 
 // ---- Anschlusspflicht (Paket „Straßen“, Teil 1) ----------------------------------------------------------------------------
@@ -261,7 +289,8 @@ test('mit Schalter: FOB-Gebiet reicht 6 Zellen, ohne Schalter 4 (Startviertel bl
   const a = plain();
   const b = rules();
   assert.equal(a.city[0].list.length, b.city[0].list.length, 'Startviertel unverändert');
-  assert.deepEqual([...a.city[0].claim], [...b.city[0].claim], 'Gebiet der Hauptstadt unverändert');
+  // seit v5.90 reicht das Gebiet um Stadtgebäude mit Schalter weiter (CITY.build.buildingClaim): mindestens so groß wie ohne
+  assert.ok(a.city[0].claim.every((v, i) => !v || b.city[0].claim[i]), 'Gebiet mit Schalter umfasst das Gebiet ohne Schalter');
 });
 
 test('Spielstand: Baugebiet bleibt erhalten', () => {
@@ -290,3 +319,18 @@ for (const seed of [3, 11]) {
     }
   });
 }
+
+test('mit Schalter (seit v5.90): Gebiet reicht buildingClaim Zellen um Stadtgebäude, auch schräg neben ein 1 × 1-Gebäude passt ein 2 × 2-Großbau', () => {
+  const g = rules();
+  const c = g.city[0];
+  updateClaim(g, c);
+  // ein fertiges 1 × 1-Gebäude der Stadt (nicht Straße) suchen
+  const i = c.list.find((j) => c.level[j] && KINDS[c.kind[j] - 1] !== 'road' && (c.part?.[j] ?? 0) === 0 && CITY.size[KINDS[c.kind[j] - 1]] === undefined);
+  assert.ok(i !== undefined, 'kein 1 × 1-Gebäude im Startviertel');
+  const q = i % c.cols;
+  const r = (i - q) / c.cols;
+  const R = CITY.build.buildingClaim;
+  // Zellen eines 2 × 2-Blocks schräg rechts unterhalb: (q+1..q+2, r+1..r+2) – alle im Gebiet
+  for (const [dq, dr] of [[1, 1], [2, 1], [1, 2], [2, 2]]) assert.equal(c.claim[(r + dr) * c.cols + q + dq], 1, `Zelle +${dq}/+${dr}`);
+  assert.equal(c.claim[r * c.cols + q + R], 1, `${R} Zellen daneben im Gebiet`);
+});
