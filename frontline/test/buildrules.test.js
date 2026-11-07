@@ -3,6 +3,7 @@
 // Konfliktzone. Straßen dürfen außerhalb des Gebiets liegen. Ohne Schalter bleibt alles wie bisher; die KI erzeugt mit Regel weiter
 // Stahl und Munition.
 import test from 'node:test';
+import { KINDS } from '../js/data/citykinds.js';
 import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
 import { AI } from '../js/ai/ai.js';
@@ -261,7 +262,8 @@ test('mit Schalter: FOB-Gebiet reicht 6 Zellen, ohne Schalter 4 (Startviertel bl
   const a = plain();
   const b = rules();
   assert.equal(a.city[0].list.length, b.city[0].list.length, 'Startviertel unverändert');
-  assert.deepEqual([...a.city[0].claim], [...b.city[0].claim], 'Gebiet der Hauptstadt unverändert');
+  // seit v5.90 reicht das Gebiet um Stadtgebäude mit Schalter weiter (CITY.build.buildingClaim): mindestens so groß wie ohne
+  assert.ok(a.city[0].claim.every((v, i) => !v || b.city[0].claim[i]), 'Gebiet mit Schalter umfasst das Gebiet ohne Schalter');
 });
 
 test('Spielstand: Baugebiet bleibt erhalten', () => {
@@ -290,3 +292,18 @@ for (const seed of [3, 11]) {
     }
   });
 }
+
+test('mit Schalter (seit v5.90): Gebiet reicht buildingClaim Zellen um Stadtgebäude, auch schräg neben ein 1 × 1-Gebäude passt ein 2 × 2-Großbau', () => {
+  const g = rules();
+  const c = g.city[0];
+  updateClaim(g, c);
+  // ein fertiges 1 × 1-Gebäude der Stadt (nicht Straße) suchen
+  const i = c.list.find((j) => c.level[j] && KINDS[c.kind[j] - 1] !== 'road' && (c.part?.[j] ?? 0) === 0 && CITY.size[KINDS[c.kind[j] - 1]] === undefined);
+  assert.ok(i !== undefined, 'kein 1 × 1-Gebäude im Startviertel');
+  const q = i % c.cols;
+  const r = (i - q) / c.cols;
+  const R = CITY.build.buildingClaim;
+  // Zellen eines 2 × 2-Blocks schräg rechts unterhalb: (q+1..q+2, r+1..r+2) – alle im Gebiet
+  for (const [dq, dr] of [[1, 1], [2, 1], [1, 2], [2, 2]]) assert.equal(c.claim[(r + dr) * c.cols + q + dq], 1, `Zelle +${dq}/+${dr}`);
+  assert.equal(c.claim[r * c.cols + q + R], 1, `${R} Zellen daneben im Gebiet`);
+});

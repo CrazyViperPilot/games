@@ -59,6 +59,17 @@ export function updateClaim(game, c) {
       }
     }
   };
+  // Kreis um einen beliebigen Weltpunkt (Zellmitten im Abstand höchstens rad Zellen; rad darf gebrochen sein)
+  const stampAt = (x, y, rad) => {
+    const cx = (x - c.x0) / c.cell - 0.5;
+    const cy = (y - c.y0) / c.cell - 0.5;
+    const R = Math.ceil(rad);
+    for (let r = Math.max(0, Math.floor(cy) - R); r <= Math.min(c.rows - 1, Math.ceil(cy) + R); r++) {
+      for (let q = Math.max(0, Math.floor(cx) - R); q <= Math.min(c.cols - 1, Math.ceil(cx) + R); q++) {
+        if ((q - cx) ** 2 + (r - cy) ** 2 <= rad * rad + 0.5) next[r * c.cols + q] = 1;
+      }
+    }
+  };
   const TR = CITY.territory;
   for (const b of game.buildings) {
     if (!b.alive || !b.built || b.team !== c.team || b.type !== 'fob') continue;
@@ -66,7 +77,13 @@ export function updateClaim(game, c) {
   }
   for (const i of c.list) {
     if (!c.level[i] || isFlat(c.kind[i]) || isPart(c, i)) continue;
-    stamp((i % c.cols + 0.5) * c.cell + c.x0, (Math.floor(i / c.cols) + 0.5) * c.cell + c.y0, TR.building);
+    const n = sizeOf(KINDS[c.kind[i] - 1]);
+    if (game.buildRules) {
+      // Baugebiet (seit v5.90): Kreis um die echte Mitte des Gebäudes (bei geraden Großbauten liegt sie auf einer Zellecke), Radius
+      // CITY.build.buildingClaim ab dem Rand – sonst passte z. B. ein 2 × 2-Kraftwerk nur genau neben, nicht schräg neben ein Gebäude
+      const m = bigCenter(c, i, n);
+      stampAt(m.x, m.y, CITY.build.buildingClaim + n / 2);
+    } else stamp((i % c.cols + 0.5) * c.cell + c.x0, (Math.floor(i / c.cols) + 0.5) * c.cell + c.y0, TR.building);
   }
   let changed = false;
   for (let i = 0; i < next.length; i++) if (next[i] !== c.claim[i]) { changed = true; break; }
