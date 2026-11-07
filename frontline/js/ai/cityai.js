@@ -408,7 +408,7 @@ function touchesRoad(c, i, reach) {
 
 /**
  * Straßenanschluss der KI (seit v5.20, AP4): höchstens ein Gebäude je Takt, dem der Weg fehlt (Förderanlage ohne Lieferweg zum
- * Werk, Werk ohne Lieferweg zum Lager, Arbeitsstätte ohne Pendlerweg). Prüft höchstens CITY.ai.roadTries Gebäude. true, wenn gebaut.
+ * Werk, Werk ohne Lieferweg zum Lager, Arbeitsstätte ohne Pendlerweg, seit dem Paket „Straßen“ Ausbildungsgebäude ohne Weg zum Lager). Prüft höchstens CITY.ai.roadTries Gebäude. true, wenn gebaut.
  */
 function aiConnect(game, c, off) {
   let tried = 0;
@@ -420,7 +420,8 @@ function aiConnect(game, c, off) {
     const k = KINDS[c.kind[i] - 1];
     const info = transportInfo(game, c, i);
     const supplier = SUPPLIER_KINDS.includes(k) && info.to === null;
-    if (!supplier && !info.noHome) continue;
+    const trainer = !!CITY.produces[k] && transportOf(game, c).supply.get(i) === null; // Ausbildung ohne Straßenweg zum Lager steht (Paket „Straßen“)
+    if (!supplier && !info.noHome && !trainer) continue;
     tried++;
     if (connectRoad(game, c, i, true, supplier ? goalOf(c, i, k) : null) > 0) return true;
   }

@@ -30,6 +30,9 @@ const FREE_EPS = 1e-4;
 /** Gruppen der Breitensuche-Felder, die transportOf anlegt. */
 const GROUPS = ['bm', 'smelter', 'steel', 'oil', 'res', 'main'];
 
+/** Ausbildungsgebäude der Stadt (CITY.produces: Kaserne, Fabrikhalle, Heliport, Stellplatz), versorgt über ihren Weg zum Lager (Paket „Straßen“). */
+const TRAINERS = new Set(Object.keys(CITY.produces).map((k) => KIND_ID[k]));
+
 /**
  * Breitensuche von mehreren Startzellen (Quellen) aus über Straßenzellen (cap > 0), höchstens CITY.transport.maxDist Schritte.
  * `sources`: Array von { cells: Zellenindizes (Straßen am Ziel), owner: Kennung des Ziels }. Liefert { dist, prev, owner } je Zelle:
@@ -186,6 +189,7 @@ function newTransport(c) {
     mun: new Map(),
     shop: new Map(),
     depot: new Map(), // seit v5.35: Kerosintank und Munitionslager ↔ Lager
+    supply: new Map(), // Paket „Straßen“: Ausbildungsgebäude ↔ Lager
     load: new Float32Array(n),
     factor,
     cap: new Float32Array(n),
@@ -211,6 +215,32 @@ function routeOf(c, tr, a, group) {
   const hit = pathFrom(tr.fields[group], accessCells(c, a));
   if (!hit) return { to: null, path: null, dist: 0 };
   return { to: hit.owner === MAIN ? 'main' : hit.owner, path: hit.path, dist: hit.path.length };
+}
+
+/**
+ * Anschluss eines Ausbildungsgebäudes oder Lagers des Fliegerhorsts an das Straßennetz (Paket „Straßen“): seine Straßenzellen
+ * (accessCells); an Rollfeld oder Bahn erreicht es die Straße über diese Betonflächen (sie tragen selbst keinen Verkehr), dann zählen
+ * die Straßen an ihrem Rand (wie beim Anschluss ans Lager, der Bahn und Rollfeld als Straße zählt).
+ */
+function supplyAccess(c, tr, a) {
+  const start = accessCells(c, a);
+  const out = start.filter((i) => tr.cap[i] > 0);
+  const seen = new Set(start);
+  const queue = start.filter((i) => !(tr.cap[i] > 0)); // Bahn und Rollfeld (flach, ohne Kapazität)
+  for (let h = 0; h < queue.length; h++) {
+    const i = queue[h];
+    const col = i % c.cols;
+    const row = (i - col) / c.cols;
+    for (const [x, y] of [[col - 1, row], [col + 1, row], [col, row - 1], [col, row + 1]]) {
+      if (x < 0 || y < 0 || x >= c.cols || y >= c.rows) continue;
+      const j = y * c.cols + x;
+      if (seen.has(j) || !roadAt(c, j)) continue;
+      seen.add(j);
+      if (tr.cap[j] > 0) out.push(j);
+      else queue.push(j);
+    }
+  }
+  return out;
 }
 
 /** Berechnet Wege, Pendler und Stau-Puffer neu (Aufruf aus transportOf). */
@@ -268,6 +298,7 @@ function build(game, c, tr) {
   const mun = new Map();
   const shop = new Map();
   const depot = new Map();
+  const supply = new Map();
   for (const a of anchors) {
     const k = KINDS[c.kind[a] - 1];
     const g = groupOf(c, a);
@@ -285,7 +316,8 @@ function build(game, c, tr) {
     if (WORKPLACE_KINDS.includes(k)) commute.set(a, pathFrom(tr.fields.res, accessCells(c, a))?.path ?? null);
     if (k === 'mun') mun.set(a, pathFrom(tr.fields.main, accessCells(c, a))?.path ?? null);
     if (k === 'com' || k === 'market') shop.set(a, pathFrom(tr.fields.main, accessCells(c, a))?.path ?? null);
-    if (k === 'ktank' || k === 'mdepot') depot.set(a, pathFrom(tr.fields.main, accessCells(c, a))?.path ?? null); // Fliegerhorst (seit v5.35)
+    if (k === 'ktank' || k === 'mdepot') depot.set(a, pathFrom(tr.fields.main, supplyAccess(c, tr, a))?.path ?? null); // Fliegerhorst (seit v5.35; seit Paket „Straßen“ auch über Bahn und Rollfeld)
+    if (TRAINERS.has(c.kind[a])) supply.set(a, pathFrom(tr.fields.main, supplyAccess(c, tr, a))?.path ?? null); // Ausbildung (Paket „Straßen“)
   }
   tr.routes = routes;
   tr.alts = alts;
@@ -293,6 +325,7 @@ function build(game, c, tr) {
   tr.mun = mun;
   tr.shop = shop;
   tr.depot = depot;
+  tr.supply = supply;
 }
 
 /**
@@ -306,6 +339,7 @@ function build(game, c, tr) {
  *   mun:     Map<Anker, Int32Array | null>  Weg Munitionswerk → Lager
  *   shop:    Map<Anker, Int32Array | null>  Weg Gewerbe/Markt → Lager
  *   depot:   Map<Anker, Int32Array | null>  Weg Kerosintank/Munitionslager → Lager (seit v5.35)
+ *   supply:  Map<Anker, Int32Array | null>  Weg Ausbildungsgebäude → Lager (Paket „Straßen“; Stellplatz über Rollfeld und Bahn)
  *   load, factor, cap: Float32Array je Stadtzelle (factor = c.congestion); list: Int32Array der Straßenzellen;
  *   active (die ersten nActive): Straßenzellen mit Last oder Stau
  * `dist` = Anzahl der Straßenzellen auf dem Weg (0, wenn es kein Ziel gibt).
@@ -356,3 +390,25 @@ export function transportInfo(game, c, anker) {
   return { to, dist, eff, commuteEff, noHome, targets };
 }
 
+
+/**
+ * Versorgung eines Ausbildungsgebäudes der Stadt (Paket „Straßen“, Teil 2; nur lesen): { path, dist, v, eff, rate }. dist = Straßenzellen
+ * des Wegs zum Lager, v = Versorgungsgrad nach der Weglänge (CITY.supply), eff = Stau-Faktor des Wegs, rate = v × eff = Tempo der
+ * Ausbildung. Ohne Weg (oder ohne fertiges Gebäude) rate 0.
+ */
+export function supplyOf(game, c, a) {
+  const path = transportOf(game, c).supply.get(a) ?? null;
+  if (!path) return { path: null, dist: 0, v: 0, eff: 0, rate: 0 };
+  const S = CITY.supply;
+  const dist = path.length;
+  const v = Math.max(S.min, 1 - S.perCell * Math.max(0, dist - S.free));
+  const eff = pathEff(transportOf(game, c), path);
+  return { path, dist, v, eff, rate: v * eff };
+}
+
+/** Tempo der Ausbildung im Gebäude e (Ziel-Entity der Stadt; andere Gebäude: 1). */
+export function trainRate(game, e) {
+  if (e.type !== 'city') return 1;
+  const c = game.city?.[e.team];
+  return c ? supplyOf(game, c, e.cityCell).rate : 1;
+}

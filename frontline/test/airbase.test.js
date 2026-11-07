@@ -11,6 +11,8 @@ import { connectRoad } from '../js/game/city/roadnet.js';
 import { isFoe } from '../js/game/entities.js';
 import { standsOf, freeSpace, runwaysOf, standRoute, jetGrounded, parkedArmor, runwayBusy } from '../js/game/aircraft.js';
 import { MAP_ROAD, BRIDGE_ROAD } from '../js/game/roads.js';
+import { withValue } from './util.js';
+import { supplyOf } from '../js/game/transport.js';
 
 const DT = 0.05;
 const run = (g, s) => {
@@ -69,6 +71,8 @@ function airbase(g, t = 0, opts = {}) {
   if (opts.atc !== false) put('atc', 4, 2);
   if (opts.ktank !== false) put('ktank', 6, 2);
   if (opts.mdepot !== false) put('mdepot', 8, 2);
+  // Straßenweg zum Lager ab dem Ende der Bahn (Paket „Straßen“: Stellplätze bilden nur mit Weg aus), kostenlos wie beim Startviertel
+  if (opts.link !== false) withValue(CITY.transport, 'connectMax', 400, () => assert.ok(connectRoad(g, c, r * c.cols + q + 9, false) >= 0, 'Weg zum Lager'));
   run(g, CITY.growTime + 1);
   const ents = [...c.ents.entries()].filter(([, e]) => e.alive);
   const of = (k) => ents.filter(([i]) => kindAt(c, i) === k).map(([, e]) => e);
@@ -106,7 +110,10 @@ test('Stellplatz bildet eine F-16 aus (einer je Stellplatz), Schutz je Stufe, Ke
   const r = g.issue(0, { type: 'train', buildingId: s.id, unit: 'f16' });
   assert.equal(r.ok, false, 'nur ein Flugzeug je Stellplatz');
   assert.match(r.reason, /Stellplatz/);
-  run(g, UNITS.f16.buildTime + 1);
+  const sup = supplyOf(g, c, s.cityCell); // Paket „Straßen“: Tempo nach dem Weg zum Lager (über die Bahn)
+  assert.ok(sup.rate > 0, 'Stellplatz über Bahn und Straße versorgt');
+  // Tempo = Versorgung × Stau des Wegs; Tank und Lager füllen sich über dieselbe Straße, daher bis höchstens 300 s warten
+  for (let k = 0; k < 300 && !g.units.some((x) => x.def.jet); k++) run(g, 1);
   const [u] = g.units.filter((x) => x.def.jet);
   assert.ok(u && u.parked && u.jet.home === s.id, 'steht auf seinem Stellplatz');
   assert.deepEqual([u.x, u.y], [s.x, s.y]);

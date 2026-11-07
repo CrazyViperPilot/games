@@ -120,7 +120,12 @@ export const CITY = {
   // die Stadt ändert (Bau, Abriss, Wachstum, Ruinen, Flucht der Bewohner), nicht nach Zeit (seit dem Review von v5.20, vorher reroute 3 s).
   // connectMax (seit v5.20, AP4): längster neuer Anschluss an die Straße zum Lager in Zellen (Startviertel und KI, connectRoad in city.js).
   // maxLanes (seit v5.38): Straßen nebeneinander bilden ein mehrspuriges Band; Kapazität je Zelle × Spuren je Richtung, höchstens so viele
-  transport: { cap: 12, mapCap: 20, maxLanes: 4, commute: 0.05, maxDist: 160, smooth: 2, connectMax: 30 },
+  transport: { cap: 12, mapCap: 20, maxLanes: 4, commute: 0.05, maxDist: 260, smooth: 2, connectMax: 30 }, // maxDist seit Paket „Straßen“ 260 (vorher 160): die Kartenmitte ist ohne Umwege schon 150 Zellen entfernt
+  // Versorgung der Ausbildungsgebäude über das Straßennetz (Paket „Straßen“, Teil 2, PRD §15 „Straßentransport“): Kaserne, Fabrikhalle,
+  // Heliport und Stellplatz bilden nur so schnell aus, wie ihr Straßenweg zum Lager der Hauptstadt es erlaubt. Versorgungsgrad
+  // v = max(min, 1 − perCell × max(0, d − free)), d = Straßenzellen des Wegs; Tempo = v × Stau-Faktor des Wegs; ohne Weg 0 (Ausbildung
+  // steht). Jeder laufende Ausbildungsplatz legt Stahl je s (CITY.metalCost ÷ Ausbildungszeit × Tempo) als Last auf den Weg.
+  supply: { free: 15, perCell: 0.006, min: 0.3 },
 
   // ---- Werkslager (seit v5.69, PRD §15 „Werke und LKW am Werk“) ----
   // Jedes Werk der Arten in `kinds` (Zellenart-Schlüssel; Ware aus CITY.chain[Art].to) hat ein kleines Ausgangslager für seine Ware.

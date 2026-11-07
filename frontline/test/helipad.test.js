@@ -8,6 +8,8 @@ import { UNITS } from '../js/data/units.js';
 import { canZone, roadAt } from '../js/game/city/cells.js';
 import { KINDS } from '../js/data/citykinds.js';
 import { heliGrounded, padBusy } from '../js/game/helipad.js';
+import { connectRoad } from '../js/game/city/roadnet.js';
+import { withValue } from './util.js';
 
 const DT = 0.05;
 const run = (g, s) => {
@@ -64,6 +66,8 @@ function heliBase(g, opts = {}) {
   if (opts.tower !== false) put('atc', 4, 0);
   if (opts.ktank !== false) put('ktank', 0, 3);
   if (opts.mdepot !== false) put('mdepot', 2, 3);
+  // Straßenweg zum Lager (Paket „Straßen“: Ausbildung nur mit Weg), kostenlos wie beim Startviertel
+  withValue(CITY.transport, 'connectMax', 400, () => assert.ok(connectRoad(g, c, (r + 2) * c.cols + q + 11, false) >= 0, 'Weg zum Lager'));
   run(g, CITY.growTime + 1);
   const of = (k) => [...c.ents.entries()].filter(([i, e]) => e.alive && KINDS[c.kind[i] - 1] === k).map(([, e]) => e);
   const pads = of('heliport');
@@ -124,7 +128,8 @@ test('Start senkrecht auf Befehl, Landung auf dem Heliport, dort tanken und nach
   const fuel0 = u.fuel;
   const k0 = ktank.stock;
   const m0 = mdepot.stock;
-  run(g, 3);
+  // ohne Nachfüllen über die Straße (die Basis hat seit dem Paket „Straßen“ einen Weg zum Lager), damit der Verbrauch sichtbar bleibt
+  withValue(CITY.air.tank, 'fill', CITY.air.tank.fill.map(() => 0), () => withValue(CITY.air.depot, 'fill', CITY.air.depot.fill.map(() => 0), () => run(g, 3)));
   assert.ok(u.fuel > fuel0, 'getankt');
   assert.ok(ktank.stock < k0, 'aus dem Kerosintank');
   assert.ok(mdepot.stock < m0 && u.weapons.some((w) => w.rounds > 0), 'aus dem Munitionslager nachgeladen');

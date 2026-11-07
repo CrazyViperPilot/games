@@ -13,7 +13,7 @@ import { CITY } from '../data/city.js';
 import { DEPOSITS, DEPOSIT_NAME, hasRoad } from '../game/city/cells.js';
 import { hasMarket } from '../game/city/query.js';
 import { careOf } from '../game/city/care.js';
-import { transportInfo, transportOf } from '../game/transport.js';
+import { transportInfo, transportOf, supplyOf } from '../game/transport.js';
 import { standRoute, runwaysOf, runwayBusy } from '../game/aircraft.js';
 import { padBusy } from '../game/helipad.js';
 import { CITY_TIP } from './citypanel.js';
@@ -618,6 +618,15 @@ export class Hud {
       const T = transportInfo(g, c, i);
       if (T.noHome) h += warn('Keine Wohnung über die Straße erreichbar: keine Arbeiter');
       else if (Math.round(T.commuteEff * 100) < 100) h += line(`Pendler: Stau ${pct(T.commuteEff)}`);
+    }
+    if (CITY.produces[k]) {
+      // Ausbildung über das Straßennetz (Paket „Straßen“, Teil 2): Versorgungsgrad nach Weglänge × Stau
+      const S = supplyOf(g, c, i);
+      if (!S.path) h += warn('Kein Straßenweg zum Lager der Hauptstadt: Ausbildung steht');
+      else {
+        h += line(`Versorgung ${pct(S.rate)} · Weg zum Lager ${S.dist} ${S.dist === 1 ? 'Feld' : 'Felder'} (Entfernung ${pct(S.v)}, Stau ${pct(S.eff)})`);
+        if (S.rate < 1) h += `<div class="muted small">Ausbildung läuft mit ${pct(S.rate)} des Tempos</div>`;
+      }
     }
     if (k === 'com' || k === 'market') {
       h += line(`Waren: ${pct(s.shopSupply ?? 1)} versorgt (Baumaterial über die Straße)`);

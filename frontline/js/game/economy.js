@@ -6,6 +6,7 @@ import { UNITS } from '../data/units.js';
 import { planPath, setIdle } from './movement.js';
 import { parkNew } from './aircraft.js';
 import { isHeliport, landHeliNew } from './helipad.js';
+import { trainRate } from './transport.js';
 
 const STOCK_KEYS = ['bm', 'mun', 'fuel'];
 const INCOME_TAU = 2; // Glättungszeitkonstante des angezeigten Einkommens (s)
@@ -55,7 +56,9 @@ export function updateEconomy(game, dt) {
   for (const b of game.city ? [...game.buildings, ...cityTrainers(game)] : game.buildings) {
     if (!b.alive || !b.built || b.queue.length === 0) continue;
     const slots = Math.min(b.trainSlots ?? BALANCE.trainSlots, b.queue.length);
-    for (let i = 0; i < slots; i++) b.queueTimes[i] += dt;
+    // Stadtgebäude (Paket „Straßen“): Tempo nach dem Straßenweg zum Lager (Versorgungsgrad × Stau, ohne Weg 0)
+    const rate = game.city ? trainRate(game, b) : 1;
+    for (let i = 0; i < slots; i++) b.queueTimes[i] += dt * rate;
     for (let i = 0; i < slots && i < b.queue.length; ) {
       const type = b.queue[i].unit;
       const ut = UNITS[type];

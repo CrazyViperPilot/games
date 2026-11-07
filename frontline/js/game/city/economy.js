@@ -4,10 +4,11 @@ import { BALANCE } from '../../data/balance.js';
 import { CITY } from '../../data/city.js';
 import { KIND, KINDS, KIND_ID, WORKS } from '../../data/citykinds.js';
 import { STORED_GOODS } from '../../data/goods.js';
-import { transportOf, pathEff, addLoad, beginLoads, settleLoads, minFactor } from '../transport.js';
+import { transportOf, pathEff, addLoad, beginLoads, settleLoads, minFactor, supplyOf } from '../transport.js';
 import { updateCare } from './care.js';
 import { isFlat, DEPOSITS, isPart, cellsOf, cellFree, releaseCell, hasRoad } from './cells.js';
-import { draftedCount, freePop } from './query.js';
+import { draftedCount, freePop, trainersOf } from './query.js';
+import { UNITS } from '../../data/units.js';
 import { zeroGoods, zeroStats, updateClaim, occupyCell, totals, syncEntity, dropEntity } from './state.js';
 
 /** Arbeitsspeicher je Stadt (einmal angelegt, kein Allokieren im Schritt): Eingang und Wirkung je Gebäude, Liste der fertigen Gebäude. */
@@ -224,6 +225,7 @@ function produce(game, c, id, P, dt) {
   s.iron = s.gross.iron;
   storeAndMunitions(x);
   fillAirbase(x);
+  supplyTrainers(game, x);
   // Stau: kleinster Stau-Faktor auf den in diesem Schritt benutzten Straßen (1 ohne Stau), dann Glättung für den nächsten Schritt
   s.jam = minFactor(tr);
   settleLoads(tr, dt);
@@ -437,6 +439,26 @@ function storeAndMunitions(x) {
     const v0 = main.store.mun;
     main.store.mun = Math.min(BALANCE.logistics.capitalCap, v0 + s.mun * dt);
     made.mun += Math.max(0, main.store.mun - v0);
+  }
+}
+
+/**
+ * Versorgung der Ausbildung (Paket „Straßen“, Teil 2): jeder laufende Ausbildungsplatz eines Stadtgebäudes legt Stahl je s
+ * (CITY.metalCost ÷ Ausbildungszeit × Tempo) als Last auf den Weg zum Lager. Das Tempo selbst rechnet economy.js (trainRate).
+ */
+function supplyTrainers(game, x) {
+  const { c, tr } = x;
+  for (const e of trainersOf(c)) {
+    if (!e.alive || !e.queue?.length) continue;
+    const sup = supplyOf(game, c, e.cityCell);
+    if (!sup.path) continue;
+    const slots = Math.min(e.trainSlots ?? BALANCE.trainSlots, e.queue.length);
+    let load = 0;
+    for (let k = 0; k < slots; k++) {
+      const u = e.queue[k].unit;
+      load += ((CITY.metalCost[u] ?? 0) / UNITS[u].buildTime) * sup.rate;
+    }
+    if (load > 0) addLoad(tr, sup.path, load);
   }
 }
 

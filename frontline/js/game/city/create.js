@@ -192,7 +192,7 @@ export function createCity(game, enabled) {
 /**
  * Startviertel (CITY.startQuarter): Straße nahe der Hauptstadt, darunter Wohnen und Raffinerie, darüber (seit v5.03) die Großbauten
  * Kaserne und Fabrikhalle nebeneinander mit der Unterkante an der Straße; Ölquelle auf dem nächsten Öl. Passt das ganze Viertel
- * nirgends, stehen die Großbauten so nah wie möglich an der Hauptstadt (ohne Straße; sie bilden trotzdem aus).
+ * nirgends, stehen die Großbauten so nah wie möglich an der Hauptstadt; seit dem Paket „Straßen“ bekommen sie danach eine Straße zum Lager.
  */
 function startQuarter(game, c) {
   const m = game.mainFob(c.team);
@@ -216,6 +216,8 @@ function startQuarter(game, c) {
   // Anschluss ans Lager (seit v5.20, AP4): erst die Raffinerie, dann die Ölquelle an deren Netz (ein Weg zur Raffinerie); ohne Kosten
   for (const i of [...c.list]) if (!isPart(c, i) && c.level[i] && KINDS[c.kind[i] - 1] === 'fuel') connectRoad(game, c, i, false);
   if (oil >= 0 && c.kind[oil]) connectRoad(game, c, oil, false, goalOf(c, oil, 'mine'));
+  // Kaserne und Fabrikhalle ebenso (Paket „Straßen“, Teil 2: Ausbildung nur mit Straßenweg zum Lager); besteht der Anschluss schon, bleibt alles gleich
+  for (const i of [...c.list]) if (!isPart(c, i) && c.level[i] && CITY.produces[KINDS[c.kind[i] - 1]]) connectRoad(game, c, i, false);
   rebuildList(c);
 }
 

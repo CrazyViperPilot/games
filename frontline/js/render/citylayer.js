@@ -1406,10 +1406,11 @@ function siteBar(ren, ctx, c, i, r, n, iso) {
 
 /** Arten, die etwas an ein Ziel liefern (Förderung, Werke, Munitionswerk). */
 const SUPPLIER_KINDS = new Set(SUPPLIERS);
-/** Warnung am Schild: Lieferant ohne Lieferweg, oder Arbeitsstätte ohne erreichbare Wohnung (Pendlerweg fehlt). */
+/** Warnung am Schild: Lieferant ohne Lieferweg, Arbeitsstätte ohne erreichbare Wohnung (Pendlerweg fehlt) oder Ausbildungsgebäude ohne Weg zum Lager. */
 function transportWarn(tr, k, i) {
   const r = tr.routes.get(i);
   const noRoute = SUPPLIER_KINDS.has(k) && (!r || r.to === null);
   const noHome = tr.commute.has(i) && tr.commute.get(i) === null;
-  return noRoute || noHome;
+  const noSupply = tr.supply?.has(i) && tr.supply.get(i) === null; // Ausbildung ohne Straßenweg zum Lager (Paket „Straßen“)
+  return noRoute || noHome || noSupply;
 }
