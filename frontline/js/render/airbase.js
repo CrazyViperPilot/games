@@ -88,7 +88,7 @@ export function airbaseGround(k, lv, half) {
     blob(-4, 18, 4, 2.5, 'rgba(30,30,28,0.12)');
     if (lv < 3) {
       for (const [a, b, c2, d] of [[-h + 5, -h + 5, h - 5, -h + 5], [h - 5, -h + 5, h - 5, h - 4], [-h + 5, -h + 5, -h + 5, h - 4]]) line(a, b, c2, d, WHITE, 1.3);
-      // je Platz (zwei F-16 nebeneinander, CITY.air.standSlot = 0,5 Zellen von der Mitte): Führungslinie und Haltemarke
+      // je Platz (zwei F-16 nebeneinander, CITY.air.standSlot = 0,4 Zellen von der Mitte): Führungslinie und Haltemarke
       for (const x of [-SLOT, SLOT]) {
         line(x, h - 1, x, -24, YEL, 2.2); // Führungslinie bis zur Haltemarke
         line(x - 9, -27, x + 9, -27, YEL, 2.6);

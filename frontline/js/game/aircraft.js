@@ -204,10 +204,14 @@ function slotPos(c, e, s) {
   return { x: e.x + d, y: e.y };
 }
 
-/** Punkt am Südrand des Stellplatzes vor Platz s: Jets rollen dort ein und aus, nicht über den anderen Platz. */
-function laneOf(c, e, s) {
+/**
+ * Punkt am Rand des Stellplatzes vor Platz s, auf der Seite (Nord oder Süd) des Zugangs `ref` (Rollfeld-, Bahn- oder Straßenzelle):
+ * Jets rollen dort ein und aus, gerade vom Platz weg, nicht über den anderen Platz. Ohne Zugang oder auf gleicher Höhe der Südrand.
+ */
+function laneOf(c, e, s, ref) {
   const p = slotPos(c, e, s);
-  return { x: p.x, y: e.y + c.cell };
+  const side = ref && ref.y < e.y - 1e-6 ? -1 : 1;
+  return { x: p.x, y: e.y + side * c.cell };
 }
 
 /**
@@ -407,7 +411,7 @@ function stepParked(game, u, dt) {
   const start = { x: from.x + dx * (c.cell / 2), y: from.y + dy * (c.cell / 2) };
   const pts = route.cells.map((i, k) => ({ ...cellCenter(c, i), enter: k === route.cells.length - 1 ? rw.key : 0 }));
   pts.push({ ...start, enter: 0 });
-  pts.unshift({ ...laneOf(c, e, u.jet.slot), enter: 0 }); // erst vom Platz zum Südrand des Stellplatzes
+  pts.unshift({ ...laneOf(c, e, u.jet.slot, pts[0]), enter: 0 }); // erst vom Platz zum Rand des Stellplatzes auf der Seite des Rollwegs
   u.parked = false;
   u.jet.warned = false;
   u.jet.phase = 'taxiOut';
@@ -476,7 +480,7 @@ function stepRollout(game, u, dt) {
   const cells = cellPath(c, [here], (i) => goal.has(i));
   const pts = (cells ?? []).map((i) => ({ ...cellCenter(c, i), enter: 0 }));
   u.jet.slot = takeSlot(game, u, e); // Platz für die Einfahrt reservieren
-  pts.push({ ...laneOf(c, e, u.jet.slot), enter: 0 }, { ...slotPos(c, e, u.jet.slot), enter: 0 });
+  pts.push({ ...laneOf(c, e, u.jet.slot, pts[pts.length - 1]), enter: 0 }, { ...slotPos(c, e, u.jet.slot), enter: 0 });
   u.jet.phase = 'taxiIn';
   u.jet.route = pts;
   u.jet.idx = 0;
