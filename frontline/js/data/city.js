@@ -64,7 +64,7 @@ export const CITY = {
     barracks: ['rifleman', 'at', 'sniper', 'commander'], // Kaserne: Soldaten
     factory: ['truck', 'engineer', 'fobTruck', 'ifv', 'tank', 'flak', 'sam', 'gepard', 'pzh', 'excavator'], // Fabrikhalle: alle Fahrzeuge (auch das FOB-Fahrzeug)
     heliport: ['littlebird', 'transporter', 'gunship'], // Heliport: Hubschrauber
-    stand: ['f16'], // Stellplatz/Hangar (seit v5.35): je Stellplatz ein Kampfflugzeug, das dort auch steht, tankt und nachlädt (CITY.air)
+    stand: ['f16'], // Stellplatz/Hangar (seit v5.35): je Stellplatz zwei Kampfflugzeuge (CITY.air.standJets), die dort auch stehen, tanken und nachladen
   },
   trainSlots: [0, 2, 3, 4], // gleichzeitige Ausbildungen je Stufe (Stufe 1 wie früher die Hauptstadt)
 
@@ -177,6 +177,12 @@ export const CITY = {
     atcRadius: 14,
     atcSight: 360, // Sicht (px) des Towers ab seinem Rand statt CITY.sight (Radar, seit v5.57): überblickt Bahn und Anflug, nicht die Front
     supplyRadius: 12,
+    // Flugzeuge je Stellplatz (Daniels Wunsch): so viele F-16 passen auf einen Stellplatz, Warteschlange und Flugzeuge zusammen.
+    // Jedes Flugzeug hat seinen festen Platz (u.jet.slot, der kleinste freie); die Plätze liegen nebeneinander, Nase nach Norden.
+    standJets: 2,
+    // Abstand der Plätze von der Mitte des Stellplatzes (Anteil einer Zelle, je Seite): 0,4 = 25 px nach links und rechts (im Shelter
+    // bleibt so Platz zwischen Tragfläche und Wand)
+    standSlot: 0.4,
     shelter: [1, 1, 0.5, 0.15],
     // Ausbau der Stellplätze (seit v5.39, Daniels Wunsch): nicht mehr von selbst, nur über „Ausbauen“ am gewählten Stellplatz.
     // Stufe 2 Überdachung (Stahldach auf Stützen), Stufe 3 Stahlbeton-Shelter (Hardened Aircraft Shelter); Kosten je Stufe
@@ -265,7 +271,7 @@ export const CITY = {
     runwayLen: 10, // Länge (Zellen) der Bahn, die sie anlegt
     standBuffer: 100, // Baumaterial, das nach einem weiteren Stellplatz im Lager der Hauptstadt bleiben muss
     upgradeBuffer: { bm: 200, steel: 200 }, // Baumaterial und Stahl, die nach dem Ausbau eines Stellplatzes bleiben müssen (Geld: CITY.air.upgradeAiReserve)
-    jets: { easy: 2, normal: 4, hard: 6 }, // so viele F-16 hält sie (seit v5.03; seit v5.35 je ein Stellplatz, die KI baut so viele)
+    jets: { easy: 2, normal: 4, hard: 6 }, // so viele F-16 hält sie (seit v5.03; seit v5.35 je Stellplatz so viele wie CITY.air.standJets, die KI baut so viele Stellplätze)
     jetReserve: 400, // Geld, das nach dem Kauf einer F-16 übrig bleiben muss
     // seit v5.20 (Review): höchstens so viele Förderanlagen je Werk, das ihren Rohstoff nimmt (Holz und Stein zusammen je BM-Werk, Erz je
     // Hütte, Öl je Raffinerie oder Kerosin-Raffinerie; aufgerundet). Mehr Förderung, als die Werke verarbeiten, verstopft nur die Straßen.

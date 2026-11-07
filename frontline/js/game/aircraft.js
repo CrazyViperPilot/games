@@ -46,8 +46,8 @@ export function jetsAt(game, e) {
   return n + (e.queue?.length ?? 0);
 }
 
-/** Freie Plätze eines Stellplatzes (einer je Stellplatz). */
-export const freeSpace = (game, e) => 1 - jetsAt(game, e);
+/** Freie Plätze eines Stellplatzes (CITY.air.standJets je Stellplatz, Warteschlange eingerechnet). */
+export const freeSpace = (game, e) => AIR.standJets - jetsAt(game, e);
 
 /** Stufe einer Stadt-Entity (0, wenn weg). */
 const levelOf = (game, e) => (e && game.city?.[e.team] ? game.city[e.team].level[e.cityCell] : 0);
@@ -198,12 +198,44 @@ function homeFor(game, u) {
   return best;
 }
 
-/** Abgestellt: auf Stellplatz e (Mitte), Nase nach Norden. */
-function park(u, e) {
-  u.x = e.x;
-  u.y = e.y;
-  u.prevX = e.x;
-  u.prevY = e.y;
+/** Ort des Platzes s auf Stellplatz e: die Plätze liegen nebeneinander (Nase nach Norden), gleichmäßig um die Mitte verteilt. */
+function slotPos(c, e, s) {
+  const d = (s - (AIR.standJets - 1) / 2) * 2 * AIR.standSlot * c.cell;
+  return { x: e.x + d, y: e.y };
+}
+
+/** Punkt am Südrand des Stellplatzes vor Platz s: Jets rollen dort ein und aus, nicht über den anderen Platz. */
+function laneOf(c, e, s) {
+  const p = slotPos(c, e, s);
+  return { x: p.x, y: e.y + c.cell };
+}
+
+/**
+ * Freier Platz für u auf Stellplatz e: der kleinste, den kein anderer Jet dort hält (ein Jet hält seinen Platz, solange er abgestellt ist
+ * oder am Boden rollt). Sind alle belegt (sollte nicht vorkommen), der erste.
+ */
+function takeSlot(game, u, e) {
+  for (let s = 0; s < AIR.standJets; s++) {
+    const held = game.units.some((o) => o !== u && o.alive && o.def?.jet && o.jet?.home === e.id && o.jet.slot === s && (o.parked || GROUND.has(o.jet.phase)));
+    if (!held) return s;
+  }
+  return 0;
+}
+
+/** Jet u steht auf seinem Platz von e (zugewiesen, wenn noch keiner da ist, z. B. nach dem Laden eines alten Standes). */
+function seat(game, u, e) {
+  const c = game.city[u.team];
+  u.jet.slot ??= takeSlot(game, u, e);
+  const p = slotPos(c, e, u.jet.slot);
+  u.x = p.x;
+  u.y = p.y;
+  u.prevX = p.x;
+  u.prevY = p.y;
+}
+
+/** Abgestellt: auf seinem Platz an Stellplatz e, Nase nach Norden. */
+function park(game, u, e) {
+  seat(game, u, e);
   u.angle = -Math.PI / 2;
   u.parked = true;
   u.jet.home = e.id;
@@ -219,10 +251,10 @@ function park(u, e) {
   setIdle(u);
 }
 
-/** Neue F-16 aus der Ausbildung (economy.js): steht gleich auf ihrem Stellplatz. */
-export function parkNew(u, e) {
+/** Neue F-16 aus der Ausbildung (economy.js): steht gleich auf ihrem Platz am Stellplatz. */
+export function parkNew(game, u, e) {
   u.jet = { home: e.id, ready: false, warned: false };
-  park(u, e);
+  park(game, u, e);
   u.jet.ready = isFull(u);
 }
 
@@ -325,8 +357,7 @@ function stepParked(game, u, dt) {
   if (lostWithStand(game, u)) return;
   const e = game.getEntity(u.jet.home);
   const c = game.city[u.team];
-  u.x = e.x;
-  u.y = e.y;
+  if (u.jet.slot == null) seat(game, u, e); // alter Stand ohne Platz (Spielstand vor den zwei Plätzen)
   const mod = modOf(game, u, 'rearm'); // Schnellwartung (Forschung): kleiner = schneller
   if (u.fuel < u.def.fuelMax) {
     const t = supplier(game, e, KIND_ID.ktank);
@@ -376,6 +407,7 @@ function stepParked(game, u, dt) {
   const start = { x: from.x + dx * (c.cell / 2), y: from.y + dy * (c.cell / 2) };
   const pts = route.cells.map((i, k) => ({ ...cellCenter(c, i), enter: k === route.cells.length - 1 ? rw.key : 0 }));
   pts.push({ ...start, enter: 0 });
+  pts.unshift({ ...laneOf(c, e, u.jet.slot), enter: 0 }); // erst vom Platz zum Südrand des Stellplatzes
   u.parked = false;
   u.jet.warned = false;
   u.jet.phase = 'taxiOut';
@@ -413,6 +445,7 @@ function stepRoll(game, u, dt) {
   const left = (R.ex - u.x) * R.dx + (R.ey - u.y) * R.dy;
   if (u.jet.v >= J.rotate * full || left <= 0) {
     u.jet.phase = 'air';
+    u.jet.slot = undefined; // Platz frei
     u.jet.alt = 0;
     u.jet.lift = true; // Steigflug: erst geradeaus, dann frei
     u.jet.locked = false;
@@ -442,7 +475,8 @@ function stepRollout(game, u, dt) {
   const goal = new Set(accessCells(c, e.cityCell));
   const cells = cellPath(c, [here], (i) => goal.has(i));
   const pts = (cells ?? []).map((i) => ({ ...cellCenter(c, i), enter: 0 }));
-  pts.push({ x: e.x, y: e.y, enter: 0 });
+  u.jet.slot = takeSlot(game, u, e); // Platz für die Einfahrt reservieren
+  pts.push({ ...laneOf(c, e, u.jet.slot), enter: 0 }, { ...slotPos(c, e, u.jet.slot), enter: 0 });
   u.jet.phase = 'taxiIn';
   u.jet.route = pts;
   u.jet.idx = 0;
@@ -451,7 +485,7 @@ function stepRollout(game, u, dt) {
 /** Rollen zum Stellplatz; dort abstellen (tanken, nachladen). */
 function stepTaxiIn(game, u, dt) {
   if (lostWithStand(game, u)) return;
-  if (taxi(game, u, dt)) park(u, game.getEntity(u.jet.home));
+  if (taxi(game, u, dt)) park(game, u, game.getEntity(u.jet.home));
 }
 
 /** Ein Flugschritt Richtung (tx, ty): Nase höchstens turn × dt × tf drehen, dann mit dem Tempo des Jets geradeaus. */
@@ -526,6 +560,7 @@ function approach(game, u, e, dt) {
     u.jet.alt = glide < u.jet.alt ? Math.max(glide, u.jet.alt - (2 * dt) / J.climb) : Math.min(1, u.jet.alt + dt / J.climb);
     if (onFinal && along >= J.touch - 2 && u.jet.alt <= 0.02) {
       u.jet.phase = 'rollout'; // aufgesetzt
+      u.jet.slot = undefined; // den Platz am Stellplatz gibt er erst beim Einrollen frei (stepRollout)
       u.jet.alt = 0;
       u.jet.home = e.id;
       u.jet.rtb = false;
@@ -692,13 +727,13 @@ export function cmdLand(game, team, cmd) {
   if (!jets.length) return { ok: false, reason: 'Kein Flugzeug gewählt' };
   // freie Stellplätze an derselben Bahn (der angeklickte zuerst)
   const base = standsOf(game, team).filter((s) => standRoute(game, s)?.rw.key === route.rw.key).sort((a, b) => (a === e ? -1 : b === e ? 1 : dist(a.x, a.y, e.x, e.y) - dist(b.x, b.y, e.x, e.y)));
-  const taken = new Set();
+  const taken = new Map(); // Stellplatz-ID → Zahl der Jets, die dort hinlanden sollen
   let n = 0;
   for (const u of jets) {
     const own = base.find((s) => s.id === u.jet?.home);
-    const s = own ?? base.find((x) => !taken.has(x.id) && freeSpace(game, x) > 0);
+    const s = own ?? base.find((x) => freeSpace(game, x) - (taken.get(x.id) ?? 0) > 0);
     if (!s) continue;
-    taken.add(s.id);
+    if (!own) taken.set(s.id, (taken.get(s.id) ?? 0) + 1);
     u.order = { type: 'land', x: s.x, y: s.y, targetId: s.id };
     u.targetId = null;
     n++;
@@ -707,10 +742,10 @@ export function cmdLand(game, team, cmd) {
   return { ok: true, count: n };
 }
 
-/** Zusatzprüfung der Ausbildung (game.cmdTrain): ein Flugzeug je Stellplatz. Fehlertext oder null. */
+/** Zusatzprüfung der Ausbildung (game.cmdTrain): CITY.air.standJets Flugzeuge je Stellplatz. Fehlertext oder null. */
 export function trainCheck(game, b, unit) {
   if (!UNITS[unit]?.jet) return null;
   if (!isStand(game, b)) return 'Nur ein fertiger Stellplatz baut Flugzeuge';
-  if (freeSpace(game, b) <= 0) return 'Stellplatz belegt (ein Flugzeug je Stellplatz)';
+  if (freeSpace(game, b) <= 0) return `Stellplatz belegt (${AIR.standJets} Flugzeuge je Stellplatz)`;
   return null;
 }

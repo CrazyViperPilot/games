@@ -12,6 +12,7 @@
 // Führungslinie, Parkplatz, Schotter) liefert airbaseGround für bigbuild.js. Örtliche Koordinaten ab der Mitte des Bausteins (±64):
 // x nach Osten, y nach Süden. Nur Zeichnen, keine Spielregeln.
 import { ISO_K } from './camera.js';
+import { CITY } from '../data/city.js';
 import {
   CAR_COLORS, DECK, FACE, G, OUTLINE, acTop, acUnit, band, box, car, carTop, circle, cyl, dish, dishTop, door, fence, flagpole,
   flat, flatTop, frustum, lamp, latticeTop, lineT, lit, mast, onFace, parapet, poly, polyF, rectF, rectS, shade, shadow, shadowTop,
@@ -82,20 +83,26 @@ export function airbaseGround(k, lv, half) {
     // Tor im Norden in den Shelter, Torschienen, dunkler Innenraum und Warnschraffur hinter der Abgasöffnung
     rect(-h, -h, h, h, CONC);
     joints(-h, -h, h, h);
+    const SLOT = CITY.air.standSlot * CITY.cell; // Abstand je Platz von der Mitte (zwei F-16 je Stellplatz)
     blob(2, 8, 7, 4, 'rgba(30,30,28,0.16)'); // Ölflecken unter dem Jet
     blob(-4, 18, 4, 2.5, 'rgba(30,30,28,0.12)');
     if (lv < 3) {
       for (const [a, b, c2, d] of [[-h + 5, -h + 5, h - 5, -h + 5], [h - 5, -h + 5, h - 5, h - 4], [-h + 5, -h + 5, -h + 5, h - 4]]) line(a, b, c2, d, WHITE, 1.3);
-      line(0, h - 1, 0, -24, YEL, 2.2); // Führungslinie bis zur Haltemarke
-      line(-9, -27, 9, -27, YEL, 2.6);
-      for (const x of [-30, 30]) line(x, -6, x, 10, YEL, 1.2, { fine: true }); // Fahrwerksmarken
+      // je Platz (zwei F-16 nebeneinander, CITY.air.standSlot = 0,5 Zellen von der Mitte): Führungslinie und Haltemarke
+      for (const x of [-SLOT, SLOT]) {
+        line(x, h - 1, x, -24, YEL, 2.2); // Führungslinie bis zur Haltemarke
+        line(x - 9, -27, x + 9, -27, YEL, 2.6);
+      }
+      for (const x of [-SLOT, SLOT]) line(x, -6, x, 10, YEL, 1.2, { fine: true }); // Fahrwerksmarken je Platz
       for (const [x, y] of [[-5, 22], [5, 22], [-17, -4], [17, -4]]) rect(x - 1.4, y - 1, x + 1.4, y + 1, '#565a5e', { fine: true }); // Verzurrpunkte
       if (lv === 2) rect(-57, -55, 63, 60, 'rgba(0,0,0,0.13)'); // Schatten des Dachs
     } else {
       const { W, N, S, D } = HS;
       rect(-W + 1, N, W - 1, S, 'rgba(18,18,16,0.3)'); // Innenraum
-      line(0, -h + 1, 0, 30, YEL, 2.2); // Führungslinie vom Tor
-      line(-8, 30, 8, 30, YEL, 2.6);
+      for (const x of [-SLOT, SLOT]) {
+        line(x, -h + 1, x, 30, YEL, 2.2); // Führungslinie vom Tor, je Platz
+        line(x - 8, 30, x + 8, 30, YEL, 2.6);
+      }
       for (const y of [N - D - 1.2, N - D - 2.8]) line(-h + 1, y, h - 1, y, '#4f5357', 0.9); // Torschienen
       for (let x = -14; x < 14; x += 4) line(x, S + D + 13, x + 3, S + D + 6, 'rgba(227,196,58,0.7)', 1.4, { fine: true }); // Warnschraffur
     }

@@ -451,14 +451,15 @@ export function aiAirport(game, c, main, reserve, want = 2) {
   const put = (kind, q, r) => game.issue(c.team, { type: 'city', kind, c0: q, r0: r, c1: q, r1: r }).ok;
   if (hasRunway) {
     // Stellplätze ausbauen (seit v5.39 nur per Befehl): den ersten fertigen unter Stufe 3, wenn genug übrig bleibt
-    const up = stands.length >= want ? stands.find((i) => c.level[i] && c.level[i] < CITY.maxLevel) : null; // erst genug Stellplätze
+    const up = stands.length >= Math.ceil(want / CITY.air.standJets) ? stands.find((i) => c.level[i] && c.level[i] < CITY.maxLevel) : null; // erst genug Stellplätze
     const cost = up != null ? CITY.air.upgrade[c.level[up] + 1] : null;
     if (cost && money >= cost.money + Math.max(reserve, CITY.air.upgradeAiReserve) && main.store.bm >= cost.bm + A.upgradeBuffer.bm && c.metal >= (cost.steel ?? 0) + A.upgradeBuffer.steel) {
       const e = c.ents.get(up);
       if (e && game.issue(c.team, { type: 'cityUpgrade', buildingId: e.id }).ok) return true;
     }
-    // weitere Stellplätze an der Bahn (beide Längsseiten)
-    if (stands.length >= want || money < CITY.cost.stand + reserve || main.store.bm < CITY.costBm.stand + A.standBuffer) return false;
+    // weitere Stellplätze an der Bahn (beide Längsseiten); so viele, dass jeder Jet einen Platz hat (CITY.air.standJets je Stellplatz)
+    const wantStands = Math.ceil(want / CITY.air.standJets);
+    if (stands.length >= wantStands || money < CITY.cost.stand + reserve || main.store.bm < CITY.costBm.stand + A.standBuffer) return false;
     const rw = c.list.filter((i) => c.kind[i] === KIND_ID.runway);
     for (const i of rw) {
       const q = i % c.cols;

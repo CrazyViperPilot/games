@@ -13,6 +13,9 @@ import { standsOf, freeSpace, runwaysOf, standRoute, jetGrounded, parkedArmor, r
 import { MAP_ROAD, BRIDGE_ROAD } from '../js/game/roads.js';
 import { withValue } from './util.js';
 import { supplyOf } from '../js/game/transport.js';
+import { AI } from '../js/ai/ai.js';
+import { snapshotGame, restoreGame } from '../js/game/savegame.js';
+import { pack, unpack } from '../js/core/snapshot.js';
 
 const DT = 0.05;
 const run = (g, s) => {
@@ -98,7 +101,7 @@ test('Bahn: gültig nur als volles Rechteck 2 Zellen breit und mindestens CITY.a
   assert.equal(r2.ok, false, 'Flughafen 10 × 10 gibt es nicht mehr');
 });
 
-test('Stellplatz bildet eine F-16 aus (einer je Stellplatz), Schutz je Stufe, Kerosintank und Munitionslager füllen sich über die Straße', () => {
+test('Stellplatz bildet zwei F-16 aus (zwei je Stellplatz), Schutz je Stufe, Kerosintank und Munitionslager füllen sich über die Straße', () => {
   const g = new Game({ seed: 3, city: true });
   const { c, stands, ktank, mdepot, rw } = airbase(g);
   assert.ok(rw, 'gültige Bahn');
@@ -106,17 +109,20 @@ test('Stellplatz bildet eine F-16 aus (einer je Stellplatz), Schutz je Stufe, Ke
   assert.deepEqual(standsOf(g, 0).map((e) => e.id).sort(), stands.map((e) => e.id).sort());
   const [s] = stands;
   assert.ok(standRoute(g, s), 'Weg vom Stellplatz zur Bahn');
-  assert.ok(g.issue(0, { type: 'train', buildingId: s.id, unit: 'f16' }).ok);
+  assert.ok(g.issue(0, { type: 'train', buildingId: s.id, unit: 'f16' }).ok, 'erste F-16');
+  assert.ok(g.issue(0, { type: 'train', buildingId: s.id, unit: 'f16' }).ok, 'zweite F-16');
   const r = g.issue(0, { type: 'train', buildingId: s.id, unit: 'f16' });
-  assert.equal(r.ok, false, 'nur ein Flugzeug je Stellplatz');
-  assert.match(r.reason, /Stellplatz/);
+  assert.equal(r.ok, false, 'dritte F-16 abgelehnt');
+  assert.match(r.reason, /Stellplatz belegt/);
   const sup = supplyOf(g, c, s.cityCell); // Paket „Straßen“: Tempo nach dem Weg zum Lager (über die Bahn)
   assert.ok(sup.rate > 0, 'Stellplatz über Bahn und Straße versorgt');
-  // Tempo = Versorgung × Stau des Wegs; Tank und Lager füllen sich über dieselbe Straße, daher bis höchstens 300 s warten
-  for (let k = 0; k < 300 && !g.units.some((x) => x.def.jet); k++) run(g, 1);
-  const [u] = g.units.filter((x) => x.def.jet);
-  assert.ok(u && u.parked && u.jet.home === s.id, 'steht auf seinem Stellplatz');
-  assert.deepEqual([u.x, u.y], [s.x, s.y]);
+  // Tempo = Versorgung × Stau des Wegs; Tank und Lager füllen sich über dieselbe Straße, daher bis höchstens 600 s warten
+  for (let k = 0; k < 600 && g.units.filter((x) => x.def.jet).length < 2; k++) run(g, 1);
+  const jets = g.units.filter((x) => x.def.jet);
+  assert.equal(jets.length, 2, 'zwei F-16 gebaut');
+  const [u] = jets.sort((a, b) => a.jet.slot - b.jet.slot);
+  assert.ok(jets.every((x) => x.parked && x.jet.home === s.id), 'beide stehen auf ihrem Stellplatz');
+  assert.deepEqual([u.x, u.y], [s.x - CITY.air.standSlot * c.cell, s.y], 'linker Platz');
   assert.equal(freeSpace(g, s), 0);
   assert.equal(isFoe(1, u), true, 'abgestellte Jets sind angreifbar');
   for (const lv of [1, 2, 3]) {
@@ -199,7 +205,7 @@ test('Einsatz: rollt zur Bahn, Startlauf auf der Bahn, Raketen, Rückkehr, Landu
   assert.ok(u.parked, `gelandet (${phases})`);
   assert.deepEqual(phases.slice(-3), ['rollout', 'taxiIn', 'park'], 'ausrollen, zum Stellplatz rollen');
   assert.ok(Math.abs(touch.y - rw.cy) < 30, 'setzt auf der Bahn auf');
-  assert.deepEqual([u.x, u.y], [s.x, s.y]);
+  assert.deepEqual([u.x, u.y], [s.x - CITY.air.standSlot * c.cell, s.y], 'wieder auf seinem Platz');
   for (let t = 0; t < 120 && !u.jet.ready; t++) run(g, 1);
   assert.ok(u.jet.ready && u.weapons[0].rounds === 2, 'wieder startbereit');
 });
@@ -391,4 +397,76 @@ test('Tower: weite Sicht (CITY.air.atcSight) statt der Sicht der übrigen Stadtg
     CITY.air.atcSight = old;
   }
   assert.ok(wide > narrow, `Tower lichtet mehr Nebel (${wide} > ${narrow} Felder)`);
+});
+
+/** Zwei F-16 an Stellplatz s ausbilden und warten, bis beide stehen (Tank und Lager voll). */
+function twoParked(g, s, c, ktank, mdepot) {
+  ktank.stock = CITY.air.tank.cap[c.level[ktank.cityCell]];
+  mdepot.stock = CITY.air.depot.cap[c.level[mdepot.cityCell]];
+  g.issue(0, { type: 'train', buildingId: s.id, unit: 'f16' });
+  g.issue(0, { type: 'train', buildingId: s.id, unit: 'f16' });
+  for (let k = 0; k < 600 && !(g.units.filter((x) => x.def.jet && x.parked).length === 2 && g.units.filter((x) => x.def.jet).every((x) => x.jet.ready)); k++) run(g, 1);
+  return g.units.filter((x) => x.def.jet && x.alive);
+}
+
+test('Zwei F-16 je Stellplatz: beide stehen auf verschiedenen Plätzen (nebeneinander, Nase nach Norden)', () => {
+  const g = new Game({ seed: 3, city: true });
+  const { c, stands, ktank, mdepot } = airbase(g);
+  const [s] = stands;
+  assert.equal(freeSpace(g, s), CITY.air.standJets);
+  const jets = twoParked(g, s, c, ktank, mdepot);
+  assert.equal(jets.length, 2);
+  assert.deepEqual(jets.map((u) => u.jet.slot).sort(), [0, 1], 'Plätze 0 und 1');
+  const xs = jets.map((u) => u.x).sort((a, b) => a - b);
+  assert.deepEqual(xs, [s.x - CITY.air.standSlot * c.cell, s.x + CITY.air.standSlot * c.cell]);
+  assert.ok(jets.every((u) => u.y === s.y && u.angle === -Math.PI / 2), 'Nase nach Norden');
+  assert.equal(freeSpace(g, s), 0);
+});
+
+test('Zwei F-16 je Stellplatz: Start und Landung beider, Platz wird beim Einrollen neu vergeben', () => {
+  const g = new Game({ seed: 3, city: true });
+  const { c, stands, ktank, mdepot, rw } = airbase(g);
+  const [s] = stands;
+  const jets = twoParked(g, s, c, ktank, mdepot);
+  assert.ok(jets.every((u) => u.jet.ready), 'beide startbereit');
+  const z = g.zone;
+  g.fog[0].revealAll?.();
+  assert.ok(g.issue(0, { type: 'attackMove', ids: jets.map((u) => u.id), x: z.x, y: z.y }).ok);
+  for (let t = 0; t < 60 && !jets.every((u) => u.jet.phase === 'air'); t += DT) g.update(DT);
+  assert.ok(jets.every((u) => u.jet.phase === 'air'), 'beide in der Luft');
+  assert.ok(jets.every((u) => u.jet.slot === undefined), 'Plätze frei, solange sie fliegen');
+  run(g, 3);
+  assert.ok(g.issue(0, { type: 'land', ids: jets.map((u) => u.id), airportId: s.id }).ok, 'Landebefehl für beide');
+  for (let t = 0; t < 300 && !jets.every((u) => u.parked); t += DT) g.update(DT);
+  assert.ok(jets.every((u) => u.parked), 'beide gelandet');
+  assert.deepEqual(jets.map((u) => u.jet.slot).sort(), [0, 1], 'wieder auf verschiedenen Plätzen');
+  assert.ok(jets.every((u) => u.jet.home === s.id && Math.abs(Math.abs(u.x - s.x) - CITY.air.standSlot * c.cell) < 1e-6), 'am Stellplatz');
+  assert.equal(rw.valid, true);
+});
+
+test('Zwei F-16 je Stellplatz überstehen Speichern und Laden (Plätze und Standort bleiben)', async () => {
+  const g = new Game({ seed: 3, city: true });
+  const { c, stands, ktank, mdepot } = airbase(g);
+  const [s] = stands;
+  const jets = twoParked(g, s, c, ktank, mdepot);
+  const before = jets.map((u) => [u.jet.slot, u.x, u.y]);
+  const snap = snapshotGame(g, new AI(g, 1, 'normal'));
+  const { game: g2 } = restoreGame(await unpack(await pack(snap)));
+  const s2 = standsOf(g2, 0)[0];
+  const jets2 = g2.units.filter((u) => u.def.jet && u.alive);
+  assert.deepEqual(jets2.map((u) => [u.jet.slot, u.x, u.y]).sort(), before.sort());
+  assert.equal(freeSpace(g2, s2), 0);
+});
+
+test('Stand ohne Platznummer (alter Spielstand): der Jet bekommt beim Abstellen einen Platz', () => {
+  const g = new Game({ seed: 3, city: true });
+  const { c, stands } = airbase(g);
+  const [s] = stands;
+  const u = g.spawnUnit('f16', 0, s.x, s.y);
+  u.parked = true;
+  u.jet = { home: s.id, ready: false, phase: 'park', alt: 0 };
+  run(g, DT);
+  assert.equal(u.jet.slot, 0, 'erster freier Platz');
+  assert.equal(u.x, s.x - CITY.air.standSlot * c.cell);
+  assert.equal(u.y, s.y);
 });
