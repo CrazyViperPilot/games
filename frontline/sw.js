@@ -112,6 +112,7 @@ const ASSETS = [
   './js/render/props.js',
   './js/render/bigbuild.js',
   './js/render/cityhall.js',
+  './js/render/govquarter.js',
   './js/render/terrain.js',
   './js/render/ground.js',
   './js/render/reliefimg.js',
