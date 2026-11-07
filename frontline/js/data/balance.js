@@ -264,6 +264,7 @@ export const BALANCE = {
     taxiTurn: 3, // Drehrate am Boden (rad/s)
     taxiWait: 12, // s, so lange wartet ein rollender Jet höchstens hinter einem anderen
     gap: 40, // Abstand zum Vordermann beim Rollen (px)
+    keepRight: 16, // Rechtsverkehr am Boden: so weit rollt ein Jet rechts neben der Mitte von Rollfeld und Straße (px), Gegenverkehr fährt aneinander vorbei
     accel: 110, // Beschleunigung im Startlauf und danach (px/s²)
     rotate: 0.62, // Anteil des Reisetempos, bei dem er abhebt
     climb: 3, // s vom Boden bis zur Reiseflughöhe

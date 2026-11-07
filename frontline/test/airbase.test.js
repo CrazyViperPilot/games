@@ -470,3 +470,36 @@ test('Stand ohne Platznummer (alter Spielstand): der Jet bekommt beim Abstellen 
   assert.equal(u.x, s.x - CITY.air.standSlot * c.cell);
   assert.equal(u.y, s.y);
 });
+
+test('Rechtsverkehr am Boden: nach der Landung rollt der Jet um keepRight rechts neben der Mitte, Stellplatz genau', () => {
+  const g = new Game({ seed: 3, city: true });
+  const { c, stands, ktank, mdepot } = airbase(g);
+  ktank.stock = CITY.air.tank.cap[c.level[ktank.cityCell]];
+  mdepot.stock = CITY.air.depot.cap[c.level[mdepot.cityCell]];
+  const [s] = stands;
+  assert.ok(g.issue(0, { type: 'train', buildingId: s.id, unit: 'f16' }).ok);
+  run(g, UNITS.f16.buildTime + 1);
+  const [u] = g.units.filter((x) => x.def.jet);
+  assert.ok(u, 'F-16 ausgebildet');
+  const z = g.zone;
+  assert.ok(g.issue(0, { type: 'attackMove', ids: [u.id], x: z.x, y: z.y }).ok);
+  for (let t = 0; t < 40 && u.jet.phase !== 'air'; t += DT) g.update(DT);
+  assert.equal(u.jet.phase, 'air');
+  run(g, 3);
+  assert.ok(g.issue(0, { type: 'land', ids: [u.id], airportId: s.id }).ok);
+  const offs = [];
+  for (let t = 0; t < 180 && !u.parked; t += DT) {
+    const r = u.jet.route;
+    const k = u.jet.idx;
+    const ph = u.jet.phase;
+    g.update(DT);
+    if (ph !== 'taxiIn' || u.jet.phase !== 'taxiIn' || !r || u.jet.idx === k || !r[k].side) continue;
+    offs.push(Math.hypot(u.x - r[k].x, u.y - r[k].y));
+    // rechts der Fahrtrichtung (Bildschirm, y nach unten): Kreuzprodukt Richtung × Versatz > 0
+    const q = r[k - 1];
+    assert.ok((r[k].x - q.x) * (u.y - r[k].y) - (r[k].y - q.y) * (u.x - r[k].x) > 0, 'Versatz liegt rechts');
+  }
+  assert.ok(offs.length > 0, 'Rollweg hat Zellen mit Rechtsverkehr');
+  for (const d of offs) assert.ok(Math.abs(d - BALANCE.jets.keepRight) < 1e-6, `Versatz ${d}`);
+  assert.ok(u.parked, 'steht wieder auf dem Stellplatz');
+});
