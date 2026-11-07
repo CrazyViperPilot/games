@@ -22,7 +22,10 @@ export class AI {
     this.difficulty = BALANCE.difficulty[difficulty] ? difficulty : 'normal';
     this.cfg = BALANCE.difficulty[this.difficulty];
     this.rng = makeRng(game.seed + team);
-    this.timer = this.cfg.think; // erster Denkschritt sofort
+    // erster Denkschritt sofort; Rot (Team 1) einen halben Takt später, damit nie beide KIs im selben Schritt rechnen (seit v5.93: weniger
+    // Ruckler). Ebenso der Takt der Stadt-KI (cityTimer, siehe think).
+    this.timer = team === 1 ? this.cfg.think * 1.5 : this.cfg.think; // Team 1: erster Schritt auch sofort, der nächste nach einem halben Takt
+    this.cityTimer = team === 1 ? CITY.ai.interval[this.difficulty] / 2 : 0;
     this.budget = 0;
     this.corridor = null; // Gasse vor der Hauptstadt, in der nichts gebaut wird (Ausgang bleibt frei)
     this.badSites = []; // { x, y, until } fehlgeschlagene FOB-Ziele

@@ -168,7 +168,7 @@ export class Game {
     this.winPoints = winPoints;
     this.radioWin = !!radio;
     this.buildRules = !!buildRules; // Baugebiet der Stadt (seit v5.78; Spielstand: Feld wird mitgespeichert)
-    this.fogTimer = 0;
+    this.fogTimers = [0, BALANCE.fogInterval / 2]; // Takt des Nebels je Team (Team 1 versetzt, seit v5.93)
     this.statTimer = 0; // Takt der Heeresgröße für die Statistik (sampleArmy, einmal je s)
     this.pathWork = 0; // untersuchte Zellen der Wegsuche seit dem letzten Schritt (Wegbudget, pathplan.js)
     this.pathBacklog = false; // warten Einheiten auf ihren Weg (neue Anfragen stellen sich dann an)? (pathplan.js)
@@ -242,6 +242,7 @@ export class Game {
       team.earned = team.earned || 0;
     }
     this.statTimer = this.statTimer || 0;
+    this.fogTimers ??= [0, BALANCE.fogInterval / 2]; // Stände vor v5.93 hatten einen gemeinsamen fogTimer
     // Ruinenliste fehlt in Ständen vor v5.66: aus den eingestürzten Häusern neu aufbauen
     if (!this.ruins) this.ruins = (this.houses || []).filter((h) => h.ruined);
     // Nachrüstungen für ältere Stände (Straßen, Forschungsbaum, Stadt, FOB-Baustellen) gibt es seit v5.56 nicht mehr: Stände eines
@@ -1147,10 +1148,19 @@ export class Game {
       this.sampleArmy();
     }
 
-    this.fogTimer += dt;
-    if (this.fogTimer >= BALANCE.fogInterval) {
-      this.fogTimer = 0;
-      this.updateFog();
+    // Nebel je Team in eigenem Takt, Team 1 um einen halben Takt versetzt (seit v5.93): beide Sichtberechnungen im selben Schritt
+    // erzeugten Ruckler. Jedes Team rechnet weiter alle fogInterval s.
+    let fogged = false;
+    for (let t = 0; t < this.teams.length; t++) {
+      this.fogTimers[t] += dt;
+      if (this.fogTimers[t] < BALANCE.fogInterval) continue;
+      this.fogTimers[t] = 0;
+      this.fog[t].update(this, t);
+      fogged = true;
+    }
+    if (fogged) {
+      updateCrateIntel(this);
+      updateScarIntel(this);
     }
 
     updateAnimals(this, dt);

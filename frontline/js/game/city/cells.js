@@ -374,20 +374,24 @@ export function roadLinkWhy(game, c, cells, kind) {
 // von einer sichtbaren gegnerischen Bodeneinheit oder einem gegnerischen Gebäude bzw. Stadtgebäude (ohne Straßen). Einmal je Takt
 // ENEMY_EVERY s Spielzeit neu gestempelt (Einheiten bewegen sich in der Zeit kaum), sofort neu, wenn eine Stadt (ver) oder die Zahl
 // der Gebäude sich ändert. So kostet jede Zellprüfung nur einen Feldzugriff (KI-Suchen, Baumodus je Bild).
-const ENEMY_CACHE = new WeakMap(); // Game → { slot, nb, vers, near: [Uint8Array|null, …] }
-const ENEMY_EVERY = 0.5; // s: Takt der Neuberechnung (reine Rechenhilfe, keine Spielregel)
+const ENEMY_CACHE = new WeakMap(); // Game → [je Team { slot, nb, foeVer, near: Uint8Array } | null]
 
 function enemyNear(game, c) {
   const team = c.team;
   const cities = game.city ?? [];
-  const slot = Math.floor(game.time / ENEMY_EVERY);
+  // Gültig für genau einen Simulationsschritt (game.time): sonst hinge das Ergebnis davon ab, wann zuletzt gerechnet wurde, und ein
+  // geladener Spielstand liefe anders weiter (seit v5.93; vorher bis ENEMY_EVERY s alt)
+  const slot = game.time;
   let hit = ENEMY_CACHE.get(game);
-  const fresh = hit && hit.slot === slot && hit.nb === game.buildings.length && cities.every((o, t) => (o ? o.ver : -1) === hit.vers[t]);
-  if (!fresh) {
-    hit = { slot, nb: game.buildings.length, vers: cities.map((o) => (o ? o.ver : -1)), near: [null, null] };
+  // Je Team eigener Eintrag (seit v5.93): Für die Feindnähe zählen nur gegnerische Städte; eigene Bauaufträge (c.ver) machen die Karte
+  // nicht ungültig (vorher baute die KI sie in einem Denkschritt nach jedem eigenen Auftrag neu).
+  if (!hit) {
+    hit = [null, null];
     ENEMY_CACHE.set(game, hit);
   }
-  if (hit.near[team]) return hit.near[team];
+  const foeVer = cities.map((o) => (o && o.team !== team ? o.ver : -1)).join(',');
+  const h = hit[team];
+  if (h && h.slot === slot && h.nb === game.buildings.length && h.foeVer === foeVer) return h.near;
   const near = new Uint8Array(c.cols * c.rows);
   const R = CITY.build.enemyR;
   const rc = Math.ceil(R / c.cell);
@@ -419,7 +423,7 @@ function enemyNear(game, c) {
       stamp(x, y);
     }
   }
-  hit.near[team] = near;
+  hit[team] = { slot, nb: game.buildings.length, foeVer, near };
   return near;
 }
 

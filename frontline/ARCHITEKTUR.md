@@ -59,7 +59,7 @@ Die Reihenfolge ist Absicht; ein neues System kommt an die Stelle, deren Ergebni
 | 15 | `updateHot` | `hotzone.js` | Hot Zone wandern lassen, Bohrer |
 | 16 | `updateRadio` | `radio.js` | Haltezeit des Sendemasts, Sieg |
 | 17 | `smoothIncome` | `economy.js` | geglättete Einkommensanzeige |
-| 18 | `updateFog` (alle `BALANCE.fogInterval` s) | `fog.js` | Sicht je Team |
+| 18 | Nebel je Team (alle `BALANCE.fogInterval` s, Team 1 einen halben Takt versetzt, seit v5.93) | `fog.js` | Sicht je Team |
 | 19 | `updateAnimals`, `ageEffects`, `cleanup`, `updateScars` | `animals.js`, `game.js`, `scars.js` | Tiere, Effekte altern, Tote entfernen (Wracks, Ereignisse), Narben |
 | 20 | `checkElimination` | `game.js` | Sieg durch Eliminierung |
 

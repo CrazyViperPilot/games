@@ -85,7 +85,8 @@ test('Stadt mit Stau (v5.20): Stau-Faktor c.congestion wird gespeichert, Laden u
     run(g1, a1, 1);
     k++;
   }
-  run(g1, a1, 40); // mitten im Stau speichern
+  run(g1, a1, 40); // eine Weile weiterspielen, dann mitten in einem Stau speichern (Stau kommt und geht)
+  for (k = 0; !g1.city[1].congestion.some((f) => f < 1) && k < 6000; k++) run(g1, a1, 1);
   const jam = Array.from(g1.city[1].congestion).filter((f) => f < 1).length;
   assert.ok(jam > 0, 'Straßen mit Stau vor dem Speichern');
   const { game: g2, ai: a2 } = restoreGame(await unpack(await pack(snapshotGame(g1, a1))));

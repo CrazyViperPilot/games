@@ -3,6 +3,7 @@
 // fliehen sieht, ahnt, wo der Gegner fährt. Eigener Zufall (deterministisch je Seed), der übrige Spielablauf bleibt unberührt.
 import { BALANCE } from '../data/balance.js';
 import { makeRng } from '../core/rng.js';
+import { buildHash, nearby } from './movement.js';
 
 const A = BALANCE.animals;
 const W = BALANCE.map.width;
@@ -93,12 +94,12 @@ export function createAnimals(game) {
 }
 
 /** Nächste Gefahr für ein Tier: Einheit in Schreckweite (je Art) oder frischer Knall. → {x, y} oder null. */
-function threatNear(game, a) {
+function threatNear(game, a, hash) {
   const S = A.scare;
   let best = null;
   let bd = Infinity;
-  for (const u of game.units) {
-    if (!u.alive || u.house) continue;
+  // Nur Einheiten in der Nähe (Raster je Denkschritt, seit v5.93) statt aller Einheiten der Karte; gleiche Auswahl (nächste in Schreckweite)
+  for (const u of nearby(hash, a.x, a.y, Math.max(S.inf, S.vehicle, S.air))) {
     const r = u.def.air ? S.air : u.def.armor === 'inf' ? S.inf : S.vehicle;
     const d = dist(a.x, a.y, u.x, u.y);
     if (d < r && d < bd) {
@@ -144,9 +145,10 @@ function setGoal(a, x, y, speed, state) {
 function think(game, time) {
   const rng = game.animalRng;
   const scared = new Map(); // Rudel → Gefahr
+  const hash = buildHash(game.units.filter((u) => u.alive && !u.house));
   for (const a of game.animals) {
     if (scared.has(a.group)) continue;
-    const t = threatNear(game, a);
+    const t = threatNear(game, a, hash);
     if (t) scared.set(a.group, t);
   }
   for (const g of game.animalGroups) {
