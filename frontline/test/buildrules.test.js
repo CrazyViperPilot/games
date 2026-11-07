@@ -139,7 +139,7 @@ test('mit Schalter: Konfliktzone sperrt, ohne CITY.build.noZone nicht', () => {
   assert.equal(buildWhy(g, c, i, 'res'), 'zone', 'Schalter zurückgestellt');
 });
 
-test('mit Schalter: Großbau nur, wenn jede Zelle des Quadrats im Gebiet liegt', () => withValue(CITY.build, 'needRoad', false, () => {
+test('mit Schalter: Großbau am Gebietsrand darf höchstens ⌊n/2⌋ Zellen über die Grenze ragen (seit v5.91)', () => withValue(CITY.build, 'needRoad', false, () => {
   const g = rules();
   reveal(g);
   rich(g);
@@ -155,7 +155,7 @@ test('mit Schalter: Großbau nur, wenn jede Zelle des Quadrats im Gebiet liegt',
     if (!cmd(g, 0, 'bm', i).ok) continue;
     placed++;
     for (let j = 0; j < c.kind.length; j++) {
-      if (c.kind[j] === KIND_ID.bm) assert.ok(c.claim[j], `Werkzelle ${j} liegt außerhalb des Gebiets`);
+      if (c.kind[j] === KIND_ID.bm) assert.ok(near(c, j, 1), `Werkzelle ${j} liegt mehr als 1 Zelle außerhalb des Gebiets`);
     }
   }
   assert.ok(placed > 0, 'mindestens ein Werk am Rand gebaut');
@@ -163,8 +163,35 @@ test('mit Schalter: Großbau nur, wenn jede Zelle des Quadrats im Gebiet liegt',
   for (const i of border.slice(0, 20)) {
     const a = fitBig(g, c, i % c.cols, Math.floor(i / c.cols), 'bm', undefined, (j) => buildAllowed(g, c, j, 'bm'));
     if (a < 0) continue;
-    for (const j of bigCells(c, a, 2)) assert.ok(c.claim[j], 'Quadrat ganz im Gebiet');
+    for (const j of bigCells(c, a, 2)) assert.ok(near(c, j, 1), 'Quadrat höchstens 1 Zelle über die Grenze');
+    assert.ok(bigCells(c, a, 2).some((j) => c.claim[j]), 'mindestens eine Zelle im Gebiet');
   }
+}));
+
+/** Liegt höchstens d Zellen von Zelle j entfernt (Schachbrettabstand) Gebiet? */
+function near(c, j, d) {
+  const q = j % c.cols;
+  const r = (j - q) / c.cols;
+  for (let rr = r - d; rr <= r + d; rr++) for (let qq = q - d; qq <= q + d; qq++) if (c.claim[rr * c.cols + qq]) return true;
+  return false;
+}
+
+test('mit Schalter (seit v5.91): Fabrikhalle 5 × 5 passt an den Gebietsrand, Bahn darf außerhalb liegen', () => withValue(CITY.build, 'needRoad', false, () => {
+  const g = rules();
+  reveal(g);
+  rich(g);
+  const c = g.city[0];
+  // Randzellen des Gebiets: dort hätte eine 5 × 5-Halle früher fast nie Platz gehabt
+  let fits = 0;
+  for (let i = 0; i < c.kind.length && fits === 0; i++) {
+    if (!c.claim[i] || c.claim[i + 1] || c.kind[i]) continue; // Zelle im Gebiet, rechts davon nicht mehr
+    const a = fitBig(g, c, (i % c.cols) + 1, Math.floor(i / c.cols), 'factory', undefined, (j) => buildAllowed(g, c, j, 'factory'));
+    if (a >= 0 && bigCells(c, a, 5).some((j) => !c.claim[j])) fits++;
+  }
+  assert.ok(fits > 0, 'eine Fabrikhalle ragt am Rand über die Grenze');
+  const out = c.claim.findIndex((v, i) => !v && canZone(g, c, i) && !c.kind[i] && !c.deposit[i]);
+  assert.equal(buildWhy(g, c, out, 'runway'), null, 'Bahn außerhalb des Gebiets erlaubt');
+  assert.equal(buildWhy(g, c, out, 'res'), 'territory', 'Wohnen außerhalb nicht');
 }));
 
 // ---- Anschlusspflicht (Paket „Straßen“, Teil 1) ----------------------------------------------------------------------------
