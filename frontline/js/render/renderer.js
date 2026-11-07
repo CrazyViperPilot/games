@@ -398,7 +398,7 @@ export class Renderer {
       // Hubschrauber zuletzt: sie fliegen über allem
       if (air) drawCityRoofs(this, ctx, team, known, inRect); // Dächer der Stellplätze über den abgestellten Flugzeugen (seit v5.39)
       for (const u of g.units) {
-        if (!u.alive || u.house || flying(u) !== air || !shown(u) || !inRect(u.x, u.y, 30)) continue; // Jets am Boden mit den Bodeneinheiten
+        if (!u.alive || u.house || flying(u) !== air || !shown(u) || !inRect(u.x, u.y, Math.max(30, u.def.radius * 1.6))) continue; // Jets am Boden mit den Bodeneinheiten
         const aim = this.aimOf(u);
         if (!drawUnitTop(ctx, u, z, aim, now)) drawUnit(ctx, u, g.teams[u.team].color, z, aim, now); // gemalt (seit v5.27), sonst einfache Form
         if (u.crate && !drawCratePainted(ctx, u.x + 4, u.y - 6, 10, z)) drawCrateTop(ctx, u.x + 4, u.y - 6, 10, z); // Kiste auf dem Rücken
@@ -507,7 +507,7 @@ export class Renderer {
   topBars(f) {
     const { ctx, g, team, z, sel, hover, inRect, shown } = f;
     for (const u of g.units) {
-      if (!u.alive || u.house || !shown(u) || !inRect(u.x, u.y, 30)) continue;
+      if (!u.alive || u.house || !shown(u) || !inRect(u.x, u.y, Math.max(30, u.def.radius * 1.6))) continue;
       if (!this.barShown(f, u)) continue;
       const bw = 24;
       this.drawHp(ctx, u.x - bw / 2, u.y - u.def.radius - HP_OFFSET / z, bw, u.hp / u.maxHp, z);
