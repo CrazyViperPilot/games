@@ -597,3 +597,32 @@ test('Erz kommt bei der angrenzenden Hütte an (Lieferweg ohne Straße), Roheise
   assert.ok(c.stats.inp.iron > 0 && c.stats.gross.iron > 0, 'Hütte bekommt Erz ohne Straße');
   assert.ok(c.stats.gross.metal > 0, 'Stahlwerk bekommt Roheisen direkt');
 });
+
+test('angrenzende Mine ohne eigene Straße: Pendler gehen durch die Hütte (deren Pendlerweg), Erz wird gefördert', () => {
+  const g = new Game({ seed: 3, city: true, startMoney: 5000 });
+  const c = netBase(g);
+  put(g, 'smelter', 5, 1, 6, 2); // Hütte an der Straße
+  put(g, 'steel', 7, 1, 8, 2);
+  c.deposit[at(g, 5, 3)] = 3; // Erz (Test), grenzt an die Hütte
+  put(g, 'mine', 5, 3, 5, 3);
+  const mine = finish(g, 5, 3);
+  const hut = finish(g, 5, 1);
+  finish(g, 7, 1);
+  assert.equal(accessCells(c, mine).length, 0, 'Mine hat keine eigene Straße');
+  run(g, CITY.growTime + 30); // Wohnungen wachsen, erst dann gibt es Pendlerziele
+  const tr = transportOf(g, c);
+  assert.ok(tr.commute.get(hut), 'Hütte hat einen Pendlerweg');
+  assert.equal(tr.commute.get(mine), tr.commute.get(hut), 'Mine nutzt den Pendlerweg der Hütte');
+  assert.equal(transportInfo(g, c, mine).noHome, false);
+  assert.ok(c.stats.raw.ore > 0, 'Erz gefördert ohne eigene Straße');
+  assert.ok(c.stats.gross.iron > 0, 'Hütte verarbeitet es');
+});
+
+test('Mine ohne Straße und ohne angrenzendes Werk: weiter kein Pendlerweg', () => {
+  const g = new Game({ seed: 3, city: true, startMoney: 5000 });
+  const c = netBase(g);
+  c.deposit[at(g, 5, 3)] = 3;
+  put(g, 'mine', 5, 3, 5, 3);
+  const mine = finish(g, 5, 3);
+  assert.equal(transportOf(g, c).commute.get(mine), null);
+});

@@ -319,6 +319,7 @@ function build(game, c, tr) {
   const shop = new Map();
   const depot = new Map();
   const supply = new Map();
+  const adjOf = new Map(); // Lieferant → angrenzende Zielwerke (für den Pendlerweg über den Nachbarn)
   for (const a of anchors) {
     const k = KINDS[c.kind[a] - 1];
     const g = groupOf(c, a);
@@ -326,6 +327,7 @@ function build(game, c, tr) {
     // Angrenzende Zielwerke (Paket „Direkte Lieferung“): ohne Straße, Weg der Länge 0, vor allen Straßenwegen
     const adj = works ? adjacentOwners(c, a, works.map((w) => w.owner)) : [];
     if (g) routes.set(a, routeOf(c, tr, a, g, adj));
+    if (adj.length) adjOf.set(a, adj);
     if (works) {
       const acc = accessCells(c, a);
       const list = adj.map((to) => ({ to, path: NO_PATH, dist: 0 }));
@@ -343,6 +345,19 @@ function build(game, c, tr) {
     if (k === 'com' || k === 'market') shop.set(a, pathFrom(tr.fields.main, accessCells(c, a))?.path ?? null);
     if (k === 'ktank' || k === 'mdepot') depot.set(a, pathFrom(tr.fields.main, supplyAccess(c, tr, a))?.path ?? null); // Fliegerhorst (seit v5.35; seit Paket „Straßen“ auch über Bahn und Rollfeld)
     if (TRAINERS.has(c.kind[a])) supply.set(a, pathFrom(tr.fields.main, supplyAccess(c, tr, a))?.path ?? null); // Ausbildung (Paket „Straßen“)
+  }
+  // Pendler über den Nachbarn (Paket „Direkte Lieferung“, Variante C): ein Lieferant ohne eigenen Pendlerweg nutzt den Pendlerweg
+  // des ersten angrenzenden Zielwerks, das einen hat (seine Arbeiter gehen durch das Nachbarwerk; Last und Stau zählen dort).
+  // Mehrere Durchgänge für Ketten (Erzmine → Hütte → Stahlwerk an der Straße); Reihenfolge nach Anker, also fest.
+  for (let pass = 0, changed = true; changed && pass < 4; pass++) {
+    changed = false;
+    for (const [a, adj] of adjOf) {
+      if (commute.get(a) !== null) continue;
+      const via = adj.find((o) => commute.get(o));
+      if (via === undefined) continue;
+      commute.set(a, commute.get(via));
+      changed = true;
+    }
   }
   tr.routes = routes;
   tr.alts = alts;

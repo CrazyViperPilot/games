@@ -3,6 +3,7 @@
 > Neueste Version oben. Gehört zum PRD ([PRD.md](../PRD.md)). Nicht von Hand bearbeiten: Einträge kommen als Datei nach
 > [docs/changes/](changes/README.md), `npm run release` trägt sie mit Version und Cache-Version hier ein (Regel 7 in [CLAUDE.md](../CLAUDE.md)).
 
+- v5.99: **Pendler über das Nachbarwerk**: Eine Förderanlage oder Hütte, die direkt an ihr Zielwerk grenzt, braucht keine eigene Straße mehr; ohne eigenen Pendlerweg gehen ihre Arbeiter durch das Nachbarwerk (dessen Weg, Last und Stau), auch über Ketten wie Erzmine → Hütte → Stahlwerk. Cache v209.
 - v5.98: **Stellplatz braucht Verbindung zur Startbahn** (§15 „Stellplatz“): Ein Stellplatz lässt sich nur noch bauen, wenn eine seiner Zellen an eine Bahnzelle grenzt oder an eine Rollfeldzelle, von der eine Kette aus Rollfeld- und Bahnzellen zur Bahn führt; mit Baugebiet ersetzt das die Straßen-Anschlusspflicht des Stellplatzes, ohne Baugebiet gilt es ebenso. Meldung: „Stellplatz braucht eine Verbindung zur Startbahn (direkt oder über das Rollfeld)“. Cache v208.
 - v5.97: **Ausbildungsfortschritt im Stadtgebäude sichtbar**: Der Fortschrittsbalken (z. B. F-16 am Stellplatz) steht jetzt gleich unter „Bildet aus“ statt am Ende des Infofelds, wo er bei langen Feldern abgeschnitten war; das Infofeld lässt sich am PC scrollen. Cache v207.
 - v5.96: **Direkte Lieferung zwischen angrenzenden Gebäuden** (§15 „Straßentransport“): Grenzt eine Förderanlage oder Hütte an ein passendes Werk, fließt die Ware ohne Straße dorthin; die Info zeigt „direkt angrenzend“. Cache v206.
