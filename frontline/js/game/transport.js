@@ -7,7 +7,7 @@ import { laneGrid } from './roads.js';
 import { CITY } from '../data/city.js';
 import { WORKS, WORKPLACE_KINDS, KINDS, KIND_ID, KIND_NAME } from '../data/citykinds.js'; // Arbeitsstätten mit Pendlerweg: alle Arten mit Arbeitsplätzen
 import { GOODS } from '../data/goods.js';
-import { DEPOSITS, isPart, roadAt, accessCells, mainAccess } from './city/cells.js';
+import { DEPOSITS, isPart, roadAt, accessCells, mainAccess, cellsOf, anchorOf, nbrsOf } from './city/cells.js';
 export { mainAccess }; // liegt seit dem Paket „Straßen“ in cells.js (Anschlusspflicht des Baugebiets)
 
 /** Ziel je Rohstoff der Förderung (Vorkommen) und je Zwischenprodukt: Gruppe der Zielwerke (Breitensuche-Feld, siehe groupOf). */
@@ -18,6 +18,8 @@ const GROUP_OF_KIND = { bm: 'bm', smelter: 'smelter', steel: 'steel', fuel: 'oil
 const PRODUCT_KINDS = WORKS.filter((k) => GOODS[CITY.chain[k].to]?.store);
 /** Kennung des Lagers der Hauptstadt im Breitensuche-Feld (Besitzer). Gebäude haben als Besitzer ihren Anker (≥ 0). */
 const MAIN = -1;
+/** Weg ohne Straßenzellen (Lieferung direkt an ein angrenzendes Werk, seit Paket „Direkte Lieferung“): Länge 0, Wirkung 1, keine Last. */
+const NO_PATH = new Int32Array(0);
 /** Breitensuche-Warteschlange, einmal angelegt und wiederverwendet (nur innerhalb von nearestField genutzt). */
 let QUEUE = new Int32Array(0);
 
@@ -210,8 +212,26 @@ function groupOf(c, a) {
   return null;
 }
 
-/** Weg vom Gebäude a zum nächsten Ziel der Gruppe; ohne Weg { to: null, path: null, dist: 0 }. */
-function routeOf(c, tr, a, group) {
+/**
+ * Angrenzende Zielwerke des Lieferanten a (Paket „Direkte Lieferung“): Anker aus `owners`, deren Zellen eine 4er-Nachbarzelle einer
+ * Zelle von a haben. Sortiert nach Anker (fest, unabhängig von der Reihenfolge der Suche).
+ */
+function adjacentOwners(c, a, owners) {
+  const mine = cellsOf(c, a);
+  const out = [];
+  for (const o of owners) {
+    if (o === a) continue;
+    if (mine.some((j) => nbrsOf(c, j).some((n) => c.kind[n] && anchorOf(c, n) === o))) out.push(o);
+  }
+  return out.sort((p, q) => p - q);
+}
+
+/**
+ * Weg vom Gebäude a zum nächsten Ziel der Gruppe; ohne Weg { to: null, path: null, dist: 0 }. Grenzt ein Zielwerk der Gruppe direkt
+ * an (`adj`, Anker sortiert), ist das erste davon das Ziel, mit leerem Weg (dist 0).
+ */
+function routeOf(c, tr, a, group, adj = []) {
+  if (adj.length) return { to: adj[0], path: NO_PATH, dist: 0 };
   const hit = pathFrom(tr.fields[group], accessCells(c, a));
   if (!hit) return { to: null, path: null, dist: 0 };
   return { to: hit.owner === MAIN ? 'main' : hit.owner, path: hit.path, dist: hit.path.length };
@@ -302,16 +322,21 @@ function build(game, c, tr) {
   for (const a of anchors) {
     const k = KINDS[c.kind[a] - 1];
     const g = groupOf(c, a);
-    if (g) routes.set(a, routeOf(c, tr, a, g));
-    if (g && perWork[g]) {
+    const works = g && perWork[g] ? perWork[g] : null;
+    // Angrenzende Zielwerke (Paket „Direkte Lieferung“): ohne Straße, Weg der Länge 0, vor allen Straßenwegen
+    const adj = works ? adjacentOwners(c, a, works.map((w) => w.owner)) : [];
+    if (g) routes.set(a, routeOf(c, tr, a, g, adj));
+    if (works) {
       const acc = accessCells(c, a);
-      const list = [];
-      for (const w of perWork[g]) {
+      const list = adj.map((to) => ({ to, path: NO_PATH, dist: 0 }));
+      const road = [];
+      for (const w of works) {
+        if (adj.includes(w.owner)) continue; // schon als direkter Nachbar gezählt
         const hit = pathFrom(w.field, acc);
-        if (hit) list.push({ to: w.owner, path: hit.path, dist: hit.path.length });
+        if (hit) road.push({ to: w.owner, path: hit.path, dist: hit.path.length });
       }
-      list.sort((p, q) => p.dist - q.dist || p.to - q.to); // nächstes zuerst, bei Gleichstand nach Anker (fest)
-      alts.set(a, list);
+      road.sort((p, q) => p.dist - q.dist || p.to - q.to); // nächstes zuerst, bei Gleichstand nach Anker (fest)
+      alts.set(a, list.concat(road));
     }
     if (WORKPLACE_KINDS.includes(k)) commute.set(a, pathFrom(tr.fields.res, accessCells(c, a))?.path ?? null);
     if (k === 'mun') mun.set(a, pathFrom(tr.fields.main, accessCells(c, a))?.path ?? null);

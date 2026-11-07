@@ -607,7 +607,8 @@ export class Hud {
     if (SUPPLIER_KINDS.includes(k)) {
       const T = transportInfo(g, c, i);
       if (T.to) {
-        h += line(`Liefert an: ${T.to} (${T.dist} ${T.dist === 1 ? 'Feld' : 'Felder'}) · Weg ${pct(T.eff)}`);
+        const way = T.dist === 0 ? 'direkt angrenzend' : `${T.dist} ${T.dist === 1 ? 'Feld' : 'Felder'}`; // Paket „Direkte Lieferung“: ohne Straße
+        h += line(`Liefert an: ${T.to} (${way}) · Weg ${pct(T.eff)}`);
         if (T.targets?.length > 1) h += line(`Verteilt auf ${T.targets.length} Werke nach freier Abnahme: ${T.targets.join(', ')}`);
       } else {
         const d = k === 'mine' ? DEPOSITS[c.deposit[i] - 1] : k === 'smelter' ? 'smelter' : null;

@@ -514,3 +514,86 @@ test('Öl wird nach freier Abnahme auf Raffinerie und Kerosin-Raffinerie verteil
   const k = c.stats.inp.kero * CITY.convert.kero;
   assert.ok(k / (f + k) > 0.15, `Verteilung Treibstoff ${f.toFixed(2)} / Kerosin ${k.toFixed(2)}`);
 });
+
+// Direkte Lieferung (Paket „Direkte Lieferung“): Erzmine (0,3) grenzt an die Hütte (0,1)–(1,2), das Stahlwerk (2,1)–(3,2) grenzt an die
+// Hütte; die Straße läuft nur oben in Zeile 0 (Hütte und Stahlwerk am Netz, die Mine nicht).
+test('Erzmine grenzt an Hütte: Weg der Länge 0 ohne Straße, Info „direkt angrenzend“', () => {
+  const g = new Game({ seed: 3, city: true, startMoney: 5000 });
+  const c = g.city[0];
+  put(g, 'road', 0, 0, 3, 0);
+  put(g, 'smelter', 0, 1, 1, 2);
+  put(g, 'steel', 2, 1, 3, 2);
+  c.deposit[at(g, 0, 3)] = 3; // Erz (Test)
+  put(g, 'mine', 0, 3, 0, 3);
+  const mine = finish(g, 0, 3);
+  const hut = finish(g, 0, 1);
+  finish(g, 2, 1);
+  assert.equal(accessCells(c, mine).length, 0, 'die Mine hat keine Straße');
+  const tr = transportOf(g, c);
+  const r = tr.routes.get(mine);
+  assert.equal(r.to, hut);
+  assert.equal(r.dist, 0);
+  assert.equal(r.path.length, 0);
+  assert.ok(r.path !== null, 'ein Weg der Länge 0 ist ein gültiger Lieferweg');
+  assert.equal(pathEff(tr, r.path), 1);
+  const info = transportInfo(g, c, mine);
+  assert.equal(info.to, 'Hütte');
+  assert.equal(info.dist, 0);
+  assert.equal(info.eff, 1);
+  assert.deepEqual(info.targets, ['Hütte']);
+});
+
+test('Hütte grenzt an Stahlwerk und hat einen Straßenweg zu einem zweiten: das angrenzende kommt zuerst', () => {
+  const g = new Game({ seed: 3, city: true, startMoney: 5000 });
+  const c = g.city[0];
+  put(g, 'road', 0, 0, 9, 0);
+  put(g, 'smelter', 0, 1, 1, 2);
+  put(g, 'steel', 2, 1, 3, 2); // direkt angrenzend
+  put(g, 'steel', 8, 1, 9, 2); // über die Straße
+  const hut = finish(g, 0, 1);
+  const near = finish(g, 2, 1);
+  const far = finish(g, 8, 1);
+  const tr = transportOf(g, c);
+  assert.equal(tr.routes.get(hut).to, near, 'das angrenzende Werk ist das Ziel');
+  assert.equal(tr.routes.get(hut).dist, 0);
+  const list = tr.alts.get(hut);
+  assert.deepEqual(list.map((x) => x.to), [near, far], 'angrenzend vor Straßenweg');
+  assert.equal(list[0].dist, 0);
+  assert.ok(list[1].dist > 0, 'das ferne Werk bleibt über die Straße');
+  assert.deepEqual(transportInfo(g, c, hut).targets, ['Stahlwerk', 'Stahlwerk']);
+});
+
+test('mehrere angrenzende Werke: fest nach Anker sortiert', () => {
+  const g = new Game({ seed: 3, city: true, startMoney: 5000 });
+  const c = g.city[0];
+  put(g, 'road', 0, 0, 3, 0);
+  put(g, 'smelter', 0, 1, 1, 2);
+  put(g, 'steel', 2, 1, 3, 2); // rechts neben der Hütte
+  put(g, 'steel', 0, 3, 1, 4); // unterhalb der Hütte
+  const hut = finish(g, 0, 1);
+  const right = finish(g, 2, 1);
+  const below = finish(g, 0, 3);
+  const expect = [right, below].sort((p, q) => p - q);
+  const got = transportOf(g, c).alts.get(hut).slice(0, 2).map((x) => x.to);
+  assert.deepEqual(got, expect);
+  assert.equal(transportOf(g, c).routes.get(hut).to, expect[0]);
+});
+
+test('Erz kommt bei der angrenzenden Hütte an (Lieferweg ohne Straße), Roheisen fährt direkt zum angrenzenden Stahlwerk', () => {
+  const g = new Game({ seed: 3, city: true, startMoney: 5000 });
+  const c = netBase(g);
+  put(g, 'smelter', 5, 1, 6, 2); // Hütte
+  put(g, 'steel', 7, 1, 8, 2); // Stahlwerk, grenzt an die Hütte
+  c.deposit[at(g, 5, 3)] = 3; // Erz (Test), grenzt an die Hütte
+  put(g, 'mine', 5, 3, 5, 3);
+  // Die Mine braucht eine Straße nur für ihre Pendler (Arbeitsstätte); die Lieferung zur Hütte läuft ohne Straße (Weg der Länge 0)
+  linkRoad(g, at(g, 5, 3));
+  finish(g, 5, 3);
+  finish(g, 5, 1);
+  finish(g, 7, 1);
+  assert.equal(transportOf(g, c).routes.get(at(g, 5, 3)).dist, 0, 'Lieferweg der Länge 0');
+  run(g, CITY.growTime + 30);
+  assert.ok(c.stats.raw.ore > 0, 'Erz gefördert');
+  assert.ok(c.stats.inp.iron > 0 && c.stats.gross.iron > 0, 'Hütte bekommt Erz ohne Straße');
+  assert.ok(c.stats.gross.metal > 0, 'Stahlwerk bekommt Roheisen direkt');
+});
