@@ -203,7 +203,7 @@ export function aiCity(game, team, difficulty, mem = cityAiMemory()) {
     rad = CITY.territory.main + CITY.territory.building * 4;
     if (!anchor) return;
   }
-  if (aiAirport(game, city, main, reserve, CITY.ai.jets[difficulty] ?? CITY.ai.jets.normal)) n++;
+  if (aiAirport(game, city, main, reserve, CITY.ai.jets[difficulty] ?? CITY.ai.jets.normal, difficulty)) n++;
   if (n < CITY.ai.perStep && aiConnect(game, city, mem.turn)) n++;
   const add = {};
   const skip = new Set(); // Großbauten, für die in diesem Takt kein Platz war
@@ -284,6 +284,41 @@ export function aiCity(game, team, difficulty, mem = cityAiMemory()) {
 
 /** Werkpaare, zwischen denen ein Zwischenprodukt über die Straße fährt (CITY.chain: Hütte macht Roheisen, das Stahlwerk verarbeitet es). */
 const CHAIN_PARTNER = { smelter: 'steel', steel: 'smelter' };
+
+/** Liegt im Rechteck (q, r, w × h) oder höchstens d Zellen darum eine Zelle an einer Straße zum Lager? */
+function runwayNear(game, c, q, r, w, h, d) {
+  const mask = roadLinked(game, c);
+  for (let y = Math.max(0, r - d); y <= Math.min(c.rows - 1, r + h - 1 + d); y++) {
+    for (let x = Math.max(0, q - d); x <= Math.min(c.cols - 1, q + w - 1 + d); x++) if (mask[y * c.cols + x]) return true;
+  }
+  return false;
+}
+
+/** Hat eine Bahnzelle eine Straße zum Lager daneben (mit Verkehr: Transportweg zum Lager)? */
+function runwayLinked(game, c) {
+  const goal = supplyGoal(game, c);
+  return c.list.some((i) => c.kind[i] === KIND_ID.runway && nbrsOf(c, i).some((j) => goal[j]));
+}
+
+/**
+ * Bahn der KI ans Lager anschließen (Anschlusspflicht, Paket „Straßen“): hat keine Bahnzelle eine Straße zum Lager daneben, Straße
+ * (connectRoad, bezahlt) von der Bahnzelle aus, die einer Lagerstraße am nächsten liegt. true, wenn gebaut.
+ */
+function linkRunway(game, c) {
+  const rw = c.list.filter((i) => c.kind[i] === KIND_ID.runway);
+  if (!rw.length || runwayLinked(game, c)) return false;
+  const goal = supplyGoal(game, c);
+  for (const i of rw) if (connectRoad(game, c, i, true, goal) > 0) return true;
+  return false;
+}
+
+/** Straßenzellen, die der Transport vom Lager der Hauptstadt aus erreicht (Ziel für den Anschluss eines Ausbildungsgebäudes). */
+function supplyGoal(game, c) {
+  const dist = transportOf(game, c).fields.main.dist;
+  const goal = new Uint8Array(dist.length);
+  for (let i = 0; i < dist.length; i++) if (dist[i] >= 0) goal[i] = 1;
+  return goal;
+}
 
 /** Gilt die Anschlusspflicht des Baugebiets (Paket „Straßen“)? */
 function linkNeeded(game) {
@@ -423,7 +458,10 @@ function aiConnect(game, c, off) {
     const trainer = !!CITY.produces[k] && transportOf(game, c).supply.get(i) === null; // Ausbildung ohne Straßenweg zum Lager steht (Paket „Straßen“)
     if (!supplier && !info.noHome && !trainer) continue;
     tried++;
-    if (connectRoad(game, c, i, true, supplier ? goalOf(c, i, k) : null) > 0) return true;
+    // Ausbildung ohne Versorgungsweg: Ziel sind nur Straßen mit Weg zum Lager, die Verkehr tragen (Bahn und Rollfeld zählen für den
+    // Anschluss als Straße, für den Transport nicht; sonst hielte connectRoad einen Stellplatz an der Bahn für angeschlossen)
+    const goal = supplier ? goalOf(c, i, k) : trainer ? supplyGoal(game, c) : null;
+    if (connectRoad(game, c, i, true, goal) > 0) return true;
   }
   return false;
 }
@@ -433,7 +471,7 @@ function aiConnect(game, c, off) {
  * (bis airportReach Zellen; waagrecht oder senkrecht, mit freiem Rand), daneben zwei Stellplätze, Tower, Kerosintank und Munitionslager;
  * Tank und Lager per connectRoad an die Straße zum Lager. Danach je Takt ein weiterer Stellplatz an der Bahn, bis sie `want` hat.
  */
-export function aiAirport(game, c, main, reserve, want = 2) {
+export function aiAirport(game, c, main, reserve, want = 2, difficulty = 'normal') {
   const A = CITY.ai;
   if (!main) return false;
   const money = game.teams[c.team].res.money;
@@ -450,6 +488,8 @@ export function aiAirport(game, c, main, reserve, want = 2) {
   const free = (j) => !c.kind[j] && !c.deposit[j] && !c.mapRoads?.[j] && buildAllowed(game, c, j, 'runway') && cellFree(game, c, j % c.cols, Math.floor(j / c.cols)) && !inDanger(c, j % c.cols, Math.floor(j / c.cols), game.time);
   const put = (kind, q, r) => game.issue(c.team, { type: 'city', kind, c0: q, r0: r, c1: q, r1: r }).ok;
   if (hasRunway) {
+    // Bahn ohne Straße zum Lager (Anschlusspflicht, Paket „Straßen“): zuerst anschließen, sonst passt kein Stellplatz daneben
+    if (linkNeeded(game) && !runwayLinked(game, c)) return linkRunway(game, c);
     // Stellplätze ausbauen (seit v5.39 nur per Befehl): den ersten fertigen unter Stufe 3, wenn genug übrig bleibt
     const up = stands.length >= Math.ceil(want / CITY.air.standJets) ? stands.find((i) => c.level[i] && c.level[i] < CITY.maxLevel) : null; // erst genug Stellplätze
     const cost = up != null ? CITY.air.upgrade[c.level[up] + 1] : null;
@@ -491,16 +531,18 @@ export function aiAirport(game, c, main, reserve, want = 2) {
     for (const vertical of [false, true]) {
       // Bahn L × 2 (bzw. 2 × L) mit einer Reihe 2 × 2-Bauten daneben: Fläche L × 4
       if (!fits(q, r, vertical ? 4 : L, vertical ? L : 4)) continue;
-      // Anschlusspflicht (Paket „Straßen“): die Bahn muss an einer Straße zum Lager beginnen, sonst dürfen Stellplätze und Lager nicht daneben
-      if (linkNeeded(game)) {
-        const mask = roadLinked(game, c);
-        let linked = false;
-        for (let k = 0; k < L && !linked; k++) for (let w = 0; w < 2 && !linked; w++) linked = !!mask[vertical ? (r + k) * c.cols + q + w : (r + w) * c.cols + q + k];
-        if (!linked) continue;
-      }
+      // Anschlusspflicht (Paket „Straßen“): die Bahn braucht eine Straße zum Lager, sonst dürfen Stellplätze und Lager nicht daneben.
+      // Liegt sie nicht direkt an einer, höchstens CITY.ai.runwayLink Zellen davon entfernt; die KI zieht die Straße gleich danach.
+      if (linkNeeded(game) && !runwayNear(game, c, q, r, vertical ? 2 : L, vertical ? L : 2, CITY.ai.runwayLink)) continue;
       if (vertical) {
         if (!game.issue(c.team, { type: 'city', kind: 'runway', c0: q, r0: r, c1: q + 1, r1: r + L - 1 }).ok) return false;
       } else if (!game.issue(c.team, { type: 'city', kind: 'runway', c0: q, r0: r, c1: q + L - 1, r1: r + 1 }).ok) return false;
+      // Straße zur Bahn, bevor Stellplätze, Tower und Lager daneben kommen; gelingt sie nicht, bleibt es bei der Bahn (spätere Takte
+      // versuchen den Anschluss erneut), damit keine Stellplätze ohne Versorgungsweg entstehen
+      if (linkNeeded(game)) {
+        linkRunway(game, c);
+        if (!runwayLinked(game, c)) return true;
+      }
       const spots = [0, 2, 4, 6, 8].map((k) => (vertical ? [q + 2, r + k] : [q + k, r + 2]));
       ['stand', 'stand', 'atc', 'ktank', 'mdepot'].forEach((kind, k) => {
         const [x, y] = spots[k];

@@ -3,6 +3,7 @@
 
 import { CITY } from '../../data/city.js';
 import { standsOf, freeSpace, isHighAlt } from '../../game/aircraft.js';
+import { supplyOf } from '../../game/transport.js';
 import { BALANCE } from '../../data/balance.js';
 import { UNITS } from '../../data/units.js';
 import { canGarrison } from '../../game/garrison.js';
@@ -10,6 +11,24 @@ import { radioEta } from '../../game/radio.js';
 import { weatherSight } from '../../game/weather.js';
 import { RESERVE_FROM, WAVE_NEUTRAL, SCOUT_EVERY, SCOUT_MOVE, JET_GROUP, JET_EVERY, JET_QUEUE, THREAT_RANGE, THREAT_DANGER, GATHER_DIST, ZONE_GATHER_DIST, RALLY_MOVE, RESERVE, DRY, THREAT_PER_UNIT, WAVE_ODDS, WAVE_PATIENCE, WAVE_MIN, SCOUT_MIN_ARMY, SCOUT_FROM, SCOUT_FUEL, SCOUT_REFILL, WX_SCOUT_SIGHT, WX_SCOUT_ARMY, WX_SCOUT_FROM, WX_FOG_SIGHT, WX_FOG_WAVE, RAID_MIN, RAID_SHARE, FALLBACK_ODDS, FALLBACK_MIN_FOES, FALLBACK_DIST, FALLBACK_HOLD, ART_BEHIND, ART_EVERY, GARRISON_SHARE, GARRISON_RANGE, GARRISON_EVERY, STORM_EVERY, STORM_RANGE, STORM_RATIO, STORM_WIRE, STORM_MIN, STORM_MAX, STORM_MARCH, HOUSE_WORK_EVERY, HOUSE_WORK_ORDER, HOUSE_WORK_RESERVE, CMD_BEHIND, CMD_DANGER, CMD_MOVE, RADIO_NEAR, RADIO_EVERY, RADIO_GATHER, RADIO_GATHER_R, RADIO_GATHER_SHARE } from '../../data/ai.js';
 import { DEF_RANGE, ZONE_FOB_R, TWO_PI, dist, unitVec } from './util.js';
+
+/** Bestellt wird nur an Stellplätzen mit Versorgungsweg zum Lager (Paket „Straßen“: ohne Weg stünde die Ausbildung still). */
+const supplied = (g, p) => !g.city || supplyOf(g, g.city[p.team], p.cityCell).rate > 0;
+
+/**
+ * Fehlt Stahl für ein Flugzeug, kauft die KI ihn direkt vor der Bestellung am Markt zu (je Los CITY.market.lot), solange danach Preis
+ * und CITY.ai.jetReserve Geld bleiben (ihre Munitionswerke verbrauchen den Stahl sonst, bevor er für Flugzeuge reicht). true, wenn er reicht.
+ */
+function steelFor(g, t, type) {
+  const c = g.city?.[t];
+  if (!c) return true;
+  const need = CITY.metalCost[type] ?? 0;
+  for (let k = 0; k < 10 && c.metal < need; k++) {
+    if (g.teams[t].res.money < UNITS[type].cost.money + CITY.ai.jetReserve + CITY.market.buy.metal) return false;
+    if (!g.issue(t, { type: 'trade', good: 'metal', dir: 'buy' }).ok) return false;
+  }
+  return c.metal >= need;
+}
 
 const SCOUT_MONEY = UNITS.littlebird.cost.money; // Geld, ab dem ein Späher ausgebildet wird
 
@@ -34,11 +53,17 @@ export const combatMethods = {
     const money = g.teams[t].res.money;
     if (total < want) {
       // F-22, solange ihr Anteil unter CITY.ai.f22Share liegt und Geld für sie und die Reserve da ist; sonst F-16
-      const f22 = f22Have < CITY.ai.f22Share * total && money >= UNITS.f22.cost.money + CITY.ai.jetReserve;
-      const type = f22 ? 'f22' : 'f16';
+      // Ist eine F-22 fällig, spart die KI auf sie, sobald sie schon einen Jet hat (sonst käme sie nie zur teureren F-22)
+      const due = f22Have < CITY.ai.f22Share * total;
+      const type = due && total > 0 ? 'f22' : 'f16';
+      // Für die U-2 bleibt ein ganz freier Stellplatz frei, solange sie noch fehlt und fliegen darf (recon)
+      const from = CITY.ai.reconFrom[this.difficulty];
+      const keep = from != null && !jets.some((u) => u.def.highAlt) ? CITY.ai.reconMax : 0;
+      const empty = ports.filter((p) => p.queue.length === 0 && freeSpace(g, p) >= (UNITS.u2.standSlots ?? 2) && supplied(g, p));
+      const reserved = new Set(empty.slice(-keep || empty.length).map((p) => p.id).slice(0, keep));
       if (money >= UNITS[type].cost.money + CITY.ai.jetReserve) {
-        const b = ports.filter((p) => p.queue.length < JET_QUEUE && freeSpace(g, p) > 0).sort((p, q) => p.queue.length - q.queue.length || p.id - q.id)[0];
-        if (b) g.issue(t, { type: 'train', buildingId: b.id, unit: type });
+        const b = ports.filter((p) => !reserved.has(p.id) && p.queue.length < JET_QUEUE && freeSpace(g, p) > 0 && supplied(g, p)).sort((p, q) => p.queue.length - q.queue.length || p.id - q.id)[0];
+        if (b && steelFor(g, t, type)) g.issue(t, { type: 'train', buildingId: b.id, unit: type });
       }
     }
     const ready = fighters.filter((u) => u.parked && u.jet?.ready && u.order.type === 'idle').sort((a, b) => a.id - b.id);
@@ -77,8 +102,8 @@ export const combatMethods = {
     const queued = ports.reduce((n, p) => n + p.queue.filter((e) => (e.unit ?? e) === 'u2').length, 0);
     const have = s.units.filter((u) => u.def.highAlt).length + queued;
     if (have < A.reconMax && g.teams[t].res.money >= UNITS.u2.cost.money + A.jetReserve) {
-      const b = ports.filter((p) => p.queue.length < JET_QUEUE && freeSpace(g, p) >= UNITS.u2.standSlots).sort((p, q) => p.queue.length - q.queue.length || p.id - q.id)[0];
-      if (b) g.issue(t, { type: 'train', buildingId: b.id, unit: 'u2' });
+      const b = ports.filter((p) => p.queue.length < JET_QUEUE && freeSpace(g, p) >= UNITS.u2.standSlots && supplied(g, p)).sort((p, q) => p.queue.length - q.queue.length || p.id - q.id)[0];
+      if (b && steelFor(g, t, 'u2')) g.issue(t, { type: 'train', buildingId: b.id, unit: 'u2' });
     }
     const ready = s.units.filter((u) => u.def.highAlt && u.parked && u.jet?.ready && u.order.type === 'idle');
     if (!ready.length || !this.once('recon', A.reconEvery)) return;

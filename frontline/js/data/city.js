@@ -295,6 +295,7 @@ export const CITY = {
     linkTries: 4,
     linkRetry: 120, // s: eine Startzelle, von der aus kein Weg ging (eingeschlossene Lücke), so lange nicht erneut versuchen
     linkBm: 200, // Baumaterial, das im Lager der Hauptstadt bleiben muss, bevor die KI ihr Netz verlängert (Anschlüsse der Werke gehen vor)
+    runwayLink: 12, // Zellen: mit Anschlusspflicht darf die Bahn der KI so weit von einer Straße zum Lager entfernt liegen; sie zieht die Straße gleich danach
     chainNear: 6, // Zellen: mit Anschlusspflicht baut die KI Hütte und Stahlwerk zuerst so nah am Partnerwerk (Roheisen fährt nicht durchs Lager)
     linkOutlets: 2, // so viele Ausgänge (freie Zelle am Netz mit freiem Nachbarn außerhalb) lässt die KI beim Bauen offen, damit ihr Netz nicht eingeschlossen wird
   },
