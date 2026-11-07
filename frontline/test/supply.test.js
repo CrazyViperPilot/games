@@ -10,6 +10,8 @@ import { KIND_ID } from '../js/data/citykinds.js';
 import { supplyOf, trainRate, transportOf } from '../js/game/transport.js';
 import { cityTrainers, trainersOf } from '../js/game/city/query.js';
 import { rebuildList } from '../js/game/city/state.js';
+import { snapshotGame, restoreGame } from '../js/game/savegame.js';
+import { pack, unpack } from '../js/core/snapshot.js';
 
 const DT = 0.1;
 const run = (g, s) => {
@@ -115,4 +117,61 @@ test('Weglänge: längerer Weg, langsamere Ausbildung (über die Untergrenze nie
   } finally {
     Object.assign(CITY.supply, keep);
   }
+});
+
+test('nah: Kaserne des Startviertels (Weg bis 15 Zellen, ohne Stau) bildet mit 100 % aus', () => {
+  const g = new Game({ seed: 3, city: true });
+  const kas = trainerFor(g, 'rifleman');
+  const s = supplyOf(g, g.city[0], kas.cityCell);
+  assert.ok(s.path && s.dist <= CITY.supply.free, `Weg ${s.dist} Zellen`);
+  assert.equal(s.v, 1);
+  assert.equal(s.eff, 1);
+  assert.equal(trainRate(g, kas), 1);
+});
+
+test('ohne Stadt: Hauptstadt und FOBs bilden unverändert mit vollem Tempo aus', () => {
+  const g = new Game({ seed: 3 });
+  for (const b of g.buildings.filter((e) => e.produces?.length)) assert.equal(trainRate(g, b), 1);
+});
+
+test('Stau verlangsamt: Stau-Faktor auf dem Weg senkt das Tempo (Versorgung × Stau) und den Fortschritt', () => {
+  const make = () => {
+    const g = new Game({ seed: 3, city: true });
+    rich(g);
+    return g;
+  };
+  const free = make();
+  const jam = make();
+  const kasF = trainerFor(free, 'rifleman');
+  const kasJ = trainerFor(jam, 'rifleman');
+  const c = jam.city[0];
+  const s0 = supplyOf(jam, c, kasJ.cityCell);
+  const tr = transportOf(jam, c);
+  for (const i of s0.path) tr.factor[i] = 0.4; // Stau auf dem ganzen Weg
+  const s1 = supplyOf(jam, c, kasJ.cityCell);
+  assert.ok(Math.abs(s1.eff - 0.4) < 1e-6);
+  assert.ok(Math.abs(s1.rate - s0.v * 0.4) < 1e-6, 'Tempo = Versorgungsgrad × Stau');
+  assert.ok(free.issue(0, { type: 'train', buildingId: kasF.id, unit: 'rifleman' }).ok);
+  assert.ok(jam.issue(0, { type: 'train', buildingId: kasJ.id, unit: 'rifleman' }).ok);
+  free.update(DT);
+  jam.update(DT);
+  assert.ok(kasF.queueTimes[0] > 0);
+  assert.ok(kasJ.queueTimes[0] < kasF.queueTimes[0] * 0.5, `mit Stau ${kasJ.queueTimes[0].toFixed(3)} < ohne ${kasF.queueTimes[0].toFixed(3)}`);
+});
+
+test('Spielstand: Ausbildung mit Versorgung (Weg, Last, Stau) speichern, laden und weiterspielen bleibt bitgleich', async () => {
+  const g1 = new Game({ seed: 3, city: true });
+  rich(g1);
+  const c = g1.city[0];
+  const fab = trainerFor(g1, 'tank');
+  const kas = trainerFor(g1, 'rifleman');
+  for (let k = 0; k < 3; k++) assert.ok(g1.issue(0, { type: 'train', buildingId: fab.id, unit: 'tank' }).ok);
+  assert.ok(g1.issue(0, { type: 'train', buildingId: kas.id, unit: 'rifleman' }).ok);
+  run(g1, 3);
+  for (const i of supplyOf(g1, c, fab.cityCell).path) transportOf(g1, c).factor[i] = 0.7; // mitten im Stau speichern
+  assert.ok(fab.queueTimes[0] > 0, 'Fortschritt vor dem Speichern');
+  const g2 = restoreGame(await unpack(await pack(snapshotGame(g1)))).game;
+  run(g1, 6);
+  run(g2, 6);
+  assert.deepEqual(snapshotGame(g2), snapshotGame(g1));
 });
