@@ -424,6 +424,23 @@ function enemyNear(game, c) {
 }
 
 /**
+ * Gebiet für Zelle i einer Zellenart (seit v5.91): Einzelzellen müssen selbst im Gebiet liegen. Großbauten (n × n) dürfen über die Grenze
+ * ragen: eine Zelle zählt, wenn höchstens ⌊n/2⌋ Zellen entfernt Gebiet liegt (Fabrikhalle 5 × 5 bis 2 Zellen, Werk 2 × 2 bis 1 Zelle), so
+ * dass am Gebietsrand Platz für Großbauten bleibt; die Mitte liegt dabei im oder am Gebiet. Andere Regeln gelten für jede Zelle.
+ */
+function inClaim(c, i, kind) {
+  if (c.claim[i]) return true;
+  const d = kind ? Math.floor(sizeOf(kind) / 2) : 0;
+  if (!d) return false;
+  const q = i % c.cols;
+  const r = (i - q) / c.cols;
+  for (let rr = Math.max(0, r - d); rr <= Math.min(c.rows - 1, r + d); rr++) {
+    for (let qq = Math.max(0, q - d); qq <= Math.min(c.cols - 1, q + d); qq++) if (c.claim[rr * c.cols + qq]) return true;
+  }
+  return false;
+}
+
+/**
  * Baugebiet (seit v5.78, nur mit game.buildRules): Grund, warum Zelle i für eine Zellenart `kind` gesperrt ist, oder null.
  * Gründe (Schlüssel von BUILD_BLOCK): `territory` nicht im eigenen Gebiet (c.claim; Straßen `kind` 'road' dürfen außerhalb liegen),
  * `unexplored` nie aufgedeckt, `zone` in der Konfliktzone (CITY.build.noZone), `enemy` nahe (CITY.build.enemyR) einer sichtbaren
@@ -432,7 +449,7 @@ function enemyNear(game, c) {
  */
 export function buildWhy(game, c, i, kind) {
   if (!game.buildRules) return null;
-  if (kind !== 'road' && !c.claim[i]) return 'territory';
+  if (kind !== 'road' && kind !== 'runway' && kind !== 'taxi' && !inClaim(c, i, kind)) return 'territory'; // Bahn und Rollfeld wie Straßen (seit v5.91)
   const col = i % c.cols;
   const x = c.x0 + (col + 0.5) * c.cell;
   const y = c.y0 + ((i - col) / c.cols + 0.5) * c.cell;
