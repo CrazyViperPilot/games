@@ -4,7 +4,7 @@ import { BALANCE } from '../../data/balance.js';
 import { CITY } from '../../data/city.js';
 import { KINDS, KIND_ID, KIND_NAME } from '../../data/citykinds.js';
 import { STORED_GOODS, MARKET_GOODS, CITY_STORE_GOODS } from '../../data/goods.js';
-import { isFlat, idx, sizeOf, anchorOf, bigCells, cellsOf, fitBig, releaseCell, hasRoad, canZone, buildAllowed, buildWhy, roadLinkWhy, BUILD_BLOCK } from './cells.js';
+import { isFlat, idx, sizeOf, anchorOf, bigCells, cellsOf, fitBig, releaseCell, hasRoad, canZone, buildAllowed, buildWhy, roadLinkWhy, airLinkWhy, BUILD_BLOCK } from './cells.js';
 import { woodScan, fellTiles, clearableAt, demolish, felledOf } from './clearing.js';
 import { hasMarket } from './query.js';
 import { zeroGoods, rebuildList, syncEntity, refundQueue, dropEntity } from './state.js';
@@ -30,13 +30,14 @@ function placeBig(game, team, c, kind, col, row) {
   const a = fitBig(game, c, col, row, kind, undefined, (j) => buildAllowed(game, c, j, kind));
   if (a < 0) {
     // Mit Baugebiet: liegt der Platz nur am Gebiet, Erkundung oder Feind, sagt die Meldung das (erste gesperrte Zelle)
-    const plain = game.buildRules ? fitBig(game, c, col, row, kind) : -1;
+    const plain = fitBig(game, c, col, row, kind); // ohne Baugebiet: Anschluss-Regeln (Straße, Stellplatz-Bahn) melden trotzdem den Grund
     if (plain >= 0) {
       for (const j of bigCells(c, plain, n)) {
         const why = buildWhy(game, c, j, kind);
         if (why) return { ok: false, reason: BUILD_BLOCK[why] };
       }
       if (roadLinkWhy(game, c, bigCells(c, plain, n), kind)) return { ok: false, reason: BUILD_BLOCK.road }; // Anschlusspflicht (Paket „Straßen“)
+      if (airLinkWhy(c, bigCells(c, plain, n), kind)) return { ok: false, reason: BUILD_BLOCK.air }; // Stellplatz: Verbindung zur Startbahn
     }
     return { ok: false, reason: `${KIND_NAME[kind]} braucht ${n} × ${n} freie Zellen` };
   }

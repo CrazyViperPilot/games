@@ -129,7 +129,10 @@ export function fitBig(game, c, col, row, kind, free, ok) {
     if (x < 0 || y < 0 || x >= c.cols || y >= c.rows) continue;
     if (!bigFits(game, c, y * c.cols + x, n, free, ok)) continue;
     // Mit Prüfung `ok` und Baugebiet: Anschlusspflicht des ganzen Großbaus (eine Randzelle an einer Straße zum Lager genügt)
-    if (ok && roadLinkWhy(game, c, bigCells(c, y * c.cols + x, n), kind)) continue;
+    if (ok) {
+      const cs = bigCells(c, y * c.cols + x, n);
+      if (roadLinkWhy(game, c, cs, kind) || airLinkWhy(c, cs, kind)) continue;
+    }
     return y * c.cols + x;
   }
   return -1;
@@ -276,6 +279,7 @@ export const BUILD_BLOCK = {
   enemy: 'Zu nah am Feind',
   zone: 'Nicht in der Konfliktzone',
   road: 'Nur an einer Straße bauen, die mit dem Lager der Hauptstadt verbunden ist',
+  air: 'Stellplatz braucht eine Verbindung zur Startbahn (direkt oder über das Rollfeld)',
 };
 
 /**
@@ -345,7 +349,8 @@ export function roadLinked(game, c) {
 
 /** Gilt die Anschlusspflicht für die Zellenart `kind`? Nicht für Straße, Bahn, Rollfeld und CITY.build.roadFree (Förderanlagen). */
 function needsLink(game, kind) {
-  return !!game.buildRules && CITY.build.needRoad && !(kind && (isFlat(KIND_ID[kind]) || CITY.build.roadFree.includes(kind)));
+  // Der Stellplatz ist vom Straßenanschluss befreit (ersetzt durch die Bahn-Regel airLinkWhy, immer gültig, auch ohne Baugebiet)
+  return !!game.buildRules && CITY.build.needRoad && kind !== 'stand' && !(kind && (isFlat(KIND_ID[kind]) || CITY.build.roadFree.includes(kind)));
 }
 
 /**
@@ -485,4 +490,125 @@ export function nbrsOf(c, i) {
   if (row > 0) out.push(i - c.cols);
   if (row < c.rows - 1) out.push(i + c.cols);
   return out;
+}
+
+// ---- Startbahn und Rollfeld (Fliegerhorst) ----
+// Bahnerkennung hier, damit Bau-Regel (airLinkWhy) und Rollweg der Jets (aircraft.js standRoute) dasselbe meinen. aircraft.js
+// importiert dieses Blattmodul, nicht umgekehrt.
+
+/**
+ * Längster gerader Streifen runwayWidth breit in einer Gruppe Bahnzellen: waagrecht oder senkrecht, beide Reihen durchgehend Bahn.
+ * { q0, q1, r0, r1, len, axis } oder null. Gleich lange: waagrecht vor senkrecht, oben/links zuerst.
+ */
+function bestStrip(c, inG, q0, q1, r0, r1) {
+  const W = CITY.air.runwayWidth;
+  let best = null;
+  const take = (cand) => {
+    if (!best || cand.len > best.len) best = cand;
+  };
+  for (let r = r0; r + W - 1 <= r1; r++) {
+    let run = 0;
+    for (let q = q0; q <= q1 + 1; q++) {
+      let ok = q <= q1;
+      for (let k = 0; ok && k < W; k++) ok = inG((r + k) * c.cols + q);
+      if (ok) run++;
+      else {
+        if (run) take({ q0: q - run, q1: q - 1, r0: r, r1: r + W - 1, len: run, axis: 'x' });
+        run = 0;
+      }
+    }
+  }
+  for (let q = q0; q + W - 1 <= q1; q++) {
+    let run = 0;
+    for (let r = r0; r <= r1 + 1; r++) {
+      let ok = r <= r1;
+      for (let k = 0; ok && k < W; k++) ok = inG(r * c.cols + q + k);
+      if (ok) run++;
+      else {
+        if (run) take({ q0: q, q1: q + W - 1, r0: r - run, r1: r - 1, len: run, axis: 'y' });
+        run = 0;
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * Bahnen einer Stadt aus den Bahnzellen (zusammenhängende Gruppen; gültig, sobald eine Gruppe einen geraden Streifen runwayWidth ×
+ * (≥ runwayMin) enthält). Je Gruppe { key, group, cells, apron, q0, q1, r0, r1, gq0, gq1, gr0, gr1, axis, valid, len, reason }:
+ * cells = Bahnstreifen (gültig) bzw. alle Zellen, apron = Rollfeld der Gruppe. Ohne Weltkoordinaten (die setzt aircraft.js).
+ */
+export function runwayGroups(c) {
+  const RW = KIND_ID.runway;
+  const seen = new Uint8Array(c.cols * c.rows);
+  const out = [];
+  for (const i0 of c.list) {
+    if (c.kind[i0] !== RW || seen[i0]) continue;
+    const group = [i0];
+    seen[i0] = 1;
+    for (let k = 0; k < group.length; k++) {
+      for (const j of nbrsOf(c, group[k])) {
+        if (c.kind[j] !== RW || seen[j]) continue;
+        seen[j] = 1;
+        group.push(j);
+      }
+    }
+    let q0 = Infinity, q1 = -1, r0 = Infinity, r1 = -1;
+    for (const i of group) {
+      const q = i % c.cols;
+      const r = (i - q) / c.cols;
+      q0 = Math.min(q0, q); q1 = Math.max(q1, q); r0 = Math.min(r0, r); r1 = Math.max(r1, r);
+    }
+    const inGroup = new Set(group);
+    const strip = bestStrip(c, (j) => inGroup.has(j), q0, q1, r0, r1);
+    const valid = !!strip && strip.len >= CITY.air.runwayMin;
+    const box = valid ? strip : { q0, q1, r0, r1, len: Math.max(q1 - q0 + 1, r1 - r0 + 1), axis: q1 - q0 >= r1 - r0 ? 'x' : 'y' };
+    const cells = [];
+    if (valid) for (let r = box.r0; r <= box.r1; r++) for (let q = box.q0; q <= box.q1; q++) cells.push(r * c.cols + q);
+    const reason = valid ? '' : strip ? `zu kurz (mindestens ${CITY.air.runwayMin} Zellen am Stück)` : `braucht einen geraden Streifen ${CITY.air.runwayWidth} Zellen breit`;
+    out.push({ key: Math.min(...group), group, cells: valid ? cells : group, apron: valid ? group.filter((j) => !cells.includes(j)) : [], q0: box.q0, q1: box.q1, r0: box.r0, r1: box.r1, gq0: q0, gq1: q1, gr0: r0, gr1: r1, axis: box.axis, valid, len: box.len, reason });
+  }
+  return out;
+}
+
+// Bahn-Verbindung je Stadt (Zwischenspeicher, nicht im Spielstand): 1 = gültige Bahnzelle oder Rollfeld-/Bahnzelle, die über eine
+// Kette aus Rollfeld-/Bahnzellen eine gültige Bahn erreicht. Neu, sobald sich die Stadt ändert (c.ver).
+const AIR_LINK = new WeakMap(); // Stadt → { ver, mask }
+
+export function airLinked(c) {
+  const hit = AIR_LINK.get(c);
+  if (hit && hit.ver === c.ver) return hit.mask;
+  const RW = KIND_ID.runway;
+  const TX = KIND_ID.taxi;
+  const mask = new Uint8Array(c.cols * c.rows);
+  const queue = [];
+  for (const g of runwayGroups(c)) {
+    if (!g.valid) continue; // zu kurze Bahn ist keine Bahn für die Jets
+    for (const i of g.cells) {
+      mask[i] = 1;
+      queue.push(i);
+    }
+  }
+  for (let h = 0; h < queue.length; h++) {
+    for (const j of nbrsOf(c, queue[h])) {
+      if (mask[j]) continue;
+      const k = c.kind[j];
+      if (k !== RW && k !== TX) continue;
+      mask[j] = 1;
+      queue.push(j);
+    }
+  }
+  AIR_LINK.set(c, { ver: c.ver, mask });
+  return mask;
+}
+
+/**
+ * Stellplatz-Regel: ein Stellplatz (Zellenart `stand`, Großbau mit Zellen `cells`) braucht eine Verbindung zur Startbahn: eine seiner
+ * Zellen grenzt (4er-Nachbarschaft) an eine Bahn- oder Rollfeldzelle, von der eine Kette aus Rollfeld-/Bahnzellen zu einer gültigen
+ * Bahn führt. Ergibt 'air' (BUILD_BLOCK) oder null. Gilt immer, auch ohne Baugebiet; andere Arten nie.
+ */
+export function airLinkWhy(c, cells, kind) {
+  if (kind !== 'stand') return null;
+  const mask = airLinked(c);
+  return cells.some((j) => nbrsOf(c, j).some((n) => mask[n])) ? null : 'air';
 }
