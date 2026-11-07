@@ -46,7 +46,7 @@ export class CityPanel {
         const name = KIND[k].name;
         return `<button type="button" class="ctool" data-tool="${k}" title="${name}${CITY_TIP[k] ? `: ${CITY_TIP[k]}` : ''}" style="--c:${CITY_COLORS[k]}"><i>${ICON[k]}</i><span>${SHORT[k]}</span><small>${price}</small></button>`;
       }).join('')}`).join('')}</div>
-      <div class="city-acts"><button type="button" class="btn-sm city-fold" data-fold title="Menü einklappen (Stadt-Knopf klappt es wieder auf)">▴ Einklappen</button><button type="button" class="btn-sm" data-tradeview title="Marktmenü: kaufen und verkaufen (braucht einen fertigen Markt)">Handel</button><button type="button" class="btn-sm" data-show>Zur Stadt</button><button type="button" class="btn-sm city-done" data-close>Fertig (Y)</button></div>`;
+      <div class="city-acts"><button type="button" class="btn-sm city-fold" data-fold title="Menü einklappen (Stadt-Knopf klappt es wieder auf)" aria-label="Einklappen"><span class="l">▴ Einklappen</span><span class="s">▴</span></button><button type="button" class="btn-sm" data-tradeview title="Marktmenü: kaufen und verkaufen (braucht einen fertigen Markt)">Handel</button><button type="button" class="btn-sm" data-show title="Kamera zur Stadt"><span class="l">Zur Stadt</span><span class="s">Stadt</span></button><button type="button" class="btn-sm city-done" data-close title="Baumodus beenden (Y)"><span class="l">Fertig (Y)</span><span class="s">Fertig</span></button></div>`;
     parent.appendChild(strip);
     parent.appendChild(root);
     this.root = root;

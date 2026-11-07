@@ -9,6 +9,10 @@
   --muted: #9aa596;
   --accent: #c9a227;
   --bad: #ff8a8a;
+  /* Höhe der Kopfleiste und Platz der Befehlskarte unten rechts: Knöpfe rechts, Baumenü und Meldungen richten sich danach
+     (Paket „Darstellung auf Tablet und Telefon“). Kleinere Werte in den Media-Queries für schmale bzw. niedrige Bildschirme. */
+  --top-h: 68px;
+  --cmd-h: 196px;
   color-scheme: dark;
 }
 
@@ -57,7 +61,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   left: 0;
   right: 0;
   top: 0;
-  height: 44px;
+  height: var(--top-h);
   display: flex;
   align-items: center;
   gap: 18px;
@@ -67,7 +71,10 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   pointer-events: auto;
 }
 
-.res-row { display: flex; gap: 14px; }
+/* Die Knöpfe rechts (.clock) schrumpfen nie; reicht die Breite nicht, geben die Anzeigen links und in der Mitte nach
+   (die Einkommenszeile kürzt mit „…“), damit Pause, Ansicht und Hilfe immer im Bild bleiben. */
+.top > * { min-width: 0; }
+.res-row { display: flex; gap: 14px; flex: none; }
 .res { display: flex; align-items: baseline; gap: 5px; white-space: nowrap; }
 .res .dot { width: 9px; height: 9px; border-radius: 2px; align-self: center; }
 .res-money .dot { background: #b5c26b; }
@@ -78,7 +85,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .res .val { font-weight: 700; font-variant-numeric: tabular-nums; }
 .res .rate { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
 
-.pts { display: flex; flex-direction: column; gap: 3px; width: 230px; flex: none; }
+.pts { display: flex; flex-direction: column; gap: 3px; width: 230px; flex: 0 1 230px; min-width: 100px; }
 .pt { display: grid; grid-template-columns: 40px 1fr 64px; align-items: center; gap: 6px; font-size: 11px; }
 .pt-name { color: var(--c); font-weight: 700; }
 .pt-track {
@@ -96,7 +103,8 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .pt-num { text-align: right; font-variant-numeric: tabular-nums; }
 
 .zone {
-  flex: none;
+  flex: 0 1 auto;
+  overflow: hidden;
   min-width: 120px;
   padding: 2px 10px;
   text-align: center;
@@ -105,7 +113,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   border-radius: 6px;
   background: #ffffff0d;
 }
-.cap { flex: none; width: 150px; height: 14px; border: 1px solid var(--line); border-radius: 7px; background: #ffffff14; overflow: hidden; }
+.cap { flex: 0 1 150px; min-width: 30px; width: 150px; height: 14px; border: 1px solid var(--line); border-radius: 7px; background: #ffffff14; overflow: hidden; }
 .cap i { display: block; height: 100%; width: 0; }
 .hotz { min-width: 96px; border-color: #ff9a1f66; }
 .radioz { min-width: 96px; border-color: #e0404099; }
@@ -116,8 +124,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .zone-cnt b:first-child { text-align: right; }
 .zone-cnt b:last-child { text-align: left; }
 .zone-cnt i { color: var(--muted); font-style: normal; }
+.zone-inc { display: block; max-width: 260px; margin: 0 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
 
-.clock { margin-left: auto; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.clock { margin-left: auto; flex: none; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 .time { font-weight: 700; font-variant-numeric: tabular-nums; min-width: 44px; text-align: right; }
 .wx {
   display: inline-flex;
@@ -160,7 +169,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .msgs {
   position: absolute;
-  top: 54px;
+  top: calc(var(--top-h) + 8px);
   left: 12px;
   display: flex;
   flex-direction: column;
@@ -427,11 +436,15 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .sel .lagerhead { margin-top: 6px; }
 .bar.store { height: 7px; margin: 0; }
 
+/* bis 1800 px: ohne Raten (+x/s) in der Ressourcenzeile, sonst wird es mit Sendemast eng */
+@media (max-width: 1800px) {
+  .res .rate { display: none; }
+}
+
 /* schmale Bildschirme (iPad, Telefon quer): Kopfleiste kompakter, damit nichts überläuft; die Kopfleiste ist hier höher,
    damit die Einkommenszeile (Geld/s) im schwarzen Balken bleibt */
 @media (max-width: 1500px) {
-  .top { height: 68px; gap: 10px; padding: 0 8px; }
-  .msgs { top: 76px; }
+  .top { gap: 10px; padding: 0 8px; }
   .res-row { gap: 8px; }
   .res .lbl, .res .rate { display: none; }
   .pts { width: 150px; }
@@ -439,16 +452,22 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .hotz { min-width: 84px; }
   .radioz { min-width: 84px; }
   .cap { width: 90px; }
-  .zone-inc { display: block; max-width: 190px; margin: 0 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+  .zone-inc { max-width: 190px; }
   .zone-cnt { font-size: 14px; }
+  /* Knöpfe enger, Wetter nur als Symbol (Name im Tooltip/Infofeld), „Stadt“ steht hier schon als großer Knopf rechts */
+  .clock { gap: 5px; }
+  .clock .btn-sm { padding: 0 8px; }
+  .wx-name { display: none; }
+  .wx { padding: 0 6px; }
+  .clock [data-act=city] { display: none; }
 }
 
 /* Telefon quer (z. B. Pixel 8a, 914 px): Kopfleiste noch knapper, Einkommenszeile und Punktebalken entfallen (die Punkte zeigen den Fortschritt) */
 @media (max-width: 1000px) {
-  .top { height: 44px; gap: 6px; padding: 0 6px; }
-  .msgs { top: 54px; }
+  :root { --top-h: 44px; }
+  .top { gap: 6px; padding: 0 6px; }
   .res-row { gap: 7px; }
-  .pts { width: 118px; }
+  .pts { width: 118px; flex-basis: 118px; min-width: 80px; }
   .pt { grid-template-columns: 28px 1fr 42px; gap: 3px; font-size: 10px; }
   .cap, .zone-inc, .dbg { display: none; }
   .zone { min-width: 0; padding: 1px 5px; }
@@ -483,9 +502,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
    und Befehle ein (die Übersichtskarte bleibt); der Zustand wird gemerkt. Befehlstasten 48–50 px (Touch-Mindestgröße ≈ 44 px). */
 .fold { display: none; }
 @media (max-height: 520px) {
+  :root { --top-h: 36px; --cmd-h: 118px; } /* Befehlskarte: bis zu 2 Reihen à 48 px */
   .hud { font-size: 12px; }
-  .top { height: 36px; }
-  .msgs { top: 42px; max-width: 320px; }
+  .msgs { max-width: 320px; }
   .msg { font-size: 12px; padding: 3px 8px; }
   .btn-sm { height: 28px; }
   .zone-state { font-size: 10px; }
@@ -525,8 +544,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 }
 
 /* Baumodus der Stadt direkt auf der Karte (SimCity-Teil, js/ui/citypanel.js, seit v4.82) */
-.city-bar { position: fixed; right: calc(10px + env(safe-area-inset-right, 0px)); top: 50px; z-index: 25; display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: 10px; background: #141814e6; border: 1px solid var(--line-2); pointer-events: auto; max-height: calc(100% - 60px); overflow-y: auto; overflow-x: hidden; }
-.city-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; width: 236px; }
+/* Unter der Kopfleiste und über der Befehlskarte; „Fertig“ und die übrigen Aktionen stehen oben fest, nur die Werkzeuge scrollen */
+.city-bar { position: fixed; right: calc(10px + env(safe-area-inset-right, 0px)); top: calc(var(--top-h) + 6px); z-index: 25; display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: 10px; background: #141814e6; border: 1px solid var(--line-2); pointer-events: auto; max-height: calc(100% - var(--top-h) - var(--cmd-h) - 12px); overflow: hidden; box-sizing: border-box; }
+.city-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; width: 236px; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; align-content: start; }
 .city-tools[hidden] { display: none; }
 .ctool-head { grid-column: 1 / -1; margin: 6px 2px 0; padding-bottom: 2px; border-bottom: 1px solid var(--line-2); color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 .ctool-head:first-child { margin-top: 0; }
@@ -534,21 +554,27 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .ctool i { grid-row: span 2; font-style: normal; color: var(--c); font-size: 17px; text-align: center; }
 .ctool small { color: var(--muted); font-weight: 500; font-size: 10px; }
 .ctool[aria-pressed="true"] { border-color: var(--c); background: #2e372e; }
-.city-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.city-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; order: -1; flex: none; }
 .city-acts .city-done, .city-acts .city-fold { grid-column: span 2; }
 .city-acts .btn-sm { min-height: 36px; }
 .city-done { border-color: var(--accent) !important; font-weight: 700; }
+.city-acts .s { display: none; } /* Kurzbeschriftung nur auf dem Telefon (unten) */
 .city-strip span { display: block; }
-.city-strip { position: fixed; left: 50%; top: 104px; transform: translateX(-50%); z-index: 25; max-width: calc(100% - 300px); padding: 4px 10px; border-radius: 8px; background: #141814e6; border: 1px solid var(--line-2); color: var(--text); font-size: 12px; text-align: center; pointer-events: none; }
+.city-strip { position: fixed; left: 50%; top: calc(var(--top-h) + 36px); transform: translateX(-50%); z-index: 25; max-width: calc(100% - 540px); box-sizing: border-box; padding: 4px 10px; border-radius: 8px; background: #141814e6; border: 1px solid var(--line-2); color: var(--text); font-size: 12px; text-align: center; pointer-events: none; }
 body.city-mode:not(.city-folded) .city-fab { display: none; }
 @media (max-height: 520px) {
-  .city-bar { top: 44px; max-height: calc(100% - 52px); }
   .city-tools { width: 196px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ctool { min-height: 38px; padding: 2px 4px; font-size: 11px; grid-template-columns: 18px minmax(0, 1fr); column-gap: 4px; }
   .ctool i { font-size: 15px; }
   .city-acts { grid-template-columns: 1fr 1fr; }
+  /* eine Reihe mit Kurzbeschriftung, damit für die Werkzeuge Höhe bleibt */
+  .city-acts { grid-template-columns: auto 1fr 1fr 1.2fr; gap: 3px; }
   .city-acts .city-done, .city-acts .city-fold { grid-column: auto; }
-  .city-strip { top: 40px; font-size: 10px; max-width: calc(100% - 230px); left: 12px; transform: none; text-align: left; }
+  .city-acts .btn-sm { min-height: 32px; padding: 0 5px; font-size: 11px; }
+  .city-acts .l { display: none; }
+  .city-acts .s { display: inline; }
+  /* links neben dem Baumenü (196 + Rand ≈ 220 px), bricht um statt unter dem Menü zu verschwinden */
+  .city-strip { top: calc(var(--top-h) + 4px); font-size: 10px; max-width: calc(100% - 250px); left: 12px; transform: none; text-align: left; }
 }
 /* Marktmenü (js/ui/citypanel.js MarketPanel, seit v4.94): Fenster oben in der Mitte, über Geldanzeige oder Markt geöffnet */
 .market { position: fixed; left: 50%; top: 56px; transform: translateX(-50%); z-index: 30; width: min(360px, calc(100% - 32px)); display: flex; flex-direction: column; gap: 6px; padding: 8px 10px 8px; border-radius: 10px; background: #141814f2; border: 1px solid var(--accent); box-shadow: 0 6px 24px #0008; pointer-events: auto; }
@@ -575,7 +601,7 @@ body.city-mode:not(.city-folded) .city-fab { display: none; }
 
 /* Große Knöpfe rechts oben für Touch (ohne Tastatur), untereinander: Stadt (nur mit Stadt), Forschung (seit v4.98, nur mit
    Forschung), Ressourcen (seit v5.07, nur mit Stadt), Bauer (seit v4.95). Fehlt einer, rücken die anderen nach oben. */
-.fabs { position: fixed; right: calc(10px + env(safe-area-inset-right, 0px)); top: 50px; z-index: 20; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; pointer-events: none; }
+.fabs { position: fixed; right: calc(10px + env(safe-area-inset-right, 0px)); top: calc(var(--top-h) + 8px); z-index: 20; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; pointer-events: none; }
 .city-fab { min-height: 44px; padding: 0 16px; border-radius: 10px; border: 2px solid var(--accent); background: #1d231df0; color: var(--text); font-size: 15px; font-weight: 700; cursor: pointer; pointer-events: auto; }
 .city-fab:active { background: #2e372e; }
 .research-fab.on { background: #2e372e; box-shadow: 0 0 0 2px #6fa8dc88; }
@@ -661,6 +687,9 @@ body.flow-open .flow-fab { background: #2e372e; }
 .fl-chip.bad { border-color: var(--bad); }
 .fl-chip.bad b { color: var(--bad); }
 .fl-close { min-width: 40px; height: 34px !important; font-size: 15px; }
+/* Kopf mit „✕“ bleibt beim Scrollen oben; auf Touch-Geräten ist „✕“ fingergroß (das Fenster kann den Knopf „Ressourcen“ verdecken) */
+.fl-head { position: sticky; top: -8px; z-index: 1; margin: -8px -10px 0; padding: 8px 10px 4px; background: #141814; }
+@media (hover: none) { .fl-close { min-width: 48px; height: 44px !important; font-size: 18px; } }
 .fl-graph { display: block; width: 100%; height: auto; max-height: calc(100vh - 150px); font-family: inherit; }
 .fl-col { fill: var(--muted); font-size: 11px; font-weight: 700; text-anchor: middle; }
 .fl-link { fill: none; stroke-linecap: round; opacity: .8; }
@@ -686,14 +715,16 @@ body.flow-open .flow-fab { background: #2e372e; }
 .fl-issues li.ok { border-left-color: #5c9a5c; color: #8fd18f; }
 .fl-issues small { color: var(--muted); }
 @media (max-height: 520px) {
-  .flow { top: 42px; max-height: calc(100% - 46px); gap: 4px; padding: 6px 8px; }
+  .flow { top: calc(var(--top-h) + 6px); max-height: calc(100% - var(--top-h) - 10px); gap: 4px; padding: 6px 8px; }
+  .fl-head { top: -6px; margin: -6px -8px 0; padding: 6px 8px 4px; }
   .fl-head { font-size: 14px; gap: 6px; }
   .fl-chips { font-size: 11px; }
   .fl-graph { max-height: none; }
   .fl-issues { font-size: 11px; }
 }
 @media (min-height: 700px) and (min-width: 1100px) {
-  .flow { width: min(1320px, calc(100% - 220px)); top: 70px; padding: 12px 14px; gap: 8px; } /* seit v5.30 breiter: die Kette hat bis zu 7 Spalten */
+  .flow { width: min(1320px, calc(100% - 220px)); top: calc(var(--top-h) + 6px); padding: 12px 14px; gap: 8px; } /* seit v5.30 breiter: die Kette hat bis zu 7 Spalten */
+  .fl-head { top: -12px; margin: -12px -14px 0; padding: 12px 14px 4px; }
   .fl-issues { font-size: 13px; }
 }
 
