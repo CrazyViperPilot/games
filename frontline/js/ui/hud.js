@@ -537,6 +537,8 @@ export class Hud {
     else if (k === 'dc') h += line(`Arbeitsplätze ${CITY.jobsDc[lv]}`);
     else if (b.produces) {
       h += line(`Bildet aus: ${b.produces.map((u) => UNITS[u].short || UNITS[u].name).join(', ')} · ${b.trainSlots} gleichzeitig (Stufe ${lv})`);
+      // Fortschritt gleich unter „Bildet aus“, nicht am Ende: lange Infofelder (Stellplatz) waren unten abgeschnitten
+      h += this.queueInfo(b);
       if (k === 'heliport') {
         // Heliport als Landeplatz (seit v5.51): Hubschrauber, Luftraum, Kerosin und Munition in der Nähe
         const heli = g.units.find((u) => u.alive && u.heli?.home === b.id);
@@ -589,7 +591,6 @@ export class Hud {
     if (!hasRoad(c, col, (i - col) / c.cols)) h += '<div class="warn small">Keine Straße daneben: wächst nicht weiter</div>';
     if (s.powerRatio < 1 && CITY.power.use[k] && k !== 'res' && k !== 'com') h += `<div class="warn small">Strommangel: arbeitet mit ${Math.round(s.powerRatio * 100)} %</div>`;
     if (k === 'res' && c.flee[i] > 0) h += `<div class="warn small">Bewohner geflohen (Beschuss), Rückkehr frühestens in ${Math.ceil(c.flee[i])} s</div>`;
-    if (b.produces) h += this.queueInfo(b);
     return h;
   }
 
