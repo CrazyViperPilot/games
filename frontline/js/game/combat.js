@@ -12,10 +12,11 @@ import { armorMul, modOf, rangeMul, sightMul, dealtMul, smokeMul, hasUnlock } fr
 const autoTurret = (game, team) => hasUnlock(game, team, 'autoturret');
 import { damageBridge, deckDist } from './river.js';
 import { forEnemyCity } from './city/query.js';
-import { jetGrounded, parkedArmor } from './aircraft.js';
+import { jetGrounded, parkedArmor, isHighAlt } from './aircraft.js';
+import { UNITS } from '../data/units.js';
 
 const SCAN = BALANCE.scanInterval;
-const MAX_UNIT_RADIUS = 16; // größter Einheitenradius (Trefferkreis-Suche)
+const MAX_UNIT_RADIUS = Math.max(...Object.values(UNITS).map((u) => u.radius ?? 0)); // größter Einheitenradius (Trefferkreis-Suche; seit v5.83 die U-2 mit 22)
 const BASE_WARN_INTERVAL = BALANCE.baseAttackWarn; // s zwischen zwei Meldungen „Basis wird angegriffen“
 // Aufträge, bei denen nicht automatisch geschossen wird (Marsch, Bau, Reparatur, Logistik)
 const NO_FIRE = new Set(['move', 'build', 'repair', 'load', 'unload', 'route', 'pickup', 'deliver', 'storm']);
@@ -153,9 +154,9 @@ export function hit(game, target, amount) {
  * Idle-Einheiten suchen nur innerhalb der Leine um ihren Ankerpunkt. Reihenfolge: Einheiten, vom Gegner besetzte Häuser, Gebäude (ohne
  * Mauern/Tore), zuletzt Gebäude der gegnerischen Stadt. prefer(e): bevorzugte Ziele schlagen jedes andere (sonst gilt die Entfernung);
  * die Suche endet, sobald das beste Ziel bevorzugt ist (ohne prefer: sobald eines da ist). unitsFirst: Einheiten schon vor den Häusern
- * als Ergebnis nehmen. buildings: false = keine Gebäude und keine Stadt.
+ * als Ergebnis nehmen. buildings: false = keine Gebäude und keine Stadt. anti: Waffe kann hochfliegende Ziele treffen (antiHighAlt).
  */
-function searchTarget(game, hash, s, R, dmg, { minRange = 0, prefer = null, unitsFirst = false, buildings = true }) {
+function searchTarget(game, hash, s, R, dmg, { minRange = 0, prefer = null, unitsFirst = false, buildings = true, anti = false }) {
   const team = s.team;
   const leashed = s.kind === 'unit' && s.order.type === 'idle';
   let best = null;
@@ -163,6 +164,7 @@ function searchTarget(game, hash, s, R, dmg, { minRange = 0, prefer = null, unit
   const consider = (e) => {
     if (!e.alive || !isFoe(team, e) || e.house) return;
     if (!(dmgVs(dmg, e) > 0)) return; // z. B. Mörser und Panzer können keine Hubschrauber treffen, Soldaten keine Flugzeuge
+    if (!anti && isHighAlt(e)) return; // hochfliegende U-2 nur für Waffen mit antiHighAlt (seit v5.83)
     if (s.house && !houseCanFire(game, s, e)) return; // Besatzer sehen und zielen nur durch Fensterseiten (seit v5.67)
     if (leashed && Math.hypot(e.x - s.anchorX, e.y - s.anchorY) > Math.max(BALANCE.leash, R) + radiusOf(e)) return;
     const d = Math.hypot(e.x - s.x, e.y - s.y);
@@ -185,8 +187,8 @@ function searchTarget(game, hash, s, R, dmg, { minRange = 0, prefer = null, unit
 }
 
 /** Zielsuche für einen Schützen (Einheit oder Gebäude): Einheiten zuerst, dann besetzte Häuser, sonst Gebäude (searchTarget). */
-function findTarget(game, hash, s, radius, minRange, allowBuildings, dmg) {
-  return searchTarget(game, hash, s, radius, dmg, { minRange, unitsFirst: true, buildings: allowBuildings });
+function findTarget(game, hash, s, radius, minRange, allowBuildings, dmg, anti) {
+  return searchTarget(game, hash, s, radius, dmg, { minRange, unitsFirst: true, buildings: allowBuildings, anti });
 }
 
 function fireDirect(game, s, t, w) {
@@ -248,6 +250,7 @@ function fireWeapon(game, u, w, t) {
 
 /** Reichweite der Waffe w von u gegen t (Forschung, Hauswand; Artillerie nicht unter minRange)? */
 const weaponReaches = (game, u, w, t) =>
+  (!isHighAlt(t) || !!w.spec.antiHighAlt) && // hochfliegende U-2 nur von Waffen mit antiHighAlt (seit v5.83)
   inRange(u, t, w.spec.range * rangeMul(game, u) + reachBonus(game, u)) &&
   !(w.spec.minRange && Math.hypot(t.x - u.x, t.y - u.y) < w.spec.minRange) &&
   houseCanFire(game, u, t); // Besatzer schießen nur durch eine Fensterseite (seit v5.67)
@@ -313,7 +316,7 @@ function prefers(spec, e) {
  */
 function weaponTarget(game, hash, u, w) {
   const R = w.spec.range * rangeMul(game, u) + reachBonus(game, u);
-  return searchTarget(game, hash, u, R, w.spec.damage, { prefer: (e) => prefers(w.spec, e) });
+  return searchTarget(game, hash, u, R, w.spec.damage, { prefer: (e) => prefers(w.spec, e), anti: !!w.spec.antiHighAlt });
 }
 
 /**
@@ -356,6 +359,7 @@ function fireShell(game, s, tx, ty, w) {
  */
 function tryFire(game, s, t, w) {
   if (s.cooldown > 0) return;
+  if (isHighAlt(t) && !w.antiHighAlt) return; // hochfliegende U-2: Flak und SAM der Gebäude greifen sie nicht an (seit v5.83)
   if (w.shell) {
     const d = Math.hypot(t.x - s.x, t.y - s.y);
     if (d < w.minRange || !inRange(s, t, w.range * rangeMul(game, s))) return;
@@ -422,7 +426,7 @@ function impact(game, p) {
     if (d < R) hit(game, b, (p.damage.struct || 0) * houseMult(p.damage) * (1 - d / R));
   }
   const splash = (e) => {
-    if (!e.alive || e.team === p.team || e.house) return; // seit v5.35 treffen Granaten auch abgestellte Jets (Schutz: parkedArmor)
+    if (!e.alive || e.team === p.team || e.house || isHighAlt(e)) return; // seit v5.35 treffen Granaten auch abgestellte Jets (Schutz: parkedArmor); hochfliegende U-2 nie (seit v5.83)
     const d = Math.max(0, Math.hypot(e.x - p.tx, e.y - p.ty) - radiusOf(e));
     if (d >= R) return;
     const dmg = dmgVs(p.damage, e) * (1 - d / R) * (p.mul ?? 1);
@@ -485,7 +489,7 @@ export function updateCombat(game, dt) {
     if (u.scanTimer <= 0) {
       u.scanTimer = SCAN;
       const R = u.def.indirect ? u.def.range * rangeMul(game, u) : u.def.sight * wx * sightMul(game, u) + reachBonus(game, u); // Artillerie: so weit sie schießt (Sicht des Teams)
-      const t = findTarget(game, hash, u, R, u.def.minRange || 0, true, u.def.damage);
+      const t = findTarget(game, hash, u, R, u.def.minRange || 0, true, u.def.damage, u.weapons.some((w) => w.spec.antiHighAlt));
       u.targetId = t ? t.id : null;
     }
     const t = u.targetId !== null ? resolveTarget(game, u.targetId) : null;
@@ -503,7 +507,7 @@ export function updateCombat(game, dt) {
     }
     if (b.scanTimer <= 0) {
       b.scanTimer = SCAN;
-      const t = findTarget(game, hash, b, w.range * rangeMul(game, b), w.minRange, true, w.damage);
+      const t = findTarget(game, hash, b, w.range * rangeMul(game, b), w.minRange, true, w.damage, !!w.antiHighAlt);
       b.targetId = t ? t.id : null;
     }
     if (b.targetId !== null) {

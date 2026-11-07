@@ -458,7 +458,8 @@ export function aiAirport(game, c, main, reserve, want = 2) {
       if (e && game.issue(c.team, { type: 'cityUpgrade', buildingId: e.id }).ok) return true;
     }
     // weitere Stellplätze an der Bahn (beide Längsseiten); so viele, dass jeder Jet einen Platz hat (CITY.air.standJets je Stellplatz)
-    const wantStands = Math.ceil(want / CITY.air.standJets);
+    // + ein ganzer Stellplatz für die U-2 zur Aufklärung, wenn sie fliegen darf (seit v5.83: sie belegt beide Plätze)
+    const wantStands = Math.ceil(want / CITY.air.standJets) + (CITY.ai.reconFrom[difficulty] != null ? CITY.ai.reconMax : 0);
     if (stands.length >= wantStands || money < CITY.cost.stand + reserve || main.store.bm < CITY.costBm.stand + A.standBuffer) return false;
     const rw = c.list.filter((i) => c.kind[i] === KIND_ID.runway);
     for (const i of rw) {

@@ -27,7 +27,7 @@ export const RESEARCH = {
   groups: {
     rifleman: 'inf', at: 'inf', sniper: 'inf', commander: 'inf',
     tank: 'tank', ifv: 'ifv', flak: 'aa', sam: 'aa', gepard: ['spaa', 'aa'], pzh: 'art', truck: 'log', engineer: 'log',
-    littlebird: 'heli', transporter: 'heli', gunship: 'heli', f16: 'jet', f22: 'jet',
+    littlebird: 'heli', transporter: 'heli', gunship: 'heli', f16: 'jet', f22: 'jet', u2: 'jet',
   },
   // Äste in Reihenfolge der Zeilen im Menü; je Ast 10 Forschungen (Stufe 1 bis 10)
   lanes: {

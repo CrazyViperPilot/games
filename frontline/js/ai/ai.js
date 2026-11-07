@@ -85,6 +85,7 @@ export class AI {
     this.research(s); // vor produce: die nächste Stufe bekommt das Geld zuerst
     this.produce(s);
     this.jets(s); // Fliegerhorst: F-16 kaufen und losschicken (seit v5.03)
+    this.recon(s); // Fliegerhorst: U-2 zur Aufklärung (seit v5.83)
     this.artillery(s); // Panzerhaubitzen hinter der Armee in Stellung (seit v5.26)
     this.buildDefense(s);
     this.buildWall(s);

@@ -29,7 +29,7 @@ export const CITY = {
     roadFree: ['mine'], // Förderanlagen auf Vorkommen: ohne Anschlusspflicht (sie liefern an Werke; ohne Straße fördern sie wie bisher nicht)
   },
   // Einwohner als Truppen (seit v4.82): ausgebildete Einheiten brauchen so viele freie Einwohner (Startarmee und Nachschub nicht)
-  crew: { default: 1, fobTruck: 2, ifv: 3, tank: 3, flak: 2, sam: 2, gepard: 3, pzh: 4, excavator: 2, littlebird: 2, transporter: 2, gunship: 2, f16: 2, f22: 2 },
+  crew: { default: 1, fobTruck: 2, ifv: 3, tank: 3, flak: 2, sam: 2, gepard: 3, pzh: 4, excavator: 2, littlebird: 2, transporter: 2, gunship: 2, f16: 2, f22: 2, u2: 2 },
   // Flucht (seit v4.82): Wohnzellen in der Konfliktzone leeren sich, wenn in ihnen oder den Nachbarzellen geschossen wird
   flee: { reach: 1, calm: 60 }, // Nachbarschaft (Zellen) und Ruhezeit (s), bis die Bewohner zurückziehen dürfen
   startStock: { bm: 1500, mun: 600, fuel: 1000 }, // Startlager der Hauptstadt bei eingeschalteter Stadt (sonst unendlich)
@@ -64,7 +64,7 @@ export const CITY = {
     barracks: ['rifleman', 'at', 'sniper', 'commander'], // Kaserne: Soldaten
     factory: ['truck', 'engineer', 'fobTruck', 'ifv', 'tank', 'flak', 'sam', 'gepard', 'pzh', 'excavator'], // Fabrikhalle: alle Fahrzeuge (auch das FOB-Fahrzeug)
     heliport: ['littlebird', 'transporter', 'gunship'], // Heliport: Hubschrauber
-    stand: ['f16', 'f22'], // Stellplatz/Hangar (seit v5.35, F-22 seit v5.82): je Stellplatz zwei Kampfflugzeuge (CITY.air.standJets, F-16 und F-22 teilen sich die Plätze), die dort auch stehen, tanken und nachladen
+    stand: ['f16', 'f22', 'u2'], // Stellplatz/Hangar (seit v5.35, F-22 seit v5.82, U-2 seit v5.83): je Stellplatz zwei Kampfflugzeuge (CITY.air.standJets, F-16 und F-22 teilen sich die Plätze); die U-2 belegt den ganzen Stellplatz (standSlots), die dort auch stehen, tanken und nachladen
   },
   trainSlots: [0, 2, 3, 4], // gleichzeitige Ausbildungen je Stufe (Stufe 1 wie früher die Hauptstadt)
 
@@ -111,7 +111,7 @@ export const CITY = {
   startMetal: 400, // Stahl im Hauptlager zu Beginn (Stahl bleibt dort, LKW fahren es nicht; Schlüssel metal)
   startKero: 300, // Kerosin im Stadtlager zu Beginn (seit v5.20; F-16 und Hubschrauber tanken es)
   // Metall je ausgebildeter Einheit (zusätzlich zum Geld); fehlt die Sorte, kostet sie kein Metall
-  metalCost: { truck: 20, engineer: 20, fobTruck: 80, ifv: 60, tank: 120, flak: 60, sam: 80, gepard: 100, pzh: 140, excavator: 80, littlebird: 60, transporter: 80, gunship: 120, f16: 160, f22: 220 },
+  metalCost: { truck: 20, engineer: 20, fobTruck: 80, ifv: 60, tank: 120, flak: 60, sam: 80, gepard: 100, pzh: 140, excavator: 80, littlebird: 60, transporter: 80, gunship: 120, f16: 160, f22: 220, u2: 150 },
   // Markt: handelt in Losen; verkaufen bringt wenig, kaufen kostet viel (Geld je Los)
   market: { lot: 100, sell: byGood('sell'), buy: byGood('buy') }, // Preise je Ware im Register js/data/goods.js
 
@@ -273,6 +273,15 @@ export const CITY = {
     upgradeBuffer: { bm: 200, steel: 200 }, // Baumaterial und Stahl, die nach dem Ausbau eines Stellplatzes bleiben müssen (Geld: CITY.air.upgradeAiReserve)
     jets: { easy: 2, normal: 4, hard: 6 }, // so viele F-16 hält sie (seit v5.03; seit v5.35 je Stellplatz so viele wie CITY.air.standJets, die KI baut so viele Stellplätze)
     jetReserve: 400, // Geld, das nach dem Kauf einer F-16 übrig bleiben muss
+    // F-22 (seit v5.83): Anteil der F-22 an ihren Kampfflugzeugen (Zahl nach CITY.ai.jets). Ist der Anteil darunter und das Geld für
+    // eine F-22 mit jetReserve da, bestellt die KI eine F-22, sonst eine F-16. F-22 greifen nur Luftziele an (Hubschrauber, Flugzeuge, U-2).
+    f22Share: 0.4,
+    // U-2 zur Aufklärung (seit v5.83, Logik js/ai/army/combat.js recon): höchstens reconMax gleichzeitig (ganzer Stellplatz, nur mit
+    // jetReserve Geld danach), ab reconFrom[Schwierigkeit] s Spielzeit (null = nie), höchstens alle reconEvery s ein Flug, abwechselnd
+    // über die Konfliktzone und die gegnerische Hauptstadt, dort kreisend.
+    reconMax: 1,
+    reconFrom: { easy: null, normal: 600, hard: 480 },
+    reconEvery: 300,
     // seit v5.20 (Review): höchstens so viele Förderanlagen je Werk, das ihren Rohstoff nimmt (Holz und Stein zusammen je BM-Werk, Erz je
     // Hütte, Öl je Raffinerie oder Kerosin-Raffinerie; aufgerundet). Mehr Förderung, als die Werke verarbeiten, verstopft nur die Straßen.
     minesPer: { bm: 1, smelter: 1, oil: 0.5 },

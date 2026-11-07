@@ -329,13 +329,38 @@ export const UNITS = {
     sight: 600,
     // Eine Waffe (kein parallel nötig): sechs Luft-Luft-Lenkraketen, nur gegen Hubschrauber und Flugzeuge
     weapons: [
-      { id: 'aim', name: 'Luft-Luft-Lenkrakete', range: 700, cooldown: 2.2, rounds: 6, munCost: 150, hitChance: 0.94, targets: ['air'], damage: { air: 700 } },
+      // antiHighAlt: greift auch die U-2 in großer Höhe an (highAlt); die übrigen Flugabwehr-Waffen können das nicht (combat.js)
+      { id: 'aim', name: 'Luft-Luft-Lenkrakete', range: 700, cooldown: 2.2, rounds: 6, munCost: 150, hitChance: 0.94, targets: ['air'], antiHighAlt: true, damage: { air: 700 } },
     ],
     cost: { money: 1900 },
     buildTime: 55,
     fuelPerSec: 1,
     fuelMax: 55, // Sekunden Flug wie die F-16 (Reichweite ≈ speed × fuelMax)
     hotkey: 'I', // im Stellplatz-Menü frei (I = Einsteigen nur bei gewählten Soldaten, U Ausbauen, K F-16)
+  },
+  // U-2 (Höhenaufklärer, seit v5.83): unbewaffnet, fliegt sehr hoch. In der Luft sieht sie weit (airSight), und nur Waffen mit
+  // antiHighAlt (die F-22) können sie treffen (highAlt, combat.js); am Boden ist sie wie ein Jet verwundbar. Sie belegt einen
+  // ganzen Stellplatz allein (standSlots, aircraft.js), Kreisen und Heimflug wie die Jets; ohne Waffen fliegt sie nicht „leer“ heim.
+  u2: {
+    name: 'U-2',
+    short: 'U-2', // Kurzname in der Befehlskarte
+    slots: 3,
+    armor: 'air',
+    air: true,
+    jet: true,
+    hp: 400,
+    speed: 300,
+    radius: 22,
+    sight: 300, // am Boden wie ein Fahrzeug
+    airSight: 1800, // Sichtweite in der Luft (fog.js, sightOf)
+    highAlt: true, // in der Luft nur von Waffen mit antiHighAlt angreifbar (combat.js)
+    standSlots: 2, // belegt beide Plätze eines Stellplatzes (CITY.air.standJets): kein anderes Flugzeug darauf
+    weapons: [],
+    cost: { money: 1600 },
+    buildTime: 50,
+    fuelPerSec: 1,
+    fuelMax: 180, // rund 3 min Flug: Karte Ecke zu Ecke (ca. 15 700 px) hin und zurück mit gut einer Minute Kreisen
+    hotkey: 'O', // im Stellplatz-Menü frei (K F-16, I F-22, W Staffel, U Ausbauen)
   },
   // Flugabwehrpanzer (Flak): Schnellfeuer-Flak gegen Hubschrauber, Munition je Schuss 20. hitChance × speedRef: schnelle Ziele trifft sie selten
   // (Tempo-Faktor speedRef/(speedRef + Zielgeschwindigkeit), siehe BALANCE.airFire). Schießt nur auf Luftziele.
@@ -424,9 +449,9 @@ export const UNITS = {
 // Abgeleitete Gesamtwerte aus den Waffen: größte Reichweite, bester Schaden je Klasse, Munitionswert des vollen Vorrats.
 for (const def of Object.values(UNITS)) {
   if (!def.weapons) continue;
-  def.range = Math.max(...def.weapons.map((w) => w.range));
+  def.range = Math.max(0, ...def.weapons.map((w) => w.range)); // ohne Waffen (U-2) 0
   def.minRange = Math.max(0, ...def.weapons.map((w) => w.minRange ?? 0)); // Artillerie: nicht näher
-  def.cooldown = def.weapons[0].cooldown;
+  def.cooldown = def.weapons[0]?.cooldown ?? 0;
   def.damage = {};
   for (const w of def.weapons) {
     for (const [k, v] of Object.entries(w.damage)) def.damage[k] = Math.max(def.damage[k] || 0, v);

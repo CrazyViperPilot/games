@@ -2,7 +2,7 @@
 // Methoden der Klasse AI (js/ai/ai.js), eingehängt über Object.assign. Befehle nur über game.issue. Kein DOM.
 
 import { CITY } from '../../data/city.js';
-import { standsOf, freeSpace } from '../../game/aircraft.js';
+import { standsOf, freeSpace, isHighAlt } from '../../game/aircraft.js';
 import { BALANCE } from '../../data/balance.js';
 import { UNITS } from '../../data/units.js';
 import { canGarrison } from '../../game/garrison.js';
@@ -15,9 +15,10 @@ const SCOUT_MONEY = UNITS.littlebird.cost.money; // Geld, ab dem ein Späher aus
 
 export const combatMethods = {
   /**
-   * Kampfflugzeuge (seit v5.03): hält CITY.ai.jets[Schwierigkeit] F-16 an ihren Flughäfen (Geld über jetReserve) und schickt alle
-   * startbereiten paarweise los: zuerst gegen gesehene Hubschrauber und Flugzeuge, sonst gegen gepanzerte Fahrzeuge in der
-   * Konfliktzone oder nahe der eigenen Basis, sonst auf Patrouille über die Zone. Rückkehr, Tanken und Nachladen regelt aircraft.js.
+   * Kampfflugzeuge (seit v5.03): hält CITY.ai.jets[Schwierigkeit] Kampfflugzeuge an ihren Flughäfen (Geld über jetReserve). Seit v5.83
+   * ist davon CITY.ai.f22Share eine F-22 (nur Luftziele). Startbereite F-16 fliegen paarweise los: zuerst gegen gesehene Hubschrauber
+   * und Flugzeuge, sonst gegen gepanzerte Fahrzeuge in der Konfliktzone oder nahe der eigenen Basis, sonst auf Patrouille über die Zone.
+   * F-22 haben nur Luft-Luft-Raketen: sie fliegen nur gegen Luftziele (auch die U-2) oder patrouillieren. Die U-2 steuert recon().
    */
   jets(s) {
     const g = this.game;
@@ -25,24 +26,66 @@ export const combatMethods = {
     const ports = standsOf(g, t);
     if (!ports.length) return;
     const jets = s.units.filter((u) => u.def.jet);
+    const fighters = jets.filter((u) => !u.def.highAlt); // U-2 nicht mitzählen (recon)
+    const queuedFighters = ports.flatMap((p) => p.queue.map((e) => e.unit ?? e)).filter((ty) => !UNITS[ty].highAlt);
     const want = CITY.ai.jets[this.difficulty] ?? CITY.ai.jets.normal;
-    const queued = ports.reduce((n, b) => n + b.queue.length, 0);
-    if (jets.length + queued < want && g.teams[t].res.money >= UNITS.f16.cost.money + CITY.ai.jetReserve) {
-      const b = ports.filter((p) => p.queue.length < JET_QUEUE && freeSpace(g, p) > 0).sort((p, q) => p.queue.length - q.queue.length || p.id - q.id)[0];
-      if (b) g.issue(t, { type: 'train', buildingId: b.id, unit: 'f16' });
+    const total = fighters.length + queuedFighters.length;
+    const f22Have = fighters.filter((u) => u.type === 'f22').length + queuedFighters.filter((ty) => ty === 'f22').length;
+    const money = g.teams[t].res.money;
+    if (total < want) {
+      // F-22, solange ihr Anteil unter CITY.ai.f22Share liegt und Geld für sie und die Reserve da ist; sonst F-16
+      const f22 = f22Have < CITY.ai.f22Share * total && money >= UNITS.f22.cost.money + CITY.ai.jetReserve;
+      const type = f22 ? 'f22' : 'f16';
+      if (money >= UNITS[type].cost.money + CITY.ai.jetReserve) {
+        const b = ports.filter((p) => p.queue.length < JET_QUEUE && freeSpace(g, p) > 0).sort((p, q) => p.queue.length - q.queue.length || p.id - q.id)[0];
+        if (b) g.issue(t, { type: 'train', buildingId: b.id, unit: type });
+      }
     }
-    const ready = jets.filter((u) => u.parked && u.jet?.ready && u.order.type === 'idle').sort((a, b) => a.id - b.id);
+    const ready = fighters.filter((u) => u.parked && u.jet?.ready && u.order.type === 'idle').sort((a, b) => a.id - b.id);
     if (!ready.length || !this.once('jets', JET_EVERY)) return;
     const air = s.enemies.filter((e) => e.def.air && !e.parked);
     const armor = s.enemies.filter((e) => (e.def.armor === 'heavy' || e.def.armor === 'light') && (dist(e.x, e.y, s.zone.x, s.zone.y) <= s.zone.r || dist(e.x, e.y, s.ax, s.ay) <= DEF_RANGE * 2));
     const near = (list) => list.slice().sort((a, b) => dist(a.x, a.y, s.ax, s.ay) - dist(b.x, b.y, s.ax, s.ay) || a.id - b.id);
-    const targets = [...near(air), ...near(armor)];
-    for (let k = 0; k < ready.length; k += JET_GROUP) {
-      const ids = ready.slice(k, k + JET_GROUP).map((u) => u.id);
-      const tg = targets[(k / JET_GROUP) % Math.max(1, targets.length)];
-      if (tg) g.issue(t, { type: 'attack', ids, targetId: tg.id });
-      else g.issue(t, { type: 'attackMove', ids, x: s.zone.x, y: s.zone.y });
+    // Nur Waffen mit Bodenziel (F-16, Luft-Boden) greifen gepanzerte Fahrzeuge an; hochfliegende Ziele nur mit antiHighAlt (F-22)
+    const groundArms = (u) => u.def.weapons.some((w) => (w.targets ?? []).some((k) => k !== 'air'));
+    const canHit = (u, e) => !isHighAlt(e) || u.def.weapons.some((w) => w.antiHighAlt);
+    const groups = [ready.filter((u) => groundArms(u)), ready.filter((u) => !groundArms(u))];
+    for (const list of groups) {
+      for (let k = 0; k < list.length; k += JET_GROUP) {
+        const ids = list.slice(k, k + JET_GROUP).map((u) => u.id);
+        const first = list[k];
+        const pool = [...near(air.filter((e) => canHit(first, e))), ...(groundArms(first) ? near(armor) : [])];
+        const tg = pool[(k / JET_GROUP) % Math.max(1, pool.length)];
+        if (tg) g.issue(t, { type: 'attack', ids, targetId: tg.id });
+        else g.issue(t, { type: 'attackMove', ids, x: s.zone.x, y: s.zone.y });
+      }
     }
+  },
+
+  /**
+   * Aufklärung (seit v5.83): eine U-2 (CITY.ai.reconMax) ab CITY.ai.reconFrom[Schwierigkeit] s, nur auf einem ganz freien Stellplatz
+   * (sie belegt beide Plätze) und mit jetReserve Geld danach. Startbereit fliegt sie im Wechsel über die Konfliktzone und die gegnerische
+   * Hauptstadt und kreist dort; höchstens alle CITY.ai.reconEvery s ein Flug.
+   */
+  recon(s) {
+    const g = this.game;
+    const t = this.team;
+    const A = CITY.ai;
+    const from = A.reconFrom[this.difficulty];
+    if (from == null || g.time < from) return;
+    const ports = standsOf(g, t);
+    const queued = ports.reduce((n, p) => n + p.queue.filter((e) => (e.unit ?? e) === 'u2').length, 0);
+    const have = s.units.filter((u) => u.def.highAlt).length + queued;
+    if (have < A.reconMax && g.teams[t].res.money >= UNITS.u2.cost.money + A.jetReserve) {
+      const b = ports.filter((p) => p.queue.length < JET_QUEUE && freeSpace(g, p) >= UNITS.u2.standSlots).sort((p, q) => p.queue.length - q.queue.length || p.id - q.id)[0];
+      if (b) g.issue(t, { type: 'train', buildingId: b.id, unit: 'u2' });
+    }
+    const ready = s.units.filter((u) => u.def.highAlt && u.parked && u.jet?.ready && u.order.type === 'idle');
+    if (!ready.length || !this.once('recon', A.reconEvery)) return;
+    this.reconToFoe = !this.reconToFoe; // im Wechsel: Konfliktzone, gegnerische Hauptstadt
+    const foe = g.buildings.find((b) => b.alive && b.built && b.type === 'fob' && b.main && b.team !== t);
+    const dest = this.reconToFoe && foe ? foe : s.zone;
+    g.issue(t, { type: 'move', ids: [ready[0].id], x: dest.x, y: dest.y });
   },
 
   /** Sammelpunkt: an der Zonen-FOB (Richtung Basis), sonst Richtung Zone vor der Hauptstadt. */

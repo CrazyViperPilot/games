@@ -6,6 +6,7 @@ import { weatherSight } from './weather.js';
 import { sightMul } from './research.js';
 import { CITY } from '../data/city.js';
 import { KIND_ID } from '../data/citykinds.js';
+import { sightOf } from './aircraft.js';
 
 const CONSTRUCTION_SIGHT = BALANCE.construction.siteSight; // Baustellen sehen weniger
 const RAY_GAP = 44; // Abstand benachbarter Sichtstrahlen am Rand (px), kleiner als eine Nebelzelle
@@ -160,10 +161,10 @@ export class Fog {
     const m = weatherSight(game);
     const mu = m;
     for (const u of game.units) {
-      if (!u.alive || u.team !== team || !(u.def.sight > 0)) continue;
+      if (!u.alive || u.team !== team || !(sightOf(u) > 0)) continue; // U-2 in der Luft: große Höhensicht (seit v5.83)
       // aus einem Haus: Sichtweite ab der Hauswand, Besatzer sehen weiter (Ausguck, seit v5.66: sightMul der Häuserkampf-Werte)
       const ausguck = u.house ? BALANCE.garrison.sightMul : 1;
-      this.markEntity(relief, u, u.def.sight * mu * sightMul(game, u) * ausguck + (u.house ? (game.entities.get(u.house)?.reach ?? 0) : 0));
+      this.markEntity(relief, u, sightOf(u) * mu * sightMul(game, u) * ausguck + (u.house ? (game.entities.get(u.house)?.reach ?? 0) : 0));
     }
     for (const b of game.buildings) {
       if (!b.alive || b.team !== team) continue;
