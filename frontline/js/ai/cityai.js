@@ -4,7 +4,7 @@
 import { CITY } from '../data/city.js';
 import { KINDS, KIND_ID, WORKS, SUPPLIER_KINDS } from '../data/citykinds.js';
 import { transportOf, transportInfo } from '../game/transport.js';
-import { DEPOSITS, cellAt, idx, sizeOf, isPart, fitBig, cellFree, roadAt, hasRoad, buildAllowed, nbrsOf } from '../game/city/cells.js';
+import { DEPOSITS, cellAt, idx, sizeOf, isPart, fitBig, bigCells, cellFree, roadAt, hasRoad, buildAllowed, nbrsOf, roadLinked } from '../game/city/cells.js';
 import { mainRoadReach, connectRoad, goalOf } from '../game/city/roadnet.js';
 import { totals } from '../game/city/state.js';
 
@@ -194,6 +194,15 @@ export function aiCity(game, team, difficulty, mem = cityAiMemory()) {
     rad = CITY.ai.quarter;
   }
   if (!anchor) return;
+  // Anschlusspflicht (Paket „Straßen“): Netz verlängern, wenn um den Anker zu wenige freie Zellen an einer Straße zum Lager liegen
+  // (auch ein FOB-Viertel ohne Anschluss bekommt so seine Straße); hat ein FOB-Viertel danach noch keinen Anschluss, baut dieser Takt
+  // an der Hauptstadt weiter
+  if (linkNeeded(game) && money() >= CITY.cost.road + reserve && extendNet(game, city, anchor, rad, mem)) n++;
+  if (anchor !== main && linkNeeded(game) && !linkSpare(game, city, anchor, rad)) {
+    anchor = main;
+    rad = CITY.territory.main + CITY.territory.building * 4;
+    if (!anchor) return;
+  }
   if (aiAirport(game, city, main, reserve, CITY.ai.jets[difficulty] ?? CITY.ai.jets.normal)) n++;
   if (n < CITY.ai.perStep && aiConnect(game, city, mem.turn)) n++;
   const add = {};
@@ -206,8 +215,17 @@ export function aiCity(game, team, difficulty, mem = cityAiMemory()) {
   // Werk (2 × 2, seit v5.20 AP4): zuerst ein Quadrat an einer Straße zum Lager, sonst an einer beliebigen Straße in Reichweite
   // (aiConnect verbindet es danach, Baumaterial vorausgesetzt)
   const workSpot = (kind) => {
+    // Anschlusspflicht (Paket „Straßen“): das Netz wächst baumartig von der Hauptstadt aus, und durch das Lager fährt keine Ware; Hütte
+    // und Stahlwerk (Roheisen fährt zwischen ihnen) daher zuerst nah am Partnerwerk (CITY.ai.chainNear Zellen), sonst wie bisher
+    const partner = linkNeeded(game) ? CHAIN_PARTNER[kind] : null;
+    let order = cands;
+    if (partner) {
+      const at = city.list.filter((j) => !isPart(city, j) && city.kind[j] === KIND_ID[partner]).map((j) => [j % city.cols, Math.floor(j / city.cols)]);
+      const near = (c2) => at.some(([q, r]) => Math.max(Math.abs(q - c2.col), Math.abs(r - c2.row)) <= CITY.ai.chainNear);
+      if (at.length) order = [...cands.filter(near), ...cands.filter((c2) => !near(c2))];
+    }
     for (const pass of [true, false]) {
-      for (const c2 of cands) {
+      for (const c2 of order) {
         if (pass ? !touchesRoad(city, c2.i, reach) : !(near[c2.i] && hasRoad(city, c2.col, c2.row))) continue;
         const a = fitBig(game, city, c2.col, c2.row, kind, free, (j) => buildAllowed(game, city, j, kind));
         if (a >= 0) return a;
@@ -244,6 +262,11 @@ export function aiCity(game, team, difficulty, mem = cityAiMemory()) {
       n = -Infinity; // Geld reicht nicht: Schluss für diesen Takt
       return;
     }
+    // Anschlusspflicht (Paket „Straßen“): kein Gebäude, das das Straßennetz einschließt (es bleiben CITY.ai.linkOutlets Ausgänge)
+    if (kind !== 'road' && linkNeeded(game) && !keepsOutlets(game, city, sizeOf(kind) > 1 ? bigCells(city, idx(city, col, row), sizeOf(kind)) : [idx(city, col, row)])) {
+      if (sizeOf(kind) > 1) skip.add(kind);
+      return;
+    }
     const r = game.issue(team, { type: 'city', kind, c0: col, r0: row, c1: col, r1: row });
     if (!r.ok) {
       if (kind !== 'road') skip.add(kind); // z. B. zu wenig Baumaterial: in diesem Takt etwas anderes (seit v5.03)
@@ -257,6 +280,125 @@ export function aiCity(game, team, difficulty, mem = cityAiMemory()) {
     place(cand);
     if (!Number.isFinite(n)) return;
   }
+}
+
+/** Werkpaare, zwischen denen ein Zwischenprodukt über die Straße fährt (CITY.chain: Hütte macht Roheisen, das Stahlwerk verarbeitet es). */
+const CHAIN_PARTNER = { smelter: 'steel', steel: 'smelter' };
+
+/** Gilt die Anschlusspflicht des Baugebiets (Paket „Straßen“)? */
+function linkNeeded(game) {
+  return !!game.buildRules && CITY.build.needRoad;
+}
+
+/** Freie, bebaubare Zellen im Umkreis `rad` (Zellen) um den Anker, die an einer Straße zum Lager liegen (gezählt bis CITY.ai.linkSpare). */
+function linkSpare(game, c, anchor, rad) {
+  const mask = roadLinked(game, c);
+  const [ac, ar] = cellAt(c, anchor.x, anchor.y);
+  let n = 0;
+  for (let r = Math.max(0, ar - rad); r <= Math.min(c.rows - 1, ar + rad); r++) {
+    for (let q = Math.max(0, ac - rad); q <= Math.min(c.cols - 1, ac + rad); q++) {
+      const j = r * c.cols + q;
+      if (mask[j] && !c.kind[j] && !c.deposit[j] && buildAllowed(game, c, j) && cellFree(game, c, q, r) && ++n >= CITY.ai.linkSpare) return n;
+    }
+  }
+  return n;
+}
+
+/** Für eine Straße frei: leer, ohne Vorkommen, ausweisbar (Baugebiet für Straßen), ohne Hindernis. */
+function roadFree(game, c, j) {
+  return !c.kind[j] && !c.deposit[j] && buildAllowed(game, c, j, 'road') && cellFree(game, c, j % c.cols, Math.floor(j / c.cols));
+}
+
+/** Ausgänge des Netzes: freie Zelle j an einer Straße zum Lager mit einem freien Nachbarn x außerhalb des Netzes ([{ j, x }]). */
+function outletsOf(game, c) {
+  const mask = roadLinked(game, c);
+  const out = [];
+  for (let j = 0; j < mask.length; j++) {
+    if (!mask[j] || !roadFree(game, c, j)) continue;
+    for (const x of nbrsOf(c, j)) if (!mask[x] && roadFree(game, c, x)) out.push({ j, x });
+  }
+  return out;
+}
+
+/**
+ * Bleibt das Straßennetz offen, wenn die Zellen `cells` bebaut werden? true, wenn danach noch CITY.ai.linkOutlets Ausgänge bleiben
+ * oder schon vorher weniger da waren (dann verhindert diese Regel nichts mehr; extendNet sucht dann einen neuen Weg).
+ */
+function keepsOutlets(game, c, cells) {
+  const taken = new Set(cells);
+  const before = new Set();
+  const after = new Set();
+  for (const o of outletsOf(game, c)) {
+    before.add(o.j);
+    if (!taken.has(o.j) && !taken.has(o.x)) after.add(o.j);
+  }
+  return after.size >= CITY.ai.linkOutlets || before.size < CITY.ai.linkOutlets;
+}
+
+/**
+ * Netz verlängern (Paket „Straßen“): liegen um den Anker weniger als CITY.ai.linkSpare freie Anschlusszellen und hat das Lager
+ * mindestens CITY.ai.linkBm Baumaterial, legt die KI eine Straße. Ohne freie Anschlusszelle (z. B. FOB-Viertel ohne Anschluss) zuerst eine
+ * Straße zur Lagerstraße (connectNear); sonst eine Straßenzelle auf den Ausgang mit dem meisten freien Land im eigenen Gebiet dahinter
+ * (bei Gleichstand der nächste zum Anker). true, wenn gebaut.
+ */
+function extendNet(game, c, anchor, rad, mem) {
+  const main = game.mainFob(c.team);
+  if (!main || main.store.bm < CITY.ai.linkBm) return false; // Baumaterial zuerst für Gebäude und Anschlüsse der Werke
+  const spare = linkSpare(game, c, anchor, rad);
+  if (spare >= CITY.ai.linkSpare) return false;
+  const outs = outletsOf(game, c);
+  const [ac, ar] = cellAt(c, anchor.x, anchor.y);
+  if (spare === 0 && connectNear(game, c, ac, ar, rad, mem)) return true;
+  const mask = roadLinked(game, c);
+  let best = null;
+  for (const o of outs) {
+    const xq = o.x % c.cols;
+    const xr = (o.x - xq) / c.cols;
+    if (inDanger(c, xq, xr, game.time)) continue;
+    let room = 0; // freies Land im eigenen Gebiet ohne Anschluss im Umkreis von 2 Zellen hinter dem Ausgang
+    for (let r = Math.max(0, xr - 2); r <= Math.min(c.rows - 1, xr + 2); r++) {
+      for (let q = Math.max(0, xq - 2); q <= Math.min(c.cols - 1, xq + 2); q++) {
+        const y = r * c.cols + q;
+        if (!mask[y] && c.claim[y] && roadFree(game, c, y)) room++;
+      }
+    }
+    const jq = o.j % c.cols;
+    const d = Math.abs(jq - ac) + Math.abs((o.j - jq) / c.cols - ar);
+    if (!best || room > best.room || (room === best.room && (d < best.d || (d === best.d && o.j < best.j)))) best = { j: o.j, room, d };
+  }
+  if (best && best.room > 0) {
+    const q = best.j % c.cols;
+    const r = (best.j - q) / c.cols;
+    if (game.issue(c.team, { type: 'city', kind: 'road', c0: q, r0: r, c1: q, r1: r }).ok) return true;
+  }
+  return false;
+}
+
+/**
+ * Straße (connectRoad, bezahlt) ab der nächsten freien Zelle im eigenen Gebiet ohne Anschluss um (ac, ar), Ringe nach außen; höchstens
+ * CITY.ai.linkTries Versuche je Takt. Startzellen ohne Weg (eingeschlossene Lücken) merkt sich die KI CITY.ai.linkRetry s in mem.linkFail.
+ */
+function connectNear(game, c, ac, ar, rad, mem) {
+  const mask = roadLinked(game, c);
+  const fail = (mem.linkFail ??= {});
+  for (const k in fail) if (fail[k] <= game.time) delete fail[k];
+  let tries = 0;
+  for (let d = 1; d <= rad && tries < CITY.ai.linkTries; d++) {
+    for (let dy = -d; dy <= d && tries < CITY.ai.linkTries; dy++) {
+      for (let dx = -d; dx <= d && tries < CITY.ai.linkTries; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== d) continue;
+        const q = ac + dx;
+        const r = ar + dy;
+        if (q < 0 || r < 0 || q >= c.cols || r >= c.rows) continue;
+        const j = idx(c, q, r);
+        if (fail[j] || !c.claim[j] || mask[j] || !roadFree(game, c, j) || inDanger(c, q, r, game.time)) continue;
+        tries++;
+        if (connectRoad(game, c, j, true) > 0) return true;
+        fail[j] = game.time + CITY.ai.linkRetry;
+      }
+    }
+  }
+  return false;
 }
 
 /** Liegt eine verbundene Straße (mit dem Lager) neben Zelle i? */
@@ -303,7 +445,8 @@ export function aiAirport(game, c, main, reserve, want = 2) {
     if (c.level[i] && (k === 'com' || k === 'market' || WORKS.includes(k))) work++;
   }
   const hasRunway = c.list.some((i) => c.kind[i] === KIND_ID.runway);
-  const free = (j) => !c.kind[j] && !c.deposit[j] && !c.mapRoads?.[j] && buildAllowed(game, c, j) && cellFree(game, c, j % c.cols, Math.floor(j / c.cols)) && !inDanger(c, j % c.cols, Math.floor(j / c.cols), game.time);
+  // Fläche prüfen wie für die Bahn (ohne Anschlusspflicht je Zelle; Stellplätze, Tower und Lager prüft der Baubefehl als Ganzes)
+  const free = (j) => !c.kind[j] && !c.deposit[j] && !c.mapRoads?.[j] && buildAllowed(game, c, j, 'runway') && cellFree(game, c, j % c.cols, Math.floor(j / c.cols)) && !inDanger(c, j % c.cols, Math.floor(j / c.cols), game.time);
   const put = (kind, q, r) => game.issue(c.team, { type: 'city', kind, c0: q, r0: r, c1: q, r1: r }).ok;
   if (hasRunway) {
     // Stellplätze ausbauen (seit v5.39 nur per Befehl): den ersten fertigen unter Stufe 3, wenn genug übrig bleibt
@@ -345,6 +488,13 @@ export function aiAirport(game, c, main, reserve, want = 2) {
     for (const vertical of [false, true]) {
       // Bahn L × 2 (bzw. 2 × L) mit einer Reihe 2 × 2-Bauten daneben: Fläche L × 4
       if (!fits(q, r, vertical ? 4 : L, vertical ? L : 4)) continue;
+      // Anschlusspflicht (Paket „Straßen“): die Bahn muss an einer Straße zum Lager beginnen, sonst dürfen Stellplätze und Lager nicht daneben
+      if (linkNeeded(game)) {
+        const mask = roadLinked(game, c);
+        let linked = false;
+        for (let k = 0; k < L && !linked; k++) for (let w = 0; w < 2 && !linked; w++) linked = !!mask[vertical ? (r + k) * c.cols + q + w : (r + w) * c.cols + q + k];
+        if (!linked) continue;
+      }
       if (vertical) {
         if (!game.issue(c.team, { type: 'city', kind: 'runway', c0: q, r0: r, c1: q + 1, r1: r + L - 1 }).ok) return false;
       } else if (!game.issue(c.team, { type: 'city', kind: 'runway', c0: q, r0: r, c1: q + L - 1, r1: r + 1 }).ok) return false;
@@ -378,7 +528,7 @@ function depositCells(game, c) {
   }
   const out = [];
   for (let i = 0; i < c.deposit.length; i++) {
-    if (!c.deposit[i] || !c.claim[i] || c.kind[i] || !buildAllowed(game, c, i)) continue;
+    if (!c.deposit[i] || !c.claim[i] || c.kind[i] || !buildAllowed(game, c, i, 'mine')) continue; // Förderanlagen ohne Anschlusspflicht (CITY.build.roadFree)
     const g = group[DEPOSITS[c.deposit[i] - 1]];
     if (!g || mines[g] >= Math.ceil(works[g] * CITY.ai.minesPer[g])) continue;
     const q = i % c.cols;

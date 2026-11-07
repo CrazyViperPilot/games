@@ -22,6 +22,10 @@ export const CITY = {
     fobClaim: 6, // Gebietsradius (Zellen) einer FOB mit dieser Regel; ohne sie gilt territory.fob (4), damit die KI ohne Regel gleich bleibt
     enemyR: 500, // Abstand (px), in dem keine Stadtzelle an sichtbare gegnerische Bodeneinheiten oder gegnerische Gebäude grenzt
     noZone: true, // Schalter: Stadtzellen nicht in der Konfliktzone (Kreis game.zone)
+    // Anschlusspflicht (Paket „Straßen“, Teil 1): Stadtgebäude nur auf Zellen, die an eine Straße mit Verbindung zum Lager der
+    // Hauptstadt grenzen (Großbau: eine Randzelle genügt). Straße, Bahn und Rollfeld sind frei, ebenso die Arten in roadFree.
+    needRoad: true,
+    roadFree: ['mine'], // Förderanlagen auf Vorkommen: ohne Anschlusspflicht (sie liefern an Werke; ohne Straße fördern sie wie bisher nicht)
   },
   // Einwohner als Truppen (seit v4.82): ausgebildete Einheiten brauchen so viele freie Einwohner (Startarmee und Nachschub nicht)
   crew: { default: 1, fobTruck: 2, ifv: 3, tank: 3, flak: 2, sam: 2, gepard: 3, pzh: 4, excavator: 2, littlebird: 2, transporter: 2, gunship: 2, f16: 2 },
@@ -257,5 +261,14 @@ export const CITY = {
     roadTries: 4, // seit v5.20 (AP4): so viele Gebäude ohne Lieferweg oder Pendlerweg prüft die KI je Takt auf einen Straßenanschluss
     connectNear: 5, // seit v5.20 (AP4): Werke ohne Straße zum Lager nur an Straßen höchstens so viele Zellen vom Lagernetz entfernt (sonst wird der Anschluss zu weit)
     connectRing: 1, // seit v5.20 (AP4): Zellen neben einer Straße zum Lager zählen so viele Ringe näher (Großbauten und Werke bevorzugt dort)
+    // Anschlusspflicht (Paket „Straßen“, nur mit Baugebiet): hat die KI im Ausbau-Umkreis weniger freie Zellen an einer Straße zum Lager
+    // als linkSpare, zieht sie je Takt eine Straße zur nächsten freien Zelle ohne Anschluss (höchstens linkTries Versuche, je bis
+    // transport.connectMax Zellen); so wächst ihr Netz auch dort, wo ihr Straßenraster nicht ans Lager grenzt.
+    linkSpare: 6,
+    linkTries: 4,
+    linkRetry: 120, // s: eine Startzelle, von der aus kein Weg ging (eingeschlossene Lücke), so lange nicht erneut versuchen
+    linkBm: 200, // Baumaterial, das im Lager der Hauptstadt bleiben muss, bevor die KI ihr Netz verlängert (Anschlüsse der Werke gehen vor)
+    chainNear: 6, // Zellen: mit Anschlusspflicht baut die KI Hütte und Stahlwerk zuerst so nah am Partnerwerk (Roheisen fährt nicht durchs Lager)
+    linkOutlets: 2, // so viele Ausgänge (freie Zelle am Netz mit freiem Nachbarn außerhalb) lässt die KI beim Bauen offen, damit ihr Netz nicht eingeschlossen wird
   },
 };

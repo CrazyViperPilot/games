@@ -127,7 +127,10 @@ export function fitBig(game, c, col, row, kind, free, ok) {
     const x = col + dx;
     const y = row + dy;
     if (x < 0 || y < 0 || x >= c.cols || y >= c.rows) continue;
-    if (bigFits(game, c, y * c.cols + x, n, free, ok)) return y * c.cols + x;
+    if (!bigFits(game, c, y * c.cols + x, n, free, ok)) continue;
+    // Mit Prüfung `ok` und Baugebiet: Anschlusspflicht des ganzen Großbaus (eine Randzelle an einer Straße zum Lager genügt)
+    if (ok && roadLinkWhy(game, c, bigCells(c, y * c.cols + x, n), kind)) continue;
+    return y * c.cols + x;
   }
   return -1;
 }
@@ -271,7 +274,100 @@ export const BUILD_BLOCK = {
   unexplored: 'Unerkundetes Gelände: erst aufklären',
   enemy: 'Zu nah am Feind',
   zone: 'Nicht in der Konfliktzone',
+  road: 'Nur an einer Straße bauen, die mit dem Lager der Hauptstadt verbunden ist',
 };
+
+/**
+ * Straßenzellen um das Lager der Hauptstadt (seit v5.20, AP4; liegt seit dem Paket „Straßen“ hier, transport.js reicht sie weiter):
+ * Straßen, deren Rechteck die Zone um die Hauptstadt (Gebäude + CITY.fobMargin + eine Zelle) schneidet.
+ */
+export function mainAccess(game, c) {
+  const m = game.mainFob(c.team);
+  if (!m) return [];
+  const T = game.grid.tile;
+  const e = CITY.fobMargin + c.cell;
+  const x0 = m.cx * T - e;
+  const x1 = (m.cx + m.w) * T + e;
+  const y0 = m.cy * T - e;
+  const y1 = (m.cy + m.h) * T + e;
+  const out = [];
+  // nur der Zellbereich um das Rechteck (die genaue Prüfung folgt je Zelle)
+  const q0 = Math.max(0, Math.floor((x0 - c.x0) / c.cell) - 1);
+  const q1 = Math.min(c.cols - 1, Math.floor((x1 - c.x0) / c.cell) + 1);
+  const r0 = Math.max(0, Math.floor((y0 - c.y0) / c.cell) - 1);
+  const r1 = Math.min(c.rows - 1, Math.floor((y1 - c.y0) / c.cell) + 1);
+  for (let row = r0; row <= r1; row++) {
+    for (let col = q0; col <= q1; col++) {
+      const i = row * c.cols + col;
+      if (!roadAt(c, i)) continue;
+      const r = cellRect(c, col, row);
+      if (r.x0 < x1 && r.x1 > x0 && r.y0 < y1 && r.y1 > y0) out.push(i);
+    }
+  }
+  return out;
+}
+
+// Anschlusspflicht (Paket „Straßen“, Teil 1): je Stadt eine Maske „Zelle grenzt an eine Straße, die mit dem Lager der Hauptstadt
+// verbunden ist“ (höchstens CITY.transport.maxDist Schritte wie der Lieferweg). Zwischenspeicher, nicht im Spielstand: neu, sobald
+// sich die Stadt (c.ver; Straßen, Bagger) oder die Hauptstadt ändert. So kostet jede Zellprüfung nur einen Feldzugriff.
+const LINK_CACHE = new WeakMap(); // Stadt → { ver, main, mask }
+
+export function roadLinked(game, c) {
+  const m = game.mainFob(c.team);
+  const key = m ? `${m.id}:${m.cx}:${m.cy}` : '';
+  const hit = LINK_CACHE.get(c);
+  if (hit && hit.ver === c.ver && hit.main === key) return hit.mask;
+  const n = c.cols * c.rows;
+  const dist = new Int32Array(n).fill(-1);
+  const queue = new Int32Array(n);
+  let tail = 0;
+  for (const i of mainAccess(game, c)) {
+    if (dist[i] >= 0) continue;
+    dist[i] = 0;
+    queue[tail++] = i;
+  }
+  const maxDist = CITY.transport.maxDist;
+  for (let head = 0; head < tail; head++) {
+    const i = queue[head];
+    if (dist[i] >= maxDist) continue;
+    for (const j of nbrsOf(c, i)) {
+      if (dist[j] >= 0 || !roadAt(c, j)) continue;
+      dist[j] = dist[i] + 1;
+      queue[tail++] = j;
+    }
+  }
+  const mask = new Uint8Array(n);
+  for (let h = 0; h < tail; h++) for (const j of nbrsOf(c, queue[h])) mask[j] = 1;
+  LINK_CACHE.set(c, { ver: c.ver, main: key, mask });
+  return mask;
+}
+
+/** Gilt die Anschlusspflicht für die Zellenart `kind`? Nicht für Straße, Bahn, Rollfeld und CITY.build.roadFree (Förderanlagen). */
+function needsLink(game, kind) {
+  return !!game.buildRules && CITY.build.needRoad && !(kind && (isFlat(KIND_ID[kind]) || CITY.build.roadFree.includes(kind)));
+}
+
+/**
+ * Anschlusspflicht eines ganzen Gebäudes aus den Zellen `cells` (Großbau: alle Zellen des Quadrats): 'road', wenn keine Zelle an einer
+ * Straße zum Lager liegt; Wohnen, Gewerbe und BM-Werk dürfen wie bei hasRoad auch über ein direkt benachbartes Gebäude gleicher Art
+ * angeschlossen sein, das selbst an einer solchen Straße liegt. Sonst (oder ohne Baugebiet) null.
+ */
+export function roadLinkWhy(game, c, cells, kind) {
+  if (!needsLink(game, kind)) return null;
+  const mask = roadLinked(game, c);
+  if (cells.some((j) => mask[j])) return null;
+  const id = KIND_ID[kind];
+  if (kind && CHAIN.has(id)) {
+    const own = new Set(cells);
+    for (const j of cells) {
+      for (const q of nbrsOf(c, j)) {
+        if (own.has(q) || c.kind[q] !== id) continue;
+        if (cellsOf(c, anchorOf(c, q)).some((x) => mask[x])) return null;
+      }
+    }
+  }
+  return 'road';
+}
 
 // Feindnähe je Team (Zwischenspeicher, nicht im Spielstand): Uint8Array über das Stadtraster, 1 = Zellmitte höchstens CITY.build.enemyR
 // von einer sichtbaren gegnerischen Bodeneinheit oder einem gegnerischen Gebäude bzw. Stadtgebäude (ohne Straßen). Einmal je Takt
@@ -330,7 +426,8 @@ function enemyNear(game, c) {
  * Baugebiet (seit v5.78, nur mit game.buildRules): Grund, warum Zelle i für eine Zellenart `kind` gesperrt ist, oder null.
  * Gründe (Schlüssel von BUILD_BLOCK): `territory` nicht im eigenen Gebiet (c.claim; Straßen `kind` 'road' dürfen außerhalb liegen),
  * `unexplored` nie aufgedeckt, `zone` in der Konfliktzone (CITY.build.noZone), `enemy` nahe (CITY.build.enemyR) einer sichtbaren
- * gegnerischen Bodeneinheit oder eines gegnerischen Gebäudes. Ohne Regel immer null. Kein Zufall, nur lesen.
+ * gegnerischen Bodeneinheit oder eines gegnerischen Gebäudes, `road` (Paket „Straßen“) nicht an einer Straße zum Lager der Hauptstadt
+ * (Einzelzellen; Großbauten über fitBig/roadLinkWhy; nicht für Straßen und CITY.build.roadFree). Ohne Regel immer null. Kein Zufall, nur lesen.
  */
 export function buildWhy(game, c, i, kind) {
   if (!game.buildRules) return null;
@@ -342,6 +439,9 @@ export function buildWhy(game, c, i, kind) {
   const z = game.zone;
   if (CITY.build.noZone && z && (x - z.x) ** 2 + (y - z.y) ** 2 <= z.r * z.r) return 'zone';
   if (enemyNear(game, c)[i]) return 'enemy';
+  // Anschlusspflicht (Paket „Straßen“): Einzelzellen hier; Großbauten prüft fitBig als Ganzes (roadLinkWhy). Ohne `kind` (strenge
+  // Prüfung, KI-Suche) zählt nur die Maske selbst.
+  if (!kind || sizeOf(kind) === 1) return roadLinkWhy(game, c, [i], kind);
   return null;
 }
 

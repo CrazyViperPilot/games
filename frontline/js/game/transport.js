@@ -7,7 +7,8 @@ import { laneGrid } from './roads.js';
 import { CITY } from '../data/city.js';
 import { WORKS, WORKPLACE_KINDS, KINDS, KIND_ID, KIND_NAME } from '../data/citykinds.js'; // Arbeitsstätten mit Pendlerweg: alle Arten mit Arbeitsplätzen
 import { GOODS } from '../data/goods.js';
-import { DEPOSITS, isPart, roadAt, accessCells, cellRect } from './city/cells.js';
+import { DEPOSITS, isPart, roadAt, accessCells, mainAccess } from './city/cells.js';
+export { mainAccess }; // liegt seit dem Paket „Straßen“ in cells.js (Anschlusspflicht des Baugebiets)
 
 /** Ziel je Rohstoff der Förderung (Vorkommen) und je Zwischenprodukt: Gruppe der Zielwerke (Breitensuche-Feld, siehe groupOf). */
 const MINE_GROUP = { wood: 'bm', stone: 'bm', ore: 'smelter', oil: 'oil' };
@@ -171,31 +172,6 @@ export function settleLoads(tr, dt) {
  * Straßenzellen am Lager der Hauptstadt: alle Straßen, deren Zellrechteck das Rechteck der Hauptstadt, erweitert um
  * CITY.fobMargin + CITY.cell px, schneidet. Leer ohne Hauptstadt.
  */
-export function mainAccess(game, c) {
-  const m = game.mainFob(c.team);
-  if (!m) return [];
-  const T = game.grid.tile;
-  const e = CITY.fobMargin + c.cell;
-  const x0 = m.cx * T - e;
-  const x1 = (m.cx + m.w) * T + e;
-  const y0 = m.cy * T - e;
-  const y1 = (m.cy + m.h) * T + e;
-  const out = [];
-  // nur der Zellbereich um das Rechteck (die genaue Prüfung folgt je Zelle)
-  const q0 = Math.max(0, Math.floor((x0 - c.x0) / c.cell) - 1);
-  const q1 = Math.min(c.cols - 1, Math.floor((x1 - c.x0) / c.cell) + 1);
-  const r0 = Math.max(0, Math.floor((y0 - c.y0) / c.cell) - 1);
-  const r1 = Math.min(c.rows - 1, Math.floor((y1 - c.y0) / c.cell) + 1);
-  for (let row = r0; row <= r1; row++) {
-    for (let col = q0; col <= q1; col++) {
-      const i = row * c.cols + col;
-      if (!roadAt(c, i)) continue;
-      const r = cellRect(c, col, row);
-      if (r.x0 < x1 && r.x1 > x0 && r.y0 < y1 && r.y1 > y0) out.push(i);
-    }
-  }
-  return out;
-}
 
 /** Neuen Zustand anlegen: Typed Arrays je Zelle, einmal (Feld-Puffer und Last/Stau werden wiederverwendet). */
 function newTransport(c) {

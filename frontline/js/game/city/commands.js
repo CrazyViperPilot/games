@@ -4,7 +4,7 @@ import { BALANCE } from '../../data/balance.js';
 import { CITY } from '../../data/city.js';
 import { KINDS, KIND_ID, KIND_NAME } from '../../data/citykinds.js';
 import { STORED_GOODS, MARKET_GOODS, CITY_STORE_GOODS } from '../../data/goods.js';
-import { isFlat, idx, sizeOf, anchorOf, bigCells, cellsOf, fitBig, releaseCell, hasRoad, canZone, buildAllowed, buildWhy, BUILD_BLOCK } from './cells.js';
+import { isFlat, idx, sizeOf, anchorOf, bigCells, cellsOf, fitBig, releaseCell, hasRoad, canZone, buildAllowed, buildWhy, roadLinkWhy, BUILD_BLOCK } from './cells.js';
 import { woodScan, fellTiles, clearableAt, demolish, felledOf } from './clearing.js';
 import { hasMarket } from './query.js';
 import { zeroGoods, rebuildList, syncEntity, refundQueue, dropEntity } from './state.js';
@@ -36,6 +36,7 @@ function placeBig(game, team, c, kind, col, row) {
         const why = buildWhy(game, c, j, kind);
         if (why) return { ok: false, reason: BUILD_BLOCK[why] };
       }
+      if (roadLinkWhy(game, c, bigCells(c, plain, n), kind)) return { ok: false, reason: BUILD_BLOCK.road }; // Anschlusspflicht (Paket „Straßen“)
     }
     return { ok: false, reason: `${KIND_NAME[kind]} braucht ${n} × ${n} freie Zellen` };
   }
