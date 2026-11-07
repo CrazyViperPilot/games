@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { UNITS } from '../js/data/units.js';
-import { unitModel, unitModelTypes, drawUnitIso, drawUnitTop, drawWreckIso, drawWreckTop } from '../js/render/unitpaint.js';
+import { unitModel, unitModelTypes, unitLook, drawUnitIso, drawUnitTop, drawWreckIso, drawWreckTop } from '../js/render/unitpaint.js';
 
 function checkSolids(name, solids) {
   assert.ok(solids.length > 0, `${name}: keine Körper`);
@@ -40,6 +40,19 @@ test('Modelle sind gültig, je Team, Gehbild und Zustand der F-16', () => {
       }
     }
   }
+});
+
+test('F-22: Raketen nur am Boden in offenen Schächten sichtbar, je Vorrat ein Bild, im Flug eines', () => {
+  const def = UNITS.f22;
+  const jet = (rounds, parked) => ({ id: 1, type: 'f22', team: 0, def, parked, jet: { phase: parked ? 'park' : 'air' }, weapons: [{ spec: def.weapons[0], rounds }] });
+  assert.deepEqual(unitLook(jet(6, true), 0), { missiles: 6, gear: true });
+  assert.deepEqual(unitLook(jet(2.6, true), 0), { missiles: 2, gear: true }, 'beim Nachladen zählen nur volle Raketen');
+  assert.deepEqual(unitLook(jet(6, false), 0), unitLook(jet(0, false), 0), 'im Flug: Schächte zu, ein Bild für jeden Vorrat');
+  const n = (o) => unitModel('f22', 0, o).S.length;
+  for (let k = 0; k <= 6; k++) checkSolids(`f22 mit ${k} Raketen`, unitModel('f22', 0, { missiles: k, gear: true }).S);
+  for (let k = 1; k <= 6; k++) assert.ok(n({ missiles: k, gear: true }) > n({ missiles: k - 1, gear: true }), `${k} Raketen sichtbar`);
+  assert.equal(n({ missiles: 6 }), n({}), 'ohne Fahrwerk keine Raketen zu sehen');
+  assert.equal(unitModel('f22', 0, {}).nozzle.ys.length, 2, 'zwei Düsen, zwei Nachbrenner');
 });
 
 test('Teams unterscheiden sich in der Farbe, Gehbilder in der Haltung', () => {
