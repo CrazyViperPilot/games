@@ -39,6 +39,7 @@ import {
   TOWN_H,
 } from './iso.js';
 import { drawCityHallTop } from './cityhall.js';
+import { isCapital, drawQuarterGround, drawQuarterTop, quarterItems, drawQuarterIso } from './govquarter.js';
 import { drawTownBuilding, drawTeamBuilding, drawCar, drawBench, drawRubble, drawCrate, drawWreckBox } from './isobuild.js';
 import { parkDeco } from './terrain.js';
 import { drawUnitSprite, drawWreckSprite } from './isosprites.js';
@@ -351,6 +352,7 @@ export class Renderer {
     }
     for (const b of g.bridges ?? []) if (inRect(b.x, b.y, b.len / 2 + 40)) drawBridgeTop(ctx, b, this.season); // über dem Fluss, unter allem anderen
     for (const p of fordPosts(g.map, reliefOf(g.map))) if (inRect(p.x, p.y, 10)) drawFordPostTop(ctx, p); // Furtstangen
+    this.drawQuarterGrounds(f, false); // Regierungsviertel: Rasen, Wege, Platz (govquarter.js)
     this.drawRuins(ctx, f.R, known);
     this.drawScars(ctx, inRect, z);
     drawCityGround(this, ctx, team, known, inRect); // Stadt: Straßen und Grundstücke
@@ -370,10 +372,14 @@ export class Renderer {
     this.drawAirPlanning(ctx, z);
     this.drawRoutes(ctx, sel, z);
 
+    // Regierungsviertel um die Hauptstädte (govquarter.js): unter allen Gebäuden und Einheiten
+    for (const b of g.buildings) {
+      if (isCapital(b) && inRect(b.x, b.y, 150) && (g.alwaysVisible(team, b) || known(b.x, b.y))) drawQuarterTop(ctx, g.grid, b, g.teams[b.team].color, z, this.season);
+    }
     for (const b of g.buildings) {
       if (!b.alive || (!g.alwaysVisible(team, b) && !known(b.x, b.y))) continue;
-      if (!inRect(b.x, b.y, (Math.max(b.w, b.h) * TILE) / 2)) continue;
-      if (b.main && b.built && b.type === 'fob') drawCityHallTop(ctx, b, g.teams[b.team].color); // Hauptstadt: Rathaus (cityhall.js)
+      if (!inRect(b.x, b.y, (Math.max(b.w, b.h) * TILE) / 2 + (b.main ? 16 : 0))) continue;
+      if (isCapital(b)) drawCityHallTop(ctx, b, g.teams[b.team].color, z, this.season); // Hauptstadt: Regierungsgebäude (cityhall.js)
       else drawBuilding(ctx, b, g.teams[b.team].color, z, drawMilTop(ctx, b, g.teams[b.team].color, z)); // Bild aus milbuild.js, darüber Anzeigen
       if (!b.built && b.team === team) this.drawSiteMarks(ctx, b, z);
     }
@@ -400,6 +406,15 @@ export class Renderer {
     }
 
     this.drawMoveMarker(ctx, v.moveMarker, now, z);
+  }
+
+  /** Boden der Regierungsviertel um die Hauptstädte (govquarter.js): 2D in Weltkoordinaten, Iso mit drei Ecken aufs Gelände gelegt. */
+  drawQuarterGrounds(f, iso) {
+    const { ctx, g, cam, team, dpr, inRect, known } = f;
+    for (const b of g.buildings) {
+      if (!isCapital(b) || !inRect(b.x, b.y, 200) || (!g.alwaysVisible(team, b) && !known(b.x, b.y))) continue;
+      drawQuarterGround(ctx, cam, b, g.teams[b.team].color, this.season, dpr, iso);
+    }
   }
 
   /** Sammelpunkte gewählter eigener Gebäude. */
@@ -801,6 +816,8 @@ export class Renderer {
     }
     setIsoGround(ctx, cam, dpr);
     drawWays(this, ctx, this.season); // Feldwege und Gleise scharf auf dem Boden (seit v5.31, ways.js)
+    this.drawQuarterGrounds(f, true); // Regierungsviertel: Rasen, Wege, Platz (govquarter.js), unter Kratern und Einheiten
+    setIsoGround(ctx, cam, dpr);
     for (const c of g.craters ?? []) {
       if (!this.scarShown(c) || !inRect(c.x, c.y, c.r + 10)) continue;
       if (relief) this.groundAt(ctx, c.x, c.y);
@@ -840,7 +857,7 @@ export class Renderer {
   /**
    * Iso: Objekte mit Höhe, nach Tiefe (x + y) sortiert → { items: [{ k, t, o }], air: fliegende Einheiten (zuletzt) }.
    * t: 0 Stadtgebäude, 1 Baum, 2 Fels, 4 Militärgebäude, 5 Einheit, 6 Auto, 7 Bank, 8 Kiste, 9/10 Wrack (Fahrzeug/Gebäude),
-   * 11 Tier, 12 Furtstange, 13 Busch, 14 Ballen.
+   * 11 Tier, 12 Furtstange, 13 Busch, 14 Ballen, 15 Gruppe des Regierungsviertels.
    */
   isoItems(f) {
     const { g, cam, team, z, relief, inRect, seen, known, shown } = f;
@@ -879,6 +896,8 @@ export class Renderer {
     for (const b of g.buildings) {
       if (!b.alive || (!g.alwaysVisible(team, b) && !known(b.x, b.y)) || !inRect(b.x, b.y, PAD)) continue;
       items.push({ k: cam.depth(b.x, b.y), t: 4, o: b });
+      // Regierungsviertel: acht Gruppen um die Hauptstadt, je mit eigener Tiefe (govquarter.js)
+      if (isCapital(b)) for (const o of quarterItems(g.grid, b)) items.push({ k: cam.depth(o.x, o.y), t: 15, o });
     }
     for (const m of this.crateMarks(seen, known)) if (inRect(m.x, m.y, 40)) items.push({ k: cam.depth(m.x, m.y), t: 8, o: m });
     for (const w of g.wrecks ?? []) {
@@ -943,6 +962,7 @@ export class Renderer {
         if (!drawCrateIso(ctx, cam, it.o.x, it.o.y, s, 0, it.o.ground ? glow : 0)) drawCrate(ctx, cam, it.o.x, it.o.y, s, 0, it.o.ground ? glow : 0);
       }
       else if (it.t === 12) drawFordPostIso(ctx, cam, it.o);
+      else if (it.t === 15) drawQuarterIso(ctx, cam, it.o, g.teams[it.o.b.team].color, this.season); // Regierungsviertel
       else if (it.t === 11) {
         const a = it.o;
         const p = cam.worldToScreen(a.x, a.y);

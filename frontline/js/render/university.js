@@ -2,7 +2,7 @@
 // vier Seiten gleich aussieht, zeichnet die Iso-Ansicht für jede Drehung der Karte dasselbe Bild (Daniels Idee): die Drehung der
 // Kamera wird hier bewusst nicht beachtet. Stufe 1: Kuppelbau mit vier Säulenportalen; Stufe 2: dazu vier Flügel (Kreuzform),
 // höhere Kuppel mit Laterne; Stufe 3: Ecktürme mit Fahnen in Teamfarbe, Bäume im Hof. 2D: dieselbe Anlage von oben.
-// Helfer (iso, poly, box, lit, FACE, DETAIL) nutzt auch das Rathaus der Hauptstadt (cityhall.js), dazu pyramid und OUTLINE die
+// Helfer (iso, poly, box, lit, FACE, DETAIL) nutzen auch isokit.js und darüber das Regierungsviertel der Hauptstadt (cityhall.js, govquarter.js), dazu pyramid und OUTLINE die
 // 2 × 2-Werke (works.js, seit v5.08).
 // Nur Zeichnen (liest b = { x, y, level, color, damage }; Rauch bei Schaden zeichnet renderer.js), keine Spielregeln. Boden (Pflaster, Rasen) zeichnet citylayer.js.
 import { ISO_K } from './camera.js';

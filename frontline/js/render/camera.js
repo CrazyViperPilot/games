@@ -8,7 +8,7 @@ const ZOOM_MAX = 1.6;
 // Bildschirm = Mitte + zoom · ISO · (Welt − Kamera) mit ISO = [[K, −K], [K/2, K/2]].
 export const ISO_K = Math.SQRT1_2;
 // Drehung der isometrischen Ansicht in 90°-Schritten: Matrix [ra, rb, rc, rd] auf den Abstand zur Kamera (rx = ra·dx + rb·dy, ry = rc·dx + rd·dy).
-const ROT = [
+export const ROT = [
   [1, 0, 0, 1],
   [0, -1, 1, 0],
   [-1, 0, 0, -1],

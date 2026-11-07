@@ -660,12 +660,13 @@ const planePt = (cam, x, y, h) => {
 
 /**
  * Spielgebäude (Team): seit v5.21 sind alle Militärgebäude und ihre Baustellen gemalt (milbuild.js), die Hauptstadt ist ein
- * Rathaus (cityhall.js). Übrig bleibt nur die Baustelle der Hauptstadt: ein halb durchsichtiger Kasten, der mit dem Fortschritt wächst.
+ * Regierungsgebäude (cityhall.js; das Viertel ringsum zeichnet renderer.js über govquarter.js). Übrig bleibt nur die Baustelle der
+ * Hauptstadt: ein halb durchsichtiger Kasten, der mit dem Fortschritt wächst.
  */
 export function drawTeamBuilding(ctx, cam, b, color) {
   if (drawMilIso(ctx, cam, b, color)) return;
   if (b.main && b.type === 'fob' && b.built) {
-    drawCityHallIso(ctx, cam, b, color); // Hauptstadt: modernes Rathaus, für jede Drehung dasselbe Bild (cityhall.js)
+    drawCityHallIso(ctx, cam, b, color); // Hauptstadt: Regierungsgebäude, für jede Drehung dasselbe Bild (cityhall.js)
     return;
   }
   const x0 = b.cx * TILE;
