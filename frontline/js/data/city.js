@@ -126,6 +126,12 @@ export const CITY = {
   // v = max(min, 1 − perCell × max(0, d − free)), d = Straßenzellen des Wegs; Tempo = v × Stau-Faktor des Wegs; ohne Weg 0 (Ausbildung
   // steht). Jeder laufende Ausbildungsplatz legt Stahl je s (CITY.metalCost ÷ Ausbildungszeit × Tempo) als Last auf den Weg.
   supply: { free: 15, perCell: 0.006, min: 0.3 },
+  // Straßen zerstören und räumen (Paket „Straßen“, Teil 3, js/game/roadwar.js): nur auf ausdrücklichen Befehl („Straße beschießen“, E)
+  // beschießen Einheiten mit Granaten oder Raketen (Waffe mit damage.struct ≥ minStruct) eine Straßenzelle (eigene Straßen beider Teams
+  // und Stadtstraßen der Karte; nicht Brücken, Bahn, Rollfeld). hp: Trefferpunkte je Zelle (Schaden = damage.struct der Waffe);
+  // rangeMul: Anteil der Waffenreichweite, bis zu dem sie heranfahren; craterR: Krater beim Einsturz (px). Schutt räumen Baufahrzeuge
+  // („Schutt räumen“, R) in clearTime s aus clearReach px, Bagger mit „Baggern“ (BALANCE.excavator.digTime).
+  roadWar: { hp: 300, minStruct: 20, rangeMul: 0.9, craterR: 26, clearTime: 5, clearReach: 54 },
 
   // ---- Werkslager (seit v5.69, PRD §15 „Werke und LKW am Werk“) ----
   // Jedes Werk der Arten in `kinds` (Zellenart-Schlüssel; Ware aus CITY.chain[Art].to) hat ein kleines Ausgangslager für seine Ware.

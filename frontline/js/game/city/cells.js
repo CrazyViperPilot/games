@@ -263,6 +263,7 @@ export function accessCells(c, a) {
 /** Darf `team` die Zelle i ausweisen? Nicht gesperrt, nicht vom Gegner belegt (überall auf der Karte). */
 export function canZone(game, c, i) {
   if (c.blocked[i]) return false; // seit v4.87 überall, nicht nur im Gebiet (das Gebiet nutzt nur noch die KI)
+  if (game.rubble?.[i]) return false; // Schutt einer zerstörten Straße (Paket „Straßen“): erst räumen
   if (c.mapRoads?.[i]) return false; // Stadtstraße der Karte (Zone, Brücke): gehört niemandem, bleibt Straße
   for (const o of game.city) if (o !== c && o.kind[i]) return false;
   return true;

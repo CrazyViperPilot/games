@@ -807,6 +807,7 @@ export class Renderer {
       else setIsoGround(ctx, cam, dpr);
       drawCrater(ctx, c, scarAlpha(c, g.time, SC.craterLife, SC.craterFade));
     }
+    this.drawRubble(ctx, inRect, relief ? (x, y) => this.groundAt(ctx, x, y) : () => setIsoGround(ctx, cam, dpr)); // Schutt zerstörter Straßen (Paket „Straßen“)
     for (const b of g.bridges ?? []) if (inRect(b.x, b.y, b.len / 2 + ISO_PAD)) drawBridgeIso(ctx, cam, dpr, b, this.season); // Einheiten fahren darüber
     setIsoGround(ctx, cam, dpr);
     drawCityGround(this, ctx, f.team, f.known, inRect); // Stadt: Straßen und Grundstücke
@@ -1180,12 +1181,39 @@ export class Renderer {
     return this.revealAll || ((s.seen >> this.team) & 1) === 1;
   }
 
+  /**
+   * Schutt zerstörter Straßen (Paket „Straßen“, Teil 3): je Zelle ein großer Krater mit Brocken, solange nicht geräumt. Gezeigt, wenn die
+   * Stelle erkundet ist (wie Stadtzellen). ground(x, y): Bodenebene je Ort setzen (Iso mit Gelände), sonst null.
+   */
+  drawRubble(ctx, inRect, ground) {
+    const g = this.game;
+    if (!g.rubble) return;
+    const S = CITY.cell;
+    const cols = g.city?.[0]?.cols ?? g.roads?.cols ?? 0;
+    const fog = g.fog?.[this.team];
+    for (const k in g.rubble) {
+      const i = +k;
+      const x = ((i % cols) + 0.5) * S;
+      const y = (Math.floor(i / cols) + 0.5) * S;
+      if (!inRect(x, y, S)) continue;
+      if (!this.revealAll && fog && !fog.isExplored(x, y)) continue;
+      if (ground) ground(x, y);
+      ctx.save();
+      ctx.fillStyle = 'rgba(70,64,56,0.85)'; // aufgerissener Belag
+      ctx.fillRect(x - S / 2 + 3, y - S / 2 + 3, S - 6, S - 6);
+      ctx.restore();
+      drawCrater(ctx, { id: 900000 + i, x, y, r: S * 0.36 }, 1);
+      drawCrater(ctx, { id: 950000 + i, x: x + S * 0.2, y: y - S * 0.18, r: S * 0.18 }, 0.9);
+    }
+  }
+
   /** Draufsicht: Krater und Brandflecken, darauf Trümmer und Fahrzeugwracks (unter Gebäuden und Einheiten). */
   drawScars(ctx, inRect, z) {
     const g = this.game;
     for (const c of g.craters ?? []) {
       if (this.scarShown(c) && inRect(c.x, c.y, c.r + 10)) drawCrater(ctx, c, scarAlpha(c, g.time, SC.craterLife, SC.craterFade));
     }
+    this.drawRubble(ctx, inRect, null);
     for (const w of g.wrecks ?? []) {
       if (!this.scarShown(w) || !inRect(w.x, w.y, 60)) continue;
       const a = scarAlpha(w, g.time, SC.wreckLife, SC.wreckFade);

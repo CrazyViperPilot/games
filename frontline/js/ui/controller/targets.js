@@ -161,6 +161,25 @@ export const targetMethods = {
     if (!shift) this.setMode('normal');
   },
 
+  /** Straße beschießen (E) bzw. Schutt räumen (R, Paket „Straßen“): Befehl auf die angeklickte Stadtzelle (Shift: Modus bleibt). */
+  confirmCellOrder(type, wx, wy, shift) {
+    const ids = this.selectedUnits().map((u) => u.id);
+    const S = CITY.cell;
+    const c = Math.floor(wx / S);
+    const r = Math.floor(wy / S);
+    if (!this.issue({ type, ids, c0: c, r0: r, c1: c, r1: r }).ok) return;
+    this.moveMarker((c + 0.5) * S, (r + 0.5) * S);
+    if (!shift) this.setMode('normal');
+  },
+
+  confirmShellRoad(wx, wy, shift) {
+    this.confirmCellOrder('shellRoad', wx, wy, shift);
+  },
+
+  confirmClearRubble(wx, wy, shift) {
+    this.confirmCellOrder('clearRubble', wx, wy, shift);
+  },
+
   /** Mörser-Ziel: Klick auf die Karte, alle gewählten Mörser in Reichweite feuern dorthin. */
   confirmMortarTarget(wx, wy) {
     const ids = this.selected().filter((e) => (e.kind === 'building' && e.def.weapon && e.def.weapon.shell) || (e.kind === 'unit' && e.def.indirect)).map((e) => e.id);

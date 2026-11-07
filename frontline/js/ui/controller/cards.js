@@ -15,6 +15,7 @@ import { FORMATION_NAMES } from '../../game/formation.js';
 import { hasCommander } from '../../game/commander.js';
 import { hasUnlock } from '../../game/research.js';
 import { RESEARCH } from '../../data/research.js';
+import { canShellRoads } from '../../game/roadwar.js';
 import { isCarrier } from './util.js';
 import { MODES } from './modes.js';
 
@@ -279,6 +280,23 @@ export const cardMethods = {
         entry('Baggern', 'G', {
           tip: 'Baggern (G): danach eine Zelle anklicken (Shift: mehrere). Der Bagger fährt hin und räumt sie: Zonenstraßen der Karte (nicht Brücken) verschwinden für beide Seiten, Bäume und leere Häuser werden geräumt, eigene Stadtgebäude abgerissen. Gegnerische Gebäude greift er mit der Schaufel an (langsam).',
           action: () => this.setMode('dig'),
+        }),
+      );
+    }
+    // Straßen beschießen und Schutt räumen (Paket „Straßen“, Teil 3)
+    if (units.some((u) => canShellRoads(u) && !u.house)) {
+      card.push(
+        entry('Beschuss', 'E', {
+          tip: `Beschuss (E): Straße beschießen, danach eine Straßenzelle anklicken (Shift: weitere). Einheiten mit Granaten oder Raketen fahren in Reichweite und schießen, bis die Zelle zu Schutt wird (${CITY.roadWar.hp} Trefferpunkte). Schutt unterbricht alle Wege über die Straße: Lieferungen, Pendler, die Versorgung der Ausbildung. Eigene Straßen und Stadtstraßen auch, Brücken, Bahn und Rollfeld nicht. Von selbst schießt niemand auf Straßen.`,
+          action: () => this.setMode('shellRoad'),
+        }),
+      );
+    }
+    if (units.some((u) => u.def.builder === 'all' && !u.house)) {
+      card.push(
+        entry('Schutt räumen', 'R', {
+          tip: `Schutt räumen (R): danach eine Zelle mit Schutt anklicken (Shift: weitere). Das Baufahrzeug räumt ihn in ${CITY.roadWar.clearTime} s, die Straße ist wieder da (eigene Straßen und Stadtstraßen). Bagger räumen Schutt mit „Baggern“.`,
+          action: () => this.setMode('clearRubble'),
         }),
       );
     }

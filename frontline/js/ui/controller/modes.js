@@ -70,6 +70,16 @@ export const MODES = {
     hint: () => 'Baggern: Zelle anklicken (Zonenstraße, Bäume, Haus, eigenes Gebäude) · Shift = weitere Zellen · Esc bricht ab',
     click: (c, wx, wy, shift) => c.confirmDig(wx, wy, shift),
   },
+  shellRoad: {
+    target: true,
+    hint: () => 'Straße beschießen: Straßenzelle anklicken (nicht Brücke, Bahn, Rollfeld) · Shift = weitere Zellen · Esc bricht ab',
+    click: (c, wx, wy, shift) => c.confirmShellRoad(wx, wy, shift),
+  },
+  clearRubble: {
+    target: true,
+    hint: () => 'Schutt räumen: Zelle mit Schutt einer eigenen Straße oder Stadtstraße anklicken · Shift = weitere Zellen · Esc bricht ab',
+    click: (c, wx, wy, shift) => c.confirmClearRubble(wx, wy, shift),
+  },
   storm: {
     target: true,
     hint: () => 'Stürmen: gegnerisch besetztes Haus anklicken · Esc bricht ab',

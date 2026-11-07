@@ -87,6 +87,7 @@ export class AI {
     this.buildWall(s);
     this.fortify(s);
     this.rebuildBridges(s);
+    this.repairRoads(s); // Schutt eigener Straßen räumen (Paket „Straßen“)
     this.manageEngineers(s);
     this.manageTrucks(s);
     this.rally(s);

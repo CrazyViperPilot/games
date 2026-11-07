@@ -37,6 +37,7 @@ import { createRoads } from './roads.js';
 import { updateAircraft, trainCheck } from './aircraft.js';
 import { updateHelis, heliTrainCheck } from './helipad.js';
 import { updateDig } from './excavator.js';
+import { updateRoadWar } from './roadwar.js';
 import { commandOf, OWN_DRIVERS } from './commands.js';
 
 const TILE = BALANCE.map.tile;
@@ -1130,6 +1131,7 @@ export class Game {
     updateLogistics(this, dt);
     updateConstruction(this, dt);
     updateDig(this, dt); // Bagger räumen Stadtzellen (seit v5.35)
+    updateRoadWar(this, dt); // Straßen beschießen, Schutt räumen (Paket „Straßen“)
     updateBridges(this, dt);
     separate(this);
     updateCommanders(this, dt);

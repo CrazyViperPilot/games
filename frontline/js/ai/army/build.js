@@ -4,7 +4,8 @@
 import { BALANCE } from '../../data/balance.js';
 import { UNITS } from '../../data/units.js';
 import { BUILDINGS } from '../../data/buildings.js';
-import { ZONE_REACH, WALL_RETRY, RELAY_STEP, FLANK_R, FOBV_MAX, DEPLOY_REACH, FOBV_RETRY, BAD_TIME, WALL_OFFSET, WALL_HALF, ENG_NEAR, RADIO_SITE, BRIDGE_EVERY, BRIDGE_RESERVE, FORT_EVERY, FORT_BM_MIN, FORT_CREW_RANGE, FORT_ROOFS } from '../../data/ai.js';
+import { CITY } from '../../data/city.js';
+import { ZONE_REACH, WALL_RETRY, RELAY_STEP, FLANK_R, FOBV_MAX, DEPLOY_REACH, FOBV_RETRY, BAD_TIME, WALL_OFFSET, WALL_HALF, ENG_NEAR, RADIO_SITE, BRIDGE_EVERY, ROAD_REPAIR_EVERY, ROAD_REPAIR_SAFE, BRIDGE_RESERVE, FORT_EVERY, FORT_BM_MIN, FORT_CREW_RANGE, FORT_ROOFS } from '../../data/ai.js';
 import { DEF_RANGE, ZONE_FOB_R, TWO_PI, dist, unitVec } from './util.js';
 
 const DEG = Math.PI / 180;
@@ -415,6 +416,39 @@ export const buildMethods = {
       if (!best) return;
       g.issue(this.team, { type: 'repairBridge', ids: [best.id], bridgeId: b.id });
     }
+  },
+
+  /**
+   * Schutt eigener Straßen räumen (Paket „Straßen“, Teil 3): alle ROAD_REPAIR_EVERY s schickt die KI das nächste freie Baufahrzeug zum
+   * Schutt einer eigenen Straße, der am nächsten an der Hauptstadt liegt (kostenlos), wenn dort keine sichtbaren gegnerischen
+   * Kampfeinheiten näher als ROAD_REPAIR_SAFE stehen. Gegnerische Straßen greift sie nicht an.
+   */
+  repairRoads(s) {
+    const g = this.game;
+    if (!g.rubble || !s.engineers.length || !this.once('roads', ROAD_REPAIR_EVERY)) return;
+    if (s.engineers.some((u) => u.order.type === 'clearRubble')) return; // einer räumt schon
+    const cols = g.city?.[0]?.cols ?? g.roads?.cols ?? 0;
+    const S = CITY.cell;
+    let best = null;
+    for (const k in g.rubble) {
+      if (g.rubble[k].owner !== this.team) continue;
+      const i = +k;
+      const x = ((i % cols) + 0.5) * S;
+      const y = (Math.floor(i / cols) + 0.5) * S;
+      if (s.enemies.some((e) => e.def.range > 0 && dist(e.x, e.y, x, y) < ROAD_REPAIR_SAFE)) continue;
+      const d = dist(x, y, s.ax, s.ay);
+      if (!best || d < best.d || (d === best.d && i < best.i)) best = { i, x, y, d };
+    }
+    if (!best) return;
+    let eng = null;
+    for (const u of s.engineers) {
+      if (u.order.type !== 'idle') continue;
+      if (!eng || dist(u.x, u.y, best.x, best.y) < dist(eng.x, eng.y, best.x, best.y)) eng = u;
+    }
+    if (!eng) return;
+    const q = best.i % cols;
+    const r = Math.floor(best.i / cols);
+    g.issue(this.team, { type: 'clearRubble', ids: [eng.id], c0: q, r0: r, c1: q, r1: r });
   },
 
   /**

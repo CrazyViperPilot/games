@@ -1,21 +1,26 @@
 // Bagger (seit v5.35, PRD §6 „Bagger“): Befehl `dig` räumt Stadtzellen eine nach der anderen. Der Bagger fährt zur Zelle, arbeitet
 // BALANCE.excavator.digTime s und räumt dann: eine Stadtstraße der Karte (Konfliktzone; nicht Brückenfahrbahnen) verschwindet für beide
 // Teams, Bäume und leere Häuser wie mit „Räumen“, ein eigenes Stadtgebäude wird abgerissen (auch eine Förderanlage; das Vorkommen
-// bleibt). Gegnerische Gebäude zerstört er langsam mit seiner Schaufel (Waffe, combat.js). Kein DOM, deterministisch.
+// bleibt). Gegnerische Gebäude zerstört er langsam mit seiner Schaufel (Waffe, combat.js). Seit dem Paket „Straßen“ räumt er Schutt
+// zerstörter Straßen (die Straße ist wieder da) und reißt gegnerische Straßen ab. Kein DOM, deterministisch.
 import { BALANCE } from '../data/balance.js';
 import { cmdCity } from './city/commands.js';
 import { driveTo, setIdle } from './movement.js';
 import { MAP_ROAD } from './roads.js';
+import { clearable, clearRubble } from './roadwar.js';
+import { KIND_ID } from '../data/citykinds.js';
+import { rebuildList } from './city/state.js';
 
 const X = BALANCE.excavator;
 
 /** Kann der Bagger von `team` die Stadtzelle i räumen (Stadtstraße der Karte, Hindernis, eigenes Gebäude)? */
 export function diggable(game, team, i) {
   if (game.roads?.kind[i] === MAP_ROAD) return true;
+  if (clearable(game, team, i)) return true; // Schutt einer eigenen Straße oder Stadtstraße (Paket „Straßen“): räumen
   const c = game.city?.[team];
   if (!c) return false;
   if (c.kind[i]) return true; // eigene Zelle (Straße, Gebäude, Ausweisung)
-  for (const o of game.city) if (o !== c && o.kind[i]) return false; // gegnerische Zelle: angreifen statt baggern
+  for (const o of game.city) if (o !== c && o.kind[i]) return o.kind[i] === KIND_ID.road; // gegnerische Straße: abreißen (Paket „Straßen“); Gebäude: angreifen statt baggern
   return !!c.blocked[i]; // Bäume, Häuser (cmdCity entscheidet, ob es geht)
 }
 
@@ -57,6 +62,15 @@ export function cmdDig(game, team, cmd) {
 
 /** Zelle i räumen (nach der Arbeitszeit). true, wenn etwas weg ist. */
 function dig(game, team, i) {
+  if (clearRubble(game, i)) return true; // Schutt: die Straße ist wieder da (Paket „Straßen“)
+  for (const o of game.city ?? []) {
+    if (o.team === team || o.kind[i] !== KIND_ID.road) continue;
+    o.kind[i] = 0; // gegnerische Straße abreißen (Paket „Straßen“): ohne Schutt, die Zelle ist frei
+    o.level[i] = 0;
+    rebuildList(o);
+    for (const c of game.city) c.ver++;
+    return true;
+  }
   const R = game.roads;
   if (R?.kind[i] === MAP_ROAD) {
     R.kind[i] = 0; // Stadtstraße der Karte: weg für beide Teams (c.mapRoads ist dasselbe Feld)
