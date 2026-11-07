@@ -293,3 +293,33 @@ Heute (seit v4.87) lassen sich Stadtzellen überall bauen, wo nichts im Weg steh
 - Test `test/buildrules.test.js`: ohne Schalter überall wie heute; mit Schalter: außerhalb des Gebiets kein Gebäude, aber Straße; unerkundet nein;
   nahe sichtbarer Feindeinheit nein, nach deren Abzug ja; Konfliktzone nein; Großbau mit einer Zelle außerhalb nein; FOB-Gebiet 6 Zellen;
   Fehlertexte; KI mit Regel erzeugt Stahl und Munition (Seeds 3 und 11, 12 min wie cityprod). Golden: ohne Schalter unverändert.
+
+## Direkte Lieferung zwischen angrenzenden Gebäuden (von Daniel bestätigt am 2026-11-07)
+
+Heute liefern Förderanlagen und Werke ihre Ware nur über Straßen an das nächste passende Werk (Wege in `js/game/transport.js`:
+`build` mit `perWork`, `routes`, `alts`; Verteilung in `js/game/city/economy.js` `distribute`). Neu: Grenzen Lieferant und Zielwerk
+direkt aneinander, fließt die Ware ohne Straße.
+
+### Regel
+- Lieferanten und Ziele wie heute: Förderanlage (Holz, Stein → BM-Werk; Erz → Hütte; Öl → Raffinerie und Kerosin-Raffinerie), Hütte
+  (Roheisen → Stahlwerk). Produkte ins Lager der Hauptstadt fahren weiter über die Straße (nicht Teil dieses Pakets).
+- **Angrenzend:** mindestens eine Zelle des Lieferanten (`cellsOf`) hat eine 4er-Nachbarzelle, die zum Zielwerk gehört (beide fertig, gleiches Team).
+- Ein angrenzendes Zielwerk bekommt einen Weg **ohne Straßenzellen**: `{ to: <Anker>, path: new Int32Array(0), dist: 0 }`
+  (`pathEff` ergibt dann 1, `addLoad` legt keine Last). In `alts` stehen angrenzende Werke **vor** allen Straßenwegen (bei mehreren nach
+  Anker, fest), in `routes` gilt das erste angrenzende Werk als Ziel. Die Verteilung nach freier Abnahme (`distribute`) bleibt; ein
+  angrenzendes Werk ist einfach ein weiteres Ziel ohne Straße. Ein Lieferant ohne jeden Straßenanschluss, aber mit angrenzendem Werk,
+  liefert trotzdem (kein rotes X, KI baut ihm keine Straße).
+- Keine neuen Balance-Zahlen.
+
+### Anzeige
+- Infofeld (`transportInfo`/`cityInfo` in `js/ui/hud.js`): bei Weglänge 0 „Liefert an: Stahlwerk (direkt angrenzend)“ statt Feldern.
+- Ressourcenanzeige und Straßenlast ändern sich von selbst (keine Last, kein Verlust).
+
+### Doku und Test
+- `docs/prd/stadt-transport.md` (Abschnitt „Ziel und Weg“), Hilfe (F1) in `js/ui/helptext.js` (Zeile Straßen/Stadt), Eintrag nach
+  `docs/changes/`.
+- Test in `test/transport.test.js`: Erzmine grenzt an Hütte → Weg dist 0, kein Verlust, keine Straßenlast, Roheisen kommt an, auch ohne
+  Straße; Hütte grenzt an Stahlwerk ebenso; nicht angrenzend → wie bisher über die Straße; angrenzend und Straßenweg zu zweitem Werk →
+  angrenzendes zuerst in `alts`.
+- `npm run test:fast`, `npm test`, `npm run metrics` (Wirtschaft der KI ändert sich: wenn gewollt, `-- --update` und neue Zeilen nennen),
+  `npm run smoke`. Golden-Prüfsummen laufen ohne Stadt und dürfen sich nicht ändern.
