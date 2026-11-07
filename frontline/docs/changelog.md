@@ -3,6 +3,7 @@
 > Neueste Version oben. Gehört zum PRD ([PRD.md](../PRD.md)). Nicht von Hand bearbeiten: Einträge kommen als Datei nach
 > [docs/changes/](changes/README.md), `npm run release` trägt sie mit Version und Cache-Version hier ein (Regel 7 in [CLAUDE.md](../CLAUDE.md)).
 
+- v5.102: **F-22** (§6 „F-22“, §15 „Fliegerhorst“): neues Kampfflugzeug mit sechs Luft-Luft-Lenkraketen und ohne Luft-Boden-Raketen, am Stellplatz des Fliegerhorsts neben der F-16 (zwei Plätze je Stellplatz für beide), 1900 Geld, 220 Stahl, Taste I; die KI baut sie nicht. Cache v212.
 - v5.101: **Rechtsverkehr der Jets am Boden**: Beim Rollen über Rollfeld, Straße und Bahn hält sich eine F-16 rechts neben der Mitte (`BALANCE.jets.keepRight`), so rollen ein startender und ein landender Jet aneinander vorbei statt durcheinander. Cache v211.
 - v5.100: **Zwei F-16 je Stellplatz** (§15 „Fliegerhorst“, Daniels Wunsch): Ein Stellplatz (2 × 2) bildet zwei F-16 aus und stellt sie nebeneinander ab (Nase nach Norden, fester Platz je Flugzeug, `CITY.air.standJets` und `standSlot`); Start, Landung und Speichern gelten für beide, alte Stände bekommen beim Abstellen einen Platz; die KI braucht für ihre Jets nur so viele Stellplätze, wie sie Jets je zwei hält. Cache v210.
 - v5.99: **Pendler über das Nachbarwerk**: Eine Förderanlage oder Hütte, die direkt an ihr Zielwerk grenzt, braucht keine eigene Straße mehr; ohne eigenen Pendlerweg gehen ihre Arbeiter durch das Nachbarwerk (dessen Weg, Last und Stau), auch über Ketten wie Erzmine → Hütte → Stahlwerk. Cache v209.
