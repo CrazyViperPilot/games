@@ -1,40 +1,40 @@
 {
  "3": [
   {
-   "steel": 871,
-   "mun": 1922,
-   "trained": 46,
-   "kills": 90,
-   "fobs": 4,
-   "cells": 344,
-   "houses": 3,
+   "steel": 943,
+   "mun": 1696,
+   "trained": 60,
+   "kills": 96,
+   "fobs": 5,
+   "cells": 408,
+   "houses": 5,
    "storms": 7,
    "workRoutes": 1,
    "airDef": 0,
-   "points": 10
+   "points": 6
   },
   {
-   "steel": 794,
-   "mun": 1472,
-   "trained": 54,
-   "kills": 72,
+   "steel": 659,
+   "mun": 1735,
+   "trained": 52,
+   "kills": 87,
    "fobs": 5,
-   "cells": 392,
-   "houses": 3,
+   "cells": 449,
+   "houses": 6,
    "storms": 0,
-   "workRoutes": 2,
+   "workRoutes": 0,
    "airDef": 0,
-   "points": 7
+   "points": 12
   }
  ],
  "7": [
   {
-   "steel": 1041,
-   "mun": 1111,
-   "trained": 40,
-   "kills": 44,
+   "steel": 1257,
+   "mun": 1439,
+   "trained": 35,
+   "kills": 49,
    "fobs": 2,
-   "cells": 284,
+   "cells": 361,
    "houses": 2,
    "storms": 0,
    "workRoutes": 1,
@@ -42,45 +42,45 @@
    "points": 0
   },
   {
-   "steel": 738,
-   "mun": 1219,
-   "trained": 73,
-   "kills": 104,
+   "steel": 384,
+   "mun": 1072,
+   "trained": 65,
+   "kills": 84,
    "fobs": 5,
-   "cells": 367,
-   "houses": 11,
+   "cells": 481,
+   "houses": 10,
    "storms": 0,
    "workRoutes": 1,
-   "airDef": 3,
+   "airDef": 2,
    "points": 26
   }
  ],
  "11": [
   {
-   "steel": 986,
-   "mun": 1579,
-   "trained": 66,
-   "kills": 72,
+   "steel": 600,
+   "mun": 1501,
+   "trained": 137,
+   "kills": 96,
    "fobs": 5,
-   "cells": 331,
-   "houses": 3,
+   "cells": 482,
+   "houses": 11,
    "storms": 6,
    "workRoutes": 1,
    "airDef": 0,
-   "points": 3
+   "points": 21
   },
   {
-   "steel": 541,
-   "mun": 1083,
-   "trained": 54,
-   "kills": 88,
-   "fobs": 5,
-   "cells": 392,
-   "houses": 6,
-   "storms": 0,
+   "steel": 442,
+   "mun": 918,
+   "trained": 59,
+   "kills": 71,
+   "fobs": 4,
+   "cells": 325,
+   "houses": 4,
+   "storms": 8,
    "workRoutes": 1,
    "airDef": 0,
-   "points": 18
+   "points": 0
   }
  ]
 }
