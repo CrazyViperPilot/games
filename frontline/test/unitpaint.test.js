@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { UNITS } from '../js/data/units.js';
-import { unitModel, unitModelTypes, unitLook, drawUnitIso, drawUnitTop, drawWreckIso, drawWreckTop } from '../js/render/unitpaint.js';
+import { unitModel, unitModelTypes, unitLook, drawUnitIso, drawUnitTop, drawWreckIso, drawWreckTop, PAINT } from '../js/render/unitpaint.js';
 
 function checkSolids(name, solids) {
   assert.ok(solids.length > 0, `${name}: keine Körper`);
@@ -53,6 +53,46 @@ test('F-22: Raketen nur am Boden in offenen Schächten sichtbar, je Vorrat ein B
   for (let k = 1; k <= 6; k++) assert.ok(n({ missiles: k, gear: true }) > n({ missiles: k - 1, gear: true }), `${k} Raketen sichtbar`);
   assert.equal(n({ missiles: 6 }), n({}), 'ohne Fahrwerk keine Raketen zu sehen');
   assert.equal(unitModel('f22', 0, {}).nozzle.ys.length, 2, 'zwei Düsen, zwei Nachbrenner');
+});
+
+test('U-2: Bild hängt nur vom Fahrwerk ab (Boden mit Stützrädern und hängenden Flügelspitzen, Flug gerade), malt ohne Fehler', () => {
+  const def = UNITS.u2;
+  assert.ok(def, 'UNITS.u2 fehlt');
+  const plane = (phase, parked) => ({ id: 1, type: 'u2', team: 0, def, parked, jet: { phase, alt: parked ? 0 : 1 }, weapons: [] });
+  for (const ph of ['taxiOut', 'roll', 'rollout', 'taxiIn']) assert.deepEqual(unitLook(plane(ph, false), 0), { gear: true }, `am Boden (${ph})`);
+  assert.deepEqual(unitLook(plane('park', true), 0), { gear: true }, 'abgestellt');
+  assert.deepEqual(unitLook(plane('air', false), 0), { gear: false }, 'im Flug');
+  const air = unitModel('u2', 0, unitLook(plane('air', false), 0));
+  const gnd = unitModel('u2', 0, unitLook(plane('park', true), 0));
+  checkSolids('u2 Flug', air.S);
+  checkSolids('u2 Boden', gnd.S);
+  assert.ok(gnd.S.length > air.S.length, 'am Boden Fahrwerk und Stützräder');
+  const pts = (m) => m.S.flatMap((so) => so.faces.flat());
+  const span = (m, f) => f(...pts(m).map((p) => Math.abs(p[1])));
+  const xs = pts(air).map((p) => p[0]);
+  const len = Math.max(...xs) - Math.min(...xs);
+  const ratio = (2 * span(air, Math.max)) / len;
+  assert.ok(ratio > 1.5 && ratio < 1.7, `Spannweite ≈ 1,6 × Länge (${ratio.toFixed(2)})`);
+  const tipZ = (m) => Math.min(...pts(m).filter((p) => Math.abs(p[1]) > 30).map((p) => p[2]));
+  assert.ok(tipZ(gnd) < tipZ(air) - 0.8, 'Flügelspitzen hängen am Boden tiefer als im Flug');
+  assert.ok(Math.min(...pts(gnd).map((p) => p[2])) < 0.05 && Math.min(...pts(air).map((p) => p[2])) > 1, 'nur am Boden reicht das Fahrwerk bis zum Boden');
+  assert.ok(air.nozzle && air.nozzle.len < 1 && air.nozzle.flame, 'schwacher Abgasschein statt Nachbrenner');
+  // Malen mit einem Canvas-Ersatz: alle Iso-Richtungen, von oben, Schatten und Wrack; Bildgrenzen umfassen die ganze Spannweite
+  let bad = 0;
+  const ctx = new Proxy({}, { get: (t, k) => (k in t ? t[k] : (...a) => { if (a.some((v) => typeof v === 'number' && !Number.isFinite(v))) bad++; }), set: (t, k, v) => ((t[k] = v), true) });
+  for (const m of [air, gnd]) {
+    for (let k = 0; k < 16; k++) {
+      const yaw = (k / 16) * Math.PI * 2;
+      PAINT.paintSolids(ctx, m.S, yaw, { iso: true, s: 2 });
+      assert.ok(PAINT.boundsOf(m, m.S, yaw, true).every(Number.isFinite), `Bildgrenzen Richtung ${k}`);
+    }
+    PAINT.paintSolids(ctx, m.S, 0, { iso: false, s: 2 });
+    PAINT.paintSolids(ctx, m.S, 0, { iso: false, s: 2, shadow: true });
+    PAINT.paintSolids(ctx, m.S, 0, { iso: true, s: 2, charred: true });
+    const [, y0, , y1] = PAINT.boundsOf(m, m.S, 0, false);
+    assert.ok(y0 <= -span(m, Math.max) && y1 >= span(m, Math.max), 'Bild von oben schneidet die Flügel nicht ab');
+  }
+  assert.equal(bad, 0, 'keine ungültigen Zahlen beim Malen');
 });
 
 test('Teams unterscheiden sich in der Farbe, Gehbilder in der Haltung', () => {

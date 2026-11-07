@@ -1,7 +1,7 @@
 // Kampf: Zielsuche, Direktfeuer, Mörser und Granaten, Flugabwehr, Schaden (docs/verlauf.md §5, §11.2). Kein DOM.
 import { BALANCE } from '../data/balance.js';
 import { createShell, inRange, radiusOf, isFoe, canAttack, resolveTarget } from './entities.js';
-import { buildHash, nearby } from './movement.js';
+import { buildHash, nearby, setIdle } from './movement.js';
 import { damageHouse, houseFire, ruinCoverMul, houseCanFire } from './garrison.js';
 import { addCrater } from './scars.js';
 import { auraCooldown } from './commander.js';
@@ -12,7 +12,7 @@ import { armorMul, modOf, rangeMul, sightMul, dealtMul, smokeMul, hasUnlock } fr
 const autoTurret = (game, team) => hasUnlock(game, team, 'autoturret');
 import { damageBridge, deckDist } from './river.js';
 import { forEnemyCity } from './city/query.js';
-import { jetGrounded, parkedArmor, isHighAlt } from './aircraft.js';
+import { jetGrounded, parkedArmor, isHighAlt, canHitAltitude } from './aircraft.js';
 import { UNITS } from '../data/units.js';
 
 const SCAN = BALANCE.scanInterval;
@@ -482,6 +482,11 @@ export function updateCombat(game, dt) {
     if (o === 'attack') {
       if (par) u.scanTimer = u.scanTimer <= 0 ? SCAN : u.scanTimer;
       const t = resolveTarget(game, u.order.targetId);
+      // Das Ziel ist erst nach dem Befehl in die Höhe gegangen (U-2 hebt ab): Angriff aufgeben, statt zu hängen (seit v5.83)
+      if (t && !canHitAltitude(u, t)) {
+        setIdle(u);
+        continue;
+      }
       if (canAttack(u.team, t)) (par ? fireParallel : tryFireUnit)(game, u, t);
       continue;
     }

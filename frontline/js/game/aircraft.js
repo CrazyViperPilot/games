@@ -61,6 +61,9 @@ export const freeSpace = (game, e) => AIR.standJets - jetsAt(game, e);
  */
 export const isHighAlt = (e) => !!e.def?.highAlt && !jetGrounded(e);
 
+/** Kann Einheit u das Ziel t in seiner Höhe treffen? Hochfliegende Ziele (isHighAlt) nur mit einer Waffe mit antiHighAlt (seit v5.83). */
+export const canHitAltitude = (u, t) => !isHighAlt(t) || !!u.def.weapons?.some((w) => w.antiHighAlt);
+
 /** Sichtweite einer Einheit: in der Luft mit highAlt die große Höhensicht (airSight), sonst def.sight (fog.js). */
 export const sightOf = (u) => (isHighAlt(u) && u.def.airSight) || u.def.sight;
 

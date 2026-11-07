@@ -34,7 +34,7 @@ import { updateAbilities } from './abilities.js';
 import { createResearch, updateResearch, rangeMul } from './research.js';
 import { createBridges, updateBridges, bridgeUnder } from './river.js';
 import { createRoads } from './roads.js';
-import { updateAircraft, trainCheck } from './aircraft.js';
+import { updateAircraft, trainCheck, isHighAlt, canHitAltitude } from './aircraft.js';
 import { updateHelis, heliTrainCheck } from './helipad.js';
 import { updateDig } from './excavator.js';
 import { updateRoadWar } from './roadwar.js';
@@ -728,8 +728,11 @@ export class Game {
     const armed = this.ownUnits(team, cmd.ids).filter((u) => u.def.range > 0);
     const units = armed.filter((u) => !u.crate); // Kistenträger schießen nicht
     if (!units.length) return fail(armed.length ? 'Kistenträger schießen nicht' : 'Keine bewaffnete Einheit gewählt');
+    // Hochfliegende Ziele (U-2 in der Luft) greifen nur Einheiten an, die sie treffen können (F-22); die übrigen bekommen keinen Befehl (seit v5.83)
+    const hitters = isHighAlt(t) ? units.filter((u) => canHitAltitude(u, t)) : units;
+    if (!hitters.length) return fail(`Die ${t.def.name} fliegt zu hoch: nur die F-22 kann sie abschießen`);
     const aim = t.house ? this.getEntity(t.house) : t;
-    for (const u of units) {
+    for (const u of hitters) {
       // Besatzer bleiben im Haus, solange das Ziel aus den Fenstern erreichbar ist und durch eine Fensterseite liegt (houseCanFire, seit v5.67);
       // sonst gehen sie hinaus und verfolgen es
       const h = u.house ? this.getEntity(u.house) : null;
@@ -740,7 +743,7 @@ export class Game {
       u.pathIndex = 0;
       u.repathTimer = 0;
     }
-    return { ok: true, count: units.length };
+    return { ok: true, count: hitters.length };
   }
 
   /**

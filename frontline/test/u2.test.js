@@ -249,3 +249,51 @@ test('KI: U-2 zur Aufklärung ab reconFrom auf freiem Stellplatz, dann Flug (hö
   assert.ok(!u.parked && u.alive, 'U-2 ist unterwegs');
   assert.ok(g.units.filter((x) => x.alive && x.def.highAlt).length === 1, 'weiterhin höchstens eine');
 });
+
+test('Angriffsbefehl auf eine fliegende U-2: nur die F-22 nimmt ihn an, sonst Ablehnung mit Meldung', () => {
+  const g = new Game({ seed: 3, city: true });
+  const { stands } = airbase(g);
+  const z = g.zone;
+  // Die U-2 gehört zu Team 1 (Gegner), damit Team 0 sie angreifen kann
+  const u = g.spawnUnit('u2', 1, z.x, z.y);
+  u.parked = false;
+  u.fuel = u.def.fuelMax;
+  u.jet = { home: stands[0].id, ready: true, phase: 'air', alt: 1 };
+  g.fog[0].revealAll?.();
+  const f16 = g.spawnUnit('f16', 0, z.x - 300, z.y);
+  f16.fuel = f16.def.fuelMax;
+  f16.parked = false;
+  f16.jet = { home: stands[1].id, ready: true, phase: 'air', alt: 1 };
+  const r = g.issue(0, { type: 'attack', ids: [f16.id], targetId: u.id });
+  assert.equal(r.ok, false, 'F-16 allein lehnt ab');
+  assert.match(r.reason, /fliegt zu hoch: nur die F-22 kann sie abschießen/);
+  assert.notEqual(f16.order.type, 'attack', 'kein neuer Befehl');
+  // Gemischte Auswahl: nur die F-22 greift an, die F-16 bekommt keinen Befehl
+  const f22 = g.spawnUnit('f22', 0, z.x + 300, z.y);
+  f22.fuel = f22.def.fuelMax;
+  f22.parked = false;
+  f22.jet = { home: stands[1].id, ready: true, phase: 'air', alt: 1 };
+  const m = g.issue(0, { type: 'attack', ids: [f16.id, f22.id], targetId: u.id });
+  assert.ok(m.ok, 'gemischte Auswahl wird angenommen');
+  assert.equal(m.count, 1, 'genau eine Einheit greift an');
+  assert.equal(f22.order.type, 'attack', 'F-22 greift an');
+  assert.notEqual(f16.order.type, 'attack', 'F-16 bekommt keinen Angriffsbefehl');
+});
+
+test('Angriff löst sich, wenn das Ziel erst nach dem Befehl in die Höhe geht (kein Hängenbleiben)', () => {
+  const g = new Game({ seed: 3, city: true });
+  const z = g.zone;
+  const u = g.spawnUnit('u2', 1, z.x, z.y);
+  u.parked = false;
+  u.fuel = u.def.fuelMax;
+  u.jet = { home: 0, ready: true, phase: 'air', alt: 1 };
+  // Ein Schütze am Boden, dessen Angriff schon auf die U-2 zielt (Befehl vor dem Start der U-2)
+  const rifle = g.spawnUnit('rifleman', 0, z.x + 100, z.y);
+  rifle.order = { type: 'attack', x: u.x, y: u.y, targetId: u.id };
+  rifle.targetId = u.id;
+  g.fog[0].revealAll?.();
+  run(g, 1);
+  assert.equal(rifle.order.type, 'idle', 'Angriff aufgegeben');
+  assert.equal(rifle.targetId, null, 'Ziel vergessen');
+  assert.ok(rifle.alive, 'Schütze lebt');
+});
