@@ -493,6 +493,32 @@ test('Markt: ohne Markt kein Handel, verkaufen und kaufen in Losen', () => {
   const metal = g.city[0].metal;
   assert.ok(g.issue(0, { type: 'trade', good: 'metal', dir: 'buy' }).ok);
   assert.ok(g.city[0].metal >= metal + CITY.market.lot - 1);
+
+  // ×10: zehn Lose auf einmal, Geld genau zehnmal der Preis (Lager leer genug, Geld reicht)
+  g.city[0].metal = 0;
+  g.teams[0].res.money = 100000;
+  const r10 = g.issue(0, { type: 'trade', good: 'metal', dir: 'buy', count: 10 });
+  assert.equal(r10.ok, true);
+  assert.equal(r10.done, 10);
+  assert.equal(g.city[0].metal, 10 * CITY.market.lot);
+  assert.equal(g.teams[0].res.money, 100000 - 10 * CITY.market.buy.metal);
+  // ×100 mit Geld für nur 3 Lose: kauft 3, meldet den Grund
+  g.teams[0].res.money = 3 * CITY.market.buy.metal + 1;
+  const r100 = g.issue(0, { type: 'trade', good: 'metal', dir: 'buy', count: 100 });
+  assert.equal(r100.ok, true);
+  assert.equal(r100.done, 3);
+  assert.match(r100.reason, /Geld/);
+  // ×10 verkaufen mit Bestand für 13 Lose: verkauft 10
+  const sold = g.issue(0, { type: 'trade', good: 'metal', dir: 'sell', count: 10 });
+  assert.equal(sold.done, 10);
+  assert.equal(g.city[0].metal, 3 * CITY.market.lot);
+  // Unsinnige Zahl: höchstens maxCount, mindestens 1
+  assert.equal(g.issue(0, { type: 'trade', good: 'metal', dir: 'sell', count: -5 }).done, 1);
+  // kein Geld: das erste Los scheitert, Grund wie bisher
+  g.teams[0].res.money = 0;
+  const none = g.issue(0, { type: 'trade', good: 'metal', dir: 'buy', count: 100 });
+  assert.equal(none.ok, false);
+  assert.match(none.reason, /Geld/);
 });
 
 test('Angriff: Stadtgebäude nehmen Schaden, werden Ruine (Prämie), wachsen danach neu', () => {

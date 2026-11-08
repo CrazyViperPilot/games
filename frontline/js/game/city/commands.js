@@ -62,10 +62,28 @@ function placeBig(game, team, c, kind, col, row) {
 }
 
 /**
- * Befehl `{ type: 'trade', good: 'bm'|'mun'|'fuel'|'metal'|'kero', dir: 'sell'|'buy' }`: ein Los (CITY.market.lot) am Markt handeln.
- * Braucht einen fertigen eigenen Markt. BM, MUN, TS liegen im Lager der Hauptstadt, Stahl und Kerosin im Stadtlager.
+ * Befehl `{ type: 'trade', good: 'bm'|'mun'|'fuel'|'metal'|'kero', dir: 'sell'|'buy', count? }`: `count` Lose (CITY.market.lot; Standard 1,
+ * höchstens CITY.market.maxCount, Knöpfe ×10 und ×100) am Markt handeln. Reicht Geld, Bestand oder Lagerplatz nicht für alle, werden so viele
+ * gehandelt wie möglich ({ ok, done, money }); scheitert schon das erste Los, der Grund. Braucht einen fertigen eigenen Markt.
+ * BM, MUN, TS liegen im Lager der Hauptstadt, Stahl und Kerosin im Stadtlager.
  */
 export function cmdTrade(game, team, cmd) {
+  const n = Math.max(1, Math.min(CITY.market.maxCount, Math.floor(Number(cmd.count) || 1)));
+  let done = 0;
+  let money = 0;
+  let res = null;
+  for (let k = 0; k < n; k++) {
+    res = tradeLot(game, team, cmd);
+    if (!res.ok) break;
+    done++;
+    money += res.money;
+  }
+  if (!done) return res;
+  return { ok: true, done, money, reason: done < n ? res.reason : undefined };
+}
+
+/** Ein Los handeln (cmdTrade). */
+function tradeLot(game, team, cmd) {
   const c = game.city?.[team];
   if (!c) return { ok: false, reason: 'Die Stadt ist in dieser Partie ausgeschaltet' };
   if (!MARKET_GOODS.includes(cmd.good) || (cmd.dir !== 'sell' && cmd.dir !== 'buy')) return { ok: false, reason: 'Unbekannter Handel' };

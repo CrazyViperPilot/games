@@ -113,7 +113,7 @@ export const CITY = {
   // Metall je ausgebildeter Einheit (zusätzlich zum Geld); fehlt die Sorte, kostet sie kein Metall
   metalCost: { truck: 20, engineer: 20, fobTruck: 80, ifv: 60, tank: 120, flak: 60, sam: 80, gepard: 100, pzh: 140, excavator: 80, littlebird: 60, transporter: 80, gunship: 120, f16: 160, f22: 220, u2: 150, su27: 160 },
   // Markt: handelt in Losen; verkaufen bringt wenig, kaufen kostet viel (Geld je Los)
-  market: { lot: 100, sell: byGood('sell'), buy: byGood('buy') }, // Preise je Ware im Register js/data/goods.js
+  market: { lot: 100, maxCount: 100, sell: byGood('sell'), buy: byGood('buy') }, // maxCount: höchstens so viele Lose je Befehl (Knöpfe ×10, ×100 im Marktmenü); Preise je Ware im Register js/data/goods.js
 
   // ---- Straßentransport (seit v5.20, Werte für AP2/AP3; PRD §15 „Straßentransport“) ----
   // cap: Einheiten je s, die eine eigene Straßenzelle trägt; mapCap: Stadtstraßen der Karte. commute: Last je Arbeiter zum Wohnen (je s).

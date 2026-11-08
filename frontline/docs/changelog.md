@@ -3,6 +3,7 @@
 > Neueste Version oben. Gehört zum PRD ([PRD.md](../PRD.md)). Nicht von Hand bearbeiten: Einträge kommen als Datei nach
 > [docs/changes/](changes/README.md), `npm run release` trägt sie mit Version und Cache-Version hier ein (Regel 7 in [CLAUDE.md](../CLAUDE.md)).
 
+- v5.114: **Markt: ×10 und ×100**: Neben Verkaufen und Kaufen handeln zwei Knöpfe 10 bzw. 100 Lose mit einem Klick (so viele, wie Geld, Bestand und Lager erlauben). Cache v222.
 - v5.113: **Mauerzug mit sehr weit entfernten Punkten**: wird jetzt sofort abgelehnt, statt den Speicher zu füllen (gefunden vom Zufallstest). Cache v221.
 - v5.112: **Su-27** (§6 „Su-27“, §15 „Fliegerhorst“): neues Kampfflugzeug am Stellplatz des Fliegerhorsts wie die F-16 (zwei Waffen, parallel), aber schneller (450) und mit mehr Treibstoff (75 s, größere Reichweite), 1600 Geld, 160 Stahl, Taste S; die KI baut sie nicht. Cache v221.
 - v5.111: **Zufallstest: alle Befehle abgedeckt** (nur Tests): weitere gezielte Lagen für Landen (Hubschrauber und Heliport), Ausbau eines Stellplatzes, Kiste abliefern und ablegen, Bohrer und Dachaufbau eines Gefechtsturms. Damit wird jeder Befehl außer dem veralteten `buildFob` mindestens einmal angenommen und mit verdorbenen Werten geprüft; keine neuen Fehler. Cache v220.

@@ -128,7 +128,7 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 | `shellRoad` | `ids, c0, r0, c1?, r1?` | `roadwar.js` `cmdShellRoad` | Einheiten mit Granaten oder Raketen beschießen die Straßenzellen des Rechtecks, bis sie zu Schutt werden (Paket „Straßen“, Teil 3) |
 | `clearRubble` | `ids, c0, r0, c1?, r1?` | `roadwar.js` `cmdClearRubble` | Baufahrzeuge räumen Schutt eigener Straßen und Stadtstraßen, die Straße ist wieder da (Paket „Straßen“, Teil 3) |
 | `storm`, `fortifyHouse` | `ids, houseId` (Sturm) / `houseId, work` (ausbauen) | `garrison.js` `cmdStorm`, `cmdFortifyHouse` | Besetztes gegnerisches Haus stürmen / ein eigenes Haus zur Stellung ausbauen |
-| `trade` | `good` (`bm`, `mun`, `fuel`, `metal`, `kero`), `dir` (`sell`, `buy`) | `city/commands.js` `cmdTrade` | Ein Los am eigenen Markt handeln (nur mit fertigem Markt) |
+| `trade` | `good` (`bm`, `mun`, `fuel`, `metal`, `kero`), `dir` (`sell`, `buy`), optional `count` (Lose, 1 … `CITY.market.maxCount`) | `city/commands.js` `cmdTrade` | Lose am eigenen Markt handeln (nur mit fertigem Markt); reicht es nicht für alle, so viele wie möglich (`done`) |
 | `board` | `ids, heliId` | `logistics.js` `cmdBoard` | in ein Fahrzeug oder einen Hubschrauber einsteigen |
 | `dropoff` | `ids, x, y` | `logistics.js` `cmdDropoff` | Passagiere am Punkt absetzen |
 | `garrison`, `ungarrison` | `ids, houseId` (Haus oder Gefechtsturm) / `ids` | `garrison.js` | Haus oder Turm besetzen / verlassen |
