@@ -9,6 +9,7 @@
     "smoke": "node tools/smoke.mjs",
     "release": "node tools/release.mjs",
     "metrics": "node tools/metrics.mjs",
-    "docs": "node tools/doc-tables.mjs"
+    "docs": "node tools/doc-tables.mjs",
+    "preview": "node tools/unitpreview.mjs"
   }
 }

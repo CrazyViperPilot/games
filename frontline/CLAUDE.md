@@ -8,6 +8,7 @@ die genannten Dateien.
   [docs/prd/](docs/prd/) (Abschnittsnummern §3 … §16 wie früher, Zuordnung in der Übersicht von PRD.md). **Für ein Paket nur PRD.md
   und die Themen-Datei(en) lesen, nicht alle.** Änderungsverlauf: [docs/changelog.md](docs/changelog.md) (nur bei Bedarf).
 - **Aufbau des Codes:** [ARCHITEKTUR.md](ARCHITEKTUR.md) (Schichten, Simulationsschritt, Datenmodelle, Befehle)
+- **Aussehen neuer Einheiten (3D-Modelle):** [docs/rezept-einheiten.md](docs/rezept-einheiten.md) – Rezept mit Vorschau-Werkzeug, auch für Sonnet/Haiku.
 - **Entstehung:** [docs/verlauf.md](docs/verlauf.md) (alter Umsetzungsplan v1 bis v4.23, nur zum Nachlesen; Code-Kommentare verweisen auf seine Abschnitte)
 
 ## Regeln
@@ -54,6 +55,7 @@ node --test test/radio.test.js    # nur eine Datei
 npm run smoke                     # Browser-Rundgang (Playwright): Start, 2D, Iso, Hilfe, Pause, Baumodus, Ressourcen, Ausbildung, Bildrate; Fotos in .smoke/<gerät>/
 npm run smoke -- --device all     # dasselbe als desktop, tablet (iPad quer, Tippen) und phone (Android quer); einzeln: --device phone
 npm run smoke -- --long 30        # langer Lauf: 30 Spielminuten bei 10× Tempo, beide Seiten KI, Kamera über Basis/Front/Städte, 2D und Iso; meldet Browserfehler und Einfrieren
+node tools/unitpreview.mjs f22    # Einheiten-Modelle als Bild (8 Richtungen, 2D, Spielgröße) neben f16 und tank: .preview/units.png (Rezept docs/rezept-einheiten.md)
 npm run release                   # Versionen vergeben (nur beim Zusammenführen auf main, siehe „Zusammenarbeit“)
 npm run metrics                   # KI-Kennzahlen: 3 Seeds × 15 min KI gegen KI (~30 s), warnt bei groben Ausreißern; auch in der CI
 ```
@@ -166,7 +168,7 @@ Bei einem neuen Feature dort eine Zeile ergänzen.
 1. `js/data/units.js`: ähnliche Einheit kopieren, neuen Schlüssel vergeben; `name`, `short`, Werte, `weapons`, `cost`, `buildTime`, `slots`, `hotkey` anpassen (Taste darf in der Hauptstadt noch nicht belegt sein).
 2. `js/data/buildings.js`: Schlüssel in `fob.produces` eintragen, für Partien mit Stadt auch in `CITY.produces` (`js/data/city.js`: Kaserne, Fabrikhalle oder Heliport).
 3. `js/data/research.js`: Gruppe in `RESEARCH.groups` eintragen (fehlt sie, wirken nur `all`, `veh` und `air`; Einheiten sind ohne Forschung frei). Mit Stadt: `CITY.crew` (Einwohner) und `CITY.metalCost` (Metall aus dem Stadtlager, fehlt = 0) in `js/data/city.js`.
-4. Aussehen: Modell in `js/render/unitpaint.js` (Funktion in `MODELS` bzw. `INFANTRY`, gilt für 2D und Iso; `test/unitpaint.test.js` prüft, dass jede Einheit eines hat). Ohne Modell zeichnen `js/render/sprites.js` (`drawUnit`) und der Renderer eine einfache Form.
+4. Aussehen: **eigenes Rezept [docs/rezept-einheiten.md](docs/rezept-einheiten.md)** (Maße, Bausteine, Stil, Vorschau-Schleife mit `node tools/unitpreview.mjs <typ>`, welches KI-Modell). Kurz: Modell in `js/render/unitpaint.js` (Funktion in `MODELS` bzw. `INFANTRY`, gilt für 2D und Iso; `test/unitpaint.test.js` prüft, dass jede Einheit eines hat). Ohne Modell zeichnen `js/render/sprites.js` (`drawUnit`) und der Renderer eine einfache Form.
 5. KI: Soll sie die Einheit bauen? Dann `MIX` in `js/data/ai.js` und die Ausbildung in `js/ai/army/produce.js` (`produce`, `counterMix`) ergänzen, sonst im PRD §10 vermerken, dass sie es nicht tut.
 6. Test in `test/` (Ausbildung über `game.issue(team, { type: 'train', … })`), Hilfe in `js/ui/menu.js`, `npm run docs` (Tabellen), PRD §6 (Rolle) und Eintrag in `docs/changes/`.
 
