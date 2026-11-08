@@ -1,1 +1,0 @@
-**Zufallstest: alle Befehle abgedeckt** (nur Tests): weitere gezielte Lagen für Landen (Hubschrauber und Heliport), Ausbau eines Stellplatzes, Kiste abliefern und ablegen, Bohrer und Dachaufbau eines Gefechtsturms. Damit wird jeder Befehl außer dem veralteten `buildFob` mindestens einmal angenommen und mit verdorbenen Werten geprüft; keine neuen Fehler.
