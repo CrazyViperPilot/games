@@ -1,9 +1,10 @@
-// Zufallstest für Befehle (Paket „Robustheit“, Punkt 2): jeder Befehl des Befehlsregisters bekommt zufällig zusammengesetzte, auch
-// kaputte Werte (fehlende Felder, NaN, Unendlich, Text statt Zahl, IDs toter, fremder oder nicht vorhandener Objekte, Granaten, Brücken,
-// Häuser), jeweils ausgehend von einer gültigen Vorlage (TEMPLATES, Felder laut ARCHITEKTUR §6). Erwartet: jedes Mal eine Antwort { ok, … } ohne Ausnahme, und das Spiel läuft danach ohne Ausnahme und ohne Hänger weiter.
-// Fester Seed (makeRng), damit ein Fund wiederholbar ist; die Meldung nennt Befehl und Werte. Angenommen wird rund die Hälfte der
-// Befehle; nicht erreicht (brauchen eine eigene Lage): repairBridge (zerstörte Brücke), clearRubble (Schutt), storm (gegnerisch besetztes
-// Haus), smoke/mine (Forschung), land/route/deliver (passende Ziele), cityUpgrade, research. Mit FUZZ_STATS=1 zeigt der Test die Zahlen.
+// Zufallstest für Befehle (Paket „Robustheit“): jeder Befehl des Befehlsregisters bekommt zufällig zusammengesetzte, auch kaputte Werte
+// (fehlende Felder, NaN, Unendlich, Text statt Zahl, IDs toter, fremder oder nicht vorhandener Objekte, Granaten, Brücken, Häuser), jeweils
+// ausgehend von einer gültigen Vorlage (TEMPLATES, Felder laut ARCHITEKTUR §6). Erwartet: jedes Mal eine Antwort { ok, … } ohne Ausnahme,
+// und das Spiel läuft danach ohne Ausnahme, ohne Hänger und ohne NaN-Positionen weiter. Der Zufall bringt rund die Hälfte der Befehle bis
+// zur Annahme; die übrigen prüfen gezielte Lagen unten (SCENES: zerstörte Brücke, Schutt, besetzte Häuser, Forschung, zwei FOBs,
+// FOB-Fahrzeug, Heliport, Stellplatz, getragene Kiste, Bohrer, Gefechtsturm …). Damit ist jeder Befehl außer dem veralteten buildFob
+// (lehnt immer ab) mindestens einmal angenommen. Fester Seed (makeRng): ein Fund ist wiederholbar. FUZZ_STATS=1 zeigt die Zahlen je Befehl.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../js/game/game.js';
