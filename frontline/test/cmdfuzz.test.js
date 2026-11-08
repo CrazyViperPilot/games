@@ -15,6 +15,12 @@ import { BUILDINGS } from '../js/data/buildings.js';
 import { KINDS } from '../js/data/citykinds.js';
 import { RESEARCH_KEYS } from '../js/game/research.js';
 import { PRESETS } from '../js/game/logistics.js';
+import { createEmptyMap } from '../js/game/mapdata.js';
+import { breakBridge } from '../js/game/river.js';
+import { destroyRoad, cellCenter } from '../js/game/roadwar.js';
+import { cityTrainers } from '../js/game/city/query.js';
+import { KIND_ID } from '../js/data/citykinds.js';
+import { RESEARCH } from '../js/data/research.js';
 
 const DT = 0.05;
 const ROAD_KINDS = ['mortar', 'flak', 'sam'];
@@ -194,3 +200,156 @@ test('Zufallstest: jeder Befehl mit gültigen und verdorbenen Werten antwortet o
   const covered = types.filter((t) => oks[t] > 0);
   assert.ok(covered.length >= types.length * 0.45, `angenommen nur ${covered.length}/${types.length}: ${types.filter((t) => !oks[t]).join(', ')}`);
 });
+
+// ---- Gezielte Lagen: Befehle, die der Zufall oben kaum bis zur Annahme bringt -------------------------------------------------------
+// Je Lage ein gültiger Befehl (muss angenommen werden), danach verdorbene Varianten auf derselben Lage (ein Feld Unsinn oder weg) und
+// Weiterspielen: keine Ausnahme, keine NaN-Positionen.
+
+const run = (g, s) => {
+  for (let k = 0; k < Math.round(s / DT); k++) g.update(DT);
+};
+
+/** Leere Karte mit einem Haus (Häuserkampf), ohne Startarmee. */
+function houseGame() {
+  const map = createEmptyMap('Stadt');
+  map.town.buildings.push({ x: 3000, y: 3000, w: 96, h: 76, kind: 'house' });
+  const g = new Game({ map });
+  for (const u of g.units) u.alive = false;
+  g.cleanup();
+  return g;
+}
+
+/** Spiel mit Stadt ohne Baugebiet, Blau reich. */
+function cityGame(opts = {}) {
+  const g = new Game({ seed: 3, city: true, river: true, research: true, ...opts });
+  g.teams[0].res.money = 1e6;
+  g.city[0].metal = 1e5;
+  g.city[0].popF = 2000;
+  return g;
+}
+
+const SCENES = {
+  repairBridge: () => {
+    const g = cityGame();
+    const b = g.bridges.find((x) => !x.broken);
+    breakBridge(g, b);
+    const eng = g.spawnUnit('engineer', 0, b.x1 - 60, b.y1);
+    return { g, cmd: { type: 'repairBridge', ids: [eng.id], bridgeId: b.id } };
+  },
+  clearRubble: () => {
+    const g = cityGame();
+    const c = g.city[0];
+    const i = c.list.find((j) => c.kind[j] === KIND_ID.road);
+    destroyRoad(g, i);
+    const { x, y } = cellCenter(g, i);
+    const eng = g.spawnUnit('engineer', 0, x + 40, y);
+    return { g, cmd: { type: 'clearRubble', ids: [eng.id], c0: i % c.cols, r0: Math.floor(i / c.cols) } };
+  },
+  storm: () => {
+    const g = houseGame();
+    const h = g.houses[0];
+    const foe = g.spawnUnit('rifleman', 1, 3000, 3100);
+    g.issue(1, { type: 'garrison', ids: [foe.id], houseId: h.id });
+    run(g, 4);
+    const own = [0, 1, 2].map((k) => g.spawnUnit('rifleman', 0, 2880 + k * 60, 3200));
+    run(g, 2);
+    return { g, cmd: { type: 'storm', ids: own.map((u) => u.id), houseId: h.id } };
+  },
+  ungarrison: () => {
+    const g = houseGame();
+    const h = g.houses[0];
+    const own = g.spawnUnit('rifleman', 0, 3000, 3100);
+    g.issue(0, { type: 'garrison', ids: [own.id], houseId: h.id });
+    run(g, 4);
+    return { g, cmd: { type: 'ungarrison', ids: [own.id] } };
+  },
+  fortifyHouse: () => {
+    const g = houseGame();
+    const h = g.houses[0];
+    g.teams[0].res.money = 5000;
+    const own = g.spawnUnit('rifleman', 0, 3000, 3100);
+    g.issue(0, { type: 'garrison', ids: [own.id], houseId: h.id });
+    run(g, 4);
+    return { g, cmd: { type: 'fortifyHouse', houseId: h.id, work: 'sandbags' } };
+  },
+  smoke: () => {
+    const g = cityGame();
+    g.teams[0].tech.done.push(RESEARCH_KEYS.find((k) => RESEARCH.items[k].unlock === 'smoke'));
+    const tank = g.units.find((u) => u.team === 0 && u.type === 'tank');
+    return { g, cmd: { type: 'smoke', ids: [tank.id] } };
+  },
+  mine: () => {
+    const g = cityGame();
+    g.teams[0].tech.done.push(RESEARCH_KEYS.find((k) => RESEARCH.items[k].unlock === 'mines'));
+    const eng = g.units.find((u) => u.team === 0 && u.type === 'engineer');
+    return { g, cmd: { type: 'mine', ids: [eng.id] } };
+  },
+  research: () => {
+    const g = new Game({ seed: 3, research: true }); // ohne Stadt (mit Stadt braucht Forschung eine Universität)
+    g.teams[0].res.money = 1e5;
+    const key = RESEARCH_KEYS.find((k) => RESEARCH.items[k].tier === 1);
+    return { g, cmd: { type: 'research', buildingId: g.mainFob(0).id, key } };
+  },
+  cancelResearch: () => {
+    const g = new Game({ seed: 3, research: true });
+    g.teams[0].res.money = 1e5;
+    const key = RESEARCH_KEYS.find((k) => RESEARCH.items[k].tier === 1);
+    g.issue(0, { type: 'research', buildingId: g.mainFob(0).id, key });
+    return { g, cmd: { type: 'cancelResearch', key } };
+  },
+  train: () => {
+    const g = cityGame();
+    const k = cityTrainers(g, 0).find((e) => e.produces.includes('rifleman'));
+    return { g, cmd: { type: 'train', buildingId: k.id, unit: 'rifleman' } };
+  },
+  cancelTrain: () => {
+    const g = cityGame();
+    const k = cityTrainers(g, 0).find((e) => e.produces.includes('rifleman'));
+    g.issue(0, { type: 'train', buildingId: k.id, unit: 'rifleman' });
+    return { g, cmd: { type: 'cancelTrain', buildingId: k.id } };
+  },
+  route: () => {
+    const g = new Game({ seed: 3 });
+    const m = g.mainFob(0);
+    const fob = g.spawnBuilding('fob', 0, g.grid.toCell(m.x + 900), g.grid.toCell(m.y), { built: true });
+    const truck = g.units.find((u) => u.team === 0 && u.type === 'truck');
+    return { g, cmd: { type: 'route', ids: [truck.id], fromId: m.id, toId: fob.id, preset: 'mix' } };
+  },
+  deploy: () => {
+    const g = new Game({ seed: 3 });
+    const m = g.mainFob(0);
+    const v = g.spawnUnit('fobTruck', 0, m.x + 1400, m.y + 300);
+    return { g, cmd: { type: 'deploy', ids: [v.id] } };
+  },
+  repair: () => {
+    const g = new Game({ seed: 3 });
+    const m = g.mainFob(0);
+    m.hp = m.maxHp / 2;
+    const eng = g.units.find((u) => u.team === 0 && u.type === 'engineer');
+    return { g, cmd: { type: 'repair', ids: [eng.id], targetId: m.id } };
+  },
+};
+
+for (const [type, make] of Object.entries(SCENES)) {
+  test(`Gezielte Lage „${type}“: gültig angenommen, verdorbene Varianten ohne Ausnahme, Spiel läuft weiter`, () => {
+    const { g, cmd } = make();
+    const r = g.issue(0, cmd);
+    assert.equal(r.ok, true, `gültiger Befehl abgelehnt: ${r.reason}`);
+    run(g, 2);
+    const rng = makeRng(type.length * 7919);
+    const fields = Object.keys(cmd).filter((f) => f !== 'type');
+    for (let k = 0; k < 30; k++) {
+      const bad = { ...cmd };
+      const f = fields[Math.floor(rng.next() * fields.length)];
+      if (rng.next() < 0.5) bad[f] = JUNK[Math.floor(rng.next() * JUNK.length)];
+      else delete bad[f];
+      let res;
+      assert.doesNotThrow(() => (res = g.issue(rng.next() < 0.8 ? 0 : 1, bad)), `${type} ${JSON.stringify(bad)}`);
+      assert.equal(typeof res.ok, 'boolean', `${type} ${JSON.stringify(bad)}: Antwort ohne ok`);
+      if (k % 5 === 0) assert.doesNotThrow(() => run(g, 0.5), `Spielschritt nach ${type} ${JSON.stringify(bad)}`);
+    }
+    run(g, 5);
+    const nan = g.units.find((u) => u.alive && !(Number.isFinite(u.x) && Number.isFinite(u.y) && Number.isFinite(u.hp)));
+    assert.equal(nan, undefined, nan ? `NaN an ${nan.type}: ${JSON.stringify(nan.order)}` : '');
+  });
+}
