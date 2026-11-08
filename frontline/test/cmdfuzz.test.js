@@ -21,6 +21,8 @@ import { destroyRoad, cellCenter } from '../js/game/roadwar.js';
 import { cityTrainers } from '../js/game/city/query.js';
 import { KIND_ID } from '../js/data/citykinds.js';
 import { RESEARCH } from '../js/data/research.js';
+import { CITY } from '../js/data/city.js';
+import { canZone, roadAt } from '../js/game/city/cells.js';
 
 const DT = 0.05;
 const ROAD_KINDS = ['mortar', 'flak', 'sam'];
@@ -228,6 +230,40 @@ function cityGame(opts = {}) {
   return g;
 }
 
+/** Freie Fläche W × H (mit Rand) nächst der Hauptstadt im Stadtraster (wie in airbase/helipad.test.js). */
+function freeArea(g, c, m, W, H) {
+  let best = null;
+  const mc = Math.floor(m.x / c.cell);
+  const mr = Math.floor(m.y / c.cell);
+  for (let r = 1; r < c.rows - H - 1; r++) {
+    for (let q = 1; q < c.cols - W - 1; q++) {
+      const d = Math.abs(q - mc) + Math.abs(r - mr);
+      if (best && d >= best.d) continue;
+      let ok = true;
+      for (let y = r - 1; ok && y <= r + H; y++) {
+        for (let x = q - 1; ok && x <= q + W; x++) {
+          const j = y * c.cols + x;
+          ok = canZone(g, c, j) && !c.kind[j] && !roadAt(c, j) && !c.deposit[j];
+        }
+      }
+      if (ok) best = { q, r, d };
+    }
+  }
+  assert.ok(best, 'freie Fläche');
+  return best;
+}
+
+/** Schütze von Blau, der eine Versorgungskiste der Karte aufgehoben hat. */
+function carrier() {
+  const g = new Game({ seed: 3 });
+  const crate = g.crates.find((c) => c.state !== 'stored' && c.state !== 'carried');
+  const man = g.spawnUnit('rifleman', 0, crate.x + 20, crate.y);
+  assert.ok(g.issue(0, { type: 'pickup', ids: [man.id], crateId: crate.id }).ok, 'aufheben');
+  for (let k = 0; k < 400 && !man.crate; k++) g.update(DT);
+  assert.ok(man.crate, 'trägt die Kiste');
+  return { g, man };
+}
+
 const SCENES = {
   repairBridge: () => {
     const g = cityGame();
@@ -320,6 +356,52 @@ const SCENES = {
     const m = g.mainFob(0);
     const v = g.spawnUnit('fobTruck', 0, m.x + 1400, m.y + 300);
     return { g, cmd: { type: 'deploy', ids: [v.id] } };
+  },
+  land: () => {
+    const g = cityGame();
+    const { c } = { c: g.city[0] };
+    const a = freeArea(g, c, g.mainFob(0), 6, 4);
+    const put = (kind, dq, dr, w = 0) => assert.ok(g.issue(0, { type: 'city', kind, c0: a.q + dq, r0: a.r + dr, c1: a.q + dq + w, r1: a.r + dr }).ok, kind);
+    put('road', 0, 2, 5);
+    put('heliport', 0, 1);
+    run(g, CITY.growTime + 1);
+    const pad = [...c.ents.values()].find((e) => e.alive && c.kind[e.cityCell] === KIND_ID.heliport);
+    const heli = g.spawnUnit('gunship', 0, pad.x + 600, pad.y);
+    return { g, cmd: { type: 'land', ids: [heli.id], airportId: pad.id } };
+  },
+  cityUpgrade: () => {
+    const g = cityGame();
+    const c = g.city[0];
+    Object.assign(g.mainFob(0).store, { bm: 1e5 });
+    const a = freeArea(g, c, g.mainFob(0), 12, 6);
+    assert.ok(g.issue(0, { type: 'city', kind: 'runway', c0: a.q, r0: a.r, c1: a.q + 9, r1: a.r + 1 }).ok, 'Bahn');
+    assert.ok(g.issue(0, { type: 'city', kind: 'stand', c0: a.q, r0: a.r + 2, c1: a.q, r1: a.r + 2 }).ok, 'Stellplatz');
+    run(g, CITY.growTime + 1);
+    const stand = [...c.ents.values()].find((e) => e.alive && c.kind[e.cityCell] === KIND_ID.stand);
+    return { g, cmd: { type: 'cityUpgrade', buildingId: stand.id } };
+  },
+  deliver: () => {
+    const { g, man } = carrier();
+    return { g, cmd: { type: 'deliver', ids: [man.id], fobId: g.mainFob(0).id } };
+  },
+  dropCrate: () => {
+    const { g, man } = carrier();
+    return { g, cmd: { type: 'dropCrate', ids: [man.id] } };
+  },
+  drill: () => {
+    const g = new Game({ seed: 7 });
+    const m = g.mainFob(0);
+    const T = g.grid.tile;
+    const d = g.spawnBuilding('drill', 0, Math.floor((m.x + 200) / T), Math.floor((m.y - 200) / T));
+    run(g, 32); // Aufwärmen
+    return { g, cmd: { type: 'drill', ids: [d.id] } };
+  },
+  roof: () => {
+    const g = new Game({ map: createEmptyMap('Festung') });
+    const m = g.mainFob(0);
+    g.teams[0].res.money = 1e5;
+    const t = g.spawnBuilding('tower', 0, m.cx + 6, m.cy, { built: true });
+    return { g, cmd: { type: 'roof', buildingId: t.id, kind: 'mortar' } };
   },
   repair: () => {
     const g = new Game({ seed: 3 });
