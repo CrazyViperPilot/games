@@ -5,8 +5,16 @@ import { RELIEF } from './relief.js';
 const RELIEF_WATER = RELIEF.water;
 const RELIEF_STEEP = RELIEF.steep;
 
-/** Zellen einer Geraden zwischen zwei Zellen (Bresenham, inklusive Endpunkte). */
+/**
+ * Zellen einer Geraden zwischen zwei Zellen (Bresenham, inklusive Endpunkte). Ungültige Koordinaten (NaN, unendlich) liefern keine Zellen,
+ * Bruchzahlen werden gerundet: sonst träfe die Schleife das Ende nie und liefe endlos (das Spiel fröre ein).
+ */
 export function lineCells(c0, r0, c1, r1) {
+  if (![c0, r0, c1, r1].every(Number.isFinite)) return [];
+  c0 = Math.round(c0);
+  r0 = Math.round(r0);
+  c1 = Math.round(c1);
+  r1 = Math.round(r1);
   const out = [];
   const dc = Math.abs(c1 - c0);
   const sc = c0 < c1 ? 1 : -1;

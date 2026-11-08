@@ -48,3 +48,18 @@ test('Bildschleife: ein Fehler beim Zeichnen oder im Spielschritt hält sie nich
     delete globalThis.cancelAnimationFrame;
   }
 });
+
+test('lineCells: ungültige Koordinaten liefern keine Zellen statt einer Endlosschleife, Bruchzahlen werden gerundet', async () => {
+  const { lineCells } = await import('../js/game/grid.js');
+  assert.deepEqual(lineCells(0, 0, NaN, 3), []);
+  assert.deepEqual(lineCells(0, 0, Infinity, 3), []);
+  assert.deepEqual(lineCells(0, 0, 2.4, 0.6), lineCells(0, 0, 2, 1), 'gerundet wie ganze Zahlen');
+  assert.deepEqual(lineCells(0, 0, 3, 0), [[0, 0], [1, 0], [2, 0], [3, 0]]);
+});
+
+test('Mauerbefehl mit fehlender Koordinate: Ablehnung statt Einfrieren', () => {
+  const g = new Game({ seed: 3 });
+  const eng = g.units.find((u) => u.team === 0 && u.def.builder === 'all');
+  const r = g.issue(0, { type: 'buildWall', ids: [eng.id], x1: eng.x, y1: eng.y, x2: undefined, y2: eng.y });
+  assert.equal(r.ok, false);
+});
