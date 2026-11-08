@@ -114,6 +114,9 @@ function takeStock(e, cost) {
 }
 
 /** Tragen alle diese Bauer nur Baumaterial (Soldaten)? Dann zahlen sie Mauern und Tore aus ihrer Ladung. */
+/** Felder mit Koordinaten in Befehlen (Weltpunkt x/y, Linie x1…y2, Turmziel tx/ty, Stadtzellen c0…r1); game.issue prüft sie. */
+const COORD_FIELDS = ['x', 'y', 'x1', 'y1', 'x2', 'y2', 'tx', 'ty', 'c0', 'r0', 'c1', 'r1'];
+
 const paysCarried = (list) => list.length > 0 && list.every((u) => u.def.builder === 'fort');
 const carriedBm = (list) => list.reduce((n, u) => n + u.cargo.bm, 0);
 function takeCarried(list, bm) {
@@ -614,7 +617,11 @@ export class Game {
     if (!cmd || !this.teams[team]) return fail('Unbekannter Befehl');
     if (this.winner !== null) return fail('Partie ist beendet');
     const c = commandOf(cmd.type); // Befehlsregister js/game/commands.js
-    return c ? c.run(this, team, cmd) : fail('Unbekannter Befehl');
+    if (!c) return fail('Unbekannter Befehl');
+    // Koordinaten (Weltpunkt oder Stadtzelle): angegeben, aber keine endliche Zahl, heißt kaputter Befehl. Sonst liefen Einheiten
+    // „nach NaN“ und ihre Position würde selbst NaN (Zeichnen, Wegsuche, Sicht brächen später). Fehlende Felder prüft der Befehl selbst.
+    for (const k of COORD_FIELDS) if (cmd[k] !== undefined && !Number.isFinite(cmd[k])) return fail('Ungültige Koordinaten');
+    return c.run(this, team, cmd);
   }
 
   /** Debug-Befehl (nur mit `debug` im Spiel, ?debug=1): money = Geld dazu; weather (+ season) = Wetter setzen, hold = es bleibt so. */
@@ -631,6 +638,7 @@ export class Game {
 
   ownUnits(team, ids = []) {
     const out = [];
+    if (!Array.isArray(ids)) return out; // kaputter Befehl (Zahl, Objekt …): keine Einheiten statt Ausnahme
     for (const id of new Set(ids)) {
       const e = this.entities.get(id);
       if (e && e.alive && e.kind === 'unit' && e.team === team) out.push(e);
@@ -698,6 +706,7 @@ export class Game {
   cmdMove(team, cmd) {
     const units = this.ownUnits(team, cmd.ids);
     if (!units.length) return fail('Keine eigenen Einheiten gewählt');
+    if (!Number.isFinite(cmd.x) || !Number.isFinite(cmd.y)) return fail('Kein Ziel auf der Karte');
     const tx = Math.min(Math.max(cmd.x, 0), W);
     const ty = Math.min(Math.max(cmd.y, 0), H);
     const go = (u, x, y, form) => {
@@ -859,7 +868,7 @@ export class Game {
   cmdMortarTarget(team, cmd) {
     const mortars = [];
     const guns = []; // Artillerie-Einheiten (Panzerhaubitze, seit v5.19)
-    for (const id of new Set(cmd.ids || [])) {
+    for (const id of new Set(Array.isArray(cmd.ids) ? cmd.ids : [])) {
       const b = this.getEntity(id);
       if (b && b.kind === 'building' && b.team === team && b.def.weapon && b.def.weapon.shell) mortars.push(b);
       else if (b && b.kind === 'unit' && b.alive && b.team === team && b.def.indirect) guns.push(b);
@@ -983,6 +992,7 @@ export class Game {
   cmdRally(team, cmd) {
     const b = this.getEntity(cmd.buildingId);
     if (!b || b.kind !== 'building' || b.team !== team) return fail('Kein eigenes Gebäude gewählt');
+    if (!Number.isFinite(cmd.x) || !Number.isFinite(cmd.y)) return fail('Kein gültiger Sammelpunkt');
     b.rallyX = cmd.x;
     b.rallyY = cmd.y;
     return { ok: true };
@@ -996,8 +1006,16 @@ export class Game {
     const b = this.getEntity(cmd.buildingId);
     if (!b || b.kind !== 'building' || b.team !== team) return fail('Kein eigenes Gebäude gewählt');
     if (b.main) return fail('Die Hauptstadt kann nicht abgerissen werden');
+    if (b.type === 'city') {
+      // Stadtgebäude reißt der Stadtbefehl ab (wie der Knopf „Abreißen“ im Spiel), sie haben kein Lager
+      const c = this.city?.[team];
+      if (!c) return fail('Kein eigenes Gebäude gewählt');
+      const col = b.cityCell % c.cols;
+      const row = Math.floor(b.cityCell / c.cols);
+      return this.issue(team, { type: 'city', kind: 'erase', c0: col, r0: row, c1: col, r1: row, demolish: true });
+    }
     const factor = b.built ? BALANCE.demolishRefund : 1;
-    const stock = { bm: b.store.bm, mun: b.store.mun, fuel: b.store.fuel };
+    const stock = { bm: b.store?.bm ?? 0, mun: b.store?.mun ?? 0, fuel: b.store?.fuel ?? 0 };
     b.demolished = true;
     b.alive = false; // vor den Erstattungen, damit die FOB selbst nicht als Ziel gilt
     b.hp = 0;

@@ -63,7 +63,7 @@ function drillTarget(game) {
 export function cmdDrill(game, team, cmd) {
   let started = 0;
   let reason = 'Kein Bohrer gewählt';
-  for (const id of new Set(cmd.ids || [])) {
+  for (const id of new Set(Array.isArray(cmd.ids) ? cmd.ids : [])) {
     const b = game.getEntity(id);
     if (!b || b.kind !== 'building' || b.team !== team || !b.drill) continue;
     if (!b.built) {

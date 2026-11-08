@@ -9,6 +9,7 @@
 // Aufruf (im Ordner frontline/):  npm run smoke                      → Fotos in .smoke/desktop/
 //                                  npm run smoke -- --device phone    → Fotos in .smoke/phone/ (desktop|tablet|phone|all)
 //                                  node tools/smoke.mjs --seed 7 --out /tmp/x --scale 2
+//                                  npm run smoke -- --long 20         langer Lauf: 20 Spielminuten bei 10× Tempo, beide Seiten KI
 // Braucht Playwright mit Chromium (`npm i -D playwright` bzw. vorinstalliert); nicht Teil von `npm test`.
 //
 // Bausteine für eigene Prüfungen (z. B. einen Fehler nachstellen):
@@ -250,6 +251,141 @@ export async function smoke(opts = {}) {
   return { steps, errors: g.errors, fps, notes };
 }
 
+/**
+ * Langer Lauf (`--long [Minuten]`, seit dem Paket „Langer Rauchtest“): spielt eine Partie bis `minutes` Spielminuten bei 10× Tempo, Blau
+ * und Rot von der KI gesteuert. Die Kamera wechselt reihum zwischen eigener Basis, Front, gegnerischer Stadt, dem größten Gefecht und
+ * dem Fliegerhorst, abwechselnd 2D und Iso und mit wechselndem Zoom; ab und zu gehen Ressourcen- und Forschungsfenster auf und zu.
+ * Prüft Browserfehler, stehende Spielzeit (Einfrieren der Simulation) und stehende Bildschleife (Einfrieren des Zeichnens) sowie das
+ * langsamste Einzelbild. Je 5 Spielminuten eine Zeile (log), alle 10 Spielminuten ein Foto. Ergebnis: { lines, errors, freezes, shots }.
+ */
+export async function longRun({ minutes = 20, log = () => {}, ...opts } = {}) {
+  const g = await openGame(opts);
+  const { page } = g;
+  const freezes = [];
+  const lines = [];
+  const shots = [];
+  const say = (t) => {
+    lines.push(t);
+    log(t);
+  };
+  try {
+    // Blau mit KI (dasselbe Modul wie im Spiel), Bildzähler im Browser, 10× Tempo
+    await g.run(async () => {
+      const { AI } = await import('/frontline/js/ai/ai.js');
+      const s = window.__frontline.session();
+      const blue = new AI(s.game, 0, 'normal');
+      const step = s.game.update.bind(s.game);
+      s.game.update = (dt) => {
+        blue.update(dt);
+        step(dt);
+      };
+      s.loop.speed = 10;
+      const w = (window.__long = { frames: 0, worst: 0, last: 0, since: 0 });
+      const tick = (t) => {
+        if (w.last) w.worst = Math.max(w.worst, t - w.last);
+        w.last = t;
+        w.frames++;
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    // Ziele der Kamera (im Browser bestimmt, je Durchgang neu)
+    const aim = (k) =>
+      g.run((k) => {
+        const s = window.__frontline.session();
+        const game = s.game;
+        const alive = game.units.filter((u) => u.alive);
+        const p = [
+          () => game.mainFob(0),
+          () => game.zone,
+          () => game.mainFob(1),
+          () => {
+            // größtes Gefecht: Einheit mit den meisten Gegnern in 500 px
+            let best = null;
+            let bn = 0;
+            for (let i = 0; i < alive.length; i += 3) {
+              const u = alive[i];
+              const n = alive.filter((e) => e.team !== u.team && Math.abs(e.x - u.x) < 500 && Math.abs(e.y - u.y) < 500).length;
+              if (n > bn) {
+                bn = n;
+                best = u;
+              }
+            }
+            return best;
+          },
+          () => [...(game.city?.[k % 2]?.ents.values() ?? [])].find((e) => e.produces?.includes?.('f16')) ?? game.mainFob(k % 2),
+        ][k % 5]() ?? game.zone;
+        s.camera.x = p.x;
+        s.camera.y = p.y;
+        s.camera.zoom = [0.6, 1, 1.6][k % 3];
+        const iso = Math.floor(k / 5) % 2 === 1;
+        if (s.camera.iso !== iso) document.querySelector('[data-act=view]')?.click();
+        // ab und zu Fenster auf und zu (Ressourcen, Forschung)
+        if (k % 7 === 3) document.querySelector('[data-act=flow]')?.click();
+        if (k % 7 === 4) document.querySelector('[data-act=flow]')?.click();
+        if (k % 11 === 5) document.querySelector('[data-act=research]')?.click();
+        if (k % 11 === 6) document.querySelector('.overlay:not([hidden]) [data-act=close], .research [data-close], [data-rs-close]')?.click();
+        return { t: game.time, units: alive.length, winner: game.winner ?? null };
+      }, k);
+    const stats = () => g.run(() => ({ t: window.__frontline.session().game.time, frames: window.__long.frames, worst: window.__long.worst }));
+    const reset = () => g.run(() => Object.assign(window.__long, { worst: 0 }));
+    const realCap = Date.now() + minutes * 60 * 1000 + 120000; // langsamer als Echtzeit (Spielminute je Minute): Abbruch mit Meldung
+    let k = 0;
+    let lastT = -1;
+    let lastFrames = -1;
+    let stuckT = 0;
+    let stuckF = 0;
+    let nextLine = 5;
+    let nextShot = 10;
+    let f0 = await stats();
+    let wall0 = Date.now();
+    while (true) {
+      const info = await aim(k++);
+      await page.waitForTimeout(3000);
+      const st = await stats();
+      // Einfrieren: Spielzeit oder Bildzähler steht über mehrere Durchgänge
+      stuckT = st.t <= lastT ? stuckT + 1 : 0;
+      stuckF = st.frames <= lastFrames ? stuckF + 1 : 0;
+      if (stuckT === 3) freezes.push(`Spielzeit steht bei ${st.t.toFixed(0)} s`);
+      if (stuckF === 3) freezes.push(`Bildschleife steht bei ${st.t.toFixed(0)} s`);
+      lastT = st.t;
+      lastFrames = st.frames;
+      if (st.t / 60 >= nextLine || info.winner !== null || st.t / 60 >= minutes) {
+        const fps = ((st.frames - f0.frames) * 1000) / Math.max(1, Date.now() - wall0);
+        say(`${(st.t / 60).toFixed(0).padStart(3)} min · Einheiten ${info.units} · ${fps.toFixed(1)} fps · langsamstes Bild ${st.worst.toFixed(0)} ms · Fehler ${g.errors.length}`);
+        nextLine += 5;
+        f0 = st;
+        wall0 = Date.now();
+        await reset();
+      }
+      if (st.t / 60 >= nextShot) {
+        // Fenster zu, damit das Foto die Karte zeigt
+        await g.run(() => {
+          if (document.body.classList.contains('flow-open')) document.querySelector('[data-fl-close]')?.click();
+          document.querySelector('[data-rs-close]')?.offsetParent && document.querySelector('[data-rs-close]').click();
+        });
+        await page.waitForTimeout(300);
+        const name = `long-${String(nextShot).padStart(2, '0')}min`;
+        await g.shot(name);
+        shots.push(name);
+        nextShot += 10;
+      }
+      if (info.winner !== null) {
+        say(`Partie entschieden: Sieger Team ${info.winner}`);
+        break;
+      }
+      if (st.t / 60 >= minutes || freezes.length) break;
+      if (Date.now() > realCap) {
+        freezes.push(`zu langsam: nach der Zeitgrenze erst ${(st.t / 60).toFixed(1)} von ${minutes} Spielminuten`);
+        break;
+      }
+    }
+  } finally {
+    await g.close();
+  }
+  return { lines, errors: g.errors, freezes, shots };
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const arg = (k, d) => {
     const i = process.argv.indexOf(`--${k}`);
@@ -259,6 +395,22 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const dev = arg('device', 'desktop');
   const list = dev === 'all' ? Object.keys(DEVICES) : [dev];
   let fail = false;
+  const li = process.argv.indexOf('--long');
+  if (li > 0) {
+    // Langer Lauf: --long [Spielminuten] (Standard 20), je Gerät
+    const minutes = Number(process.argv[li + 1]) > 0 ? Number(process.argv[li + 1]) : 20;
+    for (const device of list) {
+      const out = join(base, device);
+      const p = device.padEnd(7);
+      const r = await longRun({ minutes, seed: Number(arg('seed', 3)), out, scale: Number(arg('scale', 1)), query: arg('query', ''), device, log: (t) => console.log(`${p} ${t}`) });
+      for (const f of r.freezes) console.log(`${p} EINGEFROREN: ${f}`);
+      for (const e of r.errors) console.log(`${p} Browserfehler: ${e}`);
+      console.log(`${p} ${r.freezes.length || r.errors.length ? 'FEHL' : 'ok  '} langer Lauf, Fotos: ${r.shots.join(', ') || '–'}`);
+      fail ||= r.freezes.length > 0 || r.errors.length > 0;
+    }
+    console.log(`Bilder in ${base}/<gerät>/`);
+    process.exit(fail ? 1 : 0);
+  }
   for (const device of list) {
     const out = join(base, device);
     const { steps, errors, fps, notes } = await smoke({ seed: Number(arg('seed', 3)), out, scale: Number(arg('scale', 1)), query: arg('query', ''), device });
