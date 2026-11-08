@@ -77,8 +77,8 @@ test('Festungsbefehl: Ring mit Toren und Türmen um die FOB', () => {
   assert.equal(r.ok, true, r.reason);
   const mine = g.buildings.filter((b) => b.team === 0);
   assert.equal(mine.filter((b) => b.type === 'tower').length, BALANCE.fortress.towers);
-  assert.equal(mine.filter((b) => b.type === 'gate').length, 4);
-  assert.ok(mine.filter((b) => b.type === 'wall').length >= 20);
+  assert.equal(mine.filter((b) => b.type === 'gate').length, 8); // 4 Tore je 2 Hälften
+  assert.ok(mine.filter((b) => b.type === 'wall').length >= 16); // Ring minus 4 Tore (je 2 Felder) und Türme
   // zweiter Aufruf ergänzt nichts Doppeltes
   const n = g.buildings.length;
   g.issue(0, { type: 'fortify', buildingId: fob.id });

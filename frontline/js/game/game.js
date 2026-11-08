@@ -133,6 +133,7 @@ export function newStats() {
   return { trained: 0, lost: 0, kills: 0, buildingsLost: 0, buildingsKilled: 0, peakUnits: 0 };
 }
 
+const NO_GATE_ROOM = 'Kein Platz für ein Tor (2 Felder)';
 const NO_CARRIED = 'Zu wenig getragenes Baumaterial (Soldaten laden es in einer FOB)';
 const ONE_COMMANDER = 'Nur ein Kommandeur je Team';
 
@@ -508,9 +509,13 @@ export class Game {
   }
 
   /** Gebäude an Zelle (cx, cy) anlegen und Fußabdruck belegen. Ohne Kostenprüfung (für Befehle und Tests). */
-  spawnBuilding(type, team, cx, cy, { built = true, main = false, payerId = null } = {}) {
+  spawnBuilding(type, team, cx, cy, { built = true, main = false, payerId = null, leaf = null, axis = null } = {}) {
     const id = this.newId();
     const b = createBuilding(id, type, team, cx, cy, TILE);
+    if (leaf !== null) {
+      b.leaf = leaf; // Tor (2 Felder): 0 = Hälfte bei kleinerem x bzw. y, 1 = die andere
+      b.axis = axis; // 'x' oder 'y': Richtung des Paars (ältere Tore ohne leaf sind Einzelfelder)
+    }
     if (main) {
       b.main = true;
       b.infinite = true;
@@ -766,6 +771,14 @@ export class Game {
     const pick = this.pickBuilders(team, cmd.ids, cmd.building);
     if (pick.reason) return fail(pick.reason);
     const carried = paysCarried(pick.list);
+    if (cmd.building === 'gate') {
+      const c = this.grid.toCell(cmd.x);
+      const r = this.grid.toCell(cmd.y);
+      const res = this.placeGate(team, pick, carried, c, r, cmd.axis === 'x' || cmd.axis === 'y' ? cmd.axis : this.gateAxis(team, c, r), true);
+      if (!res.ok) return fail(res.reason);
+      orderBuildSeq(pick.list, res.sites);
+      return { ok: true, id: res.sites[0].id, ids: res.sites.map((b) => b.id) };
+    }
     const p = this.canPlace(team, cmd.building, cmd.x, cmd.y, { carried });
     if (!p.ok) return fail(p.reason);
     if (!this.canAfford(team, def.cost)) return fail(this.missingMoney());
@@ -780,7 +793,100 @@ export class Game {
     return { ok: true, id: b.id };
   }
 
-  /** { type: 'buildWall', building: 'wall'|'gate', ids?, x1, y1, x2, y2 }: Linie, Zelle für Zelle bezahlt. */
+  // ---- Tor aus zwei Hälften ------------------------------------------------------
+
+  /** Richtung eines Tors um Zelle (c, r) ohne Vorgabe: 'y', wenn nur oben/unten Mauer liegt, sonst 'x' (auch ohne Nachbarn). */
+  gateAxis(team, c, r) {
+    const wall = (cc, rr) => this.buildings.some((b) => b.alive && b.team === team && (b.type === 'wall' || b.type === 'gate') && b.cx === cc && b.cy === rr);
+    return !wall(c - 1, r) && !wall(c + 1, r) && (wall(c, r - 1) || wall(c, r + 1)) ? 'y' : 'x';
+  }
+
+  /**
+   * Plätze für ein Tor (2 Felder) um die Zelle (c, r) entlang `axis`: erst (c, c+1), mit `flex` danach (c−1, c).
+   * Liefert { ok, a, b } (canPlace-Ergebnisse der Hälften 0 und 1) oder { ok: false, reason, cells } (cells = die zwei Zellen für die Vorschau).
+   */
+  gateSpots(team, c, r, axis, carried, flex) {
+    const g = this.grid;
+    const dx = axis === 'y' ? 0 : 1;
+    const dy = 1 - dx;
+    const at = (k) => this.canPlace(team, 'gate', g.center(c + k * dx), g.center(r + k * dy), { carried });
+    const anchor = at(0);
+    const cells = [{ cx: c, cy: r }, { cx: c + dx, cy: r + dy }];
+    if (!anchor.ok) return { ok: false, reason: anchor.reason, cells };
+    const next = at(1);
+    if (next.ok) return { ok: true, a: anchor, b: next };
+    const prev = flex ? at(-1) : null;
+    if (prev?.ok) return { ok: true, a: prev, b: anchor };
+    const payerLike = /^(FOB|Außerhalb des Bau|Kein FOB|Zu wenig)/.test(next.reason || '');
+    return { ok: false, reason: payerLike ? next.reason : NO_GATE_ROOM, cells };
+  }
+
+  /** Vorschau eines Tors an Punkt (x, y): { ok, reason, cells: [{ cx, cy, ok }] } (Platz und Zahler, ohne Kasse). */
+  gatePreview(team, x, y, { carried = false } = {}) {
+    const g = this.grid;
+    const c = g.toCell(x);
+    const r = g.toCell(y);
+    const sp = this.gateSpots(team, c, r, this.gateAxis(team, c, r), carried, true);
+    if (sp.ok) return { ok: true, reason: null, cells: [{ cx: sp.a.cx, cy: sp.a.cy, ok: true }, { cx: sp.b.cx, cy: sp.b.cy, ok: true }] };
+    return { ok: false, reason: sp.reason, cells: sp.cells.map((q) => ({ ...q, ok: false })) };
+  }
+
+  /** Ein Tor (zwei Hälften nebeneinander) setzen und zweimal bezahlen. Liefert { ok, sites } oder { ok: false, reason }. */
+  placeGate(team, pick, carried, c, r, axis, flex) {
+    const def = BUILDINGS.gate;
+    const sp = this.gateSpots(team, c, r, axis, carried, flex);
+    if (!sp.ok) return sp;
+    const cost2 = {};
+    for (const k of Object.keys(def.cost)) cost2[k] = def.cost[k] * 2;
+    if (!this.canAfford(team, cost2)) return { ok: false, reason: this.missingMoney() };
+    if (carried && carriedBm(pick.list) < (cost2.bm || 0)) return { ok: false, reason: NO_CARRIED };
+    if (sp.a.payer && sp.b.payer && sp.a.payer.id === sp.b.payer.id) {
+      const e = this.getEntity(sp.a.payer.id);
+      if (!covers(e.kind === 'building' ? e.store : e.cargo, cost2)) return { ok: false, reason: this.stockReason(team, sp.a.x, sp.a.y, cost2) };
+    }
+    const sites = [];
+    [sp.a, sp.b].forEach((p, leaf) => {
+      this.pay(team, def.cost);
+      const payer = p.payer ? this.getEntity(p.payer.id) : null;
+      if (payer) takeStock(payer, def.cost);
+      else if (carried) takeCarried(pick.list, def.cost.bm || 0);
+      sites.push(this.spawnBuilding('gate', team, p.cx, p.cy, { built: false, payerId: payer ? payer.id : null, leaf, axis }));
+    });
+    return { ok: true, sites };
+  }
+
+  /** Torlinie: je zwei Zellen ein Tor (Richtung = längere Seite der Linie); ein einzelner Punkt wählt Richtung und freie Seite selbst. */
+  cmdBuildGateLine(team, pick, carried, c0, r0, c1, r1) {
+    const g = this.grid;
+    const axis = Math.abs(c1 - c0) >= Math.abs(r1 - r0) ? 'x' : 'y';
+    const n = (axis === 'x' ? Math.abs(c1 - c0) : Math.abs(r1 - r0)) + 1;
+    const sites = [];
+    let reason = 'Keine Zelle baubar';
+    if (n === 1) {
+      const res = this.placeGate(team, pick, carried, c0, r0, this.gateAxis(team, c0, r0), true);
+      if (res.ok) sites.push(...res.sites);
+      else reason = res.reason;
+    } else {
+      const step = (axis === 'x' ? c1 > c0 : r1 > r0) ? 1 : -1;
+      for (let i = 0; i + 1 < n; i += 2) {
+        // erste Zelle des Paars in Zugrichtung; Hälfte 0 liegt immer bei der kleineren Zelle
+        const k = step > 0 ? i : i + 1;
+        const c = axis === 'x' ? c0 + step * k : c0;
+        const r = axis === 'x' ? r0 : r0 + step * k;
+        const res = this.placeGate(team, pick, carried, c, r, axis, false);
+        if (res.ok) sites.push(...res.sites);
+        else {
+          reason = res.reason;
+          if (reason === this.missingMoney() || reason === NO_CARRIED) break;
+        }
+      }
+    }
+    if (!sites.length) return fail(reason);
+    if (pick.list.length) orderBuildSeq(pick.list, sites);
+    return { ok: true, count: sites.length };
+  }
+
+  /** { type: 'buildWall', building: 'wall'|'gate', ids?, x1, y1, x2, y2 }: Linie, Zelle für Zelle bezahlt (Tor: je 2 Zellen ein Tor, 2 × Kosten). */
   cmdBuildWall(team, cmd) {
     if (cmd.building !== 'wall' && cmd.building !== 'gate') return fail('Nur Mauer oder Tor als Linie');
     const def = BUILDINGS[cmd.building];
@@ -798,6 +904,7 @@ export class Game {
     const sites = [];
     const carried = paysCarried(pick.list);
     let lastReason = 'Keine Zelle baubar';
+    if (cmd.building === 'gate') return this.cmdBuildGateLine(team, pick, carried, c0, r0, c1, r1);
     for (const [c, r] of cells) {
       const p = this.canPlace(team, cmd.building, g.center(c), g.center(r), { carried });
       if (!p.ok) {

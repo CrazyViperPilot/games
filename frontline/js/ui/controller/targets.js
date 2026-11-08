@@ -300,6 +300,11 @@ export const targetMethods = {
   },
 
   placementFor(type, wx, wy) {
+    if (type === 'gate') {
+      // Tor: zwei Felder nebeneinander (Richtung nach den Nachbarmauern), Vorschau zeigt beide
+      const q = this.game.gatePreview(this.team, wx, wy, { carried: this.carriedFor(type) });
+      return { type, x: wx, y: wy, ok: q.ok, reason: q.reason, payer: null, cells: q.cells };
+    }
     const p = this.game.canPlace(this.team, type, wx, wy, { carried: this.carriedFor(type) });
     return {
       type,

@@ -565,6 +565,83 @@ function gate(g, T, along) {
   bx(10.6, 16.4, -4, 4, H, H + 1.6, T, snowy(T));
 }
 
+// Tor aus zwei Hälften (2 Felder breit): jede Hälfte malt ihren äußeren Betonpfeiler, einen schweren Stahlflügel und ihr Stück des
+// Querträgers; die Mitte des Tors bildet ein Riegelbalken, den beide Hälften je zur Hälfte malen.
+const STEEL = '#3f4852';
+const STEEL_HI = '#6c7883';
+const STEEL_DK = '#2b3138';
+const WARN = '#e3b422';
+const PIL_H = 31; // Betonpfeiler (höher als die Mauer)
+const LEAF_TOP = 24; // Oberkante des Flügels
+const LEAF_A0 = -8.6; // Flügel und Träger beginnen am Pfeiler (a = −16 … −8,6) und reichen bis zur Torfuge (a = 16)
+
+/** Tor-Hälfte (1 × 1) mit Partner: along = 'u'/'v' (Richtung des Paars), sgn = +1, wenn die andere Hälfte bei +u bzw. +v liegt. */
+function gateLeaf(g, T, along, sgn) {
+  const U = along === 'u';
+  const A = (a) => sgn * a;
+  const { P, ctx } = g;
+  const bx = (a0, a1, c0, c1, h0, h1, col, top) => {
+    const x0 = Math.min(A(a0), A(a1));
+    const x1 = Math.max(A(a0), A(a1));
+    if (U) box(g, x0, x1, c0, c1, h0, h1, col, top);
+    else box(g, c0, c1, x0, x1, h0, h1, col, top);
+  };
+  const Q = U ? (a, c, h) => P(A(a), c, h) : (a, c, h) => P(c, A(a), h);
+  const pq = (pts, fill) => poly(g, pts.map(([a, c, h]) => Q(a, c, h)), fill, null);
+  const pillar = () => {
+    bx(-16.6, -7.8, -4.8, 4.8, 0, 2, shade(CONC, 0.1), snowy(shade(CONC, 0.04)));
+    bx(-16, -8.4, -4.2, 4.2, 2, PIL_H, CONC, snowy(tint(CONC, 0.12)));
+    const x0 = Math.min(A(-16), A(-8.4));
+    const x1 = Math.max(A(-16), A(-8.4));
+    if (U) wallBand(g, x0, x1, -4.2, 4.2, PIL_H - 8, PIL_H - 6.2, T);
+    else wallBand(g, -4.2, 4.2, x0, x1, PIL_H - 8, PIL_H - 6.2, T);
+    if (g.fine) for (const h of [9, 17, 25]) stroke(g, [Q(-16, 4.2, h), Q(-8.4, 4.2, h)], 'rgba(0,0,0,0.16)', 0.4);
+    bx(-16.6, -7.8, -4.8, 4.8, PIL_H, PIL_H + 1.8, T, snowy(T));
+    bx(-13.6, -10.8, -1.4, 1.4, PIL_H + 1.8, PIL_H + 4.4, '#e69a1e', '#ffd36a'); // Warnleuchte
+  };
+  const lo = Math.min(A(-16), A(16));
+  const hi = Math.max(A(-16), A(16));
+  if (U) flat(g, lo, hi, -4, 4 + 6.8, 'rgba(0,0,0,0.16)');
+  else flat(g, -4, 4 + 6.8, lo, hi, 'rgba(0,0,0,0.16)');
+  if (sgn > 0) pillar();
+  // Stahlflügel: dicker Körper, Rahmen, zwei Felder mit Kreuzverstrebung, Warnstreifen unten, Nieten
+  bx(LEAF_A0, 16, -1.4, 1.4, 1.2, LEAF_TOP, STEEL, snowy(STEEL_HI));
+  const f = 1.4; // Vorderseite (c = +f)
+  const a0 = LEAF_A0 + 0.6;
+  const a1 = 15.2;
+  pq([[a0, f, 5.6], [a1, f, 5.6], [a1, f, 1.6], [a0, f, 1.6]], '#1c1e22');
+  for (let a = a0; a + 4.2 <= a1 + 0.01; a += 4.2) pq([[a, f, 1.6], [a + 2.1, f, 1.6], [a + 4.2, f, 5.6], [a + 2.1, f, 5.6]], WARN);
+  const hm = 14.4;
+  for (const [h0, h1] of [[6.4, hm - 0.7], [hm + 0.7, LEAF_TOP - 1.2]]) {
+    pq([[a0, f + 0.05, h0], [a1, f + 0.05, h0], [a1, f + 0.05, h1], [a0, f + 0.05, h1]], 'rgba(20,26,32,0.38)');
+    stroke(g, [Q(a0, f, h0), Q(a1, f, h0), Q(a1, f, h1), Q(a0, f, h1), Q(a0, f, h0)], STEEL_HI, 0.8);
+    stroke(g, [Q(a0, f, h0), Q(a1, f, h1)], '#59646f', 0.9);
+    stroke(g, [Q(a0, f, h1), Q(a1, f, h0)], '#59646f', 0.9);
+    stroke(g, [Q(a0, f, h0), Q(a1, f, h1)], 'rgba(255,255,255,0.12)', 0.3);
+  }
+  stroke(g, [Q(LEAF_A0, f, hm), Q(16, f, hm)], STEEL_HI, 1);
+  stroke(g, [Q(LEAF_A0 + 0.2, f, 1.4), Q(LEAF_A0 + 0.2, f, LEAF_TOP)], STEEL_HI, 1.1);
+  if (g.fine) {
+    const rv = g.z * 0.42;
+    for (const h of [6.4 - 0.9, hm - 0.7 - 0.9, hm + 0.7 + 0.9, LEAF_TOP - 0.55]) {
+      for (let a = a0 + 1.2; a < a1; a += 3.4) {
+        const [x, y] = Q(a, f, h);
+        circle(ctx, x, y, rv, '#8d98a2');
+      }
+    }
+  }
+  // Torlauf: Laufrolle unten an der Fuge
+  bx(14.4, 16, -1.8, 1.8, 0, 2.6, STEEL_DK);
+  // Riegelbalken in der Mitte (halbe Breite je Hälfte)
+  bx(14.8, 16, -1.9, 1.9, 2.6, LEAF_TOP, STEEL_DK, STEEL);
+  // Querträger über dem Tor: Stahlkasten mit Warnband
+  bx(LEAF_A0, 16, -2.7, 2.7, LEAF_TOP, LEAF_TOP + 4.4, STEEL_DK, snowy(STEEL));
+  const c2 = 2.7;
+  pq([[LEAF_A0, c2, LEAF_TOP + 1.1], [16, c2, LEAF_TOP + 1.1], [16, c2, LEAF_TOP + 3.3], [LEAF_A0, c2, LEAF_TOP + 3.3]], '#1c1e22');
+  for (let a = LEAF_A0 + 0.4; a + 3.2 <= 16.01; a += 3.2) pq([[a, c2, LEAF_TOP + 1.1], [a + 1.6, c2, LEAF_TOP + 1.1], [a + 3.2, c2, LEAF_TOP + 3.3], [a + 1.6, c2, LEAF_TOP + 3.3]], WARN);
+  if (sgn < 0) pillar();
+}
+
 /** Baustelle: aufgewühlter Boden, Bauzaun, wachsender Rohbau mit Gerüst, Baustoffe; p = Fortschritt 0 … 1 (gestuft). */
 function site(g, T, type, w, p) {
   const e = w * 16 - 2;
@@ -940,6 +1017,40 @@ function gateTop(c, T, along) {
   c.restore();
 }
 
+/** Tor-Hälfte von oben (siehe gateLeaf): Pfeiler mit Kappe, Stahlflügel in einem Rahmen aus zwei Trägern mit Verstrebung und Warnmitte. */
+function gateLeafTop(c, T, along, sgn) {
+  const U = along === 'u';
+  const A = (a) => sgn * a;
+  const rect = (a0, c0, a1, c1, fill, line, w) => {
+    const x0 = Math.min(A(a0), A(a1));
+    const x1 = Math.max(A(a0), A(a1));
+    if (U) rectS(c, x0, c0, x1, c1, fill, line, w);
+    else rectS(c, c0, x0, c1, x1, fill, line, w);
+  };
+  const L = (pts, col, w) => lineT(c, pts.map(([a, k]) => (U ? [A(a), k] : [k, A(a)])), col, w);
+  const sh = (a0, c0, a1, c1, h) => {
+    const x0 = Math.min(A(a0), A(a1));
+    const x1 = Math.max(A(a0), A(a1));
+    if (U) shadowTop(c, x0, c0, x1, c1, h);
+    else shadowTop(c, c0, x0, c1, x1, h);
+  };
+  sh(-16, -4.2, -8.4, 4.2, PIL_H);
+  sh(LEAF_A0, -2.7, 16, 2.7, LEAF_TOP);
+  rect(LEAF_A0, -2.7, 16, 2.7, STEEL, 'rgba(0,0,0,0.5)', 0.4);
+  rect(LEAF_A0 + 0.6, -1.5, 15.4, 1.5, '#4d5762', 'rgba(0,0,0,0.35)', 0.3);
+  for (let a = LEAF_A0 + 0.6; a < 15.4; a += 4) L([[a, -2.7], [a, 2.7]], STEEL_DK, 0.7); // Querstreben
+  L([[LEAF_A0 + 0.6, -1.5], [15.4, 1.5]], '#6c7883', 0.5);
+  L([[LEAF_A0 + 0.6, 1.5], [15.4, -1.5]], '#6c7883', 0.5);
+  c.save();
+  c.setLineDash([1.6, 1.6]);
+  L([[LEAF_A0 + 0.6, 0], [16, 0]], WARN, 0.9);
+  c.restore();
+  rect(14.8, -2.7, 16, 2.7, STEEL_DK, 'rgba(0,0,0,0.5)', 0.3);
+  rect(-16.4, -4.6, -8, 4.6, tint(CONC, 0.12), 'rgba(0,0,0,0.4)', 0.4);
+  rect(-14.4, -2.8, -10, 2.8, T, 'rgba(0,0,0,0.45)', 0.35);
+  rect(-13, -1.2, -11.4, 1.2, '#e69a1e', 'rgba(0,0,0,0.3)', 0.2);
+}
+
 function siteTop(c, T, type, w, p) {
   const e = w * 16 - 2;
   rectF(c, -e, -e, e, e, '#8f846f');
@@ -981,11 +1092,17 @@ function siteTop(c, T, type, w, p) {
 
 const ROT = [[1, 0, 0, 1], [0, -1, 1, 0], [-1, 0, 0, -1], [0, 1, -1, 0]]; // wie camera.js
 let walls = new Set(); // "cx,cy" aller Mauern und Tore, vom Renderer je Bild gesetzt
+let leafGates = new Set(); // "cx,cy" der Torhälften (leaf gesetzt), für die Frage, ob die andere Hälfte steht
 
 /** Mauern und Tore merken (je Bild, für die Verbindungen zu den Nachbarn). */
 export function setMilWalls(list) {
   walls = new Set();
-  for (const b of list) if (b.alive && (b.type === 'wall' || b.type === 'gate')) walls.add(`${b.cx},${b.cy}`);
+  leafGates = new Set();
+  for (const b of list) {
+    if (!b.alive || (b.type !== 'wall' && b.type !== 'gate')) continue;
+    walls.add(`${b.cx},${b.cy}`);
+    if (b.type === 'gate' && b.leaf !== undefined && b.built) leafGates.add(`${b.cx},${b.cy}`);
+  }
 }
 
 /** Nachbarn in örtlicher Richtung (nach Drehung der Ansicht): 1 = +u, 2 = +v, 4 = −u, 8 = −v. */
@@ -1006,6 +1123,18 @@ const siteStep = (b) => Math.max(0, Math.min(8, Math.floor((b.progress || 0) * 8
 function variant(b, rot) {
   if (!b.built) return `s${siteStep(b)}`;
   if (b.type === 'wall') return wallMask(b, rot);
+  if (b.type === 'gate' && b.leaf !== undefined) {
+    // Torhälfte: Partner in örtlicher Richtung (nach Drehung der Ansicht); fehlt er, wird sie wie ein altes Einzeltor gemalt
+    const k = b.leaf === 0 ? 1 : -1;
+    const dx = b.axis === 'y' ? 0 : k;
+    const dy = b.axis === 'y' ? k : 0;
+    if (leafGates.has(`${b.cx + dx},${b.cy + dy}`)) {
+      const [ra, rb, rc, rd] = ROT[rot] ?? ROT[0];
+      const lu = ra * dx + rb * dy;
+      const lv = rc * dx + rd * dy;
+      return lu ? `L${lu > 0 ? 'u+' : 'u-'}` : `L${lv > 0 ? 'v+' : 'v-'}`;
+    }
+  }
   if (b.type === 'gate') {
     const m = wallMask(b, rot);
     return m & 5 || !(m & 10) ? 'u' : 'v';
@@ -1015,7 +1144,7 @@ function variant(b, rot) {
 }
 
 /** Höhe des höchsten Punkts im Iso-Bild über der Gebäudemitte (Weltpixel; gemessen, mit Reserve). */
-const TALL = { fob: 50, wall: 28, gate: 28, mortar: 22, aa: 30, phalanx: 28, tower: 74, radio: 196, drill: 72 };
+const TALL = { fob: 50, wall: 28, gate: 40, mortar: 22, aa: 30, phalanx: 28, tower: 74, radio: 196, drill: 72 };
 const SITE_TALL = (b) => (b.w >= 3 ? 56 : (SITE_H[b.type] ?? 30) + 8);
 
 function paintIsoMil(ctx, s, b, color, v) {
@@ -1034,7 +1163,7 @@ function paintIsoMil(ctx, s, b, color, v) {
     case 'radio': return radio(g, T);
     case 'drill': return drill(g, T);
     case 'wall': return wall(g, T, v);
-    case 'gate': return gate(g, T, v);
+    case 'gate': return v[0] === 'L' ? gateLeaf(g, T, v[1], v[2] === '+' ? 1 : -1) : gate(g, T, v);
   }
 }
 
@@ -1054,7 +1183,7 @@ function paintTopMil(ctx, s, b, color, v) {
     case 'radio': return radioTop(ctx, T);
     case 'drill': return drillTop(ctx, T);
     case 'wall': return wallTop(ctx, T, v);
-    case 'gate': return gateTop(ctx, T, v);
+    case 'gate': return v[0] === 'L' ? gateLeafTop(ctx, T, v[1], v[2] === '+' ? 1 : -1) : gateTop(ctx, T, v);
   }
 }
 

@@ -65,7 +65,7 @@ Verhalten: FOB-Fahrzeuge gründen FOBs (eins zur Zeit, die KI spart darauf, auß
 | Pendler am Werk (seit v5.70) | Werk als Quelle, wenn es höchstens so weit wie die beste FOB-Quelle × `WORK_SOURCE_NEAR` von der Bedarfs-FOB liegt (oder keine FOB Überschuss hat) · KI-LKW je Werk höchstens `WORK_SOURCE_TRUCKS` · Werk liefert, wenn Ausstoß ≥ `WORK_SOURCE_MIN_RATE` (Ware je s) oder Ausgangslager ≥ `SURPLUS_MIN` | 0,5 · 1 · 0,2 je s / 120 |
 | Bedrohung | Reaktionsreichweite / FOB-Gefahrenradius | 900 px / 600 px |
 | FOB-Fahrzeug | gleichzeitig (`FOBV_MAX`) / Aufbau-Nähe (`DEPLOY_REACH`) / Neuversuche (`FOBV_RETRY`) / Sperre fehlgeschlagener Orte (`BAD_TIME`) | 1 / 64 px / 3 / 240 s |
-| Mauer | Abstand von der Hauptstadt / halbe Länge / Pause nach fertiger Linie (`WALL_RETRY`) | 4 / 3 Zellen (Tor in der Mitte) / 110 s |
+| Mauer | Abstand von der Hauptstadt / halbe Länge / Pause nach fertiger Linie (`WALL_RETRY`) | 4 / 3 Zellen (Tor aus 2 Feldern in der Mitte) / 110 s |
 | Rückzug (Vorrat) | Einheiten unter diesem Vorratsanteil ziehen sich zurück | 20 % |
 | Häuserkampf | Anteil der Infanterie in der Zone / Umkreis / Takt (`GARRISON_SHARE`, `GARRISON_RANGE`, `GARRISON_EVERY`) | 40 % / 500 px / 8 s |
 | Häuserkampf II (seit v5.67) | Sturm: Takt / Umkreis / Stürmer je Besatzer (`STORM_EVERY`, `STORM_RANGE`, `STORM_RATIO`, Stacheldraht `STORM_WIRE`) / mindestens (`STORM_MIN`) / höchstens (`STORM_MAX`) / auch Infanterie im Angriffsmarsch mit Ziel in der Zone (`STORM_MARCH`) | 8 s / 450 px / 2 (×1,5) / 3 / 8 / ja |

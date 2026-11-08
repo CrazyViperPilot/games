@@ -298,7 +298,8 @@ export const buildMethods = {
       .slice(0, 3)
       .map((u) => u.id);
     // Tor zuerst; danach die Linie – das Torfeld ist dann belegt und wird übersprungen (idempotent)
-    g.issue(t, { type: 'buildWall', building: 'gate', ids, x1: grid.center(gc), y1: grid.center(gr), x2: grid.center(gc), y2: grid.center(gr) });
+    // Tor = 2 Felder entlang der Mauer (senkrechte Mauer: untereinander, sonst nebeneinander)
+    g.issue(t, { type: 'buildWall', building: 'gate', ids, x1: grid.center(gc), y1: grid.center(gr), x2: grid.center(gc + (vertical ? 0 : 1)), y2: grid.center(gr + (vertical ? 1 : 0)) });
     const r = g.issue(t, { type: 'buildWall', building: 'wall', ids, x1, y1, x2, y2 });
     if (!r.ok) this.memo.set('wall', g.time + WALL_RETRY); // Linie steht bereits (oder nichts baubar): lange nicht erneut versuchen
   },

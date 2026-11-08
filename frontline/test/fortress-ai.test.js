@@ -26,7 +26,7 @@ const of = (g, team, type) => g.buildings.filter((b) => b.alive && b.team === te
 test('KI (schwer) baut die Hauptstadt zur Festung aus: Tore, Mauern, Türme mit Besatzung und Aufbau, Hubschrauber [langsam]', () => {
   const { game: g, heli } = play(5, 'hard', 14);
   const towers = of(g, 0, 'tower').filter((b) => b.built);
-  assert.ok(of(g, 0, 'gate').length >= 3, `Tore ${of(g, 0, 'gate').length}`);
+  assert.ok(of(g, 0, 'gate').length >= 6, `Tore ${of(g, 0, 'gate').length}`);
   assert.ok(of(g, 0, 'wall').length >= 20, `Mauern ${of(g, 0, 'wall').length}`);
   assert.ok(towers.length >= 1, 'Türme');
   assert.ok(towers.some((b) => b.occupants.length > 0), 'Besatzung');

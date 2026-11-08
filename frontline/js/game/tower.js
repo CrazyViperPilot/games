@@ -39,7 +39,7 @@ export function cmdRoof(game, team, cmd) {
 }
 
 /**
- * Plan für den Ausbau einer FOB: Mauerring im Abstand `ring` Zellen von der FOB-Mitte, ein Tor in der Mitte jeder Seite,
+ * Plan für den Ausbau einer FOB: Mauerring im Abstand `ring` Zellen von der FOB-Mitte, ein Tor (2 Felder) in der Mitte jeder Seite,
  * `n` Türme an den Ecken, die am nächsten zu (tx, ty) liegen. Alle Angaben in Weltkoordinaten (Zellmitten).
  */
 export function planFortress(game, fob, tx, ty, n) {
@@ -53,7 +53,8 @@ export function planFortress(game, fob, tx, ty, n) {
   corners.sort((a, b) => dist(a.x, a.y, tx, ty) - dist(b.x, b.y, tx, ty));
   return {
     towers: corners.slice(0, n),
-    gates: [[mc, mr - R], [mc, mr + R], [mc - R, mr], [mc + R, mr]].map(([i, j]) => ({ x: c(i), y: c(j) })),
+    // Tor = 2 Felder: Linie über die zwei Zellen entlang der Mauer (Seiten oben/unten waagrecht, links/rechts senkrecht)
+    gates: [[mc, mr - R, 1, 0], [mc, mr + R, 1, 0], [mc - R, mr, 0, 1], [mc + R, mr, 0, 1]].map(([i, j, di, dj]) => ({ x1: c(i), y1: c(j), x2: c(i + di), y2: c(j + dj) })),
     walls: [
       { x1: c(mc - R), y1: c(mr - R), x2: c(mc + R), y2: c(mr - R) },
       { x1: c(mc - R), y1: c(mr + R), x2: c(mc + R), y2: c(mr + R) },
@@ -103,7 +104,7 @@ export function cmdFortify(game, team, cmd) {
     const t = towerAt(t0);
     run({ type: 'build', building: 'tower', x: t.x, y: t.y, ids: eng });
   }
-  for (const q of plan.gates) run({ type: 'buildWall', building: 'gate', ids: fort, x1: q.x, y1: q.y, x2: q.x, y2: q.y });
+  for (const q of plan.gates) run({ type: 'buildWall', building: 'gate', ids: fort, ...q });
   for (const w of plan.walls) run({ type: 'buildWall', building: 'wall', ids: fort, ...w });
   return count ? { ok: true, count } : fail(reason);
 }
