@@ -30,8 +30,24 @@ export function createLoop({ update, render, tickRate = 20 } = {}) {
     },
   };
 
+  // Fehler in update/render: einmal je Meldung in die Konsole, das Spiel läuft weiter (vorher hielt eine Ausnahme die Schleife für
+  // immer an, weil der nächste Frame erst nach render() angefordert wurde)
+  const reported = new Set();
+  const guard = (fn, arg) => {
+    try {
+      fn(arg);
+    } catch (err) {
+      const key = String(err?.stack ?? err);
+      if (!reported.has(key)) {
+        reported.add(key);
+        console.error(err);
+      }
+    }
+  };
+
   function frame(now) {
     if (!loop.running) return;
+    raf = requestAnimationFrame(frame); // vor update/render: ein Fehler darin hält die Schleife nicht an
     // Nach Tab-Wechsel nicht den ganzen Abstand nachholen
     const elapsed = last === null ? 0 : Math.min((now - last) / 1000, 0.25);
     last = now;
@@ -40,7 +56,7 @@ export function createLoop({ update, render, tickRate = 20 } = {}) {
       acc += elapsed * loop.speed;
       let n = 0;
       while (acc >= step && n < MAX_STEPS) {
-        update(step);
+        guard(update, step);
         acc -= step;
         n++;
       }
@@ -48,8 +64,7 @@ export function createLoop({ update, render, tickRate = 20 } = {}) {
       if (acc > step) acc = step;
     }
 
-    render();
-    raf = requestAnimationFrame(frame);
+    guard(render);
   }
 
   return loop;
