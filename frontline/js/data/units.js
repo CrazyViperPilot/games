@@ -338,6 +338,33 @@ export const UNITS = {
     fuelMax: 55, // Sekunden Flug wie die F-16 (Reichweite ≈ speed × fuelMax)
     hotkey: 'I', // im Stellplatz-Menü frei (I = Einsteigen nur bei gewählten Soldaten, U Ausbauen, K F-16)
   },
+  // Kampfflugzeug Su-27 (Paket „Su-27“, PRD §6 „Su-27“): wie die F-16 (gleiche zwei Waffen, parallel, gleiche Schäden und Munition),
+  // aber etwas schneller und mit größerer Reichweite (Reichweite ≈ speed × fuelMax: 450 × 75 gegen 420 × 55). Nur mit Stadt, am Stellplatz
+  // des Fliegerhorsts (CITY.produces.stand, Plätze CITY.air.standJets teilen sich F-16, F-22 und Su-27). Die KI baut sie nicht.
+  su27: {
+    name: 'Su-27',
+    short: 'Su-27', // Kurzname in der Befehlskarte
+    slots: 3,
+    armor: 'air',
+    air: true,
+    jet: true,
+    hp: 480,
+    speed: 450,
+    radius: 15,
+    sight: 560,
+    // Zwei Waffen, die unabhängig feuern (wie die F-16): Luft-Luft-Lenkraketen nur gegen Hubschrauber und Flugzeuge,
+    // Luft-Boden-Raketen gegen gepanzerte Fahrzeuge (bevorzugt) und Gebäude. Leer geschossen (alle vier) fliegt sie heim.
+    parallel: true,
+    weapons: [
+      { id: 'aim', name: 'Luft-Luft-Lenkrakete', range: 640, cooldown: 2.5, rounds: 2, munCost: 150, hitChance: 0.92, targets: ['air'], damage: { air: 700 } },
+      { id: 'agm', name: 'Luft-Boden-Rakete', range: 600, cooldown: 2.5, rounds: 2, munCost: 150, hitChance: 0.92, targets: ['heavy', 'light'], damage: { inf: 160, light: 650, heavy: 1150, struct: 700 } },
+    ],
+    cost: { money: 1600 },
+    buildTime: 45,
+    fuelPerSec: 1,
+    fuelMax: 75, // Sekunden Flug (fuelPerSec 1, auch beim Kreisen): 75 statt 55 der F-16 (Reichweite ≈ speed × fuelMax)
+    hotkey: 'S', // im Stellplatz-Menü frei (K F-16, I F-22, O U-2, W Staffel, U Ausbauen)
+  },
   // U-2 (Höhenaufklärer, seit v5.83): unbewaffnet, fliegt sehr hoch. In der Luft sieht sie weit (airSight), und nur Waffen mit
   // antiHighAlt (die F-22) können sie treffen (highAlt, combat.js); am Boden ist sie wie ein Jet verwundbar. Sie belegt einen
   // ganzen Stellplatz allein (standSlots, aircraft.js), Kreisen und Heimflug wie die Jets; ohne Waffen fliegt sie nicht „leer“ heim.

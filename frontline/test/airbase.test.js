@@ -554,3 +554,49 @@ test('F-16 und F-22 teilen sich die Plätze eines Stellplatzes: zusammen höchst
   assert.equal(r2.ok, false, 'auch eine F-16 passt nicht mehr dazu');
   assert.equal(freeSpace(g, s), 0);
 });
+
+test('Su-27: Werte wie die F-16 (gleiche Waffen, parallel), aber schneller und mit größerer Reichweite; Taste frei', () => {
+  const su = UNITS.su27;
+  const f16 = UNITS.f16;
+  assert.ok(su.speed > f16.speed, `schneller: ${su.speed} gegen ${f16.speed}`);
+  assert.ok(su.fuelMax > f16.fuelMax, 'mehr Treibstoff');
+  assert.ok(su.speed * su.fuelMax > f16.speed * f16.fuelMax, 'größere Reichweite (speed × fuelMax)');
+  assert.deepEqual([su.hp, su.radius, su.sight, su.cost.money, su.buildTime], [480, 15, 560, 1600, 45]);
+  assert.equal(su.jet, true);
+  assert.equal(su.parallel, true, 'zwei Waffen feuern unabhängig, wie die F-16');
+  assert.deepEqual(su.weapons, f16.weapons, 'gleiche Waffen, Schäden und Munition wie die F-16');
+  assert.ok(!['K', 'I', 'O', 'U', 'W', 'Y'].includes(su.hotkey), `Taste ${su.hotkey} im Stellplatz-Menü frei`);
+  assert.ok(CITY.produces.stand.includes('su27'), 'am Stellplatz ausbildbar');
+  assert.equal(CITY.crew.su27, 2, 'zwei Einwohner wie die F-16');
+  assert.equal(CITY.metalCost.su27, CITY.metalCost.f16, 'Stahl wie die F-16');
+});
+
+test('Su-27 am Stellplatz: ausbildbar, steht auf dem Platz, hebt ab und fliegt los', () => {
+  const g = new Game({ seed: 3, city: true });
+  const { stands } = airbase(g);
+  const [s] = stands;
+  assert.ok(g.issue(0, { type: 'train', buildingId: s.id, unit: 'su27' }).ok, 'Su-27 ausbildbar');
+  for (let k = 0; k < 600 && !g.units.some((x) => x.def === UNITS.su27); k++) run(g, 1); // Stahl und Weg zum Lager wie bei der F-22
+  const [u] = g.units.filter((x) => x.def === UNITS.su27);
+  assert.ok(u, 'Su-27 gebaut');
+  assert.ok(u.parked && u.jet.home === s.id, 'steht auf dem Stellplatz');
+  assert.equal(u.weapons.length, 2, 'zwei Waffen');
+  const z = g.zone;
+  const [x0, y0] = [u.x, u.y];
+  g.fog[0].revealAll?.();
+  assert.ok(g.issue(0, { type: 'attackMove', ids: [u.id], x: z.x, y: z.y }).ok, 'Startbefehl');
+  for (let t = 0; t < 60 && u.jet.phase !== 'air'; t += DT) run(g, DT);
+  assert.equal(u.jet.phase, 'air', 'hebt ab');
+  assert.ok(u.x !== x0 || u.y !== y0, 'fliegt los');
+});
+
+test('Su-27 und F-16 teilen sich die zwei Plätze eines Stellplatzes', () => {
+  const g = new Game({ seed: 3, city: true });
+  const { stands } = airbase(g);
+  const [s] = stands;
+  assert.ok(g.issue(0, { type: 'train', buildingId: s.id, unit: 'su27' }).ok, 'erste Su-27');
+  assert.ok(g.issue(0, { type: 'train', buildingId: s.id, unit: 'f16' }).ok, 'F-16 teilt sich den Stellplatz');
+  const r = g.issue(0, { type: 'train', buildingId: s.id, unit: 'su27' });
+  assert.equal(r.ok, false, 'dritter Jet abgelehnt');
+  assert.match(r.reason, /Stellplatz belegt/);
+});
