@@ -3,6 +3,7 @@
 > Neueste Version oben. Gehört zum PRD ([PRD.md](../PRD.md)). Nicht von Hand bearbeiten: Einträge kommen als Datei nach
 > [docs/changes/](changes/README.md), `npm run release` trägt sie mit Version und Cache-Version hier ein (Regel 7 in [CLAUDE.md](../CLAUDE.md)).
 
+- v5.116: **KI baut wieder Stellplätze**: Sie legte die Startbahn manchmal außerhalb ihres Gebiets an, wo nie ein Stellplatz entstehen konnte, und wartete dann ewig. Jetzt prüft sie vorher die Stellplatz-Stelle, baut notfalls einen zweiten Fliegerhorst und versucht bei einem Fehlschlag die nächste Stelle. Cache v224.
 - v5.115: **Tor 2 Felder breit** (§5 „Tor“, §5 Festung): Ein Tor besteht jetzt aus zwei Hälften nebeneinander (50 Baumaterial), sieht mit Betonpfeilern, schweren Stahltorflügeln mit Kreuzverstrebung und Warnstreifen und einem Querträger wie ein Tor aus und passt sich der Mauerrichtung an; die KI-Mauer und die Festung bauen ihre Tore ebenfalls zweifeldrig, ältere 1×1-Tore bleiben Einzeltore. Cache v223.
 - v5.114: **Markt: ×10 und ×100**: Neben Verkaufen und Kaufen handeln zwei Knöpfe 10 bzw. 100 Lose mit einem Klick (so viele, wie Geld, Bestand und Lager erlauben). Cache v222.
 - v5.113: **Mauerzug mit sehr weit entfernten Punkten**: wird jetzt sofort abgelehnt, statt den Speicher zu füllen (gefunden vom Zufallstest). Cache v221.

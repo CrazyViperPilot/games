@@ -268,6 +268,7 @@ export const CITY = {
     airportReach: 60, // so viele Zellen um die Hauptstadt sucht sie Platz für die Bahn mit ihren Bauten (runwayLen × 4 Zellen plus Rand)
     airportMoney: 900, // Geld über der Reserve, ab dem sie den Fliegerhorst anlegt
     airportBm: 800, // … und Baumaterial im Lager der Hauptstadt
+    airportMax: 2, // höchstens so viele Bahnen: einen zweiten Fliegerhorst nur, wenn am ersten nie ein Stellplatz entstehen kann (Notausgang, aiAirport)
     runwayLen: 10, // Länge (Zellen) der Bahn, die sie anlegt
     standBuffer: 100, // Baumaterial, das nach einem weiteren Stellplatz im Lager der Hauptstadt bleiben muss
     upgradeBuffer: { bm: 200, steel: 200 }, // Baumaterial und Stahl, die nach dem Ausbau eines Stellplatzes bleiben müssen (Geld: CITY.air.upgradeAiReserve)

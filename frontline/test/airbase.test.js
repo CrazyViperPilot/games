@@ -5,7 +5,7 @@ import { Game } from '../js/game/game.js';
 import { CITY } from '../js/data/city.js';
 import { BALANCE } from '../js/data/balance.js';
 import { UNITS } from '../js/data/units.js';
-import { canZone, roadAt } from '../js/game/city/cells.js';
+import { canZone, roadAt, buildWhy } from '../js/game/city/cells.js';
 import { KINDS, KIND_ID } from '../js/data/citykinds.js';
 import { connectRoad } from '../js/game/city/roadnet.js';
 import { isFoe } from '../js/game/entities.js';
@@ -300,6 +300,33 @@ test('KI baut einen Fliegerhorst mit gültiger Bahn, Stellplätzen, Tower, Keros
   const kinds = new Set(c.list.map((i) => kindAt(c, i)));
   for (const k of ['stand', 'atc', 'ktank', 'mdepot']) assert.ok(kinds.has(k), `KI baut ${k}`);
   assert.ok(standsOf(g, 1).some((s) => standRoute(g, s)), 'Stellplatz mit Weg zur Bahn');
+});
+
+test('KI mit Baugebiet: Bahn außerhalb des Gebiets (kein Stellplatz möglich) → zweiter Fliegerhorst mit Stellplätzen im Gebiet', async () => {
+  const { aiAirport } = await import('../js/ai/cityai.js');
+  const g = new Game({ seed: 3, city: true, buildRules: true });
+  const { c, m } = rich(g, 1);
+  g.fog[1].revealAll?.();
+  // Bahn weit draußen (Bahnen dürfen außerhalb des Gebiets liegen, Stellplätze nicht): so sah es in Daniels Partie aus
+  let placed = false;
+  for (let r = 2; r < c.rows - 6 && !placed; r += 3) {
+    for (let q = 2; q < c.cols - 14 && !placed; q += 3) {
+      let out = true;
+      for (let y = r - 3; y <= r + 4 && out; y++) for (let x = q - 3; x <= q + 12 && out; x++) if (c.claim[y * c.cols + x]) out = false;
+      if (out) placed = g.issue(1, { type: 'city', kind: 'runway', c0: q, r0: r, c1: q + CITY.ai.runwayLen - 1, r1: r + 1 }).ok;
+    }
+  }
+  assert.ok(placed, 'Bahn außerhalb des Gebiets gesetzt');
+  withValue(CITY.ai, 'airportFrom', 0, () => {
+    for (let k = 0; k < 6; k++) {
+      g.teams[1].res.money = 50000;
+      m.store.bm = 3000;
+      aiAirport(g, c, m, 0, 2);
+      run(g, CITY.growTime + 1);
+    }
+  });
+  assert.ok(standsOf(g, 1).length >= 1, 'KI hat Stellplätze gebaut');
+  assert.ok(standsOf(g, 1).every((s) => buildWhy(g, c, s.cityCell, 'stand') === null), 'Stellplätze liegen im Gebiet');
 });
 
 test('Breite Bahnfläche: längster Streifen 2 breit ist die Bahn, der Rest Rollfeld; Stellplatz über Rollfeld-Kette angebunden', () => {
