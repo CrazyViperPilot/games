@@ -787,7 +787,13 @@ export class Game {
     const pick = this.pickBuilders(team, cmd.ids, cmd.building);
     if (pick.reason) return fail(pick.reason);
     const g = this.grid;
-    const cells = lineCells(g.toCell(cmd.x1), g.toCell(cmd.y1), g.toCell(cmd.x2), g.toCell(cmd.y2));
+    const c0 = g.toCell(cmd.x1);
+    const r0 = g.toCell(cmd.y1);
+    const c1 = g.toCell(cmd.x2);
+    const r1 = g.toCell(cmd.y2);
+    // Länge vor dem Aufzählen prüfen: weit entfernte (oder ungültige) Punkte erzeugten sonst Milliarden Zellen (Speicher voll)
+    if (Math.max(Math.abs(c1 - c0), Math.abs(r1 - r0)) + 1 > BALANCE.construction.wallMax) return fail(`Mauerzug zu lang (höchstens ${BALANCE.construction.wallMax} Zellen)`);
+    const cells = lineCells(c0, r0, c1, r1);
     if (cells.length > BALANCE.construction.wallMax) return fail(`Mauerzug zu lang (höchstens ${BALANCE.construction.wallMax} Zellen)`);
     const sites = [];
     const carried = paysCarried(pick.list);

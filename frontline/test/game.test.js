@@ -999,6 +999,10 @@ test('Befehle: Mauerzug über wallMax abgelehnt, Stopp ohne Einheit scheitert, G
   const long = g.issue(0, { type: 'buildWall', building: 'wall', x1: m.x, y1: m.y + 6 * T, x2: m.x + max * T, y2: m.y + 6 * T });
   assert.equal(long.ok, false);
   assert.match(long.reason, /zu lang/);
+  // riesige Koordinaten: abgelehnt, bevor die Zellen aufgezählt werden (vorher lief der Speicher voll)
+  const huge = g.issue(0, { type: 'buildWall', building: 'wall', x1: m.x, y1: m.y, x2: 1e12, y2: -1e12 });
+  assert.equal(huge.ok, false);
+  assert.match(huge.reason, /zu lang/);
   assert.equal(g.issue(0, { type: 'stop', ids: [] }).ok, false);
   const foe = g.units.find((u) => u.alive && u.team === 1);
   assert.equal(g.issue(0, { type: 'stop', ids: [foe.id] }).ok, false, 'fremde Einheit');
