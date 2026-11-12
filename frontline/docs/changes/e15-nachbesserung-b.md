@@ -1,0 +1,1 @@
+**Brückenleger und MLRS-Salve im Spielstand** (Nachbesserung E15, Punkte 4 und 5): Wird eine alte Behelfsbrücke wieder Wasser, geht darauf stehende Infanterie oder Fahrzeuge ans nächste Ufer; Brückenstelle (`u.laid`) und Salvenzähler des Raketenwerfers (`salvoLeft`) bleiben beim Speichern und Laden erhalten.

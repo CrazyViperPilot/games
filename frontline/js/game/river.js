@@ -4,7 +4,7 @@
 // Befehl beschossen (Häuser-Faktoren), zerstört sperren sie wieder; ein Baufahrzeug baut sie für Geld wieder auf. Kein DOM.
 import { BALANCE } from '../data/balance.js';
 import { RELIEF } from './relief.js';
-import { driveTo, setIdle } from './movement.js';
+import { driveTo, setIdle, nearestPassable } from './movement.js';
 
 const RV = BALANCE.river;
 const TILE = BALANCE.map.tile;
@@ -263,6 +263,24 @@ export function cmdLayBridge(game, team, cmd) {
 /** Wasser (Gelände unter dem Wasserspiegel) an der Rasterzelle (c, r). */
 const isWater = (game, c, r) => !!game.relief && game.relief.heightAt(game.grid.center(c), game.grid.center(r)) < RELIEF.water;
 
+/**
+ * Alte Behelfsbrücke (Zelle i) wird wieder Wasser: Einheiten, die dort stehen, gehen an die nächste freie Stelle am Ufer
+ * (nearestPassable, wie separate in movement.js). Luftfahrzeuge und Besatzer bleiben unberührt.
+ */
+function freeOldBridge(game, i) {
+  const G = game.grid;
+  G.terrain[i] = 1;
+  for (const v of game.units) {
+    if (!v.alive || v.def.air || v.house) continue;
+    if (G.idx(G.toCell(v.x), G.toCell(v.y)) !== i) continue;
+    const p = nearestPassable(G, v.x, v.y, v.team);
+    if (p) {
+      v.x = p.x;
+      v.y = p.y;
+    }
+  }
+}
+
 /** Brückenleger-Schritt: zum Ufer fahren, legen (def.layTime), Zelle wird befahrbar (terrain frei). */
 export function updateBridgeLayers(game, dt) {
   for (const u of game.units) {
@@ -274,7 +292,7 @@ export function updateBridgeLayers(game, dt) {
     }
     o.t += dt;
     if (o.t < u.def.layTime) continue;
-    if (u.laid != null && u.laid !== o.i) game.grid.terrain[u.laid] = 1; // alte Brücke wieder Wasser
+    if (u.laid != null && u.laid !== o.i) freeOldBridge(game, u.laid); // alte Brücke wieder Wasser
     game.grid.terrain[o.i] = 0;
     u.laid = o.i;
     game.message(u.team, 'Brücke gelegt', o.bx, o.by);

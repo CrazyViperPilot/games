@@ -60,3 +60,27 @@ test('Raketenwerfer: Salve feuert 12 Geschosse, danach Pause von 30 s', () => {
   assert.ok(r0 - w.rounds > 12, 'nach dem Nachladen beginnt die nächste Salve (ca. 33 s nach Salvenbeginn)');
   assert.ok(foe.hp < 1e9, 'Einschläge treffen den Gegner am Zielpunkt');
 });
+
+// Nachbesserung E15 (Punkt 5): Der Salvenzähler w.salvoLeft steht im Spielstand; Laden mitten in der Salve bleibt identisch.
+test('Raketenwerfer: Laden mitten in der Salve, salvoLeft bleibt erhalten [langsam]', async () => {
+  const { snapshotGame, restoreGame } = await import('../js/game/savegame.js');
+  const { AI } = await import('../js/ai/ai.js');
+  const { pack, unpack } = await import('../js/core/snapshot.js');
+  const { g, x, y } = scene();
+  const m = g.spawnUnit('mlrs', 0, x, y);
+  const tx = x + 800;
+  const foe = g.spawnUnit('rifleman', 1, tx, y);
+  foe.hp = 1e9;
+  assert.ok(g.issue(0, { type: 'mortarTarget', ids: [m.id], x: tx, y }).ok);
+  run(g, 1); // etwa 4 Schuss der Salve sind gefallen
+  const w = m.weapons[0];
+  assert.ok(w.salvoLeft > 0 && w.salvoLeft < 12, 'Salve läuft noch');
+  const { game: g2 } = restoreGame(await unpack(await pack(snapshotGame(g, new AI(g, 1, 'normal')))));
+  const w2 = g2.getEntity(m.id).weapons[0];
+  assert.equal(w2.salvoLeft, w.salvoLeft, 'Salvenzähler im Stand');
+  assert.equal(w2.rounds, w.rounds);
+  run(g, 3);
+  run(g2, 3);
+  assert.equal(w2.rounds, w.rounds, 'Weiterspielen nach dem Laden ist identisch');
+  assert.equal(w2.salvoLeft, w.salvoLeft);
+});
