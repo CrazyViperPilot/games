@@ -616,6 +616,39 @@ function mlrs(P) {
   return { S, foot: [-17.8, 17.4, -8.6, 8.6] };
 }
 
+// Bergepanzer (Vorbild Büffel auf Kampfpanzer-Fahrgestell, ohne Turm): flacher Aufbau, Fahrerkabine vorn links, Kranausleger
+// rechts (+y), schräg nach hinten über das Heck gelegt, Räumschild vorn quer, Seilwinde und Kisten auf dem Heckdeck.
+// Maße über SIZE (wie der Kampfpanzer): etwa 9 m × 3,5 m × 2,7 m.
+function recovery(P) {
+  const S = [];
+  for (const side of [-1, 1]) tracks(S, side, -16, 15.2, 6.2, 9, 4.6, P, { wheels: 6, skirt: [-13, 14], fender: 8.4 });
+  S.push(lowerHull(-15.6, 16.2, 6.6, 4.4, P));
+  const hull = prX([[-15.6, 4.6], [-15.8, 7.2], [7, 7.2], [15.4, 4.6]], -7.2, 7.2, P.body);
+  S.push(hull);
+  lights(S, hull, 15.4, 7.2, 4.9, -15.8, 6.2);
+  camoSides(S, hull, 7.2, [[-12, 5, 5.6, 6.9], [1, 4, 5.4, 7]], P.camo);
+  // Fahrerkabine vorn links (-y): flach, mit schräger Frontscheibe und Seitenscheibe
+  const cab = prX([[7.2, 7.2], [7.2, 9.8], [12.2, 9.8], [14.6, 7.6], [14.8, 7.2]], -6.4, -1.4, P.body);
+  S.push(cab);
+  S.push(on(cab, box(7.4, 12, -6.2, -1.6, 9.8, 10, P.light))); // Dach
+  S.push(on(cab, prX([[12.4, 9.6], [14.5, 7.7], [14.6, 7.5], [12.5, 7.5]], -6, -1.8, GLASS, { noLine: true })));
+  S.push(on(cab, box(8, 11.6, -6.6, -6.4, 7.8, 8.9, GLASS, { noLine: true, only: 'iso' })));
+  // Kranausleger rechts (+y): Drehkranz auf dem Deck, Ausleger, Stütze und Hakenflasche
+  S.push(on(hull, box(1.4, 6.2, 2.6, 6.4, 7.2, 8.8, P.dark)));
+  const boom = cyl([1.8, 4.6, 9.4], [-15, 4.6, 12.6], 1.1, 0.8, 4, P.light);
+  S.push(boom);
+  S.push(on(boom, cyl([-3.8, 4.6, 7.6], [-5.8, 4.6, 10.6], 0.42, 0.42, 4, METAL))); // Stütze
+  S.push(fine(on(boom, cyl([-15, 4.6, 12.6], [-15, 4.6, 10.2], 0.3, 0.3, 6, METAL)))); // Hakenflasche
+  // Heckdeck: Seilwinde quer zwischen zwei Kisten
+  S.push(cyl([-14.4, 0, 8.4], [-10.6, 0, 8.4], 1.1, 1.1, 8, METAL));
+  const crate = mix(P.dark, OLIVE, 0.4);
+  for (const side of [-1, 1]) S.push(box(-15.2, -10.4, side < 0 ? -6.2 : 2.4, side < 0 ? -2.4 : 6.2, 7.2, 9.4, crate));
+  // Räumschild vorn quer, zwei Arme zum Rahmen
+  S.push(prX([[15.6, 0.8], [17.4, 3.6], [17.8, 8.2], [15.8, 8.2]], -9.2, 9.2, P.dark));
+  for (const side of [-1, 1]) S.push(fine(cyl([13.4, side * 5.4, 5.2], [15.8, side * 6.6, 5.4], 0.5, 0.5, 4, METAL)));
+  return { S, foot: [-16.6, 17.8, -9.6, 9.6] };
+}
+
 function truck(P) {
   const S = [];
   S.push(box(-15, 12, -3.6, 3.6, 2.2, 3.8, METAL, { only: 'iso', under: true })); // Rahmen
@@ -1404,12 +1437,12 @@ function soldier(P, o) {
   return { S, foot: [-1.6, 1.6, -1.6, 1.6], inf: true };
 }
 
-const MODELS = { tank, ifv, flak, sam, gepard, pzh, mlrs, truck, scout, fobTruck, engineer, excavator, bridgelayer: excavator, littlebird, drone: littlebird, fpv: littlebird, gunship, transporter, recovery: ifv, jammer: flak, f16, f22, su27, u2, a10: f16, c130: u2 };
+const MODELS = { tank, ifv, flak, sam, gepard, pzh, mlrs, truck, scout, fobTruck, engineer, excavator, bridgelayer: excavator, littlebird, drone: littlebird, fpv: littlebird, gunship, transporter, recovery, jammer: flak, f16, f22, su27, u2, a10: f16, c130: u2 };
 const INFANTRY = { rifleman: 'rifleman', medic: 'medic', at: 'at', manpads: 'manpads', flamer: 'rifleman', mortarteam: 'rifleman', sniper: 'sniper', sapper: 'rifleman', commander: 'commander' };
 const TEAM_KEYS = ['b', 'r', 'n', 'd'];
 
 const paintOf = (team) => (team === SHOWROOM ? DISPLAY : TEAM_PAINT[team] ?? NEUTRAL);
-const SIZE = { tank: 1.12, pzh: 1.08 }; // schwere Fahrzeuge etwas größer, damit sie sich vom Schützenpanzer abheben
+const SIZE = { tank: 1.12, pzh: 1.08, recovery: 1.12 }; // schwere Fahrzeuge etwas größer, damit sie sich vom Schützenpanzer abheben
 
 /** Modell um k vergrößern (Körper, Turmdrehpunkt, Grundfläche). */
 function scaleModel(m, k) {
