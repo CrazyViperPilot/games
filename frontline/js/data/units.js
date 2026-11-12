@@ -442,6 +442,31 @@ export const UNITS = {
     seats: 0, // keine Passagiere
     hotkey: 'R', // Heliport-Menü: D Little Bird, F Transporter, G Kampfheli (R frei)
   },
+  // Kamikazedrohne (Paket E11): wie die Aufklärungsdrohne, aber 60 HP, schnell und mit Sicht 250. Angriffsbefehl auf Fahrzeug oder Gebäude:
+  // sie fliegt hin und explodiert bei Kontakt (updateFpv in js/game/fpv.js), dann ist sie weg. Die Reichweite 15 ist nur für den Angriffsbefehl
+  // (cmdAttack verlangt range > 0); unbewaffnet, keine Waffen-Liste.
+  fpv: {
+    name: 'Kamikazedrohne',
+    short: 'FPV', // Kurzname in der Befehlskarte
+    armor: 'air',
+    air: true,
+    hp: 60,
+    speed: 190,
+    radius: 8,
+    sight: 250,
+    range: 15,
+    cooldown: 0,
+    damage: null,
+    // Einschlag beim Kontakt (≤ 20 px vom Ziel): Flächenschaden mit Abfall über splash, wie eine Granate (combat.js impact)
+    blast: { damage: { light: 500, heavy: 700, struct: 300 }, splash: 30 },
+    cost: { money: 200 },
+    buildTime: 12,
+    ammoPerShot: 0,
+    fuelPerSec: 0.5,
+    fuelMax: 40,
+    seats: 0, // keine Passagiere
+    hotkey: 'X', // Heliport-Menü: D Little Bird, F Transporter, G Kampfheli, R Aufklärungsdrohne (X frei)
+  },
   transporter: {
     name: 'Transporthubschrauber',
     short: 'Transp.-Heli', // Kurzname in der Befehlskarte

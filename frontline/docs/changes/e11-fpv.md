@@ -1,0 +1,1 @@
+**Kamikazedrohne** (Taste X im Heliport, §6 „Einheiten“): 200 Geld, 30 Metall, 60 HP, schnell, Sicht 250, 0 Passagiere, Treibstoff 40; im Angriffsbefehl auf Fahrzeug oder Gebäude fliegt sie hin und explodiert bei Kontakt (Schaden 700 schwer, 500 leicht, 300 Gebäude, Splash 30), danach ist sie weg.

@@ -445,7 +445,7 @@ function interceptShells(game) {
 }
 
 /** Einschlag: Flächenschaden mit linearem Abfall über `splash` an alle gegnerischen Entities (Besatzer schützt ihr Haus) und an Brücken. */
-function impact(game, p) {
+export function impact(game, p) {
   p.alive = false;
   game.addEffect('explosion', p.tx, p.ty, p.team);
   addCrater(game, p.tx, p.ty);
