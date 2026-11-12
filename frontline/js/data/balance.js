@@ -259,6 +259,8 @@ export const BALANCE = {
     spotAny: 25, // px: Sicht durch irgendeine eigene Einheit
     clearRange: 40, // px: gegnerischer Pionier räumt die Mine
     clearTime: 3, // s Räumzeit
+    layReach: 30, // px: der Pionier läuft bis auf diese Nähe zur Klickstelle, dann legt er die Mine (Befehl layMine)
+    layNear: 40, // px: endet der Weg des Planers (Zellenraster) etwas davor, legt er trotzdem, wenn er so nah steht
   },
   // Kampfflugzeuge (seit v5.03, PRD §6 „F-16“, §15 „Fliegerhorst“): In der Luft dreht ein Jet
   // höchstens turn rad/s und kreist im Abstand orbit (px) um seinen Befehlspunkt. Er fliegt zurück, wenn der Treibstoff für den

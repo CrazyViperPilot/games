@@ -7,6 +7,7 @@ import { BUILDINGS } from '../js/data/buildings.js';
 import { CITY } from '../js/data/city.js';
 import { UNITS } from '../js/data/units.js';
 import { updateMines, mineVisible } from '../js/game/mines.js';
+import { nearestPassable } from '../js/game/movement.js';
 import { snapshotGame, restoreGame } from '../js/game/savegame.js';
 import { AI } from '../js/ai/ai.js';
 
@@ -28,18 +29,35 @@ test('Pionier: Infanterie, Kaserne (nicht Hauptstadt), Taste F im Kasernenmenü 
   assert.equal(new Set(keys).size, keys.length, 'Kasernenmenü: keine doppelte Taste');
 });
 
-test('Pionier legt eine Mine an der Klickstelle, Munition wird abgebucht; Schütze legt keine', () => {
+/** Befehl layMine und so lange Minen-Schritte, bis der Pionier an der Stelle die Mine gelegt hat (E15: erst hinlaufen). */
+function layAt(g, s, x, y) {
+  const r = g.issue(0, { type: 'layMine', ids: [s.id], x, y });
+  for (let t = 0; t < 400 && s.order.type === 'layMine'; t++) g.update(DT);
+  return r;
+}
+
+test('Pionier läuft zur Klickstelle und legt dort die Mine; Munition wird erst beim Legen abgebucht; Schütze legt keine', () => {
   const g = mk();
   const f = fobOf(g);
   f.store.mun = 500;
-  const s = g.spawnUnit('sapper', 0, f.x + 30, f.y);
-  const r = g.issue(0, { type: 'layMine', ids: [s.id], x: f.x + 60, y: f.y });
+  const s = g.spawnUnit('sapper', 0, f.x + 400, f.y);
+  const P = nearestPassable(g.grid, f.x + 150, f.y, 0); // offener Boden (kein Gebäude)
+  const r0 = g.issue(0, { type: 'layMine', ids: [s.id], x: P.x, y: P.y });
+  assert.equal(r0.ok, true, r0.reason);
+  assert.equal(s.order.type, 'layMine', 'Auftrag: hinlaufen');
+  assert.equal(g.sapperMines.length, 0, 'noch keine Mine');
+  assert.equal(f.store.mun, 500, 'noch nichts abgebucht');
+  g.update(DT);
+  assert.equal(g.sapperMines.length, 0, 'ein Schritt später noch nicht');
+  const r = layAt(g, s, P.x, P.y);
   assert.equal(r.ok, true, r.reason);
   assert.equal(g.sapperMines.length, 1);
   assert.equal(g.sapperMines[0].team, 0);
+  assert.ok(Math.hypot(s.x - P.x, s.y - P.y) <= S.layNear, 'Pionier steht in Reichweite der Mine');
+  assert.equal(s.order.type, 'idle', 'nach dem Legen wieder frei');
   assert.equal(f.store.mun, 500 - S.mineCost.mun);
   const rifle = g.spawnUnit('rifleman', 0, f.x + 30, f.y + 20);
-  assert.equal(g.issue(0, { type: 'layMine', ids: [rifle.id], x: f.x + 60, y: f.y }).ok, false);
+  assert.equal(g.issue(0, { type: 'layMine', ids: [rifle.id], x: P.x, y: P.y }).ok, false);
 });
 
 test('Höchstens maxMines aktive Minen je Pionier', () => {
@@ -47,8 +65,10 @@ test('Höchstens maxMines aktive Minen je Pionier', () => {
   const f = fobOf(g);
   f.store.mun = 1000;
   const s = g.spawnUnit('sapper', 0, f.x + 30, f.y);
-  for (let i = 0; i < S.maxMines; i++) assert.equal(g.issue(0, { type: 'layMine', ids: [s.id], x: f.x + 60, y: f.y + i * 3 }).ok, true);
-  assert.equal(g.issue(0, { type: 'layMine', ids: [s.id], x: f.x + 60, y: f.y + 60 }).ok, false);
+  const P = nearestPassable(g.grid, f.x + 150, f.y, 0);
+  for (let i = 0; i < S.maxMines; i++) assert.equal(layAt(g, s, P.x, P.y + i * 3).ok, true);
+  assert.equal(g.sapperMines.length, S.maxMines);
+  assert.equal(g.issue(0, { type: 'layMine', ids: [s.id], x: P.x, y: P.y + 60 }).ok, false);
 });
 
 test('Gegnerisches Panzerfahrzeug löst die Mine aus und nimmt Schaden; Infanterie löst nicht aus', () => {

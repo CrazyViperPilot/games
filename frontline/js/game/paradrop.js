@@ -15,16 +15,18 @@ export function cmdParadrop(game, team, cmd) {
   if (!Number.isFinite(cmd.x) || !Number.isFinite(cmd.y)) return fail('Kein Punkt gewählt');
   const planes = game.ownUnits(team, cmd.ids).filter((u) => u.type === 'c130' && u.passengers.length > 0);
   if (!planes.length) return fail('Kein Transportflugzeug mit Passagieren gewählt');
-  const flying = planes.filter((u) => !u.parked && (!u.jet?.phase || u.jet.phase === 'air'));
-  if (!flying.length) return fail('Flugzeug steht noch am Stellplatz (erst starten)');
+  // Fliegend: sofort anfliegen. Am Stellplatz (E15): erst über die vorhandene Startlogik starten (aircraft.js wantsOut); im Flug
+  // setzt stepRoll dann u.paradrop. Am Boden rollend: nein.
+  const ok = planes.filter((u) => u.parked || !u.jet?.phase || u.jet.phase === 'air');
+  if (!ok.length) return fail('Flugzeug rollt noch am Boden');
   const x = Math.min(Math.max(cmd.x, 0), game.map.width);
   const y = Math.min(Math.max(cmd.y, 0), game.map.height);
-  for (const u of flying) {
-    u.paradrop = { x, y };
+  for (const u of ok) {
+    if (!u.parked) u.paradrop = { x, y };
     u.order = { type: 'paradrop', x, y, targetId: null };
     u.targetId = null;
   }
-  return { ok: true, count: flying.length };
+  return { ok: true, count: ok.length };
 }
 
 /** Schritt je Tick: Flugzeuge im Anflug, Fallschirm-Zeiten der Passagiere. */

@@ -311,7 +311,9 @@ export function cmdBoard(game, team, cmd) {
 
 /** { type: 'dropoff', ids, x, y }: Hubschrauber fliegt zum Punkt und setzt alle Passagiere ab. */
 export function cmdDropoff(game, team, cmd) {
-  const helis = game.ownUnits(team, cmd.ids).filter((u) => u.def.seats > 0);
+  const picked = game.ownUnits(team, cmd.ids);
+  if (picked.some((u) => u.def.jet && u.def.seats > 0) && !picked.some((u) => u.def.seats > 0 && !u.def.jet)) return fail('Flugzeuge setzen mit „Fallschirm absetzen“ ab');
+  const helis = picked.filter((u) => u.def.seats > 0 && !u.def.jet); // Jets (C-130) nicht hier: paradrop.js
   if (!helis.length) return fail('Kein Transportfahrzeug gewählt');
   if (!helis.some((h) => h.passengers.length > 0)) return fail('Keine Passagiere an Bord');
   const x = Math.min(Math.max(cmd.x, 0), game.map.width);

@@ -387,7 +387,7 @@ export const cardMethods = {
         );
       }
     }
-    const helis = units.filter((u) => u.def.seats > 0);
+    const helis = units.filter((u) => u.def.seats > 0 && !u.def.jet); // Jets setzen nicht per Absetzen ab (E15): dafür Fallschirm absetzen
     if (inside.length) {
       card.push(
         entry('Raus', 'O', {

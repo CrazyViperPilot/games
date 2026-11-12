@@ -300,7 +300,7 @@ function landTarget(game, u) {
 }
 
 /** Wie weit ein Befehl den Jet in die Luft schickt: Bewegung, Angriff, Angriffsmarsch, Landen auf einem anderen Stellplatz. */
-const wantsOut = (u) => u.order.type === 'move' || u.order.type === 'attack' || u.order.type === 'attackMove' || (u.order.type === 'land' && u.order.targetId !== u.jet.home);
+const wantsOut = (u) => u.order.type === 'move' || u.order.type === 'attack' || u.order.type === 'attackMove' || u.order.type === 'paradrop' || (u.order.type === 'land' && u.order.targetId !== u.jet.home);
 
 /** Nase höchstens rate × dt in Richtung want drehen. */
 function turnTo(u, want, m) {
@@ -488,6 +488,7 @@ function stepRoll(game, u, dt) {
   const left = (R.ex - u.x) * R.dx + (R.ey - u.y) * R.dy;
   if (u.jet.v >= J.rotate * full || left <= 0) {
     u.jet.phase = 'air';
+    if (u.order.type === 'paradrop') u.paradrop = { x: u.order.x, y: u.order.y }; // Absetzen (E15): nach dem Start fliegt paradrop.js hin
     u.jet.slot = undefined; // Platz frei
     u.jet.alt = 0;
     u.jet.lift = true; // Steigflug: erst geradeaus, dann frei

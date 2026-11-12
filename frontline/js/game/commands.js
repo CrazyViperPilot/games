@@ -62,7 +62,7 @@ export const COMMANDS = {
   route: { run: cmdRoute, drives: true, sound: true },
   setPreset: { run: cmdSetPreset },
   mortarTarget: { run: (g, t, c) => g.cmdMortarTarget(t, c), sound: true },
-  layMine: { run: cmdLayMine, sound: true },
+  layMine: { run: cmdLayMine, drives: true, sound: true },
   board: { run: cmdBoard, drives: true, sound: true },
   garrison: { run: cmdGarrison, drives: true, sound: true },
   ungarrison: { run: cmdUngarrison, sound: true },

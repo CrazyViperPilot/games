@@ -521,7 +521,7 @@ export const UNITS = {
     // Bordkanone: 300 Schuss à 10 Munition; 10 Raketen à 100 Munition (gegen Panzer, Gebäude, Hubschrauber)
     weapons: [
       { id: 'cannon', name: 'Bordkanone', range: 340, cooldown: 0.5, rounds: 300, munCost: 10, damage: { inf: 22, light: 26, heavy: 30, struct: 18, air: 10, jet: 12 } },
-      { id: 'rocket', name: 'Raketen', range: 340, cooldown: 3, rounds: 10, munCost: 100, targets: ['heavy', 'struct', 'air'], damage: { inf: 40, light: 120, heavy: 220, struct: 120, air: 150, jet: 110 } },
+      { id: 'rocket', name: 'Raketen', range: 340, cooldown: 3, rounds: 10, munCost: 100, guided: true, targets: ['heavy', 'struct', 'air'], damage: { inf: 40, light: 120, heavy: 220, struct: 120, air: 150, jet: 110 } },
     ],
     cost: { money: 900 },
     buildTime: 28,
@@ -734,7 +734,7 @@ export const UNITS = {
     radius: 13,
     sight: 480,
     weapons: [
-      { id: 'twin35', name: 'Zwillingskanone 35 mm', range: 420, cooldown: 0.35, rounds: 80, munCost: 8, hitChance: 0.8, guided: true, speedRef: 400, targets: ['air'], damage: { inf: 8, light: 14, heavy: 2, struct: 6, air: 32, jet: 32 } },
+      { id: 'twin35', name: 'Zwillingskanone 35 mm', range: 420, cooldown: 0.35, rounds: 80, munCost: 8, hitChance: 0.8, speedRef: 400, targets: ['air'], damage: { inf: 8, light: 14, heavy: 2, struct: 6, air: 32, jet: 32 } },
     ],
     cost: { money: 650 },
     buildTime: 16,

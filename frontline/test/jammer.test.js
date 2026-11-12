@@ -33,3 +33,15 @@ test('Störsender: nur lebende Störsender des Ziel-Teams, nicht stapelnd', () =
   const two = { units: [jam(0, 0), jam(5, 0)] };
   assert.equal(jamFactor(two, tgt(10, 0), SAM), 1 - 0.35, 'zwei Störsender stapeln nicht');
 });
+
+test('Störsender (E15): AH-64-Raketen sind Lenkwaffen, die Gepard-Kanone nicht', () => {
+  const rocket = UNITS.gunship.weapons.find((w) => w.id === 'rocket');
+  const cannon = UNITS.gunship.weapons.find((w) => w.id === 'cannon');
+  assert.equal(rocket.guided, true, 'Raketen des AH-64 lenkbar');
+  assert.ok(!cannon.guided, 'Bordkanone des AH-64 nicht lenkbar');
+  const twin = UNITS.gepard.weapons.find((w) => w.id === 'twin35');
+  assert.ok(!twin.guided, 'Zwillingskanone 35 mm ist keine Lenkwaffe');
+  const heli = { units: [jam(0, 0)] };
+  assert.equal(jamFactor(heli, tgt(10, 0), rocket), 1 - 0.35, 'Rakete wird gestört');
+  assert.equal(jamFactor(heli, tgt(10, 0), twin), 1, 'Kanone wird nicht gestört');
+});

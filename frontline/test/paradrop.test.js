@@ -61,3 +61,10 @@ test('Befehl nur für C-130 mit Passagieren', () => {
   const empty = g.spawnUnit('c130', 0, sp.x, sp.y);
   assert.equal(g.issue(0, { type: 'paradrop', ids: [empty.id], x: sp.x + 100, y: sp.y }).ok, false, 'ohne Passagiere abgelehnt');
 });
+
+test('E15: Absetzen (dropoff) lehnt C-130 ab; Fallschirm absetzen bleibt ihr Befehl', () => {
+  const { g, plane, tx, ty } = setup();
+  assert.equal(g.issue(0, { type: 'dropoff', ids: [plane.id], x: tx, y: ty }).ok, false, 'Jet im Absetzen-Befehl abgelehnt');
+  assert.equal(plane.order.type !== 'dropoff', true);
+  assert.equal(g.issue(0, { type: 'paradrop', ids: [plane.id], x: tx, y: ty }).ok, true, 'Fallschirm absetzen geht');
+});
