@@ -50,6 +50,27 @@ export const UNITS = {
     canRide: true,
     hotkey: 'K', // im Kasernen- und Hauptstadt-Menü frei (K Ablegen nur am Transporter)
   },
+  // MANPADS-Soldat (Paket E2): Infanterie mit Flugabwehrrakete zu Fuß. Die Rakete ist wie die SAM-Startrampe, aber nur gegen Luftziele
+  // (targets), Reichweite 300, Schaden 250, 12 s Nachladen. Schießt nicht auf Panzer oder Gebäude.
+  manpads: {
+    name: 'MANPADS-Soldat',
+    short: 'MANPADS', // Kurzname in der Befehlskarte
+    armor: 'inf',
+    hp: 90,
+    speed: 40,
+    radius: 6,
+    sight: 260,
+    weapons: [
+      { id: 'sam', name: 'Wärmesuchrakete', range: 300, cooldown: 12, rounds: 4, munCost: 250, hitChance: 0.9, targets: ['air'], damage: { air: 250 } },
+    ],
+    cost: { money: 120 }, // wie Panzerabwehrsoldat
+    buildTime: 8,
+    fuelPerSec: 0,
+    builder: 'fort',
+    bmCap: 50,
+    canRide: true,
+    hotkey: 'I', // im Kasernen- und Hauptstadt-Menü frei (I Einsteigen nur am Transporter, U ist Forschung)
+  },
   at: {
     name: 'Panzerabwehrsoldat',
     short: 'PAK', // Kurzname in der Befehlskarte

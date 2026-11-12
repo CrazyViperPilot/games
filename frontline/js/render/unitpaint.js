@@ -1289,7 +1289,7 @@ function soldier(P, o) {
   const vest = box(-1.25, 1.25, -2, 2, 7.2, 11, kind === 'sniper' ? mix(P.vest, '#5a5d3c', 0.5) : P.vest);
   S.push(vest);
   S.push(fine(on(vest, box(1.25, 1.4, -1.4, 1.4, 8, 9.4, mix(P.vest, '#000000', 0.25), { noLine: true })))); // Taschen
-  S.push(box(-2.5, -1.25, -1.55, 1.55, 7.6, 10.6, kind === 'at' ? '#4b5034' : '#474c37')); // Rucksack
+  S.push(box(-2.5, -1.25, -1.55, 1.55, 7.6, 10.6, kind === 'at' || kind === 'manpads' ? '#4b5034' : '#474c37')); // Rucksack
   S.push(cyl([0, 0, 11], [0, 0, 11.7], 0.6, 0.6, 6, SKIN)); // Hals
   S.push(ball([0.15, 0, 12.6], 1.15, 1.05, 1.25, SKIN, { n: 8, m: 5 }));
   if (kind === 'commander') {
@@ -1310,7 +1310,7 @@ function soldier(P, o) {
   const armSw = o.frame ? Math.sin(ph) * 0.6 : 0;
   S.push(cyl([0, -2.2, 10.4], [hand[0] - 1.2 + armSw, -0.6, hand[2] - 0.2], 0.55, 0.5, 4, uni));
   S.push(cyl([0, 2.2, 10.4], [hand[0] - 2.6 - armSw, hand[1] + 0.5, hand[2] - 0.6], 0.55, 0.5, 4, uni));
-  if (kind === 'at') {
+  if (kind === 'at' || kind === 'manpads') {
     S.push(cyl([-5, 1.6, 11.4], [5.5, 1.6, 11.9], 0.75, 0.75, 6, OLIVE)); // Rohr auf der Schulter
     S.push(cyl([5.5, 1.6, 11.9], [7.4, 1.6, 12], 1.05, 0.25, 6, '#6a6f4a')); // Gefechtskopf
     S.push(cyl([1, 1.6, 10.6], [1, 1.6, 11], 0.3, 0.3, 4, GUN));
@@ -1330,7 +1330,7 @@ function soldier(P, o) {
 }
 
 const MODELS = { tank, ifv, flak, sam, gepard, pzh, truck, fobTruck, engineer, excavator, littlebird, gunship, transporter, f16, f22, su27, u2 };
-const INFANTRY = { rifleman: 'rifleman', medic: 'medic', at: 'at', sniper: 'sniper', commander: 'commander' };
+const INFANTRY = { rifleman: 'rifleman', medic: 'medic', at: 'at', manpads: 'manpads', sniper: 'sniper', commander: 'commander' };
 const TEAM_KEYS = ['b', 'r', 'n', 'd'];
 
 const paintOf = (team) => (team === SHOWROOM ? DISPLAY : TEAM_PAINT[team] ?? NEUTRAL);
