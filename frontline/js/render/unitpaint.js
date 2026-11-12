@@ -1648,10 +1648,20 @@ function soldier(P, o) {
     S.push(box(k - 0.9, k + 1.5, side * 0.95 - 0.7, side * 0.95 + 0.7, 0, 1.1, BOOT)); // Stiefel
   }
   S.push(box(-1, 1, -1.85, 1.85, 5.8, 7.4, uni)); // Hüfte
-  const vest = box(-1.25, 1.25, -2, 2, 7.2, 11, kind === 'sniper' ? mix(P.vest, '#5a5d3c', 0.5) : P.vest);
+  // Flammenwerfer: Weste in Uniformfarbe (Teamfarbe nur am Helmband), sonst wie die übrigen Schützen
+  const vest = box(-1.25, 1.25, -2, 2, 7.2, 11, kind === 'sniper' ? mix(P.vest, '#5a5d3c', 0.5) : kind === 'flamer' ? '#4d5339' : P.vest);
   S.push(vest);
-  S.push(fine(on(vest, box(1.25, 1.4, -1.4, 1.4, 8, 9.4, mix(P.vest, '#000000', 0.25), { noLine: true })))); // Taschen
-  S.push(box(-2.5, -1.25, -1.55, 1.55, 7.6, 10.6, kind === 'at' || kind === 'manpads' ? '#4b5034' : '#474c37')); // Rucksack
+  S.push(fine(on(vest, box(1.25, 1.4, -1.4, 1.4, 8, 9.4, mix(kind === 'flamer' ? '#4d5339' : P.vest, '#000000', 0.25), { noLine: true })))); // Taschen
+  if (kind === 'flamer') {
+    // Flammenwerfer-Tornister: zwei aufrechte Druckbehälter nebeneinander, dazwischen ein kleiner Kugel-Drucktank,
+    // Schlauch vom Behälter zum Flammrohr (vorn am Hüftgriff)
+    for (const side of [-1, 1]) S.push(cyl([-2.3, side * 0.9, 7.4], [-2.3, side * 0.9, 11.2], 0.7, 0.7, 8, '#6b6f58')); // Druckbehälter
+    S.push(ball([-2.95, 0, 9.3], 0.5, 0.5, 0.5, '#7b7f66', { n: 6, m: 4 })); // Kugel-Drucktank dazwischen
+    S.push(fine(cyl([-2.3, 0.9, 11.2], [-2.3, 0.9, 11.5], 0.3, 0.3, 4, '#3c4130')), fine(cyl([-2.3, -0.9, 11.2], [-2.3, -0.9, 11.5], 0.3, 0.3, 4, '#3c4130'))); // Ventile oben
+    S.push(cyl([-2.3, 0.9, 7.5], [-0.4, 2.2, 7.1], 0.22, 0.22, 4, '#1b1d1f'), cyl([-0.4, 2.2, 7.1], [1.2, 1.0, 7.8], 0.22, 0.22, 4, '#1b1d1f')); // Schlauch
+  } else {
+    S.push(box(-2.5, -1.25, -1.55, 1.55, 7.6, 10.6, kind === 'at' || kind === 'manpads' ? '#4b5034' : '#474c37')); // Rucksack
+  }
   S.push(cyl([0, 0, 11], [0, 0, 11.7], 0.6, 0.6, 6, SKIN)); // Hals
   S.push(ball([0.15, 0, 12.6], 1.15, 1.05, 1.25, SKIN, { n: 8, m: 5 }));
   if (kind === 'commander') {
@@ -1668,7 +1678,7 @@ function soldier(P, o) {
     tufts.forEach(([x, y, z], i) => S.push(ball([x, y, z], 1.1, 1, 0.8, i % 3 ? '#5f6a3a' : '#6e6544', { n: 6, m: 3 })));
   }
   // Arme zur Waffe (gehend schwingt der freie Arm leicht mit)
-  const hand = [3.4, 0.9, 9.2];
+  const hand = kind === 'flamer' ? [4, 0.9, 7.9] : [3.4, 0.9, 9.2]; // Flammenwerfer: Hände am Rohr auf Hüfthöhe
   const armSw = o.frame ? Math.sin(ph) * 0.6 : 0;
   S.push(cyl([0, -2.2, 10.4], [hand[0] - 1.2 + armSw, -0.6, hand[2] - 0.2], 0.55, 0.5, 4, uni));
   S.push(cyl([0, 2.2, 10.4], [hand[0] - 2.6 - armSw, hand[1] + 0.5, hand[2] - 0.6], 0.55, 0.5, 4, uni));
@@ -1691,6 +1701,11 @@ function soldier(P, o) {
     S.push(cyl([1.2, 0.7, 10.2], [4.2, 0.6, 10.2], 0.42, 0.42, 6, '#1c1e20')); // Zielfernrohr
   } else if (kind === 'commander') {
     S.push(cyl([0.5, 0.8, 9.2], [5, 0.6, 9.4], 0.32, 0.3, 4, GUN)); // Maschinenpistole
+  } else if (kind === 'flamer') {
+    // Flammrohr auf Hüfthöhe: kürzer als das Gewehr, aber dicker; Düse vorn aufgeweitet; Ventil am Griff darunter
+    S.push(cyl([0.8, 0.8, 7.9], [5.6, 0.6, 7.6], 0.5, 0.5, 6, GUN)); // Flammrohr
+    S.push(cyl([5.6, 0.6, 7.6], [7, 0.55, 7.5], 0.5, 0.8, 8, '#1c1e20')); // Düse vorn
+    S.push(fine(box(2.2, 2.9, 0.4, 1.2, 7.1, 7.5, '#1c1e20'))); // Ventil am Griff
   } else if (kind === 'medic') {
     S.push(fine(box(1.3, 1.5, -1.4, 1.4, 8.6, 9.0, WHITE))); // weißes Kreuz auf der Brust (unbewaffnet)
     S.push(fine(box(1.3, 1.5, -0.5, 0.5, 7.9, 9.7, WHITE)));
@@ -1702,7 +1717,7 @@ function soldier(P, o) {
 }
 
 const MODELS = { tank, ifv, flak, sam, gepard, pzh, mlrs, truck, scout, fobTruck, engineer, excavator, bridgelayer, littlebird, drone, fpv, gunship, transporter, recovery, jammer, f16, f22, su27, u2, a10, c130 };
-const INFANTRY = { rifleman: 'rifleman', medic: 'medic', at: 'at', manpads: 'manpads', flamer: 'rifleman', mortarteam: 'rifleman', sniper: 'sniper', sapper: 'rifleman', commander: 'commander' };
+const INFANTRY = { rifleman: 'rifleman', medic: 'medic', at: 'at', manpads: 'manpads', flamer: 'flamer', mortarteam: 'rifleman', sniper: 'sniper', sapper: 'rifleman', commander: 'commander' };
 const TEAM_KEYS = ['b', 'r', 'n', 'd'];
 
 const paintOf = (team) => (team === SHOWROOM ? DISPLAY : TEAM_PAINT[team] ?? NEUTRAL);
