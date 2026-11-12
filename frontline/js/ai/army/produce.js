@@ -7,7 +7,7 @@ import { UNITS } from '../../data/units.js';
 import { hasCommander } from '../../game/commander.js';
 import { researchBlock, RESEARCH_KEYS } from '../../game/research.js';
 import { RESEARCH } from '../../data/research.js';
-import { COUNTER_FLOOR, QUEUE_RICH, QUEUE_LONG, QUEUE_SHORT, MIX, COUNTER_MIN, COUNTER_WEIGHT, AIR_PER, AIR_MAX, AIR_SPLIT, AIR_MEMORY, SNIPER_FROM, SNIPER_ARMY, SNIPER_SHARE, SHARE_CAP, MEDIC_EVERY, MEDIC_MAX, MANPADS_SPLIT, MANPADS_MAX, FLAMER_MAX, RECON_ARMY, RECOVERY_VEH, JAM_TARGETS, ESCORT_TYPES, ESCORT_EVERY, ESCORT_DIST, ART_SHARE,ART_FROM, CMD_RESERVE, CMD_FROM, UPGRADES, UPGRADE_RESERVE, HELI_MIN_MONEY } from '../../data/ai.js';
+import { COUNTER_FLOOR, QUEUE_RICH, QUEUE_LONG, QUEUE_SHORT, MIX, COUNTER_MIN, COUNTER_WEIGHT, AIR_PER, AIR_MAX, AIR_SPLIT, AIR_MEMORY, SNIPER_FROM, SNIPER_ARMY, SNIPER_SHARE, SHARE_CAP, MEDIC_EVERY, MEDIC_MAX, MANPADS_SPLIT, MANPADS_MAX, FLAMER_MAX, RECON_ARMY, RECOVERY_VEH, JAM_TARGETS, ESCORT_TYPES, ESCORT_EVERY, ESCORT_DIST, ART_SHARE,ART_FROM, ARTY_ARMY, MORTAR_MAX, MLRS_MAX, CMD_RESERVE, CMD_FROM, UPGRADES, UPGRADE_RESERVE, HELI_MIN_MONEY } from '../../data/ai.js';
 import { dist } from './util.js';
 
 export const produceMethods = {
@@ -148,6 +148,7 @@ export const produceMethods = {
     // Panzerhaubitze (seit v5.26): ab ART_FROM Kampfeinheiten
     if ((s.combat?.length ?? 0) >= ART_FROM) add('pzh', ART_SHARE);
     this.supportShares(s, add, total);
+    this.artyShares(s, add); // Mörsertrupp und Raketenwerfer (K2)
     let extra = Object.values(shares).reduce((a, v) => a + v, 0);
     if (extra <= 0) return base;
     if (extra > SHARE_CAP) {
@@ -188,6 +189,17 @@ export const produceMethods = {
     // Störsender: 1, wenn Gegner Flugabwehr gesehen hat (gemerkt) und die KI selbst Luftfahrzeuge besitzt
     const aa = this.rememberSeen('aa', s.enemies.filter((e) => JAM_TARGETS.includes(e.type)).length);
     if (aa > 0 && own.some((u) => u.def.air)) add('jammer', per(1));
+  },
+
+  /**
+   * Artillerie (Paket K2): ab ARTY_ARMY Kampfeinheiten je ein Mörsertrupp (höchstens MORTAR_MAX) und ein Raketenwerfer (höchstens MLRS_MAX).
+   * Beide stehen hinter der Armee (artillery() in combat.js) und schießen auf Ziele (artilleryFire).
+   */
+  artyShares(s, add) {
+    if ((s.combat?.length ?? 0) < ARTY_ARMY) return;
+    const army = s.combat.length;
+    add('mortarteam', MORTAR_MAX / army);
+    add('mlrs', MLRS_MAX / army);
   },
 
   /**

@@ -87,6 +87,7 @@ export class AI {
     this.jets(s); // Fliegerhorst: F-16 kaufen und losschicken (seit v5.03)
     this.recon(s); // Fliegerhorst: U-2 zur Aufklärung (seit v5.83)
     this.artillery(s); // Panzerhaubitzen hinter der Armee in Stellung (seit v5.26)
+    this.artilleryFire(s); // Mörsertrupps und Raketenwerfer feuern auf Ziele (K2)
     this.buildDefense(s);
     this.buildWall(s);
     this.fortify(s);

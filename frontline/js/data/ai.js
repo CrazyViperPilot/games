@@ -90,6 +90,14 @@ export const ART_SHARE = 0.06; // Zielanteil Panzerhaubitzen an den Kampfeinheit
 export const ART_FROM = 15; // eigene Kampfeinheiten, ab denen sie Panzerhaubitzen ausbildet
 export const ART_BEHIND = 450; // px hinter dem Schwerpunkt der Armee (Richtung nächste eigene FOB)
 export const ART_EVERY = 5; // s zwischen zwei Stellungswechseln einer Haubitze
+// Mörsertrupp und Raketenwerfer (Paket K2, nicht auf Leicht): ab ARTY_ARMY Kampfeinheiten, je Stück als Anteil der Armee gezählt
+export const ARTY_ARMY = 12; // eigene Kampfeinheiten, ab denen die KI Mörsertrupps und einen Raketenwerfer ausbildet
+export const MORTAR_MAX = 2; // höchstens so viele Mörsertrupps (Infanterie, Kaserne)
+export const MLRS_MAX = 1; // höchstens so viele Raketenwerfer (Fabrikhalle)
+export const ARTY_FIRE_TYPES = ['mortarteam', 'mlrs']; // Einheiten, die die KI auf Ziele schießen lässt (Befehl mortarTarget)
+export const ARTY_FIRE_EVERY = 4; // s zwischen zwei Zielwahlen je Artillerie-Einheit (sie wählt neu oder schweigt)
+export const ARTY_GROUP = 3; // sichtbare gegnerische Einheiten innerhalb ARTY_GROUP_R, ab denen die Gruppe ein Ziel ist
+export const ARTY_GROUP_R = 120; // px Umkreis, in dem Gegner als eine Gruppe zählen
 export const SUPPLY_MIN = 0.25; // Versorger lädt nach, wenn die Ladung unter diesem Anteil liegt
 export const SURPLUS_MIN = 120; // Pendler fährt nur, wenn die Quelle so viel Überschuss hat
 export const ROUTE_HOLD = 20; // s, früheste Neuplanung einer Pendler-Route

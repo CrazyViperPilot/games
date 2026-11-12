@@ -9,7 +9,7 @@ import { UNITS } from '../../data/units.js';
 import { canGarrison } from '../../game/garrison.js';
 import { radioEta } from '../../game/radio.js';
 import { weatherSight } from '../../game/weather.js';
-import { RESERVE_FROM, WAVE_NEUTRAL, SCOUT_EVERY, SCOUT_MOVE, JET_GROUP, JET_EVERY, JET_QUEUE, THREAT_RANGE, THREAT_DANGER, GATHER_DIST, ZONE_GATHER_DIST, RALLY_MOVE, RESERVE, DRY, THREAT_PER_UNIT, WAVE_ODDS, WAVE_PATIENCE, WAVE_MIN, SCOUT_MIN_ARMY, SCOUT_FROM, SCOUT_FUEL, SCOUT_REFILL, WX_SCOUT_SIGHT, WX_SCOUT_ARMY, WX_SCOUT_FROM, WX_FOG_SIGHT, WX_FOG_WAVE, RAID_MIN, RAID_SHARE, FALLBACK_ODDS, FALLBACK_MIN_FOES, FALLBACK_DIST, FALLBACK_HOLD, ART_BEHIND, ART_EVERY, GARRISON_SHARE, GARRISON_RANGE, GARRISON_EVERY, STORM_EVERY, STORM_RANGE, STORM_RATIO, STORM_WIRE, STORM_MIN, STORM_MAX, STORM_MARCH, HOUSE_WORK_EVERY, HOUSE_WORK_ORDER, HOUSE_WORK_RESERVE, CMD_BEHIND, CMD_DANGER, CMD_MOVE, RADIO_NEAR, RADIO_EVERY, RADIO_GATHER, RADIO_GATHER_R, RADIO_GATHER_SHARE } from '../../data/ai.js';
+import { RESERVE_FROM, WAVE_NEUTRAL, SCOUT_EVERY, SCOUT_MOVE, JET_GROUP, JET_EVERY, JET_QUEUE, THREAT_RANGE, THREAT_DANGER, GATHER_DIST, ZONE_GATHER_DIST, RALLY_MOVE, RESERVE, DRY, THREAT_PER_UNIT, WAVE_ODDS, WAVE_PATIENCE, WAVE_MIN, SCOUT_MIN_ARMY, SCOUT_FROM, SCOUT_FUEL, SCOUT_REFILL, WX_SCOUT_SIGHT, WX_SCOUT_ARMY, WX_SCOUT_FROM, WX_FOG_SIGHT, WX_FOG_WAVE, RAID_MIN, RAID_SHARE, FALLBACK_ODDS, FALLBACK_MIN_FOES, FALLBACK_DIST, FALLBACK_HOLD, ART_BEHIND, ART_EVERY, GARRISON_SHARE, GARRISON_RANGE, GARRISON_EVERY, STORM_EVERY, STORM_RANGE, STORM_RATIO, STORM_WIRE, STORM_MIN, STORM_MAX, STORM_MARCH, HOUSE_WORK_EVERY, HOUSE_WORK_ORDER, HOUSE_WORK_RESERVE, CMD_BEHIND, CMD_DANGER, CMD_MOVE, RADIO_NEAR, RADIO_EVERY, RADIO_GATHER, RADIO_GATHER_R, RADIO_GATHER_SHARE, ARTY_FIRE_TYPES, ARTY_FIRE_EVERY, ARTY_GROUP, ARTY_GROUP_R } from '../../data/ai.js';
 import { DEF_RANGE, ZONE_FOB_R, TWO_PI, dist, unitVec } from './util.js';
 
 /** Bestellt wird nur an Stellplätzen mit Versorgungsweg zum Lager (Paket „Straßen“: ohne Weg stünde die Ausbildung still). */
@@ -248,6 +248,46 @@ export const combatMethods = {
       if (dist(u.x, u.y, q.x, q.y) <= 200 || !this.once(`art${u.id}`, ART_EVERY)) return;
       this.game.issue(this.team, { type: 'move', ids: [u.id], x: q.x, y: q.y });
     });
+  },
+
+  /**
+   * Mörsertrupp und Raketenwerfer (Paket K2) feuern auf Ziele: alle ARTY_FIRE_EVERY s wählt jede Artillerie-Einheit neu, was sie
+   * in ihrer Reichweite (ab ihrem Mindestabstand) beschießt: zuerst die größte gegnerische Gruppe (ab ARTY_GROUP Einheiten im
+   * Umkreis ARTY_GROUP_R), sonst das nächste gegnerische Gebäude, das das Team sieht. Kein Ziel: Feuer einstellen (dann rückt sie
+   * wieder in Stellung). Befehl mortarTarget über game.issue.
+   */
+  artilleryFire(s) {
+    const guns = s.artillery.filter((u) => ARTY_FIRE_TYPES.includes(u.type));
+    if (!guns.length || !this.once('artFire', ARTY_FIRE_EVERY)) return;
+    const t = this.team;
+    const g = this.game;
+    const groups = []; // Gruppen: Mitte ist ein gesehener Gegner, n die Gegner in ARTY_GROUP_R um ihn
+    for (const e of s.enemies) {
+      let n = 0;
+      for (const f of s.enemies) if (dist(e.x, e.y, f.x, f.y) <= ARTY_GROUP_R) n++;
+      if (n >= ARTY_GROUP) groups.push({ x: e.x, y: e.y, n });
+    }
+    const blds = g.buildings.filter((b) => b.alive && b.built && b.team !== t && g.sees(t, b));
+    for (const u of guns) {
+      const inReach = (x, y) => {
+        const d = dist(u.x, u.y, x, y);
+        return d <= u.def.range && d >= (u.def.minRange ?? 0);
+      };
+      let best = null;
+      for (const p of groups) if (inReach(p.x, p.y) && (!best || p.n > best.n)) best = p;
+      if (!best) {
+        let bestD = Infinity;
+        for (const b of blds) {
+          const d = dist(u.x, u.y, b.x, b.y);
+          if (d < bestD && inReach(b.x, b.y)) {
+            best = b;
+            bestD = d;
+          }
+        }
+      }
+      if (best) g.issue(t, { type: 'mortarTarget', ids: [u.id], x: best.x, y: best.y });
+      else if (u.fireTarget) g.issue(t, { type: 'mortarTarget', ids: [u.id] }); // Ziel löschen
+    }
   },
 
   // ---- Armee -----------------------------------------------------------------------

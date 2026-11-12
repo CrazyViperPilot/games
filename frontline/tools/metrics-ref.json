@@ -1,27 +1,27 @@
 {
  "3": [
   {
-   "steel": 877,
-   "mun": 1491,
-   "trained": 62,
-   "kills": 81,
+   "steel": 761,
+   "mun": 1479,
+   "trained": 53,
+   "kills": 57,
    "fobs": 5,
-   "cells": 361,
+   "cells": 589,
    "houses": 3,
    "storms": 0,
    "workRoutes": 1,
    "airDef": 0,
-   "points": 12
+   "points": 14
   },
   {
-   "steel": 423,
-   "mun": 903,
-   "trained": 64,
-   "kills": 72,
+   "steel": 803,
+   "mun": 2255,
+   "trained": 42,
+   "kills": 69,
    "fobs": 5,
-   "cells": 534,
+   "cells": 474,
    "houses": 3,
-   "storms": 0,
+   "storms": 4,
    "workRoutes": 1,
    "airDef": 0,
    "points": 7
@@ -29,58 +29,58 @@
  ],
  "7": [
   {
-   "steel": 703,
-   "mun": 1842,
-   "trained": 47,
-   "kills": 72,
+   "steel": 1552,
+   "mun": 2373,
+   "trained": 53,
+   "kills": 59,
    "fobs": 5,
-   "cells": 570,
-   "houses": 2,
-   "storms": 0,
-   "workRoutes": 1,
+   "cells": 526,
+   "houses": 4,
+   "storms": 7,
+   "workRoutes": 0,
    "airDef": 0,
-   "points": 10
+   "points": 5
   },
   {
-   "steel": 378,
-   "mun": 522,
-   "trained": 44,
-   "kills": 68,
+   "steel": 900,
+   "mun": 1226,
+   "trained": 43,
+   "kills": 64,
    "fobs": 5,
-   "cells": 439,
+   "cells": 587,
    "houses": 4,
-   "storms": 0,
-   "workRoutes": 2,
+   "storms": 3,
+   "workRoutes": 0,
    "airDef": 0,
-   "points": 13
+   "points": 18
   }
  ],
  "11": [
   {
-   "steel": 622,
-   "mun": 1255,
-   "trained": 47,
-   "kills": 77,
+   "steel": 563,
+   "mun": 2585,
+   "trained": 51,
+   "kills": 68,
    "fobs": 5,
-   "cells": 607,
-   "houses": 3,
-   "storms": 3,
+   "cells": 582,
+   "houses": 4,
+   "storms": 4,
    "workRoutes": 1,
-   "airDef": 1,
-   "points": 15
+   "airDef": 0,
+   "points": 6
   },
   {
-   "steel": 845,
-   "mun": 1625,
-   "trained": 45,
-   "kills": 67,
+   "steel": 646,
+   "mun": 847,
+   "trained": 49,
+   "kills": 65,
    "fobs": 5,
-   "cells": 642,
-   "houses": 3,
+   "cells": 490,
+   "houses": 4,
    "storms": 0,
    "workRoutes": 1,
    "airDef": 0,
-   "points": 0
+   "points": 12
   }
  ]
 }
