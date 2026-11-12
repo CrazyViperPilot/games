@@ -912,6 +912,42 @@ function drone(P) {
   return { S, foot: [-8.2, 7.2, -11, 11] };
 }
 
+/**
+ * Kamikazedrohne „fpv“ (Paket „Kamikazedrohne“): FPV-Quadrocopter im Mini-Format (Durchmesser ≈ 0,6 m, im Modell ≈ 13 Bildpunkte,
+ * zur Lesbarkeit groß gezeichnet). Flacher X-Rahmen mit vier Armen, an jedem Armende ein Motor mit Propellerscheibe. Die Scheiben
+ * sind fest: `rotors` setzt Rotoren nur auf die Mittelachse (y = 0), die Propeller stehen aber auf den Diagonalen. In der Mitte ein
+ * Akkukasten mit Teamstreifen, darunter festgezurrt der Sprengkopf (dicker Zylinder, Spitze nach vorn), vorn die kleine Kamera.
+ * Keine Zustände (kein `rotors`, kein `tail`).
+ */
+function fpv(P) {
+  const S = [];
+  const body = mix(P.air, '#3a3f43', 0.45);
+  const dark = mix(body, '#000000', 0.3);
+  const PROP = '#c9ced2';
+  const A = 3.5; // Motorabstand von der Mitte (je Achse)
+  const Z = 3.2; // Höhe des Rahmens
+  for (const sx of [-1, 1]) {
+    for (const sy of [-1, 1]) {
+      const px = sx * A;
+      const py = sy * A;
+      S.push(cyl([0, 0, Z], [px, py, Z], 0.45, 0.4, 4, body)); // Arm
+      S.push(cyl([px, py, Z], [px, py, Z + 0.9], 0.85, 0.8, 6, dark)); // Motor
+      S.push(cyl([px, py, Z + 1.3], [px, py, Z + 1.42], 1.8, 1.8, 12, PROP)); // Propellerscheibe
+    }
+  }
+  S.push(box(-2, 2, -2, 2, Z - 0.15, Z + 0.15, dark)); // Rahmenplatte in der Mitte
+  S.push(box(-1.6, 1.6, -1.3, 1.3, Z + 0.15, Z + 1.5, body)); // Akkukasten
+  S.push(fine(box(-1.2, 1.2, -0.7, 0.7, Z + 1.5, Z + 1.62, P.mark, { noLine: true, only: 'top' }))); // Teamstreifen
+  // Sprengkopf unter der Platte: dicker Zylinder, Spitze nach vorn
+  S.push(cyl([-1.9, 0, 1.7], [1.6, 0, 1.7], 1.4, 1.4, 8, OLIVE));
+  S.push(cyl([1.6, 0, 1.7], [2.9, 0, 1.7], 1.4, 0.3, 8, OLIVE));
+  S.push(fine(box(-0.3, 0.3, -1.6, 1.6, 0.25, Z - 0.15, dark, { noLine: true }))); // Spanngurt
+  // Kamera vorn auf der Platte
+  S.push(box(1.8, 2.6, -0.6, 0.6, Z - 0.1, Z + 0.5, dark));
+  S.push(fine(ball([2.75, 0, Z + 0.2], 0.45, 0.45, 0.45, GLASS)));
+  return { S, foot: [-5.3, 5.3, -5.3, 5.3] };
+}
+
 function gunship(P) {
   const S = [];
   const body = mix(P.air, '#3c4136', 0.35);
@@ -1655,7 +1691,7 @@ function soldier(P, o) {
   return { S, foot: [-1.6, 1.6, -1.6, 1.6], inf: true };
 }
 
-const MODELS = { tank, ifv, flak, sam, gepard, pzh, mlrs, truck, scout, fobTruck, engineer, excavator, bridgelayer, littlebird, drone, fpv: littlebird, gunship, transporter, recovery, jammer, f16, f22, su27, u2, a10, c130 };
+const MODELS = { tank, ifv, flak, sam, gepard, pzh, mlrs, truck, scout, fobTruck, engineer, excavator, bridgelayer, littlebird, drone, fpv, gunship, transporter, recovery, jammer, f16, f22, su27, u2, a10, c130 };
 const INFANTRY = { rifleman: 'rifleman', medic: 'medic', at: 'at', manpads: 'manpads', flamer: 'rifleman', mortarteam: 'rifleman', sniper: 'sniper', sapper: 'rifleman', commander: 'commander' };
 const TEAM_KEYS = ['b', 'r', 'n', 'd'];
 
