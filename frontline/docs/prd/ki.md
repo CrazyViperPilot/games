@@ -45,7 +45,7 @@ Verhalten: FOB-Fahrzeuge gründen FOBs (eins zur Zeit, die KI spart darauf, auß
 | Takt | Denkschritt `think` | Leicht 3 s · Normal 2 s · Schwer 1 s |
 | Luftabwehr (seit v5.71) | Anteil je gesehenem Luftziel `AIR_PER` · höchstens `AIR_MAX` · Aufteilung `AIR_SPLIT` (Hubschrauber: Gepard 60 %, Flak 40 %; Flugzeuge: SAM 70 %, Gepard 30 %) · Gedächtnis je Luftart `AIR_MEMORY` | 4 % · 25 % · 120 s |
 | Scharfschützen (seit v5.71) | ab gesehenen Soldaten `SNIPER_FROM` · ab eigenen Kampfeinheiten `SNIPER_ARMY` · Anteil `SNIPER_SHARE` (nicht auf Leicht) | 10 · 12 · 4 % |
-| Artillerie (seit K2) | Ab `ARTY_ARMY` 12 · Mörsertrupp `MORTAR_MAX` 2 · Raketenwerfer `MLRS_MAX` 1 · Zielwahl `ARTY_FIRE_EVERY` 4 s · Gruppe `ARTY_GROUP` 3 im Umkreis `ARTY_GROUP_R` 120 px | siehe §10 |
+| Artillerie (seit K2) | Ab `ARTY_ARMY` 12 · Mörsertrupp `MORTAR_MAX` 2 · Raketenwerfer `MLRS_MAX` 1 · nur mit Geldreserve `ARTY_MONEY` 1500 nach dem Kauf · Zielwahl `ARTY_FIRE_EVERY` 4 s · Gruppe `ARTY_GROUP` 3 im Umkreis `ARTY_GROUP_R` 120 px | siehe §10 |
 | Unterstützer (seit K1) | Sanitäter `MEDIC_EVERY` 8 · `MEDIC_MAX` 3 · MANPADS `MANPADS_SPLIT` 40 % · `MANPADS_MAX` 4 · Flammenwerfer `FLAMER_MAX` 3 · Aufklärungsfahrzeug ab `RECON_ARMY` 10 · Bergepanzer ab `RECOVERY_VEH` 5 Fahrzeugen · Störsender `JAM_TARGETS` · Begleiter `ESCORT_EVERY` 10 s, `ESCORT_DIST` 250 px · Sonderziele zusammen `SHARE_CAP` 60 % | siehe §10 |
 | Artillerie | Anteil `ART_SHARE` · ab Kampfeinheiten `ART_FROM` · Abstand hinter der Armee `ART_BEHIND` · Stellungswechsel `ART_EVERY` | 6 % · 15 · 450 px · 5 s |
 | Angriff | `attackStrength` (Wert der angreifenden Einheiten in Geld) | Leicht 2500 · Normal 2000 · Schwer 1600 |

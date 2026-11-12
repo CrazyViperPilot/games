@@ -94,6 +94,7 @@ export const ART_EVERY = 5; // s zwischen zwei Stellungswechseln einer Haubitze
 export const ARTY_ARMY = 12; // eigene Kampfeinheiten, ab denen die KI Mörsertrupps und einen Raketenwerfer ausbildet
 export const MORTAR_MAX = 2; // höchstens so viele Mörsertrupps (Infanterie, Kaserne)
 export const MLRS_MAX = 1; // höchstens so viele Raketenwerfer (Fabrikhalle)
+export const ARTY_MONEY = 1500; // Geld, das nach dem Kauf übrig bleiben muss, bevor die KI Artillerie (Mörsertrupp, Raketenwerfer) ausbildet (Festung und Forschung gehen vor)
 export const ARTY_FIRE_TYPES = ['mortarteam', 'mlrs']; // Einheiten, die die KI auf Ziele schießen lässt (Befehl mortarTarget)
 export const ARTY_FIRE_EVERY = 4; // s zwischen zwei Zielwahlen je Artillerie-Einheit (sie wählt neu oder schweigt)
 export const ARTY_GROUP = 3; // sichtbare gegnerische Einheiten innerhalb ARTY_GROUP_R, ab denen die Gruppe ein Ziel ist

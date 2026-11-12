@@ -7,7 +7,7 @@ import { UNITS } from '../../data/units.js';
 import { hasCommander } from '../../game/commander.js';
 import { researchBlock, RESEARCH_KEYS } from '../../game/research.js';
 import { RESEARCH } from '../../data/research.js';
-import { COUNTER_FLOOR, QUEUE_RICH, QUEUE_LONG, QUEUE_SHORT, MIX, COUNTER_MIN, COUNTER_WEIGHT, AIR_PER, AIR_MAX, AIR_SPLIT, AIR_MEMORY, SNIPER_FROM, SNIPER_ARMY, SNIPER_SHARE, SHARE_CAP, MEDIC_EVERY, MEDIC_MAX, MANPADS_SPLIT, MANPADS_MAX, FLAMER_MAX, RECON_ARMY, RECOVERY_VEH, JAM_TARGETS, ESCORT_TYPES, ESCORT_EVERY, ESCORT_DIST, ART_SHARE,ART_FROM, ARTY_ARMY, MORTAR_MAX, MLRS_MAX, CMD_RESERVE, CMD_FROM, UPGRADES, UPGRADE_RESERVE, HELI_MIN_MONEY } from '../../data/ai.js';
+import { COUNTER_FLOOR, QUEUE_RICH, QUEUE_LONG, QUEUE_SHORT, MIX, COUNTER_MIN, COUNTER_WEIGHT, AIR_PER, AIR_MAX, AIR_SPLIT, AIR_MEMORY, SNIPER_FROM, SNIPER_ARMY, SNIPER_SHARE, SHARE_CAP, MEDIC_EVERY, MEDIC_MAX, MANPADS_SPLIT, MANPADS_MAX, FLAMER_MAX, RECON_ARMY, RECOVERY_VEH, JAM_TARGETS, ESCORT_TYPES, ESCORT_EVERY, ESCORT_DIST, ART_SHARE,ART_FROM, ARTY_ARMY, ARTY_MONEY, MORTAR_MAX, MLRS_MAX, CMD_RESERVE, CMD_FROM, UPGRADES, UPGRADE_RESERVE, HELI_MIN_MONEY } from '../../data/ai.js';
 import { dist } from './util.js';
 
 export const produceMethods = {
@@ -198,8 +198,9 @@ export const produceMethods = {
   artyShares(s, add) {
     if ((s.combat?.length ?? 0) < ARTY_ARMY) return;
     const army = s.combat.length;
-    add('mortarteam', MORTAR_MAX / army);
-    add('mlrs', MLRS_MAX / army);
+    const money = this.game.teams[this.team].res.money;
+    if (money >= UNITS.mortarteam.cost.money + ARTY_MONEY) add('mortarteam', MORTAR_MAX / army);
+    if (money >= UNITS.mlrs.cost.money + ARTY_MONEY) add('mlrs', MLRS_MAX / army);
   },
 
   /**

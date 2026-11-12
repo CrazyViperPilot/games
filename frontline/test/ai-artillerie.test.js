@@ -7,7 +7,7 @@ import { AI } from '../js/ai/ai.js';
 import { classic } from './classic.js';
 import { BALANCE } from '../js/data/balance.js';
 import { UNITS } from '../js/data/units.js';
-import { ARTY_ARMY, MORTAR_MAX, MLRS_MAX, ARTY_FIRE_EVERY, ARTY_GROUP } from '../js/data/ai.js';
+import { ARTY_MONEY, ARTY_ARMY, MORTAR_MAX, MLRS_MAX, ARTY_FIRE_EVERY, ARTY_GROUP } from '../js/data/ai.js';
 
 BALANCE.slotCap = 1000; // diese Tests prüfen nicht das Einheitenlimit
 
@@ -26,6 +26,7 @@ function scene(seed = 7) {
 
 test('Mörsertrupp und Raketenwerfer: erst ab ARTY_ARMY Kampfeinheiten, höchstens MORTAR_MAX / MLRS_MAX', () => {
   const g = new Game({ seed: 7 });
+  g.teams[1].res.money = g.teams[0].res.money = 1e6; // genug Geld: die Reserve ARTY_MONEY greift hier nicht
   const ai = new AI(g, 1, 'normal');
   const low = ai.counterMix(situation(ARTY_ARMY - 1));
   assert.equal(low.mortarteam, undefined, 'unter ARTY_ARMY kein Mörsertrupp');
@@ -35,6 +36,8 @@ test('Mörsertrupp und Raketenwerfer: erst ab ARTY_ARMY Kampfeinheiten, höchste
   assert.ok(Math.abs(mix.mlrs - MLRS_MAX / ARTY_ARMY) < 1e-9, 'Raketenwerfer als Anteil an der Armee');
   const big = ai.counterMix(situation(ARTY_ARMY * 4));
   assert.ok(Math.abs(big.mortarteam * ARTY_ARMY * 4 - MORTAR_MAX) < 1e-9, 'Zahl bleibt bei größerer Armee gleich');
+  g.teams[0].res.money = g.teams[1].res.money = ARTY_MONEY; // zu wenig über der Reserve
+  assert.equal(ai.counterMix(situation(ARTY_ARMY * 4)).mlrs, undefined, 'ohne Geldreserve keine Artillerie');
   const easy = new AI(g, 1, 'easy');
   assert.equal(easy.counterMix(situation(ARTY_ARMY * 4)).mortarteam, undefined, 'auf Leicht keine Artillerie');
 });
