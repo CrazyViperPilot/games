@@ -420,6 +420,28 @@ export const UNITS = {
     seats: 5,
     hotkey: 'D',
   },
+  // Aufklärungsdrohne (Paket E10): Hubschrauber wie der Little Bird, aber sehr billig, zäh genug für Aufklärung, langsam, ohne Passagiere
+  // und unbewaffnet. Sicht 450 deckt Nebel auf; Treibstoff 40 (kehrt zum Tanken auf den Heliport zurück wie ein Hubschrauber).
+  drone: {
+    name: 'Aufklärungsdrohne',
+    short: 'Drohne', // Kurzname in der Befehlskarte
+    armor: 'air',
+    air: true,
+    hp: 120,
+    speed: 130,
+    radius: 8,
+    sight: 450,
+    range: 0,
+    cooldown: 0,
+    damage: null,
+    cost: { money: 200 },
+    buildTime: 12,
+    ammoPerShot: 0,
+    fuelPerSec: 0.5,
+    fuelMax: 40,
+    seats: 0, // keine Passagiere
+    hotkey: 'R', // Heliport-Menü: D Little Bird, F Transporter, G Kampfheli (R frei)
+  },
   transporter: {
     name: 'Transporthubschrauber',
     short: 'Transp.-Heli', // Kurzname in der Befehlskarte

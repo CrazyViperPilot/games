@@ -24,6 +24,7 @@
 | Schützenpanzer | Hauptstadt | **6 Soldaten** Platz. Schnell, gut gegen Infanterie und leichte Fahrzeuge |
 | Kampfpanzer | Hauptstadt | Teuer, schwer gepanzert, stark gegen alles (Hauptkanone trifft keine Hubschrauber, das MG schwach) |
 | Little Bird | Hauptstadt | Unbewaffnet, schnell, **5 Passagiere** (Infanterie, Baufahrzeug) |
+| Aufklärungsdrohne (Paket E10) | Heliport (nur mit Stadt) | Unbewaffnet, **0 Passagiere**, 120 HP, langsam, Sicht 450 (deckt Nebel auf), Treibstoff 40 (tankt auf dem Heliport); billig: 200 Geld, 30 Metall |
 | Transporthubschrauber | Hauptstadt | Unbewaffnet, **9 Passagiere** und **400 Ressourcen** (laden/entladen/pendeln wie ein LKW) |
 | AH-64 (Kampfhubschrauber) | Hauptstadt | Bordkanone und 10 Raketen (Tabelle oben), 650 HP, 70 Treibstoff; Nachtanken/-laden in einer FOB |
 | Flakpanzer (seit v4.54) | Hauptstadt | **2 Plätze**, 300 HP, Schnellfeuer-Flak gegen Hubschrauber, schießt nur auf Luftziele. **20 Munition je Schuss**, Reichweite 330, 0,8 s Kadenz, 40 Schaden je Treffer. **Trefferchance** 85 % gegen ein stehendes Ziel, sinkt mit dessen Tempo (×120 / (120 + Tempo in px/s), also gegen Little Bird bei voller Fahrt rund 35 %), und mit der Entfernung (bis −30 % am Waffenrand). Verfehlte Schüsse kosten trotzdem Munition. |
@@ -77,6 +78,7 @@ Die Tabellen „Werte“ und „Waffen und Schaden“ erzeugt `npm run docs` aus
 | Schützenpanzer | A | 3 | 450 | 85 | 300 | 240 | 250 Geld | 12 s | 40 / 0,4 |
 | Kampfpanzer | S | 5 | 1100 | 60 | 320 | 300 | 500 Geld | 20 s | 60 / 0,6 |
 | Little Bird | D | 1 | 220 | 170 | 380 | – | 350 Geld | 15 s | 60 / 0,5 |
+| Aufklärungsdrohne | R | 1 | 120 | 130 | 450 | – | 200 Geld | 12 s | 40 / 0,5 |
 | Transporthubschrauber | F | 1 | 500 | 130 | 320 | – | 600 Geld | 20 s | 90 / 0,7 |
 | Kampfhubschrauber | G | 1 | 650 | 150 | 400 | 340 | 900 Geld | 28 s | 70 / 0,8 |
 | F-16 | K | 3 | 450 | 420 | 560 | 640 | 1400 Geld | 40 s | 55 / 1 |

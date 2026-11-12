@@ -34,7 +34,7 @@ jedes Paket ist für sich lauffähig, getestet und committet.
 | E7 | Bergepanzer (`recovery`) | `engineer` (Reparatur) | repariert Fahrzeuge im Feld | gebaut |
 | E8 | Pionier (`sapper`) | `rifleman` | legt getarnte Panzerminen, räumt Minen | gebaut |
 | E9 | Störsender (`jammer`) | `flak` | senkt gegnerische Trefferchance von Lenkwaffen im Umkreis | gebaut |
-| E10 | Aufklärungsdrohne (`drone`) | `littlebird` | billig, Sicht, begrenzte Flugzeit | offen |
+| E10 | Aufklärungsdrohne (`drone`) | `littlebird` | billig, Sicht, begrenzte Flugzeit | gebaut |
 | E11 | Kamikazedrohne (`fpv`) | `drone` aus E10 | Einweg, stürzt sich auf ein Fahrzeug | offen |
 | E12 | Erdkampfflugzeug (`a10`) | `f16` | Bordkanone gegen Bodenziele, lange Einsatzzeit | offen |
 | E13 | Transportflugzeug + Fallschirmjäger (`c130`) | `f16`, `transporter` | setzt Infanterie über Punkt ab | offen |
