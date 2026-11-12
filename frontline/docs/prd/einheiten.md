@@ -8,6 +8,7 @@
 | Einheit | Gebaut in | Rolle |
 |---|---|---|
 | Schütze | Hauptstadt | Billige Infanterie, stark gegen Infanterie; trägt 50 Baumaterial, baut daraus Mauern und Tore |
+| Sanitäter | Hauptstadt, Kaserne | Unbewaffnete Infanterie (90 Geld, Taste K); heilt jede Sekunde 6 HP der am stärksten verletzten eigenen Infanterie im Umkreis von 90 px (nicht sich selbst, nicht in Häusern oder Fahrzeugen) |
 | Panzerabwehrsoldat | Hauptstadt | Langsam feuernd, stark gegen Fahrzeuge und Gebäude; baut Mauern und Tore |
 | Scharfschütze | Hauptstadt | Getarnt (Ghillie-Anzug), sehr große Reichweite, **ein Treffer tötet jeden Soldaten**, aber nur alle 8 s ein Schuss; gegen Fahrzeuge und Gebäude fast wirkungslos; baut nicht, kann als Passagier mitfahren |
 | LKW | Hauptstadt | Unbewaffnet, schnell, **2 Soldaten** Platz. **Logistik:** lädt Ressourcen an einer FOB (400), bringt sie zu einer anderen FOB, pendelt auf Routen, versorgt Truppen im Feld |
@@ -51,6 +52,7 @@ Die Tabellen „Werte“ und „Waffen und Schaden“ erzeugt `npm run docs` aus
 | Einheit | Taste | Plätze | HP | Tempo | Sicht | Reichweite | Preis | Ausbildung | Treibstoff (max / je s) |
 |---|---|---|---|---|---|---|---|---|---|
 | Schütze | Q | 1 | 100 | 45 | 260 | 200 | 60 Geld | 5 s | – |
+| Sanitäter | K | 1 | 100 | 45 | 260 | – | 90 Geld | 5 s | – |
 | Panzerabwehrsoldat | W | 1 | 90 | 40 | 260 | 240 | 120 Geld | 8 s | – |
 | Scharfschütze | T | 1 | 70 | 38 | 440 | 480 | 220 Geld | 10 s | – |
 | Kommandeur | C | 0 | 300 | 42 | 340 | 180 | 400 Geld | 20 s | – |

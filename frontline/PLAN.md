@@ -25,7 +25,7 @@ jedes Paket ist für sich lauffähig, getestet und committet.
 
 | Paket | Einheit (Typ-ID) | Vorbild | Kern | Stand |
 |---|---|---|---|---|
-| E1 | Sanitäter (`medic`) | `rifleman` | heilt Soldaten im Umkreis | offen |
+| E1 | Sanitäter (`medic`) | `rifleman` | heilt Soldaten im Umkreis | gebaut |
 | E2 | MANPADS-Soldat (`manpads`) | `at` + Waffe der `sam` | Flugabwehrrakete zu Fuß | offen |
 | E3 | Flammenwerfer (`flamer`) | `rifleman` | kurze Reichweite, stark gegen besetzte Häuser und Infanterie | offen |
 | E4 | Mörsertrupp (`mortarteam`) | `pzh` (Feuer auf Punkt) | leichter Mörser zu Fuß | offen |

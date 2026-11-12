@@ -31,6 +31,7 @@ import { hasCommander, updateCommanders, commanderFallen } from './commander.js'
 import { updateRadio, radioStarted, radioLost } from './radio.js';
 import { createWeather, updateWeather, setWeather, WEATHER_NAMES } from './weather.js';
 import { updateAbilities } from './abilities.js';
+import { updateMedics } from './medic.js'; // Sanitäter heilen (Paket E1)
 import { createResearch, updateResearch, rangeMul } from './research.js';
 import { createBridges, updateBridges, bridgeUnder } from './river.js';
 import { createRoads } from './roads.js';
@@ -1270,6 +1271,7 @@ export class Game {
     updateBridges(this, dt);
     separate(this);
     updateCommanders(this, dt);
+    updateMedics(this, dt); // Sanitäter heilen verletzte Infanterie im Umkreis (Paket E1)
     updateCombat(this, dt);
     updateZone(this, dt);
     updateHot(this, dt);

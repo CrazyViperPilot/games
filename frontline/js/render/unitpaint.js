@@ -1319,6 +1319,9 @@ function soldier(P, o) {
     S.push(cyl([1.2, 0.7, 10.2], [4.2, 0.6, 10.2], 0.42, 0.42, 6, '#1c1e20')); // Zielfernrohr
   } else if (kind === 'commander') {
     S.push(cyl([0.5, 0.8, 9.2], [5, 0.6, 9.4], 0.32, 0.3, 4, GUN)); // Maschinenpistole
+  } else if (kind === 'medic') {
+    S.push(fine(box(1.3, 1.5, -1.4, 1.4, 8.6, 9.0, WHITE))); // weißes Kreuz auf der Brust (unbewaffnet)
+    S.push(fine(box(1.3, 1.5, -0.5, 0.5, 7.9, 9.7, WHITE)));
   } else {
     S.push(cyl([-0.8, 0.8, 9], [6.6, 0.5, 9.4], 0.32, 0.28, 4, GUN)); // Gewehr
     S.push(fine(box(1.6, 2.6, 0.45, 1.1, 7.9, 9, GUN))); // Magazin
@@ -1327,7 +1330,7 @@ function soldier(P, o) {
 }
 
 const MODELS = { tank, ifv, flak, sam, gepard, pzh, truck, fobTruck, engineer, excavator, littlebird, gunship, transporter, f16, f22, su27, u2 };
-const INFANTRY = { rifleman: 'rifleman', at: 'at', sniper: 'sniper', commander: 'commander' };
+const INFANTRY = { rifleman: 'rifleman', medic: 'medic', at: 'at', sniper: 'sniper', commander: 'commander' };
 const TEAM_KEYS = ['b', 'r', 'n', 'd'];
 
 const paintOf = (team) => (team === SHOWROOM ? DISPLAY : TEAM_PAINT[team] ?? NEUTRAL);

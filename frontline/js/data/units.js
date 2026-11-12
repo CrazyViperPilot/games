@@ -32,6 +32,24 @@ export const UNITS = {
     canRide: true,
     hotkey: 'Q',
   },
+  // Sanitäter (Paket E1): unbewaffnet, heilt verletzte eigene Infanterie in seinem Umkreis (js/game/medic.js), keine Mauern bauen.
+  medic: {
+    name: 'Sanitäter',
+    short: 'Sanitäter', // Kurzname in der Befehlskarte
+    armor: 'inf',
+    hp: 100,
+    speed: 45,
+    radius: 6,
+    sight: 260,
+    weapons: [],
+    heal: 6, // HP je Sekunde für die am stärksten verletzte eigene Infanterie im Umkreis (nicht sich selbst)
+    healRange: 90, // Umkreis in px (Mitte zu Mitte)
+    cost: { money: 90 }, // Schütze (60) + 50 %
+    buildTime: 5,
+    fuelPerSec: 0,
+    canRide: true,
+    hotkey: 'K', // im Kasernen- und Hauptstadt-Menü frei (K Ablegen nur am Transporter)
+  },
   at: {
     name: 'Panzerabwehrsoldat',
     short: 'PAK', // Kurzname in der Befehlskarte

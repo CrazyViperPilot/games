@@ -25,7 +25,7 @@ export const RESEARCH = {
   time: [30, 38, 46, 54, 62, 70, 78, 86, 94, 102], // Forschungszeit je Stufe (s, ohne Rechenzentrum)
   // Einheit → Gruppe oder Liste von Gruppen (fehlt = keine eigene Gruppe, dann gelten nur all, veh und air); der Gepard zählt auch zu aa
   groups: {
-    rifleman: 'inf', at: 'inf', sniper: 'inf', commander: 'inf',
+    rifleman: 'inf', medic: 'inf', at: 'inf', sniper: 'inf', commander: 'inf',
     tank: 'tank', ifv: 'ifv', flak: 'aa', sam: 'aa', gepard: ['spaa', 'aa'], pzh: 'art', truck: 'log', engineer: 'log',
     littlebird: 'heli', transporter: 'heli', gunship: 'heli', f16: 'jet', f22: 'jet', u2: 'jet', su27: 'jet',
   },
