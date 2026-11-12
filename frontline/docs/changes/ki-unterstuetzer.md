@@ -1,1 +1,0 @@
-**KI bildet Unterstützer aus** (§10 „KI-Gegner“, Paket K1): Die Armee-KI baut Sanitäter, MANPADS-Soldaten (gegen gesehene Luftziele), Flammenwerfer (gegen besetzte Häuser), ein Aufklärungsfahrzeug, einen Bergepanzer und einen Störsender (gegen gesehene Flugabwehr); Sanitäter und Störsender folgen der Armee.

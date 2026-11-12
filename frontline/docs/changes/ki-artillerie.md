@@ -1,1 +1,0 @@
-**KI bildet Artillerie aus und lässt sie feuern** (§10 „KI-Gegner“, Paket K2): Ab 12 eigenen Kampfeinheiten baut die Armee-KI höchstens zwei Mörsertrupps und einen Raketenwerfer; beide stehen hinter der Armee und schießen alle 4 s auf die größte sichtbare Gegnergruppe oder ein Gebäude in Reichweite.

@@ -1,1 +1,0 @@
-**KI nutzt die Luftwaffe neu** (§10 „KI-Gegner“, Paket K3): Die Armee-KI bildet am Heliport eine Aufklärungsdrohne (ab 10 Kampfeinheiten) und bis zu zwei Kamikazedrohnen aus, die gesehene gegnerische Panzer nahe der Konfliktzone angreifen; am Fliegerhorst ersetzt eine A-10 einen Teil der F-16, wenn der Gegner viele schwere Fahrzeuge hat.

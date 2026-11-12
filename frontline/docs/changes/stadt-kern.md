@@ -1,1 +1,0 @@
-**Stadt ist fester Teil des Spiels** (Startmenü, Hilfe, Doku): Der Schalter „Stadt“ im Startmenü entfällt, Partien starten immer mit Stadt (`BALANCE.menuDefaults.city` entfernt, `startGame` übergibt `city: true`); die Hilfe und die Doku beschreiben nur noch die Stadt-Variante. Spielstände ohne Stadt laden weiter, die Simulation bleibt unverändert.

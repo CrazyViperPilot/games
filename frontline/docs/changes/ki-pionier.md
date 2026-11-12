@@ -1,1 +1,0 @@
-**KI legt Minen** (§10 „KI-Gegner“, Paket K4): Ab 12 Kampfeinheiten bildet die KI in der Kaserne bis zu zwei Pioniere aus; sie legen Minen auf Straßen und Wegen zwischen der vordersten FOB und der Konfliktzone und laufen danach mit der Armee mit.

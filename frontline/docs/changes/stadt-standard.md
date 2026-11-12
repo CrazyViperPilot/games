@@ -1,1 +1,0 @@
-**Stadt ist Standard in `new Game()`** (Plan Stadt-Kern S2a): Der Konstruktor setzt `city` standardmäßig auf `true`; Spielverhalten mit Stadt bleibt gleich. Tests, die ohne Stadt laufen sollen, geben `city: false` an (u. a. die Referenzläufe ohne Schalter in `test/golden.test.js`, Prüfsummen unverändert). Startmenü und Simulation ändern sich nicht.
