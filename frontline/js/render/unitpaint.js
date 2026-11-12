@@ -708,6 +708,46 @@ function scout(P) {
   return { S, foot: [-14.6, 14.6, -6.8, 6.8] };
 }
 
+// Störsender / EloKa-Fahrzeug (Vorbild: geschützter 6-Rad-LKW mit Shelter): vorn eine gepanzerte Kabine mit schräger Scheibe,
+// hinten ein hoher Shelter-Kasten mit gerundetem Dach. Darauf zwei hohe Peitschenantennen, ein flacher Schüsselstrahler und ein
+// Rahmen mit Dipolen. Ohne Antennen etwa 8 m × 2,5 m × 3,2 m (wie der LKW: rund 4 Welt-Pixel je Meter).
+function jammer(P) {
+  const S = [];
+  S.push(box(-15, 12, -3.4, 3.4, 2.2, 3.8, METAL, { only: 'iso', under: true })); // Rahmen
+  for (const x of [9.5, -5.5, -11]) for (const side of [-1, 1]) S.push(wheel(x, side * 3.9, 2.7, 2.7, 1.6, side)); // sechs Räder
+  // Gepanzerte Kabine: hoher Kasten mit schräger Frontscheibe, Dachpanzerung, Seitenfenster
+  const cab = prX([[8, 3.6], [8, 11.5], [12.5, 11.5], [15, 8.8], [15.4, 3.6]], -5, 5, P.body);
+  S.push(cab);
+  S.push(on(cab, box(8.4, 12.3, -4.6, 4.6, 11.5, 11.8, P.light))); // Dachpanzerung
+  S.push(on(cab, prX([[12.7, 10.6], [14.85, 8.75], [14.9, 7.4], [12.9, 7.4]], -4.5, 4.5, GLASS, { noLine: true })));
+  for (const side of [-1, 1]) S.push(on(cab, box(9, 12, side < 0 ? -5.2 : 5, side < 0 ? -5 : 5.2, 7.6, 10.2, GLASS, { noLine: true, only: 'iso' })));
+  S.push(box(15.2, 16.2, -5, 5, 3, 4.6, METAL)); // Stoßstange
+  for (const side of [-1, 1]) S.push(fine(box(15.3, 15.6, side * 3.8 - 0.8, side * 3.8 + 0.8, 5, 6, '#e8e2b8', { only: 'iso' })));
+  // Shelter: großer Kasten mit abgerundetem Dach, Tür hinten, Teamstreifen an den Seiten
+  const shelter = prY(
+    [[-5.2, 3.8], [-5.2, 12], [-4.2, 13], [4.2, 13], [5.2, 12], [5.2, 3.8]],
+    -15.2,
+    7.4,
+    mix(P.body, OLIVE, 0.2),
+  );
+  S.push(shelter);
+  S.push(on(shelter, box(-15.45, -15.25, -3.8, 3.8, 4.2, 11.6, P.dark, { only: 'iso' }))); // Hecktür
+  for (const side of [-1, 1]) S.push(fine(on(shelter, box(-6, 1, side * 5.2 - 0.06, side * 5.2 + 0.06, 6.6, 7.6, P.mark, { noLine: true, only: 'iso' })))); // Teamstreifen
+  // Peitschenantennen (hoch, dünn) am hinteren Dach
+  for (const y of [-2.2, 2.2]) S.push(on(shelter, cyl([-11, y, 13], [-11, y, 24], 0.3, 0.1, 4, GUN)));
+  // Flacher Schüsselstrahler vorn auf dem Dach, leicht nach vorn geneigt
+  S.push(on(shelter, cyl([2.8, 0, 13], [2.8, 0, 14.6], 0.45, 0.45, 6, GUN)));
+  S.push(on(shelter, cyl([2.8, 0, 14.6], [3.4, 0, 15.2], 3.4, 2.8, 12, '#c5cabf')));
+  // Rahmen mit Dipolen (quer zur Fahrtrichtung, auf zwei Stützen)
+  const fx = -5.5;
+  for (const y of [-4.4, 4.4]) S.push(on(shelter, cyl([fx, y, 13], [fx, y, 14.2], 0.3, 0.3, 4, GUN)));
+  S.push(on(shelter, box(fx - 0.25, fx + 0.25, -4.6, 4.6, 14.2, 14.6, GUN)));
+  S.push(on(shelter, box(fx - 0.25, fx + 0.25, -4.6, 4.6, 18.4, 18.8, GUN)));
+  for (const y of [-4.6, 4.2]) S.push(on(shelter, box(fx - 0.25, fx + 0.25, y, y + 0.4, 14.2, 18.8, GUN)));
+  for (const z of [15.5, 16.9]) for (const y of [-2.4, 0, 2.4]) S.push(fine(on(shelter, cyl([fx - 1.2, y, z], [fx + 1.2, y, z], 0.14, 0.14, 4, GUN))));
+  return { S, foot: [-15.5, 16, -6.2, 6.2] };
+}
+
 function fobTruck(P) {
   const S = [];
   S.push(box(-20, 15, -3.4, 3.4, 2.2, 3.8, METAL, { only: 'iso', under: true }));
@@ -1437,7 +1477,7 @@ function soldier(P, o) {
   return { S, foot: [-1.6, 1.6, -1.6, 1.6], inf: true };
 }
 
-const MODELS = { tank, ifv, flak, sam, gepard, pzh, mlrs, truck, scout, fobTruck, engineer, excavator, bridgelayer: excavator, littlebird, drone: littlebird, fpv: littlebird, gunship, transporter, recovery, jammer: flak, f16, f22, su27, u2, a10: f16, c130: u2 };
+const MODELS = { tank, ifv, flak, sam, gepard, pzh, mlrs, truck, scout, fobTruck, engineer, excavator, bridgelayer: excavator, littlebird, drone: littlebird, fpv: littlebird, gunship, transporter, recovery, jammer, f16, f22, su27, u2, a10: f16, c130: u2 };
 const INFANTRY = { rifleman: 'rifleman', medic: 'medic', at: 'at', manpads: 'manpads', flamer: 'rifleman', mortarteam: 'rifleman', sniper: 'sniper', sapper: 'rifleman', commander: 'commander' };
 const TEAM_KEYS = ['b', 'r', 'n', 'd'];
 
