@@ -1,0 +1,1 @@
+**A-10 mit eigenem 3D-Modell** (§6 „A-10“, nur Bild): Die A-10 zeigt jetzt ihr eigenes Modell mit geradem, breitem Flügel, zwei runden Triebwerksgondeln hoch am Rumpf, doppeltem Seitenleitwerk und Kanonenmündung statt der F-16-Form; am Boden mit Fahrwerk.
