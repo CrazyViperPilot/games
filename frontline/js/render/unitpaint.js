@@ -1648,8 +1648,9 @@ function soldier(P, o) {
     S.push(box(k - 0.9, k + 1.5, side * 0.95 - 0.7, side * 0.95 + 0.7, 0, 1.1, BOOT)); // Stiefel
   }
   S.push(box(-1, 1, -1.85, 1.85, 5.8, 7.4, uni)); // Hüfte
-  // Flammenwerfer und Mörsertrupp: Weste in Uniformfarbe (Teamfarbe nur am Helmband)
-  const plainVest = kind === 'flamer' || kind === 'mortar' || kind === 'sapper';
+  // Flammenwerfer, Mörsertrupp, Pionier und Sanitäter: Weste in Uniformfarbe (Teamfarbe nur am Helmband)
+  const plainVest = kind === 'flamer' || kind === 'mortar' || kind === 'sapper' || kind === 'medic';
+  const RED = '#c8202a'; // Sanitätskreuz
   const vest = box(-1.25, 1.25, -2, 2, 7.2, 11, kind === 'sniper' ? mix(P.vest, '#5a5d3c', 0.5) : plainVest ? '#4d5339' : P.vest);
   S.push(vest);
   S.push(fine(on(vest, box(1.25, 1.4, -1.4, 1.4, 8, 9.4, mix(plainVest ? '#4d5339' : P.vest, '#000000', 0.25), { noLine: true })))); // Taschen
@@ -1660,6 +1661,15 @@ function soldier(P, o) {
     S.push(ball([-2.95, 0, 9.3], 0.5, 0.5, 0.5, '#7b7f66', { n: 6, m: 4 })); // Kugel-Drucktank dazwischen
     S.push(fine(cyl([-2.3, 0.9, 11.2], [-2.3, 0.9, 11.5], 0.3, 0.3, 4, '#3c4130')), fine(cyl([-2.3, -0.9, 11.2], [-2.3, -0.9, 11.5], 0.3, 0.3, 4, '#3c4130'))); // Ventile oben
     S.push(cyl([-2.3, 0.9, 7.5], [-0.4, 2.2, 7.1], 0.22, 0.22, 4, '#1b1d1f'), cyl([-0.4, 2.2, 7.1], [1.2, 1.0, 7.8], 0.22, 0.22, 4, '#1b1d1f')); // Schlauch
+  } else if (kind === 'medic') {
+    // Sanitätsrucksack: großer Kasten auf dem Rücken; die Rückseite trägt ein weißes Feld mit rotem Kreuz (große Teile,
+    // bleiben auch herausgezoomt sichtbar)
+    const pack = box(-3.3, -1.25, -2, 2, 6.9, 11, '#4a5038');
+    S.push(pack);
+    const panel = on(pack, box(-3.45, -3.3, -1.3, 1.3, 7.5, 10.1, WHITE, { noLine: true }));
+    S.push(panel);
+    S.push(on(panel, box(-3.6, -3.45, -0.35, 0.35, 7.9, 9.7, RED, { noLine: true }))); // Kreuz: senkrechter Balken
+    S.push(on(panel, box(-3.6, -3.45, -0.9, 0.9, 8.45, 9.15, RED, { noLine: true }))); // Kreuz: waagerechter Balken
   } else {
     S.push(box(-2.5, -1.25, -1.55, 1.55, 7.6, 10.6, kind === 'at' || kind === 'manpads' ? '#4b5034' : '#474c37')); // Rucksack
   }
@@ -1671,6 +1681,13 @@ function soldier(P, o) {
   } else {
     const helmet = ball([0, 0, 12.9], 1.6, 1.5, 1.3, kind === 'sniper' ? '#4f5a35' : OLIVE, { n: 10, m: 3, half: true });
     S.push(helmet);
+    if (kind === 'medic') {
+      // Sanitäter: kleines weißes Feld vorn am Helm (über dem Teamband) mit rotem Kreuz
+      const patch = on(helmet, box(1.4, 1.65, -0.7, 0.7, 13.4, 13.95, WHITE, { noLine: true }));
+      S.push(fine(patch));
+      S.push(fine(on(patch, box(1.65, 1.7, -0.1, 0.1, 13.45, 13.9, RED, { noLine: true })))); // Kreuz: senkrecht
+      S.push(fine(on(patch, box(1.65, 1.7, -0.3, 0.3, 13.6, 13.75, RED, { noLine: true })))); // Kreuz: waagerecht
+    }
     S.push(fine(on(helmet, cyl([0, 0, 12.85], [0, 0, 13.35], 1.62, 1.55, 10, P.mark, { noLine: true })))); // Teamband
   }
   if (kind === 'sniper') {
@@ -1716,8 +1733,23 @@ function soldier(P, o) {
     S.push(box(-1, 1, 1.9, 3.1, 5.9, 7.5, '#4f5536')); // Munitionsbehälter am Gürtel
     S.push(fine(box(-0.4, 0.4, 3.1, 3.3, 6.5, 7, '#3c4130'))); // Verschlussgriff am Behälter
   } else if (kind === 'medic') {
-    S.push(fine(box(1.3, 1.5, -1.4, 1.4, 8.6, 9.0, WHITE))); // weißes Kreuz auf der Brust (unbewaffnet)
-    S.push(fine(box(1.3, 1.5, -0.5, 0.5, 7.9, 9.7, WHITE)));
+    // Sanitäter, unbewaffnet: in der linken Hand eine kleine weiße Sanitätstasche mit rotem Kreuz (hängt an der Hand, folgt
+    // der Gehbewegung); am linken Oberarm eine weiße Armbinde mit rotem Kreuz (Ellbogen → Handgelenk, mitgeschwungen).
+    const elbow = [0, -2.2, 10.4];
+    const wrist = [hand[0] - 1.2 + armSw, -0.6, hand[2] - 0.2];
+    const armAt = (t) => elbow.map((v, i) => v + (wrist[i] - v) * t);
+    const b0 = armAt(0.15);
+    const b1 = armAt(0.5);
+    const bm = armAt(0.32);
+    const band = cyl(b0, b1, 0.7, 0.7, 8, WHITE, { noLine: true });
+    S.push(band); // Armbinde
+    S.push(fine(on(band, box(bm[0] - 0.14, bm[0] + 0.14, bm[1] - 0.9, bm[1] - 0.62, bm[2] - 0.38, bm[2] + 0.38, RED, { noLine: true })))); // Armbinde-Kreuz: senkrecht
+    S.push(fine(on(band, box(bm[0] - 0.36, bm[0] + 0.36, bm[1] - 0.9, bm[1] - 0.62, bm[2] - 0.12, bm[2] + 0.12, RED, { noLine: true })))); // Armbinde-Kreuz: waagerecht
+    const bag = box(1.4, 3.4, -1.9, -0.3, 6.8, 8.6, WHITE); // Sanitätstasche
+    S.push(bag);
+    S.push(fine(box(2.0, 2.8, -1.2, -1.0, 8.6, 8.9, '#1b1d1f'))); // Griff oben
+    S.push(fine(on(bag, box(3.4, 3.55, -1.25, -0.95, 7.1, 8.3, RED, { noLine: true })))); // Taschenkreuz: senkrecht
+    S.push(fine(on(bag, box(3.4, 3.55, -1.6, -0.6, 7.4, 8.0, RED, { noLine: true })))); // Taschenkreuz: waagerecht
   } else if (kind === 'sapper') {
     // Pionier: kurzer Karabiner, runde Panzermine als dicke Scheibe auf dem Tornister (Achse nach hinten), Minensuchgerät
     // mit langem Stiel von der linken Hand schräg nach vorn unten zur flachen Suchspule am Boden, Spaten am Gürtel links.
