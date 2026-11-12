@@ -660,19 +660,18 @@ function bridgelayer(P) {
   S.push(hull);
   lights(S, hull, 13.4, 7, 4.6, -14.2, 6);
   camoSides(S, hull, 7, [[-11, 5, 5.4, 6.7], [2, 4, 5.4, 6.7]], P.camo);
-  // Auflager auf dem Deck: zwei quer liegende Balken, auf denen die Brücke ruht
-  for (const x of [-9.5, 5]) S.push(box(x, x + 2, -6.4, 6.4, 7, 7.6, P.dark));
-  // Brücke, zusammengeklappt: untere und obere Fahrbahnhälfte (breit, flach), vorn und hinten überstehend
-  const low = box(-19, 18, -6, 6, 7.6, 8.8, P.dark);
+  // Brücke, zusammengeklappt, liegt direkt auf der Wanne (Deck z = 7): untere und obere Fahrbahnhälfte (breit, flach),
+  // vorn und hinten überstehend. Die Auflagebalken darunter sind weggefallen (Höhe 0, Brücke sitzt auf dem Deck).
+  const low = box(-19, 18, -6, 6, 7, 8.2, P.dark);
   S.push(low);
-  const up = box(-19, 18, -6, 6, 8.8, 10, P.body);
+  const up = box(-19, 18, -6, 6, 8.2, 9.4, P.body);
   S.push(up);
-  S.push(fine(on(up, box(-18.5, 17.5, -5.2, 5.2, 10, 10.15, P.light, { noLine: true })))); // Fahrbahnrand oben
-  for (const x of [-6, 2, 10]) S.push(fine(on(up, box(x, x + 0.5, -6.2, 6.2, 10, 10.25, P.dark, { noLine: true })))); // Fugen zwischen den Platten
+  S.push(fine(on(up, box(-18.5, 17.5, -5.2, 5.2, 9.4, 9.55, P.light, { noLine: true })))); // Fahrbahnrand oben
+  for (const x of [-6, 2, 10]) S.push(fine(on(up, box(x, x + 0.5, -6.2, 6.2, 9.4, 9.65, P.dark, { noLine: true })))); // Fugen zwischen den Platten
   // Seitenträger: schmale Stege an beiden Längsseiten, über die ganze Höhe der Brücke
   for (const side of [-1, 1]) {
     const y = side * 6.2;
-    S.push(on(low, box(-19.4, 18.4, y - 0.45, y + 0.45, 7.6, 10.4, METAL)));
+    S.push(on(low, box(-19.4, 18.4, y - 0.45, y + 0.45, 7, 9.8, METAL)));
   }
   // Abstützschild vorn, an zwei Armen aus der Wanne
   S.push(box(13.8, 14.6, -7.6, 7.6, 1.8, 6.6, P.dark));
@@ -914,25 +913,25 @@ function drone(P) {
 
 /**
  * Kamikazedrohne „fpv“ (Paket „Kamikazedrohne“): FPV-Quadrocopter im Mini-Format (Durchmesser ≈ 0,6 m, im Modell ≈ 13 Bildpunkte,
- * zur Lesbarkeit groß gezeichnet). Flacher X-Rahmen mit vier Armen, an jedem Armende ein Motor mit Propellerscheibe. Die Scheiben
- * sind fest: `rotors` setzt Rotoren nur auf die Mittelachse (y = 0), die Propeller stehen aber auf den Diagonalen. In der Mitte ein
+ * zur Lesbarkeit groß gezeichnet). Flacher X-Rahmen mit vier Armen, an jedem Armende ein Motor. Die Propeller drehen sich als
+ * `rotors` mit x/y auf den Diagonalen (Scheibe und Blätter live gezeichnet, keine festen Scheiben im Körper). In der Mitte ein
  * Akkukasten mit Teamstreifen, darunter festgezurrt der Sprengkopf (dicker Zylinder, Spitze nach vorn), vorn die kleine Kamera.
- * Keine Zustände (kein `rotors`, kein `tail`).
+ * Keine Zustände (kein `tail`).
  */
 function fpv(P) {
   const S = [];
   const body = mix(P.air, '#3a3f43', 0.45);
   const dark = mix(body, '#000000', 0.3);
-  const PROP = '#c9ced2';
   const A = 3.5; // Motorabstand von der Mitte (je Achse)
   const Z = 3.2; // Höhe des Rahmens
+  const rotors = [];
   for (const sx of [-1, 1]) {
     for (const sy of [-1, 1]) {
       const px = sx * A;
       const py = sy * A;
       S.push(cyl([0, 0, Z], [px, py, Z], 0.45, 0.4, 4, body)); // Arm
       S.push(cyl([px, py, Z], [px, py, Z + 0.9], 0.85, 0.8, 6, dark)); // Motor
-      S.push(cyl([px, py, Z + 1.3], [px, py, Z + 1.42], 1.8, 1.8, 12, PROP)); // Propellerscheibe
+      rotors.push({ x: px, y: py, z: Z + 1.36, r: 1.8, n: 2 }); // Propeller (zwei Blätter) auf dem Motor
     }
   }
   S.push(box(-2, 2, -2, 2, Z - 0.15, Z + 0.15, dark)); // Rahmenplatte in der Mitte
@@ -945,7 +944,7 @@ function fpv(P) {
   // Kamera vorn auf der Platte
   S.push(box(1.8, 2.6, -0.6, 0.6, Z - 0.1, Z + 0.5, dark));
   S.push(fine(ball([2.75, 0, Z + 0.2], 0.45, 0.45, 0.45, GLASS)));
-  return { S, foot: [-5.3, 5.3, -5.3, 5.3] };
+  return { S, rotors, foot: [-5.3, 5.3, -5.3, 5.3] };
 }
 
 function gunship(P) {
@@ -1581,7 +1580,7 @@ function c130(P, o) {
   const S = [];
   const body = mix(P.air, '#9aa3a8', 0.5); // helles Grau, etwas heller als die A-10
   const dark = mix(body, '#000000', 0.3);
-  const PROP = '#5b6168'; // Propellerscheibe, dunkler als der Rumpf
+  const PROP = mix('#5b6168', '#dfe4e7', 0.5); // Propellerscheibe: heller als früher (Mischung mit Hellgrau), damit sie nicht wie Räder wirkt
   const RAMP = '#4a4e52'; // Laderampe
   // Rumpf: Ringe [x, Halbbreite, Halbhöhe, Mitte z]; hinten steigt die Mitte nach oben
   const RING = [
@@ -1612,7 +1611,7 @@ function c130(P, o) {
       S.push(cyl([9.8, y, 7], [-7, y, 7], 2.5, 2.3, 10, body)); // Gondel
       S.push(cyl([-7, y, 7], [-10, y, 7.3], 2.3, 1.1, 8, body)); // Heckkonus
       S.push(cyl([9.8, y, 7], [12.2, y, 7], 2.1, 0.35, 10, METAL)); // Spinner
-      S.push(cyl([10.9, y, 7], [11.2, y, 7], 4.5, 4.5, 12, PROP)); // Propellerscheibe (flach, ohne Animation)
+      S.push(cyl([10.9, y, 7], [11.2, y, 7], 2.25, 2.25, 12, PROP)); // Propellerscheibe (flach, halber Radius, ohne Animation)
     }
     // Seitliche Fahrwerksverkleidung unten am Rumpf; am Boden das Hauptrad darin
     S.push(cyl([-14.5, side * 3.6, 4.1], [-2, side * 3.6, 4.1], 1.45, 1.45, 8, body));
@@ -1729,7 +1728,7 @@ function soldier(P, o) {
     // Bodenplatte), runde Bodenplatte als flache Scheibe auf dem Rücken, Munitionsbehälter am Gürtel rechts.
     S.push(cyl([3, 1.4, 8.8], [-3, 1.4, 11.4], 0.85, 0.6, 8, '#3c4130')); // Mörserrohr
     S.push(fine(cyl([3.1, 1.4, 8.8], [3.4, 1.4, 8.8], 1.0, 1.0, 8, '#1b1d1f', { noLine: true }))); // Mündung
-    S.push(cyl([-2.5, 0, 9.6], [-3.1, 0, 9.6], 2, 2, 12, '#474c37')); // Bodenplatte auf dem Rücken
+    S.push(cyl([-2.5, 0, 9.6], [-3.1, 0, 9.6], 1.6, 1.6, 12, '#474c37')); // Bodenplatte auf dem Rücken (Radius 1,6)
     S.push(box(-1, 1, 1.9, 3.1, 5.9, 7.5, '#4f5536')); // Munitionsbehälter am Gürtel
     S.push(fine(box(-0.4, 0.4, 3.1, 3.3, 6.5, 7, '#3c4130'))); // Verschlussgriff am Behälter
   } else if (kind === 'medic') {
@@ -1773,9 +1772,9 @@ const INFANTRY = { rifleman: 'rifleman', medic: 'medic', at: 'at', manpads: 'man
 const TEAM_KEYS = ['b', 'r', 'n', 'd'];
 
 const paintOf = (team) => (team === SHOWROOM ? DISPLAY : TEAM_PAINT[team] ?? NEUTRAL);
-const SIZE = { tank: 1.12, pzh: 1.08, recovery: 1.12, bridgelayer: 1.12 }; // schwere Fahrzeuge etwas größer, damit sie sich vom Schützenpanzer abheben
+const SIZE = { tank: 1.12, pzh: 1.08, recovery: 1.12, bridgelayer: 1.12, fpv: 2 }; // schwere Fahrzeuge etwas größer, damit sie sich vom Schützenpanzer abheben; fpv (Kamikazedrohne) doppelt, sonst nur ein Punkt
 
-/** Modell um k vergrößern (Körper, Turmdrehpunkt, Grundfläche). */
+/** Modell um k vergrößern (Körper, Turmdrehpunkt, Grundfläche, Rotoren, Heckrotor). */
 function scaleModel(m, k) {
   for (const so of [...m.S, ...(m.turret?.S ?? [])]) {
     so.faces = so.faces.map((f) => f.map((p) => p.map((v) => v * k)));
@@ -1783,6 +1782,17 @@ function scaleModel(m, k) {
   }
   if (m.turret) m.turret.x *= k;
   if (m.foot) m.foot = m.foot.map((v) => v * k);
+  for (const r of m.rotors ?? []) {
+    r.x *= k;
+    r.y = (r.y ?? 0) * k;
+    r.z *= k;
+    r.r *= k;
+  }
+  if (m.tail) {
+    m.tail.x *= k;
+    m.tail.z *= k;
+    m.tail.r *= k;
+  }
 }
 
 const models = new Map(); // Schlüssel → Modell (Körper und Maße); klein, bleibt
@@ -1909,8 +1919,9 @@ function drawRotorsIso(ctx, m, u, x, y, f, hy, now) {
   const s = Math.sin(hy);
   ctx.save();
   for (const [i, r] of m.rotors.entries()) {
-    const cx = r.x * c;
-    const cy = r.x * s;
+    const ry = r.y ?? 0; // seitlicher Versatz (Modellachse), Standard 0 = Mittelachse
+    const cx = r.x * c - ry * s;
+    const cy = r.x * s + ry * c;
     const [hx, hz] = P(cx, cy, r.z);
     ctx.fillStyle = 'rgba(28,30,32,0.16)';
     ctx.beginPath();
@@ -2078,9 +2089,10 @@ function drawRotorsTop(ctx, m, u, face, k, now, zoom) {
   ctx.rotate(face);
   ctx.scale(k, k);
   for (const [i, r] of m.rotors.entries()) {
+    const ry = r.y ?? 0; // seitlicher Versatz, Standard 0
     ctx.fillStyle = 'rgba(28,30,32,0.14)';
     ctx.beginPath();
-    ctx.arc(r.x, 0, r.r, 0, TAU);
+    ctx.arc(r.x, ry, r.r, 0, TAU);
     ctx.fill();
     ctx.strokeStyle = 'rgba(32,34,36,0.8)';
     ctx.lineWidth = Math.max(1 / zoom, 1);
@@ -2089,8 +2101,8 @@ function drawRotorsTop(ctx, m, u, face, k, now, zoom) {
     const sp = spin * (i % 2 ? -1 : 1);
     for (let j = 0; j < r.n; j++) {
       const a = sp + (j / r.n) * TAU;
-      ctx.moveTo(r.x, 0);
-      ctx.lineTo(r.x + Math.cos(a) * r.r, Math.sin(a) * r.r);
+      ctx.moveTo(r.x, ry);
+      ctx.lineTo(r.x + Math.cos(a) * r.r, ry + Math.sin(a) * r.r);
     }
     ctx.stroke();
   }

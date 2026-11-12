@@ -1,0 +1,1 @@
+**Modelle nachgebessert** (Renderer, nur Bild): Kamikazedrohne „fpv“ doppelt so groß und mit drehenden Propellern auf den Diagonalen (feste Scheiben entfallen); C-130 mit kleineren, helleren Propellerscheiben; Brückenleger mit der Brücke tiefer auf der Wanne; Mörsertrupp mit kleinerer Bodenplatte.
