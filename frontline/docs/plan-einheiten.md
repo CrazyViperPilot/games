@@ -39,6 +39,7 @@ jedes Paket ist für sich lauffähig, getestet und committet.
 | E12 | Erdkampfflugzeug (`a10`) | `f16` | Bordkanone gegen Bodenziele, lange Einsatzzeit | gebaut |
 | E13 | Transportflugzeug + Fallschirmjäger (`c130`) | `f16`, `transporter` | setzt Infanterie über Punkt ab | gebaut |
 | E14 | Brückenleger (`bridgelayer`) | `excavator` | legt Behelfsbrücke über eine Flusszelle | gebaut |
+| E15 | Nachbesserungen | – | Fehler aus E1–E14 | offen |
 
 ## Pakete
 
@@ -110,3 +111,10 @@ jedes Paket ist für sich lauffähig, getestet und committet.
 - Fahrzeug, unbewaffnet. Befehl **Brücke legen** (freie Taste) auf eine Flusszelle direkt neben Land: nach 8 s wird die Zelle befahrbar
   (wie eine Brückenfahrbahn, `js/game/river.js` / `bridge`), max. 1 Brücke je Fahrzeug (neue Brücke = alte weg). Brücke hat HP und
   kann zerstört werden. Wegsuche neu berechnen wie beim Bagger. Test: Fahrzeug kommt danach über den Fluss.
+
+### E15 – Nachbesserungen aus E1–E14
+1. **Pionier (E8):** `layMine` setzt die Mine nicht mehr sofort; der Pionier läuft hin (bis 30 px) und legt sie dann (Auftrag wie `dig` des Baggers).
+2. **Störsender (E9):** Raketen des AH-64 (`gunship`) mit `guided: true` markieren; die Gepard-Kanone `twin35` **nicht** (Kanone, keine Lenkwaffe).
+3. **C-130 (E13):** Befehl „Absetzen“ (`dropoff`) für Jets ablehnen und in der Befehlskarte ausblenden; `paradrop` darf ein geparktes Flugzeug annehmen und startet es zuerst über die vorhandene Startlogik (`grep -n "takeoff\|launch" js/game/aircraft.js`).
+4. **Brückenleger (E14):** Wird eine alte Brücke wieder Wasser, Einheiten darauf ans Ufer schieben (vorhandene Funktion zum Freischieben suchen); `u.laid` in savegame mitspeichern.
+5. **MLRS (E6):** `salvoLeft` in savegame mitspeichern, falls Waffenzustand dort gespeichert wird.
