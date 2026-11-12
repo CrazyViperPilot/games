@@ -82,7 +82,7 @@ export const UNITS = {
     radius: 6,
     sight: 260,
     weapons: [
-      { id: 'sam', name: 'Wärmesuchrakete', range: 300, cooldown: 12, rounds: 4, munCost: 250, hitChance: 0.9, targets: ['air'], damage: { air: 250 } },
+      { id: 'sam', name: 'Wärmesuchrakete', range: 300, cooldown: 12, rounds: 4, munCost: 250, hitChance: 0.9, guided: true, targets: ['air'], damage: { air: 250 } },
     ],
     cost: { money: 120 }, // wie Panzerabwehrsoldat
     buildTime: 8,
@@ -286,6 +286,30 @@ export const UNITS = {
     repairCostShare: 0.5, // Baumaterial = cost.money × geheilt/maxHp × 0.5 (wie die Reparatur des Baufahrzeugs, BALANCE.construction)
     hotkey: 'W', // Fabrikhalle: Taste im Fabrikmenü frei (E K R X B A S Z N L O T belegt)
   },
+  // Störsender (Paket E9): unbewaffnetes Fahrzeug, 2 Plätze. Senkt die Trefferchance gegnerischer Lenkwaffen (guided) auf Ziele im Umkreis
+  // jamRange um sich selbst um den Faktor (1 − jam); mehrere Störsender stapeln nicht (js/game/combat.js, jamFactor).
+  jammer: {
+    name: 'Störsender',
+    short: 'Störs', // Kurzname in der Befehlskarte
+    armor: 'light',
+    hp: 300,
+    speed: 60,
+    radius: 12,
+    sight: 260,
+    range: 0,
+    cooldown: 0,
+    damage: null,
+    weapons: [],
+    cost: { money: 150 },
+    buildTime: 8,
+    ammoPerShot: 0,
+    fuelPerSec: 0.3,
+    fuelMax: 40,
+    canRide: false,
+    jam: 0.35, // Abzug der Trefferchance gegnerischer Lenkwaffen (×(1 − jam))
+    jamRange: 300, // Umkreis in px (Mitte zu Mitte) um den Störsender
+    hotkey: 'U', // Fabrikhalle: Taste im Fabrikmenü frei (E K R X B A S Z N L O T W belegt)
+  },
   // Bagger (seit v5.35): räumt mit dem Befehl „Baggern“ (G) Zellen, auch Stadtstraßen der Karte in der Konfliktzone (nicht Brücken),
   // Bäume und Häuser, und reißt eigene Stadtgebäude ab (BALANCE.excavator). Seine Schaufel trifft nur Gebäude, langsam: so zerstört er
   // auch gegnerische Gebäude und Stadtgebäude, wenn er sie angreift.
@@ -456,8 +480,8 @@ export const UNITS = {
     // Luft-Boden-Raketen gegen gepanzerte Fahrzeuge (bevorzugt) und Gebäude. Leer geschossen (alle vier) fliegt sie heim.
     parallel: true,
     weapons: [
-      { id: 'aim', name: 'Luft-Luft-Lenkrakete', range: 640, cooldown: 2.5, rounds: 2, munCost: 150, hitChance: 0.92, targets: ['air'], damage: { air: 700 } },
-      { id: 'agm', name: 'Luft-Boden-Rakete', range: 600, cooldown: 2.5, rounds: 2, munCost: 150, hitChance: 0.92, targets: ['heavy', 'light'], damage: { inf: 160, light: 650, heavy: 1150, struct: 700 } },
+      { id: 'aim', name: 'Luft-Luft-Lenkrakete', range: 640, cooldown: 2.5, rounds: 2, munCost: 150, hitChance: 0.92, guided: true, targets: ['air'], damage: { air: 700 } },
+      { id: 'agm', name: 'Luft-Boden-Rakete', range: 600, cooldown: 2.5, rounds: 2, munCost: 150, hitChance: 0.92, guided: true, targets: ['heavy', 'light'], damage: { inf: 160, light: 650, heavy: 1150, struct: 700 } },
     ],
     cost: { money: 1400 },
     buildTime: 40,
@@ -482,7 +506,7 @@ export const UNITS = {
     // Eine Waffe (kein parallel nötig): sechs Luft-Luft-Lenkraketen, nur gegen Hubschrauber und Flugzeuge
     weapons: [
       // antiHighAlt: greift auch die U-2 in großer Höhe an (highAlt); die übrigen Flugabwehr-Waffen können das nicht (combat.js)
-      { id: 'aim', name: 'Luft-Luft-Lenkrakete', range: 700, cooldown: 2.2, rounds: 6, munCost: 150, hitChance: 0.94, targets: ['air'], antiHighAlt: true, damage: { air: 700 } },
+      { id: 'aim', name: 'Luft-Luft-Lenkrakete', range: 700, cooldown: 2.2, rounds: 6, munCost: 150, hitChance: 0.94, guided: true, targets: ['air'], antiHighAlt: true, damage: { air: 700 } },
     ],
     cost: { money: 1900 },
     buildTime: 55,
@@ -508,8 +532,8 @@ export const UNITS = {
     // Luft-Boden-Raketen gegen gepanzerte Fahrzeuge (bevorzugt) und Gebäude. Leer geschossen (alle vier) fliegt sie heim.
     parallel: true,
     weapons: [
-      { id: 'aim', name: 'Luft-Luft-Lenkrakete', range: 640, cooldown: 2.5, rounds: 2, munCost: 150, hitChance: 0.92, targets: ['air'], damage: { air: 700 } },
-      { id: 'agm', name: 'Luft-Boden-Rakete', range: 600, cooldown: 2.5, rounds: 2, munCost: 150, hitChance: 0.92, targets: ['heavy', 'light'], damage: { inf: 160, light: 650, heavy: 1150, struct: 700 } },
+      { id: 'aim', name: 'Luft-Luft-Lenkrakete', range: 640, cooldown: 2.5, rounds: 2, munCost: 150, hitChance: 0.92, guided: true, targets: ['air'], damage: { air: 700 } },
+      { id: 'agm', name: 'Luft-Boden-Rakete', range: 600, cooldown: 2.5, rounds: 2, munCost: 150, hitChance: 0.92, guided: true, targets: ['heavy', 'light'], damage: { inf: 160, light: 650, heavy: 1150, struct: 700 } },
     ],
     cost: { money: 1600 },
     buildTime: 45,
@@ -573,7 +597,7 @@ export const UNITS = {
     radius: 11,
     sight: 440,
     weapons: [
-      { id: 'sam', name: 'Wärmesuchrakete', range: 420, cooldown: 10, rounds: 4, munCost: 250, hitChance: 0.9, damage: { air: 350 } },
+      { id: 'sam', name: 'Wärmesuchrakete', range: 420, cooldown: 10, rounds: 4, munCost: 250, hitChance: 0.9, guided: true, damage: { air: 350 } },
     ],
     cost: { money: 300 },
     buildTime: 12,
@@ -593,7 +617,7 @@ export const UNITS = {
     radius: 13,
     sight: 480,
     weapons: [
-      { id: 'twin35', name: 'Zwillingskanone 35 mm', range: 420, cooldown: 0.35, rounds: 80, munCost: 8, hitChance: 0.8, speedRef: 400, targets: ['air'], damage: { inf: 8, light: 14, heavy: 2, struct: 6, air: 32, jet: 32 } },
+      { id: 'twin35', name: 'Zwillingskanone 35 mm', range: 420, cooldown: 0.35, rounds: 80, munCost: 8, hitChance: 0.8, guided: true, speedRef: 400, targets: ['air'], damage: { inf: 8, light: 14, heavy: 2, struct: 6, air: 32, jet: 32 } },
     ],
     cost: { money: 650 },
     buildTime: 16,

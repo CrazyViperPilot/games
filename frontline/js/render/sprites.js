@@ -231,7 +231,7 @@ export function drawUnit(ctx, u, color, zoom = 1, aim = null, now = 0, iso = fal
     ctx.strokeRect(2, -1, 11, 2);
     ctx.fillRect(11, -4.5, 2.5, 9);
     ctx.strokeRect(11, -4.5, 2.5, 9);
-  } else if (u.type === 'ifv' || u.type === 'tank' || u.type === 'recovery') { // Bergepanzer: Platzhalter wie Schützenpanzer
+  } else if (u.type === 'ifv' || u.type === 'tank' || u.type === 'recovery' || u.type === 'jammer') { // Bergepanzer: Platzhalter wie Schützenpanzer
     const big = u.type === 'tank';
     const hl = big ? 14 : 12;
     const hw = big ? 9 : 7;

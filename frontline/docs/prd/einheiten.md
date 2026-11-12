@@ -71,6 +71,7 @@ Die Tabellen „Werte“ und „Waffen und Schaden“ erzeugt `npm run docs` aus
 | Aufklärungsfahrzeug | K | 1 | 200 | 160 | 520 | 220 | 100 Geld | 7 s | 30 / 0,2 |
 | Baufahrzeug | R | 1 | 400 | 70 | 260 | – | 150 Geld | 9 s | 40 / 0,3 |
 | Bergepanzer | W | 1 | 350 | 60 | 260 | – | 130 Geld | 8 s | 40 / 0,3 |
+| Störsender | U | 1 | 300 | 60 | 260 | – | 150 Geld | 8 s | 40 / 0,3 |
 | Bagger | X | 2 | 650 | 48 | 240 | 34 | 320 Geld | 14 s | 45 / 0,35 |
 | FOB-Fahrzeug | B | 2 | 600 | 60 | 260 | – | 500 Geld | 30 s | 50 / 0,4 |
 | Schützenpanzer | A | 3 | 450 | 85 | 300 | 240 | 250 Geld | 12 s | 40 / 0,4 |

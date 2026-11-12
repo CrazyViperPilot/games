@@ -26,7 +26,7 @@ export const RESEARCH = {
   // Einheit → Gruppe oder Liste von Gruppen (fehlt = keine eigene Gruppe, dann gelten nur all, veh und air); der Gepard zählt auch zu aa
   groups: {
     rifleman: 'inf', medic: 'inf', at: 'inf', manpads: ['inf', 'aa'], flamer: 'inf', mortarteam: 'inf', sniper: 'inf', sapper: 'inf', commander: 'inf',
-    tank: 'tank', ifv: 'ifv', flak: 'aa', sam: 'aa', gepard: ['spaa', 'aa'], pzh: 'art', mlrs: 'art', truck: 'log', engineer: 'log', recovery: 'log',
+    tank: 'tank', ifv: 'ifv', flak: 'aa', sam: 'aa', gepard: ['spaa', 'aa'], pzh: 'art', mlrs: 'art', truck: 'log', engineer: 'log', recovery: 'log', jammer: 'aa',
     littlebird: 'heli', transporter: 'heli', gunship: 'heli', f16: 'jet', f22: 'jet', u2: 'jet', su27: 'jet',
   },
   // Äste in Reihenfolge der Zeilen im Menü; je Ast 10 Forschungen (Stufe 1 bis 10)

@@ -1,0 +1,1 @@
+**Störsender** (Taste U in der Fabrikhalle, §6 „Einheiten“): unbewaffnetes Fahrzeug (150 Geld, 40 Metall, 2 Plätze); senkt die Trefferchance gegnerischer Lenkwaffen (SAM, MANPADS, Gepard, Flugzeug- und Hubschrauberraketen) auf Ziele im Umkreis von 300 px um sich selbst um 35 %; mehrere Störsender stapeln nicht.

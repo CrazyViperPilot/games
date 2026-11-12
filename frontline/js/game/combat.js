@@ -227,6 +227,22 @@ function fireUnitShell(game, u, w, tx, ty) {
   game.addEffect('muzzle', u.x, u.y, u.team, tx, ty, 'mortar');
 }
 
+/**
+ * Störsender (Paket E9): Lenkwaffen (Spec guided) treffen ein Ziel seltener, wenn es im Umkreis jamRange um einen lebenden
+ * Störsender seines Teams steht: Faktor 1 − jam. Mehrere Störsender stapeln nicht (ein Abzug). Werte in js/data/units.js.
+ */
+export function jamFactor(game, t, spec) {
+  if (!spec.guided) return 1;
+  const R2 = UNITS.jammer.jamRange * UNITS.jammer.jamRange;
+  for (const j of game.units) {
+    if (!j.alive || j.type !== 'jammer' || j.team !== t.team || j.house) continue;
+    const dx = t.x - j.x;
+    const dy = t.y - j.y;
+    if (dx * dx + dy * dy <= R2) return 1 - UNITS.jammer.jam;
+  }
+  return 1;
+}
+
 /** Waffe w der Einheit u feuert auf t (Vorrat, Abklingzeit, Effekt, Trefferwurf, Schaden). */
 function fireWeapon(game, u, w, t) {
   w.rounds -= 1;
@@ -252,7 +268,7 @@ function fireWeapon(game, u, w, t) {
   }
   if (u.def.stealth || u.def.stillCamo) u.revealedUntil = game.time + BALANCE.stealth.revealTime; // ein Schuss verrät die Stellung
   // Flak und SAM: Treffer nur mit Wurf (Trefferchance, siehe unitHitChance); daneben geht der Schuss, der Schaden bleibt aus
-  if (w.spec.hitChance !== undefined && !(game.rng.next() < unitHitChance(u, t, w.spec) * modOf(game, u, 'acc') * modOf(game, t, 'evade'))) return; // Forschung: Zünder, Radar; Flares, Störsender des Ziels
+  if (w.spec.hitChance !== undefined && !(game.rng.next() < unitHitChance(u, t, w.spec) * modOf(game, u, 'acc') * modOf(game, t, 'evade') * jamFactor(game, t, w.spec))) return; // Forschung: Zünder, Radar; Flares, Störsender des Ziels
   const dmg = shotDamage(w.spec, u, t, heightMult(game, u, t)) * dealtMul(game, u, t);
   hit(game, t, dmg, w.spec.occupantMul ?? 1);
   if (w.spec.splash) flameSplash(game, u, t, w.spec.splash, dmg);
