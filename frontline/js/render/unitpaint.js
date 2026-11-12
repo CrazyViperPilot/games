@@ -1649,7 +1649,7 @@ function soldier(P, o) {
   }
   S.push(box(-1, 1, -1.85, 1.85, 5.8, 7.4, uni)); // Hüfte
   // Flammenwerfer und Mörsertrupp: Weste in Uniformfarbe (Teamfarbe nur am Helmband)
-  const plainVest = kind === 'flamer' || kind === 'mortar';
+  const plainVest = kind === 'flamer' || kind === 'mortar' || kind === 'sapper';
   const vest = box(-1.25, 1.25, -2, 2, 7.2, 11, kind === 'sniper' ? mix(P.vest, '#5a5d3c', 0.5) : plainVest ? '#4d5339' : P.vest);
   S.push(vest);
   S.push(fine(on(vest, box(1.25, 1.4, -1.4, 1.4, 8, 9.4, mix(plainVest ? '#4d5339' : P.vest, '#000000', 0.25), { noLine: true })))); // Taschen
@@ -1718,6 +1718,17 @@ function soldier(P, o) {
   } else if (kind === 'medic') {
     S.push(fine(box(1.3, 1.5, -1.4, 1.4, 8.6, 9.0, WHITE))); // weißes Kreuz auf der Brust (unbewaffnet)
     S.push(fine(box(1.3, 1.5, -0.5, 0.5, 7.9, 9.7, WHITE)));
+  } else if (kind === 'sapper') {
+    // Pionier: kurzer Karabiner, runde Panzermine als dicke Scheibe auf dem Tornister (Achse nach hinten), Minensuchgerät
+    // mit langem Stiel von der linken Hand schräg nach vorn unten zur flachen Suchspule am Boden, Spaten am Gürtel links.
+    S.push(cyl([-0.8, 0.8, 9], [4.4, 0.5, 9.3], 0.3, 0.26, 4, GUN)); // kurzer Karabiner
+    S.push(fine(box(1.4, 2.2, 0.4, 1.0, 7.9, 9, GUN))); // Magazin
+    S.push(cyl([-2.5, 0, 9.2], [-3.3, 0, 9.2], 2.1, 2.1, 12, '#3f4433')); // Panzermine (dicke Scheibe) auf dem Rücken
+    S.push(fine(cyl([-3.3, 0, 9.2], [-3.5, 0, 9.2], 0.5, 0.5, 6, '#1b1d1f', { noLine: true }))); // Zünder mittig
+    S.push(cyl([2.2, -0.6, 9.0], [6.6, -3.2, 1.0], 0.22, 0.2, 4, '#1b1d1f')); // Stiel des Minensuchgeräts
+    S.push(cyl([7.0, -3.4, 0.2], [7.0, -3.4, 0.6], 1.7, 1.7, 10, '#3c4130')); // flache Suchspule am Boden
+    S.push(cyl([-1.7, -2.3, 6.8], [-1.7, -2.3, 5.0], 0.22, 0.22, 4, '#474c37')); // Spatenstiel am Gürtel
+    S.push(box(-2.1, -1.3, -2.5, -2.0, 3.6, 5.1, METAL)); // Spatenblatt
   } else {
     S.push(cyl([-0.8, 0.8, 9], [6.6, 0.5, 9.4], 0.32, 0.28, 4, GUN)); // Gewehr
     S.push(fine(box(1.6, 2.6, 0.45, 1.1, 7.9, 9, GUN))); // Magazin
@@ -1726,7 +1737,7 @@ function soldier(P, o) {
 }
 
 const MODELS = { tank, ifv, flak, sam, gepard, pzh, mlrs, truck, scout, fobTruck, engineer, excavator, bridgelayer, littlebird, drone, fpv, gunship, transporter, recovery, jammer, f16, f22, su27, u2, a10, c130 };
-const INFANTRY = { rifleman: 'rifleman', medic: 'medic', at: 'at', manpads: 'manpads', flamer: 'flamer', mortarteam: 'mortar', sniper: 'sniper', sapper: 'rifleman', commander: 'commander' };
+const INFANTRY = { rifleman: 'rifleman', medic: 'medic', at: 'at', manpads: 'manpads', flamer: 'flamer', mortarteam: 'mortar', sniper: 'sniper', sapper: 'sapper', commander: 'commander' };
 const TEAM_KEYS = ['b', 'r', 'n', 'd'];
 
 const paintOf = (team) => (team === SHOWROOM ? DISPLAY : TEAM_PAINT[team] ?? NEUTRAL);
