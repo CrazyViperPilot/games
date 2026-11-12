@@ -1,0 +1,1 @@
+**Eigene Modelle für die neuen Einheiten** (nur Bild): Raketenwerfer, Aufklärungsfahrzeug, Bergepanzer, Störsender, Brückenleger, C-130, Aufklärungsdrohne, Kamikazedrohne, MANPADS-Soldat, Flammenwerfer, Mörsertrupp, Pionier und Sanitäter haben eigene 3D-Modelle statt Platzhaltern.
