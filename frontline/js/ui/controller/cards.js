@@ -230,6 +230,14 @@ export const cardMethods = {
           }),
         );
       }
+      if (units.some((u) => u.def.bridgelayer)) {
+        card.push(
+          entry('Brücke legen', 'C', {
+            tip: 'Brücke legen (C): der Brückenleger legt auf einer Flusszelle am Ufer eine Behelfsbrücke (nach 8 s befahrbar, eine je Fahrzeug).',
+            action: () => this.setMode('layBridge'),
+          }),
+        );
+      }
       const sappers = units.filter((u) => u.type === 'sapper');
       if (sappers.length) {
         card.push(

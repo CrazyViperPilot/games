@@ -194,6 +194,24 @@ export const targetMethods = {
     }
   },
 
+  /** Brücke legen (E14): gewählte Brückenleger legen auf der angetippten Flusszelle eine Behelfsbrücke (js/game/river.js). */
+  confirmLayBridge(wx, wy) {
+    const ids = this.selectedUnits().filter((u) => u.def.bridgelayer).map((u) => u.id);
+    if (!ids.length) {
+      this.message('Kein Brückenleger gewählt');
+      this.setMode('normal');
+      return;
+    }
+    const S = CITY.cell;
+    const c = Math.floor(wx / S);
+    const r = Math.floor(wy / S);
+    const r2 = this.issue({ type: 'layBridge', ids, c, r });
+    if (r2.ok) {
+      this.moveMarker((c + 0.5) * S, (r + 0.5) * S);
+      this.setMode('normal');
+    } else this.message(r2.reason);
+  },
+
   /** Mine legen: gewählte Pioniere legen an der angetippten Stelle eine getarnte Panzermine (js/game/mines.js). */
   confirmLayMine(wx, wy) {
     const ids = this.selected().filter((e) => e.kind === 'unit' && e.type === 'sapper').map((e) => e.id);

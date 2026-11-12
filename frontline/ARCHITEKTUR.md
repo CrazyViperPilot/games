@@ -125,6 +125,7 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 | `layMine` | `ids, x, y` | `mines.js` `cmdLayMine` | Pionier legt an einer Stelle eine getarnte Panzermine (Munition aus dem Teamlager, höchstens `BALANCE.sapper.maxMines` je Pionier) |
 | `land` | `ids, airportId` | `aircraft.js` `cmdLand`, Heliport als Ziel `helipad.js` `cmdHeliLand` (seit v5.51) | Flugzeuge landen am Fliegerhorst des eigenen Stellplatzes `airportId` (seit v5.35; Anflug, Bahn, Ausrollen, Rollen zum Stellplatz; seit v5.15) |
 | `cityUpgrade` | `buildingId` | `city/commands.js` `cmdCityUpgrade` | Stellplatz eine Stufe ausbauen (Überdachung, Stahlbeton-Shelter) gegen Geld, BM und Stahl (seit v5.39) |
+| `layBridge` | `ids, c, r` | `river.js` `cmdLayBridge` | Brückenleger legt auf einer Flusszelle am Ufer eine Behelfsbrücke (E14); Schritt `updateBridgeLayers` (nach `updateBridges`) |
 | `dig` | `ids, c0, r0, c1, r1, append?` | `excavator.js` `cmdDig` | Bagger räumen die Zellen des Rechtecks nacheinander (Zonenstraße, Bäume, Häuser, eigene Gebäude; seit v5.35; seit dem Paket „Straßen“ auch Schutt und gegnerische Straßen) |
 | `shellRoad` | `ids, c0, r0, c1?, r1?` | `roadwar.js` `cmdShellRoad` | Einheiten mit Granaten oder Raketen beschießen die Straßenzellen des Rechtecks, bis sie zu Schutt werden (Paket „Straßen“, Teil 3) |
 | `clearRubble` | `ids, c0, r0, c1?, r1?` | `roadwar.js` `cmdClearRubble` | Baufahrzeuge räumen Schutt eigener Straßen und Stadtstraßen, die Straße ist wieder da (Paket „Straßen“, Teil 3) |

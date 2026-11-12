@@ -230,3 +230,54 @@ export function updateBridges(game, dt) {
     }
   }
 }
+
+/**
+ * Brückenleger (Paket E14): Befehl `{ type: 'layBridge', ids, c, r }` (Zelle des Rasters). Nur eine Wasserzelle mit Landnachbar; das
+ * Fahrzeug fährt ans Ufer und legt die Behelfsbrücke nach def.layTime s. Je Fahrzeug höchstens eine (die alte wird wieder Wasser).
+ */
+export function cmdLayBridge(game, team, cmd) {
+  const G = game.grid;
+  const list = game.ownUnits(team, cmd.ids).filter((u) => u.def.bridgelayer && !u.house);
+  if (!list.length) return fail('Kein Brückenleger gewählt');
+  const c = cmd.c | 0;
+  const r = cmd.r | 0;
+  if (c < 0 || r < 0 || c >= G.cols || r >= G.rows) return fail('Außerhalb der Karte');
+  if (G.terrain[G.idx(c, r)] === 0 || !isWater(game, c, r)) return fail('Hier ist kein freier Fluss');
+  const bank = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([dc, dr]) => {
+    const q = c + dc;
+    const p = r + dr;
+    return q >= 0 && p >= 0 && q < G.cols && p < G.rows && G.terrain[G.idx(q, p)] === 0 && !isWater(game, q, p);
+  });
+  if (!bank) return fail('Die Zelle muss direkt am Ufer liegen');
+  const bx = G.center(c + bank[0]);
+  const by = G.center(r + bank[1]);
+  for (const u of list) {
+    u.order = { type: 'layBridge', c, r, i: G.idx(c, r), bx, by, t: 0 };
+    u.targetId = null;
+    u.path = [];
+    u.pathIndex = 0;
+  }
+  return { ok: true, count: list.length };
+}
+
+/** Wasser (Gelände unter dem Wasserspiegel) an der Rasterzelle (c, r). */
+const isWater = (game, c, r) => !!game.relief && game.relief.heightAt(game.grid.center(c), game.grid.center(r)) < RELIEF.water;
+
+/** Brückenleger-Schritt: zum Ufer fahren, legen (def.layTime), Zelle wird befahrbar (terrain frei). */
+export function updateBridgeLayers(game, dt) {
+  for (const u of game.units) {
+    if (!u.alive || u.order.type !== 'layBridge') continue;
+    const o = u.order;
+    if (driveTo(game, u, o.bx, o.by, RV.reach, dt) !== 'arrived') {
+      o.t = 0;
+      continue;
+    }
+    o.t += dt;
+    if (o.t < u.def.layTime) continue;
+    if (u.laid != null && u.laid !== o.i) game.grid.terrain[u.laid] = 1; // alte Brücke wieder Wasser
+    game.grid.terrain[o.i] = 0;
+    u.laid = o.i;
+    game.message(u.team, 'Brücke gelegt', o.bx, o.by);
+    setIdle(u);
+  }
+}

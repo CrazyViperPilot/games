@@ -38,7 +38,7 @@ jedes Paket ist für sich lauffähig, getestet und committet.
 | E11 | Kamikazedrohne (`fpv`) | `drone` aus E10 | Einweg, stürzt sich auf ein Fahrzeug | gebaut |
 | E12 | Erdkampfflugzeug (`a10`) | `f16` | Bordkanone gegen Bodenziele, lange Einsatzzeit | gebaut |
 | E13 | Transportflugzeug + Fallschirmjäger (`c130`) | `f16`, `transporter` | setzt Infanterie über Punkt ab | gebaut |
-| E14 | Brückenleger (`bridgelayer`) | `excavator` | legt Behelfsbrücke über eine Flusszelle | offen |
+| E14 | Brückenleger (`bridgelayer`) | `excavator` | legt Behelfsbrücke über eine Flusszelle | gebaut |
 
 ## Pakete
 
@@ -106,7 +106,7 @@ jedes Paket ist für sich lauffähig, getestet und committet.
   fliegt hin, Passagiere landen im Umkreis 80 px nach 3 s „Fallschirm“ (verwundbar, nicht schießend), Flugzeug fliegt heim.
 - Test: Soldaten stehen nach dem Absetzen am Zielpunkt.
 
-### E14 – Brückenleger (`bridgelayer`)
+### E14 – Brückenleger (`bridgelayer`) (gebaut)
 - Fahrzeug, unbewaffnet. Befehl **Brücke legen** (freie Taste) auf eine Flusszelle direkt neben Land: nach 8 s wird die Zelle befahrbar
   (wie eine Brückenfahrbahn, `js/game/river.js` / `bridge`), max. 1 Brücke je Fahrzeug (neue Brücke = alte weg). Brücke hat HP und
   kann zerstört werden. Wegsuche neu berechnen wie beim Bagger. Test: Fahrzeug kommt danach über den Fluss.

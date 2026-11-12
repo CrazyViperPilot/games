@@ -313,6 +313,27 @@ export const UNITS = {
   // Bagger (seit v5.35): räumt mit dem Befehl „Baggern“ (G) Zellen, auch Stadtstraßen der Karte in der Konfliktzone (nicht Brücken),
   // Bäume und Häuser, und reißt eigene Stadtgebäude ab (BALANCE.excavator). Seine Schaufel trifft nur Gebäude, langsam: so zerstört er
   // auch gegnerische Gebäude und Stadtgebäude, wenn er sie angreift.
+  // Brückenleger (Paket E14): unbewaffnetes Fahrzeug, legt an einer Flusszelle neben dem Ufer eine Behelfsbrücke (river.js, cmdLayBridge).
+  // layTime: Sekunden, bis die Zelle befahrbar ist. Eine Brücke je Fahrzeug (die alte wird wieder Wasser).
+  bridgelayer: {
+    name: 'Brückenleger',
+    short: 'Brücke', // Kurzname in der Befehlskarte
+    armor: 'light',
+    slots: 2,
+    hp: 600,
+    speed: 46,
+    radius: 13,
+    sight: 240,
+    bridgelayer: true,
+    layTime: 8,
+    weapons: [],
+    cost: { money: 300 },
+    buildTime: 14,
+    fuelPerSec: 0.35,
+    fuelMax: 45,
+    canRide: false,
+    hotkey: 'C',
+  },
   excavator: {
     name: 'Bagger',
     short: 'Bagger', // Kurzname in der Befehlskarte

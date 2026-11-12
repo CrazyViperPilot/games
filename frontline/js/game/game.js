@@ -36,7 +36,7 @@ import { updateRecovery } from './recovery.js'; // Bergepanzer repariert Fahrzeu
 import { updateFpv } from './fpv.js'; // Kamikazedrohnen explodieren am Ziel (Paket E11)
 import { createMines, updateMines } from './mines.js'; // Pionier-Minen (Paket E8)
 import { createResearch, updateResearch, rangeMul } from './research.js';
-import { createBridges, updateBridges, bridgeUnder } from './river.js';
+import { createBridges, updateBridges, updateBridgeLayers, bridgeUnder } from './river.js';
 import { createRoads } from './roads.js';
 import { updateAircraft, trainCheck, isHighAlt, canHitAltitude } from './aircraft.js';
 import { updateParadrop } from './paradrop.js'; // C-130 setzt Fallschirmjäger ab (Paket E13 b)
@@ -1277,6 +1277,7 @@ export class Game {
     updateDig(this, dt); // Bagger räumen Stadtzellen (seit v5.35)
     updateRoadWar(this, dt); // Straßen beschießen, Schutt räumen (Paket „Straßen“)
     updateBridges(this, dt);
+    updateBridgeLayers(this, dt); // Brückenleger (Paket E14)
     separate(this);
     updateCommanders(this, dt);
     updateMedics(this, dt); // Sanitäter heilen verletzte Infanterie im Umkreis (Paket E1)
