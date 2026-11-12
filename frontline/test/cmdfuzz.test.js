@@ -161,7 +161,7 @@ test('Zufallstest: jeder Befehl mit gültigen und verdorbenen Werten antwortet o
   const failures = [];
   const oks = {};
   let issued = 0;
-  for (let round = 0; round < 40; round++) {
+  for (let round = 0; round < 60; round++) {
     for (const type of types) {
       for (const mode of ['gültig', 'Unsinn', 'fehlt', 'fremd']) {
         const cmd = { type };
