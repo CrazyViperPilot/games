@@ -1,1 +1,0 @@
-**C-130 Absetzen** (E13 Teil b, Befehl Fallschirm absetzen aus der Befehlskarte, ohne Taste): eine C-130 mit Passagieren fliegt zum Punkt; ab 60 px setzen sie alle im Umkreis 80 px lebendig ab, 3 s am Fallschirm (schießen nicht), dann Heimflug zum Stellplatz. Werte in UNITS.c130 (dropReach, dropRadius, chuteTime); Modul js/game/paradrop.js.

@@ -1,1 +1,0 @@
-**MANPADS-Soldat** (Taste I in Hauptstadt und Kaserne, §6 „Einheiten“): Infanterie mit Flugabwehrrakete, schießt nur auf Luftziele (Reichweite 300, Schaden 250, 12 s Nachladen); Forschung „inf“ und „aa“.

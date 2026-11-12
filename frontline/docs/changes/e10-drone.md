@@ -1,1 +1,0 @@
-**Aufklärungsdrohne** (Taste R im Heliport, §6 „Einheiten“): unbewaffnete Drohne (200 Geld, 30 Metall, 0 Passagiere, 120 HP, Sicht 450, Treibstoff 40); tankt und landet wie ein Hubschrauber auf dem Heliport.

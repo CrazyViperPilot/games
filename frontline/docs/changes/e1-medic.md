@@ -1,1 +1,0 @@
-**Sanitäter** (Taste K in Hauptstadt und Kaserne, §6 „Einheiten“): heilt jede Sekunde 6 HP der am stärksten verletzten eigenen Infanterie im Umkreis von 90 px; unbewaffnet, nicht in Häusern oder Fahrzeugen.
