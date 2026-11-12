@@ -21,7 +21,7 @@ Ein Paket nach dem anderen, je Paket ein Commit.
 
 | Paket | Inhalt | Stand |
 |---|---|---|
-| K1 | Unterstützer: Sanitäter, MANPADS, Flammenwerfer, Aufklärungsfahrzeug, Bergepanzer, Störsender | offen |
+| K1 | Unterstützer: Sanitäter, MANPADS, Flammenwerfer, Aufklärungsfahrzeug, Bergepanzer, Störsender | gebaut |
 | K2 | Artillerie: Mörsertrupp und Raketenwerfer ausbilden und auf Ziele feuern lassen | offen |
 | K3 | Luft: Aufklärungsdrohne, Kamikazedrohne, A-10 | offen |
 | K4 | Pionier legt Minen | offen |

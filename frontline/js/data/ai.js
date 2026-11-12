@@ -71,6 +71,19 @@ export const AIR_MEMORY = 120; // s, so lange merkt sich die KI gesehene Luftzie
 export const SNIPER_FROM = 10; // sichtbare gegnerische Soldaten, ab denen Scharfschützen in die Mischung kommen
 export const SNIPER_ARMY = 12; // und die KI selbst mindestens so viele Kampfeinheiten hat
 export const SNIPER_SHARE = 0.04; // Zielanteil Scharfschützen an den Kampfeinheiten (laufen mit der Armee)
+// Unterstützer (Paket K1): Anzahlen (1, je 8 Infanterie, höchstens …) werden als Anteil an den Kampfeinheiten gerechnet
+export const SHARE_CAP = 0.6; // höchstens dieser Anteil der Kampfeinheiten für Sonderziele zusammen (Luftabwehr, Scharfschützen, Haubitzen, Unterstützer)
+export const MEDIC_EVERY = 8; // eigene Infanterie, je Sanitäter (ab so viel Infanterie kommt der erste)
+export const MEDIC_MAX = 3; // höchstens so viele Sanitäter
+export const MANPADS_SPLIT = 0.4; // MANPADS-Soldaten bekommen diesen Anteil des Luftabwehr-Gesamtanteils (wie die Flak)
+export const MANPADS_MAX = 4; // höchstens so viele MANPADS-Soldaten
+export const FLAMER_MAX = 3; // Flammenwerfer, solange gesehene Gegner Häuser besetzen (Häuserkampf)
+export const RECON_ARMY = 10; // Kampfeinheiten, ab denen ein Aufklärungsfahrzeug mitfährt (ein Stück)
+export const RECOVERY_VEH = 5; // eigene Fahrzeuge, ab denen ein Bergepanzer mitfährt (ein Stück)
+export const JAM_TARGETS = ['sam', 'gepard', 'manpads']; // gegnerische Flugabwehr: gesehen → die KI baut einen Störsender
+export const ESCORT_TYPES = ['medic', 'jammer']; // Sanitäter und Störsender folgen der Armee (sie kämpfen nicht)
+export const ESCORT_EVERY = 10; // s zwischen zwei Prüfungen, ob ein Begleiter zurückbleibt
+export const ESCORT_DIST = 250; // px: ein untätiger Begleiter, der weiter als das vom Schwerpunkt der Armee steht, rückt nach
 // Panzerhaubitze (seit v5.26, nicht auf Leicht): Haubitze ab einer Armee von ART_FROM Kampfeinheiten; sie fährt nicht in den Wellen mit,
 // sondern steht ART_BEHIND px hinter der Armee
 export const ART_SHARE = 0.06; // Zielanteil Panzerhaubitzen an den Kampfeinheiten

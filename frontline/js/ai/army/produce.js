@@ -7,7 +7,7 @@ import { UNITS } from '../../data/units.js';
 import { hasCommander } from '../../game/commander.js';
 import { researchBlock, RESEARCH_KEYS } from '../../game/research.js';
 import { RESEARCH } from '../../data/research.js';
-import { COUNTER_FLOOR, QUEUE_RICH, QUEUE_LONG, QUEUE_SHORT, MIX, COUNTER_MIN, COUNTER_WEIGHT, AIR_PER, AIR_MAX, AIR_SPLIT, AIR_MEMORY, SNIPER_FROM, SNIPER_ARMY, SNIPER_SHARE, ART_SHARE, ART_FROM, CMD_RESERVE, CMD_FROM, UPGRADES, UPGRADE_RESERVE, HELI_MIN_MONEY } from '../../data/ai.js';
+import { COUNTER_FLOOR, QUEUE_RICH, QUEUE_LONG, QUEUE_SHORT, MIX, COUNTER_MIN, COUNTER_WEIGHT, AIR_PER, AIR_MAX, AIR_SPLIT, AIR_MEMORY, SNIPER_FROM, SNIPER_ARMY, SNIPER_SHARE, SHARE_CAP, MEDIC_EVERY, MEDIC_MAX, MANPADS_SPLIT, MANPADS_MAX, FLAMER_MAX, RECON_ARMY, RECOVERY_VEH, JAM_TARGETS, ESCORT_TYPES, ESCORT_EVERY, ESCORT_DIST, ART_SHARE,ART_FROM, CMD_RESERVE, CMD_FROM, UPGRADES, UPGRADE_RESERVE, HELI_MIN_MONEY } from '../../data/ai.js';
 import { dist } from './util.js';
 
 export const produceMethods = {
@@ -56,6 +56,7 @@ export const produceMethods = {
     const t = this.team;
     const res = g.teams[t].res;
     const qmax = res.money > QUEUE_RICH ? QUEUE_LONG : QUEUE_SHORT;
+    this.escort(s); // Sanitäter und Störsender rücken zur Armee nach (K1)
 
     // Baufahrzeuge: 1 (2 ab 3 FOBs)
     const engWant = s.fobs.length >= 3 ? 2 : 1;
@@ -133,8 +134,8 @@ export const produceMethods = {
       if (v > 0) shares[u] = (shares[u] ?? 0) + v; // Luftarten ohne gesehene Ziele tragen nichts bei
     };
     // Luftabwehr (seit v5.71): Hubschrauber und Flugzeuge getrennt gemerkt (AIR_MEMORY s), Gepard, Flak und SAM nach AIR_SPLIT
-    const heli = this.rememberAir('heli', s.enemies.filter((e) => e.def.air && !e.def.jet).length);
-    const jet = this.rememberAir('jet', s.enemies.filter((e) => e.def.jet).length);
+    const heli = this.rememberSeen('heli', s.enemies.filter((e) => e.def.air && !e.def.jet).length);
+    const jet = this.rememberSeen('jet', s.enemies.filter((e) => e.def.jet).length);
     const total = Math.min(AIR_MAX, (heli + jet) * AIR_PER);
     if (total > 0) {
       const ph = heli / (heli + jet);
@@ -146,8 +147,15 @@ export const produceMethods = {
     if (foeInf >= SNIPER_FROM && (s.combat?.length ?? 0) >= SNIPER_ARMY) add('sniper', SNIPER_SHARE);
     // Panzerhaubitze (seit v5.26): ab ART_FROM Kampfeinheiten
     if ((s.combat?.length ?? 0) >= ART_FROM) add('pzh', ART_SHARE);
-    const extra = Object.values(shares).reduce((a, v) => a + v, 0);
+    this.supportShares(s, add, total);
+    let extra = Object.values(shares).reduce((a, v) => a + v, 0);
     if (extra <= 0) return base;
+    if (extra > SHARE_CAP) {
+      // Sonderziele zusammen höchstens SHARE_CAP (sonst bliebe für die Grundmischung nichts übrig)
+      const f = SHARE_CAP / extra;
+      for (const u of Object.keys(shares)) shares[u] *= f;
+      extra = SHARE_CAP;
+    }
     // Die Grundmischung schrumpft auf den Rest, damit jede Sorte genau ihren Zielanteil hat
     const sum = Object.values(base).reduce((a, v) => a + v, 0);
     const k = (1 - extra) / sum;
@@ -158,12 +166,58 @@ export const produceMethods = {
   },
 
   /**
-   * Gemerkte Zahl gesehener Luftziele einer Art (`heli` oder `jet`): die größte Zahl gleichzeitig gesehener Ziele,
-   * AIR_MEMORY s nach dem letzten Sehen vergessen (dann 0).
+   * Unterstützer (Paket K1): Zielanteile je Sorte an den Kampfeinheiten, über `add` in counterMix eingetragen.
+   * Anzahlen (1 Stück, höchstens N) werden als Anteil an den Kampfeinheiten gerechnet (je Stück 1/Armee).
    */
-  rememberAir(kind, n) {
+  supportShares(s, add, airTotal) {
+    const army = Math.max(1, s.combat?.length ?? 0);
+    const own = s.units ?? [];
+    const per = (n) => n / army;
+    // Sanitäter: 1 je MEDIC_EVERY eigener Infanterie, höchstens MEDIC_MAX
+    const inf = own.filter((u) => u.def.armor === 'inf' && !u.def.air).length;
+    add('medic', per(Math.min(MEDIC_MAX, Math.floor(inf / MEDIC_EVERY))));
+    // MANPADS: Anteil wie die Flak (MANPADS_SPLIT des Luftabwehr-Gesamtanteils), höchstens MANPADS_MAX
+    if (airTotal > 0) add('manpads', Math.min(airTotal * MANPADS_SPLIT, per(MANPADS_MAX)));
+    // Flammenwerfer: gegen Gegner, die Häuser besetzen (Häuserkampf; gemerkt wie die Luftziele)
+    if (this.rememberSeen('house', s.enemies.filter((e) => e.house).length) > 0) add('flamer', per(FLAMER_MAX));
+    // Aufklärungsfahrzeug: 1 ab RECON_ARMY Kampfeinheiten (fährt als Kampfeinheit mit der Armee)
+    if ((s.combat?.length ?? 0) >= RECON_ARMY) add('scout', per(1));
+    // Bergepanzer: 1 ab RECOVERY_VEH eigenen Bodenfahrzeugen (repariert selbst)
+    const veh = own.filter((u) => u.def.armor !== 'inf' && !u.def.air).length;
+    if (veh >= RECOVERY_VEH) add('recovery', per(1));
+    // Störsender: 1, wenn Gegner Flugabwehr gesehen hat (gemerkt) und die KI selbst Luftfahrzeuge besitzt
+    const aa = this.rememberSeen('aa', s.enemies.filter((e) => JAM_TARGETS.includes(e.type)).length);
+    if (aa > 0 && own.some((u) => u.def.air)) add('jammer', per(1));
+  },
+
+  /**
+   * Sanitäter und Störsender (Paket K1) folgen der Armee: stehen sie untätig weit weg vom Schwerpunkt der Kampfeinheiten,
+   * rücken sie dorthin nach (alle ESCORT_EVERY s geprüft).
+   */
+  escort(s) {
+    if (!s.combat?.length || !this.once('escort', ESCORT_EVERY)) return;
+    let x = 0;
+    let y = 0;
+    for (const u of s.combat) {
+      x += u.x;
+      y += u.y;
+    }
+    x /= s.combat.length;
+    y /= s.combat.length;
+    for (const u of s.units ?? []) {
+      if (!ESCORT_TYPES.includes(u.type) || u.order.type !== 'idle' || dist(u.x, u.y, x, y) <= ESCORT_DIST) continue;
+      this.game.issue(this.team, { type: 'move', ids: [u.id], x, y });
+    }
+  },
+
+  /**
+   * Gemerkte Zahl gesehener Ziele einer Art (`heli`, `jet`, `aa`, `house` …): die größte Zahl gleichzeitig gesehener Ziele,
+   * AIR_MEMORY s nach dem letzten Sehen vergessen (dann 0). Seit K1 für alle Arten (auch Flugabwehr und besetzte Häuser).
+   */
+  rememberSeen(kind, n) {
     const now = this.game.time;
-    const m = (this.airMemo ??= { heli: { n: 0, t: -1e9 }, jet: { n: 0, t: -1e9 } })[kind];
+    const memo = (this.airMemo ??= {});
+    const m = (memo[kind] ??= { n: 0, t: -1e9 });
     if (n > 0) {
       m.n = Math.max(m.n, n);
       m.t = now;
