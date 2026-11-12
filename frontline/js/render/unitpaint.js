@@ -636,6 +636,45 @@ function truck(P) {
   return { S, foot: [-15.5, 16, -6.2, 6.2] };
 }
 
+// Aufklärungsfahrzeug (Vorbild Fennek): flacher Spähwagen mit Keilbug, schrägen Seitenwänden, kleiner Fahrerkabine mit
+// schräger Frontscheibe, MG auf dem Dach und einem ausfahrbaren Sensormast mit Kamerakopf am Heck. Ohne Mast etwa 5,7 m × 2,5 m × 1,8 m.
+function scout(P) {
+  const S = [];
+  S.push(lowerHull(-13.2, 13.4, 4.8, 3.6, P)); // Unterboden
+  for (const x of [8.6, -8.4]) for (const side of [-1, 1]) S.push(wheel(x, side * 5.4, 2.2, 2.2, 1.2, side)); // vier Räder
+  // Wanne: unten breiter als oben (schräge Seiten), vorn ein Keil
+  const hullBody = loft(
+    [[-13.2, -5.2], [10.8, -5.2], [10.8, 5.2], [-13.2, 5.2]],
+    [[-12.4, -4.4], [10, -4.4], [10, 4.4], [-12.4, 4.4]],
+    3, 6.8, P.body,
+  );
+  S.push(hullBody);
+  const nose = prX([[10.8, 3], [10, 6.8], [13.8, 3.6], [13.8, 3]], -4.8, 4.8, P.body);
+  S.push(nose);
+  lights(S, nose, 13.8, 4.8, 3.6, -13.2, 4.4);
+  S.push(fine(box(13.7, 13.9, -1.4, 1.4, 3.1, 3.5, P.mark, { noLine: true }))); // Teamfarbe: kleine Kennung am Bug
+  camoSides(S, hullBody, 4.9, [[-10, 6, 3.2, 4.4], [-2, 5, 3.2, 4.4]], P.camo);
+  // Fahrerkabine: schmal, mit schräger Frontscheibe
+  const cab = prX([[-7.2, 6.6], [-7.2, 8.6], [2.8, 8.6], [5.4, 6.6]], -4.4, 4.4, P.body);
+  S.push(cab);
+  S.push(on(cab, box(-6.9, 2.8, -4.4, 4.4, 8.6, 8.8, P.light))); // Dach
+  S.push(on(cab, prX([[2.9, 8.4], [5.25, 6.8], [5.4, 6.8], [3.05, 8.5]], -4.2, 4.2, GLASS, { noLine: true })));
+  for (const side of [-1, 1]) S.push(on(cab, box(-5.2, 1.4, side < 0 ? -4.55 : 4.4, side < 0 ? -4.4 : 4.55, 7.2, 8.2, GLASS, { noLine: true, only: 'iso' })));
+  // MG auf dem Dach: Lafette und Rohr nach vorn
+  const mgMount = on(cab, cyl([-1.8, 0, 8.8], [-1.8, 0, 9.7], 0.6, 0.6, 8, METAL));
+  S.push(mgMount);
+  S.push(on(mgMount, cyl([-1.8, 0, 9.4], [2.2, 0, 9.6], 0.26, 0.22, 4, GUN)));
+  // Heck: Staukasten mit Sensormast (leicht nach hinten geneigt) und Kamerakopf
+  const deck = on(hullBody, box(-12.6, -8.4, -4, 4, 6.8, 7.4, P.dark));
+  S.push(deck);
+  const mast = on(deck, cyl([-10.5, 0, 7.4], [-11.4, 0, 19], 0.34, 0.26, 6, GUN));
+  S.push(mast);
+  const head = on(mast, box(-12.6, -9.6, -2.2, 2.2, 18.2, 19.8, METAL));
+  S.push(head);
+  S.push(fine(on(head, cyl([-12.6, 0, 19], [-13.2, 0, 19], 0.95, 0.85, 8, GLASS, { noLine: true })))); // Objektiv nach hinten
+  return { S, foot: [-14.6, 14.6, -6.8, 6.8] };
+}
+
 function fobTruck(P) {
   const S = [];
   S.push(box(-20, 15, -3.4, 3.4, 2.2, 3.8, METAL, { only: 'iso', under: true }));
@@ -1365,7 +1404,7 @@ function soldier(P, o) {
   return { S, foot: [-1.6, 1.6, -1.6, 1.6], inf: true };
 }
 
-const MODELS = { tank, ifv, flak, sam, gepard, pzh, mlrs, truck, scout: truck, fobTruck, engineer, excavator, bridgelayer: excavator, littlebird, drone: littlebird, fpv: littlebird, gunship, transporter, recovery: ifv, jammer: flak, f16, f22, su27, u2, a10: f16, c130: u2 };
+const MODELS = { tank, ifv, flak, sam, gepard, pzh, mlrs, truck, scout, fobTruck, engineer, excavator, bridgelayer: excavator, littlebird, drone: littlebird, fpv: littlebird, gunship, transporter, recovery: ifv, jammer: flak, f16, f22, su27, u2, a10: f16, c130: u2 };
 const INFANTRY = { rifleman: 'rifleman', medic: 'medic', at: 'at', manpads: 'manpads', flamer: 'rifleman', mortarteam: 'rifleman', sniper: 'sniper', sapper: 'rifleman', commander: 'commander' };
 const TEAM_KEYS = ['b', 'r', 'n', 'd'];
 
