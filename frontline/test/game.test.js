@@ -9,7 +9,9 @@ import { nearestPassable } from '../js/game/movement.js';
 
 BALANCE.slotCap = 1000; // diese Tests prüfen nicht das Einheitenlimit (siehe economy.test.js)
 const DT = 0.05;
-const mk = (opts) => classic(new Game({ city: false, ...opts }));
+const mk = (opts) => classic(new Game({ ...opts }));
+// Übergangsweise: Tests, die noch den Modus ohne Stadt prüfen (Umstellung folgt, siehe docs/plan-stadt-kern.md)
+const mkOld = (opts) => classic(new Game({ city: false, ...opts }));
 const TILE = BALANCE.map.tile;
 
 function run(game, seconds) {
@@ -65,7 +67,7 @@ function silence(game, team) {
 }
 
 test('Startzustand: fertige Hauptstadt mit Lager, Startunits, Geld', () => {
-  const g = mk({ seed: 7 });
+  const g = mkOld({ seed: 7 });
   for (let t = 0; t < 2; t++) {
     const f = fobOf(g, t);
     assert.ok(f, `FOB für Team ${t}`);
@@ -85,7 +87,7 @@ test('Startzustand: fertige Hauptstadt mit Lager, Startunits, Geld', () => {
 });
 
 test('Team-Ressourcen sind Lesegetter: direktes Schreiben ist nicht möglich', () => {
-  const g = mk({ seed: 7 });
+  const g = mkOld({ seed: 7 });
   assert.throws(() => {
     'use strict';
     g.teams[0].res.bm = 5;
@@ -144,7 +146,7 @@ test('FOB: Bauradien eigener FOBs dürfen sich nicht überlappen, höchstens 10 
 });
 
 test('Bau: Gebäude-Baustelle kostet Geld und Lager sofort; Fortschritt nur mit Bauer', () => {
-  const g = mk({ seed: 7 });
+  const g = mkOld({ seed: 7 });
   const f = fobOf(g, 0);
   const spot = findSpot(g, 0, 'mortar', f.x, f.y);
   const eng = unitsOf(g, 0, 'engineer')[0];
@@ -207,7 +209,7 @@ test('Bauer hilft automatisch: idle Baufahrzeug in 400 px baut Baustelle ohne id
 });
 
 test('Training: Kosten werden aus dem FOB-Lager und Geld abgezogen, Einheit spawnt', () => {
-  const g = mk({ seed: 7 });
+  const g = mkOld({ seed: 7 });
   const f = fobOf(g, 0);
   const before = unitsOf(g, 0, 'rifleman').length;
   const { money } = g.teams[0].res;
@@ -225,7 +227,7 @@ test('Training: Kosten werden aus dem FOB-Lager und Geld abgezogen, Einheit spaw
 });
 
 test('Training: Einheiten kosten nur Geld und starten voll munitioniert und betankt', () => {
-  const g = mk({ seed: 7 });
+  const g = mkOld({ seed: 7 });
   const f = fobOf(g, 0);
   g.setStock(0, { bm: 0, mun: 0, fuel: 0 });
   assert.equal(g.issue(0, { type: 'train', buildingId: f.id, unit: 'rifleman' }).ok, true);
@@ -251,7 +253,7 @@ test('Kampf: Kampfpanzer tötet einen Schützen', () => {
 });
 
 test('Zone: nur Team 0 in der Zone bringt nach 30,1 s einen Punkt und Geld', () => {
-  const g = mk({ seed: 7 });
+  const g = mkOld({ seed: 7 });
   const z = g.zone;
   g.spawnUnit('rifleman', 0, z.x + 1000, z.y); // außerhalb der Hot Zone
   const money0 = g.teams[0].res.money;
@@ -315,7 +317,7 @@ test('Eliminierung: fällt die Hauptstadt, verliert das Team; eine vordere FOB o
 });
 
 test('Die Hauptstadt kann nicht abgerissen werden und bildet als einzige Einheiten aus', () => {
-  const g = mk({ seed: 7 });
+  const g = mkOld({ seed: 7 });
   const f = fobOf(g, 0);
   assert.equal(g.issue(0, { type: 'demolish', buildingId: f.id }).ok, false);
   const front = fobAt(g, 0, f.x, f.y);
@@ -437,7 +439,7 @@ test('Soldaten tragen wenig Baumaterial: reicht es nicht, baut nichts; in der FO
 });
 
 test('FOB-Fahrzeug: Hauptstadt bildet es aus, Aufbauen macht sofort eine fertige FOB mit 20 % Lager', () => {
-  const g = mk({ seed: 7 });
+  const g = mkOld({ seed: 7 });
   const f = fobOf(g, 0);
   assert.ok(f.produces.includes('fobTruck'), 'Hauptstadt bildet FOB-Fahrzeuge aus');
   const spot = findSpot(g, 0, 'fob', f.x, f.y, 950, 1300);
@@ -523,7 +525,7 @@ test('Reparatur ohne FOB-Lager in Reichweite findet nicht statt', () => {
 });
 
 test('Erstattung an den Zahler: Ausbildung abbrechen erstattet an die FOB, die bezahlt hat', () => {
-  const g = mk({ seed: 7 });
+  const g = mkOld({ seed: 7 });
   const f = fobOf(g, 0);
   const far = fobAt(g, 0, f.x, f.y, 950, 1300);
   far.store.mun = 0;
@@ -679,7 +681,7 @@ test('Waffen: Kampfhubschrauber nimmt Raketen gegen Panzer und die Bordkanone ge
 });
 
 test('Verbrauch: leerer Schütze feuert nicht, Abklingzeit läuft nicht an, Mangelmeldung', () => {
-  const g = mk({ seed: 7 });
+  const g = mkOld({ seed: 7 });
   const sp = g.map.spawns[0];
   const rifle = g.spawnUnit('rifleman', 0, sp.x + 300, sp.y - 300);
   const enemy = g.spawnUnit('rifleman', 1, rifle.x + 120, rifle.y);
@@ -744,7 +746,7 @@ test('Verbrauch: ohne Treibstoff fährt ein Panzer mit 25 % Tempo, Vorrat wird n
 });
 
 test('Verbrauch: FOB-MG feuert ohne Munition im Lager', () => {
-  const g = mk({ seed: 7 });
+  const g = mkOld({ seed: 7 });
   const f = fobOf(g, 0);
   silence(g, 0);
   g.setStock(0, { bm: 0, mun: 0, fuel: 0 });
@@ -794,7 +796,7 @@ test('Mörser: gewähltes Ziel, ein Schuss alle 20 s, nur in Reichweite', () => 
 });
 
 test('Mörser ohne Munition in der FOB feuert nicht auf das gewählte Ziel', () => {
-  const g = mk({ seed: 7 });
+  const g = mkOld({ seed: 7 });
   const f = base(g);
   const m = g.spawnBuilding('mortar', 0, cellOf(f.x + 200), cellOf(f.y - 200));
   g.issue(0, { type: 'mortarTarget', ids: [m.id], x: m.x + 500, y: m.y });
@@ -805,7 +807,7 @@ test('Mörser ohne Munition in der FOB feuert nicht auf das gewählte Ziel', () 
 });
 
 test('Flugabwehr schießt einen feindlichen Hubschrauber ab, wenn die FOB Munition hat', () => {
-  const g = mk({ seed: 7 });
+  const g = mkOld({ seed: 7 });
   const f = base(g, 1);
   const aa = g.spawnBuilding('aa', 1, cellOf(f.x + 150), cellOf(f.y - 150));
   const heli = g.spawnUnit('gunship', 0, aa.x + 250, aa.y);
@@ -817,7 +819,7 @@ test('Flugabwehr schießt einen feindlichen Hubschrauber ab, wenn die FOB Muniti
 });
 
 test('Flugabwehr ohne Munition kann den Hubschrauber nicht abschießen', () => {
-  const g = mk({ seed: 7 });
+  const g = mkOld({ seed: 7 });
   const f = base(g, 1);
   const aa = g.spawnBuilding('aa', 1, cellOf(f.x + 150), cellOf(f.y - 150));
   g.setStock(1, { bm: 100, mun: 0, fuel: 0 });
@@ -868,7 +870,7 @@ test('Transporthubschrauber lädt Ressourcen wie ein LKW', () => {
 });
 
 test('Soldaten und Fahrzeuge tanken Munition und Treibstoff in der FOB nach', () => {
-  const g = mk({ seed: 7 });
+  const g = mkOld({ seed: 7 });
   const f = base(g);
   const r = g.spawnUnit('rifleman', 0, f.x + 100, f.y);
   const t = g.spawnUnit('tank', 0, f.x + 120, f.y + 40);
@@ -884,7 +886,7 @@ test('Soldaten und Fahrzeuge tanken Munition und Treibstoff in der FOB nach', ()
 });
 
 test('Hot Zone wandert innerhalb der Konfliktzone; Einheiten darin bringen doppeltes Geld und Punkte', () => {
-  const g = mk({ seed: 7 });
+  const g = mkOld({ seed: 7 });
   const hz = g.hot;
   for (let i = 0; i < Math.round(120 / DT); i++) {
     g.update(DT);
@@ -908,7 +910,7 @@ test('Hot Zone wandert innerhalb der Konfliktzone; Einheiten darin bringen doppe
 });
 
 test('Bohrer: 30 s Aufwärmen, 2 min aktiv mit Treibstoff aus der FOB, 5 min Pause; Hot Zone zieht zum Bohrer', () => {
-  const g = mk({ seed: 7 });
+  const g = mkOld({ seed: 7 });
   const f = base(g);
   const d = g.spawnBuilding('drill', 0, cellOf(f.x + 200), cellOf(f.y - 200));
   g.update(DT);
@@ -934,7 +936,7 @@ test('Bohrer: 30 s Aufwärmen, 2 min aktiv mit Treibstoff aus der FOB, 5 min Pau
 });
 
 test('Bohrer ohne Treibstoff in der FOB startet nicht', () => {
-  const g = mk({ seed: 7 });
+  const g = mkOld({ seed: 7 });
   const f = base(g);
   const d = g.spawnBuilding('drill', 0, cellOf(f.x + 200), cellOf(f.y - 200));
   g.setStock(0, { bm: 100, mun: 0, fuel: 0 });
@@ -971,7 +973,7 @@ test('Zonenpunkt: Mehrheit statt Alleinbesitz, Hot Zone zählt doppelt, Balken f
 
 test('Abschussprämie: Fahrzeuge viel, Soldaten wenig, Mauern nichts; fertiger Bau bringt Geld', async () => {
   const { hit } = await import('../js/game/combat.js');
-  const g = classic(new Game({ city: false, seed: 7 }));
+  const g = classic(new Game({ seed: 7 }));
   const m0 = g.teams[0].res.money;
   const rifle = g.spawnUnit('rifleman', 1, 3000, 3000);
   hit(g, rifle, 9999);
@@ -992,7 +994,7 @@ test('Abschussprämie: Fahrzeuge viel, Soldaten wenig, Mauern nichts; fertiger B
 test('Befehle: Mauerzug über wallMax abgelehnt, Stopp ohne Einheit scheitert, Gebäude ohne produces', async () => {
   const { AI } = await import('../js/ai/ai.js');
   const { withValue } = await import('./util.js');
-  const g = new Game({ city: false, seed: 7 });
+  const g = new Game({ seed: 7 });
   const m = g.mainFob(0);
   const max = BALANCE.construction.wallMax;
   const T = g.grid.tile;
