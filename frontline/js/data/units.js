@@ -240,6 +240,31 @@ export const UNITS = {
     seats: 1,
     hotkey: 'R',
   },
+  // Bergepanzer (Paket E7): unbewaffnetes Fahrzeug, repariert eigene Fahrzeuge im Umkreis (js/game/recovery.js). Keine Luftfahrzeuge.
+  recovery: {
+    name: 'Bergepanzer',
+    short: 'Berge', // Kurzname in der Befehlskarte
+    armor: 'light',
+    hp: 350,
+    speed: 60,
+    radius: 12,
+    sight: 260,
+    range: 0,
+    cooldown: 0,
+    damage: null,
+    weapons: [],
+    cost: { money: 130 },
+    buildTime: 8,
+    ammoPerShot: 0,
+    fuelPerSec: 0.3,
+    fuelMax: 40,
+    canRide: false,
+    repairRate: 15, // HP je Sekunde für jedes eigene Fahrzeug im Umkreis
+    repairRange: 60, // Umkreis in px (Mitte zu Mitte)
+    pickupRange: 200, // untätig: fährt zum nächsten beschädigten eigenen Fahrzeug in diesem Umkreis
+    repairCostShare: 0.5, // Baumaterial = cost.money × geheilt/maxHp × 0.5 (wie die Reparatur des Baufahrzeugs, BALANCE.construction)
+    hotkey: 'W', // Fabrikhalle: Taste im Fabrikmenü frei (E K R X B A S Z N L O T belegt)
+  },
   // Bagger (seit v5.35): räumt mit dem Befehl „Baggern“ (G) Zellen, auch Stadtstraßen der Karte in der Konfliktzone (nicht Brücken),
   // Bäume und Häuser, und reißt eigene Stadtgebäude ab (BALANCE.excavator). Seine Schaufel trifft nur Gebäude, langsam: so zerstört er
   // auch gegnerische Gebäude und Stadtgebäude, wenn er sie angreift.

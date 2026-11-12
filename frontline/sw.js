@@ -51,6 +51,7 @@ const ASSETS = [
   './js/game/formation.js',
   './js/game/commander.js',
   './js/game/medic.js',
+  './js/game/recovery.js',
   './js/game/radio.js',
   './js/game/city/cells.js',
   './js/game/city/query.js',

@@ -1,0 +1,1 @@
+**Bergepanzer** (Taste W in der Fabrikhalle, §6 „Einheiten“): unbewaffnetes Fahrzeug (130 Geld, 40 Metall); repariert jede Sekunde 15 HP je eigenem Fahrzeug im Umkreis von 60 px aus dem Baumaterial des Teamlagers, keine Luftfahrzeuge; untätig fährt er zum nächsten beschädigten Fahrzeug in 200 px.

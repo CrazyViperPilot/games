@@ -32,6 +32,7 @@ import { updateRadio, radioStarted, radioLost } from './radio.js';
 import { createWeather, updateWeather, setWeather, WEATHER_NAMES } from './weather.js';
 import { updateAbilities } from './abilities.js';
 import { updateMedics } from './medic.js'; // Sanitäter heilen (Paket E1)
+import { updateRecovery } from './recovery.js'; // Bergepanzer repariert Fahrzeuge (Paket E7)
 import { createResearch, updateResearch, rangeMul } from './research.js';
 import { createBridges, updateBridges, bridgeUnder } from './river.js';
 import { createRoads } from './roads.js';
@@ -1274,6 +1275,7 @@ export class Game {
     separate(this);
     updateCommanders(this, dt);
     updateMedics(this, dt); // Sanitäter heilen verletzte Infanterie im Umkreis (Paket E1)
+    updateRecovery(this, dt); // Bergepanzer reparieren eigene Fahrzeuge im Umkreis (Paket E7)
     updateCombat(this, dt);
     updateZone(this, dt);
     updateHot(this, dt);
