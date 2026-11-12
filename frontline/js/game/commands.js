@@ -21,6 +21,7 @@ import { cmdLand } from './aircraft.js';
 import { cmdHeliLand, isHeliport } from './helipad.js';
 import { cmdDig } from './excavator.js';
 import { cmdShellRoad, cmdClearRubble } from './roadwar.js';
+import { cmdLayMine } from './mines.js';
 
 const fail = (reason) => ({ ok: false, reason });
 
@@ -60,6 +61,7 @@ export const COMMANDS = {
   route: { run: cmdRoute, drives: true, sound: true },
   setPreset: { run: cmdSetPreset },
   mortarTarget: { run: (g, t, c) => g.cmdMortarTarget(t, c), sound: true },
+  layMine: { run: cmdLayMine, sound: true },
   board: { run: cmdBoard, drives: true, sound: true },
   garrison: { run: cmdGarrison, drives: true, sound: true },
   ungarrison: { run: cmdUngarrison, sound: true },

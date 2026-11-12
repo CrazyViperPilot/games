@@ -194,6 +194,21 @@ export const targetMethods = {
     }
   },
 
+  /** Mine legen: gewählte Pioniere legen an der angetippten Stelle eine getarnte Panzermine (js/game/mines.js). */
+  confirmLayMine(wx, wy) {
+    const ids = this.selected().filter((e) => e.kind === 'unit' && e.type === 'sapper').map((e) => e.id);
+    if (!ids.length) {
+      this.message('Kein Pionier gewählt');
+      this.setMode('normal');
+      return;
+    }
+    const r = this.issue({ type: 'layMine', ids, x: wx, y: wy });
+    if (r.ok) {
+      this.moveMarker(wx, wy);
+      this.setMode('normal');
+    } else this.message(r.reason);
+  },
+
   /** Stürmen: gewählte Soldaten greifen das angetippte, vom Gegner besetzte Haus an der Wand an (Nahkampf, dann einziehen). */
   confirmStorm(wx, wy) {
     const house = this.pickHouse(wx, wy);

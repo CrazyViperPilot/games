@@ -248,6 +248,18 @@ export const BALANCE = {
   // schwere Waffen mehr, Handwaffen weniger). Zerstört sperren sie; ein Baufahrzeug baut sie für rebuildCost Geld in rebuild s wieder
   // auf (mehrere schneller, höchstens construction.maxBuilders), es arbeitet bis reach px vom Brückenkopf.
   river: { ford: 0.5, fordCost: 30, fordDepth: 12, deck: 80, bridgeHp: 2400, rebuildCost: 200, rebuild: 30, reach: 90 },
+  // Pionier und Panzerminen (Paket E8, js/game/mines.js): Mine kostet Munition aus dem Teamlager; sie ist für Gegner getarnt
+  // (sichtbar innerhalb spotNear durch einen eigenen Pionier, sonst innerhalb spotAny durch eine eigene Einheit).
+  sapper: {
+    mineCost: { mun: 40 }, // Munition je Mine
+    maxMines: 6, // aktive Minen je Pionier
+    mineTrigger: 18, // px: gegnerisches Fahrzeug in diesem Umkreis löst aus
+    mineDamage: { heavy: 600, light: 400 }, // Schaden je Panzerung des auslösenden Fahrzeugs
+    spotNear: 60, // px: Sicht durch einen eigenen Pionier
+    spotAny: 25, // px: Sicht durch irgendeine eigene Einheit
+    clearRange: 40, // px: gegnerischer Pionier räumt die Mine
+    clearTime: 3, // s Räumzeit
+  },
   // Kampfflugzeuge (seit v5.03, PRD §6 „F-16“, §15 „Fliegerhorst“): In der Luft dreht ein Jet
   // höchstens turn rad/s und kreist im Abstand orbit (px) um seinen Befehlspunkt. Er fliegt zurück, wenn der Treibstoff für den
   // Heimweg × reserve plus margin s nicht mehr reicht oder keine Rakete mehr da ist; landet über eine Platzrunde auf Bahn 2 (Werte unten).

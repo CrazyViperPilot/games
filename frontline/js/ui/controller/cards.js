@@ -230,6 +230,15 @@ export const cardMethods = {
           }),
         );
       }
+      const sappers = units.filter((u) => u.type === 'sapper');
+      if (sappers.length) {
+        card.push(
+          entry('Mine legen', 'Q', {
+            tip: 'Mine legen (Q): der Pionier legt an der Klickstelle eine getarnte Panzermine (Munition aus dem Teamlager, je Pionier nur wenige aktiv). Sie löst bei gegnerischen Fahrzeugen aus, Infanterie nicht.',
+            action: () => this.setMode('layMine'),
+          }),
+        );
+      }
     }
     const deployers = units.filter((u) => u.def.deploys);
     if (deployers.length) {

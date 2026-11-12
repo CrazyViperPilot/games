@@ -33,6 +33,7 @@ import { createWeather, updateWeather, setWeather, WEATHER_NAMES } from './weath
 import { updateAbilities } from './abilities.js';
 import { updateMedics } from './medic.js'; // Sanitäter heilen (Paket E1)
 import { updateRecovery } from './recovery.js'; // Bergepanzer repariert Fahrzeuge (Paket E7)
+import { createMines, updateMines } from './mines.js'; // Pionier-Minen (Paket E8)
 import { createResearch, updateResearch, rangeMul } from './research.js';
 import { createBridges, updateBridges, bridgeUnder } from './river.js';
 import { createRoads } from './roads.js';
@@ -224,6 +225,7 @@ export class Game {
     createHouses(this); // Stadthäuser zum Besetzen (Häuserkampf)
     createCity(this, city); // Zonenstadt je Team, Hauptstadt mit endlichem Lager (nur wenn eingeschaltet)
     createCrates(this); // Versorgungskisten der Karte
+    createMines(this); // Pionier-Minen (Paket E8)
     createAnimals(this); // Rehe und Wildschweine (nur Optik)
     createWeather(this, weather); // Jahreszeit und Wetter (eigener Zufall)
     this.updateFog();
@@ -1276,6 +1278,7 @@ export class Game {
     updateCommanders(this, dt);
     updateMedics(this, dt); // Sanitäter heilen verletzte Infanterie im Umkreis (Paket E1)
     updateRecovery(this, dt); // Bergepanzer reparieren eigene Fahrzeuge im Umkreis (Paket E7)
+    updateMines(this, dt); // Pionier-Minen lösen aus und werden geräumt (Paket E8)
     updateCombat(this, dt);
     updateZone(this, dt);
     updateHot(this, dt);

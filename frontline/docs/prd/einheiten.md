@@ -10,6 +10,7 @@
 | Schütze | Hauptstadt | Billige Infanterie, stark gegen Infanterie; trägt 50 Baumaterial, baut daraus Mauern und Tore |
 | Sanitäter | Hauptstadt, Kaserne | Unbewaffnete Infanterie (90 Geld, Taste K); heilt jede Sekunde 6 HP der am stärksten verletzten eigenen Infanterie im Umkreis von 90 px (nicht sich selbst, nicht in Häusern oder Fahrzeugen) |
 | Bergepanzer | Fabrikhalle | Unbewaffnetes Fahrzeug (Taste W im Fabrikmenü); repariert jede Sekunde 15 HP je eigenem Fahrzeug im Umkreis von 60 px (keine Luftfahrzeuge) aus dem Baumaterial des Teamlagers; untätig fährt er zum nächsten beschädigten Fahrzeug in 200 px |
+| Pionier | Kaserne | Infanterie mit Gewehr (Taste F im Kasernenmenü); Befehl Mine legen (Taste Q) setzt getarnte Panzerminen (40 Munition, höchstens 6 je Pionier), die nur gegnerische Fahrzeuge auslösen; räumt gegnerische Minen in 40 px nach 3 s. Minen: js/game/mines.js. |
 | Panzerabwehrsoldat | Hauptstadt | Langsam feuernd, stark gegen Fahrzeuge und Gebäude; baut Mauern und Tore |
 | MANPADS-Soldat | Hauptstadt, Kaserne | Infanterie mit Flugabwehrrakete zu Fuß (120 Geld, Taste I); schießt nur auf Luftziele, Reichweite 300, Schaden 250, 12 s Nachladen; zählt zur Flugabwehr-Forschung |
 | Flammenwerfer | Kaserne | Infanterie mit Flammenstrahl (60 Geld, Taste D, nur Kaserne); Reichweite 70, Splash 25 (halber Schaden im Umkreis), Schaden Soldat hoch, Gebäude mittel, Fahrzeuge gering; gegen Besatzer eines Stadthauses ×2 auf den Spill-Schaden |
@@ -58,6 +59,7 @@ Die Tabellen „Werte“ und „Waffen und Schaden“ erzeugt `npm run docs` aus
 | Einheit | Taste | Plätze | HP | Tempo | Sicht | Reichweite | Preis | Ausbildung | Treibstoff (max / je s) |
 |---|---|---|---|---|---|---|---|---|---|
 | Schütze | Q | 1 | 100 | 45 | 260 | 200 | 60 Geld | 5 s | – |
+| Pionier | F | 1 | 100 | 45 | 260 | 200 | 70 Geld | 6 s | – |
 | Sanitäter | K | 1 | 100 | 45 | 260 | – | 90 Geld | 5 s | – |
 | MANPADS-Soldat | I | 1 | 90 | 40 | 260 | 300 | 120 Geld | 8 s | – |
 | Flammenwerfer | D | 1 | 100 | 40 | 260 | 70 | 60 Geld | 5 s | – |
@@ -111,6 +113,7 @@ Schaden je Schuss nach Panzerklasse des Ziels (Inf = Infanterie, Leicht, Schwer,
 | Waffe | Reichweite | Kadenz (s) | Schuss | Munition je Schuss | Inf | Leicht | Schwer | Geb | Luft | Flugzeug | Hinweis |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | Schütze: Gewehr | 200 | 1 | 60 | 0,033 | 12 | 3 | 1 | 4 | 3 | 0 | Soldat: 4 Treffer |
+| Pionier: Gewehr | 200 | 1 | 60 | 0,033 | 12 | 3 | 1 | 4 | 3 | 0 | Soldat: 4 Treffer |
 | MANPADS-Soldat: Wärmesuchrakete | 300 | 12 | 4 | 250 | – | – | – | – | 250 | 250 | bevorzugt gegen Luft; Trefferchance 90 % × Entfernungs-Faktor; nur Luftziele |
 | Flammenwerfer: Flammenstrahl | 70 | 0,5 | 40 | 0,05 | 40 | 6 | 2 | 20 | 0 | 0 | – |
 | Mörsertrupp: Leichter Mörser | 700 | 5 | 20 | 2 | 60 | 50 | 25 | 80 | – | – | – |

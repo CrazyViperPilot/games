@@ -71,6 +71,7 @@ export function snapshotGame(game, ai) {
 
 export function restoreGame(data) {
   const { game, ai } = decode(data, STATICS, CLASSES);
+  game.sapperMines ??= []; // Stände vor Paket E8 haben keine Pionier-Minen
   const rd = game.relief;
   game.relief = rd ? new Relief(rd.coarse) : reliefOf(game.map);
   if (rd) keepRelief(game.map, game.relief); // Darstellung (reliefOf) zeigt dasselbe Gelände wie die Simulation

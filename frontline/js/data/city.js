@@ -61,7 +61,7 @@ export const CITY = {
   // Mit Stadt bilden nur diese Stadtgebäude Truppen aus (die Hauptstadt nicht mehr). Sie bezahlen direkt aus der Stadt:
   // Geld aus der Kasse, Metall aus dem Stadtlager, Einwohner als Truppen; kein LKW nötig, egal wo sie stehen.
   produces: {
-    barracks: ['rifleman', 'medic', 'at', 'manpads', 'flamer', 'mortarteam', 'sniper', 'commander'], // Kaserne: Soldaten
+    barracks: ['rifleman', 'medic', 'at', 'manpads', 'flamer', 'mortarteam', 'sniper', 'sapper', 'commander'], // Kaserne: Soldaten
     factory: ['truck', 'scout', 'engineer', 'fobTruck', 'ifv', 'tank', 'flak', 'sam', 'gepard', 'pzh', 'mlrs', 'excavator', 'recovery'], // Fabrikhalle: alle Fahrzeuge (auch das FOB-Fahrzeug)
     heliport: ['littlebird', 'transporter', 'gunship'], // Heliport: Hubschrauber
     stand: ['f16', 'f22', 'u2', 'su27'], // Stellplatz/Hangar (seit v5.35, F-22 seit v5.82, U-2 seit v5.83, Su-27 im Paket „Su-27“): je Stellplatz zwei Kampfflugzeuge (CITY.air.standJets, F-16, F-22 und Su-27 teilen sich die Plätze); die U-2 belegt den ganzen Stellplatz (standSlots), die dort auch stehen, tanken und nachladen

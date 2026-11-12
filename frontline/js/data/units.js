@@ -32,6 +32,27 @@ export const UNITS = {
     canRide: true,
     hotkey: 'Q',
   },
+  // Pionier (Paket E8): Infanterie mit Gewehr; legt getarnte Panzerminen (Befehl Mine legen, js/game/mines.js) und räumt gegnerische Minen.
+  // Modell: Platzhalter Schütze (unitpaint INFANTRY). Taste F im Kasernenmenü (dort frei).
+  sapper: {
+    name: 'Pionier',
+    short: 'Pionier', // Kurzname in der Befehlskarte
+    armor: 'inf',
+    hp: 100,
+    speed: 45,
+    radius: 6,
+    sight: 260,
+    weapons: [
+      { id: 'rifle', name: 'Gewehr', range: 200, cooldown: 1.0, rounds: 60, munCost: 1 / 30, hits: { inf: 4 }, damage: { inf: 12, light: 3, heavy: 1, struct: 4, air: 3, jet: 0 } },
+    ],
+    cost: { money: 70 },
+    buildTime: 6,
+    fuelPerSec: 0,
+    builder: 'fort',
+    bmCap: 50,
+    canRide: true,
+    hotkey: 'F',
+  },
   // Sanitäter (Paket E1): unbewaffnet, heilt verletzte eigene Infanterie in seinem Umkreis (js/game/medic.js), keine Mauern bauen.
   medic: {
     name: 'Sanitäter',

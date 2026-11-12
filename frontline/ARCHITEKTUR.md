@@ -122,6 +122,7 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 | `route` | `ids, fromId, toId, preset?`; `fromWork` statt `fromId` (seit v5.69) | `logistics.js` `cmdRoute` | LKW pendeln lassen, Start an einer FOB oder einem Werk |
 | `setPreset` | `ids, preset` | `logistics.js` | Ladungsart (`mix`, `bm`, `mun`, `fuel`) |
 | `mortarTarget` | `ids, x, y` | `game.js` `cmdMortarTarget` | Mörser auf einen Punkt richten |
+| `layMine` | `ids, x, y` | `mines.js` `cmdLayMine` | Pionier legt an einer Stelle eine getarnte Panzermine (Munition aus dem Teamlager, höchstens `BALANCE.sapper.maxMines` je Pionier) |
 | `land` | `ids, airportId` | `aircraft.js` `cmdLand`, Heliport als Ziel `helipad.js` `cmdHeliLand` (seit v5.51) | Flugzeuge landen am Fliegerhorst des eigenen Stellplatzes `airportId` (seit v5.35; Anflug, Bahn, Ausrollen, Rollen zum Stellplatz; seit v5.15) |
 | `cityUpgrade` | `buildingId` | `city/commands.js` `cmdCityUpgrade` | Stellplatz eine Stufe ausbauen (Überdachung, Stahlbeton-Shelter) gegen Geld, BM und Stahl (seit v5.39) |
 | `dig` | `ids, c0, r0, c1, r1, append?` | `excavator.js` `cmdDig` | Bagger räumen die Zellen des Rechtecks nacheinander (Zonenstraße, Bäume, Häuser, eigene Gebäude; seit v5.35; seit dem Paket „Straßen“ auch Schutt und gegnerische Straßen) |

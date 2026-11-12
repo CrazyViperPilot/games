@@ -32,7 +32,7 @@ jedes Paket ist für sich lauffähig, getestet und committet.
 | E5 | Aufklärungsfahrzeug (`scout`) | `truck` | große Sicht, getarnt im Stand | gebaut |
 | E6 | Raketenwerfer (`mlrs`) | `pzh` | Salve aus 12 Raketen, lange Nachladezeit | gebaut |
 | E7 | Bergepanzer (`recovery`) | `engineer` (Reparatur) | repariert Fahrzeuge im Feld | gebaut |
-| E8 | Pionier (`sapper`) | `rifleman` | legt getarnte Panzerminen, räumt Minen | offen |
+| E8 | Pionier (`sapper`) | `rifleman` | legt getarnte Panzerminen, räumt Minen | gebaut |
 | E9 | Störsender (`jammer`) | `flak` | senkt gegnerische Trefferchance von Lenkwaffen im Umkreis | offen |
 | E10 | Aufklärungsdrohne (`drone`) | `littlebird` | billig, Sicht, begrenzte Flugzeit | offen |
 | E11 | Kamikazedrohne (`fpv`) | `drone` aus E10 | Einweg, stürzt sich auf ein Fahrzeug | offen |

@@ -55,6 +55,11 @@ export const MODES = {
     hint: () => 'Mörser / Artillerie: Ziel auf der Karte anklicken (Kreis zeigt Reichweite) · Esc bricht ab',
     click: (c, wx, wy) => c.confirmMortarTarget(wx, wy),
   },
+  layMine: {
+    target: true,
+    hint: () => 'Pionier: Stelle anklicken, an der die Mine liegt (getarnt, Munition aus dem Lager) · Esc bricht ab',
+    click: (c, wx, wy) => c.confirmLayMine(wx, wy),
+  },
   dropoff: {
     target: true,
     hint: () => 'Absetzen: Zielpunkt anklicken · Esc bricht ab',

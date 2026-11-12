@@ -1,0 +1,1 @@
+**Pionier** (Taste F im Kasernenmenü, §6 „Einheiten“): Infanterie mit Gewehr (70 Geld); Befehl **Mine legen** (Taste Q): getarnte Panzermine für 40 Munition aus dem Teamlager, höchstens 6 aktive je Pionier; löst einmal bei gegnerischen Fahrzeugen in 18 px aus (600 schwer / 400 leicht), Infanterie nicht; gegnerische Pioniere räumen sie in 40 px nach 3 s.

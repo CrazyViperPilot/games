@@ -63,6 +63,7 @@ import { drawCityGround, drawCityTop, drawCityRoofs, cityBuildings, drawCityBadg
 import { drawWays } from './ways.js';
 import { drawSelectMark, drawDragFrame, drawCargoGauge, drawCareMark, drawNoAmmoMark, drawMoveRing, drawSlotMark, strokeTrail, drawArrowHead, drawFootRing, drawRallyFlag } from './marks.js';
 import { beginTownFrame, townLift } from './townhouses.js';
+import { mineVisible } from '../game/mines.js'; // Pionier-Minen: Sichtbarkeit (Paket E8)
 
 const TILE = BALANCE.map.tile;
 const W = BALANCE.map.width;
@@ -1289,6 +1290,10 @@ export class Renderer {
     }
     for (const m of g.mines ?? []) {
       if (m.team === this.team && inRect(m.x, m.y, pad)) out.push({ x: m.x, y: m.y, lift: 0, s: 3, k: 0.5, fire: false, seed: 1, mine: true });
+    }
+    // Pionier-Minen (Paket E8): eigene immer, gegnerische nur, wenn mineVisible sie sichtbar macht
+    for (const m of g.sapperMines ?? []) {
+      if (inRect(m.x, m.y, pad) && (m.team === this.team || mineVisible(g, this.team, m))) out.push({ x: m.x, y: m.y, lift: 0, s: 3, k: 0.5, fire: false, seed: 1, mine: true });
     }
     return out;
   }

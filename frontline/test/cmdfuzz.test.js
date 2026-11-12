@@ -50,6 +50,7 @@ const TEMPLATES = {
   route: { ids: 'ids', fromId: 'fob', toId: 'fob', preset: 'preset', fromWork: 'cityEnt' },
   setPreset: { ids: 'ids', preset: 'preset' },
   mortarTarget: { ids: 'ids', x: 'x', y: 'y' },
+  layMine: { ids: 'ids', x: 'x', y: 'y' },
   land: { ids: 'ids', airportId: 'cityEnt' },
   cityUpgrade: { buildingId: 'cityEnt' },
   dig: { ids: 'ids', c0: 'col', r0: 'row', c1: 'col', r1: 'row', append: 'bool' },
