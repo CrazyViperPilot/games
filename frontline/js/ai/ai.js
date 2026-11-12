@@ -14,6 +14,7 @@ import { buildMethods } from './army/build.js';
 import { produceMethods } from './army/produce.js';
 import { logisticsMethods } from './army/logistics.js';
 import { combatMethods } from './army/combat.js';
+import { tacticsMethods } from './army/tactics.js';
 
 export class AI {
   constructor(game, team, difficulty = 'normal') {
@@ -46,6 +47,13 @@ export class AI {
     this.fallbackUntil = 0; // bis dahin greift army nicht an (Gruppen-Rückzug läuft)
     this.raid = null; // laufender Flankenangriff { ids, targetId }
     this.lastWave = 0; // Zeitpunkt der letzten Angriffswelle
+    // Kampfgruppen (tactics.js): Gruppen-ID -> { id, wave, ids:Set, role 'main'|'flank'|'reserve', phase 'gather'|'stage'|'assault'|'hold',
+    // stage:{x,y} Bereitstellungsraum, target:{x,y}, t0, angle, side, value0 (Wert beim Angriffsbeginn), tReady, tAssault, tGather }
+    this.groups = new Map();
+    this.groupSeq = 0;
+    this.waveSeq = 0;
+    this.staging = new Set(); // Einheiten in Bereitstellung oder im Sammeln nach einem Rückzug (für andere Aufgaben gesperrt)
+    this.failed = null; // letzter gescheiterter Angriff { side, time }: der nächste kommt aus anderen Winkeln
     this.zoneBan = 0; // bis dahin keine neue Zonen-FOB (nach Verlust, gegen Nachschub in den Tod)
     // Buchhaltung der Stadt-KI (seit v5.58 hier statt im Stadtzustand): Ausbautakte, Zeit seit dem letzten Überfall, letzter Verteidigungsbefehl
     this.cityMem = cityAiMemory();
@@ -166,4 +174,4 @@ export class AI {
   }
 }
 
-Object.assign(AI.prototype, buildMethods, produceMethods, logisticsMethods, combatMethods);
+Object.assign(AI.prototype, buildMethods, produceMethods, logisticsMethods, combatMethods, tacticsMethods);

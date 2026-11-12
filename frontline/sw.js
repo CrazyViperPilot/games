@@ -86,6 +86,7 @@ const ASSETS = [
   './js/ai/ai.js',
   './js/ai/army/build.js',
   './js/ai/army/combat.js',
+  './js/ai/army/tactics.js',
   './js/ai/army/logistics.js',
   './js/ai/army/produce.js',
   './js/ai/army/util.js',

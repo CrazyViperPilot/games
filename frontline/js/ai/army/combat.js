@@ -1,4 +1,5 @@
 // KI-Gegner, Kampf: Armee, Angriffswellen, Rückzug, Artillerie, Späher, Flankenangriff, Häuserkampf, Kommandeur.
+// Kampfgruppen, Bereitstellung und Mehrfrontenangriff der Wellen: tactics.js (army() ruft updateGroups und launchWave).
 // Methoden der Klasse AI (js/ai/ai.js), eingehängt über Object.assign. Befehle nur über game.issue. Kein DOM.
 
 import { CITY } from '../../data/city.js';
@@ -9,8 +10,8 @@ import { UNITS } from '../../data/units.js';
 import { canGarrison } from '../../game/garrison.js';
 import { radioEta } from '../../game/radio.js';
 import { weatherSight } from '../../game/weather.js';
-import { RESERVE_FROM, WAVE_NEUTRAL, SCOUT_EVERY, SCOUT_MOVE, JET_GROUP, JET_EVERY, JET_QUEUE, THREAT_RANGE, THREAT_DANGER, GATHER_DIST, ZONE_GATHER_DIST, RALLY_MOVE, RESERVE, DRY, THREAT_PER_UNIT, WAVE_ODDS, WAVE_PATIENCE, WAVE_MIN, SCOUT_MIN_ARMY, SCOUT_FROM, SCOUT_FUEL, SCOUT_REFILL, WX_SCOUT_SIGHT, WX_SCOUT_ARMY, WX_SCOUT_FROM, WX_FOG_SIGHT, WX_FOG_WAVE, RAID_MIN, RAID_SHARE, FALLBACK_ODDS, FALLBACK_MIN_FOES, FALLBACK_DIST, FALLBACK_HOLD, ART_BEHIND, ART_EVERY, GARRISON_SHARE, GARRISON_RANGE, GARRISON_EVERY, STORM_EVERY, STORM_RANGE, STORM_RATIO, STORM_WIRE, STORM_MIN, STORM_MAX, STORM_MARCH, HOUSE_WORK_EVERY, HOUSE_WORK_ORDER, HOUSE_WORK_RESERVE, CMD_BEHIND, CMD_DANGER, CMD_MOVE, RADIO_NEAR, RADIO_EVERY, RADIO_GATHER, RADIO_GATHER_R, RADIO_GATHER_SHARE } from '../../data/ai.js';
-import { DEF_RANGE, ZONE_FOB_R, TWO_PI, dist, unitVec } from './util.js';
+import { RESERVE_FROM, WAVE_NEUTRAL, SCOUT_EVERY, SCOUT_MOVE, JET_GROUP, JET_EVERY, JET_QUEUE, THREAT_RANGE, THREAT_DANGER, GATHER_DIST, ZONE_GATHER_DIST, RALLY_MOVE, RESERVE, DRY, THREAT_PER_UNIT, WAVE_ODDS, WAVE_PATIENCE, WAVE_MIN, SCOUT_MIN_ARMY, SCOUT_FROM, SCOUT_FUEL, SCOUT_REFILL, WX_SCOUT_SIGHT, WX_SCOUT_ARMY, WX_SCOUT_FROM, WX_FOG_SIGHT, WX_FOG_WAVE, RAID_MIN, RAID_SHARE, FALLBACK_ODDS, FALLBACK_MIN_FOES, FALLBACK_DIST, FALLBACK_HOLD, ART_BEHIND, ART_EVERY, GARRISON_SHARE, GARRISON_RANGE, GARRISON_EVERY, STORM_EVERY, STORM_RANGE, STORM_RATIO, STORM_WIRE, STORM_MIN, STORM_MAX, STORM_MARCH, HOUSE_WORK_EVERY, HOUSE_WORK_ORDER, HOUSE_WORK_RESERVE, CMD_BEHIND, CMD_DANGER, CMD_MOVE, RADIO_NEAR, RADIO_EVERY, RADIO_GATHER, RADIO_GATHER_R, RADIO_GATHER_SHARE, REINF_MIN, REINF_URGENT, GROUP_MIN, STAGE_NEAR, STAGE_DIST } from '../../data/ai.js';
+import { DEF_RANGE, ZONE_FOB_R, dist, unitVec } from './util.js';
 
 /** Bestellt wird nur an Stellplätzen mit Versorgungsweg zum Lager (Paket „Straßen“: ohne Weg stünde die Ausbildung still). */
 const supplied = (g, p) => !g.city || supplyOf(g, g.city[p.team], p.cityCell).rate > 0;
@@ -255,7 +256,7 @@ export const combatMethods = {
   /** Sammelpunkte setzen (Produktionsgebäude), neu nur wenn sich der Sammelpunkt deutlich verschoben hat. */
   rally(s) {
     if (!s.home) return;
-    const gp = this.gatherPoint(s);
+    const gp = this.rallyPoint(s); // mit Taktik immer vor der Hauptstadt (gebündelter Nachschub, tactics.js)
     for (const b of s.producers) {
       if (!b.built || !b.produces.length) continue;
       const prev = this.rallyAt.get(b.id);
@@ -265,13 +266,6 @@ export const combatMethods = {
     }
   },
 
-  /**
-   * Angriff, sobald die Summe der idle Kampfeinheiten (Geldwert) die Schwelle erreicht
-   * (bei unbesetzter Zone schon ab 60 %). Nicht zu Hause stehende Einheiten folgen dem Befehl.
-   * Einheiten mit fast leerem Vorrat bleiben zum Nachfüllen zurück.
-   * In der Zone stehende Einheiten verteilen sich auf einem Kreis (r 400) statt im Zentrum zu klumpen.
-   * Ein Fünftel der ausrückenden Gruppe (ab 5 Einheiten) bleibt als Reserve an der Hauptstadt.
-   */
   /**
    * Späher (Little Bird, unbewaffnet): fliegt an den Zonenrand auf der Gegnerseite, damit die Besatzung der Zone sichtbar wird
    * (army schätzt die Gegnerstärke dann aus dem Wert der gesehenen Einheiten). Tank fast leer → heim, auftanken, wieder los.
@@ -377,7 +371,7 @@ export const combatMethods = {
     const raiding = this.raid ? this.raid.ids : null;
     for (const u of inf) {
       if (want <= 0) break;
-      if (u.house || u.order.type !== 'idle' || this.dryKind(u) || (raiding && raiding.has(u.id))) continue;
+      if (u.house || u.order.type !== 'idle' || this.dryKind(u) || (raiding && raiding.has(u.id)) || this.staging.has(u.id)) continue; // Gruppen in Bereitstellung bleiben zusammen
       let best = null;
       let bd = GARRISON_RANGE;
       for (const h of houses) {
@@ -409,7 +403,7 @@ export const combatMethods = {
     if (!foes.length) return;
     const raiding = this.raid ? this.raid.ids : null;
     const ready = (o) => o.type === 'idle' || (STORM_MARCH && o.type === 'attackMove' && dist(o.x, o.y, z.x, z.y) <= z.r);
-    const free = s.units.filter((u) => canGarrison(u) && u.def.range > 0 && !u.def.hero && !u.house && ready(u.order) && !(raiding && raiding.has(u.id)));
+    const free = s.units.filter((u) => canGarrison(u) && u.def.range > 0 && !u.def.hero && !u.house && ready(u.order) && !(raiding && raiding.has(u.id)) && !this.staging.has(u.id));
     for (const h of foes) {
       const near = free.filter((u) => dist(u.x, u.y, h.x, h.y) <= STORM_RANGE).sort((a, b) => dist(a.x, a.y, h.x, h.y) - dist(b.x, b.y, h.x, h.y) || a.id - b.id);
       const need = STORM_RATIO * h.occupants.length * (h.works.wire ? STORM_WIRE : 1);
@@ -537,18 +531,27 @@ export const combatMethods = {
     return need;
   },
 
+  /**
+   * Angriff, sobald die Summe der idle Kampfeinheiten (Geldwert) die Schwelle erreicht
+   * (bei unbesetzter Zone schon ab 60 %). Nicht zu Hause stehende Einheiten folgen dem Befehl.
+   * Einheiten mit fast leerem Vorrat bleiben zum Nachfüllen zurück.
+   * In der Zone stehende Einheiten verteilen sich auf einem Kreis (r 400) statt im Zentrum zu klumpen.
+   * Ein Fünftel der ausrückenden Gruppe (ab 5 Einheiten) bleibt als Reserve an der Hauptstadt.
+   * Seit dem Paket „KI-Taktik“ rückt die Welle als Kampfgruppen aus (launchWave in tactics.js: Hauptstoß und Flanken über
+   * Bereitstellungsräume, Nachschub gebündelt); auf Leicht bleibt es bei einer Gruppe im Keil.
+   */
   army(s) {
     const g = this.game;
     const t = this.team;
     const z = s.zone;
     this.rememberFobs();
     this.updateRaid(s);
+    this.updateGroups(s); // Kampfgruppen: Gefallene austragen, Bereitstellung → Angriff → Halten (tactics.js)
     if (g.time < this.fallbackUntil) return; // Rückzug läuft: erst sammeln
     const raiding = this.raid ? this.raid.ids : null;
-    const idle = s.combat.filter((u) => u.order.type === 'idle' && !this.dryKind(u) && !(raiding && raiding.has(u.id)));
-    if (!idle.length) return;
+    // Gruppen in Bereitstellung (oder nach einem Rückzug im Sammeln) warten auf ihren Befehl: nicht Teil der freien Einheiten
+    const idle = s.combat.filter((u) => u.order.type === 'idle' && !this.dryKind(u) && !(raiding && raiding.has(u.id)) && !this.staging.has(u.id));
     const inZone = (u) => dist(u.x, u.y, z.x, z.y) <= z.r;
-    const ammoOk = true; // die Hauptstadt hat unendlich Munition
 
     // Gegner in der Zone (sichtbar): deren Schwerpunkt ist das Ziel, sonst das Zonenzentrum
     const inside = s.enemies.filter((e) => dist(e.x, e.y, z.x, z.y) <= z.r);
@@ -559,28 +562,53 @@ export const combatMethods = {
       ty = inside.reduce((a, e) => a + e.y, 0) / inside.length;
     }
 
-    if (ammoOk) {
-      // Nur wer noch nicht in der Zone steht, zählt zur Welle (sonst gehen Nachrücker einzeln los, weil die Zonenbesatzung mitzählt).
-      const strength = idle.filter((u) => !inZone(u)).reduce((sum, u) => sum + (UNITS[u.type].cost.money || 0), 0);
-      const need = this.waveNeed(inside);
-      const ready = strength >= need || (z.owner === -1 && strength >= WAVE_NEUTRAL * need);
+    // Welle: wer noch nicht in der Zone steht (sonst gehen Nachrücker einzeln los, weil die Zonenbesatzung mitzählt), dazu Gruppen,
+    // die nach einem Rückzug im Bereitstellungsraum auf Verstärkung warten. Läuft schon eine Bereitstellung, wartet die nächste Welle.
+    const tactics = this.tacticsOn();
+    const all = [...this.groups.values()];
+    const waiting = all.filter((gr) => gr.phase === 'gather');
+    const byId = new Map(s.combat.map((u) => [u.id, u]));
+    const regroup = waiting.flatMap((gr) => [...gr.ids].map((id) => byId.get(id)).filter((u) => u && !this.dryKind(u)));
+    const pool = idle.filter((u) => !inZone(u));
+    if (pool.length && !all.some((gr) => gr.phase === 'stage' && !gr.reinforce)) {
+      const strength = pool.concat(regroup).reduce((sum, u) => sum + (UNITS[u.type].cost.money || 0), 0);
+      let need = this.waveNeed(inside);
+      // Stützpunkt vorn (mit Taktik: Zone gehalten oder eigene Zonen-FOB): Nachschub zieht gebündelt ab REINF_MIN Wert dorthin;
+      // droht die gehaltene Zone verloren zu gehen (Einheiten in der Zone sind öffentlich), sofort, aber mindestens als Trupp (GROUP_MIN)
+      const held = z.owner === t;
+      const reinforce = tactics && (held || !!(s.zoneFob && s.zoneFob.built));
+      const urgent = held && z.counts[1 - t] >= REINF_URGENT * z.counts[t];
+      if (reinforce) need = urgent ? 0 : Math.min(need, REINF_MIN);
+      const ready = (strength >= need || (z.owner === -1 && strength >= WAVE_NEUTRAL * need)) && (!urgent || pool.length >= GROUP_MIN);
       if (ready) {
-        let go = idle.filter((u) => !inZone(u));
+        let go = pool;
         // Reserve: die Einheiten nahe der Hauptstadt bleiben zur Verteidigung zurück (die große Startarmee rückt trotzdem aus)
         if (s.home && go.length >= RESERVE_FROM) {
           go.sort((a, b) => dist(a.x, a.y, s.ax, s.ay) - dist(b.x, b.y, s.ax, s.ay));
           go = go.slice(Math.ceil(go.length * RESERVE));
         }
-        const ids = go.map((u) => u.id);
-        if (ids.length) {
-          g.issue(t, { type: 'attackMove', ids, x: tx, y: ty, formation: 'wedge' }); // im Keil: Panzer vorn, alle kommen zusammen an
-          this.lastWave = g.time;
+        if (go.length) {
+          if (!reinforce) for (const gr of waiting) this.groups.delete(gr.id);
+          this.launchWave(s, go.concat(reinforce ? [] : regroup), tx, ty, inside, reinforce ? 'reinforce' : 'attack');
         }
       }
     }
 
     if (inside.length) {
-      if (!ammoOk) return;
+      const fwd = idle.filter((u) => inZone(u) && !u.house);
+      // Besatzung mit Taktik: Steht sie als Verband (ab 2 × GROUP_MIN) weit vom Gegner (über STAGE_NEAR × STAGE_DIST) und ist sie
+      // mindestens WAVE_ODDS-mal so viel wert wie die gesehenen Gegner in der Zone, greift sie über Bereitstellungsräume mit Flanke an
+      // (launchWave). Gruppen im Sammeln schließen sich an. Sonst wie bisher: wer keinen Feindkontakt hat, rückt auf die Gegner zu.
+      if (tactics && fwd.length >= 2 * GROUP_MIN && !all.some((gr) => gr.phase === 'stage' && !gr.reinforce)) {
+        const value = (list) => list.reduce((sum, u) => sum + (UNITS[u.type].cost.money || 0), 0);
+        const cx = fwd.reduce((a, u) => a + u.x, 0) / fwd.length;
+        const cy = fwd.reduce((a, u) => a + u.y, 0) / fwd.length;
+        if (dist(cx, cy, tx, ty) >= STAGE_NEAR * STAGE_DIST && value(fwd) + value(regroup) >= WAVE_ODDS * value(inside)) {
+          for (const gr of waiting) this.groups.delete(gr.id);
+          this.launchWave(s, fwd.concat(regroup), tx, ty, inside, 'forward');
+          return;
+        }
+      }
       // Gegner in der Zone, eigene Einheit ohne Feindkontakt: auf die Gegner zu, sonst stehen beide Seiten
       // außer Sichtweite und das Gefecht kommt nie zustande.
       const lone = idle
@@ -596,16 +624,6 @@ export const combatMethods = {
     if (left.length < garrison.length) return;
 
     const clumped = idle.filter((u) => !u.house && dist(u.x, u.y, z.x, z.y) < 200);
-    if (clumped.length >= 2) {
-      const groups = 4;
-      const base = this.rng.next() * TWO_PI;
-      for (let i = 0; i < groups; i++) {
-        const ids = clumped.filter((_, k) => k % groups === i).map((u) => u.id);
-        if (!ids.length) continue;
-        const a = base + (i * TWO_PI) / groups;
-        const p = this.highGround(z.x + Math.cos(a) * 400, z.y + Math.sin(a) * 400, 220); // Kuppen bevorzugt
-        g.issue(t, { type: 'attackMove', ids, x: p.x, y: p.y });
-      }
-    }
+    if (clumped.length >= 2) this.holdSpread(s, clumped); // vier Haltepunkte auf Kuppen, mit Taktik zur Gegnerseite gewichtet
   },
 };

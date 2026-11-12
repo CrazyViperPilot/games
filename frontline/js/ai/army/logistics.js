@@ -273,7 +273,8 @@ export const logisticsMethods = {
         !u.house &&
         (u.order.type === 'idle' || u.order.type === 'move') &&
         !this.dryKind(u) &&
-        !(raiding && raiding.has(u.id)),
+        !(raiding && raiding.has(u.id)) &&
+        !this.staging.has(u.id), // Gruppen in Bereitstellung bleiben zusammen
     );
     for (const c of crates) {
       if (free <= 0) break;

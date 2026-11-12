@@ -134,9 +134,12 @@ export const BALANCE = {
     // cratePickers: so viele Soldaten holen oder tragen gleichzeitig Versorgungskisten;
     // fort: baut ab Spielzeit `from` (s) bis zu `fobs` FOBs zur Festung aus (Mauerring, Tore, `towers` Türme mit Besatzung und Dachaufbau). Weitere KI-Werte: js/data/ai.js
     // houseStorm: stürmt vom Gegner besetzte Häuser in der Konfliktzone, wenn genug freie Infanterie daneben steht; houseWorks: baut eigene Besatzungshäuser aus (Sandsäcke, MG-Nest, Stacheldraht), seit v5.67
-    easy: { think: 3.0, incomeMult: 0.8, attackStrength: 2500, scout: false, counter: false, raid: false, fallback: false, weather: false, research: [240, 720], upgrades: false, fobCap: 3, radioFrom: Infinity, cratePickers: 1, fort: { from: Infinity, fobs: 0, towers: 0 }, houseStorm: false, houseWorks: false },
-    normal: { think: 2.0, incomeMult: 1.0, attackStrength: 2000, scout: true, counter: true, raid: false, fallback: false, weather: true, research: [150, 540], upgrades: true, fobCap: 5, radioFrom: 720, cratePickers: 2, fort: { from: 600, fobs: 1, towers: 1 }, houseStorm: true, houseWorks: true },
-    hard: { think: 1.0, incomeMult: 1.0, attackStrength: 1600, scout: true, counter: true, raid: true, fallback: true, weather: true, research: [90, 420], upgrades: true, fobCap: 7, radioFrom: 540, cratePickers: 3, fort: { from: 420, fobs: 2, towers: 2 }, houseStorm: true, houseWorks: true },
+    // tactics: Kampfgruppen (js/ai/army/tactics.js). flanks: Zahl der Flankengruppen neben dem Hauptstoß (0 = eine Gruppe ohne Bereitstellung,
+    // wie früher); stageTimeout: s, die bereite Gruppen in der Bereitstellung auf die übrigen warten; reangle: nach einem gescheiterten Angriff
+    // kommt auch der Hauptstoß aus neuer Richtung
+    easy: { think: 3.0, incomeMult: 0.8, attackStrength: 2500, scout: false, counter: false, raid: false, fallback: false, weather: false, research: [240, 720], upgrades: false, fobCap: 3, radioFrom: Infinity, cratePickers: 1, fort: { from: Infinity, fobs: 0, towers: 0 }, houseStorm: false, houseWorks: false, tactics: { flanks: 0, stageTimeout: 0, reangle: false } },
+    normal: { think: 2.0, incomeMult: 1.0, attackStrength: 2000, scout: true, counter: true, raid: false, fallback: false, weather: true, research: [150, 540], upgrades: true, fobCap: 5, radioFrom: 720, cratePickers: 2, fort: { from: 600, fobs: 1, towers: 1 }, houseStorm: true, houseWorks: true, tactics: { flanks: 1, stageTimeout: 45, reangle: false } },
+    hard: { think: 1.0, incomeMult: 1.0, attackStrength: 1600, scout: true, counter: true, raid: true, fallback: true, weather: true, research: [90, 420], upgrades: true, fobCap: 7, radioFrom: 540, cratePickers: 3, fort: { from: 420, fobs: 2, towers: 2 }, houseStorm: true, houseWorks: true, tactics: { flanks: 2, stageTimeout: 30, reangle: true } },
   },
   // Gelände (§7): wer höher steht, trifft härter (Direktfeuer, ab `dead` Höhenunterschied, voll ab `full`), tiefer stehend schwächer
   height: { bonus: 0.25, dead: 6, full: 36 },
