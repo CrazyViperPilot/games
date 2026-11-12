@@ -1330,7 +1330,7 @@ function soldier(P, o) {
 }
 
 const MODELS = { tank, ifv, flak, sam, gepard, pzh, truck, fobTruck, engineer, excavator, littlebird, gunship, transporter, f16, f22, su27, u2 };
-const INFANTRY = { rifleman: 'rifleman', medic: 'medic', at: 'at', manpads: 'manpads', flamer: 'rifleman', sniper: 'sniper', commander: 'commander' };
+const INFANTRY = { rifleman: 'rifleman', medic: 'medic', at: 'at', manpads: 'manpads', flamer: 'rifleman', mortarteam: 'rifleman', sniper: 'sniper', commander: 'commander' };
 const TEAM_KEYS = ['b', 'r', 'n', 'd'];
 
 const paintOf = (team) => (team === SHOWROOM ? DISPLAY : TEAM_PAINT[team] ?? NEUTRAL);

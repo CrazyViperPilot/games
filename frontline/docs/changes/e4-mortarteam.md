@@ -1,0 +1,1 @@
+**Mörsertrupp** (§6 „Infanterie“, Paket E4): Infanterie mit leichtem Mörser, Kaserne bildet aus (Taste E, 90 Geld); Feuer auf Punkt (G) und Ziel löschen (C) wie die Panzerhaubitze; Reichweite 700, min. 150, Kadenz 5 s.

@@ -93,6 +93,29 @@ export const UNITS = {
     canRide: true,
     hotkey: 'D', // nur Kaserne: im Hauptstadt-Menü sind alle Buchstaben belegt (test/config.test.js); offen, siehe Bericht
   },
+  // Mörsertrupp (Paket E4): Infanterie mit leichtem Mörser zu Fuß. Feuer auf Punkt (Befehl mortarTarget, wie die Panzerhaubitze),
+  // indirekt: Zielsuche über die Reichweite. Werte wie das Mörser-Gebäude, aber Reichweite 700, min. 150, Kadenz 5 s.
+  // Langsam, 1 Platz. Nur Kaserne (nicht Hauptstadt, Regel 4 im Plan).
+  mortarteam: {
+    name: 'Mörsertrupp',
+    short: 'Mörser', // Kurzname in der Befehlskarte
+    armor: 'inf',
+    hp: 100,
+    speed: 25,
+    radius: 6,
+    sight: 260,
+    indirect: true,
+    weapons: [
+      { id: 'mortar', name: 'Leichter Mörser', range: 700, minRange: 150, cooldown: 5, rounds: 20, munCost: 2, shell: true, splash: 60, damage: { inf: 60, light: 50, heavy: 25, struct: 80 } },
+    ],
+    cost: { money: 90 }, // Infanterie-Preis zwischen Schütze und Flammenwerfer
+    buildTime: 8,
+    fuelPerSec: 0,
+    builder: 'fort',
+    bmCap: 50,
+    canRide: false, // Mörser wird zu Fuß getragen und aufgestellt
+    hotkey: 'E', // nur Kaserne: Taste im Kasernenmenü frei (Q K W T D C I belegt); im Hauptstadt-Menü nicht ausgebildet
+  },
   at: {
     name: 'Panzerabwehrsoldat',
     short: 'PAK', // Kurzname in der Befehlskarte
