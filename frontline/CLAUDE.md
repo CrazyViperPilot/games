@@ -29,7 +29,7 @@ die genannten Dateien.
    `docs/changelog.md` nicht direkt bearbeiten. Die Hilfe (F1) in `js/ui/helptext.js` liest die meisten Zahlen und Tasten aus den Daten
    (seit v5.63); der Rest steht von Hand dort und in `js/ui/menu.js`: mitpflegen (Suche z. B. `grep -rn "300 Plätze" js docs/prd`).
 8. Neue Ideen, die Daniel nur festhalten will: PRD §13 „Geparkte Ideen“ (`docs/prd/ideen.md`), nicht bauen.
-9. Startmenü-Schalter (Sendemast, Wetter, Forschung, Fluss, Stadt) sind im Menü standardmäßig an, in `new Game()` ohne Angabe aus. Tests verlassen sich darauf.
+9. Startmenü-Schalter (Sendemast, Wetter, Forschung, Fluss) sind im Menü standardmäßig an, in `new Game()` ohne Angabe aus. Tests verlassen sich darauf. Die Stadt ist fester Teil des Spiels; `new Game()` ohne `city` läuft nur noch als Testmodus (Ausbau folgt).
 10. Texte im Spiel, Kommentare und Doku auf Deutsch, Bezeichner im Code englisch. Nach jeder Änderung in `js/data/`: `npm run docs`
     (erzeugt die Wertetabellen in `docs/prd/`) und `npm run test:quick`. Vor dem Push `npm test` (alle grün).
 11. Ressourcen der Stadt (Rohstoffe, Werke, Waren, Förder- und Verarbeitungsformeln) ändern: Zellenarten stehen im Register

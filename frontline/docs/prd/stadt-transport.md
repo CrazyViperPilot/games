@@ -7,7 +7,7 @@
 
 ### Straßentransport
 
-Die Straßen verbinden alles. Gilt nur **mit Stadt**; ohne Stadt gibt es keine Transportlogik. Werte: `CITY.transport`, `CITY.shop`, `CITY.convert`, `CITY.yield`, `CITY.startKero`, `CITY.care.refuel` (`js/data/city.js`). Logik: `js/game/transport.js` (Wege, Kapazität, Stau, ohne DOM; Wege und Lasten liegen in einer WeakMap je Stadt und werden nicht gespeichert, der geglättete Stau-Faktor je Zelle `c.congestion` schon), die Rechnung in `updateCity` (`js/game/city.js`).
+Die Straßen verbinden alles. Werte: `CITY.transport`, `CITY.shop`, `CITY.convert`, `CITY.yield`, `CITY.startKero`, `CITY.care.refuel` (`js/data/city.js`). Logik: `js/game/transport.js` (Wege, Kapazität, Stau, ohne DOM; Wege und Lasten liegen in einer WeakMap je Stadt und werden nicht gespeichert, der geglättete Stau-Faktor je Zelle `c.congestion` schon), die Rechnung in `updateCity` (`js/game/city.js`).
 
 - **Ketten** (Ware → Gebäude → Ziel):
   - **Holz, Stein** → BM-Werk → **Lager** (Baumaterial).

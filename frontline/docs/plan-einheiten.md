@@ -10,7 +10,7 @@ jedes Paket ist für sich lauffähig, getestet und committet.
 2. **Vorbild** ist immer eine vorhandene Einheit (genannt im Paket). Mit `grep -rn "<vorbild>" js test` alle Stellen finden, an denen
    das Vorbild vorkommt, und die neue Einheit dort ebenso eintragen (Ausbildung, Hilfe, Forschungsgruppen, Modell, Symbol, KI-Listen).
 3. Werte nur in `js/data/` (meist `units.js`, ggf. `balance.js`), mit deutschem Kommentar. Kosten mit Stadt wie beim Vorbild (Stahl, Einwohner).
-4. **Taste:** Das Hauptstadt-Menü ist voll (seit E3). Neue Einheiten nur in den Stadtgebäuden (Kaserne, Fabrikhalle, Heliport, Stellplatz) eintragen, nicht in `fob.produces`, mit dort freier Taste. Sonst: eine im jeweiligen Ausbildungsmenü freie Taste wählen; `test/config.test.js` prüft Kollisionen (feste Tasten J, H, V, Y, P, M tabu).
+4. **Taste:** Das Hauptstadt-Menü ist voll (seit E3). Neue Einheiten nur in den Stadtgebäuden (Kaserne, Fabrikhalle, Heliport, Stellplatz) eintragen, nicht in `fob.produces`, mit dort freier Taste; `test/config.test.js` prüft Kollisionen (feste Tasten J, H, V, Y, P, M tabu).
 5. **Modell:** nach `docs/rezept-einheiten.md`, klein halten (Silhouette aus 5–15 Körpern), höchstens 2 Vorschaurunden mit
    `node tools/unitpreview.mjs <typ>`.
 6. Doku: Zeile in der Einheitentabelle `docs/prd/einheiten.md` §6, eine Datei `docs/changes/<paket>-<typ>.md` (eine Zeile, ohne

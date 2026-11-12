@@ -221,7 +221,7 @@ export async function smoke(opts = {}) {
         s.controller.view.selection.add(e.id);
         return 1;
       });
-      if (!n) throw new Error('kein Ausbildungsgebäude (Stadt aus?)');
+      if (!n) throw new Error('kein Ausbildungsgebäude der Stadt');
       await page.waitForTimeout(600);
       if (!(await page.$('.cbtn'))) throw new Error('Befehlskarte leer');
       await g.shot('07-ausbildung');
