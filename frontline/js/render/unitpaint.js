@@ -1648,10 +1648,11 @@ function soldier(P, o) {
     S.push(box(k - 0.9, k + 1.5, side * 0.95 - 0.7, side * 0.95 + 0.7, 0, 1.1, BOOT)); // Stiefel
   }
   S.push(box(-1, 1, -1.85, 1.85, 5.8, 7.4, uni)); // Hüfte
-  // Flammenwerfer: Weste in Uniformfarbe (Teamfarbe nur am Helmband), sonst wie die übrigen Schützen
-  const vest = box(-1.25, 1.25, -2, 2, 7.2, 11, kind === 'sniper' ? mix(P.vest, '#5a5d3c', 0.5) : kind === 'flamer' ? '#4d5339' : P.vest);
+  // Flammenwerfer und Mörsertrupp: Weste in Uniformfarbe (Teamfarbe nur am Helmband)
+  const plainVest = kind === 'flamer' || kind === 'mortar';
+  const vest = box(-1.25, 1.25, -2, 2, 7.2, 11, kind === 'sniper' ? mix(P.vest, '#5a5d3c', 0.5) : plainVest ? '#4d5339' : P.vest);
   S.push(vest);
-  S.push(fine(on(vest, box(1.25, 1.4, -1.4, 1.4, 8, 9.4, mix(kind === 'flamer' ? '#4d5339' : P.vest, '#000000', 0.25), { noLine: true })))); // Taschen
+  S.push(fine(on(vest, box(1.25, 1.4, -1.4, 1.4, 8, 9.4, mix(plainVest ? '#4d5339' : P.vest, '#000000', 0.25), { noLine: true })))); // Taschen
   if (kind === 'flamer') {
     // Flammenwerfer-Tornister: zwei aufrechte Druckbehälter nebeneinander, dazwischen ein kleiner Kugel-Drucktank,
     // Schlauch vom Behälter zum Flammrohr (vorn am Hüftgriff)
@@ -1706,6 +1707,14 @@ function soldier(P, o) {
     S.push(cyl([0.8, 0.8, 7.9], [5.6, 0.6, 7.6], 0.5, 0.5, 6, GUN)); // Flammrohr
     S.push(cyl([5.6, 0.6, 7.6], [7, 0.55, 7.5], 0.5, 0.8, 8, '#1c1e20')); // Düse vorn
     S.push(fine(box(2.2, 2.9, 0.4, 1.2, 7.1, 7.5, '#1c1e20'))); // Ventil am Griff
+  } else if (kind === 'mortar') {
+    // Mörsertrupp: 60-mm-Mörser, kein Gewehr. Rohr schräg über die Schulter (vorn unten an der Hand, hinten oben auf der
+    // Bodenplatte), runde Bodenplatte als flache Scheibe auf dem Rücken, Munitionsbehälter am Gürtel rechts.
+    S.push(cyl([3, 1.4, 8.8], [-3, 1.4, 11.4], 0.85, 0.6, 8, '#3c4130')); // Mörserrohr
+    S.push(fine(cyl([3.1, 1.4, 8.8], [3.4, 1.4, 8.8], 1.0, 1.0, 8, '#1b1d1f', { noLine: true }))); // Mündung
+    S.push(cyl([-2.5, 0, 9.6], [-3.1, 0, 9.6], 2, 2, 12, '#474c37')); // Bodenplatte auf dem Rücken
+    S.push(box(-1, 1, 1.9, 3.1, 5.9, 7.5, '#4f5536')); // Munitionsbehälter am Gürtel
+    S.push(fine(box(-0.4, 0.4, 3.1, 3.3, 6.5, 7, '#3c4130'))); // Verschlussgriff am Behälter
   } else if (kind === 'medic') {
     S.push(fine(box(1.3, 1.5, -1.4, 1.4, 8.6, 9.0, WHITE))); // weißes Kreuz auf der Brust (unbewaffnet)
     S.push(fine(box(1.3, 1.5, -0.5, 0.5, 7.9, 9.7, WHITE)));
@@ -1717,7 +1726,7 @@ function soldier(P, o) {
 }
 
 const MODELS = { tank, ifv, flak, sam, gepard, pzh, mlrs, truck, scout, fobTruck, engineer, excavator, bridgelayer, littlebird, drone, fpv, gunship, transporter, recovery, jammer, f16, f22, su27, u2, a10, c130 };
-const INFANTRY = { rifleman: 'rifleman', medic: 'medic', at: 'at', manpads: 'manpads', flamer: 'flamer', mortarteam: 'rifleman', sniper: 'sniper', sapper: 'rifleman', commander: 'commander' };
+const INFANTRY = { rifleman: 'rifleman', medic: 'medic', at: 'at', manpads: 'manpads', flamer: 'flamer', mortarteam: 'mortar', sniper: 'sniper', sapper: 'rifleman', commander: 'commander' };
 const TEAM_KEYS = ['b', 'r', 'n', 'd'];
 
 const paintOf = (team) => (team === SHOWROOM ? DISPLAY : TEAM_PAINT[team] ?? NEUTRAL);
