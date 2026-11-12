@@ -1,0 +1,1 @@
+**Tests ohne Stadt aufgelöst (Teil 1, Stufe 2 Paket S2b)**: Der Lauf „ohne Schalter“ (`classic`) in `test/golden.test.js` entfällt samt Prüfsummen und Konstante; die übrigen Referenzläufe bleiben unverändert. Die weiteren `city: false`-Tests folgen in einem späteren Paket.

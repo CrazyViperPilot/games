@@ -7,7 +7,6 @@
 //   river  Karte mit Fluss (generateMap(seed, { river: true })).
 //   start  Startzustand einer Partie mit allen Menü-Schaltern an (Stadt, Fluss, Wetter, Forschung, Sendemast).
 //   play   KI gegen KI (normal) mit allen Schaltern, Prüfsumme alle 30 s bis PLAY_S. Eine Abweichung zeigt den Zeitpunkt.
-//   classic  KI gegen KI ohne Schalter (wie die meisten Tests), Prüfsumme alle 30 s bis CLASSIC_S.
 // Die Zustandssumme (stateDigest) liest nur sichtbare Spielgrößen (Einheiten, Gebäude, Kassen, Lager, Punkte, Zone, Stadtzellen,
 // Zufallszustände), nicht die Form der Objekte: Umbenennen innerer Felder oder ein anderes Speicherformat ändert sie nicht.
 //
@@ -31,15 +30,14 @@ const SEEDS = [2, 3, 7];
 const DT = 0.05;
 const EVERY_S = 30; // Abstand der Prüfsummen im Lauf
 const PLAY_S = 120; // Länge des Laufs mit allen Schaltern (vorher sind beide Seiten noch symmetrisch)
-const CLASSIC_S = 90; // Länge des Laufs ohne Schalter
 const FULL = { radio: true, weather: 'random', research: true, river: true, city: true }; // wie BALANCE.menuDefaults
 
 // prettier-ignore
-// Läufe (play, classic) neu gesetzt mit v5.61 (Review-Paket P8: Wegsuche mit Budget je Schritt, unerreichbare Ziele, lange Suchen); Paket K1: KI bildet Unterstützer aus
+// Läufe (play) neu gesetzt mit v5.61 (Review-Paket P8: Wegsuche mit Budget je Schritt, unerreichbare Ziele, lange Suchen); Paket K1: KI bildet Unterstützer aus
 const GOLDEN = {
-2: { map: '894406ba81d0', river: '533ace5a08d3', start: 'fc78e7cb5f07', play: ['0fe32c1e0053', 'e5af9e24148e', '88c196741358', '6d14f712cfb9'], classic: ['dc037cb181de', '26e1df6ef7bc', '19acdb0da3c2'] },
-3: { map: 'b8095c497a39', river: 'de3f5da9bcba', start: '90317789c157', play: ['f5d395ab5f6c', 'a69653a46fce', '796f932d01bf', '21bb296b947a'], classic: ['3b5a1a58cdfe', '354be75fab20', 'dcf8f5374dc4'] },
-7: { map: 'e6c2e69a3dc6', river: 'b5fa8dc32b8a', start: '286eed3aa049', play: ['6437d3c28a20', '362d60168a62', 'fa34f84a457b', '3a0a3ec69f5b'], classic: ['1b279f50f558', '2ddff6d1e4cb', 'ceb185ac5bd6'] },
+2: { map: '894406ba81d0', river: '533ace5a08d3', start: 'fc78e7cb5f07', play: ['0fe32c1e0053', 'e5af9e24148e', '88c196741358', '6d14f712cfb9'] },
+3: { map: 'b8095c497a39', river: 'de3f5da9bcba', start: '90317789c157', play: ['f5d395ab5f6c', 'a69653a46fce', '796f932d01bf', '21bb296b947a'] },
+7: { map: 'e6c2e69a3dc6', river: 'b5fa8dc32b8a', start: '286eed3aa049', play: ['6437d3c28a20', '362d60168a62', 'fa34f84a457b', '3a0a3ec69f5b'] },
 };
 
 /** Prüfsumme (12 Hex-Zeichen) über einen Wert: Zahlen exakt (String), Typed Arrays als Bytes, Objekte mit sortierten Schlüsseln. */
@@ -136,9 +134,6 @@ for (const seed of SEEDS) {
   });
   test(`Referenzwerte Seed ${seed}: KI gegen KI ${PLAY_S} s mit allen Schaltern`, () => {
     check(seed, 'play', play(seed, FULL, PLAY_S));
-  });
-  test(`Referenzwerte Seed ${seed}: KI gegen KI ${CLASSIC_S} s ohne Schalter`, () => {
-    check(seed, 'classic', play(seed, { city: false }, CLASSIC_S)); // ohne Stadt: alte Prüfsummen
   });
 }
 
