@@ -875,6 +875,43 @@ function littlebird(P) {
   return { S, rotors: [{ x: 1.5, z: 11.6, r: 12.5, n: 5 }], tail: { x: -15.6, z: 9.6, r: 2.4 }, foot: [-16, 10, -4.5, 4.5] };
 }
 
+/**
+ * Aufklärungsdrohne „drone“ (Paket „Aufklärungsdrohne“): kleine Starrflügel-Drohne im Mini-Format (Länge ≈ 4 m, Spannweite ≈ 6 m;
+ * im Modell Spannweite ≈ 22, Länge ≈ 15 Bildpunkte). Schlanker Rumpf mit kurzer Nase, gerader langer Flügel mittig am Rumpf (Spitzen
+ * in Teamfarbe), zwei Doppelausleger zum Heck mit zwei Seitenleitwerken (Spitzen in Teamfarbe) und horizontalem Leitwerk dazwischen.
+ * Druckpropeller hinten als feste Scheibe mit Nabe: der Renderer dreht Rotoren nur waagrecht, ein Heckpropeller steht senkrecht.
+ * Kamerakugel unter der Nase. Keine Zustände (kein `rotors`, kein `tail`).
+ */
+function drone(P) {
+  const S = [];
+  const body = mix(P.air, '#5d666b', 0.4);
+  const dark = mix(body, '#000000', 0.25);
+  // Rumpf: schlank, hinten etwas dicker, Nase spitz zulaufend
+  S.push(cyl([-4.4, 0, 3], [5.6, 0, 3], 0.8, 0.8, 8, body));
+  S.push(cyl([5.6, 0, 3], [7.2, 0, 2.9], 0.8, 0.3, 8, body));
+  S.push(cyl([-4.4, 0, 3], [-5.4, 0, 3], 0.8, 0.6, 8, dark)); // Motorgondel am Heck
+  // Druckpropeller: Scheibe in senkrechter Ebene hinter dem Motor, Nabe mit Spinner nach hinten
+  S.push(cyl([-5.7, 0, 3], [-5.9, 0, 3], 1.5, 1.5, 12, METAL));
+  S.push(cyl([-5.4, 0, 3], [-6.2, 0, 3], 0.45, 0.12, 6, METAL));
+  // Kamerakugel unter der Nase
+  S.push(ball([5.8, 0, 1.9], 0.9, 0.9, 0.9, GLASS));
+  // Flügel: gerade und lang, mittig am Rumpf; Spitzen in Teamfarbe
+  for (const side of [-1, 1]) {
+    S.push(prZ([[1.6, 0], [1.2, side * 11], [-0.8, side * 11], [-1.2, 0]], 3.1, 3.35, body));
+    S.push(fine(box(0.2, 1.2, side * 11 - 0.2, side * 11 + 0.2, 3.35, 3.4, P.mark, { noLine: true })));
+    // Doppelausleger vom Flügelende zum Heck
+    S.push(cyl([-1.5, side * 1.2, 3], [-7, side * 3.9, 3], 0.36, 0.3, 5, body));
+    // Seitenleitwerk am Auslegerende, Spitze in Teamfarbe
+    const fy = side * 3.9;
+    const fin = prX([[-5.8, 3.2], [-7.6, 6], [-8.2, 6], [-7.4, 3.2]], fy - 0.2, fy + 0.2, body);
+    S.push(fin);
+    S.push(fine(on(fin, prX([[-7.2, 5.2], [-7.6, 6], [-8.2, 6], [-7.8, 5.2]], fy - 0.23, fy + 0.23, P.mark, { noLine: true }))));
+  }
+  // Horizontales Leitwerk zwischen den Auslegern
+  S.push(prZ([[-5.6, -3.9], [-7.4, -3.9], [-7.4, 3.9], [-5.6, 3.9]], 3.15, 3.35, body));
+  return { S, foot: [-8.2, 7.2, -11, 11] };
+}
+
 function gunship(P) {
   const S = [];
   const body = mix(P.air, '#3c4136', 0.35);
@@ -1618,7 +1655,7 @@ function soldier(P, o) {
   return { S, foot: [-1.6, 1.6, -1.6, 1.6], inf: true };
 }
 
-const MODELS = { tank, ifv, flak, sam, gepard, pzh, mlrs, truck, scout, fobTruck, engineer, excavator, bridgelayer, littlebird, drone: littlebird, fpv: littlebird, gunship, transporter, recovery, jammer, f16, f22, su27, u2, a10, c130 };
+const MODELS = { tank, ifv, flak, sam, gepard, pzh, mlrs, truck, scout, fobTruck, engineer, excavator, bridgelayer, littlebird, drone, fpv: littlebird, gunship, transporter, recovery, jammer, f16, f22, su27, u2, a10, c130 };
 const INFANTRY = { rifleman: 'rifleman', medic: 'medic', at: 'at', manpads: 'manpads', flamer: 'rifleman', mortarteam: 'rifleman', sniper: 'sniper', sapper: 'rifleman', commander: 'commander' };
 const TEAM_KEYS = ['b', 'r', 'n', 'd'];
 
