@@ -108,6 +108,17 @@ export const FPV_MAX = 2; // höchstens so viele Kamikazedrohnen gleichzeitig (H
 export const FPV_MONEY = 600; // Geld, das nach dem Kauf einer Kamikazedrohne übrig bleiben muss
 export const FPV_NEAR = 400; // px: gegnerische Panzer höchstens so weit hinter dem Zonenradius sind Ziel der Kamikazedrohnen
 export const FPV_EVERY = 6; // s zwischen zwei Zielbefehlen an die Kamikazedrohnen (wer bereit ist, bekommt einen Panzer)
+// Pioniere (Paket K4, nicht auf Leicht): legen Minen auf Straßen zwischen vorderster FOB und Konfliktzone (Befehl layMine)
+export const SAPPER_ARMY = 12; // eigene Kampfeinheiten, ab denen die KI Pioniere ausbildet (Kaserne)
+export const SAPPER_MAX = 2; // höchstens so viele Pioniere (Kaserne)
+export const SAPPER_MONEY = 800; // Geld, das nach dem Kauf eines Pioniers übrig bleiben muss (Festung und Drohnen gehen vor)
+export const MINE_EVERY = 15; // s zwischen zwei Minenbefehlen je Pionier (ein Befehl = eine Mine)
+export const MINE_FROM = 0.3; // Anteil der Strecke vorderste FOB → Zonenmitte, ab dem Minen liegen (die FOB selbst bleibt frei)
+export const MINE_TO = 0.85; // Anteil der Strecke, bis zu dem Minen liegen (kurz vor der Zonenmitte)
+export const MINE_SPREAD = 60; // px: Streuung der Zufallspunkte um die Strecke
+export const MINE_ROAD = 60; // px: liegt eine Straße oder ein Feldweg so nah, legt der Pionier die Mine darauf
+export const MINE_BLDG = 50; // px: eigene Gebäude so nah – dort keine Mine
+export const MINE_TRIES = 6; // Zufallspunkte je Minenbefehl
 export const SUPPLY_MIN = 0.25; // Versorger lädt nach, wenn die Ladung unter diesem Anteil liegt
 export const SURPLUS_MIN = 120; // Pendler fährt nur, wenn die Quelle so viel Überschuss hat
 export const ROUTE_HOLD = 20; // s, früheste Neuplanung einer Pendler-Route

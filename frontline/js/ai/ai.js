@@ -93,6 +93,8 @@ export class AI {
     this.fortify(s);
     this.drone(s); // Aufklärungsdrohne am Heliport, nach der Festung: sie bekommt nur Geld, das übrig ist (K3)
     this.kamikaze(s); // Kamikazedrohnen greifen Panzer nahe der Zone an (K3)
+    this.sappers(s); // Pioniere in der Kaserne (K4)
+    this.minelay(s); // Pioniere legen Minen zwischen vorderster FOB und Zone (K4)
     this.rebuildBridges(s);
     this.repairRoads(s); // Schutt eigener Straßen räumen (Paket „Straßen“)
     this.manageEngineers(s);

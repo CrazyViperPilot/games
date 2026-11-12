@@ -9,8 +9,28 @@ import { UNITS } from '../../data/units.js';
 import { canGarrison } from '../../game/garrison.js';
 import { radioEta } from '../../game/radio.js';
 import { weatherSight } from '../../game/weather.js';
-import { DRONE_ARMY, DRONE_FROM, DRONE_MONEY, FPV_ARMY, FPV_MAX, FPV_MONEY, FPV_NEAR, FPV_EVERY, RESERVE_FROM, WAVE_NEUTRAL, SCOUT_EVERY, SCOUT_MOVE, JET_GROUP, JET_EVERY, JET_QUEUE, THREAT_RANGE, THREAT_DANGER, GATHER_DIST, ZONE_GATHER_DIST, RALLY_MOVE, RESERVE, DRY, THREAT_PER_UNIT, WAVE_ODDS, WAVE_PATIENCE, WAVE_MIN, SCOUT_MIN_ARMY, SCOUT_FROM, SCOUT_FUEL, SCOUT_REFILL, WX_SCOUT_SIGHT, WX_SCOUT_ARMY, WX_SCOUT_FROM, WX_FOG_SIGHT, WX_FOG_WAVE, RAID_MIN, RAID_SHARE, FALLBACK_ODDS, FALLBACK_MIN_FOES, FALLBACK_DIST, FALLBACK_HOLD, ART_BEHIND, ART_EVERY, GARRISON_SHARE, GARRISON_RANGE, GARRISON_EVERY, STORM_EVERY, STORM_RANGE, STORM_RATIO, STORM_WIRE, STORM_MIN, STORM_MAX, STORM_MARCH, HOUSE_WORK_EVERY, HOUSE_WORK_ORDER, HOUSE_WORK_RESERVE, CMD_BEHIND, CMD_DANGER, CMD_MOVE, RADIO_NEAR, RADIO_EVERY, RADIO_GATHER, RADIO_GATHER_R, RADIO_GATHER_SHARE, ARTY_FIRE_TYPES, ARTY_FIRE_EVERY, ARTY_GROUP, ARTY_GROUP_R } from '../../data/ai.js';
+import { DRONE_ARMY, DRONE_FROM, DRONE_MONEY, FPV_ARMY, FPV_MAX, FPV_MONEY, FPV_NEAR, FPV_EVERY, RESERVE_FROM, WAVE_NEUTRAL, SCOUT_EVERY, SCOUT_MOVE, JET_GROUP, JET_EVERY, JET_QUEUE, THREAT_RANGE, THREAT_DANGER, GATHER_DIST, ZONE_GATHER_DIST, RALLY_MOVE, RESERVE, DRY, THREAT_PER_UNIT, WAVE_ODDS, WAVE_PATIENCE, WAVE_MIN, SCOUT_MIN_ARMY, SCOUT_FROM, SCOUT_FUEL, SCOUT_REFILL, WX_SCOUT_SIGHT, WX_SCOUT_ARMY, WX_SCOUT_FROM, WX_FOG_SIGHT, WX_FOG_WAVE, RAID_MIN, RAID_SHARE, FALLBACK_ODDS, FALLBACK_MIN_FOES, FALLBACK_DIST, FALLBACK_HOLD, ART_BEHIND, ART_EVERY, GARRISON_SHARE, GARRISON_RANGE, GARRISON_EVERY, STORM_EVERY, STORM_RANGE, STORM_RATIO, STORM_WIRE, STORM_MIN, STORM_MAX, STORM_MARCH, HOUSE_WORK_EVERY, HOUSE_WORK_ORDER, HOUSE_WORK_RESERVE, CMD_BEHIND, CMD_DANGER, CMD_MOVE, RADIO_NEAR, RADIO_EVERY, RADIO_GATHER, RADIO_GATHER_R, RADIO_GATHER_SHARE, ARTY_FIRE_TYPES, ARTY_FIRE_EVERY, ARTY_GROUP, ARTY_GROUP_R, SAPPER_ARMY, SAPPER_MAX, SAPPER_MONEY, MINE_EVERY, MINE_FROM, MINE_TO, MINE_SPREAD, MINE_ROAD, MINE_BLDG, MINE_TRIES } from '../../data/ai.js';
 import { DEF_RANGE, ZONE_FOB_R, TWO_PI, dist, unitVec } from './util.js';
+
+/** Nächster Punkt auf einer Straße oder einem Feldweg der Karte (Projektion), höchstens MINE_ROAD px entfernt; sonst null. */
+function nearestRoad(game, x, y) {
+  let best = null;
+  let bd = MINE_ROAD;
+  for (const r of game.map.town?.roads ?? []) {
+    const ex = r.x2 - r.x1;
+    const ey = r.y2 - r.y1;
+    const l2 = ex * ex + ey * ey || 1;
+    const k = Math.max(0, Math.min(1, ((x - r.x1) * ex + (y - r.y1) * ey) / l2));
+    const px = r.x1 + k * ex;
+    const py = r.y1 + k * ey;
+    const d = Math.hypot(x - px, y - py);
+    if (d <= bd) {
+      bd = d;
+      best = { x: px, y: py };
+    }
+  }
+  return best;
+}
 
 /** Bestellt wird nur an Stellplätzen mit Versorgungsweg zum Lager (Paket „Straßen“: ohne Weg stünde die Ausbildung still). */
 const supplied = (g, p) => !g.city || supplyOf(g, g.city[p.team], p.cityCell).rate > 0;
@@ -416,6 +436,62 @@ export const combatMethods = {
     ready.forEach((u, k) => {
       if (tanks[k]) g.issue(t, { type: 'attack', ids: [u.id], targetId: tanks[k].id });
     });
+  },
+
+  /**
+   * Pioniere (Paket K4, nicht auf Leicht): ab SAPPER_ARMY Kampfeinheiten bildet die KI in der Kaserne höchstens SAPPER_MAX Pioniere aus,
+   * nur mit SAPPER_MONEY Geld danach. Die Hauptstadt bildet keine aus (nur Kaserne, pickProducer).
+   */
+  sappers(s) {
+    const g = this.game;
+    const t = this.team;
+    if (!this.cfg.mines || s.combat.length < SAPPER_ARMY) return;
+    const have = s.units.filter((u) => u.type === 'sapper').length;
+    if (have + this.queued(s, 'sapper') >= SAPPER_MAX || g.teams[t].res.money < UNITS.sapper.cost.money + SAPPER_MONEY) return;
+    const b = this.pickProducer(s, 'sapper', BALANCE.queueMax - 1, false);
+    if (b) g.issue(t, { type: 'train', buildingId: b.id, unit: 'sapper' });
+  },
+
+  /**
+   * Minen legen (Paket K4): jeder bereite Pionier (Befehl idle, weniger als BALANCE.sapper.maxMines Minen) bekommt alle MINE_EVERY s
+   * einen Befehl layMine auf eine Stelle zwischen der vordersten FOB und der Konfliktzone. Danach läuft er normal mit der Armee.
+   */
+  minelay(s) {
+    const g = this.game;
+    const t = this.team;
+    if (!this.cfg.mines || !s.zone) return;
+    const front = this.nearestBuilt(s, s.zone.x, s.zone.y) ?? s.home;
+    if (!front) return;
+    const sappers = s.units.filter((u) => u.type === 'sapper' && u.order.type === 'idle').sort((a, b) => a.id - b.id);
+    for (const u of sappers) {
+      let n = 0;
+      for (const m of g.sapperMines ?? []) if (m.owner === u.id) n++;
+      if (n >= BALANCE.sapper.maxMines || !this.once(`mine${u.id}`, MINE_EVERY)) continue;
+      const p = this.minePoint(s, front);
+      if (p) g.issue(t, { type: 'layMine', ids: [u.id], x: p.x, y: p.y });
+    }
+  },
+
+  /**
+   * Zufallspunkt (g.rng, MINE_TRIES Versuche) auf der Strecke front → Zonenmitte, auf einer Straße oder einem Feldweg, wenn
+   * einer nah genug liegt; sonst begehbar, nicht nahe an eigenen Gebäuden. null, wenn nichts passt.
+   */
+  minePoint(s, front) {
+    const g = this.game;
+    const z = s.zone;
+    const rng = g.rng;
+    const dx = z.x - front.x;
+    const dy = z.y - front.y;
+    for (let k = 0; k < MINE_TRIES; k++) {
+      const f = MINE_FROM + (MINE_TO - MINE_FROM) * rng.next();
+      const x = front.x + dx * f + (rng.next() * 2 - 1) * MINE_SPREAD;
+      const y = front.y + dy * f + (rng.next() * 2 - 1) * MINE_SPREAD;
+      const road = nearestRoad(g, x, y);
+      const q = road ?? this.freeNear(x, y);
+      if (s.own.some((b) => dist(b.x, b.y, q.x, q.y) <= MINE_BLDG)) continue;
+      return q;
+    }
+    return null;
   },
 
   /** Merkt sich gesehene gegnerische FOBs (Standort bleibt bekannt, bis man ihn einsieht und dort nichts mehr steht). */
