@@ -1672,7 +1672,17 @@ function soldier(P, o) {
   const armSw = o.frame ? Math.sin(ph) * 0.6 : 0;
   S.push(cyl([0, -2.2, 10.4], [hand[0] - 1.2 + armSw, -0.6, hand[2] - 0.2], 0.55, 0.5, 4, uni));
   S.push(cyl([0, 2.2, 10.4], [hand[0] - 2.6 - armSw, hand[1] + 0.5, hand[2] - 0.6], 0.55, 0.5, 4, uni));
-  if (kind === 'at' || kind === 'manpads') {
+  if (kind === 'manpads') {
+    // Stinger-Schütze: langes, dickes Startrohr auf der Schulter, etwas nach oben geneigt; Zielgerät seitlich am Rohr,
+    // Batterie-/Kühleinheit unter dem hinteren Rohr, Suchkopf vorn.
+    S.push(cyl([-6.2, 1.6, 11.2], [8.4, 1.6, 13.0], 0.8, 0.8, 6, OLIVE)); // Startrohr (rund 14 px, geneigt)
+    S.push(fine(cyl([-6.8, 1.6, 11.1], [-6.2, 1.6, 11.2], 1.0, 0.85, 6, '#3c4130', { noLine: true }))); // Rohrmündung hinten
+    S.push(cyl([8.4, 1.6, 13.0], [9.6, 1.6, 13.25], 0.8, 0.45, 6, '#6a6f4a')); // Suchkopf vorn
+    S.push(fine(box(0.2, 3.2, 2.4, 3.4, 11.9, 13.4, '#3c4130'))); // Zielgerät (kastenförmig, seitlich am Rohr)
+    S.push(fine(box(3.2, 3.9, 2.7, 3.1, 12.6, 13.0, '#1b1d1f'))); // Visierlinse vorn am Zielgerät
+    S.push(box(-4.6, -2.9, 0.9, 2.3, 9.7, 10.8, '#474c37')); // Batterie-/Kühleinheit unter dem Rohr
+    S.push(fine(cyl([2.6, 1.6, 10.8], [3.4, 1.2, 9.6], 0.35, 0.35, 4, '#1b1d1f'))); // Griff unter dem Rohr
+  } else if (kind === 'at') {
     S.push(cyl([-5, 1.6, 11.4], [5.5, 1.6, 11.9], 0.75, 0.75, 6, OLIVE)); // Rohr auf der Schulter
     S.push(cyl([5.5, 1.6, 11.9], [7.4, 1.6, 12], 1.05, 0.25, 6, '#6a6f4a')); // Gefechtskopf
     S.push(cyl([1, 1.6, 10.6], [1, 1.6, 11], 0.3, 0.3, 4, GUN));
