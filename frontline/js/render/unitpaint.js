@@ -649,6 +649,38 @@ function recovery(P) {
   return { S, foot: [-16.6, 17.8, -9.6, 9.6] };
 }
 
+// Brückenleger (Vorbild Biber): Kettenfahrgestell ohne Turm, flache Wanne, darauf längs eine zusammengeklappte Brücke aus zwei
+// breiten Fahrbahnhälften übereinander mit Seitenträgern. Die Brücke ragt vorn und hinten über die Wanne hinaus. Vorn ein
+// Abstützschild an zwei Armen. Maße über SIZE (wie der Kampfpanzer): etwa 11 m lang inkl. Brücke, 4 m breit, 3,5 m hoch.
+function bridgelayer(P) {
+  const S = [];
+  for (const side of [-1, 1]) tracks(S, side, -14, 13, 6.2, 9.6, 4.6, P, { wheels: 5, skirt: [-11, 12], fender: 8.6 });
+  S.push(lowerHull(-14.2, 13.4, 6.4, 4.4, P));
+  const hull = prX([[-14, 4.4], [-14.2, 7], [10.4, 7], [13.4, 4.4]], -7, 7, P.body);
+  S.push(hull);
+  lights(S, hull, 13.4, 7, 4.6, -14.2, 6);
+  camoSides(S, hull, 7, [[-11, 5, 5.4, 6.7], [2, 4, 5.4, 6.7]], P.camo);
+  // Auflager auf dem Deck: zwei quer liegende Balken, auf denen die Brücke ruht
+  for (const x of [-9.5, 5]) S.push(box(x, x + 2, -6.4, 6.4, 7, 7.6, P.dark));
+  // Brücke, zusammengeklappt: untere und obere Fahrbahnhälfte (breit, flach), vorn und hinten überstehend
+  const low = box(-19, 18, -6, 6, 7.6, 8.8, P.dark);
+  S.push(low);
+  const up = box(-19, 18, -6, 6, 8.8, 10, P.body);
+  S.push(up);
+  S.push(fine(on(up, box(-18.5, 17.5, -5.2, 5.2, 10, 10.15, P.light, { noLine: true })))); // Fahrbahnrand oben
+  for (const x of [-6, 2, 10]) S.push(fine(on(up, box(x, x + 0.5, -6.2, 6.2, 10, 10.25, P.dark, { noLine: true })))); // Fugen zwischen den Platten
+  // Seitenträger: schmale Stege an beiden Längsseiten, über die ganze Höhe der Brücke
+  for (const side of [-1, 1]) {
+    const y = side * 6.2;
+    S.push(on(low, box(-19.4, 18.4, y - 0.45, y + 0.45, 7.6, 10.4, METAL)));
+  }
+  // Abstützschild vorn, an zwei Armen aus der Wanne
+  S.push(box(13.8, 14.6, -7.6, 7.6, 1.8, 6.6, P.dark));
+  S.push(fine(on(hull, box(13.9, 14.7, -6.2, 6.2, 2.4, 6.0, METAL, { noLine: true, only: 'iso' })))); // Schildfeld
+  for (const side of [-1, 1]) S.push(fine(cyl([12, side * 5.2, 5], [13.8, side * 6.8, 2.4], 0.5, 0.5, 4, METAL))); // Abstützarme
+  return { S, foot: [-19.4, 18.8, -10.2, 10.2] };
+}
+
 function truck(P) {
   const S = [];
   S.push(box(-15, 12, -3.6, 3.6, 2.2, 3.8, METAL, { only: 'iso', under: true })); // Rahmen
@@ -1477,12 +1509,12 @@ function soldier(P, o) {
   return { S, foot: [-1.6, 1.6, -1.6, 1.6], inf: true };
 }
 
-const MODELS = { tank, ifv, flak, sam, gepard, pzh, mlrs, truck, scout, fobTruck, engineer, excavator, bridgelayer: excavator, littlebird, drone: littlebird, fpv: littlebird, gunship, transporter, recovery, jammer, f16, f22, su27, u2, a10: f16, c130: u2 };
+const MODELS = { tank, ifv, flak, sam, gepard, pzh, mlrs, truck, scout, fobTruck, engineer, excavator, bridgelayer, littlebird, drone: littlebird, fpv: littlebird, gunship, transporter, recovery, jammer, f16, f22, su27, u2, a10: f16, c130: u2 };
 const INFANTRY = { rifleman: 'rifleman', medic: 'medic', at: 'at', manpads: 'manpads', flamer: 'rifleman', mortarteam: 'rifleman', sniper: 'sniper', sapper: 'rifleman', commander: 'commander' };
 const TEAM_KEYS = ['b', 'r', 'n', 'd'];
 
 const paintOf = (team) => (team === SHOWROOM ? DISPLAY : TEAM_PAINT[team] ?? NEUTRAL);
-const SIZE = { tank: 1.12, pzh: 1.08, recovery: 1.12 }; // schwere Fahrzeuge etwas größer, damit sie sich vom Schützenpanzer abheben
+const SIZE = { tank: 1.12, pzh: 1.08, recovery: 1.12, bridgelayer: 1.12 }; // schwere Fahrzeuge etwas größer, damit sie sich vom Schützenpanzer abheben
 
 /** Modell um k vergrößern (Körper, Turmdrehpunkt, Grundfläche). */
 function scaleModel(m, k) {
