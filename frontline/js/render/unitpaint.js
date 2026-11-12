@@ -580,6 +580,42 @@ function pzh(P) {
   return { S, turret: { x: -5, S: T }, foot: [-17.8, 17.8, -10.5, 10.5] };
 }
 
+/** Raketenwerfer (Vorbild M270 MARS): Kettenfahrgestell wie die Panzerhaubitze, kurze flache Fahrerkabine vorn, hinten ein
+ *  großer Kasten (Werferbehälter), dessen Stirnfläche schräg nach vorn-oben zeigt und 2 × 6 Rohröffnungen trägt. Teamfarbe nur
+ *  als kleine Markierung an der Kabine. Keine Bewegung im Modell (Raketen und Salve kommen aus dem Spielzustand). */
+function mlrs(P) {
+  const S = [];
+  for (const side of [-1, 1]) tracks(S, side, -17, 16, 5.6, 8, 4.4, P, { wheels: 6, skirt: [-14, 14], fender: 6.6 });
+  S.push(lowerHull(-16.6, 16.6, 5.8, 4.4, P));
+  const hull = prX([[-16.6, 4.6], [-16.8, 7.2], [9, 7.2], [16.2, 4.6]], -6.2, 6.2, P.body);
+  S.push(hull);
+  lights(S, hull, 15.8, 5.6, 5, -16.6, 6);
+  // Fahrerkabine: flach, mit schräger Frontscheibe
+  const cab = prX([[6.2, 7.2], [6.2, 9.4], [12.8, 9.4], [15.4, 7.6], [15.6, 7.2]], -5.4, 5.4, P.body);
+  S.push(cab);
+  S.push(on(cab, box(6.4, 12.6, -5.6, 5.6, 9.4, 9.6, P.light))); // Dach
+  S.push(on(cab, prX([[12.9, 9.2], [15.2, 7.7], [15.3, 7.5], [13, 7.5]], -4.6, 4.6, GLASS, { noLine: true })));
+  for (const side of [-1, 1]) {
+    S.push(on(cab, box(7.4, 11.8, side < 0 ? -5.6 : 5.4, side < 0 ? -5.4 : 5.6, 7.8, 8.9, GLASS, { noLine: true, only: 'iso' })));
+    S.push(fine(on(cab, box(6.8, 7.8, side < 0 ? -5.6 : 5.4, side < 0 ? -5.4 : 5.6, 7.6, 8.4, P.mark, { noLine: true, only: 'iso' }))));
+  }
+  // Werferbehälter: Kasten, vorn schräg nach oben abgeschnitten (Profil in x-z, quer über die Breite gezogen)
+  const pod = prX([[-15, 7], [-15, 10.2], [1.6, 12.6], [5, 9.4], [0, 7]], -6.2, 6.2, P.body);
+  S.push(pod);
+  camoSides(S, pod, 6.2, [[-13.5, 5.5, 7.6, 9.4], [-6, 4.5, 7.6, 9]], P.camo);
+  // Rohröffnungen: 2 Reihen × 6 Rohre auf der Stirnfläche (Normale ≈ (0,69; 0,73) in x-z)
+  const NX = 0.686;
+  const NZ = 0.729;
+  for (const t of [0.3, 0.72]) {
+    const px = 1.6 + 3.4 * t;
+    const pz = 12.6 - 3.2 * t;
+    for (const y of [-5, -3, -1, 1, 3, 5]) {
+      S.push(on(pod, cyl([px - 0.25 * NX, y, pz - 0.25 * NZ], [px + 0.2 * NX, y, pz + 0.2 * NZ], 0.8, 0.8, 8, GUN)));
+    }
+  }
+  return { S, foot: [-17.8, 17.4, -8.6, 8.6] };
+}
+
 function truck(P) {
   const S = [];
   S.push(box(-15, 12, -3.6, 3.6, 2.2, 3.8, METAL, { only: 'iso', under: true })); // Rahmen
@@ -1329,7 +1365,7 @@ function soldier(P, o) {
   return { S, foot: [-1.6, 1.6, -1.6, 1.6], inf: true };
 }
 
-const MODELS = { tank, ifv, flak, sam, gepard, pzh, mlrs: pzh, truck, scout: truck, fobTruck, engineer, excavator, bridgelayer: excavator, littlebird, drone: littlebird, fpv: littlebird, gunship, transporter, recovery: ifv, jammer: flak, f16, f22, su27, u2, a10: f16, c130: u2 };
+const MODELS = { tank, ifv, flak, sam, gepard, pzh, mlrs, truck, scout: truck, fobTruck, engineer, excavator, bridgelayer: excavator, littlebird, drone: littlebird, fpv: littlebird, gunship, transporter, recovery: ifv, jammer: flak, f16, f22, su27, u2, a10: f16, c130: u2 };
 const INFANTRY = { rifleman: 'rifleman', medic: 'medic', at: 'at', manpads: 'manpads', flamer: 'rifleman', mortarteam: 'rifleman', sniper: 'sniper', sapper: 'rifleman', commander: 'commander' };
 const TEAM_KEYS = ['b', 'r', 'n', 'd'];
 
