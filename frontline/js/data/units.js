@@ -561,6 +561,30 @@ export const UNITS = {
     fuelMax: 55, // Sekunden Flug wie die F-16 (Reichweite ≈ speed × fuelMax)
     hotkey: 'I', // im Stellplatz-Menü frei (I = Einsteigen nur bei gewählten Soldaten, U Ausbauen, K F-16)
   },
+  // Erdkampfflugzeug A-10 (Paket E12, PRD §6 „A-10“): langsam, viel HP, lange Einsatzzeit; eine Bordkanone mit schneller Kadenz und
+  // vielen Schuss, nur gegen Bodenziele (keine Luftziele, keine Raketen). Nur mit Stadt, am Stellplatz des Fliegerhorsts (CITY.produces.stand).
+  // Die KI baut sie nicht. Kreisen und Heimflug laufen über die vorhandene Jet-Logik (BALANCE.jets).
+  a10: {
+    name: 'A-10',
+    short: 'A-10', // Kurzname in der Befehlskarte
+    slots: 3,
+    armor: 'air',
+    air: true,
+    jet: true,
+    hp: 700,
+    speed: 252, // rund 60 % der F-16 (420)
+    radius: 16,
+    sight: 560,
+    // Eine Waffe: Bordkanone gegen Bodenziele (Infanterie, Fahrzeuge, Gebäude); kein targets mit 'air' oder 'jet'
+    weapons: [
+      { id: 'gun', name: 'Bordkanone', range: 340, cooldown: 0.12, rounds: 400, munCost: 2, hitChance: 0.7, targets: ['inf', 'light', 'heavy', 'struct'], damage: { inf: 25, light: 60, heavy: 35, struct: 40 } },
+    ],
+    cost: { money: 1500 },
+    buildTime: 45,
+    fuelPerSec: 1,
+    fuelMax: 90, // lange Einsatzzeit: mehr Sekunden Flug als die F-16 (55), dafür langsamer
+    hotkey: 'D', // im Stellplatz-Menü frei (K F-16, I F-22, S Su-27, O U-2, W Staffel, U Ausbauen)
+  },
   // Kampfflugzeug Su-27 (Paket „Su-27“, PRD §6 „Su-27“): wie die F-16 (gleiche zwei Waffen, parallel, gleiche Schäden und Munition),
   // aber etwas schneller und mit größerer Reichweite (Reichweite ≈ speed × fuelMax: 450 × 75 gegen 420 × 55). Nur mit Stadt, am Stellplatz
   // des Fliegerhorsts (CITY.produces.stand, Plätze CITY.air.standJets teilen sich F-16, F-22 und Su-27). Die KI baut sie nicht.
