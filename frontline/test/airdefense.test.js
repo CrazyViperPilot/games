@@ -7,7 +7,7 @@ import { BALANCE } from '../js/data/balance.js';
 import { UNITS } from '../js/data/units.js';
 
 const DT = 0.05;
-const mk = (opts) => classic(new Game(opts));
+const mk = (opts) => classic(new Game({ city: false, ...opts }));
 function run(game, seconds) {
   for (let i = 0; i < Math.round(seconds / DT); i++) game.update(DT);
 }

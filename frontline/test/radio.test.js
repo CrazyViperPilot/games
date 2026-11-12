@@ -31,7 +31,7 @@ function builtMast(g, t) {
 }
 
 test('Ausgeschaltet (Standard): kein Sendemast im Baumenü, Platzieren abgelehnt', () => {
-  const g = new Game({ seed: 3 });
+  const g = new Game({ city: false, seed: 3 });
   assert.equal(g.radioWin, false);
   const p = g.canPlace(0, 'radio', spot(g, 0).x, spot(g, 0).y);
   assert.ok(!p.ok && /ausgeschaltet/.test(p.reason));
@@ -42,7 +42,7 @@ test('Ausgeschaltet (Standard): kein Sendemast im Baumenü, Platzieren abgelehnt
 });
 
 test('Eingeschaltet: Baufahrzeug baut ihn (Geld + Baumaterial), einer je Team, der Gegner erfährt den Baubeginn', () => {
-  const g = new Game({ seed: 3, radio: true });
+  const g = new Game({ city: false, seed: 3, radio: true });
   const msgs = [];
   const orig = g.message.bind(g);
   g.message = (team, text, x, y) => (msgs.push([team, text]), orig(team, text, x, y));
@@ -66,7 +66,7 @@ test('Eingeschaltet: Baufahrzeug baut ihn (Geld + Baumaterial), einer je Team, d
 });
 
 test('Fertig: der Gegner sieht ihn überall (auch im Nebel); nach hold s gewinnt sein Team [langsam]', () => {
-  const g = new Game({ seed: 3, radio: true });
+  const g = new Game({ city: false, seed: 3, radio: true });
   const b = builtMast(g, 0);
   g.updateFog();
   assert.ok(!g.isVisible(1, b.x, b.y), 'liegt im Nebel des Gegners');
@@ -80,7 +80,7 @@ test('Fertig: der Gegner sieht ihn überall (auch im Nebel); nach hold s gewinnt
 });
 
 test('Zerstört: Zeit verfällt, ein neuer Mast beginnt von vorn; Baustelle zählt in der Schätzung mit der Bauzeit', () => {
-  const g = new Game({ seed: 3, radio: true });
+  const g = new Game({ city: false, seed: 3, radio: true });
   const b = builtMast(g, 1);
   run(g, 100);
   assert.ok(Math.abs(radioLeft(b) - (R.hold - 100)) < 0.2);
@@ -98,7 +98,7 @@ test('Zerstört: Zeit verfällt, ein neuer Mast beginnt von vorn; Baustelle zäh
 });
 
 test('KI: baut ab ihrer Zeit einen Sendemast hinter der Hauptstadt (spart vorher darauf)', () => {
-  const g = new Game({ seed: 3, radio: true });
+  const g = new Game({ city: false, seed: 3, radio: true });
   const ai = new AI(g, 1, 'hard');
   g.time = 600;
   g.teams[1].res.money = 500;
@@ -114,7 +114,7 @@ test('KI: baut ab ihrer Zeit einen Sendemast hinter der Hauptstadt (spart vorher
 });
 
 test('KI: gegen einen fremden Mast sammelt sie die Armee und greift ihn an', () => {
-  const g = new Game({ seed: 3, radio: true });
+  const g = new Game({ city: false, seed: 3, radio: true });
   const ai = new AI(g, 1, 'normal');
   const b = builtMast(g, 0);
   run(g, 90, [ai]);

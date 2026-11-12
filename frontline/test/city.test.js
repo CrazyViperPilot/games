@@ -129,7 +129,7 @@ function linkMain(g, team, a) {
 const trainerFor = (g, unit, team = 0) => cityTrainers(g, team).find((e) => e.produces.includes(unit));
 
 test('ohne Stadt: unendliches Lager, Stadtbefehl abgelehnt', () => {
-  const g = new Game({ seed: 3 });
+  const g = new Game({ city: false, seed: 3 });
   assert.equal(g.city, null);
   assert.equal(g.mainFob(0).infinite, true);
   assert.equal(paint(g, 'road', 0, 0, 1, 0).ok, false);
@@ -399,7 +399,7 @@ test('Flucht: Schüsse in der Konfliktzone leeren Wohnzellen, nach Ruhe kehren s
 
 test('Rohstoffvorkommen: jede Sorte nahe jeder Hauptstadt, Karte unverändert', () => {
   const a = new Game({ seed: 4, city: true });
-  const b = new Game({ seed: 4 });
+  const b = new Game({ city: false, seed: 4 });
   assert.deepEqual([...a.grid.terrain], [...b.grid.terrain], 'Karte gleich mit und ohne Stadt');
   for (const team of [0, 1]) {
     const c = a.city[team];
@@ -650,7 +650,7 @@ test('Universität: ohne sie ruht die Forschung; Rechenzentren beschleunigen sie
   setLevel(g, 'dc', 1);
   assert.ok(Math.abs(researchSpeed(g, 0) - (1 + 3 * CITY.research.dcSpeed) * (g.city[0].stats.powerRatio ?? 1)) < 1e-9, 'alle Rechenzentren zählen');
   // ohne Stadt: keine Universität nötig
-  const n = new Game({ seed: 3, research: true });
+  const n = new Game({ city: false, seed: 3, research: true });
   assert.equal(researchBlock(n, 0, 'tank1'), '');
   assert.equal(researchSpeed(n, 0), 1);
 });

@@ -15,7 +15,7 @@ function run(game, seconds) {
   for (let i = 0; i < Math.round(seconds / DT); i++) game.update(DT);
 }
 function scene(seed = 7, opts = {}) {
-  const g = classic(new Game({ seed, ...opts }));
+  const g = classic(new Game({ city: false, seed, ...opts }));
   for (const u of g.units) u.alive = false;
   const z = g.zone;
   return { g, x: z.x + 1500, y: z.y };
@@ -26,7 +26,7 @@ test('Gepard und Panzerhaubitze: in der Hauptstadt und (mit Stadt) in der Fabrik
     assert.ok(BUILDINGS.fob.produces.includes(k), `${k} in der Hauptstadt`);
     assert.ok(CITY.produces.factory.includes(k), `${k} in der Fabrikhalle`);
   }
-  const g = classic(new Game({ seed: 7 }));
+  const g = classic(new Game({ city: false, seed: 7 }));
   const m = g.mainFob(0);
   g.teams[0].res.money = 5000;
   assert.ok(g.issue(0, { type: 'train', buildingId: m.id, unit: 'gepard' }).ok);

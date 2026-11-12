@@ -8,7 +8,7 @@ import { nearestPassable } from '../js/game/movement.js';
 
 BALANCE.slotCap = 1000; // diese Tests prüfen nicht das Einheitenlimit (siehe economy.test.js)
 const DT = 0.05;
-const mk = (opts) => classic(new Game(opts));
+const mk = (opts) => classic(new Game({ city: false, ...opts }));
 const TILE = BALANCE.map.tile;
 const cellOf = (v) => Math.floor(v / TILE);
 const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
@@ -56,7 +56,7 @@ function fobRing(game, team, x0, y0, rMin = 950, rMax = 1300) {
 }
 
 test('Hauptstadt hat unendlich Vorrat: Laden entleert sie nicht, das Front-Lager zählt ohne sie', () => {
-  const g = new Game({ seed: 7 });
+  const g = new Game({ city: false, seed: 7 });
   const f = fobOf(g, 0);
   assert.equal(f.main, true);
   assert.equal(f.infinite, true);
@@ -74,7 +74,7 @@ test('Hauptstadt hat unendlich Vorrat: Laden entleert sie nicht, das Front-Lager
 });
 
 test('Front-FOB: LKW bringt Baumaterial aus der Hauptstadt, das Front-Lager steigt', () => {
-  const g = new Game({ seed: 7 });
+  const g = new Game({ city: false, seed: 7 });
   const f = fobOf(g, 0);
   silence(g, 0);
   const front = fobRing(g, 0, f.x, f.y);
@@ -88,7 +88,7 @@ test('Front-FOB: LKW bringt Baumaterial aus der Hauptstadt, das Front-Lager stei
 });
 
 test('LKW versorgt Einheiten in kleinem Radius aus seiner Ladung (Munition, Treibstoff, Baumaterial für Soldaten)', () => {
-  const g = new Game({ seed: 7 });
+  const g = new Game({ city: false, seed: 7 });
   const f = fobOf(g, 0);
   silence(g, 0);
   const z = g.zone;
@@ -229,7 +229,7 @@ test('LKW entlädt in die Hauptstadt (bis capitalCap) und in eine FOB-Baustelle'
 });
 
 test('Vordere FOB: Entladen nur bis storeCap, die Hauptstadt fasst capitalCap', () => {
-  const g = new Game({ seed: 7 });
+  const g = new Game({ city: false, seed: 7 });
   const f = fobOf(g, 0);
   assert.ok(L.capitalCap > L.storeCap);
   assert.equal(f.store.bm, L.capitalCap, 'Hauptstadt voll bis capitalCap');
@@ -340,7 +340,7 @@ test('build mit siteId schickt Bauer an eine bestehende Baustelle; Schütze nich
 });
 
 test('Transporthubschrauber pendelt wie ein LKW und bringt gemischte Ladung zur Front-FOB', () => {
-  const g = new Game({ seed: 7 });
+  const g = new Game({ city: false, seed: 7 });
   const f = fobOf(g, 0);
   silence(g, 0);
   const front = fobRing(g, 0, f.x, f.y);
@@ -355,7 +355,7 @@ test('Transporthubschrauber pendelt wie ein LKW und bringt gemischte Ladung zur 
 });
 
 test('Bodenfahrzeuge nehmen Soldaten mit: LKW 2, Baufahrzeug 1, Schützenpanzer 6; Baufahrzeuge steigen nur in Hubschrauber', () => {
-  const g = new Game({ seed: 7 });
+  const g = new Game({ city: false, seed: 7 });
   const f = fobOf(g, 0);
   silence(g, 0);
   const at = (type, i) => g.spawnUnit(type, 0, f.x + 100 + (i % 6) * 14, f.y + 100 + Math.floor(i / 6) * 14);

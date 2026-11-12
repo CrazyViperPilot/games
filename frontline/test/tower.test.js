@@ -12,7 +12,7 @@ const run = (g, s) => {
 };
 
 function setup() {
-  const g = new Game({ map: createEmptyMap('Festung') });
+  const g = new Game({ city: false, map: createEmptyMap('Festung') });
   for (const u of g.units) u.alive = false;
   g.cleanup();
   const fob = g.buildings.find((b) => b.main && b.team === 0);

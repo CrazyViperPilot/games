@@ -16,7 +16,7 @@ const H = BALANCE.map.height;
 function crateGame(crates) {
   const map = createEmptyMap('Kisten');
   map.crates = crates;
-  const g = new Game({ map });
+  const g = new Game({ city: false, map });
   for (const u of g.units) u.alive = false;
   g.cleanup();
   return g;
@@ -42,7 +42,7 @@ test('Karte: Kistenpaare punktsymmetrisch, abseits von Zone und Startpunkten; no
 });
 
 test('Spiel: Kisten sind neutrale Entities (team −1) mit negativen IDs, getrennt von den Häusern', () => {
-  const g = new Game({ seed: 3 });
+  const g = new Game({ city: false, seed: 3 });
   assert.equal(g.crates.length, 2 * C.pairs);
   for (const c of g.crates) {
     assert.ok(c.id < -1000 && g.getEntity(c.id) === c);
@@ -141,7 +141,7 @@ test('Ablegen, keine Häuser und keine Fahrzeuge mit Kiste; untätige Träger br
   const map = createEmptyMap('Kisten');
   map.crates = [{ x: 3000, y: 3000 }];
   map.town.buildings.push({ x: 3000, y: 3200, w: 96, h: 76, kind: 'house' });
-  const g = new Game({ map });
+  const g = new Game({ city: false, map });
   for (const u of g.units) u.alive = false;
   g.cleanup();
   const c = g.crates[0];
@@ -167,7 +167,7 @@ test('Ablegen, keine Häuser und keine Fahrzeuge mit Kiste; untätige Träger br
 
 test('KI holt Kisten und lagert sie ein (Seed 3, 10 min); Kisten bleiben stimmig [langsam]', async () => {
   const { AI } = await import('../js/ai/ai.js');
-  const g = new Game({ seed: 3 });
+  const g = new Game({ city: false, seed: 3 });
   const ais = [new AI(g, 0, 'normal'), new AI(g, 1, 'normal')];
   let picked = 0;
   for (let i = 0; i < Math.round((10 * 60) / DT) && g.winner === null; i++) {

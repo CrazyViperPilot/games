@@ -24,7 +24,7 @@ const mainOf = (g, t) => g.buildings.find((b) => b.main && b.team === t);
 
 /** Leere Karte ohne Starteinheiten (Hauptstädte bleiben). */
 function empty(opts = {}) {
-  const g = new Game({ map: createEmptyMap(), ...opts });
+  const g = new Game({ city: false, map: createEmptyMap(), ...opts });
   for (const u of g.units) u.alive = false;
   g.cleanup();
   return g;
@@ -164,7 +164,7 @@ test('Befehlskarte: Forschung (U) öffnet das Menü, keine gesperrten Einheiten'
 });
 
 test('KI: forscht ab ihrer Zeit Stufe für Stufe, höchstens eine wartend, nach den Regeln des Baums [langsam]', () => {
-  const g = new Game({ seed: 3, research: true, startMoney: 4000 });
+  const g = new Game({ city: false, seed: 3, research: true, startMoney: 4000 });
   const ai = new AI(g, 1, 'hard');
   const tech = g.teams[1].tech;
   run(g, BALANCE.difficulty.hard.research[0] - 5, [ai]);

@@ -21,17 +21,17 @@ function fake(seed, setting) {
 
 /** Leere Karte ohne Starteinheiten. */
 function empty(opts = {}) {
-  const g = new Game({ map: createEmptyMap(), ...opts });
+  const g = new Game({ city: false, map: createEmptyMap(), ...opts });
   for (const u of g.units) u.alive = false;
   g.cleanup();
   return g;
 }
 
 test('Aus (Standard): Sommer, klar, alle Faktoren 1, kein Wechsel; der Spielzufall bleibt unberührt', () => {
-  const off = new Game({ seed: 4 });
+  const off = new Game({ city: false, seed: 4 });
   assert.equal(off.weather.on, false);
   assert.deepEqual([off.weather.season, off.weather.kind, off.weather.sight, off.weather.vehicle], ['summer', 'clear', 1, 1]);
-  const on = new Game({ seed: 4, weather: 'winter' });
+  const on = new Game({ city: false, seed: 4, weather: 'winter' });
   assert.equal(on.weather.on, true);
   assert.equal(on.rng.next(), off.rng.next(), 'eigener Zufall: die übrige Partie läuft gleich');
   const msgs = [];
@@ -177,7 +177,7 @@ test('Formation im Schnee: das Tempo der gebremsten Fahrzeuge gilt, Panzer und S
 
 test('KI: bei schlechter Sicht kommt der Späher früher, im Nebel geht die Welle mit 85 % los; Leicht nutzt das Wetter nicht', () => {
   const scoutAt = (kind, diff) => {
-    const g = new Game({ seed: 7 });
+    const g = new Game({ city: false, seed: 7 });
     const ai = new AI(g, 1, diff);
     g.teams[1].res.money = 5000;
     // Plätze frei machen (die Startarmee füllt das Einheitenlimit); es bleiben mehr als genug Kampfeinheiten für einen Späher
@@ -194,7 +194,7 @@ test('KI: bei schlechter Sicht kommt der Späher früher, im Nebel geht die Well
   assert.equal(scoutAt('rain', 'hard'), true);
   assert.equal(scoutAt('fog', 'easy'), false);
 
-  const g = new Game({ seed: 7 });
+  const g = new Game({ city: false, seed: 7 });
   const ai = new AI(g, 1, 'normal');
   const easy = new AI(g, 0, 'easy');
   const clear = ai.waveNeed([]);

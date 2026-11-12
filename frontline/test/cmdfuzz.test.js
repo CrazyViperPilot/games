@@ -219,7 +219,7 @@ const run = (g, s) => {
 function houseGame() {
   const map = createEmptyMap('Stadt');
   map.town.buildings.push({ x: 3000, y: 3000, w: 96, h: 76, kind: 'house' });
-  const g = new Game({ map });
+  const g = new Game({ city: false, map });
   for (const u of g.units) u.alive = false;
   g.cleanup();
   return g;
@@ -259,7 +259,7 @@ function freeArea(g, c, m, W, H) {
 
 /** Schütze von Blau, der eine Versorgungskiste der Karte aufgehoben hat. */
 function carrier() {
-  const g = new Game({ seed: 3 });
+  const g = new Game({ city: false, seed: 3 });
   const crate = g.crates.find((c) => c.state !== 'stored' && c.state !== 'carried');
   const man = g.spawnUnit('rifleman', 0, crate.x + 20, crate.y);
   assert.ok(g.issue(0, { type: 'pickup', ids: [man.id], crateId: crate.id }).ok, 'aufheben');
@@ -325,13 +325,13 @@ const SCENES = {
     return { g, cmd: { type: 'mine', ids: [eng.id] } };
   },
   research: () => {
-    const g = new Game({ seed: 3, research: true }); // ohne Stadt (mit Stadt braucht Forschung eine Universität)
+    const g = new Game({ city: false, seed: 3, research: true }); // ohne Stadt (mit Stadt braucht Forschung eine Universität)
     g.teams[0].res.money = 1e5;
     const key = RESEARCH_KEYS.find((k) => RESEARCH.items[k].tier === 1);
     return { g, cmd: { type: 'research', buildingId: g.mainFob(0).id, key } };
   },
   cancelResearch: () => {
-    const g = new Game({ seed: 3, research: true });
+    const g = new Game({ city: false, seed: 3, research: true });
     g.teams[0].res.money = 1e5;
     const key = RESEARCH_KEYS.find((k) => RESEARCH.items[k].tier === 1);
     g.issue(0, { type: 'research', buildingId: g.mainFob(0).id, key });
@@ -349,14 +349,14 @@ const SCENES = {
     return { g, cmd: { type: 'cancelTrain', buildingId: k.id } };
   },
   route: () => {
-    const g = new Game({ seed: 3 });
+    const g = new Game({ city: false, seed: 3 });
     const m = g.mainFob(0);
     const fob = g.spawnBuilding('fob', 0, g.grid.toCell(m.x + 900), g.grid.toCell(m.y), { built: true });
     const truck = g.units.find((u) => u.team === 0 && u.type === 'truck');
     return { g, cmd: { type: 'route', ids: [truck.id], fromId: m.id, toId: fob.id, preset: 'mix' } };
   },
   deploy: () => {
-    const g = new Game({ seed: 3 });
+    const g = new Game({ city: false, seed: 3 });
     const m = g.mainFob(0);
     const v = g.spawnUnit('fobTruck', 0, m.x + 1400, m.y + 300);
     return { g, cmd: { type: 'deploy', ids: [v.id] } };
@@ -393,7 +393,7 @@ const SCENES = {
     return { g, cmd: { type: 'dropCrate', ids: [man.id] } };
   },
   drill: () => {
-    const g = new Game({ seed: 7 });
+    const g = new Game({ city: false, seed: 7 });
     const m = g.mainFob(0);
     const T = g.grid.tile;
     const d = g.spawnBuilding('drill', 0, Math.floor((m.x + 200) / T), Math.floor((m.y - 200) / T));
@@ -401,14 +401,14 @@ const SCENES = {
     return { g, cmd: { type: 'drill', ids: [d.id] } };
   },
   roof: () => {
-    const g = new Game({ map: createEmptyMap('Festung') });
+    const g = new Game({ city: false, map: createEmptyMap('Festung') });
     const m = g.mainFob(0);
     g.teams[0].res.money = 1e5;
     const t = g.spawnBuilding('tower', 0, m.cx + 6, m.cy, { built: true });
     return { g, cmd: { type: 'roof', buildingId: t.id, kind: 'mortar' } };
   },
   repair: () => {
-    const g = new Game({ seed: 3 });
+    const g = new Game({ city: false, seed: 3 });
     const m = g.mainFob(0);
     m.hp = m.maxHp / 2;
     const eng = g.units.find((u) => u.team === 0 && u.type === 'engineer');

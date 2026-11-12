@@ -8,7 +8,7 @@ import { UNITS } from '../js/data/units.js';
 
 const DT = 0.05;
 const TILE = BALANCE.map.tile;
-const mk = (opts) => classic(new Game(opts));
+const mk = (opts) => classic(new Game({ city: false, ...opts }));
 
 /** Test ohne Einheitenlimit (Startarmee füllt die 52 Plätze schon). */
 const roomy = (fn) => () => {

@@ -138,7 +138,7 @@ for (const seed of SEEDS) {
     check(seed, 'play', play(seed, FULL, PLAY_S));
   });
   test(`Referenzwerte Seed ${seed}: KI gegen KI ${CLASSIC_S} s ohne Schalter`, () => {
-    check(seed, 'classic', play(seed, {}, CLASSIC_S));
+    check(seed, 'classic', play(seed, { city: false }, CLASSIC_S)); // ohne Stadt: alte Prüfsummen
   });
 }
 

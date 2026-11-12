@@ -147,10 +147,10 @@ export class Game {
   /** radio: Sendemast als zweite Siegbedingung (Startmenü; ohne Angabe aus). */
   /** weather: 'off' | 'random' | 'summer' | 'autumn' | 'winter' (Wetter und Jahreszeit, weather.js; ohne Angabe aus). */
   /** research: Forschungsstufen (research.js; ohne Angabe aus: alle Einheiten frei, keine Verbesserungen). */
-  /** city: Zonenstadt hinter der Hauptstadt (js/game/city/; ohne Angabe aus: Hauptstadt hat unendlich Material). */
+  /** city: Zonenstadt hinter der Hauptstadt (js/game/city/; Standard seit S2a an; ohne Stadt nur noch in alten Tests mit `city: false`: Hauptstadt hat dann unendlich Material). */
   /** buildRules: Baugebiet der Stadt (seit v5.78): Gebäude nur im eigenen Gebiet, auf erkundetem Gelände, nicht nahe dem Feind und nicht in der Konfliktzone (js/game/city/cells.js `buildWhy`). Wirkt nur mit city; ohne Angabe aus. */
   /** river: Zufallskarte mit Flüssen, Brücken und Furten (river.js; ohne Angabe aus). Fertige Karten bringen ihre eigenen mit. */
-  constructor({ seed = 1, winPoints = BALANCE.winPoints, startMoney = BALANCE.startRes.money, map = null, radio = false, weather = 'off', research = false, river = false, city = false, buildRules = false, debug = false } = {}) {
+  constructor({ seed = 1, winPoints = BALANCE.winPoints, startMoney = BALANCE.startRes.money, map = null, radio = false, weather = 'off', research = false, river = false, city = true, buildRules = false, debug = false } = {}) {
     this.seed = seed;
     this.debug = !!debug; // ?debug=1: erlaubt den Befehl `debug` (Geld, festes Wetter), seit v5.58
     this.rng = makeRng(seed);

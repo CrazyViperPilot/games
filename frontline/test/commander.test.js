@@ -24,14 +24,14 @@ const mainOf = (g, t) => g.buildings.find((b) => b.main && b.team === t);
 
 /** Leere Karte ohne Startarmee. */
 function empty() {
-  const g = new Game({ map: createEmptyMap() });
+  const g = new Game({ city: false, map: createEmptyMap() });
   for (const u of g.units) u.alive = false;
   g.cleanup();
   return g;
 }
 
 test('Start: je Team genau ein Kommandeur nahe der Hauptstadt; er belegt keinen Platz und zählt nicht als Soldat', () => {
-  const g = new Game({ seed: 7 });
+  const g = new Game({ city: false, seed: 7 });
   for (const t of [0, 1]) {
     const cs = g.units.filter((u) => u.team === t && u.def.hero);
     assert.equal(cs.length, 1);
@@ -45,7 +45,7 @@ test('Start: je Team genau ein Kommandeur nahe der Hauptstadt; er belegt keinen 
 });
 
 test('Einmalig: ein zweiter wird abgelehnt (auch in der Warteschlange); nach seinem Tod bildet die Hauptstadt einen neuen aus (C)', () => {
-  const g = new Game({ seed: 7 });
+  const g = new Game({ city: false, seed: 7 });
   const f = mainOf(g, 0);
   g.teams[0].res.money = 5000;
   const r = g.issue(0, { type: 'train', buildingId: f.id, unit: 'commander' });
@@ -107,7 +107,7 @@ test('Heilung: verletzte Infanterie im Umkreis heilt, aber erst healDelay s nach
 });
 
 test('Tod: der Gegner bekommt deathPoints Punkte (kann die Partie entscheiden), beide erfahren es', () => {
-  const g = new Game({ seed: 7, winPoints: 100 });
+  const g = new Game({ city: false, seed: 7, winPoints: 100 });
   const msgs = [];
   const orig = g.message.bind(g);
   g.message = (team, text, x, y) => {
@@ -140,7 +140,7 @@ test('Als Passagier: fällt das Fahrzeug, fällt der Kommandeur mit (Punkte für
 });
 
 test('KI: Kommandeur nie in der Angriffswelle, folgt der Armee; ein gefallener wird ersetzt', () => {
-  const g = new Game({ seed: 3 });
+  const g = new Game({ city: false, seed: 3 });
   const ais = [new AI(g, 0, 'normal'), new AI(g, 1, 'normal')];
   let attack = 0;
   let moved = 0;

@@ -10,7 +10,7 @@ import { pack, unpack } from '../js/core/snapshot.js';
 import { findPath } from '../js/game/pathfinding.js';
 
 function setup() {
-  const g = new Game({ map: createEmptyMap('Tor') });
+  const g = new Game({ city: false, map: createEmptyMap('Tor') });
   for (const u of g.units) u.alive = false;
   g.cleanup();
   const fob = g.buildings.find((b) => b.main && b.team === 0);
@@ -101,7 +101,7 @@ test('Festung: vier Tore je zwei Hälften, zweiter Aufruf ergänzt nichts', () =
 });
 
 test('KI baut ein Tor aus zwei Hälften in der Mauer vor der Hauptstadt', () => {
-  const g = new Game({ seed: 5 });
+  const g = new Game({ city: false, seed: 5 });
   const ai = new AI(g, 1, 'hard');
   const dt = 1 / 20;
   for (let i = 0; i < 20 * 400; i++) {

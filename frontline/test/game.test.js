@@ -9,7 +9,7 @@ import { nearestPassable } from '../js/game/movement.js';
 
 BALANCE.slotCap = 1000; // diese Tests prüfen nicht das Einheitenlimit (siehe economy.test.js)
 const DT = 0.05;
-const mk = (opts) => classic(new Game(opts));
+const mk = (opts) => classic(new Game({ city: false, ...opts }));
 const TILE = BALANCE.map.tile;
 
 function run(game, seconds) {
@@ -971,7 +971,7 @@ test('Zonenpunkt: Mehrheit statt Alleinbesitz, Hot Zone zählt doppelt, Balken f
 
 test('Abschussprämie: Fahrzeuge viel, Soldaten wenig, Mauern nichts; fertiger Bau bringt Geld', async () => {
   const { hit } = await import('../js/game/combat.js');
-  const g = classic(new Game({ seed: 7 }));
+  const g = classic(new Game({ city: false, seed: 7 }));
   const m0 = g.teams[0].res.money;
   const rifle = g.spawnUnit('rifleman', 1, 3000, 3000);
   hit(g, rifle, 9999);
@@ -992,7 +992,7 @@ test('Abschussprämie: Fahrzeuge viel, Soldaten wenig, Mauern nichts; fertiger B
 test('Befehle: Mauerzug über wallMax abgelehnt, Stopp ohne Einheit scheitert, Gebäude ohne produces', async () => {
   const { AI } = await import('../js/ai/ai.js');
   const { withValue } = await import('./util.js');
-  const g = new Game({ seed: 7 });
+  const g = new Game({ city: false, seed: 7 });
   const m = g.mainFob(0);
   const max = BALANCE.construction.wallMax;
   const T = g.grid.tile;

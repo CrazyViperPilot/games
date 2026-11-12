@@ -12,7 +12,7 @@ import { UNITS } from '../js/data/units.js';
 
 BALANCE.slotCap = 1000; // dieser Test prüft nicht das Einheitenlimit (siehe economy.test.js)
 const DT = 0.05;
-const mk = (opts) => classic(new Game(opts));
+const mk = (opts) => classic(new Game({ city: false, ...opts }));
 const run = (g, seconds) => {
   for (let i = 0; i < Math.round(seconds / DT); i++) g.update(DT);
 };
