@@ -1,0 +1,1 @@
+**Raketenwerfer** (§6, Paket E6): Fahrzeug wie die Panzerhaubitze, Fabrikhalle baut es (1000 Geld, Taste T); Salve aus 12 Raketen im Abstand 0,25 s, danach 30 s Nachladen; Reichweite 1600, min. 400, Feuer auf Punkt (G) wie die Panzerhaubitze.

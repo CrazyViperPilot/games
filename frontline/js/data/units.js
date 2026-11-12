@@ -577,6 +577,28 @@ export const UNITS = {
     fuelMax: 40,
     hotkey: 'O',
   },
+  // Raketenwerfer (Paket E6): Fahrzeug wie die Panzerhaubitze, Feuer auf Punkt (mortarTarget). Eine Salve aus 12 Raketen
+  // (salvo: 0,25 s Abstand), danach 30 s Nachladen (salvo.reload). Reichweite 1600, min. 400, Streuung 120, Splash 60.
+  // Nur Fabrikhalle (Regel 4 im Plan: nicht fob.produces). Werte vorläufig, Modell: Platzhalter Panzerhaubitze.
+  mlrs: {
+    name: 'Raketenwerfer',
+    short: 'MLRS', // Kurzname in der Befehlskarte
+    slots: 4,
+    armor: 'light',
+    hp: 500,
+    speed: 50,
+    radius: 14,
+    sight: 280,
+    indirect: true, // Zielsuche über die Reichweite (Sicht des Teams), wie die Panzerhaubitze
+    weapons: [
+      { id: 'rockets', name: 'Raketenwerfer 227 mm', range: 1600, minRange: 400, cooldown: 30, rounds: 36, munCost: 15, shell: true, splash: 60, spread: 120, shellSpeed: 480, salvo: { count: 12, gap: 0.25, reload: 30 }, damage: { inf: 70, light: 90, heavy: 60, struct: 110 } },
+    ],
+    cost: { money: 1000 },
+    buildTime: 26,
+    fuelPerSec: 0.35,
+    fuelMax: 40,
+    hotkey: 'T', // nur Fabrikhalle: im Fabrikmenü frei (E R B A S Z N L O X K belegt)
+  },
 };
 
 // Abgeleitete Gesamtwerte aus den Waffen: größte Reichweite, bester Schaden je Klasse, Munitionswert des vollen Vorrats.

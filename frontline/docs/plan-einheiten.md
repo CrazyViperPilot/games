@@ -30,7 +30,7 @@ jedes Paket ist für sich lauffähig, getestet und committet.
 | E3 | Flammenwerfer (`flamer`) | `rifleman` | kurze Reichweite, stark gegen besetzte Häuser und Infanterie | gebaut |
 | E4 | Mörsertrupp (`mortarteam`) | `pzh` (Feuer auf Punkt) | leichter Mörser zu Fuß | gebaut |
 | E5 | Aufklärungsfahrzeug (`scout`) | `truck` | große Sicht, getarnt im Stand | gebaut |
-| E6 | Raketenwerfer (`mlrs`) | `pzh` | Salve aus 12 Raketen, lange Nachladezeit | offen |
+| E6 | Raketenwerfer (`mlrs`) | `pzh` | Salve aus 12 Raketen, lange Nachladezeit | gebaut |
 | E7 | Bergepanzer (`recovery`) | `engineer` (Reparatur) | repariert Fahrzeuge im Feld | offen |
 | E8 | Pionier (`sapper`) | `rifleman` | legt getarnte Panzerminen, räumt Minen | offen |
 | E9 | Störsender (`jammer`) | `flak` | senkt gegnerische Trefferchance von Lenkwaffen im Umkreis | offen |

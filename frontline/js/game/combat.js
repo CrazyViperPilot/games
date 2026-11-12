@@ -230,7 +230,15 @@ function fireUnitShell(game, u, w, tx, ty) {
 /** Waffe w der Einheit u feuert auf t (Vorrat, Abklingzeit, Effekt, Trefferwurf, Schaden). */
 function fireWeapon(game, u, w, t) {
   w.rounds -= 1;
-  w.cd = (auraCooldown(u, w.spec.cooldown) * modOf(game, u, 'rof')) / (u.house ? houseFire(game, u) : 1); // Kommandeur in der Nähe, MG-Nest im Haus: schneller
+  // Salve (Paket E6, Feld salvo { count, gap, reload }): die ersten Schüsse im Abstand gap, der letzte lädt reload nach
+  let base = w.spec.cooldown;
+  const sv = w.spec.salvo;
+  if (sv) {
+    if (!(w.salvoLeft > 0)) w.salvoLeft = sv.count;
+    w.salvoLeft -= 1;
+    base = w.salvoLeft > 0 ? sv.gap : sv.reload;
+  }
+  w.cd = (auraCooldown(u, base) * modOf(game, u, 'rof')) / (u.house ? houseFire(game, u) : 1); // Kommandeur in der Nähe, MG-Nest im Haus: schneller
   game.teams[u.team].used.mun += w.spec.munCost;
   if (w.spec.shell) {
     fireUnitShell(game, u, w, t.x, t.y);
