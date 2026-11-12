@@ -323,7 +323,9 @@ export class Game {
     if (this.alwaysVisible(team, e)) return true;
     if (e.kind === 'house') return e.occupants.some((o) => this.sees(team, o)); // besetztes Haus: wenn ein Besatzer erkannt ist
     if (!this.fog[team].isVisible(e.x, e.y)) return false;
-    if (e.kind !== 'unit' || !e.def?.stealth) return true; // Nicht-Einheiten (Granaten, Gebäude …) zuerst: Granaten haben kein def
+    if (e.kind !== 'unit') return true; // Nicht-Einheiten (Granaten, Gebäude …) zuerst: Granaten haben kein def
+    // getarnt: Scharfschütze (def.stealth) immer, Aufklärungsfahrzeug (def.stillCamo) nach so vielen Sekunden Stillstand
+    if (!e.def?.stealth && !(e.def?.stillCamo && (e.still || 0) >= e.def.stillCamo)) return true;
     if (this.time < (e.revealedUntil || 0)) return true;
     const r2 = BALANCE.stealth.detectRange ** 2;
     for (const u of this.units) if (u.alive && u.team === team && (u.x - e.x) ** 2 + (u.y - e.y) ** 2 <= r2) return true;

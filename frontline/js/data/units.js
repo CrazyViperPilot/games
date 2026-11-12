@@ -197,6 +197,28 @@ export const UNITS = {
     seats: 2,
     hotkey: 'E',
   },
+  // Aufklärungsfahrzeug (Paket E5): leichtes, schnelles Fahrzeug mit großer Sicht und MG. Getarnt, sobald es `stillCamo` s steht
+  // (Regel wie beim Scharfschützen: Gegner sehen es nur nahe an eigenen Einheiten/Gebäuden oder kurz nach einem Schuss).
+  // Nur Fabrikhalle (nicht in fob.produces, Plan Regel 4).
+  scout: {
+    name: 'Aufklärungsfahrzeug',
+    short: 'Aufkl.', // Kurzname in der Befehlskarte
+    armor: 'light',
+    hp: 200,
+    speed: 160,
+    radius: 10,
+    sight: 520,
+    stillCamo: 3, // Sekunden Stillstand, bis das Fahrzeug getarnt ist (BALANCE.stealth für Reichweite und Aufdeckzeit)
+    weapons: [
+      { id: 'mg', name: 'MG', range: 220, cooldown: 0.25, rounds: 300, munCost: 5, hits: { inf: 2 }, damage: { inf: 9, light: 3, heavy: 1, struct: 3, air: 6, jet: 2 } },
+    ],
+    cost: { money: 100 },
+    buildTime: 7,
+    fuelPerSec: 0.2,
+    fuelMax: 30,
+    seats: 2,
+    hotkey: 'K', // Fabrikhalle: Taste im Fabrikmenü frei (E R X B A S Z N L O belegt)
+  },
   engineer: {
     name: 'Baufahrzeug',
     short: 'Baufz.', // Kurzname in der Befehlskarte

@@ -459,7 +459,11 @@ export function updateMovement(game, dt, ownDrivers) {
     if (grid.ford && !u.def.air && grid.isFord(grid.toCell(u.x), grid.toCell(u.y))) u.speedMul *= BALANCE.river.ford; // durchs seichte Wasser
     if (u.order.form && u.formMul) u.speedMul *= u.formMul; // Formation fährt geschlossen (formation.js)
     // Tempo aus der Verschiebung seit dem letzten Schritt (auch Logistikflüge, die außerhalb von stepUnit fliegen)
-    if (dt > 0) u.speedNow = Math.hypot(u.x - u.prevX, u.y - u.prevY) / dt;
+    if (dt > 0) {
+      u.speedNow = Math.hypot(u.x - u.prevX, u.y - u.prevY) / dt;
+      // Stillstandszeit für die Tarnung (def.stillCamo): Schwelle 1 px/s gegen Zittern beim Schieben, kein Balance-Wert
+      u.still = u.speedNow > 1 ? 0 : (u.still || 0) + dt;
+    }
     u.prevX = u.x;
     u.prevY = u.y;
     if (u.house || u.def.jet || ownDrivers.has(u.order.type) || (u.heli && u.heli.phase !== 'air')) continue; // Besatzer eines Hauses bewegen sich nicht; Jets fliegt aircraft.js, Hubschrauber am Heliport helipad.js

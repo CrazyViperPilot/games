@@ -187,7 +187,7 @@ export function drawUnit(ctx, u, color, zoom = 1, aim = null, now = 0, iso = fal
     drawJet(ctx, u, color, dark, light, hull, iso);
   } else if (u.def && u.def.air) {
     drawHeli(ctx, u, color, dark, light, hull, turret, now, z, iso);
-  } else if (u.type === 'truck') {
+  } else if (u.type === 'truck' || u.type === 'scout') {
     ctx.rotate(hull);
     ctx.fillStyle = dark;
     ctx.fillRect(-9, -6, 18, 12);

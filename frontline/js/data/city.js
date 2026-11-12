@@ -62,7 +62,7 @@ export const CITY = {
   // Geld aus der Kasse, Metall aus dem Stadtlager, Einwohner als Truppen; kein LKW nötig, egal wo sie stehen.
   produces: {
     barracks: ['rifleman', 'medic', 'at', 'manpads', 'flamer', 'mortarteam', 'sniper', 'commander'], // Kaserne: Soldaten
-    factory: ['truck', 'engineer', 'fobTruck', 'ifv', 'tank', 'flak', 'sam', 'gepard', 'pzh', 'excavator'], // Fabrikhalle: alle Fahrzeuge (auch das FOB-Fahrzeug)
+    factory: ['truck', 'scout', 'engineer', 'fobTruck', 'ifv', 'tank', 'flak', 'sam', 'gepard', 'pzh', 'excavator'], // Fabrikhalle: alle Fahrzeuge (auch das FOB-Fahrzeug)
     heliport: ['littlebird', 'transporter', 'gunship'], // Heliport: Hubschrauber
     stand: ['f16', 'f22', 'u2', 'su27'], // Stellplatz/Hangar (seit v5.35, F-22 seit v5.82, U-2 seit v5.83, Su-27 im Paket „Su-27“): je Stellplatz zwei Kampfflugzeuge (CITY.air.standJets, F-16, F-22 und Su-27 teilen sich die Plätze); die U-2 belegt den ganzen Stellplatz (standSlots), die dort auch stehen, tanken und nachladen
   },
@@ -111,7 +111,7 @@ export const CITY = {
   startMetal: 400, // Stahl im Hauptlager zu Beginn (Stahl bleibt dort, LKW fahren es nicht; Schlüssel metal)
   startKero: 300, // Kerosin im Stadtlager zu Beginn (seit v5.20; F-16 und Hubschrauber tanken es)
   // Metall je ausgebildeter Einheit (zusätzlich zum Geld); fehlt die Sorte, kostet sie kein Metall
-  metalCost: { truck: 20, engineer: 20, fobTruck: 80, ifv: 60, tank: 120, flak: 60, sam: 80, gepard: 100, pzh: 140, excavator: 80, littlebird: 60, transporter: 80, gunship: 120, f16: 160, f22: 220, u2: 150, su27: 160 },
+  metalCost: { truck: 20, scout: 30, engineer: 20, fobTruck: 80, ifv: 60, tank: 120, flak: 60, sam: 80, gepard: 100, pzh: 140, excavator: 80, littlebird: 60, transporter: 80, gunship: 120, f16: 160, f22: 220, u2: 150, su27: 160 },
   // Markt: handelt in Losen; verkaufen bringt wenig, kaufen kostet viel (Geld je Los)
   market: { lot: 100, maxCount: 100, sell: byGood('sell'), buy: byGood('buy') }, // maxCount: höchstens so viele Lose je Befehl (Knöpfe ×10, ×100 im Marktmenü); Preise je Ware im Register js/data/goods.js
 

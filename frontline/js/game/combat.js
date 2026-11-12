@@ -242,7 +242,7 @@ function fireWeapon(game, u, w, t) {
   } else {
     game.addEffect('tracer', u.x, u.y, u.team, t.x, t.y, w.spec.id);
   }
-  if (u.def.stealth) u.revealedUntil = game.time + BALANCE.stealth.revealTime; // ein Schuss verrät die Stellung
+  if (u.def.stealth || u.def.stillCamo) u.revealedUntil = game.time + BALANCE.stealth.revealTime; // ein Schuss verrät die Stellung
   // Flak und SAM: Treffer nur mit Wurf (Trefferchance, siehe unitHitChance); daneben geht der Schuss, der Schaden bleibt aus
   if (w.spec.hitChance !== undefined && !(game.rng.next() < unitHitChance(u, t, w.spec) * modOf(game, u, 'acc') * modOf(game, t, 'evade'))) return; // Forschung: Zünder, Radar; Flares, Störsender des Ziels
   const dmg = shotDamage(w.spec, u, t, heightMult(game, u, t)) * dealtMul(game, u, t);

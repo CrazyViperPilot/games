@@ -1329,7 +1329,7 @@ function soldier(P, o) {
   return { S, foot: [-1.6, 1.6, -1.6, 1.6], inf: true };
 }
 
-const MODELS = { tank, ifv, flak, sam, gepard, pzh, truck, fobTruck, engineer, excavator, littlebird, gunship, transporter, f16, f22, su27, u2 };
+const MODELS = { tank, ifv, flak, sam, gepard, pzh, truck, scout: truck, fobTruck, engineer, excavator, littlebird, gunship, transporter, f16, f22, su27, u2 };
 const INFANTRY = { rifleman: 'rifleman', medic: 'medic', at: 'at', manpads: 'manpads', flamer: 'rifleman', mortarteam: 'rifleman', sniper: 'sniper', commander: 'commander' };
 const TEAM_KEYS = ['b', 'r', 'n', 'd'];
 

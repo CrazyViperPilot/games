@@ -15,6 +15,7 @@
 | Mörsertrupp | Kaserne | Infanterie mit leichtem Mörser zu Fuß (90 Geld, Taste E, nur Kaserne, langsam); Feuer auf Punkt (G) und Ziel löschen (C) wie die Panzerhaubitze; Reichweite 700, min. 150, Kadenz 5 s, Splash 60, Schaden wie das Mörser-Gebäude |
 | Scharfschütze | Hauptstadt | Getarnt (Ghillie-Anzug), sehr große Reichweite, **ein Treffer tötet jeden Soldaten**, aber nur alle 8 s ein Schuss; gegen Fahrzeuge und Gebäude fast wirkungslos; baut nicht, kann als Passagier mitfahren |
 | LKW | Hauptstadt | Unbewaffnet, schnell, **2 Soldaten** Platz. **Logistik:** lädt Ressourcen an einer FOB (400), bringt sie zu einer anderen FOB, pendelt auf Routen, versorgt Truppen im Feld |
+| Aufklärungsfahrzeug | Fabrikhalle | Leichtes, schnelles Fahrzeug (100 Geld, Taste K, nur Fabrikhalle, Tempo 160, 2 Plätze) mit leichtem MG und Sicht 520; **getarnt nach 3 s Stillstand** (Regel wie beim Scharfschützen: Gegner sehen es nur nahe an eigenen Einheiten/Gebäuden oder 4 s nach einem Schuss); fahrend immer sichtbar |
 | Baufahrzeug | Hauptstadt | Unbewaffnet, **1 Soldat** Platz. Baut alle Gebäude außer FOBs (seit v5.09), repariert |
 | Bagger (seit v5.35, Daniels Wunsch) | Hauptstadt (mit Stadt: Fabrikhalle) | **2 Plätze**, 650 HP, langsam (48), leicht gepanzert. Befehl **Baggern (G)**: danach eine Zelle anklicken (Shift: weitere anhängen); der Bagger fährt hin (bis 54 px), arbeitet **6 s** (`BALANCE. Solange er arbeitet, quillt an der Zelle eine Staubwolke auf (seit v5.77, nur Bild).excavator`) und räumt sie: **Zonenstraßen der Karte** verschwinden für beide Seiten (Brückenfahrbahnen nicht; dort kein Straßentempo mehr, Wege und Stadtanschlüsse neu), Bäume und leere Häuser wie mit Räumen, **eigene Stadtgebäude** reißt er ab (Rohstoffvorkommen bleiben). Gegnerische Gebäude zerstört er langsam mit der **Schaufel** (nur Gebäude, 32 Schaden je 1,2 s, Reichweite 34). Seit dem Paket „Straßen“ räumt er auch **Schutt** zerstörter Straßen (die Straße ist wieder da) und **reißt gegnerische Straßen ab** (ohne Schutt, die Zelle ist frei). Befehl `dig` (`js/game/excavator.js`) |
 | FOB-Fahrzeug (seit v5.09) | Hauptstadt (mit Stadt: Fabrikhalle) | Unbewaffnet, langsam, **2 Plätze**. **Aufbauen (D):** wird an seiner Stelle sofort zur fertigen FOB mit 20 % Lager je Sorte (§4) |
@@ -63,6 +64,7 @@ Die Tabellen „Werte“ und „Waffen und Schaden“ erzeugt `npm run docs` aus
 | Scharfschütze | T | 1 | 70 | 38 | 440 | 480 | 220 Geld | 10 s | – |
 | Kommandeur | C | 0 | 300 | 42 | 340 | 180 | 400 Geld | 20 s | – |
 | LKW | E | 1 | 250 | 110 | 220 | – | 80 Geld | 6 s | 30 / 0,2 |
+| Aufklärungsfahrzeug | K | 1 | 200 | 160 | 520 | 220 | 100 Geld | 7 s | 30 / 0,2 |
 | Baufahrzeug | R | 1 | 400 | 70 | 260 | – | 150 Geld | 9 s | 40 / 0,3 |
 | Bagger | X | 2 | 650 | 48 | 240 | 34 | 320 Geld | 14 s | 45 / 0,35 |
 | FOB-Fahrzeug | B | 2 | 600 | 60 | 260 | – | 500 Geld | 30 s | 50 / 0,4 |
@@ -111,6 +113,7 @@ Schaden je Schuss nach Panzerklasse des Ziels (Inf = Infanterie, Leicht, Schwer,
 | Panzerabwehrsoldat: RPG | 240 | 3 | 5 | 10 | 10 | 90 | 120 | 60 | 40 | 0 | Soldat: 1 Treffer |
 | Scharfschütze: Scharfschützengewehr | 480 | 8 | 10 | 4 | 200 | 6 | 1 | 2 | 2 | 0 | Soldat: 1 Treffer |
 | Kommandeur: Maschinenpistole | 180 | 0,6 | 90 | 0,033 | 10 | 2 | 1 | 2 | 2 | 0 | Soldat: 6 Treffer |
+| Aufklärungsfahrzeug: MG | 220 | 0,25 | 300 | 5 | 9 | 3 | 1 | 3 | 6 | 2 | Soldat: 2 Treffer |
 | Bagger: Schaufel | 34 | 1,2 | 9999 | 0 | – | – | – | 32 | – | – | bevorzugt gegen Geb |
 | Schützenpanzer: Granatwerfer | 240 | 2 | 60 | 10 | 30 | 40 | 10 | 25 | – | – | bevorzugt gegen Leicht, Schwer, Geb; Soldat: 1 Treffer |
 | Schützenpanzer: MG | 220 | 0,25 | 300 | 5 | 9 | 3 | 1 | 3 | 6 | 2 | Soldat: 2 Treffer |
