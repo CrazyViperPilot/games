@@ -585,6 +585,28 @@ export const UNITS = {
     fuelMax: 90, // lange Einsatzzeit: mehr Sekunden Flug als die F-16 (55), dafür langsamer
     hotkey: 'D', // im Stellplatz-Menü frei (K F-16, I F-22, S Su-27, O U-2, W Staffel, U Ausbauen)
   },
+  // Transportflugzeug C-130 (Paket E13, Teil a, PRD §6 „C-130“): unbewaffnet, langsam, viel HP; 10 Passagiere, nur Infanterie
+  // (seats, wie der Transporthubschrauber). Nur mit Stadt, am Stellplatz des Fliegerhorsts (CITY.produces.stand), Plätze wie die
+  // anderen Jets geteilt. Die KI baut sie nicht. Modell vorläufig u2. Absetzen folgt in Teil b.
+  c130: {
+    name: 'C-130',
+    short: 'C-130', // Kurzname in der Befehlskarte
+    slots: 3,
+    armor: 'air',
+    air: true,
+    jet: true,
+    hp: 900,
+    speed: 200, // schneller als der Transporthubschrauber (130), langsamer als die Kampfjets (A-10 252, F-16 420)
+    radius: 18,
+    sight: 400,
+    weapons: [], // unbewaffnet
+    seats: 10, // Passagiere: nur Infanterie (canSeat: Flugzeuge nehmen Infanterie und Baufahrzeuge mit canRide)
+    cost: { money: 1800 },
+    buildTime: 60,
+    fuelPerSec: 1,
+    fuelMax: 90,
+    hotkey: 'C', // im Stellplatz-Menü frei (K F-16, I F-22, S Su-27, O U-2, D A-10, W Staffel, U Ausbauen, I Einsteigen)
+  },
   // Kampfflugzeug Su-27 (Paket „Su-27“, PRD §6 „Su-27“): wie die F-16 (gleiche zwei Waffen, parallel, gleiche Schäden und Munition),
   // aber etwas schneller und mit größerer Reichweite (Reichweite ≈ speed × fuelMax: 450 × 75 gegen 420 × 55). Nur mit Stadt, am Stellplatz
   // des Fliegerhorsts (CITY.produces.stand, Plätze CITY.air.standJets teilen sich F-16, F-22 und Su-27). Die KI baut sie nicht.

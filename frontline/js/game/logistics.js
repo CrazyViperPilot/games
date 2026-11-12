@@ -283,6 +283,15 @@ export function canSeat(vehicle, rider) {
   return rider.def.canRide && !rider.crate && (vehicle.def.air || rider.def.armor === 'inf');
 }
 
+/**
+ * Ort, zu dem Einsteiger laufen: beim Hubschrauber die Stelle, wo er steht. Ein abgestellter Jet (Stellplatz, Paket E13) steht im
+ * Gebäudeblock des Stellplatzes: dort der nächste begehbare Punkt, sonst ist er nicht erreichbar.
+ */
+function boardPoint(game, heli, team) {
+  if (!heli.parked) return { x: heli.x, y: heli.y };
+  return nearestPassable(game.grid, heli.x, heli.y, team) || { x: heli.x, y: heli.y };
+}
+
 /** { type: 'board', ids, heliId }: Infanterie/Baufahrzeuge gehen zu einem eigenen Hubschrauber und steigen ein. */
 export function cmdBoard(game, team, cmd) {
   const heli = game.getEntity(cmd.heliId);
@@ -293,7 +302,10 @@ export function cmdBoard(game, team, cmd) {
     return fail(heli.def.air ? 'Nur Infanterie und Baufahrzeuge steigen ein' : 'Nur Infanterie steigt hier ein');
   }
   if (heli.passengers.length >= heli.def.seats) return fail('Fahrzeug ist voll');
-  for (const u of riders) giveOrder(u, { type: 'board', x: heli.x, y: heli.y, targetId: heli.id });
+  for (const u of riders) {
+    const p = boardPoint(game, heli, u.team);
+    giveOrder(u, { type: 'board', x: p.x, y: p.y, targetId: heli.id });
+  }
   return { ok: true, count: riders.length };
 }
 
@@ -315,7 +327,8 @@ function stepBoard(game, u, dt) {
     setIdle(u);
     return;
   }
-  const st = driveTo(game, u, heli.x, heli.y, BOARD_REACH, dt);
+  const p = heli.parked ? u.order : heli; // abgestellter Jet: der Punkt am Stellplatz (boardPoint), sonst das Fahrzeug selbst
+  const st = driveTo(game, u, p.x, p.y, BOARD_REACH, dt);
   if (st === 'stuck') {
     game.message(u.team, 'Kein Weg zum Fahrzeug', u.x, u.y);
     setIdle(u);
