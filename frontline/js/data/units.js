@@ -71,6 +71,28 @@ export const UNITS = {
     canRide: true,
     hotkey: 'I', // im Kasernen- und Hauptstadt-Menü frei (I Einsteigen nur am Transporter, U ist Forschung)
   },
+  // Flammenwerfer (Paket E3): Infanterie mit kurzer Reichweite (70) und schnellem Feuer. Der Strahl trifft auch Gegner im Umkreis
+  // splash (linear abfallend, halber Schaden). Gegen Besatzer eines Stadthauses wirkt occupantMul (×2) auf den Spill-Schaden (balance.garrison.spill).
+  // Schaden: Soldat hoch, Gebäude mittel (unter garrison.heavy, also Handwaffen-Faktor), Fahrzeuge gering.
+  flamer: {
+    name: 'Flammenwerfer',
+    short: 'Flamm', // Kurzname in der Befehlskarte
+    armor: 'inf',
+    hp: 100,
+    speed: 40,
+    radius: 6,
+    sight: 260,
+    weapons: [
+      { id: 'flame', name: 'Flammenstrahl', range: 70, cooldown: 0.5, rounds: 40, munCost: 1 / 20, splash: 25, occupantMul: 2, damage: { inf: 40, light: 6, heavy: 2, struct: 20, air: 0, jet: 0 } },
+    ],
+    cost: { money: 60 }, // wie Schütze
+    buildTime: 5,
+    fuelPerSec: 0,
+    builder: 'fort',
+    bmCap: 50,
+    canRide: true,
+    hotkey: 'D', // nur Kaserne: im Hauptstadt-Menü sind alle Buchstaben belegt (test/config.test.js); offen, siehe Bericht
+  },
   at: {
     name: 'Panzerabwehrsoldat',
     short: 'PAK', // Kurzname in der Befehlskarte

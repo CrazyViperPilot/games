@@ -251,14 +251,14 @@ function stepStormer(game, u, dt) {
  * Schaden an einem Haus (aus combat.hit). Die Besatzer bekommen davon nur den Splitteranteil `spill` ab; stürzt das Haus ein, fallen sie mit
  * ejectDamage heraus, und es bleibt eine Ruine (versperrt den Weg weiter, kann nicht mehr besetzt werden).
  */
-export function damageHouse(game, h, amount) {
+export function damageHouse(game, h, amount, occMul = 1) {
   if (!h.alive || !(amount > 0)) return;
   h.hp -= amount;
   h.lastHitTime = game.time;
   for (const u of h.occupants) u.lastHitTime = game.time;
   if (h.hp > 0) {
     // Splitter treffen die Besatzer (beim Einsturz zählt stattdessen ejectDamage)
-    const spill = amount * G.spill * (h.works.sandbags ? G.works.sandbags.spillMult : 1);
+    const spill = amount * G.spill * occMul * (h.works.sandbags ? G.works.sandbags.spillMult : 1);
     for (const u of h.occupants) wound(game, u, spill / h.occupants.length);
     if (h.occupants.some((u) => !u.alive)) {
       h.occupants = h.occupants.filter((u) => u.alive);

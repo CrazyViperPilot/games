@@ -11,6 +11,7 @@
 | Sanitäter | Hauptstadt, Kaserne | Unbewaffnete Infanterie (90 Geld, Taste K); heilt jede Sekunde 6 HP der am stärksten verletzten eigenen Infanterie im Umkreis von 90 px (nicht sich selbst, nicht in Häusern oder Fahrzeugen) |
 | Panzerabwehrsoldat | Hauptstadt | Langsam feuernd, stark gegen Fahrzeuge und Gebäude; baut Mauern und Tore |
 | MANPADS-Soldat | Hauptstadt, Kaserne | Infanterie mit Flugabwehrrakete zu Fuß (120 Geld, Taste I); schießt nur auf Luftziele, Reichweite 300, Schaden 250, 12 s Nachladen; zählt zur Flugabwehr-Forschung |
+| Flammenwerfer | Kaserne | Infanterie mit Flammenstrahl (60 Geld, Taste D, nur Kaserne); Reichweite 70, Splash 25 (halber Schaden im Umkreis), Schaden Soldat hoch, Gebäude mittel, Fahrzeuge gering; gegen Besatzer eines Stadthauses ×2 auf den Spill-Schaden |
 | Scharfschütze | Hauptstadt | Getarnt (Ghillie-Anzug), sehr große Reichweite, **ein Treffer tötet jeden Soldaten**, aber nur alle 8 s ein Schuss; gegen Fahrzeuge und Gebäude fast wirkungslos; baut nicht, kann als Passagier mitfahren |
 | LKW | Hauptstadt | Unbewaffnet, schnell, **2 Soldaten** Platz. **Logistik:** lädt Ressourcen an einer FOB (400), bringt sie zu einer anderen FOB, pendelt auf Routen, versorgt Truppen im Feld |
 | Baufahrzeug | Hauptstadt | Unbewaffnet, **1 Soldat** Platz. Baut alle Gebäude außer FOBs (seit v5.09), repariert |
@@ -55,6 +56,7 @@ Die Tabellen „Werte“ und „Waffen und Schaden“ erzeugt `npm run docs` aus
 | Schütze | Q | 1 | 100 | 45 | 260 | 200 | 60 Geld | 5 s | – |
 | Sanitäter | K | 1 | 100 | 45 | 260 | – | 90 Geld | 5 s | – |
 | MANPADS-Soldat | I | 1 | 90 | 40 | 260 | 300 | 120 Geld | 8 s | – |
+| Flammenwerfer | D | 1 | 100 | 40 | 260 | 70 | 60 Geld | 5 s | – |
 | Panzerabwehrsoldat | W | 1 | 90 | 40 | 260 | 240 | 120 Geld | 8 s | – |
 | Scharfschütze | T | 1 | 70 | 38 | 440 | 480 | 220 Geld | 10 s | – |
 | Kommandeur | C | 0 | 300 | 42 | 340 | 180 | 400 Geld | 20 s | – |
@@ -102,6 +104,7 @@ Schaden je Schuss nach Panzerklasse des Ziels (Inf = Infanterie, Leicht, Schwer,
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | Schütze: Gewehr | 200 | 1 | 60 | 0,033 | 12 | 3 | 1 | 4 | 3 | 0 | Soldat: 4 Treffer |
 | MANPADS-Soldat: Wärmesuchrakete | 300 | 12 | 4 | 250 | – | – | – | – | 250 | 250 | bevorzugt gegen Luft; Trefferchance 90 % × Entfernungs-Faktor; nur Luftziele |
+| Flammenwerfer: Flammenstrahl | 70 | 0,5 | 40 | 0,05 | 40 | 6 | 2 | 20 | 0 | 0 | – |
 | Panzerabwehrsoldat: RPG | 240 | 3 | 5 | 10 | 10 | 90 | 120 | 60 | 40 | 0 | Soldat: 1 Treffer |
 | Scharfschütze: Scharfschützengewehr | 480 | 8 | 10 | 4 | 200 | 6 | 1 | 2 | 2 | 0 | Soldat: 1 Treffer |
 | Kommandeur: Maschinenpistole | 180 | 0,6 | 90 | 0,033 | 10 | 2 | 1 | 2 | 2 | 0 | Soldat: 6 Treffer |

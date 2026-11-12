@@ -128,10 +128,10 @@ function warnBase(game, target) {
 }
 
 /** Fügt Schaden zu, setzt lastHitTime und markiert Tote. Stadthäuser: garrison.damageHouse, Brücken: river.damageBridge. Einheiten: erforschte Panzerung, Deckung an Ruinen (seit v5.66). */
-export function hit(game, target, amount) {
+export function hit(game, target, amount, occMul = 1) {
   if (!target.alive || !(amount > 0)) return;
   if (target.kind === 'house') {
-    damageHouse(game, target, amount);
+    damageHouse(game, target, amount, occMul);
     return;
   }
   if (target.kind === 'bridge') {
@@ -245,7 +245,18 @@ function fireWeapon(game, u, w, t) {
   if (u.def.stealth) u.revealedUntil = game.time + BALANCE.stealth.revealTime; // ein Schuss verrät die Stellung
   // Flak und SAM: Treffer nur mit Wurf (Trefferchance, siehe unitHitChance); daneben geht der Schuss, der Schaden bleibt aus
   if (w.spec.hitChance !== undefined && !(game.rng.next() < unitHitChance(u, t, w.spec) * modOf(game, u, 'acc') * modOf(game, t, 'evade'))) return; // Forschung: Zünder, Radar; Flares, Störsender des Ziels
-  hit(game, t, shotDamage(w.spec, u, t, heightMult(game, u, t)) * dealtMul(game, u, t));
+  const dmg = shotDamage(w.spec, u, t, heightMult(game, u, t)) * dealtMul(game, u, t);
+  hit(game, t, dmg, w.spec.occupantMul ?? 1);
+  if (w.spec.splash) flameSplash(game, u, t, w.spec.splash, dmg);
+}
+
+/** Flammenstrahl (Paket E3, Waffe mit splash): trifft zusätzlich gegnerische Einheiten im Umkreis R um das Ziel, linear abfallend und mit halbem Schaden. */
+function flameSplash(game, u, t, R, dmg) {
+  for (const e of game.units) {
+    if (e === t || !e.alive || e.team === u.team || e.house) continue;
+    const d = Math.hypot(e.x - t.x, e.y - t.y);
+    if (d < R) hit(game, e, dmg * (1 - d / R) * 0.5);
+  }
 }
 
 /** Reichweite der Waffe w von u gegen t (Forschung, Hauswand; Artillerie nicht unter minRange)? */

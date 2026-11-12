@@ -91,7 +91,7 @@ export function drawUnit(ctx, u, color, zoom = 1, aim = null, now = 0, iso = fal
     ctx.beginPath();
     ctx.arc(-1.2, -1.2, 1.8, 0, Math.PI * 2);
     ctx.fill();
-  } else if (u.type === 'rifleman' || u.type === 'at' || u.type === 'manpads') {
+  } else if (u.type === 'rifleman' || u.type === 'at' || u.type === 'manpads' || u.type === 'flamer') {
     const at = u.type === 'at' || u.type === 'manpads';
     ctx.save();
     ctx.rotate(turret);

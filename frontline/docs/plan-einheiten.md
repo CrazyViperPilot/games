@@ -27,7 +27,7 @@ jedes Paket ist für sich lauffähig, getestet und committet.
 |---|---|---|---|---|
 | E1 | Sanitäter (`medic`) | `rifleman` | heilt Soldaten im Umkreis | gebaut |
 | E2 | MANPADS-Soldat (`manpads`) | `at` + Waffe der `sam` | Flugabwehrrakete zu Fuß | gebaut |
-| E3 | Flammenwerfer (`flamer`) | `rifleman` | kurze Reichweite, stark gegen besetzte Häuser und Infanterie | offen |
+| E3 | Flammenwerfer (`flamer`) | `rifleman` | kurze Reichweite, stark gegen besetzte Häuser und Infanterie | gebaut |
 | E4 | Mörsertrupp (`mortarteam`) | `pzh` (Feuer auf Punkt) | leichter Mörser zu Fuß | offen |
 | E5 | Aufklärungsfahrzeug (`scout`) | `truck` | große Sicht, getarnt im Stand | offen |
 | E6 | Raketenwerfer (`mlrs`) | `pzh` | Salve aus 12 Raketen, lange Nachladezeit | offen |
