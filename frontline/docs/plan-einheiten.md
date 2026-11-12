@@ -37,7 +37,7 @@ jedes Paket ist für sich lauffähig, getestet und committet.
 | E10 | Aufklärungsdrohne (`drone`) | `littlebird` | billig, Sicht, begrenzte Flugzeit | gebaut |
 | E11 | Kamikazedrohne (`fpv`) | `drone` aus E10 | Einweg, stürzt sich auf ein Fahrzeug | gebaut |
 | E12 | Erdkampfflugzeug (`a10`) | `f16` | Bordkanone gegen Bodenziele, lange Einsatzzeit | gebaut |
-| E13 | Transportflugzeug + Fallschirmjäger (`c130`) | `f16`, `transporter` | setzt Infanterie über Punkt ab | Teil a gebaut |
+| E13 | Transportflugzeug + Fallschirmjäger (`c130`) | `f16`, `transporter` | setzt Infanterie über Punkt ab | gebaut |
 | E14 | Brückenleger (`bridgelayer`) | `excavator` | legt Behelfsbrücke über eine Flusszelle | offen |
 
 ## Pakete

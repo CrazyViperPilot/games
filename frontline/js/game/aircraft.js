@@ -736,7 +736,7 @@ function stepAirborne(game, u, dt) {
 /** Alle Jets einen Schritt (nach updateMovement; Bewegung der Jets nur hier). */
 export function updateAircraft(game, dt) {
   for (const u of game.units) {
-    if (!u.alive || !u.def.jet) continue;
+    if (!u.alive || !u.def.jet || u.paradrop) continue; // Absetzen: paradrop.js fliegt die C-130 im Anflug (Paket E13 b)
     u.jet ??= { home: 0, ready: true, warned: false };
     u.jet.phase ??= u.parked ? 'park' : 'air';
     if (!game.city) {

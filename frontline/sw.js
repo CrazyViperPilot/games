@@ -54,6 +54,7 @@ const ASSETS = [
   './js/game/recovery.js',
   './js/game/fpv.js',
   './js/game/mines.js',
+  './js/game/paradrop.js',
   './js/game/radio.js',
   './js/game/city/cells.js',
   './js/game/city/query.js',

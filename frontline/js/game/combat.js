@@ -505,7 +505,7 @@ export function updateCombat(game, dt) {
   const wx = weatherSight(game); // Regen, Nebel und Schnee verkürzen die Zielsuche (Forschung: Optik, Drohnen verlängern sie)
 
   for (const u of units) {
-    if (!u.alive || !u.weapons.length || u.crate || u.parked || jetGrounded(u) || (u.heli && u.heli.phase !== 'air')) continue; // Kistenträger haben die Hände voll, Jets am Boden (Hangar, Rollen, Start, Ausrollen) schießen nicht
+    if (!u.alive || !u.weapons.length || u.crate || u.chute > 0 || u.parked || jetGrounded(u) || (u.heli && u.heli.phase !== 'air')) continue; // Kistenträger haben die Hände voll, Jets am Boden (Hangar, Rollen, Start, Ausrollen) schießen nicht
     const o = u.order.type;
     if (NO_FIRE.has(o)) continue;
     if (u.fireTarget && o !== 'attack') {

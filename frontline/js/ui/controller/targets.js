@@ -263,6 +263,20 @@ export const targetMethods = {
   },
 
   /** Absetzen: Transportfahrzeug fliegt/fährt zum Klickpunkt und setzt Passagiere ab. */
+  /** Fallschirm absetzen: die gewählte C-130 mit Passagieren fliegt zum Klickpunkt (js/game/paradrop.js). */
+  confirmParadrop(wx, wy) {
+    const ids = this.selectedUnits().filter((e) => e.type === 'c130').map((e) => e.id);
+    if (!ids.length) {
+      this.message('Kein Transportflugzeug gewählt');
+      this.setMode('normal');
+      return;
+    }
+    if (this.issue({ type: 'paradrop', ids, x: wx, y: wy }).ok) {
+      this.moveMarker(wx, wy);
+      this.setMode('normal');
+    } else this.message('Kein Transportflugzeug mit Passagieren oder keines in der Luft');
+  },
+
   confirmDropoff(wx, wy) {
     const ids = this.selectedUnits().filter((e) => e.def.seats > 0).map((e) => e.id);
     if (!ids.length) {

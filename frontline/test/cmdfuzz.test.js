@@ -61,6 +61,7 @@ const TEMPLATES = {
   trade: { good: 'good', dir: 'dir' },
   board: { ids: 'ids', heliId: 'unitId' },
   dropoff: { ids: 'ids', x: 'x', y: 'y' },
+  paradrop: { ids: 'ids', x: 'x', y: 'y' },
   garrison: { ids: 'ids', houseId: 'house' },
   ungarrison: { ids: 'ids' },
   roof: { buildingId: 'building_', kind: 'roofKind' },

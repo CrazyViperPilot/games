@@ -397,6 +397,17 @@ export const cardMethods = {
         }),
       );
     }
+    const planes = units.filter((u) => u.type === 'c130');
+    if (planes.length) {
+      card.push(
+        entry('Fallschirm absetzen', null, {
+          tip: 'Fallschirm absetzen (ohne Taste): Zielpunkt anklicken. Die C-130 fliegt hin, Passagiere landen im Umkreis 80 px und schießen 3 s lang nicht.',
+          enabled: planes.some((p) => p.passengers.length > 0),
+          reason: 'Keine Passagiere an Bord',
+          action: () => this.setMode('paradrop'),
+        }),
+      );
+    }
     return card;
   },
 

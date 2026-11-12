@@ -132,6 +132,7 @@ Neue Befehle: Rezept in [CLAUDE.md](CLAUDE.md).
 | `trade` | `good` (`bm`, `mun`, `fuel`, `metal`, `kero`), `dir` (`sell`, `buy`), optional `count` (Lose, 1 … `CITY.market.maxCount`) | `city/commands.js` `cmdTrade` | Lose am eigenen Markt handeln (nur mit fertigem Markt); reicht es nicht für alle, so viele wie möglich (`done`) |
 | `board` | `ids, heliId` | `logistics.js` `cmdBoard` | in ein Fahrzeug oder einen Hubschrauber einsteigen |
 | `dropoff` | `ids, x, y` | `logistics.js` `cmdDropoff` | Passagiere am Punkt absetzen |
+| `paradrop` | `ids, x, y` | `paradrop.js` `cmdParadrop` | C-130 mit Passagieren fliegt zum Punkt und setzt sie per Fallschirm ab (`chute`, dann Heimflug) |
 | `garrison`, `ungarrison` | `ids, houseId` (Haus oder Gefechtsturm) / `ids` | `garrison.js` | Haus oder Turm besetzen / verlassen |
 | `roof` | `buildingId, kind` (`mortar`, `flak`, `sam`) | `tower.js` `cmdRoof` | Dachaufbau auf einen Gefechtsturm |
 | `fortify` | `buildingId, towers?, tx?, ty?, ids?` | `tower.js` `cmdFortify` | FOB zur Festung ausbauen (Mauerring, Tore, Türme) |

@@ -587,7 +587,7 @@ export const UNITS = {
   },
   // Transportflugzeug C-130 (Paket E13, Teil a, PRD §6 „C-130“): unbewaffnet, langsam, viel HP; 10 Passagiere, nur Infanterie
   // (seats, wie der Transporthubschrauber). Nur mit Stadt, am Stellplatz des Fliegerhorsts (CITY.produces.stand), Plätze wie die
-  // anderen Jets geteilt. Die KI baut sie nicht. Modell vorläufig u2. Absetzen folgt in Teil b.
+  // anderen Jets geteilt. Die KI baut sie nicht. Modell vorläufig u2. Absetzen (Befehl paradrop) seit Teil b.
   c130: {
     name: 'C-130',
     short: 'C-130', // Kurzname in der Befehlskarte
@@ -601,6 +601,9 @@ export const UNITS = {
     sight: 400,
     weapons: [], // unbewaffnet
     seats: 10, // Passagiere: nur Infanterie (canSeat: Flugzeuge nehmen Infanterie und Baufahrzeuge mit canRide)
+    dropReach: 60, // Absetzen (Paket E13 b, js/game/paradrop.js): ab diesem Abstand (px) zum Zielpunkt lassen die Passagiere los
+    dropRadius: 80, // Umkreis (px) um den Zielpunkt, in dem die Fallschirmjäger landen
+    chuteTime: 3, // s am Fallschirm: sie schießen nicht und können nicht schießen, bis er abgelaufen ist
     cost: { money: 1800 },
     buildTime: 60,
     fuelPerSec: 1,

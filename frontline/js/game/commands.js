@@ -22,6 +22,7 @@ import { cmdHeliLand, isHeliport } from './helipad.js';
 import { cmdDig } from './excavator.js';
 import { cmdShellRoad, cmdClearRubble } from './roadwar.js';
 import { cmdLayMine } from './mines.js';
+import { cmdParadrop } from './paradrop.js';
 
 const fail = (reason) => ({ ok: false, reason });
 
@@ -73,6 +74,7 @@ export const COMMANDS = {
   deliver: { run: cmdDeliver, drives: true, sound: true },
   dropCrate: { run: cmdDropCrate },
   dropoff: { run: cmdDropoff, drives: true, sound: true },
+  paradrop: { run: cmdParadrop, drives: true, sound: true },
   drill: { run: cmdDrill },
   // Heliport als Ziel: Hubschrauber (seit v5.51, helipad.js), sonst Stellplatz: Jets (aircraft.js)
   land: { run: (g, t, c) => (isHeliport(g, g.getEntity(c.airportId)) ? cmdHeliLand(g, t, c) : cmdLand(g, t, c)), drives: true, sound: true },

@@ -60,6 +60,11 @@ export const MODES = {
     hint: () => 'Pionier: Stelle anklicken, an der die Mine liegt (getarnt, Munition aus dem Lager) · Esc bricht ab',
     click: (c, wx, wy) => c.confirmLayMine(wx, wy),
   },
+  paradrop: {
+    target: true,
+    hint: () => 'Fallschirm absetzen: Zielpunkt anklicken, die C-130 fliegt hin · Esc bricht ab',
+    click: (c, wx, wy) => c.confirmParadrop(wx, wy),
+  },
   dropoff: {
     target: true,
     hint: () => 'Absetzen: Zielpunkt anklicken · Esc bricht ab',

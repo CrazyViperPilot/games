@@ -39,6 +39,7 @@ import { createResearch, updateResearch, rangeMul } from './research.js';
 import { createBridges, updateBridges, bridgeUnder } from './river.js';
 import { createRoads } from './roads.js';
 import { updateAircraft, trainCheck, isHighAlt, canHitAltitude } from './aircraft.js';
+import { updateParadrop } from './paradrop.js'; // C-130 setzt Fallschirmjäger ab (Paket E13 b)
 import { updateHelis, heliTrainCheck } from './helipad.js';
 import { updateDig } from './excavator.js';
 import { updateRoadWar } from './roadwar.js';
@@ -1267,6 +1268,7 @@ export class Game {
     updateTowers(this, dt);
     updateFormations(this);
     updateMovement(this, dt, OWN_DRIVERS);
+    updateParadrop(this, dt); // Absetzen: C-130 im Anflug, Fallschirm-Zeiten (Paket E13 b)
     updateAircraft(this, dt); // Jets: Flug, Rückkehr, Landung, Rollen, Tanken am Stellplatz (seit v5.03, Fliegerhorst seit v5.35)
     updateHelis(this, dt); // Hubschrauber: Start, Landung, Tanken am Heliport (seit v5.51)
     updateCrates(this, dt);
