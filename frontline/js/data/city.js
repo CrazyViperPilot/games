@@ -283,6 +283,11 @@ export const CITY = {
     reconMax: 1,
     reconFrom: { easy: null, normal: 600, hard: 480 },
     reconEvery: 300,
+    // A-10 (Paket K3): statt eines Teils der F-16, wenn die KI schwere gegnerische Fahrzeuge sieht (gemerkt AIR_MEMORY s, Anzahl ab a10Heavy);
+    // Anteil an den Kampfflugzeugen a10Share (Zahl nach CITY.ai.jets), nur mit a10Reserve Geld nach dem Kauf
+    a10Heavy: 4, // gleichzeitig gesehene gegnerische schwere Fahrzeuge, ab denen die KI A-10 bestellt
+    a10Share: 0.25, // Anteil der A-10 an den Kampfflugzeugen
+    a10Reserve: 1000, // Geld, das nach dem Kauf einer A-10 übrig bleiben muss (Festung und Forschung gehen vor)
     // seit v5.20 (Review): höchstens so viele Förderanlagen je Werk, das ihren Rohstoff nimmt (Holz und Stein zusammen je BM-Werk, Erz je
     // Hütte, Öl je Raffinerie oder Kerosin-Raffinerie; aufgerundet). Mehr Förderung, als die Werke verarbeiten, verstopft nur die Straßen.
     minesPer: { bm: 1, smelter: 1, oil: 0.5 },

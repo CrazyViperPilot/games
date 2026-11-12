@@ -99,6 +99,15 @@ export const ARTY_FIRE_TYPES = ['mortarteam', 'mlrs']; // Einheiten, die die KI 
 export const ARTY_FIRE_EVERY = 4; // s zwischen zwei Zielwahlen je Artillerie-Einheit (sie wählt neu oder schweigt)
 export const ARTY_GROUP = 3; // sichtbare gegnerische Einheiten innerhalb ARTY_GROUP_R, ab denen die Gruppe ein Ziel ist
 export const ARTY_GROUP_R = 120; // px Umkreis, in dem Gegner als eine Gruppe zählen
+// Luft (Paket K3, nicht auf Leicht): Aufklärungsdrohne am Heliport, Kamikazedrohnen gegen gegnerische Panzer nahe der Konfliktzone
+export const DRONE_ARMY = 10; // eigene Kampfeinheiten, ab denen die KI eine Aufklärungsdrohne ausbildet (ein Stück, Heliport)
+export const DRONE_FROM = 240; // s Spielzeit, ab der die Aufklärungsdrohne kommt (nach dem Späher)
+export const DRONE_MONEY = 800; // Geld, das nach dem Kauf einer Aufklärungsdrohne übrig bleiben muss (Festung und Gebäude gehen vor)
+export const FPV_ARMY = 12; // eigene Kampfeinheiten, ab denen die KI Kamikazedrohnen ausbildet
+export const FPV_MAX = 2; // höchstens so viele Kamikazedrohnen gleichzeitig (Heliport)
+export const FPV_MONEY = 600; // Geld, das nach dem Kauf einer Kamikazedrohne übrig bleiben muss
+export const FPV_NEAR = 400; // px: gegnerische Panzer höchstens so weit hinter dem Zonenradius sind Ziel der Kamikazedrohnen
+export const FPV_EVERY = 6; // s zwischen zwei Zielbefehlen an die Kamikazedrohnen (wer bereit ist, bekommt einen Panzer)
 export const SUPPLY_MIN = 0.25; // Versorger lädt nach, wenn die Ladung unter diesem Anteil liegt
 export const SURPLUS_MIN = 120; // Pendler fährt nur, wenn die Quelle so viel Überschuss hat
 export const ROUTE_HOLD = 20; // s, früheste Neuplanung einer Pendler-Route

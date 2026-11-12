@@ -91,6 +91,8 @@ export class AI {
     this.buildDefense(s);
     this.buildWall(s);
     this.fortify(s);
+    this.drone(s); // Aufklärungsdrohne am Heliport, nach der Festung: sie bekommt nur Geld, das übrig ist (K3)
+    this.kamikaze(s); // Kamikazedrohnen greifen Panzer nahe der Zone an (K3)
     this.rebuildBridges(s);
     this.repairRoads(s); // Schutt eigener Straßen räumen (Paket „Straßen“)
     this.manageEngineers(s);
