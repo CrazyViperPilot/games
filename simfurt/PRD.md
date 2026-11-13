@@ -5,7 +5,7 @@ Eigenständiges Städtebauspiel im Frankfurter Gewand (Main, Skyline, Bankenvier
 ## Ziele
 - Offline-fähige PWA (`simfurt/`), eigener Cache (`simfurt-`), eigener Spielstand, unabhängig von den anderen Spielen.
 - Optimiert für Pixel 8a im **Hochformat** (Touch), dazu gut mit **Maus und Tastatur** am PC.
-- Spielstand lokal (IndexedDB) **und** auf Daniels Webspace (PHP, `simfurt/api.php` im Repo `CrazyViperPilot/vipervocs`, Deploy per dortiger Action, analog Frontline/Fruhno).
+- Spielstand lokal (IndexedDB) **und** auf Daniels Webspace (PHP, `simfurt/api.php` im Repo `CrazyViperPilot/vipervocs`, Deploy per dortiger Action, analog Fruhno).
 
 ## Spielprinzip
 Karte wählbar 64×64, 96×96 oder 128×128 Kacheln (Größe wie im Original: 128; im Neue-Stadt-Dialog, im Spielstand gespeichert) mit Fluss (Main) und Wald, isometrisch (Canvas 2D, Sprite-Cache). Ein Tick = ein Monat (Start Januar 1990). Der Spieler legt Straßen, Zonen, Kraftwerke und Dienste an; die Stadt wächst automatisch nach Nachfrage.
