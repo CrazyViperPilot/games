@@ -1,5 +1,5 @@
 # Deployt die Spielesammlung nach GitHub Pages:
-# Startseite unter /, jedes Spiel in seinem Ordner: /gate-squad/, /scroll-shooter/, /go/, /sudoku/, /frontline/, /mario-craft/.
+# Startseite unter /, jedes Spiel in seinem Ordner: /gate-squad/, /scroll-shooter/, /go/, /sudoku/, /mario-craft/.
 # Entwicklungsdateien (Tests, package.json, Pläne) werden nicht veröffentlicht.
 # cat-queens/ ist TypeScript + Vite: wird hier gebaut, veröffentlicht wird nur cat-queens/dist/ unter /cat-queens/.
 name: Deploy games to GitHub Pages

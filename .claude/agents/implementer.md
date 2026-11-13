@@ -1,6 +1,6 @@
 ---
 name: implementer
-description: Implementiert genau ein Arbeitspaket aus <spiel>/PLAN.md eines Vanilla-JS-Canvas-Spiels (z. B. gate-squad, frontline, mario-craft). Nutzen, wenn ein klar umrissenes Paket mit Dateiliste und Schnittstellen umgesetzt werden soll; der Auftrag nennt den Spielordner.
+description: Implementiert genau ein Arbeitspaket aus <spiel>/PLAN.md eines Vanilla-JS-Canvas-Spiels (z. B. gate-squad, mario-craft). Nutzen, wenn ein klar umrissenes Paket mit Dateiliste und Schnittstellen umgesetzt werden soll; der Auftrag nennt den Spielordner.
 model: haiku
 tools: Read, Write, Edit, Glob, Grep, Bash
 ---
@@ -20,7 +20,7 @@ Regeln:
 5. Performance: keine Allokationen im Update-Hotpath, Objekt-Pools nutzen.
 6. Prüfe deine Dateien vor dem Abschluss mit `node --check <datei>` (Syntax) und bei reinen
    Daten-/Logikmodulen mit einem kurzen `node --input-type=module -e "import('./<spiel>/js/...')"`-Import-Test. Gibt es Tests im Paket: `cd <spiel> && npm test` muss grün sein.
-7. Hat das Spiel einen Ordner `docs/changes/` (z. B. frontline): Versionsnummern, `CACHE_VERSION` und den Änderungsverlauf nicht selbst
+7. Hat das Spiel einen Ordner `docs/changes/` (falls vorhanden): Versionsnummern, `CACHE_VERSION` und den Änderungsverlauf nicht selbst
    setzen, sondern den Eintrag als eine Datei dort ablegen (Anleitung `docs/changes/README.md`). Langsame Tests (über ~5 s) im Namen mit
    „[langsam]“ markieren; zum Iterieren `npm run test:fast`, am Ende `npm test`.
 8. Committe nicht. Antworte am Ende knapp: angelegte/geänderte Dateien, exportierte API, offene Punkte.
