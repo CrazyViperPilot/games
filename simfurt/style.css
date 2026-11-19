@@ -67,3 +67,12 @@ input[type=text] { width:100%; padding:10px; border-radius:10px; border:1px soli
 .chart-cap { display:flex; justify-content:space-between; font-size:12px; color:var(--muted); margin-top:6px; }
 .chart-cap b { color:var(--text); font-variant-numeric:tabular-nums; }
 .chart-note { color:var(--muted); font-size:12.5px; margin:6px 0; }
+/* Minikarte (js/minimap.js): eingeklappt nur der Knopf, ausgeklappt 112×64 px; Ticker weicht aus */
+#mini { position:fixed; z-index:4; left:calc(8px + env(safe-area-inset-left,0px)); top:calc(var(--safe-t) + 96px); width:28px; height:24px; }
+#mini.open { width:112px; height:64px; }
+#mini canvas { display:none; width:112px; height:64px; border-radius:10px; border:1px solid var(--line); background:#0b121bcc; touch-action:none; cursor:pointer; }
+#mini.open canvas { display:block; }
+#miniTog { position:absolute; left:0; top:0; width:28px; height:24px; padding:0; font-size:13px; line-height:22px; background:#172233ee; border:1px solid var(--line); border-radius:8px; z-index:1; }
+#mini.open #miniTog { left:4px; top:4px; }
+#mini ~ #ticker { left:40px; }
+#mini.open ~ #ticker { left:128px; }
