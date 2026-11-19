@@ -107,3 +107,30 @@ Abweichungen: Müllbelastung wird in refresh aus Aufkommen + Deponie-Füllständ
   - Wahrzeichen angestrahlt (Glow am Sockel).
 - Nur sichtbare Kacheln, Lichtebene nur bei d > 0,05. Performance: keine Allokationen pro Frame, gecachte Sprites; 128er-Karte flüssig.
 - Overlays (Kartenansichten) werden über der Tönung ohne Abdunklung gezeichnet (Lesbarkeit). Minikarte bleibt unverändert.
+
+---
+
+# Runde 4: S-Bahn, Nachbarstädte & Handel, Zeitung
+
+Speicher (Opus erledigt): `save.js` serialisiert die Kachelebene `rail` (Uint8Array N², fehlt in alten Ständen → bleibt 0) sowie `trade` und `news` (Objekte aus newCity). Reihenfolge: S1 und Z1 parallel, danach H1.
+
+## S1 – S-Bahn · `js/data.js`, `js/sim.js`, `js/render.js`, Werkzeug in `js/main.js`, Tests
+- Kachelebene `s.rail` (0/1) in newCity. Werkzeug `rail` (Kategorie `transport`, „Gleis“, 40 €/Kachel, Brücke 150 €, unlock 2000) wird wie Straße gemalt (toolCost/applyTool). Gleis und Straße schließen sich aus, außer **Bahnübergang**: Gleis auf Straße erlaubt (beide = 1), kostet 60 €, Verkehr dort +20 %. Abriss entfernt zuerst Gleis. Gleisunterhalt 0,5 €/Kachel/Monat (Budget-Ressort `roads` gilt mit).
+- Gebäude `sbahn` (S-Bahnhof 2×1, 3000 €, Unterhalt 90, r 10, unlock 2000, kind `rail`): muss an Gleis grenzen (4-Nachbar einer Kachel).
+- Netz: Zusammenhangskomponenten über Gleise (BFS, beim refresh). Ein Bahnhof wirkt nur, wenn in seiner Komponente ≥ 2 Bahnhöfe stehen ODER (H1) die Komponente den Kartenrand erreicht. Wirkung im Radius: Verkehrsaufkommen −45 % (wie metro, multiplikativ mit metro, gemeinsam max −70 %), Grundwert +8, Gewerbe-Nachfrage leicht +. Kartenansicht `rail` (Bahnabdeckung). Verordnung Gratis-ÖPNV wirkt auch auf S-Bahn.
+- render: Gleis-Sprites (Schotter, zwei Schienen, Schwellen; Verbindungsmaske wie Straße, Brücke über Wasser, Bahnübergang mit weiß-roten Markierungen), Bahnhof-Sprite (Bahnsteigdach), optional fahrende Züge (reine Optik, wie Autos; nachts Licht, nur falls einfach).
+- Tests: Gleis bauen/abreißen/Kosten; Bahnhof nur an Gleis; einzelner Bahnhof ohne Partner wirkt nicht, zwei verbundene wirken (Verkehr sinkt); Speichern erhält rail.
+
+## Z1 – Zeitung & Bürgerstimmen · neu `js/news.js` (reine Logik, ohne DOM), UI in `js/main.js`, `style.css`, Tests neu `test/news.test.js` (+ in package.json/Workflow eintragen)
+- `export function makeIssue(s)` → `{ y, m, title (Zeitungsname, z. B. „Simfurter Rundschau“), headline, articles: [{head, text}], voices: [{who, text, mood: 'good'|'bad'|'info'}], demands: [{key, text}] }`. Deterministisch aus Zustand (stats, parts, demand, fin, hist, msgs der letzten Monate, budget, ords, Müll/Wasser/Strom) + `s.rng`-unabhängigem Hash (KEIN rand(s), damit die Simulation unverändert bleibt).
+- Schlagzeile nach größtem Thema (Meilenstein, Brand/Hochwasser, Steuern, Stau, Kriminalität, Arbeitslosigkeit, Strom-/Wasser-/Müllmangel, Wahrzeichen eröffnet, Haushalt). 3–5 Bürgerstimmen aus Textbausteinen mit Personen (Name, Alter, Viertel/Beruf), passend zu den schlechtesten/besten Zufriedenheitsteilen; Frankfurter Lokalkolorit (Ebbelwei, Main, Banker, Pendler), keine realen Personen. „Forderungen“ = die 2 drängendsten Themen mit konkretem Tipp.
+- Erscheint monatlich: `s.news = { last: {y,m}, unread: bool, issues: [max 12] }` wird in main.js nach jedem Monatstick gefüllt (nicht in sim.js). HUD/FAB: Knopf „📰 Zeitung“ mit Punkt bei ungelesen; Sheet mit Zeitungslayout (Serifenschrift aus System-Fonts, Spalten auf breiten Bildschirmen), Blättern durch die letzten 12 Ausgaben.
+- Tests: deterministisch; Schlagzeile wechselt mit Lage (z. B. hohe Steuern → Steuerthema, Stromausfall → Strom); immer 3–5 Stimmen; keine Exceptions bei leerer Stadt.
+
+## H1 – Nachbarstädte & Handel · `js/data.js`, `js/sim.js`, `js/render.js` (Kartenrand-Markierung), Rat in `js/main.js`, Tests
+- Bei newCity 3–4 Nachbarstädte deterministisch aus dem Seed: Name aus Liste (Offenbach, Bad Homburg, Hanau, Darmstadt, Bad Vilbel, Eschborn, Oberursel, Rüsselsheim, Neu-Isenburg, Maintal), Kante (N/O/S/W, verschieden), Größe (Einwohner 20.000–150.000), Schwerpunkt (Industrie/Gewerbe/Wohnen). Gespeichert in `s.trade.neighbors`.
+- Anschluss: Straßen- bzw. Gleiskachel am Kartenrand der Kante einer Nachbarstadt (vom Stadtnetz erreichbar: BFS über Straße/Gleis von Zonen aus) = Verbindung (`road`/`rail`). Rat zeigt Verbindungen; Kartenrand-Markierung mit Namen/Pfeil in render.
+- Wirkung je verbundener Nachbarstadt: Pendler (zusätzliche Arbeitskräfte bzw. Arbeitsplätze je nach Schwerpunkt, gedeckelt nach Größe), Nachfrage C/I/R +, Verkehr an der Anschlussstraße + (Gleis halbiert).
+- Handel (Rat, je Ressource Schalter + Preis aus data.js): Stromüberschuss verkaufen (€/Einheit, nur verbundene Städte, Straße reicht – Leitung symbolisch), Strom zukaufen bei Mangel (teuer, deckt Fehlbedarf bis X), Wasser analog, Müll exportieren (Gebühr/t, nur mit Straßen- oder Gleisanschluss, verringert unentsorgten Rest). Einnahmen/Ausgaben in `s.fin.parts` (tradeIn/tradeOut), Rat zeigt sie.
+- `s.trade = { neighbors, sellPower, buyPower, sellWater, buyWater, exportGarbage }` in newCity; alte Stände ohne trade → newCity-Werte (Nachbarn aus Seed – dafür eigener Hash, nicht rand(s), damit alte Stände identisch weiterlaufen).
+- Tests: ohne Anschluss keine Wirkung; mit Straße an der richtigen Kante verbunden; Pendler senken Arbeitslosigkeit bzw. füllen Jobs; Stromkauf behebt Mangel und kostet; Müllexport senkt Rest; Determinismus; alte Stände laden.

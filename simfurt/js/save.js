@@ -11,8 +11,8 @@ const DB = 'simfurt-save', STORE = 'slots', FORMAT = 2, FORMATS = [1, 2], TIMEOU
 const LS_SLOT = (slot) => 'simfurt-slot-' + slot, LS_SNAP = 'simfurt-snap', PENDING = (slot) => 'simfurt-pending-' + slot;
 
 // ---------------------------------------------------------------- Serialisierung
-const ARR = ['terrain', 'road', 'zone', 'lvl', 'vr', 'fire', 'flood'];
-const KEYS = ['rng', 'year', 'month', 'money', 'loan', 'rates', 'budget', 'ords', 'disasters', 'bld', 'nextId', 'ms', 'msgs', 'hist', 'occupancy', 'demand', 'ticks', 'seen', 'peakPop'];
+const ARR = ['terrain', 'road', 'rail', 'zone', 'lvl', 'vr', 'fire', 'flood'];
+const KEYS = ['rng', 'year', 'month', 'money', 'loan', 'rates', 'budget', 'ords', 'trade', 'news', 'disasters', 'bld', 'nextId', 'ms', 'msgs', 'hist', 'occupancy', 'demand', 'ticks', 'seen', 'peakPop'];
 function toB64(u8) { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); }
 function fromB64(b) { const s = atob(b); const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
 export { toB64, fromB64 };
