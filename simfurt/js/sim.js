@@ -5,6 +5,8 @@ import {
   BUDGET_RES, BUDGET_DEFAULT, BUDGET_MIN, BUDGET_MAX, BUDGET_STEP, BUDGET_COVER_MAX, BUDGET_ROAD_MIN, ORDINANCES,
   WATER_TREAT_CAP, WATER_TREAT_CAP_MAX, WATER_HAPPY,
   GARBAGE, GARBAGE_BLD, GARBAGE_REC, GARBAGE_REC_MAX, GARBAGE_MIN_POP, GARBAGE_POL, GARBAGE_HAPPY, GARBAGE_HAPPY_MAX,
+  RAIL_COST, RAIL_BRIDGE_COST, RAIL_CROSS_COST, RAIL_UPKEEP, RAIL_UNLOCK, RAIL_MIN_STATIONS, RAIL_TRAFFIC, RAIL_TRAFFIC_MAX,
+  RAIL_CROSS_TRAFFIC, RAIL_VALUE, RAIL_DEMAND_C,
 } from './data.js';
 
 export let NN = N * N;
@@ -40,7 +42,7 @@ export function newCity({ name = 'Simfurt', seed = 1, size = 64 } = {}) {
   const s = {
     v: 1, size, name, seed, rng: (seed * 2654435761) >>> 0, year: START_YEAR, month: 0, money: START_MONEY, loan: 0,
     rates: { r: 9, c: 9, i: 9 }, disasters: true,
-    terrain: new Uint8Array(NN), road: new Uint8Array(NN), zone: new Uint8Array(NN), lvl: new Uint8Array(NN),
+    terrain: new Uint8Array(NN), road: new Uint8Array(NN), rail: new Uint8Array(NN), zone: new Uint8Array(NN), lvl: new Uint8Array(NN),
     vr: new Uint8Array(NN), occ: new Uint16Array(NN), fire: new Uint8Array(NN), flood: new Uint8Array(NN),
     bld: [], nextId: 1, ms: 0, msgs: [], hist: [], occupancy: 0.5, demand: { r: 0.5, c: 0.2, i: 0.5, b: 0 },
     stats: null, fin: { inc: 0, exp: 0, net: 0, parts: {} }, ticks: 0, seen: {},
@@ -241,10 +243,11 @@ export const countType = (s, type) => s.bld.reduce((n, b) => n + (b.type === typ
 export function unlocked(s, key) {
   const pop = s.stats ? s.stats.pop : 0;
   const peak = s.peakPop || pop;
-  const need = BUILD[key] ? BUILD[key].unlock : ZONE_UNLOCK[key] ?? 0;
+  const need = unlockNeed(key);
   return Math.max(pop, peak * 0.9) >= need;
 }
-export const unlockNeed = (key) => (BUILD[key] ? BUILD[key].unlock : ZONE_UNLOCK[key] ?? 0);
+/** Freischaltung: Gebäude (unlock), Werkzeug „rail“ (RAIL_UNLOCK), Zonen (ZONE_UNLOCK). */
+export const unlockNeed = (key) => (BUILD[key] ? BUILD[key].unlock : key === 'rail' ? RAIL_UNLOCK : ZONE_UNLOCK[key] ?? 0);
 
 // ---------------------------------------------------------------- Werkzeuge
 export function toolCost(s, tool, x, y) {
@@ -253,16 +256,23 @@ export function toolCost(s, tool, x, y) {
   if (tool === 'road') {
     if (s.road[i]) return -1;
     if (s.occ[i] || s.lvl[i]) return -1;
+    if (s.rail[i]) return RAIL_CROSS_COST; // Straße über Gleis = Bahnübergang
     return s.terrain[i] === T_WATER ? BRIDGE_COST : ROAD_COST;
+  }
+  if (tool === 'rail') {
+    if (s.rail[i]) return -1;
+    if (s.occ[i] || s.lvl[i]) return -1;
+    if (s.road[i]) return RAIL_CROSS_COST; // Gleis über Straße = Bahnübergang
+    return s.terrain[i] === T_WATER ? RAIL_BRIDGE_COST : RAIL_COST;
   }
   if (tool.startsWith('zone')) {
     const z = Number(tool.slice(4));
-    if (s.terrain[i] === T_WATER || s.road[i] || s.occ[i] || s.zone[i] === z) return -1;
+    if (s.terrain[i] === T_WATER || s.road[i] || s.rail[i] || s.occ[i] || s.zone[i] === z) return -1;
     return ZONES[z].cost;
   }
   if (tool === 'bulldoze') {
     if (s.occ[i]) { const b = buildingAt(s, x, y); return b && BUILD[b.type].unique ? BULLDOZE_COST * 10 : BULLDOZE_COST * 5; }
-    if (s.road[i] || s.zone[i] || s.terrain[i] === T_TREES) return BULLDOZE_COST;
+    if (s.rail[i] || s.road[i] || s.zone[i] || s.terrain[i] === T_TREES) return BULLDOZE_COST;
     return -1;
   }
   return -1;
@@ -277,11 +287,15 @@ export function applyTool(s, tool, x, y) {
   if (s.rec) { recTile(s, i); s.rec.cost += c; }
   if (tool === 'road') {
     s.road[i] = 1; s.zone[i] = 0; s.lvl[i] = 0; if (s.terrain[i] === T_TREES) s.terrain[i] = T_GRASS;
+  } else if (tool === 'rail') {
+    s.rail[i] = 1; s.zone[i] = 0; s.lvl[i] = 0; if (s.terrain[i] === T_TREES) s.terrain[i] = T_GRASS;
   } else if (tool.startsWith('zone')) {
     const z = Number(tool.slice(4));
     s.zone[i] = z; s.lvl[i] = 0; s.vr[i] = rint(s, 256); if (s.terrain[i] === T_TREES) s.terrain[i] = T_GRASS;
   } else if (tool === 'bulldoze') {
+    // Bahnübergang: zuerst das Gleis, die Straße bleibt (nächster Abriss entfernt sie)
     if (s.occ[i]) removeBuilding(s, buildingAt(s, x, y));
+    else if (s.rail[i]) s.rail[i] = 0;
     else if (s.road[i]) s.road[i] = 0;
     else if (s.zone[i]) { s.zone[i] = 0; s.lvl[i] = 0; s.fire[i] = 0; }
     else if (s.terrain[i] === T_TREES) s.terrain[i] = T_GRASS;
@@ -301,6 +315,7 @@ export function canPlace(s, key, x, y) {
     const i = idx(xx, yy);
     if (s.terrain[i] === T_WATER) return 'Wasser';
     if (s.road[i]) return 'Straße im Weg';
+    if (s.rail[i]) return 'Gleis im Weg';
     if (s.occ[i]) return 'Gebäude im Weg';
     if (s.lvl[i] > 0) return 'Bebaute Zone im Weg';
   }
@@ -313,6 +328,16 @@ export function canPlace(s, key, x, y) {
       }
     }
     if (!shore) return d.shore;
+  }
+  // S-Bahnhof: eine 4-Nachbarkachel des Grundrisses muss ein Gleis sein
+  if (d.track) {
+    let on = false;
+    for (let yy = y; yy < y + d.h && !on; yy++) for (let xx = x; xx < x + d.w && !on; xx++) {
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        if (inb(xx + dx, yy + dy) && s.rail[idx(xx + dx, yy + dy)]) { on = true; break; }
+      }
+    }
+    if (!on) return d.track;
   }
   return '';
 }
@@ -352,7 +377,7 @@ export function repayLoan(s) { if (s.loan < 10000 || s.money < 10000) return fal
 // Jede Aktion speichert nur ihre Änderungen (berührte Kacheln, gebaute/abgerissene Gebäude, Kosten).
 // Undo nimmt genau diese Änderungen zurück und erstattet die Kosten – Wachstum und Einnahmen seither bleiben erhalten.
 export const UNDO_MAX = 10;
-const TILE_KEYS = ['terrain', 'road', 'zone', 'lvl', 'vr', 'fire'];
+const TILE_KEYS = ['terrain', 'road', 'rail', 'zone', 'lvl', 'vr', 'fire'];
 /** Beginnt die Aufzeichnung einer Bauaktion (bis endUndo, zum nächsten Tick oder zur nächsten Aktion). */
 export function pushUndo(s) {
   if (!s.undo) s.undo = [];
@@ -474,10 +499,65 @@ const hasRoadNear = (s, x, y) => {
   return false;
 };
 
+// ---------------------------------------------------------------- S-Bahn-Netz (Runde 4, S1)
+/**
+ * Zusammenhangskomponenten des Gleisnetzes (4-Nachbarschaft über Gleiskacheln; Straßen verbinden nicht).
+ * comp[i] = Komponenten-Nummer der Gleiskachel i, −1 sonst. touchesEdge[k]: Komponente k berührt den Kartenrand
+ * (noch ohne Wirkung – H1 nutzt das für Nachbarstädte).
+ */
+export function railComponents(s) {
+  const comp = new Int32Array(NN).fill(-1), touchesEdge = [], q = new Int32Array(NN);
+  let count = 0;
+  for (let i0 = 0; i0 < NN; i0++) {
+    if (!s.rail[i0] || comp[i0] >= 0) continue;
+    const c = count++; let h = 0, t = 0, edge = false;
+    q[t++] = i0; comp[i0] = c;
+    while (h < t) {
+      const i = q[h++], x = i % N, y = (i - x) / N;
+      if (x === 0 || y === 0 || x === N - 1 || y === N - 1) edge = true;
+      if (x > 0 && s.rail[i - 1] && comp[i - 1] < 0) { comp[i - 1] = c; q[t++] = i - 1; }
+      if (x < N - 1 && s.rail[i + 1] && comp[i + 1] < 0) { comp[i + 1] = c; q[t++] = i + 1; }
+      if (y > 0 && s.rail[i - N] && comp[i - N] < 0) { comp[i - N] = c; q[t++] = i - N; }
+      if (y < N - 1 && s.rail[i + N] && comp[i + N] < 0) { comp[i + N] = c; q[t++] = i + N; }
+    }
+    touchesEdge.push(edge);
+  }
+  return { comp, count, touchesEdge };
+}
+/**
+ * Wirksame S-Bahnhöfe: Ein Bahnhof gehört zu jeder Gleiskomponente, an die sein Grundriss grenzt.
+ * Er wirkt, wenn eine dieser Komponenten mindestens RAIL_MIN_STATIONS Bahnhöfe hat. Gibt Set der Gebäude-IDs zurück.
+ */
+function railActiveStations(s, net) {
+  const on = new Set(), cnt = new Int32Array(net.count), adj = [];
+  for (const b of s.bld) {
+    if (BUILD[b.type].kind !== 'rail') continue;
+    const cs = [];
+    for (let yy = b.y; yy < b.y + b.h; yy++) for (let xx = b.x; xx < b.x + b.w; xx++) {
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        if (!inb(xx + dx, yy + dy)) continue;
+        const c = net.comp[idx(xx + dx, yy + dy)];
+        if (c >= 0 && !cs.includes(c)) cs.push(c);
+      }
+    }
+    for (const c of cs) cnt[c]++;
+    adj.push([b.id, cs]);
+  }
+  for (const [id, cs] of adj) if (cs.some((c) => cnt[c] >= RAIL_MIN_STATIONS)) on.add(id);
+  return on;
+}
+
 /** Berechnet alle abgeleiteten Karten und Kennzahlen. */
 export function refresh(s) {
   budgetFx(s); ordFx(s);
-  const m = s.maps = { power: mk(), police: mk(), fire: mk(), health: mk(), edu: mk(), park: mk(), metro: mk(), pol: mk(), crime: mk(), value: mk(), traffic: mk(), happy: mk(), water: mk(), garb: mk() };
+  const m = s.maps = { power: mk(), police: mk(), fire: mk(), health: mk(), edu: mk(), park: mk(), metro: mk(), pol: mk(), crime: mk(), value: mk(), traffic: mk(), happy: mk(), water: mk(), garb: mk(), rail: mk() };
+  // S-Bahn: Netz und wirksame Bahnhöfe (nur wenn es überhaupt einen Bahnhof gibt)
+  const hasStation = s.bld.some((b) => BUILD[b.type].kind === 'rail');
+  const railNet = hasStation ? railComponents(s) : null;
+  const railOn = railNet ? railActiveStations(s, railNet) : new Set();
+  let railTiles = 0; for (let i = 0; i < NN; i++) if (s.rail[i]) railTiles++;
+  s.railOn = railOn; // abgeleitet (nicht gespeichert): für Kachelinfo und Rat
+  let railSt = 0, railWirk = 0;
   let cap = 0, load = 0, wload = 0;
   let burnCap = 0, dumpN = 0, dumpLeft = 0, dumpRoom = 0, recN = 0, gRaw = 0; // Müll: Verbrennung, Deponien, Recyclinghöfe, Rohaufkommen
   let wcapPumps = 0, pumps = 0, treatN = 0, cut = null; // Wasser: Pumpwerk-Kapazität, Anzahl Pumpwerke, Kläranlagen, Verschmutzungsfaktor je Kachel
@@ -486,6 +566,7 @@ export function refresh(s) {
   for (const b of s.bld) {
     const d = BUILD[b.type]; const [cx, cy] = bcen(b);
     switch (d.kind) {
+      case 'rail': railSt++; if (railOn.has(b.id)) { railWirk++; stamp(m.rail, cx, cy, d.r, 1, true); } break;
       case 'power': stamp(m.power, cx, cy, d.r, 1, true); cap += d.cap; stamp(m.pol, cx, cy, 7, d.pol * 1.4); break;
       case 'police': stamp(m.police, cx, cy, d.r, BCOV.police, true); break;
       case 'fire': stamp(m.fire, cx, cy, d.r, BCOV.fire, true); break;
@@ -585,7 +666,12 @@ export function refresh(s) {
     const i = idx(x, y); const z = s.zone[i], l = s.lvl[i];
     if (!z || !l || !active[i]) continue;
     const zz = ZONES[z];
-    const trips = (zz.pop[l] || zz.jobs[l]) * 0.4 * (1 - 0.5 * m.metro[i]);
+    let tf = 1 - 0.5 * m.metro[i]; // U-Bahn senkt das Aufkommen
+    if (railWirk) { // S-Bahn: zusammen mit der U-Bahn höchstens −RAIL_TRAFFIC_MAX
+      const rf = 1 - RAIL_TRAFFIC * FX.metro * m.rail[i];
+      if (rf < 1) tf = Math.max(tf * rf, Math.min(tf, 1 - RAIL_TRAFFIC_MAX));
+    }
+    const trips = (zz.pop[l] || zz.jobs[l]) * 0.4 * tf;
     let start = -1;
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (roadAt(s, x + dx, y + dy)) { start = idx(x + dx, y + dy); break; }
     if (start < 0) for (let dy = -1; dy <= 1 && start < 0; dy++) for (let dx = -1; dx <= 1; dx++) if (roadAt(s, x + dx, y + dy)) { start = idx(x + dx, y + dy); break; }
@@ -604,7 +690,11 @@ export function refresh(s) {
   }
   let tSum = 0, cSum = 0;
   const tmul = roadMul * FX.traffic;
-  for (const i of roads) { const c = m.traffic[i] / 55 * tmul; m.traffic[i] = Math.min(3, c); tSum += m.traffic[i]; if (c > 1) cSum++; }
+  for (const i of roads) {
+    let c = m.traffic[i] / 55 * tmul;
+    if (s.rail[i]) c *= 1 + RAIL_CROSS_TRAFFIC; // Bahnübergang: mehr Stau an der Schranke
+    m.traffic[i] = Math.min(3, c); tSum += m.traffic[i]; if (c > 1) cSum++;
+  }
   const cong = roads.length ? tSum / roads.length : 0;
 
   // Grundwert
@@ -617,7 +707,7 @@ export function refresh(s) {
     for (let dy = -3; dy <= 3 && !nearW; dy++) for (let dx = -3; dx <= 3; dx++) if (inb(x + dx, y + dy) && s.terrain[idx(x + dx, y + dy)] === T_WATER) { nearW = true; break; }
     let near = 0;
     for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) if (inb(x + dx, y + dy)) near += dens[idx(x + dx, y + dy)];
-    let v = 34 + (nearW ? 12 : 0) + Math.min(18, near * 0.45) + m.park[i] * 12 + m.police[i] * 5 + m.fire[i] * 4 + m.health[i] * 6 + m.edu[i] * 8 + m.happy[i] * 3 + m.metro[i] * 6
+    let v = 34 + (nearW ? 12 : 0) + Math.min(18, near * 0.45) + m.park[i] * 12 + m.police[i] * 5 + m.fire[i] * 4 + m.health[i] * 6 + m.edu[i] * 8 + m.happy[i] * 3 + m.metro[i] * 6 + m.rail[i] * RAIL_VALUE
       - m.pol[i] * 0.4 - m.crime[i] * 0.2;
     if (s.road[i]) v -= Math.min(10, m.traffic[i] * 5);
     v += FX.value;
@@ -655,6 +745,7 @@ export function refresh(s) {
     crime: f(crimeSum), pollution: f(polSum), value: f(valSum), parts, roads: roads.length, covPolice: f(covPolice), covFire: f(covFire),
     covHealth: f(covHealth), covEdu: f(covEdu), waterDry: dryLots,
     dumps: dumpN, dumpLeft, burnCap,
+    railTiles, railStations: railSt, railActive: railWirk,
   };
   s.peakPop = Math.max(s.peakPop || 0, pop);
   s.dirty = false;
@@ -671,7 +762,7 @@ function demandStep(s) {
   const smooth = (a, b) => a + (b - a) * 0.35;
   const dr = 0.3 + 1.3 * (jobs - workers) / (jobs + workers + 30) + hap - taxPen(s.rates.r) - (st.capR === 0 ? 0 : 0) + FX.demandR;
   const di = 0.35 + 1.1 * (workers - jobs) / (workers + jobs + 30) - taxPen(s.rates.i) - st.pollution / 160 + FX.demandI;
-  const dc = 0.15 + 1.4 * (st.pop * 0.28 - st.jobsC) / (st.pop * 0.28 + st.jobsC + 40) - taxPen(s.rates.c) + (st.jobsI > 0 ? 0.1 : 0) + FX.demandC;
+  const dc = 0.15 + 1.4 * (st.pop * 0.28 - st.jobsC) / (st.pop * 0.28 + st.jobsC + 40) - taxPen(s.rates.c) + (st.jobsI > 0 ? 0.1 : 0) + (st.railActive ? RAIL_DEMAND_C : 0) + FX.demandC;
   const db = st.pop < 2500 ? -0.2 : Math.min(1, (st.pop - 2500) / 6000 + 0.2) - taxPen(s.rates.c) - 0.35 * (1 - Math.min(1, st.covEdu * 1.5)) + (st.jobsB * 2 < st.capR * 0.5 ? 0.25 : -0.15) + FX.demandB;
   const clamp = (v) => Math.max(-1, Math.min(1, v));
   s.demand = { r: smooth(s.demand.r, clamp(dr)), c: smooth(s.demand.c, clamp(dc)), i: smooth(s.demand.i, clamp(di)), b: smooth(s.demand.b, clamp(db)) };
@@ -717,14 +808,15 @@ function financeStep(s) {
     if (d.tour) { let t = d.tour * (0.5 + st.happy / 200) * FX.tourism; if (b.type === 'fraport') t *= FX.fraportTour; tour += t; }
   }
   const roads = st.roads * ROAD_UPKEEP * BUP.roads;
+  const rail = (st.railTiles || 0) * RAIL_UPKEEP * BUP.roads; // Gleisunterhalt: Budget „Straßen“ gilt mit
   const interest = s.loan * 0.004;
   const ordCost = FX.cost;
   const inc = tR + tC + tI + tB + tour;
-  const exp = up + roads + interest + ordCost;
+  const exp = up + roads + rail + interest + ordCost;
   s.money += inc - exp;
   s.fin = {
     inc, exp, net: inc - exp,
-    parts: { tR, tC, tI, tB, tour, up, roads, interest, ordCost, upPolice: ur.police, upFire: ur.fire, upHealth: ur.health, upEdu: ur.edu },
+    parts: { tR, tC, tI, tB, tour, up, roads, rail, interest, ordCost, upPolice: ur.police, upFire: ur.fire, upHealth: ur.health, upEdu: ur.edu },
   };
 }
 
@@ -839,6 +931,7 @@ function adviceStep(s) {
   if (st.avgTax > 13) k('tax', 'Die Steuern sind hoch. Die Leute murren.', 'bad', 2);
   if (st.dumps && st.dumpLeft < 1 && s.garbage > 0) k('dumpfull', 'Die Deponie ist voll! Neue Deponie bauen oder Müll verbrennen.', 'bad', 3);
   if (st.pop >= GARBAGE_MIN_POP && s.garbageRatio > 0.2) k('garb', 'Müll bleibt liegen: Dreck und Unzufriedenheit steigen. Recyclinghof oder Müllverbrennung bauen.', 'bad', 2);
+  if (st.railStations && !st.railActive) k('rail', 'Der S-Bahnhof wirkt nur, wenn ein zweiter Bahnhof am selben Gleisnetz steht.', 'info', 4);
   if (s.demand.r > 0.5 && st.lots > 10) k('dr', 'Viele wollen hier wohnen: Wohnzonen ausweisen.', 'info', 3);
   if (s.demand.c > 0.5 && st.lots > 10) k('dc', 'Geschäfte fehlen: Gewerbezonen ausweisen.', 'info', 3);
   if (s.demand.i > 0.5 && st.lots > 10) k('di', 'Arbeit gesucht: Industriezonen ausweisen.', 'info', 3);
@@ -889,7 +982,10 @@ export function tileInfo(s, x, y) {
       lines.push(fill >= d.vol ? `Voll (${d.vol.toLocaleString('de-DE')} t) – nimmt keinen Müll mehr an`
         : `Füllstand ${Math.round(fill / d.vol * 100)} % · ${Math.round(fill).toLocaleString('de-DE')} von ${d.vol.toLocaleString('de-DE')} t`);
     }
+    if (d.kind === 'rail') lines.push(s.railOn && s.railOn.has(b.id) ? 'Wirksam: im Gleisnetz mit mindestens zwei Bahnhöfen'
+      : '⚠ Wirkt nur mit einem zweiten Bahnhof im selben Gleisnetz');
   }
+  else if (s.rail[i]) title = s.terrain[i] === T_WATER ? 'Gleisbrücke über den Main' : s.road[i] ? 'Bahnübergang' : 'Gleis';
   else if (s.terrain[i] === T_WATER) title = s.road[i] ? 'Brücke über den Main' : 'Main';
   else if (s.road[i]) title = 'Straße';
   else if (s.zone[i]) {

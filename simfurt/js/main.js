@@ -9,6 +9,7 @@ import { Renderer } from './render.js';
 import { saveSlot, loadSlot, listSlots, deleteSlot, SLOTS, snapshot, exportFile, importFile, storageInfo, persist } from './save.js';
 import { sound } from './sound.js';
 import { MiniMap } from './minimap.js';
+import { ensureNews, publishNews, issueDate } from './news.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.round(n).toLocaleString('de-DE');
@@ -55,9 +56,12 @@ const TOOLS = {
   query: { name: 'Info', icon: '🔍', cat: 'tool', cost: 0, desc: 'Kachel antippen.' },
   bulldoze: { name: 'Abriss', icon: '🚜', cat: 'tool', cost: 4, desc: 'Reißt ab, was du überstreichst.' },
   undo: { name: 'Rückgängig', icon: '↶', cat: 'tool', cost: 0, desc: 'Macht die letzte Bauaktion rückgängig (Strg+Z / U).' },
+  rail: { name: 'Gleis', icon: '🛤', cat: 'transport', cost: 40, desc: 'Ziehen wie Straße. Kreuzt eine Straße: Bahnübergang (60 €). Auf Wasser: Gleisbrücke (150 €).' },
 };
 for (const [k, b] of Object.entries(BUILD)) TOOLS[k] = { name: b.name, icon: b.icon, cat: b.cat, cost: b.cost, desc: b.desc, build: true };
 const zoneOf = (id) => (id.startsWith('zone') ? Number(id.slice(4)) : 0);
+/** Schlüssel für Freischaltung: Gebäude-ID, „rail“ oder Zonen-Nummer (0 = keine Sperre). */
+const lockKey = (id) => (TOOLS[id].build || id === 'rail' ? id : zoneOf(id));
 
 function renderCats() {
   $('cats').innerHTML = CATS.map((c) => `<button data-c="${c.id}" class="${cat === c.id ? 'on' : ''}"><span class="e">${c.icon}</span>${c.name}</button>`).join('');
@@ -73,8 +77,8 @@ function renderItems() {
       const n = S && canUndo(S) ? S.undo.length : 0;
       return `<button class="it ${n ? '' : 'lock'}" data-t="${k}"><span class="ic">${t.icon}</span><b>${t.name}</b><span>${n ? n + ' Schritt' + (n > 1 ? 'e' : '') : 'nichts'}</span></button>`;
     }
-    const need = TOOLS[k].build ? unlockNeed(k) : ZONE_UNLOCK[zoneOf(k)] ?? 0;
-    const locked = !unlocked(S, TOOLS[k].build ? k : zoneOf(k));
+    const need = unlockNeed(lockKey(k));
+    const locked = !unlocked(S, lockKey(k));
     return `<button class="it ${tool.id === k ? 'sel' : ''} ${locked ? 'lock' : ''}" data-t="${k}"><span class="ic">${t.icon}</span><b>${t.name}</b><span>${locked ? '🔒 ab ' + fmt(need) + ' Einw.' : t.cost ? eur(t.cost) + (t.build ? '' : ' / Kachel') : 'gratis'}</span></button>`;
   }).join('');
 }
@@ -87,8 +91,8 @@ $('items').addEventListener('click', (e) => {
   const b = e.target.closest('.it'); if (!b) return;
   const id = b.dataset.t;
   if (id === 'undo') { undoNow(); return; } // Aktion: wechselt das Werkzeug nicht
-  const key = TOOLS[id].build ? id : zoneOf(id) ? zoneOf(id) : null;
-  if (key !== null && !unlocked(S, key)) { toast(`Gesperrt bis ${fmt(unlockNeed(TOOLS[id].build ? id : 0) || ZONE_UNLOCK[zoneOf(id)])} Einwohner`); return; }
+  const key = lockKey(id);
+  if (key && !unlocked(S, key)) { toast(`Gesperrt bis ${fmt(unlockNeed(key))} Einwohner`); return; }
   setTool(id);
 });
 function setTool(id) {
@@ -117,9 +121,9 @@ function hideTip() { $('tip').hidden = true; }
 
 // ---------------------------------------------------------------- Sheet (Fenster)
 function sheet(title, html) {
-  $('sTitle').textContent = title; $('sBody').innerHTML = html; $('sheet').hidden = false;
+  $('sTitle').textContent = title; $('sBody').innerHTML = html; $('sheet').classList.remove('news'); $('sheet').hidden = false;
 }
-const closeSheet = () => { $('sheet').hidden = true; };
+const closeSheet = () => { $('sheet').hidden = true; $('sheet').classList.remove('news'); };
 $('sClose').onclick = closeSheet;
 $('sheet').addEventListener('pointerdown', (e) => { if (e.target === $('sheet')) closeSheet(); });
 
@@ -158,7 +162,7 @@ function zoomAt(sx, sy, f) {
   c.x = wx - (sx - R.w / 2) / c.z; c.y = wy - (sy - R.h / 2) / c.z; R.clampCam(); needDraw = true;
 }
 
-function isPaintTool() { return tool.id === 'road' || tool.id === 'bulldoze' || tool.id.startsWith('zone'); }
+function isPaintTool() { return tool.id === 'road' || tool.id === 'rail' || tool.id === 'bulldoze' || tool.id.startsWith('zone'); }
 const isRectTool = () => tool.id.startsWith('zone');
 
 function line(a, b) { // Kacheln zwischen a und b (Bresenham)
@@ -305,7 +309,7 @@ window.addEventListener('keydown', (e) => {
   if (k === ' ' || k === 'p') { speed = speed ? 0 : 1; e.preventDefault(); }
   else if (k === '1') speed = 1; else if (k === '2') speed = 2; else if (k === '3') speed = 3;
   else if (k === 'escape') { setTool('hand'); cat = null; renderCats(); renderItems(); }
-  else if (k === 'h') setTool('hand'); else if (k === 'q') setTool('query'); else if (k === 'b') setTool('bulldoze'); else if (k === 'r') setTool('road');
+  else if (k === 'h') setTool('hand'); else if (k === 'q') setTool('query'); else if (k === 'b') setTool('bulldoze'); else if (k === 'r') setTool('road'); else if (k === 'g') setTool('rail');
   else if (k === 'w' || k === 'arrowup') panBy(0, step); else if (k === 's' || k === 'arrowdown') panBy(0, -step);
   else if (k === 'a' || k === 'arrowleft') panBy(step, 0); else if (k === 'd' || k === 'arrowright') panBy(-step, 0);
   else if (k === '+' || k === '=') zoomAt(R.w / 2, R.h / 2, 1.2); else if (k === '-') zoomAt(R.w / 2, R.h / 2, 1 / 1.2);
@@ -412,7 +416,7 @@ function councilHtml() {
     <div class="kv">
       <span>Einnahmen Wohnen</span><span>${eur(p.tR || 0)}</span><span>Einnahmen Gewerbe</span><span>${eur(p.tC || 0)}</span>
       <span>Einnahmen Industrie</span><span>${eur(p.tI || 0)}</span><span>Einnahmen Banken</span><span>${eur(p.tB || 0)}</span><span>Tourismus</span><span>${eur(p.tour || 0)}</span>
-      <span>Unterhalt Gebäude</span><span>−${eur(p.up || 0)}</span><span>Unterhalt Straßen</span><span>−${eur(p.roads || 0)}</span><span>Kreditzinsen</span><span>−${eur(p.interest || 0)}</span>
+      <span>Unterhalt Gebäude</span><span>−${eur(p.up || 0)}</span><span>Unterhalt Straßen</span><span>−${eur(p.roads || 0)}</span><span>Unterhalt Gleise</span><span>−${eur(p.rail || 0)}</span><span>Kreditzinsen</span><span>−${eur(p.interest || 0)}</span>
       <span>Verordnungen</span><span>−${eur(p.ordCost || 0)}</span>
       <span><b>Bilanz</b></span><span class="${cl(f.net)}"><b>${f.net >= 0 ? '+' : ''}${eur(f.net)}</b></span>
     </div>
@@ -430,6 +434,7 @@ function councilHtml() {
     ${histHtml()}
     <h3 class="sec">Stadt</h3>
     <div class="kv"><span>Einwohner</span><span>${fmt(st.pop)}</span><span>Arbeitsplätze</span><span>${fmt(st.jobs)} (davon Banken ${fmt(st.jobsB)})</span><span>Arbeitslosigkeit</span><span>${Math.round(st.unemp * 100)} %</span>
+    ${st.railStations || st.railTiles ? `<span>S-Bahn</span><span>${st.railActive} von ${st.railStations} Bahnhöfen wirksam · ${fmt(st.railTiles)} Gleis-Kacheln</span>` : ''}
     <span>Strom</span><span>${fmt(S.powerCap)} / ${fmt(S.powerLoad)}</span><span>Wasser cap / load</span><span>${fmt(S.waterCap)} / ${fmt(S.waterLoad)}</span>
     <span>Müll: Aufkommen / entsorgt (Deponie-Restvolumen)</span><span>${fmt(S.garbage)} / ${fmt(S.garbage - S.garbageLeft)} t (${st.dumps ? fmt(st.dumpLeft) + ' t' : 'keine Deponie'})</span><span>Grundwert Ø</span><span>${Math.round(st.value)}</span><span>Stau</span><span>${Math.round(st.cong * 100)} %</span></div>
     <h3 class="sec">Nachrichten</h3>${S.msgs.slice(-14).reverse().map((m) => `<div class="msg ${m.kind}"><small>${MONTHS[m.m]} ${m.y}</small>${m.text}</div>`).join('')}`;
@@ -459,6 +464,45 @@ $('bCouncil').onclick = () => {
     if (e.target.id === 'bRepay') { if (!repayLoan(S)) toast('Nicht möglich (Geld oder Schulden).'); else sound.play('money'); body.innerHTML = councilHtml(); drawCharts(); hud(); }
   };
 };
+
+// ---------------------------------------------------------------- Zeitung (Runde 4, Z1)
+let newsIdx = 0; // 0 = neueste Ausgabe, 1 = die davor, …
+/** Punkt am Zeitung-Knopf, solange eine ungelesene Ausgabe vorliegt. */
+function newsBadge() { const b = $('bNews'); if (b) b.classList.toggle('unread', !!(S && S.news && S.news.unread)); }
+function newsHtml(i) {
+  const list = S.news.issues, total = list.length;
+  if (!total) return '<p class="chart-note">Noch keine Ausgabe. Die erste erscheint nach dem nächsten Monatswechsel.</p>';
+  const is = list[total - 1 - i];
+  return `<div class="paper">
+    <div class="np-mast"><div class="np-title">${is.title}</div><div class="np-date">Ausgabe ${issueDate(is)}</div></div>
+    <h2 class="np-head">${is.headline}</h2>
+    <div class="np-cols">${is.articles.map((a) => `<article><h4>${a.head}</h4><p>${a.text}</p></article>`).join('')}</div>
+    <div class="np-box"><h3>Stimmen aus Simfurt</h3>${is.voices.map((v) => `<div class="np-voice ${v.mood}"><p>„${v.text}“</p><small>${v.who}</small></div>`).join('')}</div>
+    <div class="np-box np-demand"><h3>Das fordern die Bürger</h3><ol>${is.demands.map((d) => `<li>${d.text}</li>`).join('')}</ol></div>
+    <div class="np-nav"><button id="nOld"${i >= total - 1 ? ' disabled' : ''}>‹ ältere</button><span>${total - i} / ${total}</span><button id="nNew"${i <= 0 ? ' disabled' : ''}>neuere ›</button></div>
+  </div>`;
+}
+function showNews() {
+  sheet('Zeitung', newsHtml(newsIdx));
+  $('sheet').classList.add('news');
+  $('sBody').onclick = (e) => {
+    const b = e.target.closest('button'); if (!b || !S || !S.news) return;
+    const total = S.news.issues.length;
+    if (b.id === 'nOld' && newsIdx < total - 1) newsIdx++;
+    else if (b.id === 'nNew' && newsIdx > 0) newsIdx--;
+    else return;
+    $('sBody').innerHTML = newsHtml(newsIdx);
+    $('sheet').querySelector('.panel').scrollTop = 0;
+  };
+}
+/** Öffnen setzt „ungelesen“ zurück (Ausgabe gilt als gelesen). Die Zeitung hält das Spiel an wie andere Fenster. */
+function openNews() {
+  if (!S) return;
+  ensureNews(S);
+  S.news.unread = false; changed = true; newsBadge();
+  newsIdx = 0; showNews();
+}
+$('bNews').onclick = openNews;
 
 // ---------------------------------------------------------------- Speichern / Laden / Menü
 async function saveNow(manual) {
@@ -558,7 +602,7 @@ function newGameDialog(n) {
   };
 }
 function startGame(s, n) {
-  S = s; slot = n; S.undo = []; S.onMsg = ticker; S.onMilestone = () => { renderItems(); sound.play('milestone'); };
+  S = s; slot = n; S.undo = []; ensureNews(S); newsBadge(); S.onMsg = ticker; S.onMilestone = () => { renderItems(); sound.play('milestone'); };
   closeSheet(); renderCats(); renderItems(); speed = 1; lastHud = ''; hud();
   // Kamera: Mitte der Karte
   R.centerOn(N / 2, N / 2); R.cam.z = Math.min(1, Math.max(0.55, R.w / 560)); R.clampCam();
@@ -600,7 +644,7 @@ function frame(now) {
       acc += dt * 1000;
       const step = SPEEDMS[speed];
       let n = 0;
-      while (acc >= step && n < 4) { acc -= step; tick(S); n++; changed = true; if (S.month % 3 === 0) saveNow(false); }
+      while (acc >= step && n < 4) { acc -= step; tick(S); if (publishNews(S)) newsBadge(); n++; changed = true; if (S.month % 3 === 0) saveNow(false); }
       if (n) { hud(); if (cat) renderItems(); needDraw = true; }
     }
     stepCars(dt);

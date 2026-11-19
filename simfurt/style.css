@@ -85,3 +85,29 @@ input[type=text] { width:100%; padding:10px; border-radius:10px; border:1px soli
 #mini.open ~ #ticker { left:128px; }
 /* Runde 3: Tageszeit im Menü */
 .chk select { margin-left:auto; padding:8px 10px; border-radius:10px; border:1px solid var(--line); background:var(--bg); color:var(--text); font:inherit; }
+/* Runde 4 (Z1): Zeitung & Bürgerstimmen. Knopf mit Punkt bei ungelesen, Zeitungslayout im Sheet */
+#bNews { position:relative; }
+#bNews.unread::after { content:""; position:absolute; top:5px; right:5px; width:10px; height:10px; border-radius:50%; background:var(--red); box-shadow:0 0 0 2px var(--panel); }
+#sheet.news .panel { width:min(100%,760px); }
+.paper { font-family:Georgia,"Times New Roman","Noto Serif","DejaVu Serif",serif; color:#1d1b18; background:#f6f1e4; border-radius:12px; padding:14px 14px 12px; line-height:1.45; }
+.np-mast { border-bottom:3px double #1d1b18; padding-bottom:6px; margin-bottom:10px; text-align:center; }
+.np-title { font-size:26px; font-weight:700; letter-spacing:.02em; }
+.np-date { font-size:12.5px; font-style:italic; color:#5b564c; }
+.np-head { font-size:24px; line-height:1.15; margin:6px 0 12px; font-weight:700; color:#1d1b18; }
+.np-cols { column-count:1; column-gap:22px; }
+.np-cols article { break-inside:avoid; margin-bottom:10px; }
+.np-cols h4 { margin:0 0 3px; font-size:15px; font-style:italic; color:#1d1b18; }
+.np-cols p { margin:0 0 6px; font-size:15px; text-align:justify; hyphens:auto; color:#1d1b18; }
+.np-box { border:1px solid #1d1b18; padding:8px 10px; margin:10px 0; background:#fbf8ef; }
+.np-box h3 { margin:0 0 6px; font-size:13px; text-transform:uppercase; letter-spacing:.06em; border-bottom:1px solid #1d1b18; padding-bottom:3px; color:#1d1b18; }
+.np-voice { margin:6px 0; padding-left:8px; border-left:3px solid #9a9383; }
+.np-voice.good { border-left-color:#3d8f5a; } .np-voice.bad { border-left-color:#b8433a; }
+.np-voice p { margin:0; font-size:14px; font-style:italic; color:#1d1b18; }
+.np-voice small { color:#5b564c; font-size:12px; }
+.np-demand ol { margin:4px 0 0 18px; padding:0; font-size:14px; color:#1d1b18; }
+.np-demand li { margin-bottom:4px; }
+.np-nav { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:10px; }
+.np-nav button { background:#e6dfcc; color:#1d1b18; }
+.np-nav button:disabled { opacity:.4; cursor:default; }
+.np-nav span { font-variant-numeric:tabular-nums; color:#5b564c; font-size:13px; }
+@media (min-width:700px) { .np-cols { column-count:2; } .np-title { font-size:30px; } .np-head { font-size:28px; } }

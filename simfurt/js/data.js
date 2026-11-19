@@ -41,6 +41,8 @@ export const BUILD = {
   dump:   { name: 'Deponie', cat: 'waste', w: 3, h: 3, cost: 1500, up: 40, kind: 'dump', r: 0, cap: 300, vol: 12000, pol: 30, polR: 7, icon: '🗑', color: '#6b5b3e', unlock: 0, desc: 'Nimmt Müll an, bis das Volumen voll ist. Starker Dreck im Umkreis.' },
   incin:  { name: 'Müllverbrennung', cat: 'waste', w: 2, h: 2, cost: 7000, up: 220, kind: 'incin', r: 8, power: 60, pol: 18, burn: 500, icon: '🔥', color: '#5b5552', unlock: 2500, desc: 'Verbrennt Müll und liefert Strom. Macht etwas Dreck.' },
   recyc:  { name: 'Recyclinghof', cat: 'waste', w: 2, h: 2, cost: 4000, up: 120, kind: 'recyc', r: 0, icon: '♻', color: '#3d8f5a', unlock: 1200, desc: 'Trennt Wertstoffe: senkt das Müllaufkommen stadtweit um 12 % je Hof (höchstens 36 %).' },
+  // S-Bahn (Runde 4): wirkt nur im Gleisnetz mit mindestens RAIL_MIN_STATIONS Bahnhöfen (siehe unten)
+  sbahn:  { name: 'S-Bahnhof', cat: 'transport', w: 2, h: 1, cost: 3000, up: 90, kind: 'rail', r: 10, icon: 'S', color: '#7a4fb0', unlock: 2000, track: 'Nur am Gleis', desc: 'Wirkt nur im Gleisnetz mit mindestens zwei Bahnhöfen: weniger Verkehr, mehr Grundwert.' },
 
   // Wahrzeichen: je einmal baubar
   roemer: { name: 'Römer', cat: 'land', w: 2, h: 2, cost: 5000, up: 80, kind: 'happy', r: 9, happy: 3, tour: 120, unique: 1, icon: '🏛', color: '#d9c7a0', unlock: 2000, desc: 'Rathaus am Römerberg. Staatstragend schön.' },
@@ -76,6 +78,22 @@ export const GARBAGE_REC = 0.12, GARBAGE_REC_MAX = 0.36;
 export const GARBAGE_MIN_POP = 400;
 /** Verschmutzung stadtweit (+ × unentsorgter Anteil) und Zufriedenheit (−min(MAX, HAPPY × Anteil)). */
 export const GARBAGE_POL = 20, GARBAGE_HAPPY = 25, GARBAGE_HAPPY_MAX = 20;
+
+// ---------------------------------------------------------------- S-Bahn (Runde 4, S1)
+/** Gleis 40 €/Kachel, Gleisbrücke über Wasser 150 €, Bahnübergang (Gleis auf Straße oder umgekehrt) 60 €. */
+export const RAIL_COST = 40, RAIL_BRIDGE_COST = 150, RAIL_CROSS_COST = 60;
+/** Gleisunterhalt €/Kachel/Monat (Budget-Ressort „Straßen“ gilt mit). */
+export const RAIL_UPKEEP = 0.5;
+/** Einwohner, ab denen das Werkzeug „Gleis“ freigeschaltet ist. */
+export const RAIL_UNLOCK = 2000;
+/** Ein Bahnhof wirkt nur, wenn in seinem Gleisnetz mindestens so viele Bahnhöfe stehen. */
+export const RAIL_MIN_STATIONS = 2;
+/** Verkehrsaufkommen im Radius eines wirksamen Bahnhofs: −RAIL_TRAFFIC (× Gratis-ÖPNV), zusammen mit der U-Bahn höchstens −RAIL_TRAFFIC_MAX. */
+export const RAIL_TRAFFIC = 0.45, RAIL_TRAFFIC_MAX = 0.7;
+/** Bahnübergang: Verkehr auf der Straßenkachel ×(1 + RAIL_CROSS_TRAFFIC). */
+export const RAIL_CROSS_TRAFFIC = 0.2;
+/** Grundwert-Zuschlag im Radius eines wirksamen Bahnhofs, Gewerbe-Nachfrage bei mindestens einem wirksamen Bahnhof. */
+export const RAIL_VALUE = 8, RAIL_DEMAND_C = 0.05;
 
 // ---------------------------------------------------------------- Budget je Ressort (Prozent, Regler 0–120 in 10er-Schritten)
 /** Ressorts mit Regler. police/fire/health/edu wirken über die Gebäude-kind gleichen Namens, roads auf Straßen. */
@@ -138,6 +156,7 @@ export const OVERLAYS = [
   { id: 'none', name: 'Normal' },
   { id: 'power', name: 'Strom' },
   { id: 'water', name: 'Wasser' },
+  { id: 'rail', name: 'Bahn' },
   { id: 'traffic', name: 'Verkehr' },
   { id: 'crime', name: 'Kriminalität' },
   { id: 'pollution', name: 'Verschmutzung' },

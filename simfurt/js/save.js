@@ -11,8 +11,8 @@ const DB = 'simfurt-save', STORE = 'slots', FORMAT = 2, FORMATS = [1, 2], TIMEOU
 const LS_SLOT = (slot) => 'simfurt-slot-' + slot, LS_SNAP = 'simfurt-snap', PENDING = (slot) => 'simfurt-pending-' + slot;
 
 // ---------------------------------------------------------------- Serialisierung
-const ARR = ['terrain', 'road', 'zone', 'lvl', 'vr', 'fire', 'flood'];
-const KEYS = ['rng', 'year', 'month', 'money', 'loan', 'rates', 'budget', 'ords', 'disasters', 'bld', 'nextId', 'ms', 'msgs', 'hist', 'occupancy', 'demand', 'ticks', 'seen', 'peakPop'];
+const ARR = ['terrain', 'road', 'rail', 'zone', 'lvl', 'vr', 'fire', 'flood'];
+const KEYS = ['rng', 'year', 'month', 'money', 'loan', 'rates', 'budget', 'ords', 'trade', 'news', 'disasters', 'bld', 'nextId', 'ms', 'msgs', 'hist', 'occupancy', 'demand', 'ticks', 'seen', 'peakPop'];
 function toB64(u8) { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); }
 function fromB64(b) { const s = atob(b); const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
 export { toB64, fromB64 };
@@ -21,7 +21,7 @@ export function serialize(s) {
   const o = { format: FORMAT, app: 'simfurt', size: N, name: s.name, seed: s.seed, savedAt: Date.now() };
   for (const k of KEYS) o[k] = s[k];
   o.msgs = s.msgs.slice(-30); o.peakPop = s.peakPop || 0;
-  for (const k of ARR) o[k] = toB64(s[k]);
+  for (const k of ARR) if (s[k]) o[k] = toB64(s[k]);
   return JSON.stringify(o);
 }
 
@@ -33,7 +33,7 @@ export function deserialize(text) {
   const s = newCity({ name: o.name, seed: o.seed, size });
   for (const k of KEYS) if (o[k] !== undefined) s[k] = o[k];
   for (const k of ARR) {
-    if (!o[k]) continue; // ältere Stände ohne flood o. Ä.
+    if (!o[k] || !s[k]) continue; // ältere Stände ohne flood/rail o. Ä.
     const u = fromB64(o[k]); if (u.length !== size * size) throw new Error('Kartengröße passt nicht'); s[k].set(u);
   }
   s.occ.fill(0);

@@ -178,6 +178,63 @@ export function roadSprite(mask, bridge, water) {
   });
 }
 
+/**
+ * Gleis (S-Bahn): Schotterband, Schwellen und zwei Schienen entlang der Verbindungen (Maske wie bei Straßen;
+ * ohne Verbindung ein waagrechtes Stück). bridge: Gleisbrücke über Wasser mit Stahldeck und Geländer.
+ * cross: Bahnübergang – weiß-rote Schranken quer über die Straße (die Straßenkachel liegt darunter).
+ * Transparent außerhalb des Bandes, daher wird der Sprite über den Boden bzw. die Straße gelegt.
+ */
+export function railSprite(mask, bridge, cross) {
+  return groundSprite(`rl${mask}_${bridge ? 1 : 0}_${cross ? 1 : 0}`, (g, o) => {
+    const mm = mask || 10;                  // ohne Verbindung: waagrechtes Gleisstück
+    const B = bridge ? 0.17 : 0.22;         // halbe Breite des Bandes
+    const RW = 0.075;                       // halber Schienenabstand
+    const ballast = bridge ? '#6f757c' : '#a89f8a';
+    const sleeper = bridge ? '#4b5058' : '#6b5a44';
+    const arms = [[mm & 1, 0.5, 0, 0.5, 0.5, true], [mm & 2, 0.5, 0.5, 1, 0.5, false], [mm & 4, 0.5, 0.5, 0.5, 1, true], [mm & 8, 0, 0.5, 0.5, 0.5, false]];
+    const seg = (u0, v0, u1, v1, col, lw, z = 0) => {
+      g.strokeStyle = col; g.lineWidth = lw; g.beginPath();
+      g.moveTo(X(o, u0, v0), Y(o, u0, v0, z)); g.lineTo(X(o, u1, v1), Y(o, u1, v1, z)); g.stroke();
+    };
+    flat(g, o, 0.5 - B, 0.5 - B, 0.5 + B, 0.5 + B, ballast);
+    for (const [on, u0, v0, u1, v1, vert] of arms) {
+      if (!on) continue;
+      if (vert) flat(g, o, 0.5 - B, v0, 0.5 + B, v1, ballast);
+      else flat(g, o, u0, 0.5 - B, u1, 0.5 + B, ballast);
+    }
+    for (const [on, u0, v0, u1, v1, vert] of arms) {
+      if (!on) continue;
+      for (const f of [0.2, 0.5, 0.85]) { // Schwellen
+        if (vert) { const v = v0 + (v1 - v0) * f; seg(0.5 - B - 0.02, v, 0.5 + B + 0.02, v, sleeper, 1.6); }
+        else { const u = u0 + (u1 - u0) * f; seg(u, 0.5 - B - 0.02, u, 0.5 + B + 0.02, sleeper, 1.6); }
+      }
+      // Schienen bis zur Mitte, damit die Ecken schließen
+      if (vert) {
+        const a = v0 === 0.5 ? 0.5 - RW : v0, b = v1 === 0.5 ? 0.5 + RW : v1;
+        seg(0.5 - RW, a, 0.5 - RW, b, '#dfe4e8', 1.3); seg(0.5 + RW, a, 0.5 + RW, b, '#dfe4e8', 1.3);
+      } else {
+        const a = u0 === 0.5 ? 0.5 - RW : u0, b = u1 === 0.5 ? 0.5 + RW : u1;
+        seg(a, 0.5 - RW, b, 0.5 - RW, '#dfe4e8', 1.3); seg(a, 0.5 + RW, b, 0.5 + RW, '#dfe4e8', 1.3);
+      }
+      if (bridge) { // Geländer
+        if (vert) { seg(0.5 - B, v0, 0.5 - B, v1, '#d9dde2', 1.2, 3); seg(0.5 + B, v0, 0.5 + B, v1, '#d9dde2', 1.2, 3); }
+        else { seg(u0, 0.5 - B, u1, 0.5 - B, '#d9dde2', 1.2, 3); seg(u0, 0.5 + B, u1, 0.5 + B, '#d9dde2', 1.2, 3); }
+      }
+    }
+    if (cross) { // Schranken beidseits des Gleises, über die Straße
+      const t = B + 0.05;
+      for (const a of arms) {
+        if (!a[0]) continue;
+        for (const sg of [-1, 1]) {
+          const p = a[5] ? [0.5 + sg * t, 0.5 - 0.3, 0.5 + sg * t, 0.5 + 0.3] : [0.5 - 0.3, 0.5 + sg * t, 0.5 + 0.3, 0.5 + sg * t];
+          seg(p[0], p[1], p[2], p[3], '#f4f4f4', 2.4);
+          g.setLineDash([3, 3]); seg(p[0], p[1], p[2], p[3], '#d23a2e', 2.4); g.setLineDash([]);
+        }
+      }
+    }
+  });
+}
+
 // ---------------------------------------------------------------- Zonengebäude
 const WALL_R = ['#f1e2c0', '#f0d38a', '#e8b9a0', '#d9e0cc', '#efe9dc'];
 const ROOF_R = ['#b8452f', '#a1432c', '#7c3b2e', '#8c5a3c'];
@@ -249,7 +306,7 @@ function pad(g, o, w, h, col = '#a9b09a') { flat(g, o, 0, 0, w, h, col); flat(g,
 
 export function buildingSprite(key, light = false) {
   const d = BUILD[key];
-  const hmax = { fraport: 90, ctower: 260, maintower: 230, mtower: 230, dom: 190, uni: 100, gas: 110, wind: 120, hbf: 90, dike: 20, pump: 60, tower: 100, treat: 36, incin: 110, dump: 40, recyc: 40 }[key] || 100;
+  const hmax = { fraport: 90, ctower: 260, maintower: 230, mtower: 230, dom: 190, uni: 100, gas: 110, wind: 120, hbf: 90, dike: 20, pump: 60, tower: 100, treat: 36, incin: 110, dump: 40, recyc: 40, sbahn: 50 }[key] || 100;
   return sprite((light ? 'L' : '') + 'b_' + key, d.w, d.h, hmax, (g, o) => {
     const w = d.w, h = d.h;
     switch (key) {
@@ -291,6 +348,17 @@ export function buildingSprite(key, light = false) {
         prism(g, o, 0.18, 0.2, 0.8, 0.8, 0, 14, '#e8d9b8', { win: { c: 3, rows: 1, lit: 0.8, seed: 3 } });
         gable(g, o, 0.14, 0.16, 0.84, 0.84, 14, 12, '#8d3a2a', 'u');
         g.fillStyle = '#6b4a2a'; g.fillRect(X(o, 0.2, 0.95) - 3, Y(o, 0.2, 0.95) - 8, 6, 8); icon(g, o, 0.5, 0.95, 20, '🍏', 11); break;
+      }
+      case 'sbahn': {
+        // S-Bahnhof: Bahnsteig mit gelber Kante, Glasdach auf Stützen, blaues S-Schild
+        pad(g, o, w, h, '#b5b9bc');
+        flat(g, o, 0.1, 0.18, 1.9, 0.86, '#d7dadd');
+        flat(g, o, 0.1, 0.78, 1.9, 0.86, '#e0b030');
+        for (const [u, v] of [[0.14, 0.24], [1.84, 0.24], [0.14, 0.8], [1.84, 0.8]]) prism(g, o, u, v, u + 0.08, v + 0.08, 0, 22, '#5c6368');
+        prism(g, o, 0.06, 0.14, 1.94, 0.9, 22, 4, '#3f6e8f', { top: '#9cc4dc' });
+        g.fillStyle = '#0b5cad'; g.beginPath(); g.arc(X(o, 1, 0.5), Y(o, 1, 0.5, 36), 7, 0, 7); g.fill();
+        g.fillStyle = '#fff'; g.font = 'bold 10px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText('S', X(o, 1, 0.5), Y(o, 1, 0.5, 36)); break;
       }
       case 'dike': {
         // Ufergras, darauf ein niedriger grüner Erdwall; die Steinkante liegt auf der Flussseite (+v)
@@ -582,6 +650,7 @@ export class Renderer {
     const T = s.terrain, idx = (x, y) => y * N + x;
     const wat = (x, y) => x >= 0 && y >= 0 && x < N && y < N && T[idx(x, y)] === T_WATER;
     const roadAt = (x, y) => x >= 0 && y >= 0 && x < N && y < N && s.road[idx(x, y)] === 1;
+    const railAt = (x, y) => x >= 0 && y >= 0 && x < N && y < N && s.rail[idx(x, y)] === 1;
 
     // --- Boden
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
@@ -596,6 +665,10 @@ export class Renderer {
       } else if (s.zone[i] && !s.occ[i]) {
         draw(s.lvl[i] ? lotSprite(s.zone[i]) : zoneSprite(s.zone[i], (x * 3 + y * 5) & 3), x, y);
       } else draw(grassSprite((x * 7 + y * 13 + (x ^ y)) & 3), x, y);
+      if (s.rail[i]) { // Gleis (auf Straße = Bahnübergang, auf Wasser = Gleisbrücke) über den Boden gelegt
+        const rm = (railAt(x, y - 1) ? 1 : 0) | (railAt(x + 1, y) ? 2 : 0) | (railAt(x, y + 1) ? 4 : 0) | (railAt(x - 1, y) ? 8 : 0);
+        draw(railSprite(rm, T[i] === T_WATER, !!s.road[i]), x, y);
+      }
     }
     // --- Autos
     g.save();
@@ -621,7 +694,7 @@ export class Renderer {
         } else if (s.zone[i] && s.lvl[i]) {
           draw(zoneBuilding(s.zone[i], s.lvl[i], s.vr[i]), x, y);
           if (lg) nightZone(lg, s.zone[i], s.lvl[i], s.vr[i], x, y, blink);
-        } else if (T[i] === T_TREES && !s.road[i]) draw(treeSprite((x * 5 + y * 11) & 7), x, y);
+        } else if (T[i] === T_TREES && !s.road[i] && !s.rail[i]) draw(treeSprite((x * 5 + y * 11) & 7), x, y);
         if (lg && !bid && s.road[i] && !((x + y) & 1)) lampAt(lg, x, y); // jede 2. Straßenkachel
         if (s.fire[i]) {
           g.font = '20px "Noto Color Emoji",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
@@ -644,11 +717,12 @@ export class Renderer {
     const m = s.maps;
     if (ui.overlay && ui.overlay !== 'none' && m) {
       for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-        const i = idx(x, y); if (T[i] === T_WATER && !s.road[i]) continue;
+        const i = idx(x, y); if (T[i] === T_WATER && !s.road[i] && !s.rail[i]) continue;
         let col = null;
         switch (ui.overlay) {
           case 'power': col = s.powered[i] ? 'rgba(250,215,60,.45)' : (s.zone[i] || s.occ[i] ? 'rgba(200,40,40,.5)' : null); break;
           case 'water': col = s.watered[i] ? 'rgba(70,190,255,.45)' : (s.zone[i] || s.occ[i] ? 'rgba(200,40,40,.5)' : null); break;
+          case 'rail': if (s.rail[i]) col = 'rgba(160,110,240,.75)'; else if (m.rail[i] > 0.01) col = m.rail[i] > 0.5 ? 'rgba(160,110,240,.45)' : 'rgba(160,110,240,.2)'; break;
           case 'traffic': if (s.road[i]) col = heat(m.traffic[i] / 1.6); break;
           case 'crime': col = heat(m.crime[i] / 70); break;
           case 'pollution': col = heat(m.pol[i] / 70); break;
