@@ -7,7 +7,7 @@ const REFRESH_MS = 500;             // Kartenbild höchstens alle 500 ms neu ers
 const KEY = 'simfurt-mini';
 
 // Farben (gepackt 0xRRGGBB). Zonen und Gebäude kommen aus data.js.
-const COL = { water: 0x3e86c4, flood: 0x5aa0ff, forest: 0x2f7a3c, grass: 0x6fae52, road: 0x5a5f66, bridge: 0xc9ced6, fire: 0xff3b30 };
+const COL = { water: 0x3e86c4, flood: 0x5aa0ff, forest: 0x2f7a3c, grass: 0x6fae52, road: 0x5a5f66, bridge: 0xc9ced6, rail: 0xb0703c, fire: 0xff3b30 };
 
 const cl = (v) => Math.max(0, Math.min(255, Math.round(v)));
 const pack = (r, g, b) => (cl(r) << 16) | (cl(g) << 8) | cl(b);
@@ -134,12 +134,13 @@ export class MiniMap {
   /** Kartenbild: eine Pixelzeile je Kachel in `layer`, dann per putImageData ins Offscreen-Canvas. */
   buildImage(s) {
     const n = this.n, tot = n * n, T = s.terrain, zone = s.zone, lvl = s.lvl, road = s.road, L = this.layer;
-    const fire = s.fire, flood = s.flood;
+    const fire = s.fire, flood = s.flood, rail = s.rail;
     for (let i = 0; i < tot; i++) {
       let c = T[i] === T_WATER ? COL.water : T[i] === T_TREES ? COL.forest : COL.grass;
       const z = zone[i];
       if (z && T[i] !== T_WATER) { const t = ZT[z]; if (t) c = lvl[i] ? t.lvl[Math.min(lvl[i], t.lvl.length - 1)] : t.lot; }
       if (road[i]) c = T[i] === T_WATER ? COL.bridge : COL.road;
+      if (rail && rail[i]) c = COL.rail; // Gleis (auch Bahnübergang und Gleisbrücke)
       if (flood && flood[i]) c = COL.flood;
       L[i] = c;
     }

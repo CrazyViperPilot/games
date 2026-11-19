@@ -2,7 +2,7 @@
 // Bei Änderungen an Dateien CACHE_NAME hochzählen. API-Aufrufe (anderer Ursprung) werden nie gecacht.
 const CACHE_PREFIX = 'simfurt-';
 const CACHE_NAME = CACHE_PREFIX + 'v6';
-const ASSETS = ['./', './index.html', './style.css', './manifest.json', './js/main.js', './js/sim.js', './js/data.js', './js/render.js', './js/save.js', './js/sound.js', './js/minimap.js',
+const ASSETS = ['./', './index.html', './style.css', './manifest.json', './js/main.js', './js/sim.js', './js/data.js', './js/render.js', './js/save.js', './js/sound.js', './js/minimap.js', './js/news.js',
   './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png'];
 
 self.addEventListener('install', (e) => {

@@ -22,3 +22,4 @@ jobs:
           node-version: 22
       - run: node simfurt/test/sim.test.js
       - run: node simfurt/test/save.test.js
+      - run: node simfurt/test/news.test.js

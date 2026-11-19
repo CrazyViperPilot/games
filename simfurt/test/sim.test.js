@@ -1,7 +1,7 @@
 // Tests für Simfurt: node simfurt/test/sim.test.js
 import assert from 'node:assert';
-import { N, T_WATER, T_TREES, BUILD, ORDINANCES, CATS, Z_R, GARBAGE_BLD } from '../js/data.js';
-import { newCity, tick, applyTool, placeBuilding, canPlace, refresh, unlocked, idx, takeLoan, repayLoan, pushUndo, endUndo, undo, canUndo, flood, tileInfo, UNDO_MAX, setBudget, budgetPct, toggleOrd, ordBlock, removeBuilding } from '../js/sim.js';
+import { N, T_WATER, T_TREES, BUILD, ORDINANCES, CATS, Z_R, GARBAGE_BLD, RAIL_COST, RAIL_BRIDGE_COST, RAIL_CROSS_COST, RAIL_UPKEEP, BULLDOZE_COST } from '../js/data.js';
+import { newCity, tick, applyTool, placeBuilding, canPlace, refresh, unlocked, idx, takeLoan, repayLoan, pushUndo, endUndo, undo, canUndo, flood, tileInfo, UNDO_MAX, setBudget, budgetPct, toggleOrd, ordBlock, removeBuilding, railComponents } from '../js/sim.js';
 import { performance } from 'node:perf_hooks';
 import { serialize, deserialize } from '../js/save.js';
 import { buildCity } from './bot.mjs';
@@ -644,6 +644,178 @@ test('Müll: alte Stände ohne fill gelten als leere Deponie', () => {
   assert.strictEqual(dumpsOf(t).length, 1);
   assert.strictEqual(t.stats.dumpLeft, BUILD.dump.vol, 'Restvolumen = volles Volumen');
   assert.ok(t.garbageLeft >= 0);
+});
+
+// ---------------------------------------------------------------- S-Bahn (Runde 4, S1)
+/** Erster Platz (x, y), an dem ein w×h-Block ohne Wasser, Straße, Gleis, Zone und Gebäude frei ist. */
+const freeBlock = (s, w, h) => {
+  for (let y = 2; y < N - h - 2; y++) for (let x = 2; x < N - w - 2; x++) {
+    let ok = true;
+    for (let yy = y; yy < y + h && ok; yy++) for (let xx = x; xx < x + w; xx++) {
+      const i = idx(xx, yy);
+      if (s.terrain[i] === T_WATER || s.road[i] || s.rail[i] || s.occ[i] || s.lvl[i] || s.zone[i]) { ok = false; break; }
+    }
+    if (ok) return [x, y];
+  }
+  return null;
+};
+/**
+ * Kleines Stadtstück (24×12): Straße in Zeile y0+5, Wohnzonen Stufe 2 in Zeile y0+6 (Lücke bei x0+gapOff),
+ * Gaskraftwerk in der Nähe. Gleise werden von den Tests selbst gelegt.
+ */
+function railTown(seed = 5, gapOff = -1) {
+  const s = fresh(seed); const b = freeBlock(s, 24, 12); assert.ok(b, 'Platz für das Stadtstück');
+  const [x0, y0] = b, gap = gapOff < 0 ? -1 : x0 + gapOff;
+  for (let x = x0; x < x0 + 24; x++) applyTool(s, 'road', x, y0 + 5);
+  for (let x = x0; x < x0 + 24; x++) if (x !== gap) { applyTool(s, 'zone1', x, y0 + 6); s.lvl[idx(x, y0 + 6)] = 2; }
+  assert.ok(placeBuilding(s, 'gas', x0 + 10, y0 + 9).ok, 'Kraftwerk');
+  refresh(s);
+  return { s, x0, y0 };
+}
+const trafficSum = (s) => { let t = 0; for (let i = 0; i < N * N; i++) if (s.road[i]) t += s.maps.traffic[i]; return t; };
+
+test('S-Bahn: Gleis 40 €/Kachel, Gleisbrücke über Wasser 150 €, zweimal legen abgelehnt', () => {
+  const s = fresh();
+  const [x, y] = freeBlock(s, 1, 1);
+  const m0 = s.money;
+  assert.strictEqual(applyTool(s, 'rail', x, y), RAIL_COST); assert.strictEqual(s.rail[idx(x, y)], 1);
+  assert.strictEqual(applyTool(s, 'rail', x, y), -1, 'doppelt');
+  assert.strictEqual(m0 - s.money, RAIL_COST);
+  let wat = -1; for (let i = 0; i < N * N && wat < 0; i++) if (s.terrain[i] === T_WATER && !s.road[i]) wat = i;
+  assert.strictEqual(applyTool(s, 'rail', wat % N, (wat / N) | 0), RAIL_BRIDGE_COST);
+  assert.strictEqual(s.rail[wat], 1); assert.strictEqual(s.terrain[wat], T_WATER, 'Wasser bleibt Wasser');
+  assert.strictEqual(RAIL_COST, 40); assert.strictEqual(RAIL_BRIDGE_COST, 150); assert.strictEqual(RAIL_CROSS_COST, 60);
+});
+
+test('S-Bahn: Bahnübergang – Gleis auf Straße und Straße auf Gleis kosten je 60 €, Abriss nimmt zuerst das Gleis', () => {
+  const s = fresh();
+  const [x, y] = freeBlock(s, 1, 1), i = idx(x, y);
+  assert.strictEqual(applyTool(s, 'road', x, y), 20);
+  assert.strictEqual(applyTool(s, 'rail', x, y), RAIL_CROSS_COST, 'Gleis auf Straße');
+  assert.ok(s.road[i] === 1 && s.rail[i] === 1, 'beides liegt auf der Kachel');
+  assert.strictEqual(applyTool(s, 'bulldoze', x, y), BULLDOZE_COST);
+  assert.ok(s.rail[i] === 0 && s.road[i] === 1, 'erster Abriss: Gleis weg, Straße bleibt');
+  assert.strictEqual(applyTool(s, 'bulldoze', x, y), BULLDOZE_COST);
+  assert.ok(s.road[i] === 0, 'zweiter Abriss: Straße weg');
+  // Straße auf vorhandenem Gleis
+  assert.strictEqual(applyTool(s, 'rail', x, y), RAIL_COST);
+  assert.strictEqual(applyTool(s, 'road', x, y), RAIL_CROSS_COST, 'Straße auf Gleis');
+  assert.ok(s.road[i] === 1 && s.rail[i] === 1);
+});
+
+test('S-Bahn: Zonen und Gebäude nicht auf Gleisen; Bahnhof nur an einem Gleis', () => {
+  const s = fresh();
+  const [x, y] = freeBlock(s, 4, 8);
+  applyTool(s, 'rail', x, y);
+  assert.strictEqual(applyTool(s, 'zone1', x, y), -1, 'Zone auf Gleis');
+  assert.strictEqual(canPlace(s, 'park', x, y), 'Gleis im Weg');
+  assert.ok(!placeBuilding(s, 'park', x, y).ok);
+  assert.strictEqual(canPlace(s, 'sbahn', x, y), 'Gleis im Weg', 'Bahnhof auf dem Gleis');
+  assert.strictEqual(canPlace(s, 'sbahn', x, y + 1), '', 'Bahnhof am Gleis (4-Nachbar)');
+  assert.strictEqual(canPlace(s, 'sbahn', x, y + 4), 'Nur am Gleis', 'Bahnhof ohne Gleis');
+});
+
+test('S-Bahn: Rückgängig nimmt Gleis und Kosten zurück', () => {
+  const s = fresh(); const [x, y] = freeBlock(s, 1, 1); const m0 = s.money;
+  pushUndo(s); assert.strictEqual(applyTool(s, 'rail', x, y), RAIL_COST); endUndo(s);
+  assert.strictEqual(s.rail[idx(x, y)], 1);
+  assert.ok(undo(s));
+  assert.strictEqual(s.rail[idx(x, y)], 0); assert.strictEqual(s.money, m0);
+});
+
+test('S-Bahn: railComponents – Teilnetze, Kartenrand-Flag, Kacheln ohne Gleis', () => {
+  const s = fresh();
+  for (let x = 0; x < 3; x++) applyTool(s, 'rail', x, 0);      // am Kartenrand
+  for (let x = 20; x < 22; x++) applyTool(s, 'rail', x, 20);   // im Inneren
+  applyTool(s, 'road', 5, 5);
+  const r = railComponents(s);
+  assert.strictEqual(r.count, 2);
+  assert.strictEqual(r.comp.length, N * N);
+  assert.strictEqual(r.comp[idx(5, 5)], -1, 'Straße ist kein Gleis');
+  assert.strictEqual(r.comp[idx(0, 0)], r.comp[idx(2, 0)]);
+  assert.strictEqual(r.comp[idx(20, 20)], r.comp[idx(21, 20)]);
+  assert.notStrictEqual(r.comp[idx(0, 0)], r.comp[idx(20, 20)]);
+  assert.strictEqual(r.touchesEdge[r.comp[idx(0, 0)]], true);
+  assert.strictEqual(r.touchesEdge[r.comp[idx(20, 20)]], false);
+  assert.strictEqual(r.touchesEdge.length, 2);
+});
+
+test('S-Bahn: ein Bahnhof ohne Partner wirkt nicht, zwei am selben Gleis schon (Verkehr sinkt)', () => {
+  const { s, x0, y0 } = railTown(5);
+  const t0 = trafficSum(s); assert.ok(t0 > 0, 'Verkehr vorhanden');
+  for (let x = x0; x < x0 + 24; x++) applyTool(s, 'rail', x, y0 + 2);
+  refresh(s);
+  assert.strictEqual(trafficSum(s), t0, 'Gleis allein ändert nichts');
+  assert.ok(placeBuilding(s, 'sbahn', x0 + 2, y0 + 1).ok, 'erster Bahnhof');
+  refresh(s);
+  assert.strictEqual(s.stats.railStations, 1); assert.strictEqual(s.stats.railActive, 0);
+  assert.strictEqual(trafficSum(s), t0, 'einzelner Bahnhof wirkt nicht');
+  assert.strictEqual(s.maps.rail[idx(x0 + 2, y0 + 1)], 0);
+  assert.ok(tileInfo(s, x0 + 2, y0 + 1).lines.some((l) => l.includes('zweiten Bahnhof')), 'Kachelinfo sagt es');
+  assert.ok(placeBuilding(s, 'sbahn', x0 + 20, y0 + 1).ok, 'zweiter Bahnhof');
+  refresh(s);
+  assert.strictEqual(s.stats.railActive, 2);
+  const t2 = trafficSum(s);
+  assert.ok(t2 < t0 * 0.95, `Verkehr ${t2.toFixed(3)} statt ${t0.toFixed(3)}`);
+  assert.ok(t2 > t0 * 0.4, 'nicht unrealistisch niedrig');
+  assert.ok(s.maps.rail[idx(x0 + 2, y0 + 1)] > 0.5, 'Bahnabdeckung am Bahnhof');
+});
+
+test('S-Bahn: Zwei Bahnhöfe auf getrennten Gleisnetzen wirken nicht', () => {
+  const { s, x0, y0 } = railTown(5);
+  for (let x = x0; x < x0 + 10; x++) applyTool(s, 'rail', x, y0 + 2);        // Netz A
+  for (let x = x0 + 12; x < x0 + 24; x++) applyTool(s, 'rail', x, y0 + 2);   // Netz B, Lücke bei x0+10/11
+  assert.ok(placeBuilding(s, 'sbahn', x0 + 2, y0 + 1).ok, 'Bahnhof in Netz A');
+  assert.ok(placeBuilding(s, 'sbahn', x0 + 14, y0 + 1).ok, 'Bahnhof in Netz B');
+  refresh(s);
+  assert.strictEqual(s.stats.railStations, 2);
+  assert.strictEqual(s.stats.railActive, 0, 'jeder Bahnhof allein in seinem Netz');
+  assert.strictEqual(railComponents(s).count, 2);
+});
+
+test('S-Bahn: Bahnübergang erhöht den Verkehr auf der Straßenkachel um 20 %', () => {
+  const { s, x0, y0 } = railTown(5, 12);
+  const cx = x0 + 12, cy = y0 + 5, ci = idx(cx, cy);
+  const t0 = s.maps.traffic[ci]; assert.ok(t0 > 0.05 && t0 < 2.5, 'Verkehr auf der Kachel ' + t0);
+  for (let y = y0 + 3; y <= y0 + 8; y++) assert.ok(applyTool(s, 'rail', cx, y) >= 0, 'Gleis bei ' + y);
+  assert.strictEqual(s.road[ci] && s.rail[ci], 1, 'Übergang');
+  refresh(s);
+  const t1 = s.maps.traffic[ci];
+  assert.ok(Math.abs(t1 / t0 - 1.2) < 1e-6, `Verhältnis ${(t1 / t0).toFixed(6)}`);
+});
+
+test('S-Bahn: Gleisunterhalt 0,5 € je Kachel, Budget „Straßen“ gilt mit', () => {
+  const { s, x0, y0 } = railTown(5);
+  for (let x = x0; x < x0 + 10; x++) applyTool(s, 'rail', x, y0 + 2);
+  refresh(s); const n = s.stats.railTiles;
+  assert.strictEqual(n, 10);
+  tick(s);
+  assert.ok(Math.abs(s.fin.parts.rail - n * RAIL_UPKEEP) < 1e-9, 'Gleisunterhalt ' + s.fin.parts.rail);
+  setBudget(s, 'roads', 50); tick(s);
+  assert.ok(Math.abs(s.fin.parts.rail - n * RAIL_UPKEEP * 0.5) < 1e-9, 'halbes Budget ' + s.fin.parts.rail);
+});
+
+test('S-Bahn: Speichern erhält rail und die Wirkung nach dem Laden', () => {
+  const { s, x0, y0 } = railTown(4);
+  for (let x = x0; x < x0 + 24; x++) applyTool(s, 'rail', x, y0 + 2);
+  placeBuilding(s, 'sbahn', x0 + 2, y0 + 1); placeBuilding(s, 'sbahn', x0 + 20, y0 + 1);
+  for (let t = 0; t < 12; t++) tick(s);
+  const t = deserialize(serialize(s));
+  assert.deepStrictEqual(t.rail, s.rail);
+  assert.strictEqual(t.bld.filter((b) => b.type === 'sbahn').length, 2);
+  for (let k = 0; k < 12; k++) { tick(s); tick(t); }
+  assert.strictEqual(t.stats.railActive, s.stats.railActive); assert.strictEqual(t.stats.railActive, 2);
+  assert.strictEqual(Math.round(t.money), Math.round(s.money));
+  assert.strictEqual(t.stats.pop, s.stats.pop);
+});
+
+test('S-Bahn: Bahnhöfe, Gleis und Werkzeug sind freigeschaltet ab ihrer Einwohnerzahl', () => {
+  const s = newCity({ seed: 3 });
+  assert.strictEqual(unlocked(s, 'rail'), false, 'Gleis gesperrt bei 0 Einwohnern');
+  assert.strictEqual(unlocked(s, 'sbahn'), false);
+  s.peakPop = 2500; assert.strictEqual(unlocked(s, 'rail'), true); assert.strictEqual(unlocked(s, 'sbahn'), true);
+  assert.strictEqual(BUILD.sbahn.cat, 'transport');
+  assert.strictEqual(BUILD.sbahn.kind, 'rail');
 });
 
 console.log(`${n} Tests ok`);
