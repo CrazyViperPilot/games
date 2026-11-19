@@ -571,15 +571,15 @@ export class Life {
     p.x = (tx - ty) * 32 + (Math.random() - 0.5) * 3; p.y = (tx + ty) * 16 - z + (Math.random() - 0.5) * 2;
     p.age = 0; p.kind = kind;
     if (kind === 1) { p.vx = this.wind * 0.5; p.vy = -(3 + Math.random() * 3); p.life = 2 + Math.random(); p.r0 = 2; p.r1 = 5 + Math.random() * 3; p.al = 0.35; }
-    else if (kind === 2) { p.vx = this.wind * (0.6 + 0.4 * Math.random()); p.vy = -(9 + Math.random() * 6); p.life = 2.5 + Math.random() * 2; p.r0 = 3; p.r1 = 9 + Math.random() * 5; p.al = 0.6; }
-    else { p.vx = this.wind * (0.6 + 0.4 * Math.random()); p.vy = -(7 + Math.random() * 6); p.life = 3 + Math.random() * 2; p.r0 = 2.5; p.r1 = 7 + Math.random() * 5; p.al = 0.55; }
+    else if (kind === 2) { p.vx = this.wind * (0.6 + 0.4 * Math.random()); p.vy = -(9 + Math.random() * 6); p.life = 3 + Math.random() * 2; p.r0 = 5; p.r1 = 16 + Math.random() * 8; p.al = 0.7; }
+    else { p.vx = this.wind * (0.6 + 0.4 * Math.random()); p.vy = -(7 + Math.random() * 6); p.life = 3.5 + Math.random() * 2; p.r0 = 4; p.r1 = 12 + Math.random() * 6; p.al = 0.62; }
   }
   /** Flamme (orange) mit gelbem Kern; kind 3/4. */
   flame(tx, ty) {
     const p = this.pool[this.pIdx]; this.pIdx = (this.pIdx + 1) % LIFE.partMax;
-    p.x = (tx - ty) * 32 + (Math.random() - 0.5) * 6; p.y = (tx + ty) * 16 - 3 - Math.random() * 5;
+    p.x = (tx - ty) * 32 + (Math.random() - 0.5) * 22; p.y = (tx + ty) * 16 - 3 - Math.random() * 14;
     p.vx = (Math.random() - 0.5) * 6 + this.wind * 0.3; p.vy = -(18 + Math.random() * 14);
-    p.age = 0; p.life = 0.5 + Math.random() * 0.4; p.r0 = 4.5; p.r1 = 1.5; p.al = 0.95; p.kind = 3;
+    p.age = 0; p.life = 0.6 + Math.random() * 0.5; p.r0 = 8 + Math.random() * 3; p.r1 = 2; p.al = 0.95; p.kind = 3;
   }
   emit(s, dt) {
     const n = this.n;
@@ -592,12 +592,12 @@ export class Life {
     for (let m = 0; m < this.fireN; m++) {
       const j = fl[m], x = j % n, y = (j - x) / n;
       if (!this.visT(x + 0.5, y + 0.5, 2)) continue;
-      this.fireAcc[j] += dt * 6;
+      this.fireAcc[j] += dt * 16;
       while (this.fireAcc[j] >= 1) {
         this.fireAcc[j] -= 1;
         this.flame(x + 0.5, y + 0.5);
-        if (Math.random() < 0.5) { const q = this.pool[this.pIdx]; this.pIdx = (this.pIdx + 1) % LIFE.partMax; q.x = (x - y) * 32; q.y = (x + y + 1) * 16 - 4; q.vx = this.wind * 0.3; q.vy = -(14 + Math.random() * 6); q.age = 0; q.life = 0.3; q.r0 = 3; q.r1 = 1; q.al = 1; q.kind = 4; }
-        if (Math.random() < 0.3) this.puff(x + 0.5, y + 0.5, 14, 2);
+        if (Math.random() < 0.5) { const q = this.pool[this.pIdx]; this.pIdx = (this.pIdx + 1) % LIFE.partMax; q.x = (x - y) * 32; q.y = (x + y + 1) * 16 - 4; q.vx = this.wind * 0.3; q.vy = -(14 + Math.random() * 6); q.age = 0; q.life = 0.35; q.r0 = 6; q.r1 = 1.5; q.al = 1; q.kind = 4; }
+        if (Math.random() < 0.55) this.puff(x + 0.5, y + 0.5, 22, 2);
       }
     }
   }

@@ -138,7 +138,8 @@ Speicher (Opus erledigt): `save.js` serialisiert die Kachelebene `rail` (Uint8Ar
 
 ---
 
-# Runde 5: Lebendigkeit & Optik
+# Runde 5: Lebendigkeit & Optik – erledigt
+Abweichungen: Tuning-Werte in `LIFE` (life.js); Schranken statisch; Flammen/Rauch nach Sichtprüfung verstärkt; Zebrastreifen nur an Vier-Arm-Kreuzungen.
 
 Reine Optik – die Simulation (`sim.js`) bleibt unverändert, Tests müssen bitgenau grün bleiben. Kein `rand(s)` in Optik-Code (eigener Math.random / Hash).
 

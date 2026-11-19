@@ -36,6 +36,8 @@ Wohnen (R), Gewerbe (C), Industrie (I), **Bankenviertel (B, ab 3.000 Einw.)** mi
 - **Rückgängig** (Werkzeug ↶, Strg+Z / U): bis zu 10 Bauaktionen (Malen, Abriss, Gebäude); nimmt nur die Änderungen der Aktion zurück und erstattet die Kosten, Wachstum seither bleibt.
 - **Verlauf** im Rat: Diagramme für Einwohner, Kasse und Zufriedenheit (letzte 10 Jahre, ein Wert je Jahreswechsel).
 - **Tag & Nacht** (Menü: Auto/Tag/Nacht, Auto = 6 Minuten je Tag, reine Optik): Dämmerung, Nachttönung, leuchtende Fenster (Banken kühlweiß), blinkende Positionslichter an Türmen, Straßenlaternen, Scheinwerfer, angestrahlte Wahrzeichen. Kartenansichten bleiben unverdunkelt.
+- **Leben auf der Karte** (`js/life.js`, reine Optik, Math.random statt Simulationszufall): S-Bahnen (2–3 Wagen, halten an Bahnhöfen, nachts beleuchtet) in aktiven Netzen, Boote (Ausflugsschiff, Lastkahn, Kielwasser, Positionslichter) auf größeren Gewässern, Fußgänger in Parks/Wahrzeichen/Geschäftsstraßen (ab Zoom 0,7), Löschzüge mit Blaulicht von der Wache zum Brand, Rauch über Industrie/Kraftwerk/Verbrennung, Staub über Deponien, Brände mit Flammen und dunkler Rauchsäule. Partikel-Pool (max. 400), nur Sichtbereich.
+- **Optik**: Gras mit Körnung, Ufer, Wasser mit Tiefenverlauf, Gehwege und Mittelstreifen, mehrere Baumformen mit Schatten, Gebäude mit Schlagschatten, Kanten-Highlights, Balkonen, Dachgärten, Klimageräten; Glasspiegelung an Türmen. UI mit Glas-Panels, größerem Dock, Sheet-Animation (prefers-reduced-motion beachtet).
 - **Minikarte** (🗺, ein-/ausklappbar): Raute mit Sichtfeld, Antippen/Ziehen springt dorthin.
 - **Ton** (abschaltbar im Menü): kleine WebAudio-Klänge ohne Audiodateien (`js/sound.js`).
 - **Berater** (Ticker) und **Meilensteine** (500 Dorf … 100.000 Mainhattan).
@@ -63,4 +65,4 @@ Strom: Gaskraftwerk, Windpark (ab 800), Solarpark (ab 4.000). Dienste: Polizei, 
 Vanilla ES-Module, kein Build. `js/data.js` (Daten), `js/sim.js` (Logik), `js/render.js` (isometrische Sprites, Autos, Overlays), `js/save.js` (lokal/Datei/Webspace), `js/sound.js` (WebAudio), `js/minimap.js` (Minikarte), `js/news.js` (Zeitung), `js/main.js` (UI/Eingabe/Schleife). Tests: `node simfurt/test/sim.test.js` `node simfurt/test/save.test.js` und `node simfurt/test/news.test.js` (bzw. `npm test` im Ordner; Workflow `test-simfurt.yml`). Arbeitsplan: `PLAN.md`. Service Worker network-first, Cache-Name in `sw.js` bei Änderungen hochzählen.
 
 ## Bewusst offen / Ideen
-Musik, Tag/Nacht, Wasserversorgung, Schienen/S-Bahn, Szenarien (z. B. Hochwasser 1995), Bevölkerungsgruppen, höhere Karten (Hügel/Taunus), Cloud-Sync mit Login, Altersgruppen, fahrende Züge, Szenarien mit Zielen, Erfolge, Wiederherstellen, Gelände mit Höhen.
+Musik, Tag/Nacht, Wasserversorgung, Schienen/S-Bahn, Szenarien (z. B. Hochwasser 1995), Bevölkerungsgruppen, höhere Karten (Hügel/Taunus), Cloud-Sync mit Login, Altersgruppen, Szenarien mit Zielen, Erfolge, Wiederherstellen, Gelände mit Höhen.
