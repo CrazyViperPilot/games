@@ -4,7 +4,8 @@ import {
   newCity, tick, refresh, applyTool, toolCost, placeBuilding, canPlace, unlocked, unlockNeed, tileInfo, takeLoan, repayLoan, inb, idx, roadAt, dateStr, say,
 } from './sim.js';
 import { Renderer } from './render.js';
-import { saveSlot, loadSlot, listSlots, deleteSlot, SLOTS } from './save.js';
+import { saveSlot, loadSlot, listSlots, deleteSlot, SLOTS, snapshot, exportFile, importFile, storageInfo, persist } from './save.js';
+import { sound } from './sound.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.round(n).toLocaleString('de-DE');
@@ -21,7 +22,7 @@ let overlay = 'none';
 let acc = 0, lastT = performance.now();
 let ui = { overlay: 'none', time: 0 };
 let needDraw = true;
-let saving = false, lastSaveMsg = '';
+let saving = false, saveAgain = false, lastSaveMsg = '', lastSaveAt = 0, changed = false;
 const SPEEDMS = [0, 3200, 1400, 500];
 
 // ---------------------------------------------------------------- Werkzeuge im Dock
@@ -80,7 +81,11 @@ function toast(text, ms = 2600) {
 let tickerT = 0;
 function ticker(m) {
   const t = $('ticker'); t.textContent = m.text; t.className = m.kind; t.hidden = false; clearTimeout(tickerT); tickerT = setTimeout(() => (t.hidden = true), 7000);
+  if (m.kind === 'bad') alarm();
 }
+// Alarmton höchstens alle 4 s (Berater-Meldungen und Geldmangel zusammen).
+let lastAlarm = -1e9;
+function alarm() { const now = performance.now(); if (now - lastAlarm < 4000) return; lastAlarm = now; sound.play('alarm'); }
 function showTip(sx, sy, text, bad) { const t = $('tip'); t.textContent = text; t.className = bad ? 'bad' : ''; t.hidden = false; t.style.left = sx + 'px'; t.style.top = sy + 'px'; }
 function hideTip() { $('tip').hidden = true; }
 
@@ -230,15 +235,16 @@ function commitPaint() {
     if (r >= 0) { total += r; n++; }
   }
   hideTip();
-  if (stopped) toast('Das Geld reicht nicht weiter.');
+  if (stopped) { toast('Das Geld reicht nicht weiter.'); alarm(); }
   else if (n) toast(`${n} Kacheln · ${eur(total)}`, 1400);
   if (S.dirty) { refresh(S); hud(); }
+  if (n) { changed = true; sound.play(tool.id === 'bulldoze' ? 'bulldoze' : 'click'); }
 }
 function commitGhost(e) {
-  const g = ghost; if (!g.ok) { if (S.money < BUILD[g.key].cost) toast('Zu wenig Geld'); return; }
+  const g = ghost; if (!g.ok) { if (S.money < BUILD[g.key].cost) { toast('Zu wenig Geld'); alarm(); } return; }
   const r = placeBuilding(S, g.key, g.x, g.y);
-  if (!r.ok) { toast(r.why); return; }
-  refresh(S); hud();
+  if (!r.ok) { toast(r.why); if (r.why === 'Zu wenig Geld') alarm(); return; }
+  refresh(S); hud(); changed = true; sound.play('build');
   if (BUILD[g.key].unique) { setTool('hand'); toast(`${BUILD[g.key].name} eröffnet!`); }
 }
 function queryTile(x, y) {
@@ -278,6 +284,70 @@ $('bOverlay').onclick = () => {
   $('sBody').onclick = (e) => { const b = e.target.closest('[data-o]'); if (!b) return; overlay = b.dataset.o; ui.overlay = overlay; closeSheet(); needDraw = true; };
 };
 
+// ---------------------------------------------------------------- Verlauf (Diagramme im Rat)
+const CHARTS = [
+  { id: 'chPop', key: 'pop', label: 'Einwohner', css: '--good', fb: '#4cc46a', txt: (v) => fmt(v) },
+  { id: 'chMoney', key: 'money', label: 'Kasse', css: '--accent', fb: '#ffb703', txt: (v) => eur(v), zero: true },
+  { id: 'chHappy', key: 'happy', label: 'Zufriedenheit', css: '--chart-happy', fb: '#4a8df0', txt: (v) => Math.round(v) + ' / 100', fixed: [0, 100] },
+];
+const CHART_YEARS = 10; // gezeigt werden die letzten 10 Einträge (je ein Jahresende)
+function histHtml() {
+  if (S.hist.length < 2) return '<h3 class="sec">Verlauf</h3><p class="chart-note">Noch keine Daten – ab dem zweiten Jahreswechsel gibt es Verlauf.</p>';
+  const last = S.hist[S.hist.length - 1];
+  return '<h3 class="sec">Verlauf</h3>' + CHARTS.map((c) => `<div class="chart-cap"><span>${c.label}</span><b>${c.txt(last[c.key])}</b></div><canvas class="chart" id="${c.id}"></canvas>`).join('');
+}
+/** Zeichnet alle Verlaufsdiagramme neu (no-op, solange keine Canvas-Elemente im Rat sind). */
+function drawCharts() {
+  if (!S || !$('chPop')) return;
+  const rows = S.hist.slice(-CHART_YEARS);
+  if (rows.length < 2) return;
+  const css = getComputedStyle(document.documentElement);
+  const colVar = (n, fb) => css.getPropertyValue(n).trim() || fb;
+  const grid = colVar('--line', '#ffffff1c'), muted = colVar('--muted', '#97a6bd');
+  for (const c of CHARTS) {
+    const cv = $(c.id); if (!cv) continue;
+    drawChart(cv, rows, c, colVar(c.css, c.fb), grid, muted);
+  }
+}
+function drawChart(cv, rows, c, color, grid, muted) {
+  const w = cv.clientWidth, h = cv.clientHeight; if (!w || !h) return; // nicht sichtbar
+  const dpr = window.devicePixelRatio || 1;
+  const pw0 = Math.round(w * dpr), ph0 = Math.round(h * dpr);
+  if (cv.width !== pw0 || cv.height !== ph0) { cv.width = pw0; cv.height = ph0; }
+  const g = cv.getContext('2d'); if (!g) return;
+  g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+  const padL = 36, padR = 6, padT = 6, padB = 14;
+  const pw = w - padL - padR, ph = h - padT - padB;
+  let lo, hi;
+  if (c.fixed) { lo = c.fixed[0]; hi = c.fixed[1]; }
+  else {
+    lo = Infinity; hi = -Infinity;
+    for (const r of rows) { const v = r[c.key]; if (v < lo) lo = v; if (v > hi) hi = v; }
+    if (c.zero) { if (lo > 0) lo = 0; if (hi < 0) hi = 0; }
+  }
+  if (hi - lo < 1e-9) hi = lo + 1;
+  const X = (i) => padL + pw * i / (rows.length - 1);
+  const Y = (v) => padT + ph * (1 - (v - lo) / (hi - lo));
+  const short = (v) => (Math.abs(v) >= 10000 ? Math.round(v / 1000) + 'k' : fmt(v));
+  // Gitter und Nulllinie
+  g.lineWidth = 1;
+  g.strokeStyle = grid;
+  g.beginPath(); g.moveTo(padL, padT + 0.5); g.lineTo(w - padR, padT + 0.5); g.moveTo(padL, padT + ph + 0.5); g.lineTo(w - padR, padT + ph + 0.5); g.stroke();
+  if (lo < 0 && hi > 0) { g.strokeStyle = muted; g.beginPath(); g.moveTo(padL, Math.round(Y(0)) + 0.5); g.lineTo(w - padR, Math.round(Y(0)) + 0.5); g.stroke(); }
+  // Achsenbeschriftung: Max oben, Min unten, erstes/letztes Jahr
+  g.fillStyle = muted; g.font = '10px system-ui,sans-serif';
+  g.textAlign = 'right'; g.textBaseline = 'top'; g.fillText(short(hi), padL - 4, padT - 2);
+  g.textBaseline = 'bottom'; g.fillText(short(lo), padL - 4, padT + ph + 2);
+  g.textBaseline = 'bottom'; g.textAlign = 'left'; g.fillText(String(rows[0].y), padL, h);
+  g.textAlign = 'right'; g.fillText(String(rows[rows.length - 1].y), w - padR, h);
+  // Linie
+  g.strokeStyle = color; g.lineWidth = 2; g.lineJoin = 'round'; g.beginPath();
+  for (let i = 0; i < rows.length; i++) { const x = X(i), y = Y(rows[i][c.key]); if (i) g.lineTo(x, y); else g.moveTo(x, y); }
+  g.stroke();
+  const lx = X(rows.length - 1), ly = Y(rows[rows.length - 1][c.key]);
+  g.fillStyle = color; g.beginPath(); g.arc(lx, ly, 2.5, 0, Math.PI * 2); g.fill();
+}
+
 function councilHtml() {
   const st = S.stats, f = S.fin, p = f.parts;
   const cl = (v) => (v >= 0 ? 'pos' : 'neg');
@@ -297,6 +367,7 @@ function councilHtml() {
     <button class="btn small" id="bLoan">+10.000 € leihen</button><button class="btn small" id="bRepay">10.000 € tilgen</button>
     <h3 class="sec">Zufriedenheit: ${Math.round(st.happy)} / 100</h3>
     <div class="kv">${Object.entries(st.parts).filter(([, v]) => Math.abs(v) >= 0.5).map(([k, v]) => `<span>${names[k]}</span><span class="${cl(v)}">${v >= 0 ? '+' : ''}${v.toFixed(1)}</span>`).join('') || '<span>Alles neutral</span><span></span>'}</div>
+    ${histHtml()}
     <h3 class="sec">Stadt</h3>
     <div class="kv"><span>Einwohner</span><span>${fmt(st.pop)}</span><span>Arbeitsplätze</span><span>${fmt(st.jobs)} (davon Banken ${fmt(st.jobsB)})</span><span>Arbeitslosigkeit</span><span>${Math.round(st.unemp * 100)} %</span>
     <span>Strom</span><span>${fmt(S.powerCap)} / ${fmt(S.powerLoad)}</span><span>Grundwert Ø</span><span>${Math.round(st.value)}</span><span>Stau</span><span>${Math.round(st.cong * 100)} %</span></div>
@@ -304,21 +375,48 @@ function councilHtml() {
 }
 $('bCouncil').onclick = () => {
   sheet('Stadtrat', councilHtml());
+  drawCharts();
   const body = $('sBody');
   body.oninput = (e) => { const r = e.target.dataset.r; if (r) { S.rates[r] = Number(e.target.value); $('rv' + r).textContent = S.rates[r] + ' %'; } };
   body.onclick = (e) => {
-    if (e.target.id === 'bLoan') { if (!takeLoan(S)) toast('Mehr Kredit gibt es nicht.'); body.innerHTML = councilHtml(); hud(); }
-    if (e.target.id === 'bRepay') { if (!repayLoan(S)) toast('Nicht möglich (Geld oder Schulden).'); body.innerHTML = councilHtml(); hud(); }
+    if (e.target.id === 'bLoan') { if (!takeLoan(S)) toast('Mehr Kredit gibt es nicht.'); else sound.play('money'); body.innerHTML = councilHtml(); drawCharts(); hud(); }
+    if (e.target.id === 'bRepay') { if (!repayLoan(S)) toast('Nicht möglich (Geld oder Schulden).'); else sound.play('money'); body.innerHTML = councilHtml(); drawCharts(); hud(); }
   };
 };
 
 // ---------------------------------------------------------------- Speichern / Laden / Menü
 async function saveNow(manual) {
-  if (!S || !slot || saving) return;
+  if (!S || !slot) { if (manual) toast('Kein Speicherplatz aktiv'); return; }
+  if (saving) { saveAgain = true; return; }
   saving = true;
-  try { const r = await saveSlot(slot, S); lastSaveMsg = r === 'beide' ? 'Gespeichert (Gerät + Webspace)' : 'Gespeichert (nur Gerät – Webspace nicht erreichbar)'; if (manual) toast(lastSaveMsg, 3200); }
-  catch (err) { toast('Speichern fehlgeschlagen: ' + err.message); }
+  try {
+    const r = await saveSlot(slot, S); lastSaveAt = Date.now(); changed = false;
+    lastSaveMsg = `Gespeichert in Platz ${slot} (${r.where})`;
+    if (manual) {
+      toast(lastSaveMsg + ' …', 2000);
+      r.remote.then((ok) => toast(lastSaveMsg + (ok ? ' + Webspace' : ' – Webspace nicht erreichbar'), 3000));
+    }
+  } catch (err) { toast('Speichern fehlgeschlagen: ' + err.message + ' – Tipp: Menü → Als Datei exportieren', 6000); }
   saving = false;
+  if (saveAgain) { saveAgain = false; saveNow(false); }
+}
+/** Beim Verlassen der Seite: synchroner Schnappschuss (sicher) + normales Speichern (falls Zeit bleibt). */
+function saveOnLeave() { if (!S || !slot) return; snapshot(S, slot); saveNow(false); }
+async function doExport() {
+  if (!S) return;
+  try { const name = await exportFile(S); toast('Datei gespeichert: ' + name, 3500); } catch (err) { toast('Export fehlgeschlagen: ' + err.message, 4000); }
+}
+function doImport(n) {
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.simfurt,.json,.gz,application/json,application/octet-stream';
+  inp.onchange = async () => {
+    const f = inp.files && inp.files[0]; if (!f) return;
+    try {
+      const s = await importFile(f);
+      if (!n) n = slot || 1;
+      startGame(s, n); await saveNow(false); toast(`Datei geladen in Platz ${n}: ${s.name}`, 3500);
+    } catch (err) { toast('Import fehlgeschlagen: ' + err.message, 5000); }
+  };
+  inp.click();
 }
 
 function slotRow(info) {
@@ -328,16 +426,17 @@ function slotRow(info) {
   const state = r === undefined ? '' : r ? (m && m.savedAt >= r.savedAt ? ' ☁ gesichert' : ' ☁ neuer online') : ' (nicht online)';
   return `<div class="slot"><h3>Platz ${info.slot}${best ? ' – ' + best.name : ''}</h3>
     <p>${best ? `${MONTHS[best.month]} ${best.year} · 👥 ${fmt(best.pop)} · ${eur(best.money)}<br>${when(best)}${state}` : 'Leer'}</p>
-    <div class="acts">${best ? `<button class="btn" data-load="${info.slot}">Laden</button>` : ''}<button class="btn pri" data-new="${info.slot}">Neue Stadt</button>${best ? `<button class="btn dng" data-del="${info.slot}">✕</button>` : ''}</div></div>`;
+    <div class="acts">${best ? `<button class="btn" data-load="${info.slot}">Laden</button>` : ''}<button class="btn pri" data-new="${info.slot}">Neue Stadt</button><button class="btn" data-imp="${info.slot}" title="Datei in diesen Platz laden">📂</button>${best ? `<button class="btn dng" data-del="${info.slot}">✕</button>` : ''}</div></div>`;
 }
 
 async function openMenu(first) {
   const base = (rows) => `<div class="title"><h1>SIMFURT</h1><p>Die Städtebau-Simulation am Main</p></div>
-    ${S && !first ? `<button class="btn pri" id="mResume">Weiterspielen</button><button class="btn" id="mSave">💾 Jetzt speichern${slot ? ' (Platz ' + slot + ')' : ''}</button>` : ''}
+    ${S && !first ? `<button class="btn pri" id="mResume">Weiterspielen</button><button class="btn" id="mSave">💾 Jetzt speichern${slot ? ' (Platz ' + slot + ')' : ''}</button><button class="btn" id="mExport">📤 Als Datei exportieren</button>` : ''}
     <h3 class="sec">Spielstände</h3>${rows}
     <div class="chk"><input type="checkbox" id="mDis" ${S ? (S.disasters ? 'checked' : '') : 'checked'}><label for="mDis">Katastrophen (Feuer, Hochwasser)</label></div>
+    <div class="chk"><input type="checkbox" id="mSnd" ${sound.on ? 'checked' : ''}><label for="mSnd">Ton</label></div>
     <details class="slot"><summary><b>So geht's</b></summary><p style="margin-top:8px">1. <b>Straße</b> ziehen · 2. <b>Zonen</b> (Wohnen, Gewerbe, Industrie) als Rechteck neben die Straße · 3. <b>Gaskraftwerk</b> bauen · 4. Zeit läuft: die Stadt wächst nach Nachfrage (Balken oben). Später Polizei, Feuerwehr, Schulen, Parks, U-Bahn und Wahrzeichen. Banken und Skyline gibt es ab 3.000 Einwohnern. Steuern und Kredit im <b>Rat</b>.</p></details>
-    <p style="color:var(--muted);font-size:12px">Gespeichert wird auf dem Gerät und – wenn online – auf Daniels Webspace. Tipp: Zwei Finger = Karte verschieben/zoomen, Maus: rechte Taste ziehen, Rad = Zoom.</p>`;
+    <p style="color:var(--muted);font-size:12px">Speicher: ${storageInfo().local} · Webspace: ${storageInfo().remote}${lastSaveAt ? ' · zuletzt ' + new Date(lastSaveAt).toLocaleTimeString('de-DE', { timeStyle: 'short' }) : ''}. Autospeichern alle 3 Spielmonate, jede Minute und beim Verlassen. Sicherung: 📤 exportieren, 📂 importieren. Tipp: Zwei Finger = Karte verschieben/zoomen, Maus: rechte Taste ziehen, Rad = Zoom.</p>`;
   sheet(first ? 'Willkommen' : 'Menü', base('<p style="color:var(--muted)">Lade …</p>'));
   bindMenu();
   const show = (infos) => { if ($('sheet').hidden || $('sTitle').textContent === 'Neue Stadt') return; $('sBody').innerHTML = base(infos.map(slotRow).join('')); bindMenu(); };
@@ -352,9 +451,14 @@ function bindMenu() {
     else if (t.id === 'mSave') { await saveNow(true); openMenu(); }
     else if (t.dataset.load) { t.textContent = 'Lade …'; await startLoad(Number(t.dataset.load)); }
     else if (t.dataset.new) newGameDialog(Number(t.dataset.new));
+    else if (t.id === 'mExport') doExport();
+    else if (t.dataset.imp) doImport(Number(t.dataset.imp));
     else if (t.dataset.del) { if (confirm('Diesen Spielstand wirklich löschen (auch online)?')) { await deleteSlot(Number(t.dataset.del)); if (slot === Number(t.dataset.del)) slot = 0; openMenu(); } }
   };
-  b.onchange = (e) => { if (e.target.id === 'mDis' && S) S.disasters = e.target.checked; };
+  b.onchange = (e) => {
+    if (e.target.id === 'mDis' && S) S.disasters = e.target.checked;
+    if (e.target.id === 'mSnd') { sound.on = e.target.checked; if (sound.on) sound.play('click'); }
+  };
 }
 async function startLoad(n) {
   try {
@@ -376,7 +480,7 @@ function newGameDialog(n) {
   };
 }
 function startGame(s, n) {
-  S = s; slot = n; S.onMsg = ticker; S.onMilestone = () => { renderItems(); };
+  S = s; slot = n; S.onMsg = ticker; S.onMilestone = () => { renderItems(); sound.play('milestone'); };
   closeSheet(); renderCats(); renderItems(); speed = 1; lastHud = ''; hud();
   // Kamera: Mitte der Karte
   R.centerOn(N / 2, N / 2); R.cam.z = Math.min(1, Math.max(0.55, R.w / 560)); R.clampCam();
@@ -417,7 +521,7 @@ function frame(now) {
       acc += dt * 1000;
       const step = SPEEDMS[speed];
       let n = 0;
-      while (acc >= step && n < 4) { acc -= step; tick(S); n++; if (S.month === 0) saveNow(false); }
+      while (acc >= step && n < 4) { acc -= step; tick(S); n++; changed = true; if (S.month % 3 === 0) saveNow(false); }
       if (n) { hud(); if (cat) renderItems(); needDraw = true; }
     }
     stepCars(dt);
@@ -427,14 +531,16 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-function fit() { R.resize(); layoutFab(); needDraw = true; }
+function fit() { R.resize(); layoutFab(); needDraw = true; drawCharts(); }
 window.addEventListener('resize', fit);
-document.addEventListener('visibilitychange', () => { if (document.hidden) saveNow(false); });
-window.addEventListener('pagehide', () => saveNow(false));
+document.addEventListener('visibilitychange', () => { if (document.hidden) saveOnLeave(); });
+window.addEventListener('pagehide', saveOnLeave);
+setInterval(() => { if (changed && Date.now() - lastSaveAt > 55000) saveNow(false); }, 15000);
 
 // ---------------------------------------------------------------- Start
 fit();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+persist();
 (async function boot() {
   S = newCity({ name: 'Simfurt', seed: 7 }); // Hintergrund fürs Menü
   R.centerOn(N / 2, N / 2); R.cam.z = 0.6; renderCats(); hud();
