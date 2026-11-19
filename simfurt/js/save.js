@@ -1,11 +1,11 @@
 // Simfurt – Speichern.
 // Drei Plätze. Lokal zuerst (IndexedDB, Ersatz: localStorage), zusätzlich ein synchroner Notfall-Schnappschuss beim Verlassen der Seite.
-// Optional im Hintergrund: Webspace (PHP, simfurt/api.php im Repo vipervocs) – blockiert nie das lokale Speichern.
+// Optional im Hintergrund: Webspace (PHP, simfurt/api.php in diesem Repo, Deploy per deploy-backend.yml) – blockiert nie das lokale Speichern.
 // Außerdem Export/Import als Datei (.simfurt = gzip-JSON, ohne CompressionStream reines JSON).
 import { N } from './data.js';
 import { newCity, refresh, say } from './sim.js';
 
-export const REMOTE_URL = 'https://phpexpert.de/vocs/simfurt/api.php';
+export const REMOTE_URL = 'https://phpexpert.de/games/simfurt/api.php';
 export const SLOTS = [1, 2, 3];
 const DB = 'simfurt-save', STORE = 'slots', FORMAT = 2, FORMATS = [1, 2], TIMEOUT = 8000, RETRY_MS = 5 * 60 * 1000;
 const LS_SLOT = (slot) => 'simfurt-slot-' + slot, LS_SNAP = 'simfurt-snap', PENDING = (slot) => 'simfurt-pending-' + slot;

@@ -5,7 +5,7 @@ Eigenständiges Städtebauspiel im Frankfurter Gewand (Main, Skyline, Bankenvier
 ## Ziele
 - Offline-fähige PWA (`simfurt/`), eigener Cache (`simfurt-`), eigener Spielstand, unabhängig von den anderen Spielen.
 - Optimiert für Pixel 8a im **Hochformat** (Touch), dazu gut mit **Maus und Tastatur** am PC.
-- Spielstand lokal (IndexedDB, Ersatz localStorage), als **Datei** (Export/Import) und optional auf Daniels Webspace (PHP, `simfurt/api.php` im Repo `CrazyViperPilot/vipervocs`, Deploy per dortiger Action, analog Fruhno). Das Spiel funktioniert vollständig ohne Webspace.
+- Spielstand lokal (IndexedDB, Ersatz localStorage), als **Datei** (Export/Import) und optional auf Daniels Webspace (PHP, `simfurt/api.php` in diesem Repo, Deploy per `deploy-backend.yml`, analog Fruhno). Das Spiel funktioniert vollständig ohne Webspace.
 
 ## Spielprinzip
 Karte wählbar 64×64, 96×96 oder 128×128 Kacheln (im Neue-Stadt-Dialog, im Spielstand gespeichert) mit Fluss (Main) und Wald, isometrisch (Canvas 2D, Sprite-Cache). Ein Tick = ein Monat (Start Januar 1990). Der Spieler legt Straßen, Zonen, Kraftwerke und Dienste an; die Stadt wächst automatisch nach Nachfrage.
@@ -52,9 +52,9 @@ Strom: Gaskraftwerk, Windpark (ab 800), Solarpark (ab 4.000). Dienste: Polizei, 
 - **Notfall-Schnappschuss**: beim Verstecken/Schließen der Seite synchron in `localStorage` (`simfurt-snap`), weil asynchrones Speichern dort oft nicht fertig wird. Beim Laden gewinnt der neueste Stand aus lokal, Schnappschuss und Webspace; ein beschädigter Stand wird übersprungen.
 - **Autospeichern** alle 3 Spielmonate, jede Minute Echtzeit (wenn sich etwas geändert hat), beim Verlassen und über „Jetzt speichern“. Beim Start wird der zuletzt gespielte Platz geladen. `navigator.storage.persist()` wird angefragt.
 - **Datei**: Menü → „📤 Als Datei exportieren“ (`Name-JJJJ-MM.simfurt`, gzip-JSON; ohne CompressionStream reines JSON); „📂“ je Platz importiert eine Datei in diesen Platz.
-- **Webspace (optional)**: `https://phpexpert.de/vocs/simfurt/api.php` (`?ping=1`, `?list=1`, `?slot=N`, POST save/delete, ohne Login). Nicht-JSON-Antwort, 404 oder Netzfehler → 5 Minuten „nicht erreichbar“, kein weiterer Versuch; nicht gesendete Stände werden gemerkt (`simfurt-pending-N`) und später nachgeschickt. Status steht im Menü.
-- Server: `simfurt/api.php` + `simfurt/data/.htaccess` im Repo vipervocs; Deploy-Workflow kopiert `simfurt/` mit; vorheriger Stand bleibt als `prevN` erhalten. Meta: `savedAt, format, name, year, month, pop, money, mapSize, bytes`.
-- Stand Nov 2026: `https://phpexpert.de/vocs/…` liefert 404 (Deploy/Hosting prüfen: Secrets der Umgebung „Dogado“, Zielordner `FTP_DIR`).
+- **Webspace (optional)**: `https://phpexpert.de/games/simfurt/api.php` (`?ping=1`, `?list=1`, `?slot=N`, POST save/delete, ohne Login). Nicht-JSON-Antwort, 404 oder Netzfehler → 5 Minuten „nicht erreichbar“, kein weiterer Versuch; nicht gesendete Stände werden gemerkt (`simfurt-pending-N`) und später nachgeschickt. Status steht im Menü.
+- Server: `simfurt/api.php` + `simfurt/data/.htaccess` in diesem Repo; `deploy-backend.yml` lädt sie nach `/games/simfurt/`; vorheriger Stand bleibt als `prevN` erhalten. Meta: `savedAt, format, name, year, month, pop, money, mapSize, bytes`.
+- Nov 2026: Backend von `/vocs/simfurt/` nach `/games/simfurt/` umgezogen (games ist eigenständig). Live geprüft (19.11.2026): ping, list, save, load, delete und CORS für GitHub Pages funktionieren.
 
 ## Technik
 Vanilla ES-Module, kein Build. `js/data.js` (Daten), `js/sim.js` (Logik), `js/render.js` (isometrische Sprites, Autos, Overlays), `js/save.js` (lokal/Datei/Webspace), `js/sound.js` (WebAudio), `js/minimap.js` (Minikarte), `js/main.js` (UI/Eingabe/Schleife). Tests: `node simfurt/test/sim.test.js` und `node simfurt/test/save.test.js` (bzw. `npm test` im Ordner; Workflow `test-simfurt.yml`). Arbeitsplan: `PLAN.md`. Service Worker network-first, Cache-Name in `sw.js` bei Änderungen hochzählen.
