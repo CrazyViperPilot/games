@@ -117,7 +117,7 @@ function generateMap(s) {
   const nx = -dy / len, ny = dx / len;
   const pts = [a];
   for (let k = 1; k <= nCtl; k++) {
-    const t = k / (nCtl + 1), off = (rand(s) * 2 - 1) * N * 0.2;
+    const t = k / (nCtl + 1), off = (rand(s) * 2 - 1) * N * 0.26;
     const bx = t < 0.5 ? a[0] + (mx0 - a[0]) * 2 * t : mx0 + (b[0] - mx0) * (2 * t - 1);
     const by = t < 0.5 ? a[1] + (my0 - a[1]) * 2 * t : my0 + (b[1] - my0) * (2 * t - 1);
     pts.push([cl(bx + nx * off), cl(by + ny * off)]);
@@ -125,7 +125,7 @@ function generateMap(s) {
   pts.push(b);
   const path = splinePts(pts, 12), M = path.length;
   // Mäander: sanfte Schlangenlinie senkrecht zum Lauf (am Ein-/Austritt ausgeblendet)
-  const wig = (0.9 + rand(s) * 0.6) * sc, cyc = 2 + rint(s, 3), phw = rand(s) * 6.283;
+  const wig = (1.4 + rand(s) * 0.7) * sc, cyc = 2 + rint(s, 3), phw = rand(s) * 6.283;
   const wp = path.map((p, j) => {
     const p0 = path[Math.max(0, j - 1)], p1 = path[Math.min(M - 1, j + 1)];
     const tl = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) || 1;
@@ -135,22 +135,31 @@ function generateMap(s) {
   // Breite variiert entlang des Laufs; optional breite Stelle mit Insel
   const wLo = (1.8 + rand(s) * 0.6) * sc, wHi = (2.8 + rand(s) * 0.8) * sc, fw = 1 + rint(s, 2), phx = rand(s) * 6.283;
   const island = rand(s) < 0.35, uI = 0.3 + rand(s) * 0.4, riI = (1.2 + rand(s) * 0.5) * sc;
-  const half = (u) => {
-    let r = (wLo + (wHi - wLo) * (0.5 + 0.5 * Math.sin(2 * Math.PI * fw * u + phx))) / 2 + 0.5;
+  const half = (u, extra) => {
+    let r = (wLo + (wHi - wLo) * (0.5 + 0.5 * Math.sin(2 * Math.PI * fw * u + phx))) / 2 + extra;
     if (island) r += (riI + 1.8 * sc) * Math.exp(-(((u - uI) / 0.07) ** 2));
     return r;
   };
-  for (let j = 0; j < M; j++) {
-    const p = wp[j];
-    diskT(s, p[0], p[1], half(j / (M - 1)), T_WATER);
-    if (j) lineT(s, Math.floor(wp[j - 1][0]), Math.floor(wp[j - 1][1]), Math.floor(p[0]), Math.floor(p[1]), T_WATER);
-  }
-  if (island) {
-    const p = wp[Math.round(uI * (M - 1))];
-    for (let y = Math.floor(p[1] - riI - 2); y <= Math.floor(p[1] + riI + 2); y++) for (let x = Math.floor(p[0] - riI - 2); x <= Math.floor(p[0] + riI + 2); x++) {
-      if (inb(x, y) && Math.hypot(x + 0.5 - p[0], y + 0.5 - p[1]) <= riI) s.terrain[idx(x, y)] = T_GRASS;
+  // Hauptfluss (+ Insel) malen; ohne Zufallsaufrufe, daher beliebig oft wiederholbar
+  const paintRiver = (extra) => {
+    s.terrain.fill(0);
+    for (let j = 0; j < M; j++) {
+      const p = wp[j];
+      diskT(s, p[0], p[1], half(j / (M - 1), extra), T_WATER);
+      if (j) lineT(s, Math.floor(wp[j - 1][0]), Math.floor(wp[j - 1][1]), Math.floor(p[0]), Math.floor(p[1]), T_WATER);
     }
-  }
+    if (island) {
+      const p = wp[Math.round(uI * (M - 1))];
+      for (let y = Math.floor(p[1] - riI - 2); y <= Math.floor(p[1] + riI + 2); y++) for (let x = Math.floor(p[0] - riI - 2); x <= Math.floor(p[0] + riI + 2); x++) {
+        if (inb(x, y) && Math.hypot(x + 0.5 - p[0], y + 0.5 - p[1]) <= riI) s.terrain[idx(x, y)] = T_GRASS;
+      }
+    }
+  };
+  paintRiver(0.5);
+  // Mindestwasseranteil: ist der Fluss zu schmal (kurzer Eck-Lauf), wird er etwas breiter gemalt
+  let water = 0;
+  for (let i = 0; i < NN; i++) if (s.terrain[i] === T_WATER) water++;
+  if (water < 0.06 * NN) paintRiver(1.6);
   // 0–2 schmale Seitenarme (1 Kachel) von einer anderen Kante in den Hauptfluss.
   // Ein Arm wird verworfen, wenn die größte Landfläche unter 41 % fiele (Regel: ≥ 40 %).
   const others = [0, 1, 2, 3].filter((k) => k !== eIn && k !== eOut);

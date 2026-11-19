@@ -1,7 +1,8 @@
 // Tests für Simfurt: node simfurt/test/sim.test.js
 import assert from 'node:assert';
-import { N, T_WATER, BUILD } from '../js/data.js';
+import { N, T_WATER, T_TREES, BUILD } from '../js/data.js';
 import { newCity, tick, applyTool, placeBuilding, canPlace, refresh, unlocked, idx, takeLoan, repayLoan } from '../js/sim.js';
+import { performance } from 'node:perf_hooks';
 import { serialize, deserialize } from '../js/save.js';
 import { buildCity } from './bot.mjs';
 
@@ -115,6 +116,86 @@ test('Kartengröße 128: Karte, Wachstum und Speichern passen', () => {
   const r = deserialize(serialize(s));
   assert.strictEqual(N, 128); assert.deepStrictEqual(r.lvl, s.lvl); assert.strictEqual(r.stats.pop, s.stats.pop);
   const small = deserialize(serialize(newCity({ seed: 1 }))); assert.strictEqual(N, 64); assert.strictEqual(small.terrain.length, 4096);
+});
+
+// ---------------------------------------------------------------- Flusslauf (P2)
+// 4-zusammenhängende Komponenten von Wasser oder Land, größte zuerst; edges = berührte Kanten
+function components(s, water) {
+  const n = N, T = s.terrain, seen = new Uint8Array(n * n), out = [];
+  for (let i0 = 0; i0 < n * n; i0++) {
+    if (seen[i0] || (T[i0] === T_WATER) !== water) continue;
+    const st = [i0], edges = new Set(); let size = 0; seen[i0] = 1;
+    while (st.length) {
+      const i = st.pop(), x = i % n, y = (i - x) / n; size++;
+      if (x === 0) edges.add('W'); if (x === n - 1) edges.add('O'); if (y === 0) edges.add('N'); if (y === n - 1) edges.add('S');
+      for (const [xx, yy] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+        if (xx < 0 || yy < 0 || xx >= n || yy >= n) continue;
+        const j = yy * n + xx;
+        if (!seen[j] && (T[j] === T_WATER) === water) { seen[j] = 1; st.push(j); }
+      }
+    }
+    out.push({ size, edges });
+  }
+  return out.sort((a, b) => b.size - a.size);
+}
+const SIZES = [64, 96, 128];
+
+test('Flusslauf: 30 Seeds ergeben mindestens 5 verschiedene Kantenpaare', () => {
+  const keys = new Set();
+  for (let seed = 1; seed <= 30; seed++) keys.add([...components(newCity({ seed }), true)[0].edges].sort().join(''));
+  assert.ok(keys.size >= 5, 'verschiedene Kantenpaare: ' + keys.size);
+});
+
+test('Flusslauf: Wasseranteil liegt für 30 Seeds je Kartengröße zwischen 4 und 22 %', () => {
+  for (const size of SIZES) for (let seed = 1; seed <= 30; seed++) {
+    const s = newCity({ seed, size }), share = s.terrain.filter((t) => t === T_WATER).length / (size * size);
+    assert.ok(share >= 0.04 && share <= 0.22, `Wasseranteil ${(share * 100).toFixed(1)} % (Größe ${size}, Seed ${seed})`);
+  }
+});
+
+test('Flusslauf: Hauptfluss berührt zwei verschiedene Kanten und ist zusammenhängend', () => {
+  for (const size of SIZES) for (let seed = 1; seed <= 30; seed++) {
+    const s = newCity({ seed, size }), main = components(s, true)[0];
+    assert.ok(main.edges.size >= 2, `Kanten ${[...main.edges]} (Größe ${size}, Seed ${seed})`);
+    assert.ok(main.size >= size * 2, `Hauptfluss nur ${main.size} Kacheln (Größe ${size}, Seed ${seed})`);
+  }
+});
+
+test('Flusslauf: größte Landfläche ist mindestens 40 % der Karte', () => {
+  for (const size of SIZES) for (let seed = 1; seed <= 30; seed++) {
+    const s = newCity({ seed, size }), land = components(s, false)[0].size / (size * size);
+    assert.ok(land >= 0.4, `größte Landfläche ${(land * 100).toFixed(1)} % (Größe ${size}, Seed ${seed})`);
+  }
+});
+
+test('Flusslauf: gleicher Seed gibt dieselbe Karte, anderer Seed eine andere (auch 96/128)', () => {
+  for (const size of [96, 128]) {
+    const a = newCity({ seed: 21, size }), b = newCity({ seed: 21, size }), c = newCity({ seed: 22, size });
+    assert.deepStrictEqual(a.terrain, b.terrain, 'Größe ' + size);
+    assert.notDeepStrictEqual(a.terrain, c.terrain, 'Größe ' + size);
+  }
+});
+
+test('Flusslauf: Startfläche in der Mitte bleibt im Mittel waldarm', () => {
+  let sum = 0;
+  for (let seed = 1; seed <= 30; seed++) {
+    const s = newCity({ seed, size: 64 }); let ct = 0, cl = 0, at = 0, al = 0;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const t = s.terrain[idx(x, y)]; if (t === T_WATER) continue;
+      const c = x > N * 0.28 && x < N * 0.72 && y > N * 0.22 && y < N * 0.78;
+      al++; if (t === T_TREES) at++;
+      if (c) { cl++; if (t === T_TREES) ct++; }
+    }
+    sum += (ct / cl) / (at / al);
+  }
+  assert.ok(sum / 30 < 0.6, 'mittlere Waldquote Mitte/gesamt ' + (sum / 30).toFixed(2));
+});
+
+test('Flusslauf: Kartenerzeugung 128×128 bleibt unter 100 ms', () => {
+  newCity({ seed: 1, size: 128 });
+  const t0 = performance.now(); newCity({ seed: 7, size: 128 }); const dt = performance.now() - t0;
+  console.log('   Karte 128: ' + dt.toFixed(1) + ' ms');
+  assert.ok(dt < 100, dt + ' ms');
 });
 
 console.log(`${n} Tests ok`);
