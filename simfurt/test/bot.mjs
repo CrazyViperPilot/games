@@ -16,6 +16,12 @@ export function placePumps(s, count, cx = 32, cy = 32) {
 export function buildCity(s) {
   placePumps(s, 6);
   for (const [x,y] of [[15,19],[33,19],[45,19],[15,37],[33,37],[45,37]]) placeBuilding(s,'gas',x,y);
+  // Deponie in der Kartenecke (weit weg von der Stadt), damit der Müll ab 400 Einwohnern entsorgt wird
+  let dumped = false;
+  for (let y = N - 3; y >= 1 && !dumped; y--) for (let x = N - 3; x >= 1 && !dumped; x--) dumped = placeBuilding(s, 'dump', x, y).ok;
+  // Müllverbrennung in der Ecke: ohne sie wäre die Deponie nach ~60 Monaten voll und die Stadt sänke ab
+  let burned = false;
+  for (let y = N - 3; y >= 1 && !burned; y--) for (let x = N - 3; x >= 1 && !burned; x--) burned = placeBuilding(s, 'incin', x, y).ok;
   // Raster aus Straßen oberhalb des Flusses, Zonen dazwischen
   const g = 6;
   for (let y = 18; y < 46; y++) for (let x = 14; x < 50; x++) {

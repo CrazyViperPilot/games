@@ -4,6 +4,13 @@ import { N, T_WATER, T_TREES, Z_R, Z_C, Z_I, Z_B, ZONES, BUILD } from './data.js
 export const TW = 64, TH = 32;
 const SS = 2;                                   // Sprite-Auflösung (Supersampling)
 const sprites = new Map();
+// Lichtpass (Nacht): Sprite-Funktionen zeichnen unverändert, aber Füllungen werden schwarz
+// (Gebäude-Silhouette verdeckt Licht dahinter); nur Fenster bekommen Lichtfarbe.
+let LIGHT = false, lightFill = '#000', lightCool = false;
+const lightCtx = (g) => new Proxy(g, {
+  get(t, k) { const v = t[k]; return typeof v === 'function' ? v.bind(t) : v; },
+  set(t, k, v) { t[k] = (k === 'fillStyle' || k === 'strokeStyle') ? lightFill : v; return true; },
+});
 
 // ---------------------------------------------------------------- Farben
 function hexToRgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
@@ -14,14 +21,19 @@ const rnd = (seed) => { let h = Math.imul(seed + 1, 0x9E3779B1); h ^= h >>> 15; 
 
 // ---------------------------------------------------------------- Sprite-Werkzeuge
 /** Erzeugt einen Sprite für eine Fläche fw×fh Kacheln mit maximaler Höhe hmax px. Lokale Ursprung: Spitze (oben) der Fläche. */
-function sprite(key, fw, fh, hmax, draw) {
+function sprite(key, fw, fh, hmax, draw, light = false, cool = false) {
   let sp = sprites.get(key);
   if (sp) return sp;
   const ox = fh * 32 + 4, oy = hmax + 4;
   const w = (fw + fh) * 32 + 8, h = (fw + fh) * 16 + hmax + 8;
-  const c = document.createElement('canvas'); c.width = w * SS; c.height = h * SS;
-  const g = c.getContext('2d'); g.scale(SS, SS);
-  draw(g, { ox, oy });
+  // Lichtsprites: gleiche Geometrie (w, h, ox, oy), aber 1× Auflösung – sie werden ohnehin skaliert gezeichnet
+  const ss = light ? 1 : SS;
+  const c = document.createElement('canvas'); c.width = w * ss; c.height = h * ss;
+  const g = c.getContext('2d'); g.scale(ss, ss);
+  if (light) {
+    LIGHT = true; lightFill = '#000'; lightCool = cool;
+    try { draw(lightCtx(g), { ox, oy }); } finally { LIGHT = false; lightFill = '#000'; }
+  } else draw(g, { ox, oy });
   sp = { c, ox, oy, w, h };
   sprites.set(key, sp);
   return sp;
@@ -58,12 +70,19 @@ function windows(g, o, u0, v0, u1, v1, z0, H, w) {
     g.save(); g.translate(bx[0], bx[1]); g.transform(1, dy / dx, 0, 1, 0, 0);
     const cw = (len * 32) / cols;
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-      const lit = rnd((w.seed || 0) * 131 + r * 17 + c * 7 + (side === 'L' ? 1 : 2)) < (w.lit ?? 0.35);
-      g.fillStyle = lit ? (w.litc || '#ffe9a8') : (w.dark || 'rgba(20,30,50,.55)');
+      if (LIGHT) { // Nachtpass: gleiche Fenster, nur ≈ 55 % leuchten (Banken kühlweiß, sonst warmgelb)
+        if (rnd((w.seed || 0) * 131 + r * 17 + c * 7 + (side === 'L' ? 3 : 5) + 4096) >= 0.55) continue;
+        lightFill = lightCool ? '#d4ebff' : '#ffd98a';
+        g.fillStyle = lightFill;
+      } else {
+        const lit = rnd((w.seed || 0) * 131 + r * 17 + c * 7 + (side === 'L' ? 1 : 2)) < (w.lit ?? 0.35);
+        g.fillStyle = lit ? (w.litc || '#ffe9a8') : (w.dark || 'rgba(20,30,50,.55)');
+      }
       g.fillRect(c * cw + cw * 0.22, -(r + 1) * rh + rh * 0.2 - 2, cw * 0.56, rh * 0.55);
     }
     g.restore();
   }
+  if (LIGHT) lightFill = '#000';
 }
 /** Satteldach: Firstachse entlang u (axis 'u') oder v. */
 function gable(g, o, u0, v0, u1, v1, z, H, col, axis = 'u') {
@@ -164,9 +183,9 @@ const WALL_R = ['#f1e2c0', '#f0d38a', '#e8b9a0', '#d9e0cc', '#efe9dc'];
 const ROOF_R = ['#b8452f', '#a1432c', '#7c3b2e', '#8c5a3c'];
 const GLASS = ['#5b8fb8', '#4f9aa8', '#7a8fb0', '#6d9a9a'];
 
-export function zoneBuilding(z, lvl, vr) {
+export function zoneBuilding(z, lvl, vr, light = false) {
   const v = vr & 31;
-  return sprite(`zb${z}_${lvl}_${v}`, 1, 1, z === Z_B ? 220 : 120, (g, o) => {
+  return sprite(`${light ? 'L' : ''}zb${z}_${lvl}_${v}`, 1, 1, z === Z_B ? 220 : 120, (g, o) => {
     const wall = WALL_R[v % WALL_R.length], roof = ROOF_R[(v >> 2) % ROOF_R.length];
     if (z === Z_R) {
       if (lvl === 1) {
@@ -222,16 +241,16 @@ export function zoneBuilding(z, lvl, vr) {
       else if (top === 2) { prism(g, o, 0.2, 0.2, 0.46, 0.8, H, 12 + lvl * 3, shade(gl, 1.05), { win: { c: 2, rows: 2, lit: 0.3, seed: v } }); }
       else { prism(g, o, 0.3, 0.3, 0.7, 0.7, H, 6, '#d6dcdf'); g.fillStyle = '#ff3b30'; g.beginPath(); g.arc(X(o, 0.5, 0.5), Y(o, 0.5, 0.5, H + 7), 1.6, 0, 7); g.fill(); }
     }
-  });
+  }, light, z === Z_B);
 }
 
 // ---------------------------------------------------------------- Dienste und Wahrzeichen
 function pad(g, o, w, h, col = '#a9b09a') { flat(g, o, 0, 0, w, h, col); flat(g, o, 0.04, 0.04, w - 0.04, h - 0.04, shade(col, 1.06)); }
 
-export function buildingSprite(key) {
+export function buildingSprite(key, light = false) {
   const d = BUILD[key];
-  const hmax = { fraport: 90, ctower: 260, maintower: 230, mtower: 230, dom: 190, uni: 100, gas: 110, wind: 120, hbf: 90, dike: 20, pump: 60, tower: 100, treat: 36 }[key] || 100;
-  return sprite('b_' + key, d.w, d.h, hmax, (g, o) => {
+  const hmax = { fraport: 90, ctower: 260, maintower: 230, mtower: 230, dom: 190, uni: 100, gas: 110, wind: 120, hbf: 90, dike: 20, pump: 60, tower: 100, treat: 36, incin: 110, dump: 40, recyc: 40 }[key] || 100;
+  return sprite((light ? 'L' : '') + 'b_' + key, d.w, d.h, hmax, (g, o) => {
     const w = d.w, h = d.h;
     switch (key) {
       case 'gas': {
@@ -401,9 +420,36 @@ export function buildingSprite(key) {
         prism(g, o, 3.7, 0.3, 4.7, 1.9, 0, 26, '#b8c5cf', { win: { c: 3, rows: 2, lit: 0.4, dark: 'rgba(40,80,120,.5)', seed: 3 } });
         prism(g, o, 0.6, 1.4, 1.3, 1.8, 0, 8, '#a6adb3'); prism(g, o, 4.3, 2.0, 4.5, 2.1, 0, 44, '#8a9096'); icon(g, o, 2.2, 1.7, 22, '✈', 22); break;
       }
+      case 'dump': {
+        // Deponie: abgedeckter Erdhügel mit grüner Kuppe
+        pad(g, o, w, h, '#8a7d5a');
+        ellipseFlat(g, o, 1.5, 1.5, 1.35, 1.35, 0, '#6b5b3e');
+        ellipseFlat(g, o, 1.5, 1.5, 1.0, 1.0, 4, '#7d6e4f');
+        ellipseFlat(g, o, 1.5, 1.5, 0.6, 0.6, 9, '#9c8f70');
+        ellipseFlat(g, o, 1.5, 1.5, 0.3, 0.3, 13, '#4f9a45');
+        icon(g, o, 1.5, 1.5, 22, '🗑', 13); break;
+      }
+      case 'incin': {
+        // Müllverbrennung: Halle mit Schornstein und Rauchfahne
+        pad(g, o, w, h, '#8f9489');
+        prism(g, o, 0.15, 0.2, 1.2, 1.85, 0, 22, '#8e8a84', { win: { c: 3, rows: 1, lit: 0.2, seed: 4 } });
+        for (let z = 0; z < 60; z += 4) ellipseFlat(g, o, 1.6, 1.0, 0.2, 0.2, z, z % 8 ? '#77716b' : '#6e6a66');
+        ellipseFlat(g, o, 1.6, 1.0, 0.2, 0.2, 60, '#5b5552');
+        g.fillStyle = 'rgba(205,205,205,.6)';
+        g.beginPath(); g.arc(X(o, 1.6, 1.0), Y(o, 1.6, 1.0, 70), 5, 0, 7); g.fill();
+        g.beginPath(); g.arc(X(o, 1.6, 1.0) + 4, Y(o, 1.6, 1.0, 82), 3.5, 0, 7); g.fill();
+        icon(g, o, 0.67, 1.0, 24, '🔥', 12); break;
+      }
+      case 'recyc': {
+        // Recyclinghof: vier farbige Container
+        pad(g, o, w, h, '#9fb08a');
+        const cols = ['#3a7bd5', '#e0b030', '#3d8f5a', '#8a8a8a'];
+        for (let k = 0; k < 4; k++) { const u = 0.15 + (k % 2) * 0.95, v = 0.2 + Math.floor(k / 2) * 0.95; prism(g, o, u, v, u + 0.7, v + 0.6, 0, 12, cols[k]); }
+        icon(g, o, 1.0, 1.0, 16, '♻', 13); break;
+      }
       default: pad(g, o, w, h); prism(g, o, 0.15, 0.15, w - 0.15, h - 0.15, 0, 24, d.color); icon(g, o, w / 2, h / 2, 26, d.icon);
     }
-  });
+  }, light, false);
 }
 
 export function treeSprite(variant) {
@@ -422,6 +468,65 @@ function heat(v) { // 0..1 → grün → gelb → rot
   return `rgba(${r | 0},${g | 0},60,.55)`;
 }
 const cool = (v) => { const t = Math.max(0, Math.min(1, v)); return `rgba(${(60 + (1 - t) * 160) | 0},${(90 + t * 130) | 0},${(220 - t * 40) | 0},.5)`; };
+
+// ---------------------------------------------------------------- Tag & Nacht
+/** Maximale Abdunklung (0 = Tag). */
+export const MAX_DARK = 0.62;
+/** Tageszeit t ∈ [0,1) (0 = Mitternacht, 0,5 = Mittag) → Abdunklung 0 … MAX_DARK, weicher Übergang. */
+export function darkness(t) {
+  const raw = (1 + Math.cos(2 * Math.PI * t)) / 2;       // 1 um Mitternacht, 0 am Mittag
+  const x = Math.max(0, Math.min(1, (raw - 0.35) / 0.5));
+  return MAX_DARK * x * x * (3 - 2 * x);
+}
+const TINT_STEPS = 48;
+const TINT = [];   // vorberechnete Tönungen je Nachtanteil (keine Allokation pro Frame)
+for (let k = 0; k <= TINT_STEPS; k++) {
+  const n = k / TINT_STEPS;                               // Anteil Nacht
+  const dusk = (1 - Math.abs(2 * n - 1)) * 0.7;           // Übergang (Dämmerung): orange/rosa, Nacht: dunkelblau
+  const r = 18 + (255 - 18) * dusk, gg = 26 + (140 - 26) * dusk, b = 70 + (150 - 70) * dusk;
+  TINT[k] = `rgba(${r | 0},${gg | 0},${b | 0},${(MAX_DARK * n).toFixed(3)})`;
+}
+const GLOW_RGB = { lamp: [255, 196, 110], head: [255, 248, 215], beacon: [255, 70, 60], base: [255, 200, 120] };
+const glows = {};
+/** Weicher Lichtfleck (radialer Verlauf), einmal gezeichnet und gecacht. */
+function glow(name) {
+  let c = glows[name]; if (c) return c;
+  const [r, gg, b] = GLOW_RGB[name];
+  c = document.createElement('canvas'); c.width = 32; c.height = 32;
+  const x = c.getContext('2d'), gr = x.createRadialGradient(16, 16, 0, 16, 16, 16);
+  gr.addColorStop(0, `rgba(${r},${gg},${b},0.9)`); gr.addColorStop(0.4, `rgba(${r},${gg},${b},0.35)`); gr.addColorStop(1, `rgba(${r},${gg},${b},0)`);
+  x.fillStyle = gr; x.fillRect(0, 0, 32, 32);
+  glows[name] = c; return c;
+}
+// Lichtebene: lg = Lichtpuffer mit derselben Transformation wie die Szene. Gebäude-Silhouetten sind dort
+// schwarz und verdecken Licht dahinter; die Ebene wird danach additiv („lighter“) über die getönte Szene gelegt.
+const BEACON_Z = { mtower: 206, maintower: 182, ctower: 256 };   // Höhe der Dachspitze (Pixel über Boden)
+const lightSprite = (lg, sp, tx, ty) => lg.drawImage(sp.c, (tx - ty) * 32 - sp.ox, (tx + ty) * 16 - sp.oy, sp.w, sp.h);
+function lampAt(lg, x, y) {
+  lg.globalCompositeOperation = 'lighter';
+  lg.drawImage(glow('lamp'), (x - y) * 32 - 22, (x + y) * 16 + 2, 44, 28);
+}
+function beacon(lg, cx, cy, z) { // blinkendes rotes Positionslicht, cx/cy = Mitte der Grundfläche
+  lg.globalCompositeOperation = 'lighter';
+  lg.drawImage(glow('beacon'), cx - 8, cy - z - 8, 16, 16);
+  lg.fillStyle = '#ff4a3d'; lg.fillRect(cx - 1, cy - z - 1, 2, 2);
+}
+function nightZone(lg, z, l, vr, x, y, blink) {
+  lg.globalCompositeOperation = 'source-over';
+  lightSprite(lg, zoneBuilding(z, l, vr, true), x, y);
+  if (blink && z === Z_B && l >= 3) beacon(lg, (x - y) * 32, (x + y) * 16 + 16, l >= 4 ? 226 : 176);
+}
+function nightBuilding(lg, b, blink) {
+  lg.globalCompositeOperation = 'source-over';
+  lightSprite(lg, buildingSprite(b.type, true), b.x, b.y);
+  if (BUILD[b.type].cat !== 'land') return;
+  // Wahrzeichen: Glow am Sockel (Mitte der Grundfläche)
+  const cx = (b.x - b.y) * 32 + (b.w - b.h) * 16, cy = (b.x + b.y) * 16 + (b.w + b.h) * 8;
+  const W = (b.w + b.h) * 26, H = (b.w + b.h) * 15;
+  lg.globalCompositeOperation = 'lighter';
+  lg.drawImage(glow('base'), cx - W / 2, cy - H / 2, W, H);
+  if (blink && BEACON_Z[b.type]) beacon(lg, cx, cy, BEACON_Z[b.type]);
+}
 
 // ---------------------------------------------------------------- Renderer
 export class Renderer {
@@ -463,6 +568,17 @@ export class Renderer {
     const y0 = Math.max(0, Math.floor(Math.min(...c.map((p) => p[1]))) - 2), y1 = Math.min(N - 1, Math.ceil(Math.max(...c.map((p) => p[1]))) + 2 + 6);
     const frame = Math.floor(ui.time / 700) & 1;
     const draw = (sp, tx, ty) => g.drawImage(sp.c, (tx - ty) * 32 - sp.ox, (tx + ty) * 16 - sp.oy, sp.w, sp.h);
+    // Tag & Nacht: bei Tag (d ≤ 0,05) kein Lichtpuffer, keine Mehrkosten
+    const dk = darkness(ui.daytime ?? 0.5), night = dk > 0.05;
+    let lg = null, blink = false;
+    if (night) {
+      if (!this.lcv) this.lcv = document.createElement('canvas');
+      if (this.lcv.width !== this.cv.width || this.lcv.height !== this.cv.height) { this.lcv.width = this.cv.width; this.lcv.height = this.cv.height; }
+      lg = this.lcv.getContext('2d');
+      lg.setTransform(1, 0, 0, 1, 0, 0); lg.clearRect(0, 0, this.lcv.width, this.lcv.height);
+      lg.setTransform(dpr * cam.z, 0, 0, dpr * cam.z, dpr * (this.w / 2 - cam.x * cam.z), dpr * (this.h / 2 - cam.y * cam.z));
+      blink = (ui.time % 1200) < 300;
+    }
     const T = s.terrain, idx = (x, y) => y * N + x;
     const wat = (x, y) => x >= 0 && y >= 0 && x < N && y < N && T[idx(x, y)] === T_WATER;
     const roadAt = (x, y) => x >= 0 && y >= 0 && x < N && y < N && s.road[idx(x, y)] === 1;
@@ -490,6 +606,7 @@ export class Renderer {
       const sx = (px - py) * 32, sy = (px + py) * 16;
       g.fillStyle = car.color; g.fillRect(sx - 3, sy - 3, 6, 4);
       g.fillStyle = 'rgba(255,255,255,.55)'; g.fillRect(sx - 2, sy - 3, 3, 1.5);
+      if (lg) { lg.globalCompositeOperation = 'lighter'; lg.drawImage(glow('head'), sx + (dx - dy) * 4 - 5, sy + (dx + dy) * 2 - 4, 10, 8); }
     }
     g.restore();
 
@@ -500,10 +617,12 @@ export class Renderer {
         const bid = s.occ[i];
         if (bid) {
           const b = s.bld.find((q) => q.id === bid);
-          if (b && x === b.x + b.w - 1 && y === b.y + b.h - 1) { const sp = buildingSprite(b.type); g.drawImage(sp.c, (b.x - b.y) * 32 - sp.ox, (b.x + b.y) * 16 - sp.oy, sp.w, sp.h); }
+          if (b && x === b.x + b.w - 1 && y === b.y + b.h - 1) { const sp = buildingSprite(b.type); g.drawImage(sp.c, (b.x - b.y) * 32 - sp.ox, (b.x + b.y) * 16 - sp.oy, sp.w, sp.h); if (lg) nightBuilding(lg, b, blink); }
         } else if (s.zone[i] && s.lvl[i]) {
           draw(zoneBuilding(s.zone[i], s.lvl[i], s.vr[i]), x, y);
+          if (lg) nightZone(lg, s.zone[i], s.lvl[i], s.vr[i], x, y, blink);
         } else if (T[i] === T_TREES && !s.road[i]) draw(treeSprite((x * 5 + y * 11) & 7), x, y);
+        if (lg && !bid && s.road[i] && !((x + y) & 1)) lampAt(lg, x, y); // jede 2. Straßenkachel
         if (s.fire[i]) {
           g.font = '20px "Noto Color Emoji",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
           g.fillText(frame ? '🔥' : '🧯', (x - y) * 32, (x + y) * 16 + 8 - (frame ? 6 : 2));
@@ -513,6 +632,14 @@ export class Renderer {
     }
     // --- Flut
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (s.flood[idx(x, y)]) this.diamond(x, y, 'rgba(60,130,220,.45)');
+    // --- Nacht: Tönung über die Szene, danach die Lichtebene additiv. Overlays kommen erst danach (ohne Abdunklung).
+    if (lg) {
+      const k = Math.round(Math.min(1, dk / MAX_DARK) * TINT_STEPS);
+      g.save(); g.setTransform(1, 0, 0, 1, 0, 0);
+      g.fillStyle = TINT[k]; g.fillRect(0, 0, this.cv.width, this.cv.height);
+      g.globalCompositeOperation = 'lighter'; g.drawImage(this.lcv, 0, 0);
+      g.restore();
+    }
     // --- Overlay
     const m = s.maps;
     if (ui.overlay && ui.overlay !== 'none' && m) {
@@ -525,6 +652,7 @@ export class Renderer {
           case 'traffic': if (s.road[i]) col = heat(m.traffic[i] / 1.6); break;
           case 'crime': col = heat(m.crime[i] / 70); break;
           case 'pollution': col = heat(m.pol[i] / 70); break;
+          case 'garbage': if (m.garb[i] > 0.01) col = heat(m.garb[i] / 8); break;
           case 'value': col = cool(m.value[i] / 80); break;
           case 'fire': col = cool(m.fire[i]); break;
           case 'health': col = cool(m.health[i]); break;

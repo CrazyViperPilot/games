@@ -4,6 +4,7 @@ import {
   ROAD_COST, BRIDGE_COST, BULLDOZE_COST, ROAD_UPKEEP, ZONE_UNLOCK, MILESTONES, MONTHS,
   BUDGET_RES, BUDGET_DEFAULT, BUDGET_MIN, BUDGET_MAX, BUDGET_STEP, BUDGET_COVER_MAX, BUDGET_ROAD_MIN, ORDINANCES,
   WATER_TREAT_CAP, WATER_TREAT_CAP_MAX, WATER_HAPPY,
+  GARBAGE, GARBAGE_BLD, GARBAGE_REC, GARBAGE_REC_MAX, GARBAGE_MIN_POP, GARBAGE_POL, GARBAGE_HAPPY, GARBAGE_HAPPY_MAX,
 } from './data.js';
 
 export let NN = N * N;
@@ -20,7 +21,9 @@ export function rand(s) {
 }
 const rint = (s, n) => Math.floor(rand(s) * n);
 /** Gebäudearten ohne eigene Strom- und Wasserlast (Kraftwerke, Deich, Wasseranlagen). */
-const NOLOAD = new Set(['power', 'dike', 'pump', 'tower', 'treat']);
+const NOLOAD = new Set(['power', 'dike', 'pump', 'tower', 'treat', 'incin']);
+/** Gebäudearten ohne Müllaufkommen (Anlagen selbst und Wasser/Deich). */
+const GARB_NONE = new Set(['power', 'dike', 'pump', 'tower', 'treat', 'dump', 'incin', 'recyc']);
 /** Ruft fn(i) für jede Kachel im Radius r um die Gebäudemitte auf (Kachelmittelpunkte). */
 function forDisc(b, r, fn) {
   const cx = b.x + b.w / 2, cy = b.y + b.h / 2, r2 = r * r;
@@ -43,6 +46,7 @@ export function newCity({ name = 'Simfurt', seed = 1, size = 64 } = {}) {
     stats: null, fin: { inc: 0, exp: 0, net: 0, parts: {} }, ticks: 0, seen: {},
     budget: { ...BUDGET_DEFAULT }, ords: {},
     waterCap: 0, waterLoad: 0, waterRatio: 0, watered: new Uint8Array(NN),
+    garbage: 0, garbageLeft: 0, garbageRatio: 0, // Müll: Aufkommen, unentsorgt (t/Monat), Anteil; abgeleitet, nicht gespeichert nötig
   };
   generateMap(s);
   say(s, 'Willkommen in ' + name + '! Zonen anlegen, Straße, Strom und Wasser nicht vergessen.', 'info');
@@ -320,6 +324,7 @@ export function placeBuilding(s, key, x, y) {
   if (!unlocked(s, key)) return { ok: false, why: 'Noch gesperrt' };
   if (s.money < d.cost) return { ok: false, why: 'Zu wenig Geld' };
   const b = { id: s.nextId++, type: key, x, y, w: d.w, h: d.h, fire: 0 };
+  if (d.kind === 'dump') b.fill = 0; // Füllstand der Deponie in t (wird mit gespeichert)
   if (s.rec) { for (let yy = y; yy < y + d.h; yy++) for (let xx = x; xx < x + d.w; xx++) recTile(s, idx(xx, yy)); s.rec.added.push(b.id); s.rec.cost += d.cost; }
   s.bld.push(b);
   for (let yy = y; yy < y + d.h; yy++) for (let xx = x; xx < x + d.w; xx++) {
@@ -415,7 +420,7 @@ export function setBudget(s, key, v) {
 // ---------------------------------------------------------------- Verordnungen (Runde 2)
 const ORD_BY_ID = Object.fromEntries(ORDINANCES.map((o) => [o.id, o]));
 const FX_DEF = {
-  traffic: 1, crime: 1, pollution: 1, metro: 1, tourism: 1, fraportTour: 1, healthPart: 1, bankTax: 1,
+  traffic: 1, crime: 1, pollution: 1, metro: 1, tourism: 1, fraportTour: 1, healthPart: 1, bankTax: 1, garbage: 1,
   happy: 0, value: 0, demandR: 0, demandC: 0, demandI: 0, demandB: 0, cost: 0,
 };
 const FX = { ...FX_DEF }; // aufsummierte Wirkung der aktiven Verordnungen (wird je Aufruf neu gesetzt)
@@ -472,8 +477,9 @@ const hasRoadNear = (s, x, y) => {
 /** Berechnet alle abgeleiteten Karten und Kennzahlen. */
 export function refresh(s) {
   budgetFx(s); ordFx(s);
-  const m = s.maps = { power: mk(), police: mk(), fire: mk(), health: mk(), edu: mk(), park: mk(), metro: mk(), pol: mk(), crime: mk(), value: mk(), traffic: mk(), happy: mk(), water: mk() };
+  const m = s.maps = { power: mk(), police: mk(), fire: mk(), health: mk(), edu: mk(), park: mk(), metro: mk(), pol: mk(), crime: mk(), value: mk(), traffic: mk(), happy: mk(), water: mk(), garb: mk() };
   let cap = 0, load = 0, wload = 0;
+  let burnCap = 0, dumpN = 0, dumpLeft = 0, dumpRoom = 0, recN = 0, gRaw = 0; // Müll: Verbrennung, Deponien, Recyclinghöfe, Rohaufkommen
   let wcapPumps = 0, pumps = 0, treatN = 0, cut = null; // Wasser: Pumpwerk-Kapazität, Anzahl Pumpwerke, Kläranlagen, Verschmutzungsfaktor je Kachel
   const towers = [];
   const bcen = (b) => [b.x + b.w / 2, b.y + b.h / 2];
@@ -491,6 +497,18 @@ export function refresh(s) {
       case 'pump': stamp(m.water, cx, cy, d.r, 1, true); wcapPumps += d.cap; pumps++; break;
       case 'tower': towers.push(b); break;
       case 'treat': treatN++; if (!cut) cut = new Float32Array(NN).fill(1); forDisc(b, d.r, (i) => { cut[i] *= 1 - d.polCut; }); break;
+      case 'incin': stamp(m.power, cx, cy, d.r, 1, true); cap += d.power; stamp(m.pol, cx, cy, 7, d.pol); burnCap += d.burn; break;
+      case 'dump': {
+        stamp(m.pol, cx, cy, d.polR, d.pol); dumpN++;
+        const room = d.vol - (b.fill || 0); // alte Stände ohne fill: leer
+        dumpLeft += Math.max(0, room); dumpRoom += Math.max(0, Math.min(d.cap, room));
+        break;
+      }
+      case 'recyc': recN++; break;
+    }
+    if (!GARB_NONE.has(d.kind)) { // Dienst- und Wahrzeichen-Gebäude: Aufkommen auf die Footprint-Kacheln verteilt
+      gRaw += GARBAGE_BLD; const per = GARBAGE_BLD / (b.w * b.h);
+      for (let yy = b.y; yy < b.y + b.h; yy++) for (let xx = b.x; xx < b.x + b.w; xx++) m.garb[idx(xx, yy)] += per;
     }
     if (!NOLOAD.has(d.kind)) { load += 2; wload += 1; } // Dienstgebäude: 2 Strom, 1 Wasser
   }
@@ -507,8 +525,18 @@ export function refresh(s) {
     if (!z || !l) continue;
     const road = hasRoadNear(s, x, y);
     if (road) wload += ZONES[z].load[l];
-    if (m.power[i] > 0 && road) { totalLoad += ZONES[z].load[l]; active[i] = 1; }
+    if (m.power[i] > 0 && road) {
+      totalLoad += ZONES[z].load[l]; active[i] = 1;
+      const g = GARBAGE[z][l]; gRaw += g; m.garb[i] += g; // Müll: aktive Parzellen
+    }
   }
+  // Müll: Aufkommen nach Verordnung und Recyclinghöfen; entsorgt wird erst durch Verbrennung, dann durch Deponien (Restvolumen)
+  const gFactor = FX.garbage * (1 - Math.min(GARBAGE_REC_MAX, GARBAGE_REC * recN));
+  const net = gRaw * gFactor;
+  const gLeft = Math.max(0, net - burnCap - dumpRoom);
+  const gRatio = net > 0 ? gLeft / net : 0;
+  if (gRaw > 0) { const share = gLeft / gRaw; for (let i = 0; i < NN; i++) m.garb[i] *= share; } // je Kachel: unentsorgte Menge
+  s.garbage = net; s.garbageLeft = gLeft; s.garbageRatio = gRatio;
   const ratio = cap > 0 ? Math.min(1, cap / Math.max(1, totalLoad)) : 0;
   s.powerRatio = ratio; s.powerCap = cap; s.powerLoad = totalLoad;
   for (let i = 0; i < NN; i++) powered[i] = m.power[i] > 0 && (ratio >= 1 || hash(i, 11) < ratio) ? 1 : 0;
@@ -544,6 +572,9 @@ export function refresh(s) {
     m.pol[i] = Math.min(100, m.pol[i] * FX.pollution * (cut ? cut[i] : 1)); // Kläranlagen senken den Dreck im Radius
     if (s.terrain[i] === T_TREES) m.pol[i] *= 0.7;
   }
+  // Unentsorgter Müll: Dreck steigt stadtweit (nach den Kläranlagen, die Müll nicht erfassen)
+  const gEff = Math.round(capR * s.occupancy) >= GARBAGE_MIN_POP ? gRatio : 0; // Schonfrist
+  if (gEff > 0) { const add = GARBAGE_POL * gEff; for (let i = 0; i < NN; i++) m.pol[i] = Math.min(100, m.pol[i] + add); }
 
   // Verkehr
   const roads = [];
@@ -615,6 +646,7 @@ export function refresh(s) {
     landmark: Math.min(12, landmark * 1.4), jobs: -unemp * 25, power: ratio < 1 && lots ? -(1 - ratio) * 30 : 0,
     // Wasser: Anteil besiedelter Parzellen ohne Wasser, sobald Parzellen ab Stufe 2 existieren
     water: hiLots && lots ? -WATER_HAPPY * dryLots / lots : 0,
+    garbage: gEff ? -Math.min(GARBAGE_HAPPY_MAX, GARBAGE_HAPPY * gEff) : 0,
     ords: FX.happy,
   };
   const happy = Math.max(0, Math.min(100, 66 + Object.values(parts).reduce((a, b) => a + b, 0)));
@@ -622,6 +654,7 @@ export function refresh(s) {
     pop, capR, workers: Math.round(workers), jobs, jobsC, jobsI, jobsB, lots, happy, unemp, avgTax, cong, congRoads: cSum,
     crime: f(crimeSum), pollution: f(polSum), value: f(valSum), parts, roads: roads.length, covPolice: f(covPolice), covFire: f(covFire),
     covHealth: f(covHealth), covEdu: f(covEdu), waterDry: dryLots,
+    dumps: dumpN, dumpLeft, burnCap,
   };
   s.peakPop = Math.max(s.peakPop || 0, pop);
   s.dirty = false;
@@ -693,6 +726,25 @@ function financeStep(s) {
     inc, exp, net: inc - exp,
     parts: { tR, tC, tI, tB, tour, up, roads, interest, ordCost, upPolice: ur.police, upFire: ur.fire, upHealth: ur.health, upEdu: ur.edu },
   };
+}
+
+// ---------------------------------------------------------------- Müll (Runde 3)
+/**
+ * Monatlicher Müll-Schritt: Die Verbrennung nimmt bis zu ihrer Kapazität, der Rest füllt die Deponien in der
+ * Reihenfolge der Gebäude (je höchstens cap t/Monat, nicht über vol). Was übrig bleibt, ist unentsorgt.
+ * Die Belastung in refresh folgt demselben Rechenweg, daher bleibt der Stand nach dem Laden gleich.
+ */
+function garbageStep(s) {
+  const st = s.stats, net = s.garbage || 0;
+  let rest = Math.max(0, net - st.burnCap), left = 0;
+  for (const b of s.bld) {
+    const d = BUILD[b.type]; if (d.kind !== 'dump') continue;
+    const fill = b.fill || 0, room = Math.min(d.cap, d.vol - fill);
+    if (room > 0 && rest > 0) { const take = Math.min(room, rest); b.fill = fill + take; rest -= take; }
+    left += Math.max(0, d.vol - (b.fill || 0));
+  }
+  s.garbageLeft = rest; s.garbageRatio = net > 0 ? rest / net : 0;
+  st.dumpLeft = left;
 }
 
 // ---------------------------------------------------------------- Katastrophen
@@ -785,6 +837,8 @@ function adviceStep(s) {
   if (st.crime > 40) k('crime', 'Die Kriminalität steigt. Polizeireviere bauen!', 'bad', 2);
   if (st.pollution > 40) k('pol', 'Die Luft ist dick. Industrie weiter weg von den Wohngebieten bauen.', 'bad', 2);
   if (st.avgTax > 13) k('tax', 'Die Steuern sind hoch. Die Leute murren.', 'bad', 2);
+  if (st.dumps && st.dumpLeft < 1 && s.garbage > 0) k('dumpfull', 'Die Deponie ist voll! Neue Deponie bauen oder Müll verbrennen.', 'bad', 3);
+  if (st.pop >= GARBAGE_MIN_POP && s.garbageRatio > 0.2) k('garb', 'Müll bleibt liegen: Dreck und Unzufriedenheit steigen. Recyclinghof oder Müllverbrennung bauen.', 'bad', 2);
   if (s.demand.r > 0.5 && st.lots > 10) k('dr', 'Viele wollen hier wohnen: Wohnzonen ausweisen.', 'info', 3);
   if (s.demand.c > 0.5 && st.lots > 10) k('dc', 'Geschäfte fehlen: Gewerbezonen ausweisen.', 'info', 3);
   if (s.demand.i > 0.5 && st.lots > 10) k('di', 'Arbeit gesucht: Industriezonen ausweisen.', 'info', 3);
@@ -813,6 +867,7 @@ export function tick(s) {
   s.occupancy += (target - s.occupancy) * 0.12;
   growStep(s);
   if (s.dirty) refresh(s);
+  garbageStep(s);
   financeStep(s);
   eventsStep(s);
   adviceStep(s);
@@ -827,7 +882,14 @@ export function tileInfo(s, x, y) {
   const lines = [];
   const b = buildingAt(s, x, y);
   let title = 'Freifläche';
-  if (b) { const d = BUILD[b.type]; title = d.name; lines.push(d.desc); lines.push(`Unterhalt ${d.up} €/Monat`); }
+  if (b) {
+    const d = BUILD[b.type]; title = d.name; lines.push(d.desc); lines.push(`Unterhalt ${d.up} €/Monat`);
+    if (d.kind === 'dump') { // Füllstand der Deponie
+      const fill = b.fill || 0;
+      lines.push(fill >= d.vol ? `Voll (${d.vol.toLocaleString('de-DE')} t) – nimmt keinen Müll mehr an`
+        : `Füllstand ${Math.round(fill / d.vol * 100)} % · ${Math.round(fill).toLocaleString('de-DE')} von ${d.vol.toLocaleString('de-DE')} t`);
+    }
+  }
   else if (s.terrain[i] === T_WATER) title = s.road[i] ? 'Brücke über den Main' : 'Main';
   else if (s.road[i]) title = 'Straße';
   else if (s.zone[i]) {
