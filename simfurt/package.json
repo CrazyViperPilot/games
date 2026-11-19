@@ -1,1 +1,1 @@
-{"type":"module","private":true}
+{"type":"module","private":true,"scripts":{"test":"node test/sim.test.js && node test/save.test.js"}}
