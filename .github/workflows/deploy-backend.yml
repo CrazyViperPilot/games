@@ -5,10 +5,10 @@
 #   simfurt/           ← api.php, data/.htaccess
 # Frankfurtopoly hat ein eigenes Repo und lädt selbst nach /games/frankfurtopoly/ hoch.
 #
-# Secrets der Umgebung "FTP" (Settings → Environments → FTP), dieselben Werte wie im Repo frankfurtopoly:
+# Repository-Secrets (Settings → Secrets and variables → Actions → Secrets), dieselben Werte wie im Repo frankfurtopoly:
 #   FTP_SERVER, FTP_USER, FTP_PASSWORD  – FTP-Zugang des games-Benutzers (Login startet in /games)
 #   FRUHNO_KEY                          – gemeinsamer Fruhno-Schlüssel (derselbe, den alle in der App eingegeben haben)
-# Optionale Variablen (gleiche Umgebung):
+# Optionale Repository-Variablen (gleiche Seite, Reiter Variables):
 #   FTP_DIR       Zielordner relativ zum FTP-Login, mit Schrägstrich am Ende (Standard ./)
 #   FTP_PROTOCOL  ftps (Standard) oder ftp
 #   FTP_SECURITY  strict (Standard) oder loose, falls das FTPS-Zertifikat nicht zum Hostnamen passt
@@ -33,7 +33,6 @@ concurrency: deploy-backend
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: FTP
     steps:
       - uses: actions/checkout@v4
 
@@ -50,7 +49,7 @@ jobs:
           if [ -n "$FTP_SERVER" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::warning::FTP-Secrets fehlen in der Umgebung FTP – Deploy übersprungen."
+            echo "::warning::FTP-Secrets fehlen in den Repository-Secrets – Deploy übersprungen."
           fi
 
       - name: Build upload folder

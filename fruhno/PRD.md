@@ -133,7 +133,7 @@ Legende: **🏠 = Hausregel** (weicht vom offiziellen UNO ab, von Daniel festgel
 - dogado-Webspace, games-Bereich (`phpexpert.de/games/`, eigener FTP-Benutzer, unabhängig von vocs), Unterordner **`fruhno/`**, d. h. `phpexpert.de/games/fruhno/api.php`. (Bis Nov 2026 lag es unter `/vocs/fruhno/`; alte gespeicherte Server-Adressen stellt `js/api.js` automatisch um.) Dateibasierter Zustand (eine JSON-Datei mit `flock`), keine Datenbank – wie `stats.php`.
 - Das Frontend läuft auf GitHub Pages (anderer Origin) → API sendet CORS-Header für `https://crazyviperpilot.github.io`.
 - Der Server ist **maßgeblich** (Autorität): prüft Züge, mischt, teilt aus; Clients bekommen nur ihren eigenen Handblick (fremde Hände nie im Response).
-- Zugriffsschutz: gemeinsamer Schlüssel im Header `X-Fruhno-Key` (Secret `FRUHNO_KEY` der Umgebung „FTP“ im games-Repo) (wie `X-Vocs-Key`), den Daniel einmal in der App eingibt; der Hash liegt in einer vom Deploy geschriebenen `config.php`. Zusätzlich pro Spieler ein zufälliges Session-Token beim Join (verhindert, dass jemand einen anderen Namen übernimmt).
+- Zugriffsschutz: gemeinsamer Schlüssel im Header `X-Fruhno-Key` (Repository-Secret `FRUHNO_KEY` im games-Repo) (wie `X-Vocs-Key`), den Daniel einmal in der App eingibt; der Hash liegt in einer vom Deploy geschriebenen `config.php`. Zusätzlich pro Spieler ein zufälliges Session-Token beim Join (verhindert, dass jemand einen anderen Namen übernimmt).
 - Endpunkte (eine URL `api.php`): `GET` liefert den ganzen Tisch aus Sicht des Spielers (Polling alle ~1,5 s); `POST {action}` mit `host`, `join`, `leave`, `addbot`, `removebot`, `start`, `end`, `play`, `draw`, `pass`, `fruhno`, `catch`, `skip`, `chat`.
 - Aufräumen: Lobby/Spiel ohne Aktivität für 2 Stunden wird automatisch beendet.
 
@@ -141,7 +141,7 @@ Legende: **🏠 = Hausregel** (weicht vom offiziellen UNO ab, von Daniel festgel
 - **Polling (Standard)**: Client fragt alle ~1,5 s `state?since=N`; Server antwortet mit `304`/leer, wenn sich nichts geändert hat. Für 3 Spieler auf Shared-Hosting robust und simpel. Long-Polling/SSE sind auf Shared-Hosting oft instabil (PHP-Prozess-Limits) → nur bei Bedarf später.
 
 ### Deploy
-- Deploy: Workflow `.github/workflows/deploy-backend.yml` im games-Repo (lftp, Umgebung „FTP“ mit `FTP_SERVER`, `FTP_USER`, `FTP_PASSWORD`, `FRUHNO_KEY`); schreibt `fruhno/config.php` mit dem Schlüssel-Hash.
+- Deploy: Workflow `.github/workflows/deploy-backend.yml` im games-Repo (lftp, Repository-Secrets `FTP_SERVER`, `FTP_USER`, `FTP_PASSWORD`, `FRUHNO_KEY`); schreibt `fruhno/config.php` mit dem Schlüssel-Hash.
 - `fruhno/data/` auf dem Server wird nie überschrieben (wie `api/data/`, mit `.htaccess` gesperrt).
 
 ## 8. Tests
