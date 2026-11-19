@@ -21,7 +21,7 @@ export function serialize(s) {
   const o = { format: FORMAT, app: 'simfurt', size: N, name: s.name, seed: s.seed, savedAt: Date.now() };
   for (const k of KEYS) o[k] = s[k];
   o.msgs = s.msgs.slice(-30); o.peakPop = s.peakPop || 0;
-  for (const k of ARR) o[k] = toB64(s[k]);
+  for (const k of ARR) if (s[k]) o[k] = toB64(s[k]);
   return JSON.stringify(o);
 }
 
@@ -33,7 +33,7 @@ export function deserialize(text) {
   const s = newCity({ name: o.name, seed: o.seed, size });
   for (const k of KEYS) if (o[k] !== undefined) s[k] = o[k];
   for (const k of ARR) {
-    if (!o[k]) continue; // ältere Stände ohne flood o. Ä.
+    if (!o[k] || !s[k]) continue; // ältere Stände ohne flood/rail o. Ä.
     const u = fromB64(o[k]); if (u.length !== size * size) throw new Error('Kartengröße passt nicht'); s[k].set(u);
   }
   s.occ.fill(0);
