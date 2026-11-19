@@ -185,7 +185,7 @@ const GLASS = ['#5b8fb8', '#4f9aa8', '#7a8fb0', '#6d9a9a'];
 
 export function zoneBuilding(z, lvl, vr, light = false) {
   const v = vr & 31;
-  return sprite(`${light ? 'L' : ''}zb${z}_${lvl}_${v}`, 1, 1, z === Z_B ? 220 : 120, (g, o) => {
+  return sprite(`${light ? 'L' : ''}zb${z}_${lvl}_${v}`, 1, 1, z === Z_B ? 240 : 120, (g, o) => {
     const wall = WALL_R[v % WALL_R.length], roof = ROOF_R[(v >> 2) % ROOF_R.length];
     if (z === Z_R) {
       if (lvl === 1) {

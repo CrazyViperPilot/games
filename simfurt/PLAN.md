@@ -84,7 +84,8 @@ Gemeinsame Regeln: Neue Zustandsfelder legt `newCity` mit Standardwerten an; `js
 
 ---
 
-# Runde 3: Müll & Recycling, Tag & Nacht
+# Runde 3: Müll & Recycling, Tag & Nacht – erledigt
+Abweichungen: Müllbelastung wird in refresh aus Aufkommen + Deponie-Füllständen berechnet (speicherfest); buildCity setzt Deponie + Verbrennung; Bank-Sprite hmax 240.
 
 ## M1 – Müll & Recycling · `js/data.js`, `js/sim.js`, Sprites in `js/render.js` (nur `buildingSprite`-Fälle + Overlay-Fall), Rat/Hilfe in `js/main.js`, Tests
 - Müllaufkommen je Monat: Σ über aktive Parzellen `GARBAGE[z][l]` (Daten in data.js; R klein, C mittel, I groß, B mittel) + Dienstgebäude 1. Kennzahl `s.garbage` (t/Monat).

@@ -39,6 +39,7 @@ export function deserialize(text) {
   s.occ.fill(0);
   for (const b of s.bld) for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) s.occ[y * size + x] = b.id;
   refresh(s);
+  if (s.stats.pop >= 400 && !s.bld.some((b) => b.type === 'dump' || b.type === 'incin')) say(s, 'Neu: Müllabfuhr! Baue eine Deponie oder Müllverbrennung (Kategorie Müll), sonst leiden Umwelt und Zufriedenheit.', 'info');
   if (o.budget === undefined && s.bld.length) say(s, 'Neu in Simfurt: Wasserversorgung, Budget und Verordnungen. Baue ein Pumpwerk am Ufer, sonst sinken Gebäude ab Stufe 2 langsam ab.', 'info');
   return s;
 }
