@@ -296,4 +296,133 @@ test('Deich: Hochwasser trifft Kacheln im Deichradius nicht, außerhalb schon', 
   assert.ok(outFlooded > 0, 'außerhalb des Radius wird weiterhin überflutet');
 });
 
+// ---------------------------------------------------------------- Budget je Ressort + Verordnungen (Runde 2)
+const upkeepOf = (s, kind) => s.bld.reduce((a, b) => a + (BUILD[b.type].kind === kind ? BUILD[b.type].up : 0), 0);
+const cityB = (seed = 5) => { const s = fresh(seed); buildCity(s); for (let t = 0; t < 36; t++) tick(s); return s; };
+
+test('Budget/Verordnungen: Standard 100 % und keine Verordnung ergeben den bisherigen Unterhalt', () => {
+  const s = cityB();
+  assert.deepStrictEqual(s.budget, { police: 100, fire: 100, health: 100, edu: 100, roads: 100 });
+  assert.deepStrictEqual(s.ords, {});
+  assert.strictEqual(s.fin.parts.upPolice, upkeepOf(s, 'police'));
+  assert.strictEqual(s.fin.parts.up, s.bld.reduce((a, b) => a + BUILD[b.type].up, 0));
+  assert.strictEqual(s.fin.parts.ordCost, 0);
+});
+
+test('Budget Polizei 0 %: keine Abdeckung, Kriminalität höher als bei 100 %, 50 % halbiert die Stärke', () => {
+  const s = cityB();
+  refresh(s); const c100 = s.stats.crime, p100 = Math.max(...s.maps.police);
+  assert.ok(p100 > 0, 'Polizei wirkt bei 100 %');
+  setBudget(s, 'police', 0); refresh(s);
+  assert.ok(s.stats.crime > c100, `Kriminalität bei 0 %: ${s.stats.crime} vs ${c100}`);
+  assert.strictEqual(Math.max(...s.maps.police), 0);
+  setBudget(s, 'police', 50); refresh(s);
+  assert.ok(Math.abs(Math.max(...s.maps.police) - p100 / 2) < 1e-4, 'Stärke bei 50 %');
+});
+
+test('Budget senkt den Unterhalt je Ressort proportional (Polizei 50 %, Feuerwehr 0 %, Straßen 50 %)', () => {
+  const s = cityB();
+  tick(s); const up = upkeepOf(s, 'police'), upF = upkeepOf(s, 'fire');
+  assert.ok(up > 0 && upF > 0);
+  const roads100 = s.fin.parts.roads;
+  setBudget(s, 'police', 50); setBudget(s, 'fire', 0); setBudget(s, 'roads', 50);
+  tick(s);
+  assert.ok(Math.abs(s.fin.parts.upPolice - up * 0.5) < 1e-6, 'Polizei ' + s.fin.parts.upPolice);
+  assert.strictEqual(s.fin.parts.upFire, 0);
+  assert.ok(Math.abs(s.fin.parts.roads - roads100 * 0.5) < 1e-9, 'Straßen ' + s.fin.parts.roads);
+});
+
+test('Budget Straßen: unter 60 % steigt die Verkehrsbelastung und die Zufriedenheit sinkt, ab 60 % keine Wirkung', () => {
+  const s = cityB();
+  refresh(s); const c100 = s.stats.cong, h100 = s.stats.happy;
+  setBudget(s, 'roads', 60); refresh(s);
+  assert.strictEqual(s.stats.cong, c100, 'bei 60 % noch ohne Wirkung');
+  setBudget(s, 'roads', 0); refresh(s);
+  assert.ok(Math.abs(s.stats.cong / c100 - 1.6) < 0.02, 'Verkehr × ' + (s.stats.cong / c100).toFixed(3));
+  assert.ok(s.stats.happy < h100, 'Zufriedenheit ' + s.stats.happy + ' vs ' + h100);
+});
+
+test('setBudget: 0–120 %, auf 10er-Schritte gerundet; unbekanntes Ressort und alte Stände', () => {
+  const s = newCity({ seed: 3 });
+  assert.strictEqual(setBudget(s, 'edu', 135), 120);
+  assert.strictEqual(setBudget(s, 'edu', -5), 0);
+  assert.strictEqual(setBudget(s, 'edu', 47), 50);
+  assert.strictEqual(setBudget(s, 'parks', 50), false);
+  assert.strictEqual(setBudget(s, 'police', NaN), false);
+  assert.strictEqual(budgetPct(s, 'police'), 100);
+  s.budget = { police: 70 };
+  assert.strictEqual(budgetPct(s, 'fire'), 100, 'fehlendes Feld gilt als 100 %');
+  assert.strictEqual(budgetPct(s, 'police'), 70);
+});
+
+test('Verordnung kostet Geld pro Monat (Fixkosten und je Einwohner), die Bilanz stimmt', () => {
+  const s = cityB();
+  assert.ok(toggleOrd(s, 'tempo30')); assert.ok(toggleOrd(s, 'oepnv'));
+  refresh(s); const m0 = s.money;
+  tick(s);
+  assert.ok(s.stats.pop > 0);
+  assert.ok(Math.abs(s.fin.parts.ordCost - (300 + 0.25 * s.stats.pop)) < 1e-6, 'Kosten ' + s.fin.parts.ordCost);
+  assert.ok(Math.abs((s.money - m0) - s.fin.net) < 1e-6, 'Kasse folgt der Bilanz');
+  assert.ok(s.fin.exp >= s.fin.parts.ordCost);
+  toggleOrd(s, 'tempo30'); toggleOrd(s, 'oepnv');
+  tick(s); assert.strictEqual(s.fin.parts.ordCost, 0);
+});
+
+test('Verordnungen wirken: Nachbarschaftswache senkt Kriminalität (×0,9), Tempo 30 senkt Verkehr (×0,9)', () => {
+  const s = cityB();
+  refresh(s); const c0 = s.stats.crime, v0 = s.stats.cong;
+  assert.ok(toggleOrd(s, 'wache')); refresh(s);
+  assert.ok(Math.abs(s.stats.crime / c0 - 0.9) < 0.01, 'Kriminalität × ' + (s.stats.crime / c0).toFixed(3));
+  toggleOrd(s, 'wache'); assert.ok(toggleOrd(s, 'tempo30')); refresh(s);
+  assert.ok(Math.abs(s.stats.cong / v0 - 0.9) < 0.01, 'Verkehr × ' + (s.stats.cong / v0).toFixed(3));
+  toggleOrd(s, 'tempo30'); refresh(s);
+  assert.strictEqual(s.stats.cong, v0, 'ausgeschaltet wieder wie vorher');
+});
+
+test('Gesperrte Verordnung lässt sich nicht einschalten (Einwohner oder Flughafen fehlen)', () => {
+  const s = newCity({ seed: 5 });
+  assert.strictEqual(toggleOrd(s, 'gruen'), false); assert.ok(!s.ords.gruen);
+  assert.deepStrictEqual(ordBlock(s, 'gruen'), { pop: 4000 });
+  const f = fresh(5);
+  assert.strictEqual(toggleOrd(f, 'nachtflug'), false); assert.ok(!f.ords.nachtflug);
+  assert.deepStrictEqual(ordBlock(f, 'nachtflug'), { build: 'fraport' });
+  let spot = null;
+  for (let y = 1; y < N - 3 && !spot; y++) for (let x = 1; x < N - 5; x++) if (!canPlace(f, 'fraport', x, y)) { spot = [x, y]; break; }
+  assert.ok(spot, 'Platz für den Flughafen');
+  assert.ok(placeBuilding(f, 'fraport', spot[0], spot[1]).ok);
+  assert.strictEqual(toggleOrd(f, 'nachtflug'), true);
+  assert.strictEqual(toggleOrd(f, 'nachtflug'), false);
+  assert.strictEqual(toggleOrd(f, 'gibtsnicht'), false);
+});
+
+test('Speichern und Laden erhalten budget und ords', () => {
+  const s = cityB();
+  setBudget(s, 'police', 70); setBudget(s, 'roads', 120); toggleOrd(s, 'tempo30'); toggleOrd(s, 'wache');
+  tick(s);
+  const t = deserialize(serialize(s));
+  assert.deepStrictEqual(t.budget, s.budget); assert.deepStrictEqual(t.ords, s.ords);
+  assert.deepStrictEqual(t.ords, { tempo30: true, wache: true });
+  for (let k = 0; k < 12; k++) { tick(s); tick(t); }
+  assert.strictEqual(Math.round(t.money), Math.round(s.money)); assert.strictEqual(t.stats.pop, s.stats.pop);
+});
+
+test('Alte Stände ohne budget/ords laden mit den Standardwerten', () => {
+  const s = cityB();
+  const o = JSON.parse(serialize(s)); delete o.budget; delete o.ords;
+  const t = deserialize(JSON.stringify(o));
+  assert.deepStrictEqual(t.budget, { police: 100, fire: 100, health: 100, edu: 100, roads: 100 });
+  assert.deepStrictEqual(t.ords, {});
+  assert.strictEqual(budgetPct(t, 'police'), 100);
+});
+
+test('Verordnungen: mindestens 8 Einträge mit eindeutiger id, Kurzbeschreibung und Kosten', () => {
+  assert.ok(ORDINANCES.length >= 8, 'Anzahl ' + ORDINANCES.length);
+  const ids = new Set(ORDINANCES.map((o) => o.id));
+  assert.strictEqual(ids.size, ORDINANCES.length);
+  for (const o of ORDINANCES) {
+    assert.ok(o.name && o.desc, o.id);
+    assert.ok(o.cost >= 0 && (o.costPerPop || 0) >= 0 && o.unlock >= 0, o.id);
+  }
+});
+
 console.log(`${n} Tests ok`);

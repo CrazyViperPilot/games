@@ -67,6 +67,13 @@ input[type=text] { width:100%; padding:10px; border-radius:10px; border:1px soli
 .chart-cap { display:flex; justify-content:space-between; font-size:12px; color:var(--muted); margin-top:6px; }
 .chart-cap b { color:var(--text); font-variant-numeric:tabular-nums; }
 .chart-note { color:var(--muted); font-size:12.5px; margin:6px 0; }
+/* Runde 2: Budget je Ressort und Verordnungen */
+.sl.wide { grid-template-columns:92px 1fr 46px; }
+.ord { display:flex; gap:10px; align-items:flex-start; padding:8px 0; border-bottom:1px solid var(--line); cursor:pointer; }
+.ord input { margin-top:3px; accent-color:var(--accent); }
+.ord-body { display:flex; flex-direction:column; gap:2px; }
+.ord-body small { color:var(--muted); font-size:12px; }
+.ord.lock { opacity:.5; cursor:default; }
 /* Minikarte (js/minimap.js): eingeklappt nur der Knopf, ausgeklappt 112×64 px; Ticker weicht aus */
 #mini { position:fixed; z-index:4; left:calc(8px + env(safe-area-inset-left,0px)); top:calc(var(--safe-t) + 96px); width:28px; height:24px; }
 #mini.open { width:112px; height:64px; }

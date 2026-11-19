@@ -1,8 +1,9 @@
 // Simfurt – Oberfläche, Eingabe (Touch + Maus), Spielschleife.
 import { N, MAP_SIZES, BUILD, CATS, ZONES, OVERLAYS, MONTHS, Z_R, Z_C, Z_I, Z_B, ZONE_UNLOCK, CITY_NAMES, START_MONEY } from './data.js';
+import { ORDINANCES, BUDGET_RES, BUDGET_NAMES, BUDGET_MIN, BUDGET_MAX, BUDGET_STEP } from './data.js';
 import {
   newCity, tick, refresh, applyTool, toolCost, placeBuilding, canPlace, unlocked, unlockNeed, tileInfo, takeLoan, repayLoan, inb, idx, roadAt, dateStr, say,
-  pushUndo, popUndo, endUndo, undo, canUndo,
+  pushUndo, popUndo, endUndo, undo, canUndo, setBudget, budgetPct, toggleOrd, ordBlock,
 } from './sim.js';
 import { Renderer } from './render.js';
 import { saveSlot, loadSlot, listSlots, deleteSlot, SLOTS, snapshot, exportFile, importFile, storageInfo, persist } from './save.js';
@@ -380,16 +381,33 @@ function councilHtml() {
   const st = S.stats, f = S.fin, p = f.parts;
   const cl = (v) => (v >= 0 ? 'pos' : 'neg');
   const rate = (k, label) => `<div class="sl"><span>${label}</span><input type="range" min="0" max="20" value="${S.rates[k]}" data-r="${k}"><b id="rv${k}">${S.rates[k]} %</b></div>`;
-  const names = { tax: 'Steuern', crime: 'Kriminalität', pol: 'Umwelt', traffic: 'Verkehr', health: 'Gesundheit', edu: 'Bildung', police: 'Polizei', fire: 'Feuerwehr', park: 'Grünflächen', landmark: 'Wahrzeichen', jobs: 'Arbeitslosigkeit', power: 'Strom' };
+  const names = { tax: 'Steuern', crime: 'Kriminalität', pol: 'Umwelt', traffic: 'Verkehr', health: 'Gesundheit', edu: 'Bildung', police: 'Polizei', fire: 'Feuerwehr', park: 'Grünflächen', landmark: 'Wahrzeichen', jobs: 'Arbeitslosigkeit', power: 'Strom', ords: 'Verordnungen' };
+  // Monatlicher Unterhalt je Ressort (schon mit Budget); Straßen über den Straßenunterhalt
+  const resCost = { police: p.upPolice || 0, fire: p.upFire || 0, health: p.upHealth || 0, edu: p.upEdu || 0, roads: p.roads || 0 };
+  const budgetRow = (k) => { const v = budgetPct(S, k); return `<div class="sl wide"><span>${BUDGET_NAMES[k]}</span><input type="range" min="${BUDGET_MIN}" max="${BUDGET_MAX}" step="${BUDGET_STEP}" value="${v}" data-b="${k}"><b id="bv${k}">${v} %</b></div>`; };
+  const ordRow = (o) => {
+    const on = !!(S.ords && S.ords[o.id]); const blk = ordBlock(S, o.id);
+    const locked = !!blk && !on;
+    const lockTxt = locked ? (blk.build ? `braucht ${BUILD[blk.build].name}` : `ab ${fmt(blk.pop)} Einw.`) : '';
+    const parts = [o.cost ? eur(o.cost) : '', o.costPerPop ? o.costPerPop.toLocaleString('de-DE', { maximumFractionDigits: 2 }) + ' €/Einw.' : ''].filter(Boolean);
+    const cost = parts.length ? parts.join(' + ') + ' / Monat' : 'kostenlos';
+    return `<label class="ord${locked ? ' lock' : ''}"><input type="checkbox" data-ord="${o.id}"${on ? ' checked' : ''}${locked ? ' disabled' : ''}><span class="ord-body"><b>${o.name}</b><small>${o.desc}</small><small>${locked ? '🔒 ' + lockTxt : cost}</small></span></label>`;
+  };
   return `
     <h3 class="sec">Haushalt (pro Monat)</h3>
     <div class="kv">
       <span>Einnahmen Wohnen</span><span>${eur(p.tR || 0)}</span><span>Einnahmen Gewerbe</span><span>${eur(p.tC || 0)}</span>
       <span>Einnahmen Industrie</span><span>${eur(p.tI || 0)}</span><span>Einnahmen Banken</span><span>${eur(p.tB || 0)}</span><span>Tourismus</span><span>${eur(p.tour || 0)}</span>
       <span>Unterhalt Gebäude</span><span>−${eur(p.up || 0)}</span><span>Unterhalt Straßen</span><span>−${eur(p.roads || 0)}</span><span>Kreditzinsen</span><span>−${eur(p.interest || 0)}</span>
+      <span>Verordnungen</span><span>−${eur(p.ordCost || 0)}</span>
       <span><b>Bilanz</b></span><span class="${cl(f.net)}"><b>${f.net >= 0 ? '+' : ''}${eur(f.net)}</b></span>
     </div>
     <h3 class="sec">Steuersätze</h3>${rate('r', 'Wohnen')}${rate('c', 'Gewerbe/Banken')}${rate('i', 'Industrie')}
+    <h3 class="sec">Budget je Ressort</h3>${BUDGET_RES.map(budgetRow).join('')}
+    <div class="kv">${BUDGET_RES.map((k) => `<span>${BUDGET_NAMES[k]} pro Monat</span><span>−${eur(resCost[k])}</span>`).join('')}</div>
+    <p class="chart-note">100 % wie bisher. Weniger Budget spart Geld, schwächt aber die Wirkung. Straßen unter 60 %: mehr Stau.</p>
+    <h3 class="sec">Verordnungen</h3>
+    <div class="ords">${ORDINANCES.map(ordRow).join('')}</div>
     <h3 class="sec">Kredit</h3>
     <div class="kv"><span>Schulden</span><span>${eur(S.loan)}</span></div>
     <button class="btn small" id="bLoan">+10.000 € leihen</button><button class="btn small" id="bRepay">10.000 € tilgen</button>
@@ -405,7 +423,22 @@ $('bCouncil').onclick = () => {
   sheet('Stadtrat', councilHtml());
   drawCharts();
   const body = $('sBody');
-  body.oninput = (e) => { const r = e.target.dataset.r; if (r) { S.rates[r] = Number(e.target.value); $('rv' + r).textContent = S.rates[r] + ' %'; } };
+  body.oninput = (e) => {
+    const r = e.target.dataset.r; if (r) { S.rates[r] = Number(e.target.value); $('rv' + r).textContent = S.rates[r] + ' %'; }
+    const bk = e.target.dataset.b;
+    if (bk) { const v = setBudget(S, bk, e.target.value); if (v !== false) { $('bv' + bk).textContent = v + ' %'; changed = true; refresh(S); lastHud = ''; hud(); needDraw = true; } }
+  };
+  body.onchange = (e) => {
+    if (e.target.dataset.b) { body.innerHTML = councilHtml(); drawCharts(); }
+    const oid = e.target.dataset.ord;
+    if (oid) {
+      const want = e.target.checked, now = toggleOrd(S, oid);
+      if (now !== want) { const blk = ordBlock(S, oid); toast(blk && blk.build ? `Braucht ${BUILD[blk.build].name}.` : `Gesperrt bis ${fmt(blk ? blk.pop : 0)} Einwohner.`); }
+      else if (now) sound.play('click');
+      changed = true; refresh(S); lastHud = ''; hud(); needDraw = true;
+      body.innerHTML = councilHtml(); drawCharts();
+    }
+  };
   body.onclick = (e) => {
     if (e.target.id === 'bLoan') { if (!takeLoan(S)) toast('Mehr Kredit gibt es nicht.'); else sound.play('money'); body.innerHTML = councilHtml(); drawCharts(); hud(); }
     if (e.target.id === 'bRepay') { if (!repayLoan(S)) toast('Nicht möglich (Geld oder Schulden).'); else sound.play('money'); body.innerHTML = councilHtml(); drawCharts(); hud(); }
