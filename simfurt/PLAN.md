@@ -6,7 +6,7 @@ Verbindlich: `PRD.md`. Tests: `node simfurt/test/sim.test.js` (muss grün bleibe
 ## Befund
 | Bereich | Problem |
 |---|---|
-| Speichern | Webspace `phpexpert.de/vocs/simfurt/api.php` liefert **404** (gesamtes `/vocs` nicht ausgeliefert). Ein Push wartet bis 12 s; währenddessen blockiert die `saving`-Sperre **auch das lokale Speichern** (Verstecken/Schließen der Seite geht verloren). |
+| Speichern | Webspace `phpexpert.de/vocs/simfurt/api.php` lieferte **404** (gesamtes `/vocs` nicht ausgeliefert; Nov 2026 behoben: Backend liegt jetzt in diesem Repo und läuft unter `phpexpert.de/games/simfurt/api.php`). Ein Push wartet bis 12 s; währenddessen blockiert die `saving`-Sperre **auch das lokale Speichern** (Verstecken/Schließen der Seite geht verloren). |
 | Speichern | `pagehide` startet nur asynchron gzip + IndexedDB → beim Schließen oft nicht fertig. Autosave nur jährlich → Fortschritt weg. |
 | Speichern | Fällt IndexedDB aus (privater Modus, gesperrter Speicher), gibt es keinen Ersatz und kein Datei-Export/Import. |
 | Server | `api.php` überschreibt `meta.size` (Kartengröße) mit der Bytezahl; `mb_substr` ohne Fallback. |
@@ -18,7 +18,7 @@ Alle Pakete P1–P5 erledigt (Nov 2026). Abweichung P3: Rückgängig speichert p
 
 ## Pakete
 
-### P1 – Speichersystem (Opus) · `js/save.js`, Speicher-Teil von `js/main.js`, vipervocs `simfurt/api.php`
+### P1 – Speichersystem (Opus) · `js/save.js`, Speicher-Teil von `js/main.js`, `simfurt/api.php`
 - Lokale Speicherung entkoppelt vom Webspace: lokal sofort, Webspace im Hintergrund (eigene Sperre, nie blockierend).
 - Backend-Kette lokal: IndexedDB → Fallback `localStorage` (gzip+Base64 bzw. JSON).
 - Notfall-Schnappschuss synchron in `localStorage` (`simfurt-snap`) bei `visibilitychange`/`pagehide`; beim Laden gewinnt der neuere Stand.

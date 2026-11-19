@@ -34,7 +34,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Test Fruhno rules engine
         run: |
@@ -95,10 +95,17 @@ jobs:
           bye
           EOF
 
+      # Kurzer Check nach dem Upload: fruhno ohne Schlüssel 401, simfurt-Ping 200, Frankfurtopoly-Startseite 200.
       - name: Check live URLs
         if: steps.check.outputs.ready == 'true'
         run: |
-          for u in fruhno/api.php "simfurt/api.php?ping=1" frankfurtopoly/; do
-            code=$(curl -s -o /dev/null -w '%{http_code}' "https://phpexpert.de/games/$u")
-            echo "https://phpexpert.de/games/$u → $code"
-          done
+          fail=0
+          check() {
+            code=$(curl -s -o /dev/null -w '%{http_code}' "$1")
+            echo "$1 → $code (erwartet $2)"
+            [ "$code" = "$2" ] || { echo "::error::$1 liefert $code statt $2"; fail=1; }
+          }
+          check https://phpexpert.de/games/fruhno/api.php 401
+          check "https://phpexpert.de/games/simfurt/api.php?ping=1" 200
+          check https://phpexpert.de/games/frankfurtopoly/ 200
+          exit $fail
