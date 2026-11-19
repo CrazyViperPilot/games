@@ -596,6 +596,26 @@ function nightBuilding(lg, b, blink) {
   if (blink && BEACON_Z[b.type]) beacon(lg, cx, cy, BEACON_Z[b.type]);
 }
 
+// ---------------------------------------------------------------- Nachbarstädte (H1): Schilder am Kartenrand
+const SIGN_FONT = 'bold 13px system-ui,"Noto Sans",sans-serif';
+const SIGN_ARROW = ['↙', '↖', '↗', '↘']; // Kante N/O/S/W: Pfeil zeigt isometrisch in die Karte
+const signs = new Map();
+/** Schild mit Namen (Sprite je Name, Kante und Verbindung gecacht). */
+function signSprite(name, edge, linked) {
+  const key = name + '|' + edge + '|' + (linked ? 1 : 0);
+  let sp = signs.get(key); if (sp) return sp;
+  const label = SIGN_ARROW[edge] + ' ' + name, ss = 2, h = 20;
+  let c = document.createElement('canvas'); let g = c.getContext('2d'); g.font = SIGN_FONT;
+  const w = Math.ceil(g.measureText(label).width) + 14;
+  c.width = w * ss; c.height = h * ss;
+  g = c.getContext('2d'); g.scale(ss, ss); g.font = SIGN_FONT;
+  g.fillStyle = linked ? 'rgba(26,94,50,.9)' : 'rgba(20,28,40,.78)'; g.fillRect(0, 0, w, h);
+  g.strokeStyle = linked ? '#7af09a' : 'rgba(200,212,224,.55)'; g.lineWidth = 1; g.strokeRect(0.5, 0.5, w - 1, h - 1);
+  g.fillStyle = linked ? '#e8fff0' : '#e6ecf2'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(label, w / 2, h / 2 + 0.5);
+  sp = { c, w, h }; signs.set(key, sp); return sp;
+}
+
 // ---------------------------------------------------------------- Renderer
 export class Renderer {
   constructor(canvas) {
@@ -713,6 +733,8 @@ export class Renderer {
       g.globalCompositeOperation = 'lighter'; g.drawImage(this.lcv, 0, 0);
       g.restore();
     }
+    // --- Nachbarstädte (H1): nach der Tönung, damit Schilder auch nachts lesbar sind
+    if (s.trade && s.trade.neighbors) this.drawNeighbors(s, g);
     // --- Overlay
     const m = s.maps;
     if (ui.overlay && ui.overlay !== 'none' && m) {
@@ -747,6 +769,25 @@ export class Renderer {
     }
     if (ui.hover && !ui.ghost && !ui.sel) this.diamond(ui.hover[0], ui.hover[1], 'rgba(255,255,255,.28)');
     if (ui.pick) this.diamondStroke(ui.pick[0], ui.pick[1]);
+  }
+  /** Je Nachbarstadt ein Schild außerhalb der Karte an ihrer Kante (am Anschluss, sonst Kantenmitte); verbunden = grün, Anschlusskacheln grün markiert. */
+  drawNeighbors(s, g) {
+    const links = s.trade.links || [];
+    for (const nb of s.trade.neighbors) {
+      const ln = links.find((l) => l.edge === nb.edge) || null;
+      const i = ln ? (ln.tile >= 0 ? ln.tile : ln.rtile) : -1;
+      const along = i >= 0 ? ((nb.edge === 0 || nb.edge === 2) ? i % N : Math.floor(i / N)) : N / 2;
+      if (ln) {
+        if (ln.tile >= 0) this.diamond(ln.tile % N, Math.floor(ln.tile / N), 'rgba(90,230,120,.42)');
+        if (ln.rtile >= 0) this.diamond(ln.rtile % N, Math.floor(ln.rtile / N), 'rgba(90,230,120,.42)');
+      }
+      const t = along + 0.5;
+      const ax = nb.edge === 0 ? t : nb.edge === 1 ? N + 1.6 : nb.edge === 2 ? t : -1.6;
+      const ay = nb.edge === 0 ? -1.6 : nb.edge === 1 ? t : nb.edge === 2 ? N + 1.6 : t;
+      const sx = (ax - ay) * 32, sy = (ax + ay) * 16;
+      const sp = signSprite(nb.name, nb.edge, !!ln);
+      g.drawImage(sp.c, sx - sp.w / 2, sy - sp.h / 2, sp.w, sp.h);
+    }
   }
   diamond(x, y, fill) {
     const g = this.g, px = (x - y) * 32, py = (x + y) * 16;

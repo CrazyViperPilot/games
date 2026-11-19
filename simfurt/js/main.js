@@ -2,8 +2,12 @@
 import { N, MAP_SIZES, BUILD, CATS, ZONES, OVERLAYS, MONTHS, Z_R, Z_C, Z_I, Z_B, ZONE_UNLOCK, CITY_NAMES, START_MONEY } from './data.js';
 import { ORDINANCES, BUDGET_RES, BUDGET_NAMES, BUDGET_MIN, BUDGET_MAX, BUDGET_STEP } from './data.js';
 import {
+  TRADE_FOCUS_NAMES, TRADE_POWER_SELL, TRADE_POWER_BUY, TRADE_POWER_LINK, TRADE_WATER_SELL, TRADE_WATER_BUY, TRADE_WATER_LINK,
+  TRADE_GARB_FEE, TRADE_GARB_LINK,
+} from './data.js';
+import {
   newCity, tick, refresh, applyTool, toolCost, placeBuilding, canPlace, unlocked, unlockNeed, tileInfo, takeLoan, repayLoan, inb, idx, roadAt, dateStr, say,
-  pushUndo, popUndo, endUndo, undo, canUndo, setBudget, budgetPct, toggleOrd, ordBlock,
+  pushUndo, popUndo, endUndo, undo, canUndo, setBudget, budgetPct, toggleOrd, ordBlock, setTrade,
 } from './sim.js';
 import { Renderer } from './render.js';
 import { saveSlot, loadSlot, listSlots, deleteSlot, SLOTS, snapshot, exportFile, importFile, storageInfo, persist } from './save.js';
@@ -395,6 +399,41 @@ function drawChart(cv, rows, c, color, grid, muted) {
   g.fillStyle = color; g.beginPath(); g.arc(lx, ly, 2.5, 0, Math.PI * 2); g.fill();
 }
 
+/** Abschnitt „Nachbarn & Handel“ im Rat (H1): Anschlüsse, Pendler, Handelsschalter, Handelsposten, Hilfetext. */
+function tradeHtml() {
+  const tr = S.trade; if (!tr || !Array.isArray(tr.neighbors)) return '';
+  const T = S.stats.trade, p = S.fin.parts, links = tr.links || [];
+  const dirs = ['Norden', 'Osten', 'Süden', 'Westen'];
+  const nbRows = tr.neighbors.map((nb) => {
+    const ln = links.find((l) => l.edge === nb.edge);
+    const how = ln ? `${[ln.road ? 'Straße' : '', ln.rail ? 'Gleis' : ''].filter(Boolean).join(' + ')} · ${fmt(ln.commuters)} Pendler`
+      : '<span class="neg">nicht angebunden</span>';
+    return `<span>${nb.name} (${dirs[nb.edge]})</span><span>${fmt(nb.size)} Einw. · ${TRADE_FOCUS_NAMES[nb.focus]}<br>${how}</span>`;
+  }).join('');
+  const sw = (k, title, sub) => `<label class="ord${T.n ? '' : ' lock'}"><input type="checkbox" data-trade="${k}"${tr[k] ? ' checked' : ''}><span class="ord-body"><b>${title}</b><small>${sub}</small></span></label>`;
+  return `
+    <h3 class="sec">Nachbarn &amp; Handel</h3>
+    <div class="kv">${nbRows}</div>
+    <div class="kv"><span>Verbunden</span><span>${T.n} von ${tr.neighbors.length}</span>
+      <span>Pendler rein (füllen offene Stellen)</span><span>${fmt(T.commIn)}</span>
+      <span>Pendler raus (Arbeitslose)</span><span>${fmt(T.commOut)}</span></div>
+    <div class="ords">
+      ${sw('sellPower', 'Strom verkaufen', `Ungenutzte Kapazität zu ${TRADE_POWER_SELL} € je Einheit, bis ${TRADE_POWER_LINK} je Anschluss und Monat`)}
+      ${sw('buyPower', 'Strom zukaufen', `Deckt Fehlbedarf zu ${TRADE_POWER_BUY} € je Einheit, bis ${TRADE_POWER_LINK} je Anschluss (braucht ein Kraftwerk)`)}
+      ${sw('sellWater', 'Wasser verkaufen', `Ungenutzte Pumpkapazität zu ${TRADE_WATER_SELL} € je Einheit, bis ${TRADE_WATER_LINK} je Anschluss`)}
+      ${sw('buyWater', 'Wasser zukaufen', `Deckt Fehlbedarf zu ${TRADE_WATER_BUY} € je Einheit, bis ${TRADE_WATER_LINK} je Anschluss (braucht ein Pumpwerk)`)}
+      ${sw('exportGarbage', 'Müll exportieren', `Unentsorgter Rest zu ${TRADE_GARB_FEE} € je Tonne, bis ${TRADE_GARB_LINK} t je Anschluss`)}
+    </div>
+    <div class="kv">
+      <span>Strom verkauft / gekauft</span><span>${fmt(T.sellP)} / ${fmt(T.buyP)} Einh.</span>
+      <span>Wasser verkauft / gekauft</span><span>${fmt(T.sellW)} / ${fmt(T.buyW)} Einh.</span>
+      <span>Müll exportiert</span><span>${fmt(T.gExp)} t</span>
+      <span>Einnahmen Handel</span><span class="pos">+${eur(p.tradeIn || 0)}</span>
+      <span>Ausgaben Handel</span><span class="neg">−${eur(p.tradeOut || 0)}</span>
+    </div>
+    <p class="chart-note">Nachbarstädte liegen am Kartenrand, ihr Schild zeigt die Kante. Führe eine Straße (oder ein Gleis mit Bahnhof) bis zum Rand an das Schild: dann ist die Stadt verbunden (grünes Schild). Wohnen-Städte schicken Pendler, die offene Stellen füllen; Gewerbe- und Industriestädte nehmen Arbeitslose auf. Die Pendler belasten die Straße am Anschluss (mit Gleis halb so viel). Handel wirkt nur mit mindestens einer Verbindung; alle Schalter stehen anfangs aus.</p>`;
+}
+
 function councilHtml() {
   const st = S.stats, f = S.fin, p = f.parts;
   const cl = (v) => (v >= 0 ? 'pos' : 'neg');
@@ -426,6 +465,7 @@ function councilHtml() {
     <p class="chart-note">100 % wie bisher. Weniger Budget spart Geld, schwächt aber die Wirkung. Straßen unter 60 %: mehr Stau.</p>
     <h3 class="sec">Verordnungen</h3>
     <div class="ords">${ORDINANCES.map(ordRow).join('')}</div>
+    ${tradeHtml()}
     <h3 class="sec">Kredit</h3>
     <div class="kv"><span>Schulden</span><span>${eur(S.loan)}</span></div>
     <button class="btn small" id="bLoan">+10.000 € leihen</button><button class="btn small" id="bRepay">10.000 € tilgen</button>
@@ -456,6 +496,13 @@ $('bCouncil').onclick = () => {
       if (now !== want) { const blk = ordBlock(S, oid); toast(blk && blk.build ? `Braucht ${BUILD[blk.build].name}.` : `Gesperrt bis ${fmt(blk ? blk.pop : 0)} Einwohner.`); }
       else if (now) sound.play('click');
       changed = true; refresh(S); lastHud = ''; hud(); needDraw = true;
+      body.innerHTML = councilHtml(); drawCharts();
+    }
+    const tk = e.target.dataset.trade;
+    if (tk) {
+      setTrade(S, tk, e.target.checked); // rechnet selbst neu
+      if (e.target.checked) sound.play('click');
+      changed = true; lastHud = ''; hud(); needDraw = true;
       body.innerHTML = councilHtml(); drawCharts();
     }
   };

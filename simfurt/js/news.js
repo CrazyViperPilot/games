@@ -226,7 +226,7 @@ const TEXT = {
       (F) => `Im Schnitt zahlen die Simfurter ${Math.round(F.avgTax)} Prozent. Am Stammtisch in Sachsenhausen wird nachgerechnet, und mancher denkt schon ans Umland.`,
       'Die Kasse freut sich, die Geldbörsen der Bürger weniger. Gewerbetreibende klagen, Simfurt sei teuer geworden, und Banken prüfen ihren Standort.',
     ],
-    demands: ['Steuersatz im Rat (Steuersätze) um 2 bis 3 Punkte senken – das wirkt spürbar auf die Zufriedenheit.', 'Die Gewerbesteuer etwas schonen, damit Läden und Büros bleiben.'],
+    demands: ['Steuersatz im Rat (Steuersätze) um 2 bis 3 Punkte senken – das wirkt spürbar auf die Zufriedenheit.', 'Den höchsten der drei Steuersätze zuerst senken – dort drückt der Schuh am meisten.'],
   },
   money: {
     heads: ['Kasse leer! Die Stadt muss sparen', 'Haushalt im Minus – der Rat rechnet nach', 'Stadtsäckel leer: Ausgaben stehen auf dem Prüfstand'],

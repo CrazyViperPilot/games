@@ -110,7 +110,8 @@ Abweichungen: Müllbelastung wird in refresh aus Aufkommen + Deponie-Füllständ
 
 ---
 
-# Runde 4: S-Bahn, Nachbarstädte & Handel, Zeitung
+# Runde 4: S-Bahn, Nachbarstädte & Handel, Zeitung – erledigt
+Abweichungen: keine fahrenden Züge; Straßenanschluss zählt nur mit Bebauung im Netz; Strom/Wasser-Zukauf nur mit eigener Anlage; `trade.links` wird abgeleitet (mitgespeichert, harmlos).
 
 Speicher (Opus erledigt): `save.js` serialisiert die Kachelebene `rail` (Uint8Array N², fehlt in alten Ständen → bleibt 0) sowie `trade` und `news` (Objekte aus newCity). Reihenfolge: S1 und Z1 parallel, danach H1.
 

@@ -95,6 +95,33 @@ export const RAIL_CROSS_TRAFFIC = 0.2;
 /** Grundwert-Zuschlag im Radius eines wirksamen Bahnhofs, Gewerbe-Nachfrage bei mindestens einem wirksamen Bahnhof. */
 export const RAIL_VALUE = 8, RAIL_DEMAND_C = 0.05;
 
+// ---------------------------------------------------------------- Nachbarstädte & Handel (Runde 4, H1)
+/** Mögliche Namen der Nachbarstädte (je Seed 3–4 verschiedene). */
+export const TRADE_CITY_NAMES = ['Offenbach', 'Bad Homburg', 'Hanau', 'Darmstadt', 'Bad Vilbel', 'Eschborn', 'Oberursel', 'Rüsselsheim', 'Neu-Isenburg', 'Maintal'];
+/** Schwerpunkte: ind = Industrie, gew = Gewerbe, wohn = Wohnen. */
+export const TRADE_FOCUS = ['ind', 'gew', 'wohn'];
+export const TRADE_FOCUS_NAMES = { ind: 'Industrie', gew: 'Gewerbe', wohn: 'Wohnen' };
+export const TRADE_NEIGHBORS_MIN = 3, TRADE_NEIGHBORS_MAX = 4;
+/** Einwohnerzahl einer Nachbarstadt (in 5.000er-Schritten) und Bezugsgröße für ihre Wirkung. */
+export const TRADE_CITY_MIN = 20000, TRADE_CITY_MAX = 150000, TRADE_SIZE_REF = 100000;
+/** Preise in € je Einheit und Monat; Obergrenzen je verbundener Nachbarstadt und Monat. */
+export const TRADE_POWER_SELL = 6, TRADE_POWER_BUY = 14, TRADE_POWER_LINK = 150;
+export const TRADE_WATER_SELL = 3, TRADE_WATER_BUY = 7, TRADE_WATER_LINK = 150;
+/** Müllexport: Gebühr je Tonne, höchstens TRADE_GARB_LINK Tonnen je Anschluss und Monat (nur der unentsorgte Rest). */
+export const TRADE_GARB_FEE = 40, TRADE_GARB_LINK = 60;
+/** Pendler je Nachbarstadt: Einwohner × Anteil, höchstens Anteil der eigenen Einwohner. */
+export const TRADE_COMMUTE = 0.02, TRADE_COMMUTE_POP = 0.2;
+/** Verkehr am Anschlusspunkt je Pendler (Verkehrseinheiten wie die Wege im Verkehrsmodell); mit Gleis am selben Rand halb so viel. */
+export const TRADE_TRAFFIC = 0.02;
+/** Nachfrage-Zuschlag je verbundener Nachbarstadt (× Größenfaktor 0,2–1,5). */
+export const TRADE_DEMAND = {
+  wohn: { r: 0, c: 0.02, i: 0.03 },
+  gew: { r: 0.02, c: 0.05, i: 0 },
+  ind: { r: 0.03, c: 0, i: 0.03 },
+};
+/** Handelsschalter in s.trade (Standard aus). */
+export const TRADE_SWITCHES = ['sellPower', 'buyPower', 'sellWater', 'buyWater', 'exportGarbage'];
+
 // ---------------------------------------------------------------- Budget je Ressort (Prozent, Regler 0–120 in 10er-Schritten)
 /** Ressorts mit Regler. police/fire/health/edu wirken über die Gebäude-kind gleichen Namens, roads auf Straßen. */
 export const BUDGET_RES = ['police', 'fire', 'health', 'edu', 'roads'];

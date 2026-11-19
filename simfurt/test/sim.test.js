@@ -1,7 +1,8 @@
 // Tests für Simfurt: node simfurt/test/sim.test.js
 import assert from 'node:assert';
-import { N, T_WATER, T_TREES, BUILD, ORDINANCES, CATS, Z_R, GARBAGE_BLD, RAIL_COST, RAIL_BRIDGE_COST, RAIL_CROSS_COST, RAIL_UPKEEP, BULLDOZE_COST } from '../js/data.js';
-import { newCity, tick, applyTool, placeBuilding, canPlace, refresh, unlocked, idx, takeLoan, repayLoan, pushUndo, endUndo, undo, canUndo, flood, tileInfo, UNDO_MAX, setBudget, budgetPct, toggleOrd, ordBlock, removeBuilding, railComponents } from '../js/sim.js';
+import { N, T_WATER, T_TREES, BUILD, ORDINANCES, CATS, Z_R, Z_C, Z_I, Z_B, GARBAGE_BLD, RAIL_COST, RAIL_BRIDGE_COST, RAIL_CROSS_COST, RAIL_UPKEEP, BULLDOZE_COST } from '../js/data.js';
+import { TRADE_TRAFFIC, TRADE_GARB_FEE, TRADE_GARB_LINK, TRADE_POWER_LINK, TRADE_CITY_MIN, TRADE_CITY_MAX, TRADE_NEIGHBORS_MIN, TRADE_NEIGHBORS_MAX, TRADE_CITY_NAMES, TRADE_FOCUS, TRADE_SWITCHES } from '../js/data.js';
+import { newCity, tick, applyTool, placeBuilding, canPlace, refresh, unlocked, idx, takeLoan, repayLoan, pushUndo, endUndo, undo, canUndo, flood, tileInfo, UNDO_MAX, setBudget, budgetPct, toggleOrd, ordBlock, removeBuilding, railComponents, makeNeighbors, makeTrade, setTrade } from '../js/sim.js';
 import { performance } from 'node:perf_hooks';
 import { serialize, deserialize } from '../js/save.js';
 import { buildCity } from './bot.mjs';
@@ -816,6 +817,205 @@ test('S-Bahn: Bahnhöfe, Gleis und Werkzeug sind freigeschaltet ab ihrer Einwohn
   s.peakPop = 2500; assert.strictEqual(unlocked(s, 'rail'), true); assert.strictEqual(unlocked(s, 'sbahn'), true);
   assert.strictEqual(BUILD.sbahn.cat, 'transport');
   assert.strictEqual(BUILD.sbahn.kind, 'rail');
+});
+
+// ---------------------------------------------------------------- Nachbarstädte & Handel (Runde 4, H1)
+/** Stadt mit Bebauung (bot.mjs), 24 Monate gespielt. Größe fest 64, damit die Kantenkoordinaten stimmen. */
+const newTown = (seed) => { const s = newCity({ seed, size: 64 }); s.disasters = false; s.money = 1e6; s.peakPop = 1e6; buildCity(s); for (let t = 0; t < 24; t++) tick(s); return s; };
+/** Straße vom Stadtnetz bis zur Randreihe der Kante (Norden/Osten/Süden/Westen) – passt zu buildCity-Raster. */
+function roadToEdge(s, edge) {
+  if (edge === 0) for (let y = 17; y >= 0; y--) applyTool(s, 'road', 32, y);
+  if (edge === 1) for (let x = 50; x < N; x++) applyTool(s, 'road', x, 24);
+  if (edge === 2) for (let y = 46; y < N; y++) applyTool(s, 'road', 36, y);
+  if (edge === 3) for (let x = 13; x >= 0; x--) applyTool(s, 'road', x, 24);
+}
+const linkOf = (s, edge) => s.trade.links.find((l) => l.edge === edge) || null;
+
+test('Handel: 3–4 Nachbarstädte aus dem Seed, verschiedene Namen und Kanten, Größe und Schwerpunkt gültig', () => {
+  for (let seed = 1; seed <= 30; seed++) {
+    const nb = makeNeighbors(seed);
+    assert.ok(nb.length >= TRADE_NEIGHBORS_MIN && nb.length <= TRADE_NEIGHBORS_MAX, 'Anzahl ' + nb.length);
+    assert.strictEqual(new Set(nb.map((n) => n.name)).size, nb.length, 'Namen verschieden');
+    assert.strictEqual(new Set(nb.map((n) => n.edge)).size, nb.length, 'Kanten verschieden');
+    for (const n of nb) {
+      assert.ok(TRADE_CITY_NAMES.includes(n.name));
+      assert.ok(n.edge >= 0 && n.edge <= 3);
+      assert.ok(n.size >= TRADE_CITY_MIN && n.size <= TRADE_CITY_MAX && n.size % 5000 === 0, 'Größe ' + n.size);
+      assert.ok(TRADE_FOCUS.includes(n.focus));
+    }
+  }
+});
+
+test('Handel: gleicher Seed gibt dieselben Nachbarn, anderer Seed andere; newCity legt trade mit Schaltern aus an', () => {
+  assert.deepStrictEqual(makeNeighbors(42), makeNeighbors(42));
+  assert.notDeepStrictEqual(makeNeighbors(42), makeNeighbors(43));
+  const s = newCity({ seed: 42 });
+  assert.deepStrictEqual(s.trade.neighbors, makeNeighbors(42));
+  for (const k of TRADE_SWITCHES) assert.strictEqual(s.trade[k], false, k + ' aus');
+  assert.strictEqual(setTrade(s, 'kein Schalter', true), false, 'unbekannter Schalter');
+  assert.strictEqual(setTrade(s, 'sellPower', true), true);
+  assert.strictEqual(s.trade.sellPower, true);
+});
+
+test('Handel: ohne Anschluss keine Wirkung – auch bei eingeschalteten Schaltern bleibt die Simulation wie ohne Handel', () => {
+  const a = newTown(5), b = newTown(5);
+  delete b.trade; // Stand ohne Handel (nur alte Stände hätten das nicht; hier zum Vergleich)
+  for (const k of TRADE_SWITCHES) setTrade(a, k, true);
+  assert.strictEqual(a.trade.links.length, 0, 'keine Verbindung');
+  for (let t = 0; t < 24; t++) { tick(a); tick(b); }
+  assert.strictEqual(a.money, b.money); assert.strictEqual(a.stats.pop, b.stats.pop);
+  assert.strictEqual(a.stats.unemp, b.stats.unemp); assert.strictEqual(a.stats.jobs, b.stats.jobs);
+  assert.strictEqual(a.powerRatio, b.powerRatio); assert.strictEqual(a.waterRatio, b.waterRatio);
+  assert.deepStrictEqual(a.maps.traffic, b.maps.traffic);
+  assert.strictEqual(a.fin.parts.tradeIn, 0); assert.strictEqual(a.fin.parts.tradeOut, 0);
+});
+
+test('Handel: Straße bis zum Rand an der Kante einer Nachbarstadt verbindet nur diese; Straße ohne Stadtnetz nicht', () => {
+  // Isolierte Straße ohne Bebauung: kein Anschluss
+  const iso = newCity({ seed: 7, size: 64 }); iso.disasters = false; iso.money = 1e6;
+  roadToEdge(iso, 0); refresh(iso);
+  assert.strictEqual(iso.trade.links.length, 0, 'Straße ohne Stadt verbindet nicht');
+  // Stadt mit Raster: Straße nach Norden verbindet die Nachbarstadt an Kante 0, Kante 3 hat keine Nachbarstadt
+  const s = newTown(7);
+  assert.strictEqual(s.trade.links.length, 0, 'ohne Straße keine Verbindung');
+  const edges = s.trade.neighbors.map((n) => n.edge);
+  roadToEdge(s, 0); refresh(s);
+  assert.strictEqual(s.trade.links.length, 1, 'eine Verbindung');
+  assert.ok(linkOf(s, 0) && linkOf(s, 0).road && !linkOf(s, 0).rail, 'Norden über Straße');
+  assert.strictEqual(s.trade.links[0].name, s.trade.neighbors.find((n) => n.edge === 0).name);
+  // Straße nach Westen: keine Nachbarstadt auf Kante 3 (Seed 7 hat Kanten 0, 1, 2) → unverändert
+  assert.ok(!edges.includes(3));
+  roadToEdge(s, 3); refresh(s);
+  assert.strictEqual(s.trade.links.length, 1, 'Westkante ohne Nachbarn verbindet nichts');
+  // Kachelinfo nennt den Anschluss
+  const tile = linkOf(s, 0).tile;
+  assert.ok(tileInfo(s, tile % N, (tile / N) | 0).lines.some((l) => l.includes('Anschluss an')), 'Kachelinfo');
+});
+
+test('Handel: Gleis bis zum Rand mit einem Bahnhof verbindet; der Bahnhof wirkt dann allein', () => {
+  const s = newTown(7);
+  for (let y = 47; y < N; y++) applyTool(s, 'rail', 40, y);
+  placeBuilding(s, 'sbahn', 41, 50);
+  refresh(s);
+  const ln = linkOf(s, 2);
+  assert.ok(ln && ln.rail, 'Süden über Gleis verbunden: ' + JSON.stringify(s.trade.links));
+  assert.strictEqual(s.stats.railStations, 1);
+  assert.strictEqual(s.stats.railActive, 1, 'Bahnhof am angebundenen Gleis wirkt allein');
+  // Gegenprobe: ohne Anschluss (Gleis endet vor dem Rand) wirkt ein einzelner Bahnhof nicht
+  const t = newTown(7);
+  for (let y = 47; y < 60; y++) applyTool(t, 'rail', 40, y);
+  placeBuilding(t, 'sbahn', 41, 50);
+  refresh(t);
+  assert.strictEqual(t.stats.railActive, 0, 'ohne Rand kein Wirken');
+  assert.strictEqual(t.trade.links.length, 0);
+});
+
+test('Handel: Pendler – Gewerbe-Nachbar senkt die Arbeitslosigkeit (Auspendler), Wohnen-Nachbar füllt offene Stellen', () => {
+  // Nur Wohnen: alle Arbeitskräfte ohne Arbeit → Arbeitslosigkeit 100 %
+  const a = newTown(7);
+  for (let i = 0; i < N * N; i++) if (a.zone[i] === Z_C || a.zone[i] === Z_I || a.zone[i] === Z_B) { a.zone[i] = 0; a.lvl[i] = 0; }
+  refresh(a);
+  const u0 = a.stats.unemp;
+  assert.ok(u0 > 0.99, 'ohne Arbeit: Arbeitslosigkeit ' + u0);
+  a.trade.neighbors.forEach((n) => { n.focus = 'gew'; });
+  roadToEdge(a, 0); refresh(a);
+  assert.ok(a.stats.trade.commOut > 0, 'Auspendler');
+  assert.ok(a.stats.unemp < u0 - 0.1, 'Arbeitslosigkeit sinkt: ' + a.stats.unemp + ' < ' + u0);
+  assert.strictEqual(a.stats.trade.commIn, 0, 'keine offenen Stellen');
+  // Nur Gewerbe mit wenigen Wohnungen: offene Stellen, Wohnen-Nachbar füllt sie
+  const b = newTown(7);
+  let k = 0;
+  for (let i = 0; i < N * N; i++) if (b.zone[i] === Z_R && (k++ % 4) !== 0) { b.zone[i] = 0; b.lvl[i] = 0; }
+  refresh(b);
+  const w0 = b.stats.workers, j0 = b.stats.jobs;
+  assert.ok(j0 > w0 + 50, 'offene Stellen: ' + j0 + ' > ' + w0);
+  b.trade.neighbors.forEach((n) => { n.focus = 'wohn'; });
+  roadToEdge(b, 0); refresh(b);
+  assert.ok(b.stats.trade.commIn > 0, 'Einpendler');
+  assert.strictEqual(b.stats.workers, w0 + b.stats.trade.commIn, 'Arbeitskräfte steigen um die Einpendler');
+  assert.ok(b.stats.workers <= b.stats.jobs, 'nur offene Stellen werden besetzt');
+  assert.ok(b.stats.trade.dI > 0, 'Industrie-Nachfrage steigt durch Einpendler');
+});
+
+test('Handel: Pendler sind durch Größe und eigene Einwohner gedeckelt; Verkehr am Anschluss steigt um Pendler × Faktor', () => {
+  const s = newTown(7);
+  roadToEdge(s, 0); refresh(s);
+  const ln = linkOf(s, 0);
+  assert.ok(ln.commuters > 0 && ln.commuters <= Math.round(s.stats.pop * 0.2) + 1, 'Deckel über Einwohner: ' + ln.commuters);
+  assert.ok(ln.commuters <= Math.round(ln.size * 0.02) + 1, 'Deckel über Größe');
+  const with1 = s.maps.traffic[ln.tile];
+  s.trade.neighbors = []; refresh(s);
+  const without = s.maps.traffic[ln.tile];
+  assert.ok(with1 > without, 'Verkehr am Anschluss steigt');
+  if (with1 < 3) assert.ok(Math.abs((with1 - without) - ln.commuters * TRADE_TRAFFIC / 55) < 1e-6, 'Zuschlag = Pendler × Faktor');
+});
+
+test('Handel: Stromkauf deckt den Fehlbedarf bis zur Obergrenze und kostet Geld; Verkauf nur bei Überschuss', () => {
+  const s = newTown(5);
+  for (const b of [...s.bld]) if (b.type === 'incin' || (b.type === 'gas' && s.bld.filter((o) => o.type === 'gas').indexOf(b) > 0)) removeBuilding(s, b);
+  refresh(s);
+  const r0 = s.powerRatio; assert.ok(r0 < 0.99, 'Stromengpass ' + r0);
+  roadToEdge(s, 0); refresh(s);
+  assert.strictEqual(s.stats.trade.buyP, 0, 'ohne Schalter kein Kauf');
+  setTrade(s, 'buyPower', true);
+  const bought = s.stats.trade.buyP;
+  assert.ok(bought > 0 && bought <= TRADE_POWER_LINK, 'Kauf ' + bought);
+  assert.ok(s.powerRatio > r0, 'Ratio steigt');
+  const m0 = s.money;
+  tick(s);
+  assert.ok(Math.abs(s.fin.parts.tradeOut - s.stats.trade.cost) < 1e-6 && s.fin.parts.tradeOut > 0, 'Ausgabe Handel');
+  // Verkauf: Überschuss wird vergütet, kein Kauf gleichzeitig
+  const t = newTown(7);
+  assert.ok(placeBuilding(t, 'gas', ...spotFor(t, 'gas')).ok, 'zusätzliches Kraftwerk');
+  refresh(t);
+  assert.ok(t.powerCap > t.powerLoad, 'Überschuss vorhanden');
+  roadToEdge(t, 0); setTrade(t, 'sellPower', true); refresh(t);
+  assert.ok(t.stats.trade.sellP > 0, 'Überschuss verkauft: ' + t.stats.trade.sellP);
+  assert.strictEqual(t.stats.trade.buyP, 0);
+  assert.ok(t.stats.trade.income > 0);
+});
+
+test('Handel: Müllexport senkt den unentsorgten Rest gegen Gebühr; ohne Anschluss kein Export', () => {
+  const s = newTown(5);
+  for (const b of [...s.bld]) if (BUILD[b.type].kind === 'dump' || BUILD[b.type].kind === 'incin') removeBuilding(s, b);
+  refresh(s);
+  const left0 = s.garbageLeft; assert.ok(left0 > 0, 'Rest ohne Entsorgung ' + left0);
+  roadToEdge(s, 0); setTrade(s, 'exportGarbage', true); refresh(s);
+  assert.ok(s.garbageLeft < left0, 'Rest sinkt');
+  assert.ok(Math.abs(s.garbageLeft - (left0 - s.stats.trade.gExp)) < 1e-6, 'Rest = Rest − Export');
+  assert.ok(s.stats.trade.gExp > 0 && s.stats.trade.gExp <= TRADE_GARB_LINK, 'Obergrenze je Anschluss');
+  tick(s);
+  assert.ok(Math.abs(s.fin.parts.tradeOut - s.stats.trade.gExp * TRADE_GARB_FEE) < 1e-6, 'Gebühr je Tonne');
+  // Ohne Schalter: kein Export, keine Gebühr
+  const t = newTown(5);
+  for (const b of [...t.bld]) if (BUILD[b.type].kind === 'dump' || BUILD[b.type].kind === 'incin') removeBuilding(t, b);
+  roadToEdge(t, 0); refresh(t);
+  assert.strictEqual(t.stats.trade.gExp, 0);
+});
+
+test('Handel: Determinismus – gleicher Seed und gleiche Eingaben ergeben denselben Verlauf', () => {
+  const run = () => {
+    const s = newTown(7); roadToEdge(s, 0); setTrade(s, 'sellWater', true); setTrade(s, 'buyPower', true);
+    for (let t = 0; t < 12; t++) tick(s);
+    return [s.money, s.stats.pop, s.stats.unemp, s.stats.trade.commIn, s.stats.trade.income, s.powerRatio];
+  };
+  assert.deepStrictEqual(run(), run());
+});
+
+test('Handel: Speichern erhält Nachbarn und Schalter; alte Stände ohne trade laden mit Nachbarn aus dem Seed', () => {
+  const s = newTown(5);
+  setTrade(s, 'sellWater', true); setTrade(s, 'exportGarbage', true);
+  const t = deserialize(serialize(s));
+  assert.deepStrictEqual(t.trade.neighbors, s.trade.neighbors);
+  assert.strictEqual(t.trade.sellWater, true); assert.strictEqual(t.trade.exportGarbage, true);
+  assert.strictEqual(t.trade.buyPower, false);
+  // alter Stand: JSON ohne trade
+  const o = JSON.parse(serialize(s)); delete o.trade;
+  const old = deserialize(JSON.stringify(o));
+  assert.deepStrictEqual(old.trade.neighbors, makeNeighbors(s.seed));
+  assert.strictEqual(old.trade.sellWater, false);
+  for (let k = 0; k < 6; k++) tick(old);
+  assert.ok(Array.isArray(old.trade.links));
 });
 
 console.log(`${n} Tests ok`);

@@ -7,6 +7,9 @@ import {
   GARBAGE, GARBAGE_BLD, GARBAGE_REC, GARBAGE_REC_MAX, GARBAGE_MIN_POP, GARBAGE_POL, GARBAGE_HAPPY, GARBAGE_HAPPY_MAX,
   RAIL_COST, RAIL_BRIDGE_COST, RAIL_CROSS_COST, RAIL_UPKEEP, RAIL_UNLOCK, RAIL_MIN_STATIONS, RAIL_TRAFFIC, RAIL_TRAFFIC_MAX,
   RAIL_CROSS_TRAFFIC, RAIL_VALUE, RAIL_DEMAND_C,
+  TRADE_CITY_NAMES, TRADE_FOCUS, TRADE_NEIGHBORS_MIN, TRADE_NEIGHBORS_MAX, TRADE_CITY_MIN, TRADE_CITY_MAX, TRADE_SIZE_REF,
+  TRADE_POWER_SELL, TRADE_POWER_BUY, TRADE_POWER_LINK, TRADE_WATER_SELL, TRADE_WATER_BUY, TRADE_WATER_LINK,
+  TRADE_GARB_FEE, TRADE_GARB_LINK, TRADE_COMMUTE, TRADE_COMMUTE_POP, TRADE_TRAFFIC, TRADE_DEMAND, TRADE_SWITCHES,
 } from './data.js';
 
 export let NN = N * N;
@@ -49,6 +52,7 @@ export function newCity({ name = 'Simfurt', seed = 1, size = 64 } = {}) {
     budget: { ...BUDGET_DEFAULT }, ords: {},
     waterCap: 0, waterLoad: 0, waterRatio: 0, watered: new Uint8Array(NN),
     garbage: 0, garbageLeft: 0, garbageRatio: 0, // Müll: Aufkommen, unentsorgt (t/Monat), Anteil; abgeleitet, nicht gespeichert nötig
+    trade: makeTrade(seed), // Nachbarstädte & Handel (H1); links und Kennzahlen werden in refresh abgeleitet
   };
   generateMap(s);
   say(s, 'Willkommen in ' + name + '! Zonen anlegen, Straße, Strom und Wasser nicht vergessen.', 'info');
@@ -524,12 +528,9 @@ export function railComponents(s) {
   }
   return { comp, count, touchesEdge };
 }
-/**
- * Wirksame S-Bahnhöfe: Ein Bahnhof gehört zu jeder Gleiskomponente, an die sein Grundriss grenzt.
- * Er wirkt, wenn eine dieser Komponenten mindestens RAIL_MIN_STATIONS Bahnhöfe hat. Gibt Set der Gebäude-IDs zurück.
- */
-function railActiveStations(s, net) {
-  const on = new Set(), cnt = new Int32Array(net.count), adj = [];
+/** Bahnhöfe je Gleiskomponente: cnt[c] = Anzahl, adj = [[Gebäude-ID, [Komponenten …]], …]. */
+function railStationAdj(s, net) {
+  const cnt = new Int32Array(net.count), adj = [];
   for (const b of s.bld) {
     if (BUILD[b.type].kind !== 'rail') continue;
     const cs = [];
@@ -543,8 +544,98 @@ function railActiveStations(s, net) {
     for (const c of cs) cnt[c]++;
     adj.push([b.id, cs]);
   }
-  for (const [id, cs] of adj) if (cs.some((c) => cnt[c] >= RAIL_MIN_STATIONS)) on.add(id);
+  return { cnt, adj };
+}
+/**
+ * Wirksame S-Bahnhöfe: Ein Bahnhof gehört zu jeder Gleiskomponente, an die sein Grundriss grenzt.
+ * Er wirkt, wenn eine dieser Komponenten mindestens RAIL_MIN_STATIONS Bahnhöfe hat oder (H1) per Gleis
+ * an eine Nachbarstadt angebunden ist (linked[c] = 1). Gibt Set der Gebäude-IDs zurück.
+ */
+function railActiveStations(st, linked) {
+  const on = new Set();
+  for (const [id, cs] of st.adj) if (cs.some((c) => st.cnt[c] >= RAIL_MIN_STATIONS || (linked && linked[c]))) on.add(id);
   return on;
+}
+
+// ---------------------------------------------------------------- Nachbarstädte & Handel (Runde 4, H1)
+/** Deterministischer Hash aus Seed und Index. Eigener Zufall, nicht s.rng: die Simulation bleibt unberührt. */
+function seedHash(seed, k) {
+  let h = Math.imul((seed | 0) ^ Math.imul(k + 1, 0x9E3779B1), 0x85EBCA6B);
+  h ^= h >>> 15; h = Math.imul(h, 0xC2B2AE35); h ^= h >>> 13;
+  return (h >>> 0) / 4294967296;
+}
+/** 3–4 Nachbarstädte aus dem Seed: verschiedene Namen, verschiedene Kanten, Größe und Schwerpunkt. */
+export function makeNeighbors(seed) {
+  const pick = (n, k) => Math.min(n - 1, Math.floor(seedHash(seed, k) * n));
+  const names = TRADE_CITY_NAMES.slice(), edges = [0, 1, 2, 3];
+  for (let i = names.length - 1; i > 0; i--) { const j = pick(i + 1, 100 + i); [names[i], names[j]] = [names[j], names[i]]; }
+  for (let i = 3; i > 0; i--) { const j = pick(i + 1, 200 + i); [edges[i], edges[j]] = [edges[j], edges[i]]; }
+  const n = TRADE_NEIGHBORS_MIN + pick(TRADE_NEIGHBORS_MAX - TRADE_NEIGHBORS_MIN + 1, 1);
+  const out = [];
+  for (let k = 0; k < n; k++) {
+    const steps = Math.round((TRADE_CITY_MAX - TRADE_CITY_MIN) / 5000);
+    out.push({ name: names[k], edge: edges[k], size: TRADE_CITY_MIN + pick(steps + 1, 300 + k) * 5000, focus: TRADE_FOCUS[pick(TRADE_FOCUS.length, 400 + k)] });
+  }
+  return out;
+}
+/** Handelszustand einer neuen Stadt: Nachbarn aus dem Seed, alle Schalter aus. */
+export function makeTrade(seed) {
+  return { neighbors: makeNeighbors(seed), sellPower: false, buyPower: false, sellWater: false, buyWater: false, exportGarbage: false, links: [] };
+}
+/** Schaltet einen Handelsschalter (TRADE_SWITCHES). Gibt den neuen Zustand zurück, false bei unbekanntem Schalter. */
+export function setTrade(s, key, on) {
+  if (!TRADE_SWITCHES.includes(key) || !s.trade) return false;
+  s.trade[key] = !!on; s.dirty = true; refresh(s);
+  return s.trade[key];
+}
+/** Index der Randkachel t (0 … N−1) der Kante k: 0 = Norden (Zeile 0), 1 = Osten, 2 = Süden, 3 = Westen. */
+const edgeIdx = (k, t) => (k === 0 ? t : k === 1 ? t * N + N - 1 : k === 2 ? (N - 1) * N + t : t * N);
+/**
+ * Straßen-Komponenten. city[c] = 1, wenn die Komponente eine bebaute Parzelle oder ein Gebäude berührt
+ * (also am Stadtnetz hängt). Gibt { comp, city } zurück; comp[i] = −1 für Kacheln ohne Straße.
+ */
+function roadNet(s) {
+  const comp = new Int32Array(NN).fill(-1), q = new Int32Array(NN), city = [];
+  for (let i0 = 0; i0 < NN; i0++) {
+    if (!s.road[i0] || comp[i0] >= 0) continue;
+    const c = city.length; let h = 0, t = 0, touch = 0;
+    q[t++] = i0; comp[i0] = c;
+    while (h < t) {
+      const i = q[h++], x = i % N, y = (i - x) / N;
+      for (let d = 0; d < 4; d++) {
+        const nx = x + (d === 0 ? 1 : d === 1 ? -1 : 0), ny = y + (d === 2 ? 1 : d === 3 ? -1 : 0);
+        if (nx < 0 || ny < 0 || nx >= N || ny >= N) continue;
+        const j = ny * N + nx;
+        if (s.road[j]) { if (comp[j] < 0) { comp[j] = c; q[t++] = j; } }
+        else if (s.occ[j] || (s.zone[j] && s.lvl[j] > 0)) touch = 1;
+      }
+    }
+    city.push(touch);
+  }
+  return { comp, city };
+}
+/**
+ * Anschlüsse der Nachbarstädte (abgeleitet, nicht gespeichert). Eine Nachbarstadt ist verbunden, wenn auf der Randreihe
+ * ihrer Kante (a) eine Straße liegt, die am Stadtnetz hängt (road), oder (b) ein Gleis, dessen Gleisnetz mindestens
+ * einen Bahnhof hat (rail). Gibt [{name, edge, size, focus, road, rail, tile, rtile, railComp, commuters}] zurück.
+ */
+function tradeLinks(s, nbs, railNet, railAdj) {
+  const out = [];
+  let rn = null;
+  for (const nb of nbs) {
+    let tile = -1, rtile = -1;
+    for (let t = 0; t < N && (tile < 0 || rtile < 0); t++) {
+      const i = edgeIdx(nb.edge, t);
+      if (tile < 0 && s.road[i]) { rn = rn || roadNet(s); if (rn.city[rn.comp[i]]) tile = i; }
+      if (rtile < 0 && railNet && s.rail[i] && railAdj.cnt[railNet.comp[i]] > 0) rtile = i;
+    }
+    if (tile < 0 && rtile < 0) continue;
+    out.push({
+      name: nb.name, edge: nb.edge, size: nb.size, focus: nb.focus,
+      road: tile >= 0, rail: rtile >= 0, tile, rtile, railComp: rtile >= 0 ? railNet.comp[rtile] : -1, commuters: 0,
+    });
+  }
+  return out;
 }
 
 /** Berechnet alle abgeleiteten Karten und Kennzahlen. */
@@ -554,7 +645,16 @@ export function refresh(s) {
   // S-Bahn: Netz und wirksame Bahnhöfe (nur wenn es überhaupt einen Bahnhof gibt)
   const hasStation = s.bld.some((b) => BUILD[b.type].kind === 'rail');
   const railNet = hasStation ? railComponents(s) : null;
-  const railOn = railNet ? railActiveStations(s, railNet) : new Set();
+  const railAdj = railNet ? railStationAdj(s, railNet) : null;
+  // Nachbarstädte (H1): Anschlüsse über Straßen- und Gleiskacheln am Kartenrand
+  const tr = s.trade || {};
+  const nbs = Array.isArray(tr.neighbors) ? tr.neighbors : [];
+  const links = nbs.length ? tradeLinks(s, nbs, railNet, railAdj) : [];
+  const nL = links.length;
+  if (s.trade) s.trade.links = links;
+  const railLinked = railNet && links.some((l) => l.rail) ? new Uint8Array(railNet.count) : null;
+  if (railLinked) for (const l of links) if (l.rail) railLinked[l.railComp] = 1;
+  const railOn = railNet ? railActiveStations(railAdj, railLinked) : new Set();
   let railTiles = 0; for (let i = 0; i < NN; i++) if (s.rail[i]) railTiles++;
   s.railOn = railOn; // abgeleitet (nicht gespeichert): für Kachelinfo und Rat
   let railSt = 0, railWirk = 0;
@@ -614,19 +714,32 @@ export function refresh(s) {
   // Müll: Aufkommen nach Verordnung und Recyclinghöfen; entsorgt wird erst durch Verbrennung, dann durch Deponien (Restvolumen)
   const gFactor = FX.garbage * (1 - Math.min(GARBAGE_REC_MAX, GARBAGE_REC * recN));
   const net = gRaw * gFactor;
-  const gLeft = Math.max(0, net - burnCap - dumpRoom);
+  const gLeft0 = Math.max(0, net - burnCap - dumpRoom);
+  const gCap = tr.exportGarbage && nL ? TRADE_GARB_LINK * nL : 0; // Müllexport (H1): nur der unentsorgte Rest
+  const gExp = Math.min(gLeft0, gCap);
+  const gLeft = gLeft0 - gExp;
   const gRatio = net > 0 ? gLeft / net : 0;
   if (gRaw > 0) { const share = gLeft / gRaw; for (let i = 0; i < NN; i++) m.garb[i] *= share; } // je Kachel: unentsorgte Menge
   s.garbage = net; s.garbageLeft = gLeft; s.garbageRatio = gRatio;
-  const ratio = cap > 0 ? Math.min(1, cap / Math.max(1, totalLoad)) : 0;
-  s.powerRatio = ratio; s.powerCap = cap; s.powerLoad = totalLoad;
+  // Handel Strom (H1): Kauf deckt den Fehlbedarf bis zur Obergrenze (nur mit Kraftwerk), Verkauf nutzt den Überschuss
+  let pBuy = 0, pSell = 0;
+  if (nL && cap > 0 && tr.buyPower && totalLoad > cap) pBuy = Math.min(totalLoad - cap, TRADE_POWER_LINK * nL);
+  else if (nL && tr.sellPower && cap > totalLoad) pSell = Math.min(cap - totalLoad, TRADE_POWER_LINK * nL);
+  const capE = cap + pBuy;
+  const ratio = capE > 0 ? Math.min(1, capE / Math.max(1, totalLoad)) : 0;
+  s.powerRatio = ratio; s.powerCap = capE; s.powerLoad = totalLoad;
   for (let i = 0; i < NN; i++) powered[i] = m.power[i] > 0 && (ratio >= 1 || hash(i, 11) < ratio) ? 1 : 0;
   s.powered = powered;
   // Wasser: wie Strom (Radius + Kapazität, Teilausfall per Hash)
-  const wratio = wcap > 0 ? Math.min(1, wcap / Math.max(1, wload)) : 0;
+  // Handel Wasser (H1): wie Strom, nur mit Pumpwerk
+  let wBuy = 0, wSell = 0;
+  if (nL && wcap > 0 && tr.buyWater && wload > wcap) wBuy = Math.min(wload - wcap, TRADE_WATER_LINK * nL);
+  else if (nL && tr.sellWater && wcap > wload) wSell = Math.min(wcap - wload, TRADE_WATER_LINK * nL);
+  const wcapE = wcap + wBuy;
+  const wratio = wcapE > 0 ? Math.min(1, wcapE / Math.max(1, wload)) : 0;
   const watered = new Uint8Array(NN);
   for (let i = 0; i < NN; i++) watered[i] = m.water[i] > 0 && (wratio >= 1 || hash(i, 13) < wratio) ? 1 : 0;
-  s.waterRatio = wratio; s.waterCap = wcap; s.waterLoad = wload; s.watered = watered;
+  s.waterRatio = wratio; s.waterCap = wcapE; s.waterLoad = wload; s.watered = watered;
   let dryLots = 0, hiLots = 0;
 
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
@@ -656,6 +769,22 @@ export function refresh(s) {
   // Unentsorgter Müll: Dreck steigt stadtweit (nach den Kläranlagen, die Müll nicht erfassen)
   const gEff = Math.round(capR * s.occupancy) >= GARBAGE_MIN_POP ? gRatio : 0; // Schonfrist
   if (gEff > 0) { const add = GARBAGE_POL * gEff; for (let i = 0; i < NN; i++) m.pol[i] = Math.min(100, m.pol[i] + add); }
+
+  // Pendler (H1): Wohnen-Nachbarn füllen offene Stellen, Gewerbe/Industrie-Nachbarn nehmen Arbeitslose auf.
+  // Mehr als die offenen Stellen bzw. Arbeitslosen pendeln nicht; Größe und eigene Einwohner begrenzen die Zahl.
+  const wk0 = capR * s.occupancy * 0.5, jobs0 = jobsC + jobsI + jobsB, pop0 = Math.round(capR * s.occupancy);
+  let inCap = 0, outCap = 0, dR = 0, dC = 0, dI = 0, commTotal = 0;
+  for (const ln of links) {
+    const com = Math.round(Math.min(ln.size * TRADE_COMMUTE, pop0 * TRADE_COMMUTE_POP));
+    ln.commuters = com; commTotal += com;
+    if (ln.focus === 'wohn') inCap += com; else outCap += com;
+    const f = Math.max(0.2, Math.min(1.5, ln.size / TRADE_SIZE_REF)), dm = TRADE_DEMAND[ln.focus] || {};
+    dR += (dm.r || 0) * f; dC += (dm.c || 0) * f; dI += (dm.i || 0) * f;
+  }
+  const commIn = Math.min(Math.max(0, jobs0 - wk0), inCap);      // Einpendler füllen offene Stellen
+  const commOut = Math.min(Math.max(0, wk0 - jobs0), outCap);    // Auspendler nehmen Arbeitslose auf
+  // Verkehr an der Anschlussstraße (mit Gleis am selben Rand halb so viel)
+  for (const ln of links) if (ln.road && ln.commuters) m.traffic[ln.tile] += ln.commuters * TRADE_TRAFFIC * (ln.rail ? 0.5 : 1);
 
   // Verkehr
   const roads = [];
@@ -728,7 +857,8 @@ export function refresh(s) {
   const f = (v) => (rLots ? v / rLots : 0);
   const landmark = s.bld.reduce((n, b) => n + (BUILD[b.type].kind === 'happy' ? BUILD[b.type].happy : 0), 0);
   const avgTax = (s.rates.r * pop + s.rates.c * jobsC + s.rates.i * jobsI + s.rates.c * jobsB) / Math.max(1, pop + jobs);
-  const unemp = workers > 0 ? Math.max(0, workers - jobs) / workers : 0;
+  const workersT = workers + commIn;
+  const unemp = workersT > 0 ? Math.max(0, workersT - jobs - commOut) / workersT : 0;
   const parts = {
     tax: -Math.max(0, avgTax - 9) * 2.2 + Math.max(0, 9 - avgTax) * 0.8,
     crime: -f(crimeSum) * 0.35, pol: -f(polSum) * 0.3, traffic: -cong * 14,
@@ -741,11 +871,18 @@ export function refresh(s) {
   };
   const happy = Math.max(0, Math.min(100, 66 + Object.values(parts).reduce((a, b) => a + b, 0)));
   s.stats = {
-    pop, capR, workers: Math.round(workers), jobs, jobsC, jobsI, jobsB, lots, happy, unemp, avgTax, cong, congRoads: cSum,
+    pop, capR, workers: Math.round(workersT), jobs, jobsC, jobsI, jobsB, lots, happy, unemp, avgTax, cong, congRoads: cSum,
     crime: f(crimeSum), pollution: f(polSum), value: f(valSum), parts, roads: roads.length, covPolice: f(covPolice), covFire: f(covFire),
     covHealth: f(covHealth), covEdu: f(covEdu), waterDry: dryLots,
     dumps: dumpN, dumpLeft, burnCap,
     railTiles, railStations: railSt, railActive: railWirk,
+    // Handel (H1): abgeleitet; Geld fließt in financeStep, Nachfrage in demandStep
+    trade: {
+      n: nL, sellP: pSell, buyP: pBuy, sellW: wSell, buyW: wBuy, gCap, gExp,
+      income: pSell * TRADE_POWER_SELL + wSell * TRADE_WATER_SELL,
+      cost: pBuy * TRADE_POWER_BUY + wBuy * TRADE_WATER_BUY,
+      commIn, commOut, commTotal, dR, dC, dI,
+    },
   };
   s.peakPop = Math.max(s.peakPop || 0, pop);
   s.dirty = false;
@@ -755,14 +892,15 @@ export function refresh(s) {
 function demandStep(s) {
   const st = s.stats;
   ordFx(s);
-  const workers = st.capR * 0.5; // Arbeitskräfte bei voller Belegung
+  const workers = st.capR * 0.5 + st.trade.commIn; // Arbeitskräfte bei voller Belegung (+ Einpendler)
   const jobs = st.jobs;
+  const T = st.trade; // Handel (H1): Nachfrage-Zuschläge verbundener Nachbarstädte
   const taxPen = (r) => (r - 9) * 0.045;
   const hap = (st.happy - 55) / 90;
   const smooth = (a, b) => a + (b - a) * 0.35;
-  const dr = 0.3 + 1.3 * (jobs - workers) / (jobs + workers + 30) + hap - taxPen(s.rates.r) - (st.capR === 0 ? 0 : 0) + FX.demandR;
-  const di = 0.35 + 1.1 * (workers - jobs) / (workers + jobs + 30) - taxPen(s.rates.i) - st.pollution / 160 + FX.demandI;
-  const dc = 0.15 + 1.4 * (st.pop * 0.28 - st.jobsC) / (st.pop * 0.28 + st.jobsC + 40) - taxPen(s.rates.c) + (st.jobsI > 0 ? 0.1 : 0) + (st.railActive ? RAIL_DEMAND_C : 0) + FX.demandC;
+  const dr = 0.3 + 1.3 * (jobs - workers) / (jobs + workers + 30) + hap - taxPen(s.rates.r) - (st.capR === 0 ? 0 : 0) + FX.demandR + T.dR;
+  const di = 0.35 + 1.1 * (workers - jobs) / (workers + jobs + 30) - taxPen(s.rates.i) - st.pollution / 160 + FX.demandI + T.dI;
+  const dc = 0.15 + 1.4 * (st.pop * 0.28 - st.jobsC) / (st.pop * 0.28 + st.jobsC + 40) - taxPen(s.rates.c) + (st.jobsI > 0 ? 0.1 : 0) + (st.railActive ? RAIL_DEMAND_C : 0) + FX.demandC + T.dC;
   const db = st.pop < 2500 ? -0.2 : Math.min(1, (st.pop - 2500) / 6000 + 0.2) - taxPen(s.rates.c) - 0.35 * (1 - Math.min(1, st.covEdu * 1.5)) + (st.jobsB * 2 < st.capR * 0.5 ? 0.25 : -0.15) + FX.demandB;
   const clamp = (v) => Math.max(-1, Math.min(1, v));
   s.demand = { r: smooth(s.demand.r, clamp(dr)), c: smooth(s.demand.c, clamp(dc)), i: smooth(s.demand.i, clamp(di)), b: smooth(s.demand.b, clamp(db)) };
@@ -811,12 +949,14 @@ function financeStep(s) {
   const rail = (st.railTiles || 0) * RAIL_UPKEEP * BUP.roads; // Gleisunterhalt: Budget „Straßen“ gilt mit
   const interest = s.loan * 0.004;
   const ordCost = FX.cost;
-  const inc = tR + tC + tI + tB + tour;
-  const exp = up + roads + rail + interest + ordCost;
+  // Handel (H1): Verkauf (Strom/Wasser) als Einnahme, Zukauf und Müllgebühr als Ausgabe
+  const tIn = st.trade.income, tOut = st.trade.cost + st.trade.gExp * TRADE_GARB_FEE;
+  const inc = tR + tC + tI + tB + tour + tIn;
+  const exp = up + roads + rail + interest + ordCost + tOut;
   s.money += inc - exp;
   s.fin = {
     inc, exp, net: inc - exp,
-    parts: { tR, tC, tI, tB, tour, up, roads, rail, interest, ordCost, upPolice: ur.police, upFire: ur.fire, upHealth: ur.health, upEdu: ur.edu },
+    parts: { tR, tC, tI, tB, tour, up, roads, rail, interest, ordCost, upPolice: ur.police, upFire: ur.fire, upHealth: ur.health, upEdu: ur.edu, tradeIn: tIn, tradeOut: tOut },
   };
 }
 
@@ -835,6 +975,8 @@ function garbageStep(s) {
     if (room > 0 && rest > 0) { const take = Math.min(room, rest); b.fill = fill + take; rest -= take; }
     left += Math.max(0, d.vol - (b.fill || 0));
   }
+  // Müllexport (H1): nimmt vom verbleibenden Rest (gleiche Obergrenze wie in refresh)
+  const ex = Math.min(rest, st.trade.gCap); rest -= ex; st.trade.gExp = ex;
   s.garbageLeft = rest; s.garbageRatio = net > 0 ? rest / net : 0;
   st.dumpLeft = left;
 }
@@ -995,6 +1137,8 @@ export function tileInfo(s, x, y) {
     if (!s.powered[i]) lines.push('⚠ Kein Strom');
     if (!s.watered[i]) lines.push('⚠ Kein Wasser');
   } else if (s.terrain[i] === T_TREES) title = 'Wald';
+  const ln = s.trade && s.trade.links ? s.trade.links.find((l) => l.tile === i || l.rtile === i) : null;
+  if (ln) lines.push(`Anschluss an ${ln.name} (${[ln.road ? 'Straße' : '', ln.rail ? 'Gleis' : ''].filter(Boolean).join(' + ')})`);
   if (s.fire[i]) lines.push('🔥 Es brennt!');
   if (s.flood[i]) lines.push('🌊 Überschwemmt');
   lines.push(`Grundwert ${Math.round(m.value[i])} · Kriminalität ${Math.round(m.crime[i])} · Dreck ${Math.round(m.pol[i])}`);
