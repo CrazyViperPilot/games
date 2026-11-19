@@ -135,3 +135,26 @@ Speicher (Opus erledigt): `save.js` serialisiert die Kachelebene `rail` (Uint8Ar
 - Handel (Rat, je Ressource Schalter + Preis aus data.js): Stromüberschuss verkaufen (€/Einheit, nur verbundene Städte, Straße reicht – Leitung symbolisch), Strom zukaufen bei Mangel (teuer, deckt Fehlbedarf bis X), Wasser analog, Müll exportieren (Gebühr/t, nur mit Straßen- oder Gleisanschluss, verringert unentsorgten Rest). Einnahmen/Ausgaben in `s.fin.parts` (tradeIn/tradeOut), Rat zeigt sie.
 - `s.trade = { neighbors, sellPower, buyPower, sellWater, buyWater, exportGarbage }` in newCity; alte Stände ohne trade → newCity-Werte (Nachbarn aus Seed – dafür eigener Hash, nicht rand(s), damit alte Stände identisch weiterlaufen).
 - Tests: ohne Anschluss keine Wirkung; mit Straße an der richtigen Kante verbunden; Pendler senken Arbeitslosigkeit bzw. füllen Jobs; Stromkauf behebt Mangel und kostet; Müllexport senkt Rest; Determinismus; alte Stände laden.
+
+---
+
+# Runde 5: Lebendigkeit & Optik
+
+Reine Optik – die Simulation (`sim.js`) bleibt unverändert, Tests müssen bitgenau grün bleiben. Kein `rand(s)` in Optik-Code (eigener Math.random / Hash).
+
+## L1 – Leben auf der Karte · neu `js/life.js`, zwei Hooks in `Renderer.draw`, Hook in `main.js` (frame), Tests optional
+- `export class Life { constructor(); reset(); step(s, dt); drawGround(g, lg, view); drawAir(g, lg, view, time) }`; `view = {x0,y0,x1,y1}` (sichtbare Kacheln). Renderer bekommt `this.life` (gesetzt in main.js) und ruft `drawGround` direkt nach den Autos, `drawAir` nach den Objekten und vor der Flut/Tönung auf. `lg` ist die Nacht-Lichtebene oder null.
+- **S-Bahnen**: Züge (2–3 Wagen, weiß-rot) fahren auf Gleisen zwischen Bahnhöfen der aktiven Netze (sonst gar nicht); Anzahl ~ Bahnhöfe; halten kurz am Bahnhof (Kacheln neben `sbahn`); Wagen folgen dem Pfad (Ringpuffer der letzten Kacheln). Nachts: Fensterband leuchtet, Frontlicht. Am Bahnübergang optional Schranke unten (nur Optik).
+- **Boote**: auf zusammenhängendem Wasser ≥ 30 Kacheln, wenige (max 6), Ausflugsschiff (weiß) und Lastkahn (dunkel, lang), fahren langsam entlang des Flusses (Zufallsweg über Wasserkacheln ohne Rückwärts, an Brücken vorbei), Kielwasser-Linien; nachts Positionslichter.
+- **Fußgänger**: kleine Figuren (2–3 px Körper, Kopf) in Parks, Wahrzeichen-Umgebung und auf Straßen nahe Gewerbe/Banken; Anzahl ~ Einwohner, max 80 sichtbar; schlendern zufällig; nur ab Zoom ≥ 0,7 zeichnen.
+- **Löschzüge**: brennt eine Kachel und gibt es eine Feuerwehr, fährt ein rotes Löschfahrzeug (Blaulicht blinkt, nachts Glow) über Straßen von der Wache zur nächstgelegenen Straßenkachel am Brand (BFS), bleibt dort, solange es brennt, fährt dann zurück.
+- **Rauch & Flammen**: Partikel (Pool, keine Allokation pro Frame) über Industrie Stufe ≥ 2 (Schornstein-Position aus Sprite-Höhe grob), Kraftwerk Gas, Müllverbrennung, Deponie (Staub/Möwen optional); weiche graue Kreise, steigen, wehen leicht, verblassen. Brände: animierte Flammen-Partikel (orange/gelb, nachts als Licht in lg) + dunkler Rauch statt der bisherigen Emojis (Emoji-Zeichnung in render.js entfernen).
+- Performance: alles nur im Sichtbereich zeichnen, Partikel max ~400, step mit dt; Pause (speed 0) → Fahrzeuge/Fußgänger dürfen weiterlaufen (Optik), Brände nicht neu.
+
+## L2 – Optik aufhübschen · `js/render.js` (nur Sprite-Funktionen, Boden/Wasser/Bäume/Gebäude-Details, KEINE Änderung an Renderer.draw-Ablauf), `style.css`, `index.html` (nur Meta/Klassen)
+- Boden: Gras mit feiner Textur/Farbvarianz und weichen Übergängen, Ufer mit Sandkante/Böschung, Wasser mit Tiefenverlauf (Ufer heller), Glanzlinien animiert über `frame`.
+- Straßen: Bürgersteigkante, Mittelstreifen gestrichelt, Kreuzungen mit Zebrastreifen bei hoher Stufe optional; Brücken mit Geländerschatten.
+- Bäume: mehrere Formen (Laub rund, Kegel/Tanne), Schatten am Boden, Farbvarianz.
+- Gebäude: weiche Schlagschatten (halbtransparentes Parallelogramm nach rechts unten), Kanten-Highlights (Licht von links oben), Fassadenvarianz (Balkone, Dachgärten, Klimageräte auf Dächern), Bankentürme mit Glas-Spiegelung (Verlauf). Größen/Offsets der Sprites (hmax, ox/oy) und die Fensterraster-Geometrie NICHT ändern (Nachtlicht-Sprites hängen daran); nur zusätzliche Details/Schattierung.
+- UI (style.css): einheitliche Glas-Panels (backdrop-filter, Fallback), sanfte Übergänge beim Öffnen von Sheets, bessere Knöpfe im Dock (Icons größer, aktive Kategorie hervorgehoben), lesbarere HUD-Chips, Nachfragebalken mit Verlauf. Touch-Ziele ≥ 44 px, Hochformat Pixel 8a.
+- Prüfen per headless Chrome (Screenshots im Scratchpad, nicht im Projekt): Tag/Nacht, Zoom 0,6 und 1,4, 128er-Karte flüssig.
