@@ -47,22 +47,144 @@ function noise(s, cells) {
   };
 }
 
+// Kanten: 0 = Norden, 1 = Osten, 2 = Süden, 3 = Westen. Kachel (x, y) belegt [x, x+1) × [y, y+1).
+const edgePt = (k, t, d) => (k === 0 ? [t * N, -d] : k === 1 ? [N + d, t * N] : k === 2 ? [t * N, N + d] : [-d, t * N]);
+
+// Catmull-Rom-Spline durch pts, K Abtastpunkte je Segment (Endpunkte inklusive)
+function splinePts(pts, K) {
+  const out = [], n = pts.length;
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(n - 1, i + 2)];
+    for (let k = 0; k < K; k++) {
+      const t = k / K, t2 = t * t, t3 = t2 * t;
+      const f = (a, b, c, d) => 0.5 * (2 * b + (c - a) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (3 * b - a - 3 * c + d) * t3);
+      out.push([f(p0[0], p1[0], p2[0], p3[0]), f(p0[1], p1[1], p2[1], p3[1])]);
+    }
+  }
+  out.push(pts[n - 1]);
+  return out;
+}
+
+const paintT = (s, x, y, v) => { if (inb(x, y)) s.terrain[idx(x, y)] = v; };
+
+// 4-zusammenhängende Linie (erst waagrecht, dann senkrecht) – Fluss bleibt so ohne Lücken
+function lineT(s, x0, y0, x1, y1, v) {
+  let x = x0, y = y0;
+  while (x !== x1) { paintT(s, x, y, v); x += Math.sign(x1 - x); }
+  while (y !== y1) { paintT(s, x, y, v); y += Math.sign(y1 - y); }
+  paintT(s, x1, y1, v);
+}
+
+// Scheibe um (px, py): Kachelmittelpunkte im Radius r, dazu die Kachel, in der der Punkt liegt
+function diskT(s, px, py, r, v) {
+  const cx = Math.floor(px), cy = Math.floor(py), k = Math.ceil(r) + 1;
+  paintT(s, cx, cy, v);
+  for (let y = cy - k; y <= cy + k; y++) for (let x = cx - k; x <= cx + k; x++) {
+    if (Math.hypot(x + 0.5 - px, y + 0.5 - py) <= r) paintT(s, x, y, v);
+  }
+}
+
+// Größte zusammenhängende Landfläche (4-Nachbarschaft) als Anteil der Karte
+function largestLand(s) {
+  const seen = new Uint8Array(NN), q = new Int32Array(NN);
+  let best = 0;
+  for (let i0 = 0; i0 < NN; i0++) {
+    if (seen[i0] || s.terrain[i0] === T_WATER) continue;
+    let h = 0, t = 0;
+    q[t++] = i0; seen[i0] = 1;
+    while (h < t) {
+      const i = q[h++], x = i % N, y = (i - x) / N;
+      if (x > 0 && !seen[i - 1] && s.terrain[i - 1] !== T_WATER) { seen[i - 1] = 1; q[t++] = i - 1; }
+      if (x < N - 1 && !seen[i + 1] && s.terrain[i + 1] !== T_WATER) { seen[i + 1] = 1; q[t++] = i + 1; }
+      if (y > 0 && !seen[i - N] && s.terrain[i - N] !== T_WATER) { seen[i - N] = 1; q[t++] = i - N; }
+      if (y < N - 1 && !seen[i + N] && s.terrain[i + N] !== T_WATER) { seen[i + N] = 1; q[t++] = i + N; }
+    }
+    if (t > best) best = t;
+  }
+  return best / NN;
+}
+
 function generateMap(s) {
-  const p1 = rand(s) * 6.28, p2 = rand(s) * 6.28, amp = 6 + rand(s) * 4, mid = N * (0.45 + rand(s) * 0.1);
-  for (let x = 0; x < N; x++) {
-    const cy = mid + Math.sin(x * 0.095 + p1) * amp + Math.sin(x * 0.23 + p2) * 2.5;
-    const w = 2.2 + Math.sin(x * 0.17 + p2) * 0.7;
-    for (let y = 0; y < N; y++) if (Math.abs(y - cy) < w) s.terrain[idx(x, y)] = T_WATER;
+  const sc = Math.sqrt(N / 64);
+  const cl = (v) => Math.min(N - 2, Math.max(2, v));
+  // Ein- und Austrittskante zufällig und verschieden (auch über Eck)
+  const eIn = rint(s, 4), eOut = (eIn + 1 + rint(s, 3)) % 4;
+  const a = edgePt(eIn, 0.15 + 0.7 * rand(s), 3), b = edgePt(eOut, 0.15 + 0.7 * rand(s), 3);
+  // Kontrollpunkte mit seitlicher Auslenkung, Catmull-Rom-Lauf. Der Grundlauf geht über einen
+  // zufälligen Anker nahe der Mitte, damit auch Eck-Kombinationen einen langen Fluss ergeben.
+  const mx0 = N * (0.5 + (rand(s) - 0.5) * 0.3), my0 = N * (0.5 + (rand(s) - 0.5) * 0.3);
+  const nCtl = 3 + rint(s, 4), dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1;
+  const nx = -dy / len, ny = dx / len;
+  const pts = [a];
+  for (let k = 1; k <= nCtl; k++) {
+    const t = k / (nCtl + 1), off = (rand(s) * 2 - 1) * N * 0.2;
+    const bx = t < 0.5 ? a[0] + (mx0 - a[0]) * 2 * t : mx0 + (b[0] - mx0) * (2 * t - 1);
+    const by = t < 0.5 ? a[1] + (my0 - a[1]) * 2 * t : my0 + (b[1] - my0) * (2 * t - 1);
+    pts.push([cl(bx + nx * off), cl(by + ny * off)]);
   }
-  // Seitenarm (Nidda-artig) von Norden in den Main
-  let nx = 10 + Math.floor(rand(s) * 40);
-  for (let y = 0; y < N; y++) {
-    const cy = mid + Math.sin(nx * 0.095 + p1) * amp;
-    if (y > cy - 4) break;
-    nx += (rand(s) - 0.5) * 1.4;
-    const xi = Math.round(nx); if (xi > 1 && xi < N - 2) { s.terrain[idx(xi, y)] = T_WATER; }
+  pts.push(b);
+  const path = splinePts(pts, 12), M = path.length;
+  // Mäander: sanfte Schlangenlinie senkrecht zum Lauf (am Ein-/Austritt ausgeblendet)
+  const wig = (0.9 + rand(s) * 0.6) * sc, cyc = 2 + rint(s, 3), phw = rand(s) * 6.283;
+  const wp = path.map((p, j) => {
+    const p0 = path[Math.max(0, j - 1)], p1 = path[Math.min(M - 1, j + 1)];
+    const tl = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) || 1;
+    const u = j / (M - 1), o = wig * Math.sin(2 * Math.PI * cyc * u + phw) * Math.sin(Math.PI * u);
+    return [p[0] - (p1[1] - p0[1]) / tl * o, p[1] + (p1[0] - p0[0]) / tl * o];
+  });
+  // Breite variiert entlang des Laufs; optional breite Stelle mit Insel
+  const wLo = (1.8 + rand(s) * 0.6) * sc, wHi = (2.8 + rand(s) * 0.8) * sc, fw = 1 + rint(s, 2), phx = rand(s) * 6.283;
+  const island = rand(s) < 0.35, uI = 0.3 + rand(s) * 0.4, riI = (1.2 + rand(s) * 0.5) * sc;
+  const half = (u) => {
+    let r = (wLo + (wHi - wLo) * (0.5 + 0.5 * Math.sin(2 * Math.PI * fw * u + phx))) / 2 + 0.5;
+    if (island) r += (riI + 1.8 * sc) * Math.exp(-(((u - uI) / 0.07) ** 2));
+    return r;
+  };
+  for (let j = 0; j < M; j++) {
+    const p = wp[j];
+    diskT(s, p[0], p[1], half(j / (M - 1)), T_WATER);
+    if (j) lineT(s, Math.floor(wp[j - 1][0]), Math.floor(wp[j - 1][1]), Math.floor(p[0]), Math.floor(p[1]), T_WATER);
   }
-  const sc = N / 64, n1 = noise(s, Math.round(6 * sc)), n2 = noise(s, Math.round(14 * sc));
+  if (island) {
+    const p = wp[Math.round(uI * (M - 1))];
+    for (let y = Math.floor(p[1] - riI - 2); y <= Math.floor(p[1] + riI + 2); y++) for (let x = Math.floor(p[0] - riI - 2); x <= Math.floor(p[0] + riI + 2); x++) {
+      if (inb(x, y) && Math.hypot(x + 0.5 - p[0], y + 0.5 - p[1]) <= riI) s.terrain[idx(x, y)] = T_GRASS;
+    }
+  }
+  // 0–2 schmale Seitenarme (1 Kachel) von einer anderen Kante in den Hauptfluss.
+  // Ein Arm wird verworfen, wenn die größte Landfläche unter 41 % fiele (Regel: ≥ 40 %).
+  const others = [0, 1, 2, 3].filter((k) => k !== eIn && k !== eOut);
+  const nB = rint(s, 3);
+  for (let q = 0; q < nB; q++) {
+    const k = others[rint(s, others.length)];
+    const tgt = wp[Math.floor((0.25 + 0.5 * rand(s)) * (M - 1))], st = edgePt(k, 0.15 + 0.7 * rand(s), 3);
+    const bl = Math.hypot(tgt[0] - st[0], tgt[1] - st[1]) || 1, off = (rand(s) * 2 - 1) * N * 0.15;
+    const mx = (st[0] + tgt[0]) / 2 - (tgt[1] - st[1]) / bl * off, my = (st[1] + tgt[1]) / 2 + (tgt[0] - st[0]) / bl * off;
+    const bp = splinePts([st, [cl(mx), cl(my)], tgt], 10);
+    const snap = s.terrain.slice();
+    let px = Math.floor(bp[0][0]), py = Math.floor(bp[0][1]);
+    for (let m = 1; m < bp.length; m++) {
+      const x = Math.floor(bp[m][0]), y = Math.floor(bp[m][1]);
+      lineT(s, px, py, x, y, T_WATER); px = x; py = y;
+    }
+    if (largestLand(s) < 0.41) s.terrain.set(snap);
+  }
+  // Optional kleiner See abseits des Flusses (ohne Kantenkontakt); verworfen, wenn er Land zerschneidet
+  if (rand(s) < 0.25) {
+    for (let tr = 0; tr < 40; tr++) {
+      const cx = (0.2 + 0.6 * rand(s)) * N, cy = (0.2 + 0.6 * rand(s)) * N, r = (1.8 + 1.6 * rand(s)) * sc;
+      let dmin = Infinity;
+      for (const p of wp) dmin = Math.min(dmin, Math.hypot(p[0] - cx, p[1] - cy));
+      if (dmin < r + 4.5 * sc + 1) continue;
+      const snap = s.terrain.slice();
+      for (let y = Math.floor(cy - r) - 1; y <= Math.ceil(cy + r) + 1; y++) for (let x = Math.floor(cx - r) - 1; x <= Math.ceil(cx + r) + 1; x++) {
+        if (inb(x, y) && Math.hypot(x + 0.5 - cx, y + 0.5 - cy) <= r) s.terrain[idx(x, y)] = T_WATER;
+      }
+      if (largestLand(s) < 0.41) s.terrain.set(snap);
+      break;
+    }
+  }
+  const n1 = noise(s, Math.round(6 * sc)), n2 = noise(s, Math.round(14 * sc));
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const i = idx(x, y);
     if (s.terrain[i] === T_WATER) continue;
