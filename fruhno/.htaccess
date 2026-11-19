@@ -1,0 +1,9 @@
+# Only api.php is meant to be called; keep the key hash and game state private.
+<FilesMatch "^(config\.php|engine\.php|test\.php)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Deny from all
+  </IfModule>
+</FilesMatch>

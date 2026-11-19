@@ -1,11 +1,14 @@
 // Fruhno API client. Settings live in localStorage under the "fruhno:" prefix.
-const DEFAULT_SERVER = 'https://phpexpert.de/vocs/fruhno/api.php';
+const DEFAULT_SERVER = 'https://phpexpert.de/games/fruhno/api.php';
+// The backend moved from /vocs/ to /games/ (Nov 2026); saved settings with the old address are switched over.
+const OLD_SERVERS = ['https://phpexpert.de/vocs/fruhno/api.php'];
 
 const store = {
   get(k, d = '') { try { return localStorage.getItem('fruhno:' + k) ?? d; } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem('fruhno:' + k, v); } catch (e) { /* private mode */ } },
   del(k) { try { localStorage.removeItem('fruhno:' + k); } catch (e) { /* ignore */ } },
 };
+if (OLD_SERVERS.includes(store.get('server'))) store.set('server', DEFAULT_SERVER);
 
 async function apiCall(body) {
   const headers = {

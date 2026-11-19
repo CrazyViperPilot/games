@@ -130,10 +130,10 @@ Legende: **🏠 = Hausregel** (weicht vom offiziellen UNO ab, von Daniel festgel
 - Eintrag in der Spieleliste (`index.html` im Root) wie bei den anderen Spielen.
 
 ### Backend (PHP, Daniels Webspace)
-- Gleicher Webspace wie vipervocs (dogado, `phpexpert.de/vocs`), Unterordner **`fruhno/`** davon, d. h. `phpexpert.de/vocs/fruhno/api.php`. Dateibasierter Zustand (eine JSON-Datei mit `flock`), keine Datenbank – wie `stats.php`.
+- dogado-Webspace, games-Bereich (`phpexpert.de/games/`, eigener FTP-Benutzer, unabhängig von vocs), Unterordner **`fruhno/`**, d. h. `phpexpert.de/games/fruhno/api.php`. (Bis Nov 2026 lag es unter `/vocs/fruhno/`; alte gespeicherte Server-Adressen stellt `js/api.js` automatisch um.) Dateibasierter Zustand (eine JSON-Datei mit `flock`), keine Datenbank – wie `stats.php`.
 - Das Frontend läuft auf GitHub Pages (anderer Origin) → API sendet CORS-Header für `https://crazyviperpilot.github.io`.
 - Der Server ist **maßgeblich** (Autorität): prüft Züge, mischt, teilt aus; Clients bekommen nur ihren eigenen Handblick (fremde Hände nie im Response).
-- Zugriffsschutz: gemeinsamer Schlüssel im Header `X-Fruhno-Key` (Secret `FRUHNO_KEY`, ersatzweise `VOCS_KEY`) (wie `X-Vocs-Key`), den Daniel einmal in der App eingibt; der Hash liegt in einer vom Deploy geschriebenen `config.php`. Zusätzlich pro Spieler ein zufälliges Session-Token beim Join (verhindert, dass jemand einen anderen Namen übernimmt).
+- Zugriffsschutz: gemeinsamer Schlüssel im Header `X-Fruhno-Key` (Secret `FRUHNO_KEY` der Umgebung „FTP“ im games-Repo) (wie `X-Vocs-Key`), den Daniel einmal in der App eingibt; der Hash liegt in einer vom Deploy geschriebenen `config.php`. Zusätzlich pro Spieler ein zufälliges Session-Token beim Join (verhindert, dass jemand einen anderen Namen übernimmt).
 - Endpunkte (eine URL `api.php`): `GET` liefert den ganzen Tisch aus Sicht des Spielers (Polling alle ~1,5 s); `POST {action}` mit `host`, `join`, `leave`, `addbot`, `removebot`, `start`, `end`, `play`, `draw`, `pass`, `fruhno`, `catch`, `skip`, `chat`.
 - Aufräumen: Lobby/Spiel ohne Aktivität für 2 Stunden wird automatisch beendet.
 
@@ -141,8 +141,7 @@ Legende: **🏠 = Hausregel** (weicht vom offiziellen UNO ab, von Daniel festgel
 - **Polling (Standard)**: Client fragt alle ~1,5 s `state?since=N`; Server antwortet mit `304`/leer, wenn sich nichts geändert hat. Für 3 Spieler auf Shared-Hosting robust und simpel. Long-Polling/SSE sind auf Shared-Hosting oft instabil (PHP-Prozess-Limits) → nur bei Bedarf später.
 
 ### Deploy
-- Das vipervocs-Repo deployt bereits per `lftp` auf den Webspace und kopiert nur `index.html manifest.json sw.js css js assets api`. Es braucht eine kleine Erweiterung: `fruhno/` mit in die Kopierliste, plus Schreiben einer `fruhno/config.php` (Schlüssel-Hash) – **nicht ohne Daniels Freigabe**.
-- Alternative ohne Eingriff in vipervocs: eigener Workflow im games-Repo (benötigt dieselben FTP-Secrets dort).
+- Deploy: Workflow `.github/workflows/deploy-backend.yml` im games-Repo (lftp, Umgebung „FTP“ mit `FTP_SERVER`, `FTP_USER`, `FTP_PASSWORD`, `FRUHNO_KEY`); schreibt `fruhno/config.php` mit dem Schlüssel-Hash.
 - `fruhno/data/` auf dem Server wird nie überschrieben (wie `api/data/`, mit `.htaccess` gesperrt).
 
 ## 8. Tests
@@ -158,7 +157,7 @@ Legende: **🏠 = Hausregel** (weicht vom offiziellen UNO ab, von Daniel festgel
 
 ## 10. Umsetzung
 - Frontend: `games/fruhno/` (Vanilla JS: `js/cards.js` Kartendaten/Rendering, `js/api.js` Client, `js/main.js` UI).
-- Backend: Repo `vipervocs`, Ordner `fruhno/` (`engine.php` Regeln, `api.php` Endpunkt, `test.php` Regeltests: `php fruhno/test.php`). Deploy über die bestehende dogado-Action; Zielpfad `…/vocs/fruhno/api.php`.
+- Backend: im selben Ordner `fruhno/` (`engine.php` Regeln, `api.php` Endpunkt, `test.php` Regeltests: `php fruhno/test.php`). Deploy per `deploy-backend.yml`; Zielpfad `phpexpert.de/games/fruhno/api.php`.
 - Beim ersten Start gibt jeder Name, Schlüssel und (vorbelegt) Server-URL ein; alles liegt im localStorage (`fruhno:`).
 - Wer ein Spiel hostet, ist Host; verlässt der Host das Spiel, wird der nächste Mensch Host. Ein Name ist nur mit seinem Token (oder nach 25 s Inaktivität) neu belegbar.
 - Aufräumen: nach 2 h ohne Aktivität wird alles zurückgesetzt.

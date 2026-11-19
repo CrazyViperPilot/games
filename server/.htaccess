@@ -1,0 +1,3 @@
+# Wurzel des games-Webspace (phpexpert.de/games/). Wird vom Workflow deploy-backend.yml hochgeladen.
+# Ohne DirectoryIndex liefert der Server für Ordner wie /games/frankfurtopoly/ nur „403 Zugriff verweigert“.
+DirectoryIndex index.html index.php

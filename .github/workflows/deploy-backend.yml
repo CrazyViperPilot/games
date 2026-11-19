@@ -1,0 +1,105 @@
+# Lädt die PHP-Backends der Spiele per FTP auf den games-Webspace (phpexpert.de/games/).
+# Die Oberflächen liegen weiter auf GitHub Pages (pages.yml); hier geht nur der Server-Teil hoch:
+#   .htaccess          ← server/.htaccess (DirectoryIndex für alle Spiele-Ordner)
+#   fruhno/            ← api.php, engine.php, .htaccess, data/.htaccess, config.php (aus FRUHNO_KEY)
+#   simfurt/           ← api.php, data/.htaccess
+# Frankfurtopoly hat ein eigenes Repo und lädt selbst nach /games/frankfurtopoly/ hoch.
+#
+# Secrets der Umgebung "FTP" (Settings → Environments → FTP), dieselben Werte wie im Repo frankfurtopoly:
+#   FTP_SERVER, FTP_USER, FTP_PASSWORD  – FTP-Zugang des games-Benutzers (Login startet in /games)
+#   FRUHNO_KEY                          – gemeinsamer Fruhno-Schlüssel (derselbe, den alle in der App eingegeben haben)
+# Optionale Variablen (gleiche Umgebung):
+#   FTP_DIR       Zielordner relativ zum FTP-Login, mit Schrägstrich am Ende (Standard ./)
+#   FTP_PROTOCOL  ftps (Standard) oder ftp
+#   FTP_SECURITY  strict (Standard) oder loose, falls das FTPS-Zertifikat nicht zum Hostnamen passt
+# Daten auf dem Server (fruhno/data/*.json, simfurt/data/*) werden nie überschrieben oder gelöscht (kein --delete).
+name: Deploy backends to dogado
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "fruhno/*.php"
+      - "fruhno/.htaccess"
+      - "fruhno/data/.htaccess"
+      - "simfurt/api.php"
+      - "simfurt/data/.htaccess"
+      - "server/**"
+      - ".github/workflows/deploy-backend.yml"
+  workflow_dispatch:
+
+concurrency: deploy-backend
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: FTP
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test Fruhno rules engine
+        run: |
+          for f in fruhno/*.php simfurt/api.php; do php -l "$f"; done
+          php fruhno/test.php
+
+      - name: Check secrets
+        id: check
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+        run: |
+          if [ -n "$FTP_SERVER" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::FTP-Secrets fehlen in der Umgebung FTP – Deploy übersprungen."
+          fi
+
+      - name: Build upload folder
+        if: steps.check.outputs.ready == 'true'
+        env:
+          FRUHNO_KEY: ${{ secrets.FRUHNO_KEY }}
+        run: |
+          if [ -z "$FRUHNO_KEY" ]; then echo "::error::Secret FRUHNO_KEY fehlt."; exit 1; fi
+          mkdir -p site/fruhno/data site/simfurt/data
+          cp server/.htaccess site/.htaccess
+          cp fruhno/api.php fruhno/engine.php fruhno/.htaccess site/fruhno/
+          cp fruhno/data/.htaccess site/fruhno/data/
+          hash=$(printf '%s' "$FRUHNO_KEY" | sha256sum | cut -d' ' -f1)
+          printf "<?php\nreturn ['key_sha256' => '%s'];\n" "$hash" > site/fruhno/config.php
+          cp simfurt/api.php site/simfurt/
+          cp simfurt/data/.htaccess site/simfurt/data/
+          find site -type f | sort
+
+      # lftp statt einer Node-FTP-Action: kommt mit FTPS-Servern klar, die TLS-Session-Reuse
+      # auf der Datenverbindung verlangen (dogado bricht sonst ab).
+      - name: Upload via FTP
+        if: steps.check.outputs.ready == 'true'
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          LFTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_DIR: ${{ vars.FTP_DIR || './' }}
+          FTP_PROTOCOL: ${{ vars.FTP_PROTOCOL || 'ftps' }}
+          FTP_SECURITY: ${{ vars.FTP_SECURITY || 'strict' }}
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq lftp > /dev/null
+          ssl=$([ "$FTP_PROTOCOL" = "ftp" ] && echo false || echo true)
+          verify=$([ "$FTP_SECURITY" = "loose" ] && echo no || echo yes)
+          lftp --env-password -u "$FTP_USER" "$FTP_SERVER" <<EOF
+          set ftp:ssl-force $ssl
+          set ftp:ssl-protect-data $ssl
+          set ssl:verify-certificate $verify
+          set ftp:passive-mode true
+          set net:timeout 20
+          set net:max-retries 2
+          mkdir -p -f $FTP_DIR
+          mirror --reverse --no-perms --verbose site/ $FTP_DIR
+          bye
+          EOF
+
+      - name: Check live URLs
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          for u in fruhno/api.php "simfurt/api.php?ping=1" frankfurtopoly/; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "https://phpexpert.de/games/$u")
+            echo "https://phpexpert.de/games/$u → $code"
+          done
