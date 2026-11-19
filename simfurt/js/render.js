@@ -7,6 +7,7 @@ const sprites = new Map();
 // Lichtpass (Nacht): Sprite-Funktionen zeichnen unverändert, aber Füllungen werden schwarz
 // (Gebäude-Silhouette verdeckt Licht dahinter); nur Fenster bekommen Lichtfarbe.
 let LIGHT = false, lightFill = '#000', lightCool = false;
+let SPR = { fw: 1, fh: 1 };                     // Fläche des gerade gezeichneten Sprites (für Schatten im Rahmen)
 const lightCtx = (g) => new Proxy(g, {
   get(t, k) { const v = t[k]; return typeof v === 'function' ? v.bind(t) : v; },
   set(t, k, v) { t[k] = (k === 'fillStyle' || k === 'strokeStyle') ? lightFill : v; return true; },
@@ -30,6 +31,7 @@ function sprite(key, fw, fh, hmax, draw, light = false, cool = false) {
   const ss = light ? 1 : SS;
   const c = document.createElement('canvas'); c.width = w * ss; c.height = h * ss;
   const g = c.getContext('2d'); g.scale(ss, ss);
+  SPR = { fw, fh };
   if (light) {
     LIGHT = true; lightFill = '#000'; lightCool = cool;
     try { draw(lightCtx(g), { ox, oy }); } finally { LIGHT = false; lightFill = '#000'; }
@@ -49,14 +51,81 @@ function poly(g, pts, fill, stroke) {
 function flat(g, o, u0, v0, u1, v1, fill, z = 0) {
   poly(g, [[X(o, u0, v0), Y(o, u0, v0, z)], [X(o, u1, v0), Y(o, u1, v0, z)], [X(o, u1, v1), Y(o, u1, v1, z)], [X(o, u0, v1), Y(o, u0, v1, z)]], fill);
 }
-/** Quader: [u0,u1]×[v0,v1], von z0 bis z0+H. Sichtbar: Oberseite, linke Fläche (+v), rechte Fläche (+u). */
+/**
+ * Quader: [u0,u1]×[v0,v1], von z0 bis z0+H. Sichtbar: Oberseite, linke Fläche (+v), rechte Fläche (+u).
+ * Optik: Schlagschatten nach rechts unten (nur z0 = 0), weicher Vertikalverlauf der Fassaden, Kanten-Highlights
+ * (Licht von links oben), dunkle Bodenkante. Im Licht-Pass (LIGHT) entfallen diese Zutaten – Silhouette bleibt schwarz.
+ */
 function prism(g, o, u0, v0, u1, v1, z0, H, col, opt = {}) {
   const z1 = z0 + H;
+  if (!LIGHT && z0 === 0 && opt.sh !== false) groundShadow(g, o, u0, v0, u1, v1);
   const L = [[X(o, u0, v1), Y(o, u0, v1, z0)], [X(o, u1, v1), Y(o, u1, v1, z0)], [X(o, u1, v1), Y(o, u1, v1, z1)], [X(o, u0, v1), Y(o, u0, v1, z1)]];
   const R = [[X(o, u1, v1), Y(o, u1, v1, z0)], [X(o, u1, v0), Y(o, u1, v0, z0)], [X(o, u1, v0), Y(o, u1, v0, z1)], [X(o, u1, v1), Y(o, u1, v1, z1)]];
-  poly(g, L, shade(col, opt.l ?? 1.0), opt.line); poly(g, R, shade(col, opt.r ?? 0.72), opt.line);
+  poly(g, L, faceFill(g, col, opt.l ?? 1.0, (X(o, u0, v1) + X(o, u1, v1)) / 2, (Y(o, u0, v1, z1) + Y(o, u1, v1, z1)) / 2, (Y(o, u0, v1, z0) + Y(o, u1, v1, z0)) / 2), opt.line);
+  poly(g, R, faceFill(g, col, opt.r ?? 0.72, (X(o, u1, v1) + X(o, u1, v0)) / 2, (Y(o, u1, v1, z1) + Y(o, u1, v0, z1)) / 2, (Y(o, u1, v1, z0) + Y(o, u1, v0, z0)) / 2), opt.line);
   flat(g, o, u0, v0, u1, v1, opt.top ?? shade(col, 1.18), z1);
+  if (!LIGHT && opt.hl !== false) edgeHL(g, o, u0, v0, u1, v1, z0, z1);
   if (opt.win) windows(g, o, u0, v0, u1, v1, z0, H, opt.win);
+}
+/** Fassadenfläche mit weichem Vertikalverlauf (oben heller). Im Licht-Pass einfarbig (wird ohnehin schwarz). */
+function faceFill(g, col, f, x, yTop, yBot) {
+  if (LIGHT) return shade(col, f);
+  const gr = g.createLinearGradient(x, yTop, x, yBot);
+  gr.addColorStop(0, shade(col, f * 1.08)); gr.addColorStop(1, shade(col, f * 0.88));
+  return gr;
+}
+/** Schlagschatten am Boden: halbtransparente Fläche nach rechts unten, begrenzt auf den Sprite-Rahmen. */
+function groundShadow(g, o, u0, v0, u1, v1) {
+  const du = Math.max(0, Math.min(0.12, SPR.fw + 0.1 - u1)), dv = Math.max(0, Math.min(0.03, SPR.fh + 0.1 - v1));
+  flat(g, o, u0 + du, v0 + dv, u1 + du, v1 + dv, 'rgba(12,30,42,.26)');
+}
+/** Kanten-Highlights: obere Vorderkanten und linke Ecke hell, Bodenkante dunkel (Licht von links oben). */
+function edgeHL(g, o, u0, v0, u1, v1, z0, z1) {
+  const P = (u, v, z) => [X(o, u, v), Y(o, u, v, z)];
+  g.lineWidth = 0.9; g.strokeStyle = 'rgba(255,255,255,.42)';
+  let p = P(u0, v1, z1); g.beginPath(); g.moveTo(p[0], p[1]);
+  p = P(u0, v0, z1); g.lineTo(p[0], p[1]); p = P(u1, v0, z1); g.lineTo(p[0], p[1]); g.stroke();
+  p = P(u0, v1, z0); g.strokeStyle = 'rgba(255,255,255,.22)'; g.beginPath(); g.moveTo(p[0], p[1]);
+  p = P(u0, v1, z1); g.lineTo(p[0], p[1]); g.stroke();
+  g.lineWidth = 1; g.strokeStyle = 'rgba(10,20,30,.3)'; g.beginPath();
+  p = P(u0, v1, z0); g.moveTo(p[0], p[1]); p = P(u1, v1, z0); g.lineTo(p[0], p[1]); p = P(u1, v0, z0); g.lineTo(p[0], p[1]); g.stroke();
+}
+/** Punkt auf einer Fassade: a ∈ [0,1] entlang der Front (L: +u, R: −v), z = Höhe. */
+function facePt(o, side, u0, v0, u1, v1, a, z) {
+  if (side === 'L') { const u = u0 + (u1 - u0) * a; return [X(o, u, v1), Y(o, u, v1, z)]; }
+  const v = v1 - (v1 - v0) * a; return [X(o, u1, v), Y(o, u1, v, z)];
+}
+/** Balkone: helle Platte mit Schattenkante unter jeder Fensterreihe (auf jeder `step`-ten Reihe). Nur Tagpass. */
+function balconies(g, o, side, u0, v0, u1, v1, z0, H, rows, step) {
+  if (LIGHT) return;
+  const rh = (H - 4) / rows, P = (a, z) => facePt(o, side, u0, v0, u1, v1, a, z);
+  for (let r = 1; r < rows; r += step) {
+    const zb = z0 + (r + 0.25) * rh + 0.2, zt = zb + 1.6;
+    poly(g, [P(0.1, zt), P(0.9, zt), P(0.9, zb), P(0.1, zb)], '#e8e1d1', 'rgba(60,50,40,.35)');
+    poly(g, [P(0.1, zb), P(0.9, zb), P(0.9, zb - 0.9), P(0.1, zb - 0.9)], 'rgba(20,25,35,.28)');
+  }
+}
+/** Glas-Spiegelung: zwei schräge helle Bänder auf einer Fassade (Verlauf von oben links). Nur Tagpass. */
+function sheen(g, o, side, u0, v0, u1, v1, z0, z1) {
+  if (LIGHT) return;
+  const P = (a, z) => facePt(o, side, u0, v0, u1, v1, a, z), zb = z0 + 2, zt = z1 - 2;
+  poly(g, [P(0.2, zb), P(0.34, zb), P(0.46, zt), P(0.32, zt)], 'rgba(255,255,255,.16)');
+  poly(g, [P(0.62, zb), P(0.66, zb), P(0.78, zt), P(0.74, zt)], 'rgba(255,255,255,.1)');
+}
+/** Klimageräte: 1–3 kleine helle Kästen auf einem Flachdach (Höhe z). */
+function acUnits(g, o, u0, v0, u1, v1, z, n = 2) {
+  const spots = [[0.14, 0.14], [0.6, 0.18], [0.16, 0.6]];
+  for (let k = 0; k < n; k++) {
+    const [a, b] = spots[k % 3], u = u0 + (u1 - u0) * a, v = v0 + (v1 - v0) * b;
+    prism(g, o, u, v, u + 0.14, v + 0.12, z, 4, '#e3e8eb', { top: '#f6f8fa', sh: false, hl: false });
+  }
+}
+/** Dachgarten: Rasenfläche mit zwei dunkleren Büschen auf dem Flachdach. */
+function roofGarden(g, o, u0, v0, u1, v1, z) {
+  const cu = (u0 + u1) / 2, cv = (v0 + v1) / 2, ru = (u1 - u0) * 0.34, rv = (v1 - v0) * 0.34;
+  ellipseFlat(g, o, cu, cv, ru, rv, z, '#5aa650');
+  ellipseFlat(g, o, cu - ru * 0.5, cv - rv * 0.2, ru * 0.36, rv * 0.3, z + 0.6, '#3e8a42');
+  ellipseFlat(g, o, cu + ru * 0.4, cv + rv * 0.35, ru * 0.3, rv * 0.26, z + 0.6, '#2f7a3a');
 }
 /** Fenster auf beiden Sichtflächen. win: {c: Spalten pro Kachel-Einheit, rows, lit, dark, seed} */
 function windows(g, o, u0, v0, u1, v1, z0, H, w) {
@@ -112,68 +181,173 @@ function icon(g, o, cu, cv, z, ch, size = 16) {
   g.font = `${size}px "Segoe UI Emoji","Noto Color Emoji",sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
   g.fillStyle = '#fff'; g.fillText(ch, X(o, cu, cv), Y(o, cu, cv, z));
 }
+/** Schatten eines Baumes am Boden (Licht von links oben → nach rechts unten). */
+function treeShadow(g, x, y, s, rx) {
+  g.fillStyle = 'rgba(12,35,15,.26)'; g.beginPath(); g.ellipse(x + 3.5 * s, y + 0.6 * s, rx * s, 2.6 * s, 0, 0, 7); g.fill();
+}
+/** Laubbaum: runde Krone, dunklere Unterseite rechts, Lichtfleck oben links. */
 function tree(g, x, y, s = 1, c = '#2f7a3c') {
+  treeShadow(g, x, y, s, 6.5);
   g.fillStyle = '#5a3d22'; g.fillRect(x - 1 * s, y - 4 * s, 2 * s, 5 * s);
-  g.fillStyle = shade(c, 0.85); g.beginPath(); g.ellipse(x, y - 8 * s, 6 * s, 6.5 * s, 0, 0, 7); g.fill();
-  g.fillStyle = c; g.beginPath(); g.ellipse(x - 1.5 * s, y - 10 * s, 4.5 * s, 4.8 * s, 0, 0, 7); g.fill();
+  g.fillStyle = shade(c, 0.8); g.beginPath(); g.ellipse(x + 0.6 * s, y - 7.8 * s, 6.1 * s, 6.4 * s, 0, 0, 7); g.fill();
+  g.fillStyle = c; g.beginPath(); g.ellipse(x - 0.9 * s, y - 9.6 * s, 5 * s, 5 * s, 0, 0, 7); g.fill();
+  g.fillStyle = shade(c, 1.25); g.beginPath(); g.ellipse(x - 2.5 * s, y - 11.4 * s, 2.2 * s, 1.9 * s, 0, 0, 7); g.fill();
+}
+/** Nadelbaum (Tanne): drei gestaffelte Dreiecke, links hell, rechts dunkel. Höchstens ~25 px über dem Fuß. */
+function conifer(g, x, y, s = 1, c = '#2a6e3a') {
+  treeShadow(g, x, y, s, 5);
+  g.fillStyle = '#5a3d22'; g.fillRect(x - 0.8 * s, y - 3 * s, 1.6 * s, 4 * s);
+  for (let i = 0; i < 3; i++) {
+    const base = y - (2 + i * 5) * s, apex = base - 11 * s, hw = (5.2 - i * 1.1) * s;
+    g.fillStyle = shade(c, 1.05); g.beginPath(); g.moveTo(x, apex); g.lineTo(x - hw, base); g.lineTo(x, base); g.closePath(); g.fill();
+    g.fillStyle = shade(c, 0.74); g.beginPath(); g.moveTo(x, apex); g.lineTo(x, base); g.lineTo(x + hw, base); g.closePath(); g.fill();
+  }
+}
+/** Busch: zwei flache Ballen mit Schatten. */
+function bush(g, x, y, s = 1, c = '#3f8f45') {
+  treeShadow(g, x, y, s, 5.5);
+  g.fillStyle = shade(c, 0.8); g.beginPath(); g.ellipse(x + 0.6 * s, y - 3.4 * s, 5.4 * s, 3.8 * s, 0, 0, 7); g.fill();
+  g.fillStyle = c; g.beginPath(); g.ellipse(x - 0.6 * s, y - 4.6 * s, 4.6 * s, 3.4 * s, 0, 0, 7); g.fill();
+  g.fillStyle = shade(c, 1.22); g.beginPath(); g.ellipse(x - 2 * s, y - 6 * s, 1.8 * s, 1.1 * s, 0, 0, 7); g.fill();
 }
 
 // ---------------------------------------------------------------- Boden
 const GRASS = ['#6fae52', '#74b356', '#6aa84f', '#78b65a'];
 function groundSprite(key, fn) { return sprite(key, 1, 1, 0, fn); }
 
+/** Kleine Farbtupfer und Grasbüschel auf einer Kachel (deterministisch je Variante). */
+function grassSpeckle(g, o, variant, n, tuft) {
+  for (let k = 0; k < n; k++) {
+    const u = 0.08 + rnd(variant * 31 + k) * 0.84, v = 0.08 + rnd(variant * 17 + k * 3 + 90) * 0.84;
+    g.fillStyle = rnd(variant * 5 + k + 7) < 0.6 ? 'rgba(40,90,30,.2)' : 'rgba(214,246,160,.16)';
+    g.beginPath(); g.ellipse(X(o, u, v), Y(o, u, v), 1.2 + rnd(k + variant) * 0.8, 0.7, 0, 0, 7); g.fill();
+  }
+  if (!tuft) return;
+  g.strokeStyle = 'rgba(36,82,28,.5)'; g.lineWidth = 0.8;
+  for (let k = 0; k < 4; k++) {
+    const u = 0.15 + rnd(variant * 13 + k * 7 + 3) * 0.7, v = 0.15 + rnd(variant * 19 + k * 5 + 11) * 0.7, x = X(o, u, v), y = Y(o, u, v);
+    g.beginPath(); g.moveTo(x - 1.5, y); g.lineTo(x - 2.2, y - 2.6); g.moveTo(x, y); g.lineTo(x, y - 3.2); g.moveTo(x + 1.5, y); g.lineTo(x + 2.3, y - 2.4); g.stroke();
+  }
+}
+/** Hell-Dunkel-Verlauf über eine Kachel (oben heller, unten dunkler). */
+function tileShade(g, o, a0, a1) {
+  const gr = g.createLinearGradient(X(o, 0, 0), Y(o, 0, 0), X(o, 1, 1), Y(o, 1, 1));
+  gr.addColorStop(0, `rgba(255,255,220,${a0})`); gr.addColorStop(0.5, 'rgba(255,255,255,0)'); gr.addColorStop(1, `rgba(20,50,20,${a1})`);
+  flat(g, o, 0, 0, 1, 1, gr);
+}
+function rgba(hex, a) { const [r, gg, b] = hexToRgb(hex); return `rgba(${r},${gg},${b},${a})`; }
 export function grassSprite(variant) {
   return groundSprite('gr' + variant, (g, o) => {
     flat(g, o, 0, 0, 1, 1, GRASS[variant & 3]);
-    for (let k = 0; k < 5; k++) { const u = rnd(variant * 9 + k) , v = rnd(variant * 5 + k + 40); g.fillStyle = 'rgba(40,90,30,.28)'; g.fillRect(X(o, u, v) - 1, Y(o, u, v), 2, 1); }
+    tileShade(g, o, 0.05, 0.05);
+    grassSpeckle(g, o, variant, 16, true);
   });
 }
 export function waterSprite(frame, mask) {
   return groundSprite(`w${frame}_${mask}`, (g, o) => {
-    flat(g, o, 0, 0, 1, 1, frame ? '#3e86c4' : '#4290cf');
-    // Ufer: N=(y-1) → Kante Spitze→rechts; E=(x+1) → rechts→unten; S=(y+1) → unten→links; W=(x-1) → links→Spitze
-    const edge = (a, b, c, d) => poly(g, [[X(o, a[0], a[1]), Y(o, a[0], a[1])], [X(o, b[0], b[1]), Y(o, b[0], b[1])], [X(o, d[0], d[1]), Y(o, d[0], d[1])], [X(o, c[0], c[1]), Y(o, c[0], c[1])]], 'rgba(214,196,150,.8)');
+    flat(g, o, 0, 0, 1, 1, frame ? '#3b80bd' : '#4089c8');
+    // Tiefenverlauf: an jeder Uferseite gestapelte helle Streifen (Ufer heller, Mitte dunkler)
+    const sides = [mask & 1, mask & 2, mask & 4, mask & 8];
+    const strip = [(w) => [0, 0, 1, w], (w) => [1 - w, 0, 1, 1], (w) => [0, 1 - w, 1, 1], (w) => [0, 0, w, 1]];
+    for (const [w, a] of [[0.34, 0.06], [0.22, 0.07], [0.1, 0.09]]) {
+      for (let s = 0; s < 4; s++) if (sides[s]) { const [u0, v0, u1, v1] = strip[s](w); flat(g, o, u0, v0, u1, v1, `rgba(170,230,250,${a})`); }
+    }
+    // Ufer: N=(y-1) → Kante Spitze→rechts; E=(x+1) → rechts→unten; S=(y+1) → unten→links; W=(x-1) → links→Spitze.
+    // Sandkante (a→b Landseite, c→d Wasserseite) mit Böschungslinie und hellem Schaumsaum.
+    const P = (p) => [X(o, p[0], p[1]), Y(o, p[0], p[1])];
+    const edge = (a, b, c, d) => {
+      poly(g, [P(a), P(b), P(d), P(c)], 'rgba(222,204,156,.94)');
+      const off = [(c[0] - a[0]) * 0.22, (c[1] - a[1]) * 0.22];
+      g.lineCap = 'round'; g.lineWidth = 0.9; g.strokeStyle = 'rgba(96,78,50,.4)';
+      g.beginPath(); g.moveTo(...P(c)); g.lineTo(...P(d)); g.stroke();
+      g.lineWidth = 0.7; g.strokeStyle = 'rgba(235,250,255,.4)';
+      g.beginPath(); g.moveTo(...P([c[0] + off[0], c[1] + off[1]])); g.lineTo(...P([d[0] + off[0], d[1] + off[1]])); g.stroke();
+    };
     if (mask & 1) edge([0, 0], [1, 0], [0, 0.14], [1, 0.14]);
     if (mask & 2) edge([1, 0], [1, 1], [0.86, 0], [0.86, 1]);
     if (mask & 4) edge([0, 1], [1, 1], [0, 0.86], [1, 0.86]);
     if (mask & 8) edge([0, 0], [0, 1], [0.14, 0], [0.14, 1]);
-    g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 0.8;
-    for (let k = 0; k < 3; k++) { const u = 0.2 + rnd(frame * 7 + k + mask) * 0.6, v = 0.2 + rnd(frame * 3 + k * 5 + mask) * 0.6; g.beginPath(); g.moveTo(X(o, u, v) - 4, Y(o, u, v)); g.lineTo(X(o, u, v) + 4, Y(o, u, v)); g.stroke(); }
+    // Glanzlinien: je Bild (frame) andere Positionen → sie flackern beim Wechsel
+    g.strokeStyle = frame ? 'rgba(255,255,255,.42)' : 'rgba(255,255,255,.26)'; g.lineWidth = 0.8; g.lineCap = 'round';
+    for (let k = 0; k < 3; k++) {
+      const u = 0.25 + rnd(frame * 7 + k + mask) * 0.5, v = 0.25 + rnd(frame * 3 + k * 5 + mask) * 0.5, len = 3 + rnd(frame * 11 + k) * 2.5;
+      g.beginPath(); g.moveTo(X(o, u, v) - len, Y(o, u, v)); g.lineTo(X(o, u, v) + len, Y(o, u, v)); g.stroke();
+    }
   });
 }
 export function zoneSprite(z, variant) {
-  const col = ZONES[z].color;
+  const col = ZONES[z].color, base = GRASS[variant & 3];
   return groundSprite(`zn${z}_${variant & 3}`, (g, o) => {
-    flat(g, o, 0, 0, 1, 1, GRASS[variant & 3]);
-    flat(g, o, 0.06, 0.06, 0.94, 0.94, mix(GRASS[variant & 3], col, 0.5));
-    flat(g, o, 0.14, 0.14, 0.86, 0.86, mix(GRASS[variant & 3], col, 0.28));
+    flat(g, o, 0, 0, 1, 1, base);
+    // weicher Übergang: mehrere schwach gefärbte Ringe von außen nach innen statt harter Kanten
+    for (let k = 0; k < 4; k++) { const i = 0.04 + k * 0.035; flat(g, o, i, i, 1 - i, 1 - i, rgba(col, 0.2 + k * 0.07)); }
+    grassSpeckle(g, o, variant, 6, false);
   });
 }
 export function lotSprite(z) {
+  const body = z === Z_I ? '#8d8a82' : z === Z_B ? '#9ea4ae' : '#a2ab92';
   return groundSprite('lot' + z, (g, o) => {
-    flat(g, o, 0, 0, 1, 1, '#8a9a78'); flat(g, o, 0.04, 0.04, 0.96, 0.96, z === Z_I ? '#8d8a82' : z === Z_B ? '#9ea4ae' : '#a2ab92');
+    flat(g, o, 0, 0, 1, 1, '#8a9a78'); flat(g, o, 0.04, 0.04, 0.96, 0.96, body);
+    tileShade(g, o, 0.04, 0.05);
+    // Schotter und eine Fahrspur der Baustelle
+    for (let k = 0; k < 12; k++) {
+      const u = 0.08 + rnd(z * 41 + k) * 0.84, v = 0.08 + rnd(z * 23 + k * 3 + 5) * 0.84;
+      g.fillStyle = rnd(z * 9 + k) < 0.5 ? 'rgba(60,55,45,.22)' : 'rgba(255,255,255,.2)';
+      g.beginPath(); g.ellipse(X(o, u, v), Y(o, u, v), 0.9, 0.6, 0, 0, 7); g.fill();
+    }
+    flat(g, o, 0.28, 0.46, 0.72, 0.52, 'rgba(70,64,52,.16)');
   });
 }
 export function roadSprite(mask, bridge, water) {
   return groundSprite(`rd${mask}_${bridge ? 1 : 0}`, (g, o) => {
-    if (bridge) flat(g, o, 0, 0, 1, 1, '#3f86c3');
-    else flat(g, o, 0, 0, 1, 1, '#9aa389');
-    const W = 0.3;
-    const arms = [[mask & 1, 0.5 - W, 0, 0.5 + W, 0.5 + 0.0], [mask & 2, 0.5, 0.5 - W, 1, 0.5 + W], [mask & 4, 0.5 - W, 0.5, 0.5 + W, 1], [mask & 8, 0, 0.5 - W, 0.5, 0.5 + W]];
-    const asphalt = bridge ? '#5d6670' : '#4d5159';
-    flat(g, o, 0.5 - W, 0.5 - W, 0.5 + W, 0.5 + W, asphalt);
-    for (const [on, u0, v0, u1, v1] of arms) if (on) flat(g, o, u0, v0, u1, v1, asphalt);
-    if (!mask) { flat(g, o, 0.5 - W, 0.5 - W, 0.5 + W, 0.5 + W, asphalt); }
-    // Mittellinie
-    g.strokeStyle = '#e8d874'; g.lineWidth = 1; g.setLineDash([3, 3]);
+    const W = 0.3, CW = 0.37;                       // halbe Fahrbahn- bzw. Gehwegbreite (Bordstein)
+    const bits = [mask & 1, mask & 2, mask & 4, mask & 8];
+    // Rechteck eines Arms (0 N, 1 O, 2 S, 3 W) mit halber Breite h, inklusive Mitte
+    const arm = (a, h) => (a === 0 ? [0.5 - h, 0, 0.5 + h, 0.5 + h] : a === 1 ? [0.5 - h, 0.5 - h, 1, 0.5 + h] : a === 2 ? [0.5 - h, 0.5 - h, 0.5 + h, 1] : [0, 0.5 - h, 0.5 + h, 0.5 + h]);
+    const band = (h, fill) => {
+      flat(g, o, 0.5 - h, 0.5 - h, 0.5 + h, 0.5 + h, fill);
+      for (let a = 0; a < 4; a++) if (bits[a]) flat(g, o, ...arm(a, h), fill);
+    };
+    if (bridge) {
+      // Brücke: Schatten von Fahrbahn und Geländer aufs Wasser (rechts unten), dann das Deck
+      flat(g, o, 0, 0, 1, 1, '#3f86c3');
+      g.save(); g.translate(3, 2.5); band(W + 0.02, 'rgba(6,26,44,.3)'); g.restore();
+      band(W, '#5d6670');
+    } else {
+      flat(g, o, 0, 0, 1, 1, '#9aa389');            // Grünstreifen
+      band(CW + 0.015, 'rgba(40,46,36,.22)');       // Bordsteinschatten
+      band(CW, '#c6c4b6');                          // Gehweg
+      band(W, '#4d5159');                           // Fahrbahn
+    }
+    // Mittelstreifen gestrichelt
+    g.strokeStyle = bridge ? '#e8d874' : '#ecd98a'; g.lineWidth = 1; g.setLineDash([3, 3]);
     const seg = (a, b) => { g.beginPath(); g.moveTo(X(o, a[0], a[1]), Y(o, a[0], a[1])); g.lineTo(X(o, b[0], b[1]), Y(o, b[0], b[1])); g.stroke(); };
     if (mask & 1) seg([0.5, 0], [0.5, 0.5]); if (mask & 4) seg([0.5, 0.5], [0.5, 1]); if (mask & 2) seg([0.5, 0.5], [1, 0.5]); if (mask & 8) seg([0, 0.5], [0.5, 0.5]);
     g.setLineDash([]);
-    if (bridge) { // Geländer
-      g.strokeStyle = '#d9dde2'; g.lineWidth = 1.5;
-      const rail = (u0, v0, u1, v1) => { g.beginPath(); g.moveTo(X(o, u0, v0), Y(o, u0, v0, 3)); g.lineTo(X(o, u1, v1), Y(o, u1, v1, 3)); g.stroke(); };
-      if (mask & (1 | 4)) { rail(0.5 - W, 0, 0.5 - W, 1); rail(0.5 + W, 0, 0.5 + W, 1); }
-      if (mask & (2 | 8)) { rail(0, 0.5 - W, 1, 0.5 - W); rail(0, 0.5 + W, 1, 0.5 + W); }
+    // Zebrastreifen an Kreuzungen (3 oder 4 Arme): weiße Balken quer über die Fahrbahn, Stufe nicht im Sprite-Schlüssel
+    if (!bridge && bits[0] + bits[1] + bits[2] + bits[3] === 4) {
+      const step = (2 * W) / 4, ZW = 'rgba(246,244,236,.7)';
+      for (let a = 0; a < 4; a++) {
+        if (!bits[a]) continue;
+        for (let k = 0; k < 4; k++) {
+          const p = 0.5 - W + k * step + step * 0.22, q = step * 0.52;
+          if (a === 0) flat(g, o, p, 0.21, p + q, 0.31, ZW);
+          else if (a === 2) flat(g, o, p, 0.69, p + q, 0.79, ZW);
+          else if (a === 1) flat(g, o, 0.69, p, 0.79, p + q, ZW);
+          else flat(g, o, 0.21, p, 0.31, p + q, ZW);
+        }
+      }
+    }
+    if (bridge) { // Geländer mit Schatten (Schiene auf z = 3 → Schatten um 2,5 px versetzt)
+      const rails = (col, lw, dx, dy) => {
+        g.save(); g.translate(dx, dy); g.strokeStyle = col; g.lineWidth = lw;
+        const rail = (u0, v0, u1, v1) => { g.beginPath(); g.moveTo(X(o, u0, v0), Y(o, u0, v0, 3)); g.lineTo(X(o, u1, v1), Y(o, u1, v1, 3)); g.stroke(); };
+        if (mask & (1 | 4)) { rail(0.5 - W, 0, 0.5 - W, 1); rail(0.5 + W, 0, 0.5 + W, 1); }
+        if (mask & (2 | 8)) { rail(0, 0.5 - W, 1, 0.5 - W); rail(0, 0.5 + W, 1, 0.5 + W); }
+        g.restore();
+      };
+      rails('rgba(6,26,44,.35)', 1.6, 2.5, 2.5);
+      rails('#d9dde2', 1.5, 0, 0);
     }
   });
 }
@@ -252,11 +426,16 @@ export function zoneBuilding(z, lvl, vr, light = false) {
         g.fillStyle = '#4f9a45'; g.beginPath(); g.ellipse(X(o, 0.12, 0.9), Y(o, 0.12, 0.9), 4, 2.5, 0, 0, 7); g.fill();
       } else if (lvl === 2) {
         prism(g, o, 0.1, 0.12, 0.9, 0.88, 0, 33, wall, { win: { c: 5, rows: 3, lit: 0.35, seed: v } });
+        if (v & 1) balconies(g, o, 'L', 0.1, 0.12, 0.9, 0.88, 0, 33, 3, 1);
+        if (v & 2) balconies(g, o, 'R', 0.1, 0.12, 0.9, 0.88, 0, 33, 3, 1);
         gable(g, o, 0.08, 0.1, 0.92, 0.9, 33, 9, roof, v & 1 ? 'u' : 'v');
       } else {
         const col = mix(['#d8d4cb', '#c9c2b4', '#bfc8cf', '#cfc0b2'][v & 3], '#ffffff', 0.05);
         prism(g, o, 0.12, 0.12, 0.88, 0.88, 0, 62, col, { win: { c: 5, rows: 7, lit: 0.4, seed: v } });
-        prism(g, o, 0.3, 0.3, 0.7, 0.7, 62, 8, '#aab0b4');
+        if (v & 1) balconies(g, o, 'L', 0.12, 0.12, 0.88, 0.88, 0, 62, 7, 2);
+        if (v & 4) balconies(g, o, 'R', 0.12, 0.12, 0.88, 0.88, 0, 62, 7, 2);
+        if (v & 2) roofGarden(g, o, 0.12, 0.12, 0.88, 0.88, 62); else acUnits(g, o, 0.12, 0.12, 0.88, 0.88, 62, 2);
+        prism(g, o, 0.3, 0.3, 0.7, 0.7, 62, 8, '#aab0b4');   // Aufbau auf dem Dach
       }
     } else if (z === Z_C) {
       if (lvl === 1) {
@@ -265,9 +444,12 @@ export function zoneBuilding(z, lvl, vr, light = false) {
         poly(g, [[X(o, 0.12, 0.9), Y(o, 0.12, 0.9, 11)], [X(o, 0.88, 0.9), Y(o, 0.88, 0.9, 11)], [X(o, 0.88, 0.98), Y(o, 0.88, 0.98, 8)], [X(o, 0.12, 0.98), Y(o, 0.12, 0.98, 8)]], ['#d5392e', '#2f7bd0', '#3aa35a'][v % 3]);
       } else if (lvl === 2) {
         prism(g, o, 0.1, 0.1, 0.9, 0.9, 0, 40, GLASS[v & 3], { win: { c: 5, rows: 5, lit: 0.45, dark: 'rgba(210,235,255,.5)', seed: v } });
+        sheen(g, o, 'L', 0.1, 0.1, 0.9, 0.9, 0, 40); sheen(g, o, 'R', 0.1, 0.1, 0.9, 0.9, 0, 40);
         prism(g, o, 0.3, 0.3, 0.7, 0.7, 40, 5, '#8e9aa5');
       } else {
         prism(g, o, 0.12, 0.12, 0.88, 0.88, 0, 56, GLASS[v & 3], { win: { c: 5, rows: 8, lit: 0.45, dark: 'rgba(210,235,255,.5)', seed: v } });
+        sheen(g, o, 'L', 0.12, 0.12, 0.88, 0.88, 0, 56); sheen(g, o, 'R', 0.12, 0.12, 0.88, 0.88, 0, 56);
+        if (v & 1) roofGarden(g, o, 0.12, 0.12, 0.88, 0.88, 56); else acUnits(g, o, 0.12, 0.12, 0.88, 0.88, 56, 2);
         prism(g, o, 0.24, 0.24, 0.76, 0.76, 56, 26, shade(GLASS[v & 3], 0.95), { win: { c: 4, rows: 3, lit: 0.45, dark: 'rgba(210,235,255,.5)', seed: v + 3 } });
       }
     } else if (z === Z_I) {
@@ -292,7 +474,9 @@ export function zoneBuilding(z, lvl, vr, light = false) {
       const gl = ['#4a7fae', '#3f8f9c', '#6c7fa5', '#8a9aa6'][v & 3];
       const top = v % 4;
       prism(g, o, 0.2, 0.2, 0.8, 0.8, 0, H, gl, { win: { c: 5, rows: Math.floor(H / 7), lit: 0.32, dark: 'rgba(225,240,255,.55)', seed: v } });
+      sheen(g, o, 'L', 0.2, 0.2, 0.8, 0.8, 0, H); sheen(g, o, 'R', 0.2, 0.2, 0.8, 0.8, 0, H);
       if (lvl >= 2) prism(g, o, 0.14, 0.14, 0.86, 0.86, 0, 8, shade(gl, 0.9));
+      if (lvl >= 3 && top !== 0) acUnits(g, o, 0.2, 0.2, 0.8, 0.8, H, 2);   // Klimageräte auf dem Flachdach
       if (top === 0) { pyramid(g, o, 0.2, 0.2, 0.8, 0.8, H, 22 + lvl * 4, '#c9d3da'); }
       else if (top === 1) { prism(g, o, 0.34, 0.34, 0.66, 0.66, H, 8, '#cfd5da'); g.fillStyle = '#e8eef0'; g.fillRect(X(o, 0.5, 0.5) - 1, Y(o, 0.5, 0.5, H + 8 + 26) , 2, 26); }
       else if (top === 2) { prism(g, o, 0.2, 0.2, 0.46, 0.8, H, 12 + lvl * 3, shade(gl, 1.05), { win: { c: 2, rows: 2, lit: 0.3, seed: v } }); }
@@ -363,8 +547,8 @@ export function buildingSprite(key, light = false) {
       case 'dike': {
         // Ufergras, darauf ein niedriger grüner Erdwall; die Steinkante liegt auf der Flussseite (+v)
         flat(g, o, 0, 0, 1, 1, '#6aa04c');
-        prism(g, o, 0.03, 0.2, 0.97, 0.7, 0, 6, '#6f8f4e', { top: '#8fb066', l: 0.9, r: 0.68 });
-        prism(g, o, 0.03, 0.64, 0.97, 0.74, 0, 4, '#a59f92', { top: '#cbc5b7', l: 0.95, r: 0.75 });
+        prism(g, o, 0.03, 0.2, 0.97, 0.7, 0, 6, '#6f8f4e', { top: '#8fb066', l: 0.9, r: 0.68, sh: false });
+        prism(g, o, 0.03, 0.64, 0.97, 0.74, 0, 4, '#a59f92', { top: '#cbc5b7', l: 0.95, r: 0.75, sh: false });
         break;
       }
       case 'pump': {
@@ -463,11 +647,13 @@ export function buildingSprite(key, light = false) {
         prism(g, o, 0.2, 0.2, 1.4, 1.2, 0, 26, '#c3ced6', { win: { c: 3, rows: 2, lit: 0.3, dark: 'rgba(60,90,130,.5)', seed: 5 } });
         prism(g, o, 0.2, 1.4, 1.4, 2.8, 0, 26, '#c3ced6', { win: { c: 3, rows: 2, lit: 0.3, dark: 'rgba(60,90,130,.5)', seed: 6 } });
         prism(g, o, 1.7, 0.4, 2.8, 2.6, 0, 40, '#8aa9c2', { win: { c: 4, rows: 4, lit: 0.4, dark: 'rgba(230,245,255,.6)', seed: 7 } });
+        sheen(g, o, 'L', 1.7, 0.4, 2.8, 2.6, 0, 40); sheen(g, o, 'R', 1.7, 0.4, 2.8, 2.6, 0, 40);
         icon(g, o, 1, 1.4, 40, '🏢', 16); break;
       }
       case 'mtower': {
         flat(g, o, 0, 0, 1, 1, '#a9a99a');
         prism(g, o, 0.24, 0.24, 0.76, 0.76, 0, 170, '#c9a98c', { win: { c: 4, rows: 22, lit: 0.18, dark: 'rgba(70,60,60,.5)', seed: 9 } });
+        sheen(g, o, 'L', 0.24, 0.24, 0.76, 0.76, 0, 170); sheen(g, o, 'R', 0.24, 0.24, 0.76, 0.76, 0, 170);
         pyramid(g, o, 0.24, 0.24, 0.76, 0.76, 170, 34, '#7a8a8a'); break;
       }
       case 'maintower': {
@@ -478,6 +664,7 @@ export function buildingSprite(key, light = false) {
       case 'ctower': {
         flat(g, o, 0, 0, 1, 1, '#a9a99a');
         prism(g, o, 0.2, 0.2, 0.8, 0.8, 0, 200, '#dfe6e8', { win: { c: 4, rows: 28, lit: 0.15, dark: 'rgba(120,140,155,.5)', seed: 8 } });
+        sheen(g, o, 'L', 0.2, 0.2, 0.8, 0.8, 0, 200); sheen(g, o, 'R', 0.2, 0.2, 0.8, 0.8, 0, 200);
         g.fillStyle = '#e8eef0'; g.fillRect(X(o, 0.5, 0.5) - 1, Y(o, 0.5, 0.5, 200 + 52), 2, 52);
         g.fillStyle = '#ff3b30'; g.beginPath(); g.arc(X(o, 0.5, 0.5), Y(o, 0.5, 0.5, 254), 2, 0, 7); g.fill(); break;
       }
@@ -523,9 +710,16 @@ export function buildingSprite(key, light = false) {
 export function treeSprite(variant) {
   return sprite('tree' + (variant & 7), 1, 1, 30, (g, o) => {
     flat(g, o, 0, 0, 1, 1, GRASS[variant & 3]);
+    tileShade(g, o, 0.05, 0.05);
+    grassSpeckle(g, o, variant + 3, 8, true);
     const pos = [[0.3, 0.3], [0.7, 0.35], [0.5, 0.65], [0.25, 0.75], [0.75, 0.8]];
     const n = 3 + (variant & 1) + ((variant >> 1) & 1);
-    pos.slice(0, n).sort((a, b) => a[0] + a[1] - (b[0] + b[1])).forEach(([u, v], k) => tree(g, X(o, u, v), Y(o, u, v), 0.95 + rnd(variant * 3 + k) * 0.3, ['#2f7a3c', '#3a8a40', '#2a6e38', '#4a9444'][(variant + k) & 3]));
+    // Formen mischen sich je Variante: Laubbaum (rund), Tanne, Busch; Farbvarianz je Baum
+    pos.slice(0, n).sort((a, b) => a[0] + a[1] - (b[0] + b[1])).forEach(([u, v], k) => {
+      const x = X(o, u, v), y = Y(o, u, v), s = 0.95 + rnd(variant * 3 + k) * 0.3, c = ['#2f7a3c', '#3a8a40', '#2a6e38', '#4a9444'][(variant + k) & 3];
+      const kind = (variant + k * 2) % 3;
+      if (kind === 0) tree(g, x, y, s, c); else if (kind === 1) conifer(g, x, y, s, shade(c, 0.9)); else bush(g, x, y, s * 0.9, shade(c, 1.05));
+    });
   });
 }
 
@@ -702,6 +896,8 @@ export class Renderer {
       if (lg) { lg.globalCompositeOperation = 'lighter'; lg.drawImage(glow('head'), sx + (dx - dy) * 4 - 5, sy + (dx + dy) * 2 - 4, 10, 8); }
     }
     g.restore();
+    // --- Leben (L1): S-Bahnen, Boote, Löschzüge, Fußgänger auf dem Boden (vor den Objekten, wie Autos)
+    if (this.life) this.life.drawGround(g, lg, this.life.view(x0, y0, x1, y1, cam.z));
 
     // --- Objekte (diagonal sortiert)
     for (let sum = x0 + y0; sum <= x1 + y1; sum++) {
@@ -716,13 +912,10 @@ export class Renderer {
           if (lg) nightZone(lg, s.zone[i], s.lvl[i], s.vr[i], x, y, blink);
         } else if (T[i] === T_TREES && !s.road[i] && !s.rail[i]) draw(treeSprite((x * 5 + y * 11) & 7), x, y);
         if (lg && !bid && s.road[i] && !((x + y) & 1)) lampAt(lg, x, y); // jede 2. Straßenkachel
-        if (s.fire[i]) {
-          g.font = '20px "Noto Color Emoji",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-          g.fillText(frame ? '🔥' : '🧯', (x - y) * 32, (x + y) * 16 + 8 - (frame ? 6 : 2));
-          g.fillText('🔥', (x - y) * 32, (x + y) * 16 + 4 - (frame ? 2 : 8));
-        }
       }
     }
+    // --- Rauch und Flammen (L1) über den Objekten, vor der Flut
+    if (this.life) this.life.drawAir(g, lg, this.life.view(x0, y0, x1, y1, cam.z), ui.time);
     // --- Flut
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (s.flood[idx(x, y)]) this.diamond(x, y, 'rgba(60,130,220,.45)');
     // --- Nacht: Tönung über die Szene, danach die Lichtebene additiv. Overlays kommen erst danach (ohne Abdunklung).

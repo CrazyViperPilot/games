@@ -14,12 +14,15 @@ import { saveSlot, loadSlot, listSlots, deleteSlot, SLOTS, snapshot, exportFile,
 import { sound } from './sound.js';
 import { MiniMap } from './minimap.js';
 import { ensureNews, publishNews, issueDate } from './news.js';
+import { Life } from './life.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.round(n).toLocaleString('de-DE');
 const eur = (n) => fmt(n) + ' €';
 const cv = $('cv');
 const R = new Renderer(cv);
+const life = new Life();      // Leben auf der Karte (L1): Züge, Boote, Fußgänger, Löschzüge, Rauch
+R.life = life;
 const mini = new MiniMap($('miniCv'), R);   // Minikarte oben links; Sprung setzt needDraw
 mini.onJump = () => { needDraw = true; };
 
@@ -653,7 +656,7 @@ function startGame(s, n) {
   closeSheet(); renderCats(); renderItems(); speed = 1; lastHud = ''; hud();
   // Kamera: Mitte der Karte
   R.centerOn(N / 2, N / 2); R.cam.z = Math.min(1, Math.max(0.55, R.w / 560)); R.clampCam();
-  R.cars = []; needDraw = true;
+  R.cars = []; life.reset(); needDraw = true;
   try { localStorage.setItem('simfurt-last', String(n)); } catch { /* egal */ }
   layoutFab();
 }
@@ -695,6 +698,7 @@ function frame(now) {
       if (n) { hud(); if (cat) renderItems(); needDraw = true; }
     }
     stepCars(dt);
+    life.step(S, dt);
     ui.time = now; ui.daytime = daytime; ui.overlay = overlay; ui.ghost = ghost; ui.sel = sel; ui.pick = pick; ui.hover = hover;
     R.draw(S, ui);
     mini.draw(S);
