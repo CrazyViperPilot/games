@@ -2,6 +2,7 @@
 import {
   N, setMapSize, START_MONEY, START_YEAR, T_GRASS, T_WATER, T_TREES, Z_NONE, Z_R, Z_C, Z_I, Z_B, ZONES, BUILD,
   ROAD_COST, BRIDGE_COST, BULLDOZE_COST, ROAD_UPKEEP, ZONE_UNLOCK, MILESTONES, MONTHS,
+  BUDGET_RES, BUDGET_DEFAULT, BUDGET_MIN, BUDGET_MAX, BUDGET_STEP, BUDGET_COVER_MAX, BUDGET_ROAD_MIN, ORDINANCES,
 } from './data.js';
 
 export let NN = N * N;
@@ -29,6 +30,7 @@ export function newCity({ name = 'Simfurt', seed = 1, size = 64 } = {}) {
     vr: new Uint8Array(NN), occ: new Uint16Array(NN), fire: new Uint8Array(NN), flood: new Uint8Array(NN),
     bld: [], nextId: 1, ms: 0, msgs: [], hist: [], occupancy: 0.5, demand: { r: 0.5, c: 0.2, i: 0.5, b: 0 },
     stats: null, fin: { inc: 0, exp: 0, net: 0, parts: {} }, ticks: 0, seen: {},
+    budget: { ...BUDGET_DEFAULT }, ords: {},
   };
   generateMap(s);
   say(s, 'Willkommen in ' + name + '! Zonen anlegen, Straße und Strom nicht vergessen.', 'info');
@@ -369,6 +371,73 @@ export function undo(s) {
 }
 export const canUndo = (s) => !!(s.undo && s.undo.length);
 
+// ---------------------------------------------------------------- Budget je Ressort (Runde 2)
+/** Budget eines Ressorts in Prozent; fehlt der Wert (alter Stand), gilt 100 %. */
+export function budgetPct(s, key) {
+  const v = s.budget ? s.budget[key] : undefined;
+  return typeof v === 'number' && Number.isFinite(v) ? Math.max(BUDGET_MIN, Math.min(BUDGET_MAX, v)) : 100;
+}
+// Faktoren je Ressort; budgetFx(s) aktualisiert sie vor jeder Auswertung (keine Allokation)
+const BCOV = { police: 1, fire: 1, health: 1, edu: 1 };           // Abdeckungsstärke beim Stempeln: min(1.1, b/100)
+const BUP = { police: 1, fire: 1, health: 1, edu: 1, roads: 1 };  // Unterhaltsfaktor: b/100
+let roadMul = 1;                                                   // Verkehrsbelastung bei knappen Straßen
+function budgetFx(s) {
+  for (const k of BUDGET_RES) {
+    const p = budgetPct(s, k) / 100;
+    BUP[k] = p;
+    if (k !== 'roads') BCOV[k] = Math.min(BUDGET_COVER_MAX, p);
+  }
+  const rb = budgetPct(s, 'roads');
+  roadMul = rb < BUDGET_ROAD_MIN ? 1 + (BUDGET_ROAD_MIN - rb) / 100 : 1;
+}
+/** Setzt das Budget eines Ressorts (0–120 %, auf 10er-Schritte gerundet). Gibt den neuen Wert zurück oder false. */
+export function setBudget(s, key, v) {
+  if (!BUDGET_RES.includes(key)) return false;
+  const x = Number(v); if (!Number.isFinite(x)) return false;
+  const val = Math.max(BUDGET_MIN, Math.min(BUDGET_MAX, Math.round(x / BUDGET_STEP) * BUDGET_STEP));
+  s.budget = { ...BUDGET_DEFAULT, ...(s.budget || {}) };
+  s.budget[key] = val; s.dirty = true;
+  return val;
+}
+
+// ---------------------------------------------------------------- Verordnungen (Runde 2)
+const ORD_BY_ID = Object.fromEntries(ORDINANCES.map((o) => [o.id, o]));
+const FX_DEF = {
+  traffic: 1, crime: 1, pollution: 1, metro: 1, tourism: 1, fraportTour: 1, healthPart: 1, bankTax: 1,
+  happy: 0, value: 0, demandR: 0, demandC: 0, demandI: 0, demandB: 0, cost: 0,
+};
+const FX = { ...FX_DEF }; // aufsummierte Wirkung der aktiven Verordnungen (wird je Aufruf neu gesetzt)
+/** Summiert die Wirkung aktiver Verordnungen in FX (Standardwerte: alles neutral). Gibt FX zurück, nicht speichern. */
+function ordFx(s) {
+  Object.assign(FX, FX_DEF);
+  const ords = s.ords; if (!ords) return FX;
+  const pop = s.stats ? s.stats.pop : 0;
+  for (const o of ORDINANCES) {
+    if (!ords[o.id] || (o.needs && !countType(s, o.needs))) continue; // Voraussetzung fehlt: wirkungslos und kostenfrei
+    FX.cost += o.cost + (o.costPerPop || 0) * pop;
+    if (o.mul) for (const k in o.mul) FX[k] *= o.mul[k];
+    if (o.add) for (const k in o.add) FX[k] += o.add[k];
+  }
+  return FX;
+}
+/** Sperrgrund einer Verordnung: null (verfügbar), { pop } (ab X Einwohner) oder { build } (Gebäude fehlt). */
+export function ordBlock(s, id) {
+  const o = ORD_BY_ID[id]; if (!o) return { pop: Infinity };
+  const pop = s.stats ? s.stats.pop : 0, peak = s.peakPop || pop;
+  if (Math.max(pop, peak * 0.9) < o.unlock) return { pop: o.unlock };
+  if (o.needs && !countType(s, o.needs)) return { build: o.needs };
+  return null;
+}
+/** Schaltet eine Verordnung um. Gibt den neuen Zustand zurück (true = an); gesperrt → false, bleibt aus. */
+export function toggleOrd(s, id) {
+  if (!ORD_BY_ID[id]) return false;
+  if (!s.ords) s.ords = {};
+  if (s.ords[id]) { delete s.ords[id]; s.dirty = true; return false; }
+  if (ordBlock(s, id)) return false;
+  s.ords[id] = true; s.dirty = true;
+  return true;
+}
+
 // ---------------------------------------------------------------- Karten (Abdeckung, Verschmutzung, Verkehr ...)
 const mk = () => new Float32Array(NN);
 function stamp(map, cx, cy, r, v, max = false) {
@@ -390,6 +459,7 @@ const hasRoadNear = (s, x, y) => {
 
 /** Berechnet alle abgeleiteten Karten und Kennzahlen. */
 export function refresh(s) {
+  budgetFx(s); ordFx(s);
   const m = s.maps = { power: mk(), police: mk(), fire: mk(), health: mk(), edu: mk(), park: mk(), metro: mk(), pol: mk(), crime: mk(), value: mk(), traffic: mk(), happy: mk() };
   let cap = 0, load = 0;
   const bcen = (b) => [b.x + b.w / 2, b.y + b.h / 2];
@@ -397,12 +467,12 @@ export function refresh(s) {
     const d = BUILD[b.type]; const [cx, cy] = bcen(b);
     switch (d.kind) {
       case 'power': stamp(m.power, cx, cy, d.r, 1, true); cap += d.cap; stamp(m.pol, cx, cy, 7, d.pol * 1.4); break;
-      case 'police': stamp(m.police, cx, cy, d.r, 1, true); break;
-      case 'fire': stamp(m.fire, cx, cy, d.r, 1, true); break;
-      case 'health': stamp(m.health, cx, cy, d.r, 1, true); break;
-      case 'edu': stamp(m.edu, cx, cy, d.r, d.lvl === 2 ? 1 : 0.6, true); break;
+      case 'police': stamp(m.police, cx, cy, d.r, BCOV.police, true); break;
+      case 'fire': stamp(m.fire, cx, cy, d.r, BCOV.fire, true); break;
+      case 'health': stamp(m.health, cx, cy, d.r, BCOV.health, true); break;
+      case 'edu': stamp(m.edu, cx, cy, d.r, (d.lvl === 2 ? 1 : 0.6) * BCOV.edu, true); break;
       case 'park': stamp(m.park, cx, cy, d.r, 1, true); break;
-      case 'metro': stamp(m.metro, cx, cy, d.r, 1, true); break;
+      case 'metro': stamp(m.metro, cx, cy, d.r, FX.metro, true); break;
       case 'happy': stamp(m.park, cx, cy, d.r, d.happy > 0 ? 1 : 0, true); stamp(m.happy, cx, cy, d.r, d.happy, false); if (d.pol) stamp(m.pol, cx, cy, 6, d.pol); break;
     }
     if (d.kind !== 'power' && d.kind !== 'dike') load += 2;
@@ -440,9 +510,9 @@ export function refresh(s) {
   }
   for (const b of s.bld) { const [cx, cy] = bcen(b); const bk = BUILD[b.type].kind; if (bk === 'power' || bk === 'happy' || bk === 'dike') continue; stamp(m.crime, cx, cy, 3, 2); }
   // Polizei senkt Kriminalität
-  for (let i = 0; i < NN; i++) m.crime[i] = Math.max(0, Math.min(100, m.crime[i] * (1 - 0.85 * m.police[i]) * 1.5));
+  for (let i = 0; i < NN; i++) m.crime[i] = Math.max(0, Math.min(100, m.crime[i] * (1 - 0.85 * m.police[i]) * 1.5 * FX.crime));
   for (let i = 0; i < NN; i++) {
-    m.pol[i] = Math.min(100, m.pol[i] * 1.0);
+    m.pol[i] = Math.min(100, m.pol[i] * FX.pollution);
     if (s.terrain[i] === T_TREES) m.pol[i] *= 0.7;
   }
 
@@ -473,7 +543,8 @@ export function refresh(s) {
     }
   }
   let tSum = 0, cSum = 0;
-  for (const i of roads) { const c = m.traffic[i] / 55; m.traffic[i] = Math.min(3, c); tSum += m.traffic[i]; if (c > 1) cSum++; }
+  const tmul = roadMul * FX.traffic;
+  for (const i of roads) { const c = m.traffic[i] / 55 * tmul; m.traffic[i] = Math.min(3, c); tSum += m.traffic[i]; if (c > 1) cSum++; }
   const cong = roads.length ? tSum / roads.length : 0;
 
   // Grundwert
@@ -489,6 +560,7 @@ export function refresh(s) {
     let v = 34 + (nearW ? 12 : 0) + Math.min(18, near * 0.45) + m.park[i] * 12 + m.police[i] * 5 + m.fire[i] * 4 + m.health[i] * 6 + m.edu[i] * 8 + m.happy[i] * 3 + m.metro[i] * 6
       - m.pol[i] * 0.4 - m.crime[i] * 0.2;
     if (s.road[i]) v -= Math.min(10, m.traffic[i] * 5);
+    v += FX.value;
     m.value[i] = Math.max(0, Math.min(100, v));
   }
 
@@ -510,8 +582,9 @@ export function refresh(s) {
   const parts = {
     tax: -Math.max(0, avgTax - 9) * 2.2 + Math.max(0, 9 - avgTax) * 0.8,
     crime: -f(crimeSum) * 0.35, pol: -f(polSum) * 0.3, traffic: -cong * 14,
-    health: 8 * f(covHealth), edu: 6 * f(covEdu), police: 6 * f(covPolice), fire: 4 * f(covFire), park: 9 * f(covPark),
+    health: 8 * f(covHealth) * FX.healthPart, edu: 6 * f(covEdu), police: 6 * f(covPolice), fire: 4 * f(covFire), park: 9 * f(covPark),
     landmark: Math.min(12, landmark * 1.4), jobs: -unemp * 25, power: ratio < 1 && lots ? -(1 - ratio) * 30 : 0,
+    ords: FX.happy,
   };
   const happy = Math.max(0, Math.min(100, 66 + Object.values(parts).reduce((a, b) => a + b, 0)));
   s.stats = {
@@ -526,15 +599,16 @@ export function refresh(s) {
 // ---------------------------------------------------------------- Nachfrage
 function demandStep(s) {
   const st = s.stats;
+  ordFx(s);
   const workers = st.capR * 0.5; // Arbeitskräfte bei voller Belegung
   const jobs = st.jobs;
   const taxPen = (r) => (r - 9) * 0.045;
   const hap = (st.happy - 55) / 90;
   const smooth = (a, b) => a + (b - a) * 0.35;
-  const dr = 0.3 + 1.3 * (jobs - workers) / (jobs + workers + 30) + hap - taxPen(s.rates.r) - (st.capR === 0 ? 0 : 0);
-  const di = 0.35 + 1.1 * (workers - jobs) / (workers + jobs + 30) - taxPen(s.rates.i) - st.pollution / 160;
-  const dc = 0.15 + 1.4 * (st.pop * 0.28 - st.jobsC) / (st.pop * 0.28 + st.jobsC + 40) - taxPen(s.rates.c) + (st.jobsI > 0 ? 0.1 : 0);
-  const db = st.pop < 2500 ? -0.2 : Math.min(1, (st.pop - 2500) / 6000 + 0.2) - taxPen(s.rates.c) - 0.35 * (1 - Math.min(1, st.covEdu * 1.5)) + (st.jobsB * 2 < st.capR * 0.5 ? 0.25 : -0.15);
+  const dr = 0.3 + 1.3 * (jobs - workers) / (jobs + workers + 30) + hap - taxPen(s.rates.r) - (st.capR === 0 ? 0 : 0) + FX.demandR;
+  const di = 0.35 + 1.1 * (workers - jobs) / (workers + jobs + 30) - taxPen(s.rates.i) - st.pollution / 160 + FX.demandI;
+  const dc = 0.15 + 1.4 * (st.pop * 0.28 - st.jobsC) / (st.pop * 0.28 + st.jobsC + 40) - taxPen(s.rates.c) + (st.jobsI > 0 ? 0.1 : 0) + FX.demandC;
+  const db = st.pop < 2500 ? -0.2 : Math.min(1, (st.pop - 2500) / 6000 + 0.2) - taxPen(s.rates.c) - 0.35 * (1 - Math.min(1, st.covEdu * 1.5)) + (st.jobsB * 2 < st.capR * 0.5 ? 0.25 : -0.15) + FX.demandB;
   const clamp = (v) => Math.max(-1, Math.min(1, v));
   s.demand = { r: smooth(s.demand.r, clamp(dr)), c: smooth(s.demand.c, clamp(dc)), i: smooth(s.demand.i, clamp(di)), b: smooth(s.demand.b, clamp(db)) };
 }
@@ -562,18 +636,30 @@ function growStep(s) {
 // ---------------------------------------------------------------- Finanzen
 function financeStep(s) {
   const st = s.stats; const r = s.rates;
+  budgetFx(s); ordFx(s);
   const tR = st.pop * 0.085 * r.r * (0.7 + st.value / 120);
   const tC = st.jobsC * 0.11 * r.c * (0.7 + st.value / 120);
   const tI = st.jobsI * 0.1 * r.i;
-  const tB = st.jobsB * 0.28 * r.c * (0.7 + st.value / 100);
+  const tB = st.jobsB * 0.28 * r.c * (0.7 + st.value / 100) * FX.bankTax;
   let tour = 0, up = 0;
-  for (const b of s.bld) { const d = BUILD[b.type]; up += d.up; if (d.tour) tour += d.tour * (0.5 + st.happy / 200); }
-  const roads = st.roads * ROAD_UPKEEP;
+  const ur = { police: 0, fire: 0, health: 0, edu: 0 }; // Unterhalt je Ressort (schon mit Budget)
+  for (const b of s.bld) {
+    const d = BUILD[b.type];
+    let u = d.up;
+    if (d.kind in ur) { u *= BUP[d.kind]; ur[d.kind] += u; }
+    up += u;
+    if (d.tour) { let t = d.tour * (0.5 + st.happy / 200) * FX.tourism; if (b.type === 'fraport') t *= FX.fraportTour; tour += t; }
+  }
+  const roads = st.roads * ROAD_UPKEEP * BUP.roads;
   const interest = s.loan * 0.004;
+  const ordCost = FX.cost;
   const inc = tR + tC + tI + tB + tour;
-  const exp = up + roads + interest;
+  const exp = up + roads + interest + ordCost;
   s.money += inc - exp;
-  s.fin = { inc, exp, net: inc - exp, parts: { tR, tC, tI, tB, tour, up, roads, interest } };
+  s.fin = {
+    inc, exp, net: inc - exp,
+    parts: { tR, tC, tI, tB, tour, up, roads, interest, ordCost, upPolice: ur.police, upFire: ur.fire, upHealth: ur.health, upEdu: ur.edu },
+  };
 }
 
 // ---------------------------------------------------------------- Katastrophen

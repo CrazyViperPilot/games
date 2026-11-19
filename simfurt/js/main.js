@@ -7,12 +7,15 @@ import {
 import { Renderer } from './render.js';
 import { saveSlot, loadSlot, listSlots, deleteSlot, SLOTS, snapshot, exportFile, importFile, storageInfo, persist } from './save.js';
 import { sound } from './sound.js';
+import { MiniMap } from './minimap.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.round(n).toLocaleString('de-DE');
 const eur = (n) => fmt(n) + ' €';
 const cv = $('cv');
 const R = new Renderer(cv);
+const mini = new MiniMap($('miniCv'), R);   // Minikarte oben links; Sprung setzt needDraw
+mini.onJump = () => { needDraw = true; };
 
 let S = null;                 // aktueller Spielstand
 let slot = 0;                 // aktiver Speicherplatz (0 = keiner)
@@ -250,6 +253,7 @@ function commitPaint() {
   if (stopped) { toast('Das Geld reicht nicht weiter.'); alarm(); }
   else if (n) toast(`${n} Kacheln · ${eur(total)}`, 1400);
   if (S.dirty) { refresh(S); hud(); }
+  mini.draw(S, true);
   if (n) { changed = true; sound.play(tool.id === 'bulldoze' ? 'bulldoze' : 'click'); if (cat) renderItems(); }
 }
 function commitGhost(e) {
@@ -258,7 +262,7 @@ function commitGhost(e) {
   const r = placeBuilding(S, g.key, g.x, g.y);
   if (!r.ok) { popUndo(S); toast(r.why); if (r.why === 'Zu wenig Geld') alarm(); return; }
   endUndo(S);
-  refresh(S); hud(); changed = true; sound.play('build'); if (cat) renderItems();
+  refresh(S); hud(); changed = true; sound.play('build'); if (cat) renderItems(); mini.draw(S, true);
   if (BUILD[g.key].unique) { setTool('hand'); toast(`${BUILD[g.key].name} eröffnet!`); }
 }
 /** Rückgängig (Werkzeug-Klick oder Taste): stellt die letzte Bauaktion wieder her. Das Werkzeug bleibt. */
@@ -267,7 +271,7 @@ function undoNow() {
   const ok = undo(S);
   if (ok) changed = true;
   toast(ok ? 'Rückgängig gemacht' : 'Nichts rückgängig zu machen', 1600);
-  lastHud = ''; hud(); if (cat) renderItems(); needDraw = true;
+  lastHud = ''; hud(); if (cat) renderItems(); needDraw = true; mini.draw(S, true);
 }
 function queryTile(x, y) {
   pick = [x, y]; needDraw = true;
@@ -551,11 +555,12 @@ function frame(now) {
     stepCars(dt);
     ui.time = now; ui.overlay = overlay; ui.ghost = ghost; ui.sel = sel; ui.pick = pick; ui.hover = hover;
     R.draw(S, ui);
+    mini.draw(S);
   }
   requestAnimationFrame(frame);
 }
 
-function fit() { R.resize(); layoutFab(); needDraw = true; drawCharts(); }
+function fit() { R.resize(); mini.resize(); layoutFab(); needDraw = true; drawCharts(); }
 window.addEventListener('resize', fit);
 document.addEventListener('visibilitychange', () => { if (document.hidden) saveOnLeave(); });
 window.addEventListener('pagehide', saveOnLeave);

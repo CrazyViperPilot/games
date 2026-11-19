@@ -49,6 +49,35 @@ export const BUILD = {
   fraport:{ name: 'Flughafen Fraport', cat: 'land', w: 5, h: 3, cost: 90000, up: 1400, kind: 'happy', r: 14, happy: -2, tour: 3000, unique: 1, icon: '✈', color: '#c3c9cf', unlock: 50000, desc: 'Drehkreuz Europas. Lärm, aber Milliarden.' },
 };
 
+// ---------------------------------------------------------------- Budget je Ressort (Prozent, Regler 0–120 in 10er-Schritten)
+/** Ressorts mit Regler. police/fire/health/edu wirken über die Gebäude-kind gleichen Namens, roads auf Straßen. */
+export const BUDGET_RES = ['police', 'fire', 'health', 'edu', 'roads'];
+export const BUDGET_NAMES = { police: 'Polizei', fire: 'Feuerwehr', health: 'Gesundheit', edu: 'Bildung', roads: 'Straßen' };
+export const BUDGET_DEFAULT = { police: 100, fire: 100, health: 100, edu: 100, roads: 100 };
+export const BUDGET_MIN = 0, BUDGET_MAX = 120, BUDGET_STEP = 10;
+/** Abdeckungsstärke beim Stempeln: min(COVER_MAX, b/100). */
+export const BUDGET_COVER_MAX = 1.1;
+/** Straßen unter diesem Budget (%): Verkehrsbelastung × (1 + (ROAD_MIN − b)/100). */
+export const BUDGET_ROAD_MIN = 60;
+
+// ---------------------------------------------------------------- Verordnungen (Ratsbeschlüsse, ein/aus, kosten monatlich)
+/**
+ * id, name, desc; cost (€/Monat), costPerPop (€/Monat je Einwohner), unlock (Einwohner), needs (Gebäudetyp, optional).
+ * mul: Faktoren (multiplikativ, Standard 1), add: Summanden (Standard 0). Schlüssel: traffic, crime, pollution, metro,
+ * tourism, fraportTour, healthPart, bankTax (mul); happy, value, demandR, demandC, demandI, demandB (add).
+ */
+export const ORDINANCES = [
+  { id: 'tempo30', name: 'Tempo 30', desc: 'Innenstadt langsamer, leiser und sicherer. Weniger Stau.', cost: 300, costPerPop: 0, unlock: 0, mul: { traffic: 0.9 }, add: { happy: 1, demandC: -0.03 } },
+  { id: 'oepnv', name: 'Gratis-ÖPNV', desc: 'Bus und Bahn kostenlos: die U-Bahn wirkt stärker. Kostet je Einwohner.', cost: 0, costPerPop: 0.25, unlock: 1500, mul: { metro: 1.5 } },
+  { id: 'rauch', name: 'Rauchverbot', desc: 'Gesündere Luft in Lokalen und Büros. Gesundheit steigt, Gewerbe zieht etwas weniger an.', cost: 200, costPerPop: 0, unlock: 800, mul: { healthPart: 1.2 }, add: { demandC: -0.03 } },
+  { id: 'ebbelwei', name: 'Ebbelwei-Fest', desc: 'Großes Fest am Main: mehr Tourismus und gute Laune, dafür etwas mehr Trubel.', cost: 500, costPerPop: 0, unlock: 1000, mul: { tourism: 1.15, crime: 1.05 }, add: { happy: 2 } },
+  { id: 'wache', name: 'Nachbarschaftswache', desc: 'Freiwillige patrouillieren in den Vierteln. Weniger Kriminalität.', cost: 350, costPerPop: 0, unlock: 1000, mul: { crime: 0.9 } },
+  { id: 'recycling', name: 'Recyclingpflicht', desc: 'Müll wird getrennt gesammelt. Weniger Dreck. Kostet je Einwohner.', cost: 150, costPerPop: 0.1, unlock: 1200, mul: { pollution: 0.9 } },
+  { id: 'nachtflug', name: 'Nachtflugverbot', desc: 'Keine Starts und Landungen nachts: ruhiger, dafür weniger Flug-Tourismus. Braucht den Flughafen.', cost: 0, costPerPop: 0, unlock: 50000, needs: 'fraport', mul: { fraportTour: 0.8 }, add: { happy: 3 } },
+  { id: 'gruen', name: 'Grüne Dächer', desc: 'Begrünte Dächer filtern die Luft und werten die Viertel auf. Teuer.', cost: 1200, costPerPop: 0, unlock: 4000, mul: { pollution: 0.95 }, add: { value: 2 } },
+  { id: 'bankrabatt', name: 'Gewerbesteuer-Rabatt für Banken', desc: 'Banken zahlen 15 % weniger Steuern und kommen eher nach Frankfurt.', cost: 0, costPerPop: 0, unlock: 3000, mul: { bankTax: 0.85 }, add: { demandB: 0.08 } },
+];
+
 export const CATS = [
   { id: 'road', name: 'Straße', icon: '🛣' },
   { id: 'zone', name: 'Zonen', icon: '🏘' },

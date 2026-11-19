@@ -1,7 +1,7 @@
 // Tests für Simfurt: node simfurt/test/sim.test.js
 import assert from 'node:assert';
-import { N, T_WATER, T_TREES, BUILD } from '../js/data.js';
-import { newCity, tick, applyTool, placeBuilding, canPlace, refresh, unlocked, idx, takeLoan, repayLoan, pushUndo, endUndo, undo, canUndo, flood, tileInfo, UNDO_MAX } from '../js/sim.js';
+import { N, T_WATER, T_TREES, BUILD, ORDINANCES } from '../js/data.js';
+import { newCity, tick, applyTool, placeBuilding, canPlace, refresh, unlocked, idx, takeLoan, repayLoan, pushUndo, endUndo, undo, canUndo, flood, tileInfo, UNDO_MAX, setBudget, budgetPct, toggleOrd, ordBlock } from '../js/sim.js';
 import { performance } from 'node:perf_hooks';
 import { serialize, deserialize } from '../js/save.js';
 import { buildCity } from './bot.mjs';
