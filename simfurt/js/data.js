@@ -32,6 +32,7 @@ export const BUILD = {
   park:   { name: 'Park', cat: 'service', w: 1, h: 1, cost: 70, up: 2, kind: 'park', r: 5, icon: '🌳', color: '#3fa04a', unlock: 0, desc: 'Grün macht glücklich und wertet auf.' },
   apple:  { name: 'Äppelwoi-Wirtschaft', cat: 'service', w: 1, h: 1, cost: 450, up: 25, kind: 'park', r: 7, tour: 40, icon: '🍺', color: '#a8452e', unlock: 500, desc: 'Gemütlich in Sachsenhausen. Ebbelwei hebt die Stimmung.' },
   metro:  { name: 'U-Bahn-Station', cat: 'transport', w: 1, h: 1, cost: 700, up: 45, kind: 'metro', r: 8, icon: 'U', color: '#1f6a43', unlock: 1500, desc: 'Entlastet Straßen im Umkreis.' },
+  dike:   { name: 'Deich', cat: 'transport', w: 1, h: 1, cost: 150, up: 2, kind: 'dike', r: 4, icon: '🧱', color: '#6f8f4e', unlock: 0, desc: 'Am Ufer bauen: schützt den Umkreis vor Hochwasser.' },
 
   // Wahrzeichen: je einmal baubar
   roemer: { name: 'Römer', cat: 'land', w: 2, h: 2, cost: 5000, up: 80, kind: 'happy', r: 9, happy: 3, tour: 120, unique: 1, icon: '🏛', color: '#d9c7a0', unlock: 2000, desc: 'Rathaus am Römerberg. Staatstragend schön.' },

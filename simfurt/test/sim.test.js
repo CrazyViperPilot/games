@@ -1,7 +1,7 @@
 // Tests für Simfurt: node simfurt/test/sim.test.js
 import assert from 'node:assert';
 import { N, T_WATER, T_TREES, BUILD } from '../js/data.js';
-import { newCity, tick, applyTool, placeBuilding, canPlace, refresh, unlocked, idx, takeLoan, repayLoan } from '../js/sim.js';
+import { newCity, tick, applyTool, placeBuilding, canPlace, refresh, unlocked, idx, takeLoan, repayLoan, pushUndo, endUndo, undo, canUndo, flood, tileInfo, UNDO_MAX } from '../js/sim.js';
 import { performance } from 'node:perf_hooks';
 import { serialize, deserialize } from '../js/save.js';
 import { buildCity } from './bot.mjs';
@@ -196,6 +196,104 @@ test('Flusslauf: Kartenerzeugung 128×128 bleibt unter 100 ms', () => {
   const t0 = performance.now(); newCity({ seed: 7, size: 128 }); const dt = performance.now() - t0;
   console.log('   Karte 128: ' + dt.toFixed(1) + ' ms');
   assert.ok(dt < 100, dt + ' ms');
+});
+
+// ---------------------------------------------------------------- Rückgängig + Deich (P3)
+test('Rückgängig: Straße und Geld werden zurückgesetzt, Monat und Jahr bleiben', () => {
+  const s = fresh(); const m0 = s.money, mo = s.month, yr = s.year;
+  let land = -1;
+  for (let i = 0; i < N * N && land < 0; i++) if (s.terrain[i] === 0) land = i;
+  assert.ok(!canUndo(s));
+  pushUndo(s);
+  assert.strictEqual(applyTool(s, 'road', land % N, (land / N) | 0), 20);
+  assert.strictEqual(s.road[land], 1); assert.ok(canUndo(s));
+  assert.ok(undo(s));
+  assert.strictEqual(s.road[land], 0); assert.strictEqual(s.money, m0);
+  assert.strictEqual(s.month, mo); assert.strictEqual(s.year, yr);
+  assert.ok(!canUndo(s)); assert.ok(!undo(s));
+});
+
+test('Rückgängig: Gebäude verschwindet, occ ist leer, nextId und Gelände stimmen', () => {
+  const s = fresh(); const nid = s.nextId;
+  let spot = null;
+  for (let y = 2; y < N - 3 && !spot; y++) for (let x = 2; x < N - 3; x++) if (!canPlace(s, 'park', x, y)) { spot = [x, y]; break; }
+  assert.ok(spot);
+  const ter = s.terrain.slice();
+  pushUndo(s);
+  assert.ok(placeBuilding(s, 'park', spot[0], spot[1]).ok);
+  assert.strictEqual(s.bld.length, 1);
+  assert.ok(undo(s));
+  assert.strictEqual(s.bld.length, 0); assert.ok(s.occ.every((v) => v === 0));
+  assert.ok(s.nextId >= nid); assert.deepStrictEqual(s.terrain, ter);
+});
+
+test('Rückgängig: höchstens 10 Schritte, der älteste bleibt bestehen', () => {
+  assert.strictEqual(UNDO_MAX, 10);
+  const s = fresh(); const m0 = s.money; const cells = [];
+  for (let i = 0; i < N * N && cells.length < 12; i++) if (s.terrain[i] === 0 && !s.road[i]) cells.push(i);
+  for (const i of cells) { pushUndo(s); applyTool(s, 'road', i % N, (i / N) | 0); endUndo(s); }
+  let steps = 0;
+  while (undo(s)) steps++;
+  assert.strictEqual(steps, 10);
+  assert.strictEqual(s.money, m0 - 40); assert.strictEqual(s.road[cells[0]] + s.road[cells[1]], 2); assert.strictEqual(s.road[cells[2]], 0);
+  assert.ok(!canUndo(s));
+});
+
+test('Rückgängig: späteres Wachstum und Einnahmen bleiben, nur die Aktion wird erstattet', () => {
+  const s = fresh(); buildCity(s); for (let t = 0; t < 36; t++) tick(s);
+  const pop0 = s.stats.pop;
+  let spot = null;
+  for (let y = 2; y < N - 3 && !spot; y++) for (let x = 2; x < N - 3; x++) if (!canPlace(s, 'park', x, y)) { spot = [x, y]; break; }
+  pushUndo(s); assert.ok(placeBuilding(s, 'park', spot[0], spot[1]).ok); endUndo(s);
+  for (let t = 0; t < 6; t++) tick(s);
+  const m1 = s.money, lv = s.lvl.slice();
+  assert.ok(undo(s));
+  assert.strictEqual(s.money, m1 + BUILD.park.cost);
+  let same = 0; for (let i = 0; i < N * N; i++) if (lv[i] === s.lvl[i]) same++;
+  assert.ok(same > N * N - 4, 'Stufen geändert: ' + (N * N - same)); assert.ok(pop0 > 0);
+});
+
+test('Rückgängig: Abriss eines Gebäudes stellt es wieder her', () => {
+  const s = fresh(); let spot = null;
+  for (let y = 2; y < N - 3 && !spot; y++) for (let x = 2; x < N - 3; x++) if (!canPlace(s, 'police', x, y)) { spot = [x, y]; break; }
+  placeBuilding(s, 'police', spot[0], spot[1]); const m0 = s.money;
+  pushUndo(s); applyTool(s, 'bulldoze', spot[0], spot[1]); endUndo(s);
+  assert.strictEqual(s.bld.length, 0);
+  assert.ok(undo(s)); assert.strictEqual(s.bld.length, 1); assert.ok(s.occ[idx(spot[0], spot[1])]); assert.strictEqual(s.money, m0);
+});
+
+test('Deich: nur an Wasser (4-Nachbarschaft) baubar, sonst „Nur am Wasser“', () => {
+  const s = fresh(); let inland = null, shore = null;
+  for (let y = 1; y < N - 1; y++) for (let x = 1; x < N - 1; x++) {
+    if (s.terrain[idx(x, y)] === T_WATER) continue;
+    const wet = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => s.terrain[idx(x + dx, y + dy)] === T_WATER);
+    if (wet && !shore) shore = [x, y];
+    if (!wet && !inland) inland = [x, y];
+  }
+  assert.ok(shore && inland);
+  assert.strictEqual(canPlace(s, 'dike', inland[0], inland[1]), 'Nur am Wasser');
+  assert.strictEqual(canPlace(s, 'dike', shore[0], shore[1]), '');
+  assert.ok(placeBuilding(s, 'dike', shore[0], shore[1]).ok);
+  assert.strictEqual(tileInfo(s, shore[0], shore[1]).title, 'Deich');
+  refresh(s); assert.strictEqual(s.powerLoad, 0); // Deich verbraucht keinen Strom
+});
+
+test('Deich: Hochwasser trifft Kacheln im Deichradius nicht, außerhalb schon', () => {
+  const s = fresh(5); let shore = null;
+  for (let y = 1; y < N - 1 && !shore; y++) for (let x = 1; x < N - 1; x++) if (!canPlace(s, 'dike', x, y)) { shore = [x, y]; break; }
+  assert.ok(shore);
+  const ctrl = fresh(5); // Kontrolle: gleiche Karte ohne Deich
+  flood(ctrl);
+  assert.ok(placeBuilding(s, 'dike', shore[0], shore[1]).ok);
+  flood(s);
+  const R = 4; let inRadius = 0, wetInRadius = 0, outFlooded = 0;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const d2 = (x - shore[0]) ** 2 + (y - shore[1]) ** 2, i = idx(x, y);
+    if (d2 <= R * R) { inRadius++; assert.strictEqual(s.flood[i], 0, `Kachel ${x},${y} im Deichradius überflutet`); if (ctrl.flood[i]) wetInRadius++; }
+    else if (s.flood[i]) outFlooded++;
+  }
+  assert.ok(inRadius > 0 && wetInRadius > 1, 'Kontrolle: im Radius wäre ohne Deich überflutet worden (' + wetInRadius + ')');
+  assert.ok(outFlooded > 0, 'außerhalb des Radius wird weiterhin überflutet');
 });
 
 console.log(`${n} Tests ok`);

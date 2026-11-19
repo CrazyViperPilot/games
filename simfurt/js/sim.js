@@ -256,6 +256,7 @@ export function applyTool(s, tool, x, y) {
   if (c < 0) return -1;
   if (s.money < c) return -2;
   const i = idx(x, y);
+  if (s.rec) { recTile(s, i); s.rec.cost += c; }
   if (tool === 'road') {
     s.road[i] = 1; s.zone[i] = 0; s.lvl[i] = 0; if (s.terrain[i] === T_TREES) s.terrain[i] = T_GRASS;
   } else if (tool.startsWith('zone')) {
@@ -285,6 +286,16 @@ export function canPlace(s, key, x, y) {
     if (s.occ[i]) return 'Gebäude im Weg';
     if (s.lvl[i] > 0) return 'Bebaute Zone im Weg';
   }
+  // Deich: nur, wenn eine 4-Nachbarkachel des Grundrisses Wasser ist
+  if (d.kind === 'dike') {
+    let shore = false;
+    for (let yy = y; yy < y + d.h && !shore; yy++) for (let xx = x; xx < x + d.w && !shore; xx++) {
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        if (inb(xx + dx, yy + dy) && s.terrain[idx(xx + dx, yy + dy)] === T_WATER) { shore = true; break; }
+      }
+    }
+    if (!shore) return 'Nur am Wasser';
+  }
   return '';
 }
 
@@ -295,6 +306,7 @@ export function placeBuilding(s, key, x, y) {
   if (!unlocked(s, key)) return { ok: false, why: 'Noch gesperrt' };
   if (s.money < d.cost) return { ok: false, why: 'Zu wenig Geld' };
   const b = { id: s.nextId++, type: key, x, y, w: d.w, h: d.h, fire: 0 };
+  if (s.rec) { for (let yy = y; yy < y + d.h; yy++) for (let xx = x; xx < x + d.w; xx++) recTile(s, idx(xx, yy)); s.rec.added.push(b.id); s.rec.cost += d.cost; }
   s.bld.push(b);
   for (let yy = y; yy < y + d.h; yy++) for (let xx = x; xx < x + d.w; xx++) {
     const i = idx(xx, yy);
@@ -308,6 +320,7 @@ export function placeBuilding(s, key, x, y) {
 
 export function removeBuilding(s, b) {
   if (!b) return;
+  if (s.rec && !s.rec.added.includes(b.id)) s.rec.removed.push({ ...b });
   for (let yy = b.y; yy < b.y + b.h; yy++) for (let xx = b.x; xx < b.x + b.w; xx++) { const i = idx(xx, yy); s.occ[i] = 0; s.fire[i] = 0; }
   s.bld = s.bld.filter((o) => o !== b);
   s.dirty = true;
@@ -315,6 +328,46 @@ export function removeBuilding(s, b) {
 
 export function takeLoan(s) { if (s.loan >= 50000) return false; s.loan += 10000; s.money += 10000; return true; }
 export function repayLoan(s) { if (s.loan < 10000 || s.money < 10000) return false; s.loan -= 10000; s.money -= 10000; return true; }
+
+// ---------------------------------------------------------------- Rückgängig (nur Bauaktionen; s.undo wird nicht gespeichert)
+// Jede Aktion speichert nur ihre Änderungen (berührte Kacheln, gebaute/abgerissene Gebäude, Kosten).
+// Undo nimmt genau diese Änderungen zurück und erstattet die Kosten – Wachstum und Einnahmen seither bleiben erhalten.
+export const UNDO_MAX = 10;
+const TILE_KEYS = ['terrain', 'road', 'zone', 'lvl', 'vr', 'fire'];
+/** Beginnt die Aufzeichnung einer Bauaktion (bis endUndo, zum nächsten Tick oder zur nächsten Aktion). */
+export function pushUndo(s) {
+  if (!s.undo) s.undo = [];
+  s.rec = { tiles: new Map(), added: [], removed: [], cost: 0 };
+  s.undo.push(s.rec);
+  if (s.undo.length > UNDO_MAX) s.undo.shift();
+}
+export function endUndo(s) { s.rec = null; }
+/** Verwirft die oberste Aufzeichnung (wenn die Aktion doch nichts geändert hat). */
+export function popUndo(s) { if (s.undo && s.undo.length) { if (s.undo[s.undo.length - 1] === s.rec) s.rec = null; s.undo.pop(); } }
+function recTile(s, i) {
+  const r = s.rec; if (!r || r.tiles.has(i)) return;
+  r.tiles.set(i, TILE_KEYS.map((k) => s[k][i]));
+}
+/** Nimmt die letzte Bauaktion zurück. Zeit, Monat und Verlauf bleiben unverändert. true bei Erfolg. */
+export function undo(s) {
+  const r = s.undo && s.undo.pop();
+  if (!r) return false;
+  if (s.rec === r) s.rec = null;
+  for (const id of r.added) { const b = s.bld.find((o) => o.id === id); if (b) removeBuilding(s, b); }
+  for (const [i, v] of r.tiles) { if (s.occ[i]) continue; TILE_KEYS.forEach((k, j) => { s[k][i] = v[j]; }); }
+  for (const b of r.removed) {
+    let free = true;
+    for (let y = b.y; y < b.y + b.h && free; y++) for (let x = b.x; x < b.x + b.w; x++) if (s.occ[idx(x, y)]) { free = false; break; }
+    if (!free) continue;
+    s.bld.push(b);
+    for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) s.occ[idx(x, y)] = b.id;
+  }
+  s.money += r.cost;
+  s.dirty = true;
+  refresh(s);
+  return true;
+}
+export const canUndo = (s) => !!(s.undo && s.undo.length);
 
 // ---------------------------------------------------------------- Karten (Abdeckung, Verschmutzung, Verkehr ...)
 const mk = () => new Float32Array(NN);
@@ -352,7 +405,7 @@ export function refresh(s) {
       case 'metro': stamp(m.metro, cx, cy, d.r, 1, true); break;
       case 'happy': stamp(m.park, cx, cy, d.r, d.happy > 0 ? 1 : 0, true); stamp(m.happy, cx, cy, d.r, d.happy, false); if (d.pol) stamp(m.pol, cx, cy, 6, d.pol); break;
     }
-    if (d.kind !== 'power') load += 2;
+    if (d.kind !== 'power' && d.kind !== 'dike') load += 2;
   }
   // Brownout
   const powered = new Uint8Array(NN);
@@ -385,7 +438,7 @@ export function refresh(s) {
     else if (z === Z_I) jobsI += ZONES[z].jobs[l];
     else jobsB += ZONES[z].jobs[l];
   }
-  for (const b of s.bld) { const [cx, cy] = bcen(b); if (BUILD[b.type].kind === 'power' || BUILD[b.type].kind === 'happy') continue; stamp(m.crime, cx, cy, 3, 2); }
+  for (const b of s.bld) { const [cx, cy] = bcen(b); const bk = BUILD[b.type].kind; if (bk === 'power' || bk === 'happy' || bk === 'dike') continue; stamp(m.crime, cx, cy, 3, 2); }
   // Polizei senkt Kriminalität
   for (let i = 0; i < NN; i++) m.crime[i] = Math.max(0, Math.min(100, m.crime[i] * (1 - 0.85 * m.police[i]) * 1.5));
   for (let i = 0; i < NN; i++) {
@@ -556,19 +609,46 @@ function eventsStep(s) {
   }
   // Hochwasser: Main tritt im Frühjahr über die Ufer
   if (s.month === 1 && st.lots > 30 && rand(s) < 0.08) {
-    let hit = 0;
-    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-      const i = idx(x, y); if (s.terrain[i] === T_WATER) continue;
-      let near = false;
-      for (let dy = -2; dy <= 2 && !near; dy++) for (let dx = -2; dx <= 2; dx++) if (inb(x + dx, y + dy) && s.terrain[idx(x + dx, y + dy)] === T_WATER) { near = true; break; }
-      if (!near) continue;
-      s.flood[i] = 3;
-      if (s.lvl[i] > 0 && rand(s) < 0.4) { s.lvl[i]--; hit++; }
-    }
-    s.dirty = true;
+    const hit = flood(s);
     say(s, 'Hochwasser! Der Main ist über die Ufer getreten' + (hit ? ` – ${hit} Gebäude beschädigt.` : '.'), 'bad');
   }
   for (let i = 0; i < NN; i++) if (s.flood[i]) s.flood[i]--;
+}
+
+/** Schutzmaske: alle Kacheln im Radius eines Deichs (Euklid, Kachelmitte zu Kachelmitte; die Deichkachel zählt mit). */
+function dikeMask(s) {
+  const prot = new Uint8Array(NN);
+  for (const b of s.bld) {
+    const d = BUILD[b.type];
+    if (!d || d.kind !== 'dike') continue;
+    const r = d.r, r2 = r * r;
+    for (let y = Math.max(0, b.y - r); y <= Math.min(N - 1, b.y + r); y++) for (let x = Math.max(0, b.x - r); x <= Math.min(N - 1, b.x + r); x++) {
+      const dx = x - b.x, dy = y - b.y;
+      if (dx * dx + dy * dy <= r2) prot[idx(x, y)] = 1;
+    }
+  }
+  return prot;
+}
+
+/**
+ * Hochwasser-Ereignis (ohne Zufall und Monatsprüfung, die steuert eventsStep): Ufernahe Kacheln
+ * (Wasser innerhalb 2 Kacheln) werden überflutet, Gebäudestufen können beschädigt werden.
+ * Kacheln im Deichradius bleiben trocken. Gibt die Zahl beschädigter Gebäude zurück.
+ */
+export function flood(s) {
+  const prot = dikeMask(s);
+  let hit = 0;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const i = idx(x, y);
+    if (s.terrain[i] === T_WATER || prot[i]) continue;
+    let near = false;
+    for (let dy = -2; dy <= 2 && !near; dy++) for (let dx = -2; dx <= 2; dx++) if (inb(x + dx, y + dy) && s.terrain[idx(x + dx, y + dy)] === T_WATER) { near = true; break; }
+    if (!near) continue;
+    s.flood[i] = 3;
+    if (s.lvl[i] > 0 && rand(s) < 0.4) { s.lvl[i]--; hit++; }
+  }
+  s.dirty = true;
+  return hit;
 }
 
 // ---------------------------------------------------------------- Berater & Meilensteine
@@ -596,6 +676,7 @@ function adviceStep(s) {
 
 // ---------------------------------------------------------------- Tick
 export function tick(s) {
+  s.rec = null;
   s.ticks++;
   s.month++;
   if (s.month >= 12) {

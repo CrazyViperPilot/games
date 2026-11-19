@@ -26,8 +26,8 @@ Wohnen (R), Gewerbe (C), Industrie (I), **Bankenviertel (B, ab 3.000 Einw.)** mi
 - **Zufriedenheit** (0–100) aus Steuern, Kriminalität, Umwelt, Verkehr, Diensten, Parks, Wahrzeichen, Arbeitslosigkeit, Strom; steuert die Belegung (Einwohner = Kapazität × Belegung).
 - **Finanzen**: Steuer je Zone (3 Regler), Tourismus der Wahrzeichen, Unterhalt (Gebäude, Straßen), Kredit in 10.000-€-Schritten (bis 50.000 €, 0,4 %/Monat).
 - **Katastrophen** (abschaltbar): Brände (breiten sich aus, Feuerwehr löscht), Hochwasser des Mains im Februar. **Deiche** (am Ufer, Radius 4) schützen vor Hochwasser.
-- **Rückgängig** (Werkzeug ↶, Strg+Z / U): bis zu 10 Bauaktionen (Malen, Gebäude) inkl. Kosten; die Zeit läuft weiter.
-- **Verlauf** im Rat: Diagramme für Einwohner, Kasse und Zufriedenheit (letzte 10 Jahre, monatlich).
+- **Rückgängig** (Werkzeug ↶, Strg+Z / U): bis zu 10 Bauaktionen (Malen, Abriss, Gebäude); nimmt nur die Änderungen der Aktion zurück und erstattet die Kosten, Wachstum seither bleibt.
+- **Verlauf** im Rat: Diagramme für Einwohner, Kasse und Zufriedenheit (letzte 10 Jahre, ein Wert je Jahreswechsel).
 - **Ton** (abschaltbar im Menü): kleine WebAudio-Klänge ohne Audiodateien (`js/sound.js`).
 - **Berater** (Ticker) und **Meilensteine** (500 Dorf … 100.000 Mainhattan).
 

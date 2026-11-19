@@ -230,7 +230,7 @@ function pad(g, o, w, h, col = '#a9b09a') { flat(g, o, 0, 0, w, h, col); flat(g,
 
 export function buildingSprite(key) {
   const d = BUILD[key];
-  const hmax = { fraport: 90, ctower: 260, maintower: 230, mtower: 230, dom: 190, uni: 100, gas: 110, wind: 120, hbf: 90 }[key] || 100;
+  const hmax = { fraport: 90, ctower: 260, maintower: 230, mtower: 230, dom: 190, uni: 100, gas: 110, wind: 120, hbf: 90, dike: 20 }[key] || 100;
   return sprite('b_' + key, d.w, d.h, hmax, (g, o) => {
     const w = d.w, h = d.h;
     switch (key) {
@@ -272,6 +272,13 @@ export function buildingSprite(key) {
         prism(g, o, 0.18, 0.2, 0.8, 0.8, 0, 14, '#e8d9b8', { win: { c: 3, rows: 1, lit: 0.8, seed: 3 } });
         gable(g, o, 0.14, 0.16, 0.84, 0.84, 14, 12, '#8d3a2a', 'u');
         g.fillStyle = '#6b4a2a'; g.fillRect(X(o, 0.2, 0.95) - 3, Y(o, 0.2, 0.95) - 8, 6, 8); icon(g, o, 0.5, 0.95, 20, '🍏', 11); break;
+      }
+      case 'dike': {
+        // Ufergras, darauf ein niedriger grüner Erdwall; die Steinkante liegt auf der Flussseite (+v)
+        flat(g, o, 0, 0, 1, 1, '#6aa04c');
+        prism(g, o, 0.03, 0.2, 0.97, 0.7, 0, 6, '#6f8f4e', { top: '#8fb066', l: 0.9, r: 0.68 });
+        prism(g, o, 0.03, 0.64, 0.97, 0.74, 0, 4, '#a59f92', { top: '#cbc5b7', l: 0.95, r: 0.75 });
+        break;
       }
       case 'metro': {
         flat(g, o, 0, 0, 1, 1, '#9fa596');

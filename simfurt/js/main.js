@@ -2,6 +2,7 @@
 import { N, MAP_SIZES, BUILD, CATS, ZONES, OVERLAYS, MONTHS, Z_R, Z_C, Z_I, Z_B, ZONE_UNLOCK, CITY_NAMES, START_MONEY } from './data.js';
 import {
   newCity, tick, refresh, applyTool, toolCost, placeBuilding, canPlace, unlocked, unlockNeed, tileInfo, takeLoan, repayLoan, inb, idx, roadAt, dateStr, say,
+  pushUndo, popUndo, endUndo, undo, canUndo,
 } from './sim.js';
 import { Renderer } from './render.js';
 import { saveSlot, loadSlot, listSlots, deleteSlot, SLOTS, snapshot, exportFile, importFile, storageInfo, persist } from './save.js';
@@ -35,6 +36,7 @@ const TOOLS = {
   hand: { name: 'Hand', icon: '✋', cat: 'tool', cost: 0, desc: 'Karte verschieben, Tippen = Info.' },
   query: { name: 'Info', icon: '🔍', cat: 'tool', cost: 0, desc: 'Kachel antippen.' },
   bulldoze: { name: 'Abriss', icon: '🚜', cat: 'tool', cost: 4, desc: 'Reißt ab, was du überstreichst.' },
+  undo: { name: 'Rückgängig', icon: '↶', cat: 'tool', cost: 0, desc: 'Macht die letzte Bauaktion rückgängig (Strg+Z / U).' },
 };
 for (const [k, b] of Object.entries(BUILD)) TOOLS[k] = { name: b.name, icon: b.icon, cat: b.cat, cost: b.cost, desc: b.desc, build: true };
 const zoneOf = (id) => (id.startsWith('zone') ? Number(id.slice(4)) : 0);
@@ -48,7 +50,12 @@ function renderItems() {
   box.hidden = false;
   const ids = Object.keys(TOOLS).filter((k) => TOOLS[k].cat === cat);
   box.innerHTML = ids.map((k) => {
-    const t = TOOLS[k]; const need = TOOLS[k].build ? unlockNeed(k) : ZONE_UNLOCK[zoneOf(k)] ?? 0;
+    const t = TOOLS[k];
+    if (k === 'undo') { // kein Werkzeug, sondern Aktion: zeigt, wie viele Schritte es gibt
+      const n = S && canUndo(S) ? S.undo.length : 0;
+      return `<button class="it ${n ? '' : 'lock'}" data-t="${k}"><span class="ic">${t.icon}</span><b>${t.name}</b><span>${n ? n + ' Schritt' + (n > 1 ? 'e' : '') : 'nichts'}</span></button>`;
+    }
+    const need = TOOLS[k].build ? unlockNeed(k) : ZONE_UNLOCK[zoneOf(k)] ?? 0;
     const locked = !unlocked(S, TOOLS[k].build ? k : zoneOf(k));
     return `<button class="it ${tool.id === k ? 'sel' : ''} ${locked ? 'lock' : ''}" data-t="${k}"><span class="ic">${t.icon}</span><b>${t.name}</b><span>${locked ? '🔒 ab ' + fmt(need) + ' Einw.' : t.cost ? eur(t.cost) + (t.build ? '' : ' / Kachel') : 'gratis'}</span></button>`;
   }).join('');
@@ -61,6 +68,7 @@ $('cats').addEventListener('click', (e) => {
 $('items').addEventListener('click', (e) => {
   const b = e.target.closest('.it'); if (!b) return;
   const id = b.dataset.t;
+  if (id === 'undo') { undoNow(); return; } // Aktion: wechselt das Werkzeug nicht
   const key = TOOLS[id].build ? id : zoneOf(id) ? zoneOf(id) : null;
   if (key !== null && !unlocked(S, key)) { toast(`Gesperrt bis ${fmt(unlockNeed(TOOLS[id].build ? id : 0) || ZONE_UNLOCK[zoneOf(id)])} Einwohner`); return; }
   setTool(id);
@@ -228,24 +236,38 @@ cv.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse' && !p
 cv.addEventListener('wheel', (e) => { e.preventDefault(); const r = cv.getBoundingClientRect(); zoomAt(e.clientX - r.left, e.clientY - r.top, Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
 
 function commitPaint() {
+  // Schnappschuss nur, wenn mindestens eine Kachel gültig ist
+  const pushed = paint.cells.some(([x, y]) => toolCost(S, tool.id, x, y) >= 0);
+  if (pushed) pushUndo(S);
   let total = 0, n = 0, stopped = false;
   for (const [x, y] of paint.cells) {
     const r = applyTool(S, tool.id, x, y);
     if (r === -2) { stopped = true; break; }
     if (r >= 0) { total += r; n++; }
   }
+  if (pushed && !n) popUndo(S); else endUndo(S);
   hideTip();
   if (stopped) { toast('Das Geld reicht nicht weiter.'); alarm(); }
   else if (n) toast(`${n} Kacheln · ${eur(total)}`, 1400);
   if (S.dirty) { refresh(S); hud(); }
-  if (n) { changed = true; sound.play(tool.id === 'bulldoze' ? 'bulldoze' : 'click'); }
+  if (n) { changed = true; sound.play(tool.id === 'bulldoze' ? 'bulldoze' : 'click'); if (cat) renderItems(); }
 }
 function commitGhost(e) {
   const g = ghost; if (!g.ok) { if (S.money < BUILD[g.key].cost) { toast('Zu wenig Geld'); alarm(); } return; }
+  pushUndo(S);
   const r = placeBuilding(S, g.key, g.x, g.y);
-  if (!r.ok) { toast(r.why); if (r.why === 'Zu wenig Geld') alarm(); return; }
-  refresh(S); hud(); changed = true; sound.play('build');
+  if (!r.ok) { popUndo(S); toast(r.why); if (r.why === 'Zu wenig Geld') alarm(); return; }
+  endUndo(S);
+  refresh(S); hud(); changed = true; sound.play('build'); if (cat) renderItems();
   if (BUILD[g.key].unique) { setTool('hand'); toast(`${BUILD[g.key].name} eröffnet!`); }
+}
+/** Rückgängig (Werkzeug-Klick oder Taste): stellt die letzte Bauaktion wieder her. Das Werkzeug bleibt. */
+function undoNow() {
+  if (!S) return;
+  const ok = undo(S);
+  if (ok) changed = true;
+  toast(ok ? 'Rückgängig gemacht' : 'Nichts rückgängig zu machen', 1600);
+  lastHud = ''; hud(); if (cat) renderItems(); needDraw = true;
 }
 function queryTile(x, y) {
   pick = [x, y]; needDraw = true;
@@ -259,6 +281,8 @@ window.addEventListener('keydown', (e) => {
   if (!S || !$('sheet').hidden || e.target.tagName === 'INPUT') return;
   const k = e.key.toLowerCase();
   const step = 60;
+  if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); undoNow(); return; }
+  if (k === 'u' && !e.ctrlKey && !e.metaKey) { undoNow(); return; }
   if (k === ' ' || k === 'p') { speed = speed ? 0 : 1; e.preventDefault(); }
   else if (k === '1') speed = 1; else if (k === '2') speed = 2; else if (k === '3') speed = 3;
   else if (k === 'escape') { setTool('hand'); cat = null; renderCats(); renderItems(); }
@@ -480,7 +504,7 @@ function newGameDialog(n) {
   };
 }
 function startGame(s, n) {
-  S = s; slot = n; S.onMsg = ticker; S.onMilestone = () => { renderItems(); sound.play('milestone'); };
+  S = s; slot = n; S.undo = []; S.onMsg = ticker; S.onMilestone = () => { renderItems(); sound.play('milestone'); };
   closeSheet(); renderCats(); renderItems(); speed = 1; lastHud = ''; hud();
   // Kamera: Mitte der Karte
   R.centerOn(N / 2, N / 2); R.cam.z = Math.min(1, Math.max(0.55, R.w / 560)); R.clampCam();

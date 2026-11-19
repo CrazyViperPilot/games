@@ -13,6 +13,9 @@ Verbindlich: `PRD.md`. Tests: `node simfurt/test/sim.test.js` (muss grün bleibe
 | Karte | Fluss läuft immer West→Ost als Sinuskurve um die Kartenmitte, Seitenarm immer von Norden. |
 | UI | `s.hist` wird aufgezeichnet, aber nirgends angezeigt. Kein Rückgängig. Keine Hochwasser-Abwehr. Kein Ton. |
 
+## Status
+Alle Pakete P1–P5 erledigt (Nov 2026). Abweichung P3: Rückgängig speichert pro Aktion nur die Änderungen (berührte Kacheln, Gebäude, Kosten) statt eines ganzen Kartenschnappschusses – Wachstum und Einnahmen seit der Aktion bleiben erhalten. `s.hist` ist jährlich (Diagramme ab dem 2. Jahreswechsel).
+
 ## Pakete
 
 ### P1 – Speichersystem (Opus) · `js/save.js`, Speicher-Teil von `js/main.js`, vipervocs `simfurt/api.php`
@@ -28,12 +31,12 @@ Verbindlich: `PRD.md`. Tests: `node simfurt/test/sim.test.js` (muss grün bleibe
 Siehe Auftrag im Abschnitt „P2 Details“.
 
 ### P3 – Rückgängig + Deich (Haiku) · `js/sim.js`, `js/data.js`, `js/render.js`, kleine Hooks in `js/main.js`
-- `snapshotUndo(s)` / `undo(s)` in sim.js: hält bis zu 10 Schritte (Kopien von terrain/road/zone/lvl/vr/occ + bld/nextId/money). Nur Bauaktionen (Malen, Gebäude); Monatsticks löschen den Verlauf nicht, aber ein Undo setzt nur Karten/Gebäude/Geld zurück (Zeit läuft weiter).
+- `pushUndo(s)` / `endUndo(s)` / `popUndo(s)` / `undo(s)` / `canUndo(s)` in sim.js: bis zu 10 Aktionen, je Aktion nur die Änderungen + Kosten (Erstattung).
 - Werkzeug „↶ Rückgängig“ in Kategorie Werkzeug + Taste Strg+Z / U.
 - Gebäude `dike` (Deich, 1×1, 150 €, Unterhalt 2, unlock 0, cat `transport`, kind `dike`, r 4): nur an Wasser angrenzend baubar; Kacheln im Radius werden von Hochwasser nicht getroffen. Sprite: niedriger grüner Wall.
 
 ### P4 – Statistik + Ton (Haiku) · `js/main.js`, neu `js/sound.js`, `style.css`
-- Rat → Abschnitt „Verlauf“: Canvas-Diagramme aus `s.hist` (Einwohner, Kasse, Zufriedenheit), 10 Jahre.
+- Rat → Abschnitt „Verlauf“: Canvas-Diagramme aus `s.hist` (Einwohner, Kasse, Zufriedenheit; ein Eintrag pro Jahr), letzte 10 Jahre.
 - `js/sound.js`: WebAudio-Synth ohne Dateien (`click`, `build`, `bulldoze`, `money`, `alarm`, `milestone`), Schalter im Menü, Einstellung in `localStorage` `simfurt-sound`.
 
 ### P5 – Abschluss (Opus) · PRD, `sw.js`, README, Review.
