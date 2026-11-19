@@ -51,3 +51,32 @@ Siehe Auftrag im Abschnitt „P2 Details“.
 - Wasseranteil 4–22 % der Karte. Hauptfluss zusammenhängend von Kante zu Kante.
 - Mittlere Startfläche weiterhin waldarm; mindestens 40 % der Karte Land in der größten Landfläche.
 - Tests: 30 Seeds → mindestens 5 verschiedene Kantenpaare; Wasseranteil im Rahmen; Fluss berührt zwei Kanten und ist zusammenhängend; gleiche Seed = gleiche Karte. Bestehende Tests müssen grün bleiben (bot.mjs ggf. robuster machen, z. B. Raster auf Land verschieben).
+
+---
+
+# Runde 2 (Nov 2026): Budget, Verordnungen, Wasser, Minikarte
+
+Gemeinsame Regeln: Neue Zustandsfelder legt `newCity` mit Standardwerten an; `js/save.js` serialisiert `budget` und `ords` bereits (KEYS). Fehlen sie in alten Ständen, bleiben die Standardwerte aus `newCity`. Werte/Balancing in `js/data.js`. Tests in `test/sim.test.js` anhängen; `npm test` (im Ordner simfurt) muss grün sein. `buildCity` in `test/bot.mjs` darf erweitert werden (z. B. Pumpwerke), Schwellen nicht absenken.
+
+## Q1 – Budget je Ressort + Verordnungen · `js/data.js`, `js/sim.js`, Rat in `js/main.js`
+- `s.budget = { police: 100, fire: 100, health: 100, edu: 100, roads: 100 }` (Prozent, Regler 0–120 in 10er-Schritten).
+- Wirkung: Unterhalt der Gebäude dieses Ressorts × budget/100 (roads → Straßenunterhalt). Abdeckungsstärke beim Stempeln × f(b) mit f(b) = min(1.1, b/100) (0 % = keine Wirkung). Straßen < 60 %: Verkehrsbelastung steigt (× 1 + (60−b)/100), Zufriedenheit „Verkehr“ leidet.
+- Mapping Gebäude → Ressort über `kind`: police→police, fire→fire, health→health, edu→edu. Parks/Wahrzeichen/Metro/Strom bleiben ohne Regler.
+- Finanzaufschlüsselung `s.fin.parts` um Ressorts ergänzen (Unterhalt je Ressort), Rat zeigt sie.
+- Verordnungen `ORDINANCES` in data.js, Zustand `s.ords = {}` (id → true). Je Eintrag: `{ id, name, desc, cost (€/Monat, kann von Einwohnern abhängen: costPerPop), unlock (Einwohner), effects }`. Mindestens 8: Tempo 30 (Verkehr −10 %, Zufriedenheit +1, Gewerbe-Nachfrage −0,03), Gratis-ÖPNV (Metro-Wirkung ×1,5, Kosten je Einw.), Rauchverbot (Gesundheit +, Gewerbe-Nachfrage −), Ebbelwei-Fest (Tourismus +, Kriminalität leicht +, Zufriedenheit +2), Nachbarschaftswache (Kriminalität −10 %), Recyclingpflicht (Verschmutzung −10 %, Kosten), Nachtflugverbot (nur mit Flughafen; Zufriedenheit +3, Tourismus Flughafen −20 %), Grüne Dächer (Verschmutzung −5 %, Grundwert +2, teuer), Gewerbesteuer-Rabatt für Banken (B-Nachfrage +, Bankensteuer −15 %). Wirkungen werden zentral in refresh/financeStep/demandStep angewendet (Hilfsfunktion `ordFx(s)` liefert aufsummierte Faktoren).
+- Zufriedenheits-Teile (`stats.parts`) um `ords` ergänzen. Rat: Abschnitte „Budget“ (Regler) und „Verordnungen“ (Checkbox-Liste mit Kosten, gesperrte grau mit „ab X Einw.“).
+- Exporte: `ORDINANCES` (data.js), `setBudget(s, key, v)`, `toggleOrd(s, id)` → bool (sim.js).
+
+## Q2 – Wasserversorgung · `js/data.js`, `js/sim.js`, `js/render.js`, kleine Hooks in `js/main.js`
+- Ohne Leitungen (touch-freundlich): Wasser wie Strom per Radius + Kapazität.
+- Gebäude (cat `water`, neue Kategorie „Wasser“ 💧 in CATS): `pump` Pumpwerk 2×2, 2500 €, Unterhalt 80, cap 260, r 14, unlock 0, **muss an Wasser grenzen** (wie Deich: eine Kachel des Rechtecks hat Wasser als 4-Nachbar); `tower` Wasserturm 1×1, 1200 €, Unterhalt 30, cap 0, r 9, verteilt (erweitert die Versorgung: Kacheln im Radius gelten als versorgt, wenn mindestens ein Pumpwerk existiert); `treat` Kläranlage 2×2, 6000 €, Unterhalt 160, unlock 3000, senkt Verschmutzung im Radius 10 um 40 % und erhöht die Wasser-Kapazität aller Pumpwerke um 25 %. Deich zieht nach `water`.
+- `m.water` (0/1), `s.waterCap`, `s.waterLoad`, `s.waterRatio`, `s.watered` (Uint8Array) analog zu Strom; Last je Zone/Stufe = ZONES.load.
+- Wachstum: Stufe ≥ 2 nur mit Wasser. Ohne Wasser bleibt eine Parzelle auf max. Stufe 1; Stufen > 1 ohne Wasser sinken langsam (rand < 0,05).
+- Zufriedenheit `parts.water` (−20 × Fehlanteil, wenn Parzellen ≥ Stufe 2 existieren), Berater-Meldung, Kartenansicht `water` (OVERLAYS + render), tileInfo-Hinweis „⚠ Kein Wasser“.
+- Startgeld unverändert; Hilfe-Text im Menü (main.js) um Pumpwerk ergänzen.
+
+## Q3 – Minikarte · neu `js/minimap.js`, `index.html`, `style.css`, Hooks in `js/main.js`
+- Kleines Canvas (z. B. 112×112 CSS-px, oben links unter dem HUD, ein-/ausklappbar per Knopf, Zustand in localStorage `simfurt-mini`). Draufsicht (nicht isometrisch gedreht – oder als Raute, ist frei) mit Farben: Wasser, Wald, Gras, Straße, Zonenfarben je Stufe, Gebäude, Feuer rot.
+- Zeichnet das aktuelle Sichtfeld als Rahmen. Antippen/Klicken/Ziehen springt dorthin (`R.centerOn(x, y)`).
+- Neu zeichnen höchstens 2×/s bzw. bei Änderungen (ImageData, eine Pixelzeile je Kachel, dann skaliert).
+- API: `export class MiniMap { constructor(canvas, renderer); draw(s); }`.
