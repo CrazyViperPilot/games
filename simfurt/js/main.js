@@ -25,10 +25,24 @@ let tool = { id: 'hand' };    // aktives Werkzeug
 let cat = null;               // geöffnete Dock-Kategorie
 let overlay = 'none';
 let acc = 0, lastT = performance.now();
-let ui = { overlay: 'none', time: 0 };
+let ui = { overlay: 'none', time: 0, daytime: 0.3 };
 let needDraw = true;
 let saving = false, saveAgain = false, lastSaveMsg = '', lastSaveAt = 0, changed = false;
 const SPEEDMS = [0, 3200, 1400, 500];
+
+// ---------------------------------------------------------------- Tag & Nacht (nur Optik)
+const DAY_LEN = 360;                  // Auto-Modus: ein Tag = 6 Minuten Echtzeit (läuft auch in Pause)
+const DAY_MODES = ['auto', 'day', 'night'];
+let dayMode = 'auto';
+try { const v = localStorage.getItem('simfurt-daynight'); if (DAY_MODES.includes(v)) dayMode = v; } catch { /* egal */ }
+/** Tageszeit ∈ [0,1): Auto startet am Morgen (0,3), Tag = Mittag, Nacht = Mitternacht. */
+const dayStart = (m) => (m === 'day' ? 0.5 : m === 'night' ? 0 : 0.3);
+let daytime = dayStart(dayMode);
+function setDayMode(m) {
+  if (!DAY_MODES.includes(m)) return;
+  dayMode = m; if (m !== 'auto') daytime = dayStart(m);
+  try { localStorage.setItem('simfurt-daynight', m); } catch { /* egal */ }
+}
 
 // ---------------------------------------------------------------- Werkzeuge im Dock
 const TOOLS = {
@@ -381,7 +395,7 @@ function councilHtml() {
   const st = S.stats, f = S.fin, p = f.parts;
   const cl = (v) => (v >= 0 ? 'pos' : 'neg');
   const rate = (k, label) => `<div class="sl"><span>${label}</span><input type="range" min="0" max="20" value="${S.rates[k]}" data-r="${k}"><b id="rv${k}">${S.rates[k]} %</b></div>`;
-  const names = { tax: 'Steuern', crime: 'Kriminalität', pol: 'Umwelt', traffic: 'Verkehr', health: 'Gesundheit', edu: 'Bildung', police: 'Polizei', fire: 'Feuerwehr', park: 'Grünflächen', landmark: 'Wahrzeichen', jobs: 'Arbeitslosigkeit', power: 'Strom', water: 'Wasser', ords: 'Verordnungen' };
+  const names = { tax: 'Steuern', crime: 'Kriminalität', pol: 'Umwelt', traffic: 'Verkehr', health: 'Gesundheit', edu: 'Bildung', police: 'Polizei', fire: 'Feuerwehr', park: 'Grünflächen', landmark: 'Wahrzeichen', jobs: 'Arbeitslosigkeit', power: 'Strom', water: 'Wasser', garbage: 'Müll', ords: 'Verordnungen' };
   // Monatlicher Unterhalt je Ressort (schon mit Budget); Straßen über den Straßenunterhalt
   const resCost = { police: p.upPolice || 0, fire: p.upFire || 0, health: p.upHealth || 0, edu: p.upEdu || 0, roads: p.roads || 0 };
   const budgetRow = (k) => { const v = budgetPct(S, k); return `<div class="sl wide"><span>${BUDGET_NAMES[k]}</span><input type="range" min="${BUDGET_MIN}" max="${BUDGET_MAX}" step="${BUDGET_STEP}" value="${v}" data-b="${k}"><b id="bv${k}">${v} %</b></div>`; };
@@ -416,7 +430,8 @@ function councilHtml() {
     ${histHtml()}
     <h3 class="sec">Stadt</h3>
     <div class="kv"><span>Einwohner</span><span>${fmt(st.pop)}</span><span>Arbeitsplätze</span><span>${fmt(st.jobs)} (davon Banken ${fmt(st.jobsB)})</span><span>Arbeitslosigkeit</span><span>${Math.round(st.unemp * 100)} %</span>
-    <span>Strom</span><span>${fmt(S.powerCap)} / ${fmt(S.powerLoad)}</span><span>Wasser cap / load</span><span>${fmt(S.waterCap)} / ${fmt(S.waterLoad)}</span><span>Grundwert Ø</span><span>${Math.round(st.value)}</span><span>Stau</span><span>${Math.round(st.cong * 100)} %</span></div>
+    <span>Strom</span><span>${fmt(S.powerCap)} / ${fmt(S.powerLoad)}</span><span>Wasser cap / load</span><span>${fmt(S.waterCap)} / ${fmt(S.waterLoad)}</span>
+    <span>Müll: Aufkommen / entsorgt (Deponie-Restvolumen)</span><span>${fmt(S.garbage)} / ${fmt(S.garbage - S.garbageLeft)} t (${st.dumps ? fmt(st.dumpLeft) + ' t' : 'keine Deponie'})</span><span>Grundwert Ø</span><span>${Math.round(st.value)}</span><span>Stau</span><span>${Math.round(st.cong * 100)} %</span></div>
     <h3 class="sec">Nachrichten</h3>${S.msgs.slice(-14).reverse().map((m) => `<div class="msg ${m.kind}"><small>${MONTHS[m.m]} ${m.y}</small>${m.text}</div>`).join('')}`;
 }
 $('bCouncil').onclick = () => {
@@ -496,7 +511,8 @@ async function openMenu(first) {
     <h3 class="sec">Spielstände</h3>${rows}
     <div class="chk"><input type="checkbox" id="mDis" ${S ? (S.disasters ? 'checked' : '') : 'checked'}><label for="mDis">Katastrophen (Feuer, Hochwasser)</label></div>
     <div class="chk"><input type="checkbox" id="mSnd" ${sound.on ? 'checked' : ''}><label for="mSnd">Ton</label></div>
-    <details class="slot"><summary><b>So geht's</b></summary><p style="margin-top:8px">1. <b>Straße</b> ziehen · 2. <b>Zonen</b> (Wohnen, Gewerbe, Industrie) als Rechteck neben die Straße · 3. <b>Gaskraftwerk</b> bauen · 4. <b>Pumpwerk am Ufer</b> (Kategorie Wasser) setzen, damit die Zonen Wasser bekommen · 5. Zeit läuft: die Stadt wächst nach Nachfrage (Balken oben). Später Polizei, Feuerwehr, Schulen, Parks, U-Bahn und Wahrzeichen. Banken und Skyline gibt es ab 3.000 Einwohnern. Steuern und Kredit im <b>Rat</b>.</p></details>
+    <div class="chk"><label for="mDay">Tageszeit</label><select id="mDay"><option value="auto"${dayMode === 'auto' ? ' selected' : ''}>Auto</option><option value="day"${dayMode === 'day' ? ' selected' : ''}>Tag</option><option value="night"${dayMode === 'night' ? ' selected' : ''}>Nacht</option></select></div>
+    <details class="slot"><summary><b>So geht's</b></summary><p style="margin-top:8px">1. <b>Straße</b> ziehen · 2. <b>Zonen</b> (Wohnen, Gewerbe, Industrie) als Rechteck neben die Straße · 3. <b>Gaskraftwerk</b> bauen · 4. <b>Pumpwerk am Ufer</b> (Kategorie Wasser) setzen, damit die Zonen Wasser bekommen · 5. Zeit läuft: die Stadt wächst nach Nachfrage (Balken oben). Später Polizei, Feuerwehr, Schulen, Parks, U-Bahn und Wahrzeichen. Banken und Skyline gibt es ab 3.000 Einwohnern. Müll: Jede Stadt erzeugt Müll – <b>Deponie</b> (Volumen begrenzt), <b>Recyclinghof</b> oder <b>Müllverbrennung</b> (liefert Strom) entsorgen ihn; bleibt Müll liegen, leidet die Umwelt. Steuern und Kredit im <b>Rat</b>.</p></details>
     <p style="color:var(--muted);font-size:12px">Speicher: ${storageInfo().local} · Webspace: ${storageInfo().remote}${lastSaveAt ? ' · zuletzt ' + new Date(lastSaveAt).toLocaleTimeString('de-DE', { timeStyle: 'short' }) : ''}. Autospeichern alle 3 Spielmonate, jede Minute und beim Verlassen. Sicherung: 📤 exportieren, 📂 importieren. Tipp: Zwei Finger = Karte verschieben/zoomen, Maus: rechte Taste ziehen, Rad = Zoom.</p>`;
   sheet(first ? 'Willkommen' : 'Menü', base('<p style="color:var(--muted)">Lade …</p>'));
   bindMenu();
@@ -519,6 +535,7 @@ function bindMenu() {
   b.onchange = (e) => {
     if (e.target.id === 'mDis' && S) S.disasters = e.target.checked;
     if (e.target.id === 'mSnd') { sound.on = e.target.checked; if (sound.on) sound.play('click'); }
+    if (e.target.id === 'mDay') setDayMode(e.target.value);
   };
 }
 async function startLoad(n) {
@@ -577,6 +594,7 @@ function stepCars(dt) {
 // ---------------------------------------------------------------- Hauptschleife
 function frame(now) {
   const dt = Math.min(0.25, (now - lastT) / 1000); lastT = now;
+  if (dayMode === 'auto') daytime = (daytime + dt / DAY_LEN) % 1;
   if (S) {
     if (speed && $('sheet').hidden) {
       acc += dt * 1000;
@@ -586,7 +604,7 @@ function frame(now) {
       if (n) { hud(); if (cat) renderItems(); needDraw = true; }
     }
     stepCars(dt);
-    ui.time = now; ui.overlay = overlay; ui.ghost = ghost; ui.sel = sel; ui.pick = pick; ui.hover = hover;
+    ui.time = now; ui.daytime = daytime; ui.overlay = overlay; ui.ghost = ghost; ui.sel = sel; ui.pick = pick; ui.hover = hover;
     R.draw(S, ui);
     mini.draw(S);
   }

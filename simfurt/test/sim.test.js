@@ -1,6 +1,6 @@
 // Tests für Simfurt: node simfurt/test/sim.test.js
 import assert from 'node:assert';
-import { N, T_WATER, T_TREES, BUILD, ORDINANCES, CATS, Z_R } from '../js/data.js';
+import { N, T_WATER, T_TREES, BUILD, ORDINANCES, CATS, Z_R, GARBAGE_BLD } from '../js/data.js';
 import { newCity, tick, applyTool, placeBuilding, canPlace, refresh, unlocked, idx, takeLoan, repayLoan, pushUndo, endUndo, undo, canUndo, flood, tileInfo, UNDO_MAX, setBudget, budgetPct, toggleOrd, ordBlock, removeBuilding } from '../js/sim.js';
 import { performance } from 'node:perf_hooks';
 import { serialize, deserialize } from '../js/save.js';
@@ -535,6 +535,115 @@ test('Wasser: Speichern erhält die Versorgung nach dem Laden (abgeleitet, Stand
   const t = deserialize(serialize(s));
   assert.strictEqual(t.waterCap, s.waterCap); assert.strictEqual(t.waterLoad, s.waterLoad);
   assert.deepStrictEqual(Array.from(t.watered), Array.from(s.watered));
+});
+
+// ---------------------------------------------------------------- Müll & Recycling (Runde 3, M1)
+const dumpsOf = (s) => s.bld.filter((b) => b.type === 'dump');
+const cityM = (seed = 5) => { const s = fresh(seed); buildCity(s); for (let t = 0; t < 36; t++) tick(s); return s; };
+const noIncin = (s) => { for (const b of [...s.bld]) if (BUILD[b.type].kind === 'incin') removeBuilding(s, b); refresh(s); return s; };
+const noDumps = (s) => { for (const b of [...s.bld]) if (BUILD[b.type].kind === 'dump' || BUILD[b.type].kind === 'incin') removeBuilding(s, b); refresh(s); return s; };
+/** Erster freier Platz für ein Gebäude (von oben links). */
+const spotFor = (s, key) => { for (let y = 1; y < N - 2; y++) for (let x = 1; x < N - 2; x++) if (canPlace(s, key, x, y) === '') return [x, y]; return null; };
+
+test('Müll: entsteht nur in aktiven Parzellen (Straße + Strom), Dienstgebäude zählen mit', () => {
+  const s = fresh(5);
+  for (let x = 20; x < 30; x++) applyTool(s, 'road', x, 20);
+  for (let x = 20; x < 30; x++) { applyTool(s, 'zone1', x, 21); s.lvl[idx(x, 21)] = 2; }
+  refresh(s);
+  assert.strictEqual(s.garbage, 0, 'ohne Strom kein Aufkommen');
+  assert.ok(placeBuilding(s, 'gas', 22, 23).ok);
+  refresh(s);
+  assert.ok(s.garbage > 0, 'mit Strom entsteht Müll: ' + s.garbage);
+  const g1 = s.garbage;
+  assert.ok(placeBuilding(s, 'police', 26, 23).ok); refresh(s);
+  assert.ok(Math.abs(s.garbage - g1 - GARBAGE_BLD) < 1e-9, 'Dienstgebäude: +' + GARBAGE_BLD + ' t');
+  const sum = s.maps.garb.reduce((a, b) => a + b, 0);
+  assert.ok(Math.abs(sum - s.garbageLeft) < 1e-3 * Math.max(1, s.garbage), 'Kartenansicht summiert sich zum unentsorgten Rest');
+});
+
+test('Müll: Aufkommen wächst mit der Stadt (ca. 0,1 t je Einwohner) und die Deponie nimmt bis 300 t je Monat', () => {
+  const s = noIncin(cityM(5));
+  const ratio = s.garbage / s.stats.pop;
+  assert.ok(ratio > 0.03 && ratio < 0.3, `Aufkommen je Einwohner ${ratio.toFixed(3)}`);
+  const d = dumpsOf(s)[0]; assert.ok(d, 'buildCity setzt eine Deponie');
+  const f0 = d.fill; tick(s);
+  const inc = d.fill - f0;
+  assert.ok(inc > 0 && inc <= BUILD.dump.cap + 1e-9, 'Füllung je Monat ' + inc);
+});
+
+test('Deponie: füllt sich bis zum Volumen, dann nimmt sie nichts mehr an und die Berater-Meldung kommt', () => {
+  const s = noIncin(cityM(5)); const d = dumpsOf(s)[0];
+  d.fill = BUILD.dump.vol - 20; tick(s);
+  assert.strictEqual(d.fill, BUILD.dump.vol, 'voll');
+  assert.strictEqual(s.stats.dumpLeft, 0);
+  assert.ok(s.garbageLeft > 0 && s.garbageRatio > 0, 'Rest bleibt liegen');
+  tick(s); assert.strictEqual(d.fill, BUILD.dump.vol, 'nimmt nichts mehr an');
+  assert.ok(s.msgs.some((m) => m.text.includes('Deponie ist voll')), 'Berater-Meldung');
+  assert.ok(tileInfo(s, d.x, d.y).lines.some((l) => l.startsWith('Voll')), 'Kachelinfo: voll');
+});
+
+test('Recyclinghof: senkt das Aufkommen um 12 % je Hof, höchstens 36 %; Recyclingpflicht zusätzlich ×0,85', () => {
+  const s = noDumps(cityM(5)); const g0 = s.garbage;
+  const factor = [];
+  for (let k = 1; k <= 4; k++) {
+    const sp = spotFor(s, 'recyc'); assert.ok(sp && placeBuilding(s, 'recyc', sp[0], sp[1]).ok, 'Platz für Hof ' + k);
+    refresh(s); factor.push(s.garbage / g0);
+  }
+  const want = [0.88, 0.76, 0.64, 0.64];
+  factor.forEach((f, i) => assert.ok(Math.abs(f - want[i]) < 1e-9, `Hof ${i + 1}: ×${f.toFixed(4)}`));
+  assert.ok(toggleOrd(s, 'recycling')); refresh(s);
+  assert.ok(Math.abs(s.garbage / g0 - 0.64 * 0.85) < 1e-9, 'Verordnung ×0,85 zusätzlich: ' + (s.garbage / g0));
+});
+
+test('Müll: ohne Entsorgung sinkt die Zufriedenheit (bis −20), mit Deponie nicht', () => {
+  const s = noDumps(cityM(5));
+  assert.ok(s.stats.pop >= 400, 'Stadt über der Schonfrist: ' + s.stats.pop);
+  assert.strictEqual(s.garbageRatio, 1);
+  assert.strictEqual(s.stats.parts.garbage, -20, 'Teil Müll ' + s.stats.parts.garbage);
+  const sp = spotFor(s, 'dump'); assert.ok(sp && placeBuilding(s, 'dump', sp[0], sp[1]).ok); refresh(s);
+  assert.strictEqual(s.stats.parts.garbage, 0, 'mit Deponie keine Strafe');
+  tick(s); assert.strictEqual(s.stats.parts.garbage, 0);
+});
+
+test('Müll: Schonfrist – unter 400 Einwohnern wirkt unentsorgter Müll nicht auf Zufriedenheit und Dreck', () => {
+  const s = fresh(5);
+  for (let x = 20; x < 30; x++) applyTool(s, 'road', x, 20);
+  for (let x = 20; x < 30; x++) applyTool(s, 'zone1', x, 21);
+  placeBuilding(s, 'gas', 22, 23);
+  for (let t = 0; t < 24; t++) tick(s);
+  assert.ok(s.stats.pop < 400, 'klein: ' + s.stats.pop);
+  assert.ok(s.garbageLeft > 0, 'Müll fällt an und bleibt liegen');
+  assert.strictEqual(s.stats.parts.garbage, 0);
+});
+
+test('Verbrennung: liefert zusätzlich 60 Strom und entsorgt Müll vor den Deponien', () => {
+  const s = fresh(5); refresh(s); const c0 = s.powerCap;
+  const sp = spotFor(s, 'incin'); assert.ok(sp && placeBuilding(s, 'incin', sp[0], sp[1]).ok);
+  refresh(s);
+  assert.strictEqual(s.powerCap - c0, BUILD.incin.power, 'Kraftwerk-Kapazität');
+  const c = noDumps(cityM(6)); const sp2 = spotFor(c, 'incin'); placeBuilding(c, 'incin', sp2[0], sp2[1]); refresh(c);
+  assert.ok(c.garbage < BUILD.incin.burn, 'Aufkommen unter Verbrennungskapazität');
+  assert.strictEqual(c.garbageLeft, 0, 'Verbrennung nimmt alles');
+  assert.strictEqual(c.stats.parts.garbage, 0);
+});
+
+test('Müll: Speichern erhält den Füllstand (fill) und die Entwicklung nach dem Laden', () => {
+  const s = cityM(4); const d = dumpsOf(s)[0]; d.fill = 1234; refresh(s);
+  const t = deserialize(serialize(s));
+  const dt = t.bld.find((b) => b.type === 'dump');
+  assert.strictEqual(dt.fill, 1234, 'fill nach dem Laden');
+  for (let k = 0; k < 12; k++) { tick(s); tick(t); }
+  assert.strictEqual(dumpsOf(t)[0].fill, dumpsOf(s)[0].fill, 'Füllstand gleich nach weiteren Monaten');
+  assert.strictEqual(Math.round(t.money), Math.round(s.money)); assert.strictEqual(t.stats.pop, s.stats.pop);
+});
+
+test('Müll: alte Stände ohne fill gelten als leere Deponie', () => {
+  const s = cityM(5);
+  const o = JSON.parse(serialize(s)); for (const b of o.bld) delete b.fill;
+  const t = deserialize(JSON.stringify(o));
+  assert.strictEqual(dumpsOf(t).length, 1);
+  assert.strictEqual(t.stats.dumpLeft, BUILD.dump.vol, 'Restvolumen = volles Volumen');
+  assert.ok(t.garbageLeft >= 0);
 });
 
 console.log(`${n} Tests ok`);

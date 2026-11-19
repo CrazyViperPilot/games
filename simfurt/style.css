@@ -83,3 +83,5 @@ input[type=text] { width:100%; padding:10px; border-radius:10px; border:1px soli
 #mini.open #miniTog { left:4px; top:4px; }
 #mini ~ #ticker { left:40px; }
 #mini.open ~ #ticker { left:128px; }
+/* Runde 3: Tageszeit im Menü */
+.chk select { margin-left:auto; padding:8px 10px; border-radius:10px; border:1px solid var(--line); background:var(--bg); color:var(--text); font:inherit; }
