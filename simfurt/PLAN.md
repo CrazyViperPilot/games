@@ -81,3 +81,28 @@ Gemeinsame Regeln: Neue Zustandsfelder legt `newCity` mit Standardwerten an; `js
 - Zeichnet das aktuelle Sichtfeld als Rahmen. Antippen/Klicken/Ziehen springt dorthin (`R.centerOn(x, y)`).
 - Neu zeichnen höchstens 2×/s bzw. bei Änderungen (ImageData, eine Pixelzeile je Kachel, dann skaliert).
 - API: `export class MiniMap { constructor(canvas, renderer); draw(s); }`.
+
+---
+
+# Runde 3: Müll & Recycling, Tag & Nacht
+
+## M1 – Müll & Recycling · `js/data.js`, `js/sim.js`, Sprites in `js/render.js` (nur `buildingSprite`-Fälle + Overlay-Fall), Rat/Hilfe in `js/main.js`, Tests
+- Müllaufkommen je Monat: Σ über aktive Parzellen `GARBAGE[z][l]` (Daten in data.js; R klein, C mittel, I groß, B mittel) + Dienstgebäude 1. Kennzahl `s.garbage` (t/Monat).
+- Neue Kategorie `waste` („Müll“, 🗑) in CATS nach `water`. Gebäude:
+  - `dump` Deponie 3×3, 1500 €, Unterhalt 40, cap 300 t/Monat Annahme, r 0, Volumen 12.000 t (`b.fill` im Gebäudeobjekt, wird mit gespeichert, da `bld` serialisiert wird); voll → nimmt nichts mehr an, Berater-Meldung; starke Verschmutzung Radius 7 (pol 30), Grundwert −; kann abgerissen werden.
+  - `incin` Müllverbrennung 2×2, 7000 €, Unterhalt 220, unlock 2500, cap 500 t, erzeugt Strom (Kraftwerk-Kapazität +60, zählt als `power` mit r 8) und Verschmutzung pol 18.
+  - `recyc` Recyclinghof 2×2, 4000 €, Unterhalt 120, unlock 1200, reduziert Müllaufkommen stadtweit um 12 % je Hof (max. 36 %), keine Verschmutzung, kleiner Tourismus 0.
+  - Verordnung `recycling` (vorhanden): zusätzlich Müllaufkommen −15 %.
+- Entsorgung: Müll wird erst an Recycling (Reduktion), dann an Verbrennungen (bis cap), dann an Deponien (bis cap & Restvolumen) verteilt. Nicht entsorgter Rest `s.garbageLeft`: Verschmutzung steigt stadtweit (alle Parzellen + Anteil), Zufriedenheit `parts.garbage` = −min(20, 25 × Anteil unentsorgt); Kartenansicht `garbage` (Müll-Belastung je Parzelle = unentsorgter Anteil × Aufkommen). Erst ab 400 Einwohnern wirksam (Schonfrist), damit der Start nicht leidet.
+- Rat: Zeile „Müll: Aufkommen / entsorgt (Deponie-Restvolumen)“, Finanzen: Unterhalt wie andere Gebäude. tileInfo für Deponie: Füllstand.
+- Bestehende Tests grün; buildCity bekommt eine Deponie, falls nötig. Neue Tests: Aufkommen wächst mit Stadt; Deponie füllt sich und ist irgendwann voll; Recyclinghof und Verordnung senken Aufkommen; ohne Entsorgung sinkt Zufriedenheit; Verbrennung liefert Strom; Speichern erhält `fill`.
+
+## M2 – Tag & Nacht (Optik) · `js/render.js` (Renderer.draw + neue Licht-Sprites), Schalter in `js/main.js`, `style.css` falls nötig
+- Tageszeit `ui.daytime` ∈ [0,1) (0 = Mitternacht, 0,5 = Mittag). Modus im Menü: „Auto“ (ein Tag = 6 Minuten Echtzeit, läuft auch in Pause weiter), „Tag“, „Nacht“; Einstellung in localStorage `simfurt-daynight`. Standard Auto.
+- Dunkelheit d(t) weich (Dämmerung orange/rosa, Nacht dunkelblau, max. Abdunklung ~0,62). Umsetzung: Szene normal zeichnen → Vollbild-Tönung (`fillRect`, ggf. `multiply`) → Lichtebene mit `globalCompositeOperation = 'lighter'`:
+  - Gebäude-Lichtsprites (gecacht wie andere Sprites, Schlüssel z. B. `light:z:lvl:vr` bzw. `light:key`): beleuchtete Fenster passend zu den Fensterrastern der Gebäudesprites (gleiche Geometrie wie `windows()`; pro Fenster per `rnd` an/aus, ~55 % an, warmgelb; Bankentürme kühlweiß, Antennen-/Dachspitzen rote Positionslichter blinkend).
+  - Straßenlaternen: weicher Lichtkegel an jeder 2. Straßenkachel (deterministisch).
+  - Autos: Scheinwerfer (kleiner heller Punkt) nachts.
+  - Wahrzeichen angestrahlt (Glow am Sockel).
+- Nur sichtbare Kacheln, Lichtebene nur bei d > 0,05. Performance: keine Allokationen pro Frame, gecachte Sprites; 128er-Karte flüssig.
+- Overlays (Kartenansichten) werden über der Tönung ohne Abdunklung gezeichnet (Lesbarkeit). Minikarte bleibt unverändert.
