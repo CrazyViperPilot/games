@@ -230,7 +230,7 @@ function pad(g, o, w, h, col = '#a9b09a') { flat(g, o, 0, 0, w, h, col); flat(g,
 
 export function buildingSprite(key) {
   const d = BUILD[key];
-  const hmax = { fraport: 90, ctower: 260, maintower: 230, mtower: 230, dom: 190, uni: 100, gas: 110, wind: 120, hbf: 90, dike: 20 }[key] || 100;
+  const hmax = { fraport: 90, ctower: 260, maintower: 230, mtower: 230, dom: 190, uni: 100, gas: 110, wind: 120, hbf: 90, dike: 20, pump: 60, tower: 100, treat: 36 }[key] || 100;
   return sprite('b_' + key, d.w, d.h, hmax, (g, o) => {
     const w = d.w, h = d.h;
     switch (key) {
@@ -278,6 +278,35 @@ export function buildingSprite(key) {
         flat(g, o, 0, 0, 1, 1, '#6aa04c');
         prism(g, o, 0.03, 0.2, 0.97, 0.7, 0, 6, '#6f8f4e', { top: '#8fb066', l: 0.9, r: 0.68 });
         prism(g, o, 0.03, 0.64, 0.97, 0.74, 0, 4, '#a59f92', { top: '#cbc5b7', l: 0.95, r: 0.75 });
+        break;
+      }
+      case 'pump': {
+        // Pumpenhaus am Ufer, davor ein blaues Becken
+        pad(g, o, w, h, '#8fa08a');
+        ellipseFlat(g, o, 1.42, 1.38, 0.56, 0.46, 0, '#1f4f86');
+        ellipseFlat(g, o, 1.42, 1.38, 0.46, 0.37, 1, '#4a9ad8');
+        ellipseFlat(g, o, 1.34, 1.3, 0.14, 0.11, 2, '#bfe4ff');
+        prism(g, o, 0.14, 0.18, 0.86, 0.78, 0, 24, '#dfe6ea', { win: { c: 3, rows: 1, lit: 0.3, seed: 2 } });
+        gable(g, o, 0.11, 0.15, 0.89, 0.81, 24, 10, '#2f5f8a', 'u');
+        break;
+      }
+      case 'tower': {
+        // Wasserturm: Säule mit Kessel oben
+        pad(g, o, w, h, '#a8ad9f');
+        prism(g, o, 0.42, 0.42, 0.58, 0.58, 0, 60, '#c5ccd2', { top: '#dfe5ea', win: { c: 1, rows: 3, lit: 0.1, seed: 3 } });
+        const cx = X(o, 0.5, 0.5), cy = Y(o, 0.5, 0.5, 76);
+        g.fillStyle = '#7fb6df'; g.beginPath(); g.arc(cx, cy, 9, 0, 7); g.fill();
+        g.fillStyle = '#c9e6fa'; g.beginPath(); g.arc(cx - 3, cy - 3, 3, 0, 7); g.fill();
+        break;
+      }
+      case 'treat': {
+        // Klärbecken: runder Beton-Rand, grün-blaues Wasser
+        pad(g, o, w, h, '#9aa98a');
+        ellipseFlat(g, o, 1.0, 1.0, 0.72, 0.72, 0, '#8f989c');
+        for (let z = 0; z < 8; z += 2) ellipseFlat(g, o, 1.0, 1.0, 0.72, 0.72, z, z % 4 ? '#c9d0d3' : '#b5bcc0');
+        ellipseFlat(g, o, 1.0, 1.0, 0.6, 0.6, 8, '#4fb3a0');
+        ellipseFlat(g, o, 1.0, 1.0, 0.34, 0.34, 8, '#2f8f9a');
+        prism(g, o, 1.5, 0.12, 1.86, 0.48, 0, 12, '#d7dde0', { top: '#e6ebee' });
         break;
       }
       case 'metro': {
@@ -492,6 +521,7 @@ export class Renderer {
         let col = null;
         switch (ui.overlay) {
           case 'power': col = s.powered[i] ? 'rgba(250,215,60,.45)' : (s.zone[i] || s.occ[i] ? 'rgba(200,40,40,.5)' : null); break;
+          case 'water': col = s.watered[i] ? 'rgba(70,190,255,.45)' : (s.zone[i] || s.occ[i] ? 'rgba(200,40,40,.5)' : null); break;
           case 'traffic': if (s.road[i]) col = heat(m.traffic[i] / 1.6); break;
           case 'crime': col = heat(m.crime[i] / 70); break;
           case 'pollution': col = heat(m.pol[i] / 70); break;

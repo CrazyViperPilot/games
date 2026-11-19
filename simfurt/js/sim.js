@@ -3,6 +3,7 @@ import {
   N, setMapSize, START_MONEY, START_YEAR, T_GRASS, T_WATER, T_TREES, Z_NONE, Z_R, Z_C, Z_I, Z_B, ZONES, BUILD,
   ROAD_COST, BRIDGE_COST, BULLDOZE_COST, ROAD_UPKEEP, ZONE_UNLOCK, MILESTONES, MONTHS,
   BUDGET_RES, BUDGET_DEFAULT, BUDGET_MIN, BUDGET_MAX, BUDGET_STEP, BUDGET_COVER_MAX, BUDGET_ROAD_MIN, ORDINANCES,
+  WATER_TREAT_CAP, WATER_TREAT_CAP_MAX, WATER_HAPPY,
 } from './data.js';
 
 export let NN = N * N;
@@ -18,6 +19,16 @@ export function rand(s) {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
 const rint = (s, n) => Math.floor(rand(s) * n);
+/** Gebäudearten ohne eigene Strom- und Wasserlast (Kraftwerke, Deich, Wasseranlagen). */
+const NOLOAD = new Set(['power', 'dike', 'pump', 'tower', 'treat']);
+/** Ruft fn(i) für jede Kachel im Radius r um die Gebäudemitte auf (Kachelmittelpunkte). */
+function forDisc(b, r, fn) {
+  const cx = b.x + b.w / 2, cy = b.y + b.h / 2, r2 = r * r;
+  for (let y = Math.max(0, Math.floor(cy - r)); y <= Math.min(N - 1, Math.ceil(cy + r)); y++) for (let x = Math.max(0, Math.floor(cx - r)); x <= Math.min(N - 1, Math.ceil(cx + r)); x++) {
+    const dx = x + 0.5 - cx, dy = y + 0.5 - cy;
+    if (dx * dx + dy * dy <= r2) fn(idx(x, y));
+  }
+}
 const hash = (i, k = 0) => { let h = Math.imul(i + 1 + k * 7919, 0x9E3779B1); h ^= h >>> 15; h = Math.imul(h, 0x85EBCA6B); return ((h ^ (h >>> 13)) >>> 0) / 4294967296; };
 
 // ---------------------------------------------------------------- Neue Stadt / Karte
@@ -31,9 +42,10 @@ export function newCity({ name = 'Simfurt', seed = 1, size = 64 } = {}) {
     bld: [], nextId: 1, ms: 0, msgs: [], hist: [], occupancy: 0.5, demand: { r: 0.5, c: 0.2, i: 0.5, b: 0 },
     stats: null, fin: { inc: 0, exp: 0, net: 0, parts: {} }, ticks: 0, seen: {},
     budget: { ...BUDGET_DEFAULT }, ords: {},
+    waterCap: 0, waterLoad: 0, waterRatio: 0, watered: new Uint8Array(NN),
   };
   generateMap(s);
-  say(s, 'Willkommen in ' + name + '! Zonen anlegen, Straße und Strom nicht vergessen.', 'info');
+  say(s, 'Willkommen in ' + name + '! Zonen anlegen, Straße, Strom und Wasser nicht vergessen.', 'info');
   refresh(s);
   return s;
 }
@@ -288,15 +300,15 @@ export function canPlace(s, key, x, y) {
     if (s.occ[i]) return 'Gebäude im Weg';
     if (s.lvl[i] > 0) return 'Bebaute Zone im Weg';
   }
-  // Deich: nur, wenn eine 4-Nachbarkachel des Grundrisses Wasser ist
-  if (d.kind === 'dike') {
+  // Ufer-Gebäude (Deich, Pumpwerk): eine 4-Nachbarkachel des Grundrisses muss Wasser sein
+  if (d.shore) {
     let shore = false;
     for (let yy = y; yy < y + d.h && !shore; yy++) for (let xx = x; xx < x + d.w && !shore; xx++) {
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         if (inb(xx + dx, yy + dy) && s.terrain[idx(xx + dx, yy + dy)] === T_WATER) { shore = true; break; }
       }
     }
-    if (!shore) return 'Nur am Wasser';
+    if (!shore) return d.shore;
   }
   return '';
 }
@@ -460,8 +472,10 @@ const hasRoadNear = (s, x, y) => {
 /** Berechnet alle abgeleiteten Karten und Kennzahlen. */
 export function refresh(s) {
   budgetFx(s); ordFx(s);
-  const m = s.maps = { power: mk(), police: mk(), fire: mk(), health: mk(), edu: mk(), park: mk(), metro: mk(), pol: mk(), crime: mk(), value: mk(), traffic: mk(), happy: mk() };
-  let cap = 0, load = 0;
+  const m = s.maps = { power: mk(), police: mk(), fire: mk(), health: mk(), edu: mk(), park: mk(), metro: mk(), pol: mk(), crime: mk(), value: mk(), traffic: mk(), happy: mk(), water: mk() };
+  let cap = 0, load = 0, wload = 0;
+  let wcapPumps = 0, pumps = 0, treatN = 0, cut = null; // Wasser: Pumpwerk-Kapazität, Anzahl Pumpwerke, Kläranlagen, Verschmutzungsfaktor je Kachel
+  const towers = [];
   const bcen = (b) => [b.x + b.w / 2, b.y + b.h / 2];
   for (const b of s.bld) {
     const d = BUILD[b.type]; const [cx, cy] = bcen(b);
@@ -474,29 +488,44 @@ export function refresh(s) {
       case 'park': stamp(m.park, cx, cy, d.r, 1, true); break;
       case 'metro': stamp(m.metro, cx, cy, d.r, FX.metro, true); break;
       case 'happy': stamp(m.park, cx, cy, d.r, d.happy > 0 ? 1 : 0, true); stamp(m.happy, cx, cy, d.r, d.happy, false); if (d.pol) stamp(m.pol, cx, cy, 6, d.pol); break;
+      case 'pump': stamp(m.water, cx, cy, d.r, 1, true); wcapPumps += d.cap; pumps++; break;
+      case 'tower': towers.push(b); break;
+      case 'treat': treatN++; if (!cut) cut = new Float32Array(NN).fill(1); forDisc(b, d.r, (i) => { cut[i] *= 1 - d.polCut; }); break;
     }
-    if (d.kind !== 'power' && d.kind !== 'dike') load += 2;
+    if (!NOLOAD.has(d.kind)) { load += 2; wload += 1; } // Dienstgebäude: 2 Strom, 1 Wasser
   }
+  // Wassertürme verteilen nur, wenn es mindestens ein Pumpwerk gibt
+  if (pumps) for (const t of towers) { const [cx, cy] = bcen(t); stamp(m.water, cx, cy, BUILD[t.type].r, 1, true); }
+  const wcap = pumps ? wcapPumps * Math.min(WATER_TREAT_CAP_MAX, 1 + WATER_TREAT_CAP * treatN) : 0;
   // Brownout
   const powered = new Uint8Array(NN);
-  for (let i = 0; i < NN; i++) if (m.power[i] > 0) load += 0; // Platzhalter, Last unten
   let jobsC = 0, jobsI = 0, jobsB = 0, capR = 0, lots = 0;
   const active = new Uint8Array(NN);
   let totalLoad = load;
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const i = idx(x, y); const z = s.zone[i], l = s.lvl[i];
     if (!z || !l) continue;
-    if (m.power[i] > 0 && hasRoadNear(s, x, y)) { totalLoad += ZONES[z].load[l]; active[i] = 1; }
+    const road = hasRoadNear(s, x, y);
+    if (road) wload += ZONES[z].load[l];
+    if (m.power[i] > 0 && road) { totalLoad += ZONES[z].load[l]; active[i] = 1; }
   }
   const ratio = cap > 0 ? Math.min(1, cap / Math.max(1, totalLoad)) : 0;
   s.powerRatio = ratio; s.powerCap = cap; s.powerLoad = totalLoad;
   for (let i = 0; i < NN; i++) powered[i] = m.power[i] > 0 && (ratio >= 1 || hash(i, 11) < ratio) ? 1 : 0;
   s.powered = powered;
+  // Wasser: wie Strom (Radius + Kapazität, Teilausfall per Hash)
+  const wratio = wcap > 0 ? Math.min(1, wcap / Math.max(1, wload)) : 0;
+  const watered = new Uint8Array(NN);
+  for (let i = 0; i < NN; i++) watered[i] = m.water[i] > 0 && (wratio >= 1 || hash(i, 13) < wratio) ? 1 : 0;
+  s.waterRatio = wratio; s.waterCap = wcap; s.waterLoad = wload; s.watered = watered;
+  let dryLots = 0, hiLots = 0;
 
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const i = idx(x, y); const z = s.zone[i], l = s.lvl[i];
     if (!z || !l) continue;
     lots++;
+    if (!s.watered[i]) dryLots++;
+    if (l >= 2) hiLots++;
     const act = active[i] && powered[i];
     s.vr[i] = s.vr[i]; // unverändert
     // Verschmutzung / Verkehr / Kriminalität entstehen auch ohne Strom
@@ -512,7 +541,7 @@ export function refresh(s) {
   // Polizei senkt Kriminalität
   for (let i = 0; i < NN; i++) m.crime[i] = Math.max(0, Math.min(100, m.crime[i] * (1 - 0.85 * m.police[i]) * 1.5 * FX.crime));
   for (let i = 0; i < NN; i++) {
-    m.pol[i] = Math.min(100, m.pol[i] * FX.pollution);
+    m.pol[i] = Math.min(100, m.pol[i] * FX.pollution * (cut ? cut[i] : 1)); // Kläranlagen senken den Dreck im Radius
     if (s.terrain[i] === T_TREES) m.pol[i] *= 0.7;
   }
 
@@ -584,13 +613,15 @@ export function refresh(s) {
     crime: -f(crimeSum) * 0.35, pol: -f(polSum) * 0.3, traffic: -cong * 14,
     health: 8 * f(covHealth) * FX.healthPart, edu: 6 * f(covEdu), police: 6 * f(covPolice), fire: 4 * f(covFire), park: 9 * f(covPark),
     landmark: Math.min(12, landmark * 1.4), jobs: -unemp * 25, power: ratio < 1 && lots ? -(1 - ratio) * 30 : 0,
+    // Wasser: Anteil besiedelter Parzellen ohne Wasser, sobald Parzellen ab Stufe 2 existieren
+    water: hiLots && lots ? -WATER_HAPPY * dryLots / lots : 0,
     ords: FX.happy,
   };
   const happy = Math.max(0, Math.min(100, 66 + Object.values(parts).reduce((a, b) => a + b, 0)));
   s.stats = {
     pop, capR, workers: Math.round(workers), jobs, jobsC, jobsI, jobsB, lots, happy, unemp, avgTax, cong, congRoads: cSum,
     crime: f(crimeSum), pollution: f(polSum), value: f(valSum), parts, roads: roads.length, covPolice: f(covPolice), covFire: f(covFire),
-    covHealth: f(covHealth), covEdu: f(covEdu),
+    covHealth: f(covHealth), covEdu: f(covEdu), waterDry: dryLots,
   };
   s.peakPop = Math.max(s.peakPop || 0, pop);
   s.dirty = false;
@@ -623,12 +654,14 @@ function growStep(s) {
     if (!z || s.occ[i] || s.fire[i]) continue;
     const l = s.lvl[i], zz = ZONES[z], d = dmap[z];
     const act = s.powered[i] && hasRoadNear(s, x, y);
+    const wet = s.watered[i]; // Stufe 1 braucht kein Wasser, ab Stufe 2 schon
     if (l === 0) {
       if (act && d > 0.03 && m.crime[i] < 90 && rand(s) < 0.12 + d * 0.5) { s.lvl[i] = 1; s.vr[i] = rint(s, 256); s.dirty = true; }
     } else if (!act) {
       if (rand(s) < 0.1) { s.lvl[i] = l - 1; s.dirty = true; }
     } else if (d < -0.25 && rand(s) < 0.05) { s.lvl[i] = l - 1; s.dirty = true; }
-    else if (l < zz.max && d > 0.12 && m.value[i] >= MINVAL[z][l + 1] && (z !== Z_B || l < 2 || m.edu[i] > 0.15) && (z !== Z_R || m.pol[i] < 45) && rand(s) < 0.03 + d * 0.12) { s.lvl[i] = l + 1; s.dirty = true; }
+    else if (l > 1 && !wet && rand(s) < 0.05) { s.lvl[i] = l - 1; s.dirty = true; } // ohne Wasser sinkt Stufe > 1 langsam
+    else if (l < zz.max && wet && d > 0.12 && m.value[i] >= MINVAL[z][l + 1] && (z !== Z_B || l < 2 || m.edu[i] > 0.15) && (z !== Z_R || m.pol[i] < 45) && rand(s) < 0.03 + d * 0.12) { s.lvl[i] = l + 1; s.dirty = true; }
     else if (l > 1 && m.value[i] < MINVAL[z][l] - 14 && rand(s) < 0.04) { s.lvl[i] = l - 1; s.dirty = true; }
   }
 }
@@ -743,6 +776,9 @@ function adviceStep(s) {
     if (!s.seen[key] || s.ticks - s.seen[key] >= every * 12) { s.seen[key] = s.ticks; say(s, text, kind); }
   };
   if (st.lots > 5 && s.powerRatio < 0.99) k('power', s.powerCap ? 'Stromengpass! Zu wenig Kraftwerke für die ganze Stadt.' : 'Kein Strom! Baue ein Kraftwerk in der Nähe der Zonen.', 'bad', 1);
+  if (st.lots > 5 && (s.waterRatio < 0.99 || st.waterDry > st.lots * 0.3)) {
+    k('water', !s.waterCap ? 'Kein Wasser! Pumpwerk am Ufer bauen.' : s.waterRatio < 0.99 ? 'Wassermangel! Zu wenig Pumpwerke für die ganze Stadt.' : 'Manche Viertel haben kein Wasser. Wasserturm in der Nähe bauen.', 'bad', 2);
+  }
   if (s.money < 0) k('money', 'Die Stadtkasse ist leer! Steuern erhöhen oder Ausgaben senken.', 'bad', 1);
   if (st.unemp > 0.25) k('jobs', 'Hohe Arbeitslosigkeit: Gewerbe und Industrie fehlen.', 'bad', 2);
   if (st.cong > 0.8) k('traffic', 'Dauerstau auf den Straßen. Mehr Straßen oder U-Bahn-Stationen helfen.', 'bad', 2);
@@ -799,6 +835,7 @@ export function tileInfo(s, x, y) {
     if (s.lvl[i]) lines.push(zz.pop[s.lvl[i]] ? `Wohnplatz für ${zz.pop[s.lvl[i]]} Einwohner` : `${zz.jobs[s.lvl[i]]} Arbeitsplätze`);
     if (!hasRoadNear(s, x, y)) lines.push('⚠ Keine Straße in der Nähe');
     if (!s.powered[i]) lines.push('⚠ Kein Strom');
+    if (!s.watered[i]) lines.push('⚠ Kein Wasser');
   } else if (s.terrain[i] === T_TREES) title = 'Wald';
   if (s.fire[i]) lines.push('🔥 Es brennt!');
   if (s.flood[i]) lines.push('🌊 Überschwemmt');

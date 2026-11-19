@@ -54,7 +54,8 @@ Siehe Auftrag im Abschnitt „P2 Details“.
 
 ---
 
-# Runde 2 (Nov 2026): Budget, Verordnungen, Wasser, Minikarte
+# Runde 2 (Nov 2026): Budget, Verordnungen, Wasser, Minikarte – erledigt
+Abweichungen: Verordnungs-Wirkungen als `mul`/`add` in ORDINANCES; Minikarte 112×64 (Raute 2:1); Wassergebäude ohne Strom-/Kriminalitätslast; alte Stände bekommen einen Hinweis aufs Pumpwerk.
 
 Gemeinsame Regeln: Neue Zustandsfelder legt `newCity` mit Standardwerten an; `js/save.js` serialisiert `budget` und `ords` bereits (KEYS). Fehlen sie in alten Ständen, bleiben die Standardwerte aus `newCity`. Werte/Balancing in `js/data.js`. Tests in `test/sim.test.js` anhängen; `npm test` (im Ordner simfurt) muss grün sein. `buildCity` in `test/bot.mjs` darf erweitert werden (z. B. Pumpwerke), Schwellen nicht absenken.
 

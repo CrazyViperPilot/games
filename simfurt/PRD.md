@@ -22,17 +22,21 @@ Wohnen (R), Gewerbe (C), Industrie (I), **Bankenviertel (B, ab 3.000 Einw.)** mi
 ### Simulation (`js/sim.js`, ohne DOM, getestet)
 - **Nachfrage** W/G/I/B aus Arbeitsplätzen vs. Arbeitskräften, Einwohnern, Steuern, Zufriedenheit, Verschmutzung, Bildung (Balken oben).
 - **Strom**: Kraftwerke versorgen einen Radius und haben Kapazität; Überlast → Teilausfall.
+- **Wasser** (ohne Leitungen): Pumpwerk (am Ufer) versorgt Radius 14 mit Kapazität; Wassertürme erweitern die Versorgung (nur wenn ein Pumpwerk existiert); Kläranlage (ab 3.000) senkt Dreck im Umkreis und erhöht die Pumpkapazität (+25 % je Anlage, max. ×1,5). Stufe ≥ 2 braucht Wasser, ohne Wasser sinken höhere Stufen langsam. Kartenansicht „Wasser“.
+- **Budget je Ressort** (Rat): Polizei, Feuerwehr, Gesundheit, Bildung, Straßen 0–120 %. Unterhalt skaliert, Wirkung ×min(1,1; b/100); Straßen < 60 % → mehr Stau.
+- **Verordnungen** (Rat, 9 Stück, teils mit Freischaltung): z. B. Tempo 30, Gratis-ÖPNV, Rauchverbot, Ebbelwei-Fest, Nachbarschaftswache, Recyclingpflicht, Nachtflugverbot (nur mit Flughafen), Grüne Dächer, Banken-Steuerrabatt. Monatliche Kosten, Wirkung auf Verkehr, Kriminalität, Dreck, Nachfrage, Tourismus, Zufriedenheit.
 - **Karten**: Polizei, Feuerwehr, Gesundheit, Bildung, Parks, U-Bahn (Abdeckung), Kriminalität, Verschmutzung, Verkehr (BFS über Straßen), Grundwert. Alle als Kartenansichten (Auge-Knopf).
 - **Zufriedenheit** (0–100) aus Steuern, Kriminalität, Umwelt, Verkehr, Diensten, Parks, Wahrzeichen, Arbeitslosigkeit, Strom; steuert die Belegung (Einwohner = Kapazität × Belegung).
 - **Finanzen**: Steuer je Zone (3 Regler), Tourismus der Wahrzeichen, Unterhalt (Gebäude, Straßen), Kredit in 10.000-€-Schritten (bis 50.000 €, 0,4 %/Monat).
 - **Katastrophen** (abschaltbar): Brände (breiten sich aus, Feuerwehr löscht), Hochwasser des Mains im Februar. **Deiche** (am Ufer, Radius 4) schützen vor Hochwasser.
 - **Rückgängig** (Werkzeug ↶, Strg+Z / U): bis zu 10 Bauaktionen (Malen, Abriss, Gebäude); nimmt nur die Änderungen der Aktion zurück und erstattet die Kosten, Wachstum seither bleibt.
 - **Verlauf** im Rat: Diagramme für Einwohner, Kasse und Zufriedenheit (letzte 10 Jahre, ein Wert je Jahreswechsel).
+- **Minikarte** (🗺, ein-/ausklappbar): Raute mit Sichtfeld, Antippen/Ziehen springt dorthin.
 - **Ton** (abschaltbar im Menü): kleine WebAudio-Klänge ohne Audiodateien (`js/sound.js`).
 - **Berater** (Ticker) und **Meilensteine** (500 Dorf … 100.000 Mainhattan).
 
 ### Gebäude
-Strom: Gaskraftwerk, Windpark (ab 800), Solarpark (ab 4.000). Dienste: Polizei, Feuerwehr (400), Schule (600), Äppelwoi-Wirtschaft (500), Krankenhaus (1.500), Goethe-Uni (5.000), Park. Verkehr: U-Bahn-Station (1.500), Deich (am Wasser, ab Start). **Wahrzeichen** (je einmal): Römer 2.000, Kaiserdom 4.000, Zoo, Palmengarten 6.000, Alte Oper 8.000, Hauptbahnhof 10.000, Messe 15.000, Stadion 20.000, Messeturm 25.000, Main Tower 30.000, Commerzbank Tower 40.000, Flughafen Fraport 50.000 (Zahl = Einwohner; gesperrt bis dahin, bleibt nach Spitzenwert 90 % offen). Wahrzeichen geben Zufriedenheit und Tourismuseinnahmen.
+Strom: Gaskraftwerk, Windpark (ab 800), Solarpark (ab 4.000). Dienste: Polizei, Feuerwehr (400), Schule (600), Äppelwoi-Wirtschaft (500), Krankenhaus (1.500), Goethe-Uni (5.000), Park. Verkehr: U-Bahn-Station (1.500). Wasser: Pumpwerk (am Ufer), Wasserturm, Kläranlage (3.000), Deich (am Wasser). **Wahrzeichen** (je einmal): Römer 2.000, Kaiserdom 4.000, Zoo, Palmengarten 6.000, Alte Oper 8.000, Hauptbahnhof 10.000, Messe 15.000, Stadion 20.000, Messeturm 25.000, Main Tower 30.000, Commerzbank Tower 40.000, Flughafen Fraport 50.000 (Zahl = Einwohner; gesperrt bis dahin, bleibt nach Spitzenwert 90 % offen). Wahrzeichen geben Zufriedenheit und Tourismuseinnahmen.
 
 ## Bedienung
 - **Touch (Hochformat)**: Werkzeug im Dock wählen (Kategorien unten). Ein Finger: Straße/Abriss malen, Zonen als Rechteck, Gebäude per Geisterbild setzen (loslassen = bauen). **Zwei Finger** verschieben/zoomen immer. Werkzeug „Hand“: ein Finger verschiebt, Tippen = Info.
@@ -51,7 +55,7 @@ Strom: Gaskraftwerk, Windpark (ab 800), Solarpark (ab 4.000). Dienste: Polizei, 
 - Stand Nov 2026: `https://phpexpert.de/vocs/…` liefert 404 (Deploy/Hosting prüfen: Secrets der Umgebung „Dogado“, Zielordner `FTP_DIR`).
 
 ## Technik
-Vanilla ES-Module, kein Build. `js/data.js` (Daten), `js/sim.js` (Logik), `js/render.js` (isometrische Sprites, Autos, Overlays), `js/save.js` (lokal/Datei/Webspace), `js/sound.js` (WebAudio), `js/main.js` (UI/Eingabe/Schleife). Tests: `node simfurt/test/sim.test.js` und `node simfurt/test/save.test.js` (bzw. `npm test` im Ordner; Workflow `test-simfurt.yml`). Arbeitsplan: `PLAN.md`. Service Worker network-first, Cache-Name in `sw.js` bei Änderungen hochzählen.
+Vanilla ES-Module, kein Build. `js/data.js` (Daten), `js/sim.js` (Logik), `js/render.js` (isometrische Sprites, Autos, Overlays), `js/save.js` (lokal/Datei/Webspace), `js/sound.js` (WebAudio), `js/minimap.js` (Minikarte), `js/main.js` (UI/Eingabe/Schleife). Tests: `node simfurt/test/sim.test.js` und `node simfurt/test/save.test.js` (bzw. `npm test` im Ordner; Workflow `test-simfurt.yml`). Arbeitsplan: `PLAN.md`. Service Worker network-first, Cache-Name in `sw.js` bei Änderungen hochzählen.
 
 ## Bewusst offen / Ideen
-Musik, Tag/Nacht, Wasserversorgung, Schienen/S-Bahn, Szenarien (z. B. Hochwasser 1995), Bevölkerungsgruppen, höhere Karten (Hügel/Taunus), Minikarte, Cloud-Sync mit Login.
+Musik, Tag/Nacht, Wasserversorgung, Schienen/S-Bahn, Szenarien (z. B. Hochwasser 1995), Bevölkerungsgruppen, höhere Karten (Hügel/Taunus), Cloud-Sync mit Login, Müll/Recycling, Nachbarstädte/Handel, Altersgruppen, Szenarien mit Zielen, Tag/Nacht, Erfolge, Wiederherstellen.

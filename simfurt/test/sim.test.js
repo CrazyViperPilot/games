@@ -1,7 +1,7 @@
 // Tests für Simfurt: node simfurt/test/sim.test.js
 import assert from 'node:assert';
-import { N, T_WATER, T_TREES, BUILD, ORDINANCES } from '../js/data.js';
-import { newCity, tick, applyTool, placeBuilding, canPlace, refresh, unlocked, idx, takeLoan, repayLoan, pushUndo, endUndo, undo, canUndo, flood, tileInfo, UNDO_MAX, setBudget, budgetPct, toggleOrd, ordBlock } from '../js/sim.js';
+import { N, T_WATER, T_TREES, BUILD, ORDINANCES, CATS, Z_R } from '../js/data.js';
+import { newCity, tick, applyTool, placeBuilding, canPlace, refresh, unlocked, idx, takeLoan, repayLoan, pushUndo, endUndo, undo, canUndo, flood, tileInfo, UNDO_MAX, setBudget, budgetPct, toggleOrd, ordBlock, removeBuilding } from '../js/sim.js';
 import { performance } from 'node:perf_hooks';
 import { serialize, deserialize } from '../js/save.js';
 import { buildCity } from './bot.mjs';
@@ -74,6 +74,7 @@ test('Gleicher Seed und gleiche Eingaben → gleicher Verlauf', () => {
 
 test('Speichern und Laden ergibt denselben Zustand', () => {
   const s = fresh(4); buildCity(s); for (let t = 0; t < 40; t++) tick(s);
+  refresh(s); // Kennzahlen auf den aktuellen Stand (tick rechnet die Stats vor der Belegungsanpassung)
   const t = deserialize(serialize(s));
   for (const k of ['terrain', 'road', 'zone', 'lvl', 'vr', 'occ', 'fire']) assert.deepStrictEqual(t[k], s[k], k);
   assert.strictEqual(t.money, s.money); assert.strictEqual(t.year, s.year); assert.strictEqual(t.bld.length, s.bld.length);
@@ -423,6 +424,117 @@ test('Verordnungen: mindestens 8 Einträge mit eindeutiger id, Kurzbeschreibung 
     assert.ok(o.name && o.desc, o.id);
     assert.ok(o.cost >= 0 && (o.costPerPop || 0) >= 0 && o.unlock >= 0, o.id);
   }
+});
+
+// ---------------------------------------------------------------- Wasserversorgung (Runde 2, Q2)
+const spotsFor = (s, key) => { const out = []; for (let y = 0; y < N - 1; y++) for (let x = 0; x < N - 1; x++) if (canPlace(s, key, x, y) === '') out.push([x, y]); return out; };
+const maxLvl = (s, z) => { let m = 0; for (let i = 0; i < N * N; i++) if (s.zone[i] === z) m = Math.max(m, s.lvl[i]); return m; };
+const cnt = (s, pred) => { let n = 0; for (let i = 0; i < N * N; i++) if (pred(i)) n++; return n; };
+
+test('Wasser: Kategorie „Wasser“ vor „Dienste“, Deich und Wasseranlagen darin', () => {
+  const ids = CATS.map((c) => c.id);
+  assert.ok(ids.indexOf('water') >= 0 && ids.indexOf('water') < ids.indexOf('service'), ids.join(','));
+  assert.strictEqual(BUILD.dike.cat, 'water');
+  for (const k of ['pump', 'tower', 'treat']) assert.strictEqual(BUILD[k].cat, 'water', k);
+});
+
+test('Pumpwerk: nur am Ufer baubar (4-Nachbar Wasser), im Landesinneren „Nur am Ufer“', () => {
+  const s = fresh(5);
+  const inland = spotsFor(s, 'pump').length ? null : null; void inland;
+  let land = null;
+  for (let y = 2; y < N - 3 && !land; y++) for (let x = 2; x < N - 3; x++) if (canPlace(s, 'pump', x, y) === 'Nur am Ufer') { land = [x, y]; break; }
+  assert.ok(land, 'Landstelle ohne Ufer');
+  const shore = spotsFor(s, 'pump')[0];
+  assert.ok(shore, 'Uferstelle');
+  assert.ok(placeBuilding(s, 'pump', shore[0], shore[1]).ok);
+  const wat = s.terrain.indexOf(T_WATER);
+  assert.strictEqual(canPlace(s, 'pump', wat % N, (wat / N) | 0), 'Wasser', 'auf Wasser bleibt verboten');
+});
+
+test('Wasser: ohne Pumpwerk wächst keine Wohnzone über Stufe 1, mit Wasser schon', () => {
+  const dry = fresh(5); buildCity(dry);
+  for (const b of [...dry.bld]) if (b.type === 'pump' || b.type === 'tower') removeBuilding(dry, b);
+  refresh(dry);
+  assert.strictEqual(dry.waterCap, 0); assert.ok(dry.watered.every((v) => v === 0));
+  for (let t = 0; t < 120; t++) tick(dry);
+  assert.ok(dry.stats.lots > 0, 'Stufe 1 entsteht ohne Wasser');
+  assert.ok(maxLvl(dry, Z_R) <= 1, 'ohne Wasser max. Stufe ' + maxLvl(dry, Z_R));
+  const wet = fresh(5); buildCity(wet);
+  for (let t = 0; t < 120; t++) tick(wet);
+  assert.ok(maxLvl(wet, Z_R) >= 2, 'mit Wasser höhere Stufen ' + maxLvl(wet, Z_R));
+});
+
+test('Wasser: ohne Versorgung sinkt Stufe > 1 nur langsam (rand < 0,05 je Parzelle und Monat)', () => {
+  const s = fresh(5); buildCity(s);
+  for (let t = 0; t < 96; t++) tick(s);
+  const hi0 = cnt(s, (i) => s.zone[i] && s.lvl[i] >= 2);
+  assert.ok(hi0 > 20, 'Stufe ≥ 2 vorhanden: ' + hi0);
+  for (const b of [...s.bld]) if (b.type === 'pump' || b.type === 'tower') removeBuilding(s, b);
+  refresh(s);
+  tick(s);
+  const hi1 = cnt(s, (i) => s.zone[i] && s.lvl[i] >= 2);
+  assert.ok(hi1 >= hi0 * 0.8, `in einem Monat sinkt nur ein kleiner Teil: ${hi0} → ${hi1}`);
+  assert.ok(hi1 < hi0, 'es sinkt aber doch etwas');
+});
+
+test('Wasser: Zufriedenheit sinkt bei trockenen Parzellen ab Stufe 2, nicht vorher', () => {
+  const s = fresh(5); buildCity(s);
+  refresh(s); assert.strictEqual(s.stats.parts.water, 0, 'mit Versorgung keine Strafe');
+  for (let t = 0; t < 96; t++) tick(s);
+  for (const b of [...s.bld]) if (b.type === 'pump' || b.type === 'tower') removeBuilding(s, b);
+  refresh(s);
+  assert.ok(s.stats.parts.water < 0 && s.stats.parts.water >= -20, 'Teil Wasser ' + s.stats.parts.water);
+  assert.ok(s.stats.waterDry > 0);
+});
+
+test('Kläranlage: senkt Verschmutzung im Radius, Pumpwerk-Kapazität ×1,25, mit zwei und mehr ×1,5 (Obergrenze)', () => {
+  const s = fresh(5); buildCity(s); refresh(s);
+  const cap0 = s.waterCap; assert.ok(cap0 > 0);
+  const pol0 = Float32Array.from(s.maps.pol);
+  let hot = 0; for (let i = 1; i < N * N; i++) if (pol0[i] > pol0[hot]) hot = i;
+  assert.ok(pol0[hot] > 0, 'Verschmutzung vorhanden');
+  const hx = hot % N, hy = (hot / N) | 0;
+  let spot = null;
+  for (let r = 3; r <= 6 && !spot; r++) for (let y = hy - r; y <= hy + r && !spot; y++) for (let x = hx - r; x <= hx + r; x++) {
+    if (canPlace(s, 'treat', x, y) === '') { spot = [x, y]; break; }
+  }
+  assert.ok(spot, 'Platz für die Kläranlage');
+  assert.ok(placeBuilding(s, 'treat', spot[0], spot[1]).ok);
+  refresh(s);
+  assert.ok(Math.abs(s.waterCap - cap0 * 1.25) < 1e-6, `Kapazität ${s.waterCap} statt ${cap0 * 1.25}`);
+  let up = 0, sum0 = 0, sum1 = 0;
+  for (let i = 0; i < N * N; i++) { sum0 += pol0[i]; sum1 += s.maps.pol[i]; if (s.maps.pol[i] > pol0[i] + 1e-4) up++; }
+  assert.strictEqual(up, 0, 'Verschmutzung darf nirgends steigen');
+  assert.ok(s.maps.pol[hot] < pol0[hot] * 0.9, `Dreck am Hotspot ${s.maps.pol[hot]} vorher ${pol0[hot]}`);
+  assert.ok(sum1 < sum0, 'Summe der Verschmutzung sinkt');
+  const place = () => { for (let y = 1; y < N - 2; y++) for (let x = 1; x < N - 2; x++) if (placeBuilding(s, 'treat', x, y).ok) return true; return false; };
+  assert.ok(place()); refresh(s);
+  assert.ok(Math.abs(s.waterCap - cap0 * 1.5) < 1e-6, 'zwei Anlagen: ×1,5 ' + s.waterCap);
+  assert.ok(place()); refresh(s);
+  assert.ok(Math.abs(s.waterCap - cap0 * 1.5) < 1e-6, 'drei Anlagen bleiben bei ×1,5 ' + s.waterCap);
+});
+
+test('Wasserturm: ohne Pumpwerk keine Versorgung, mit einem Pumpwerk verteilt er im Radius', () => {
+  const s = fresh(5);
+  const land = spotsFor(s, 'tower')[Math.floor(N * N / 3)];
+  assert.ok(land, 'Platz für den Wasserturm');
+  assert.ok(placeBuilding(s, 'tower', land[0], land[1]).ok);
+  refresh(s);
+  const ti = idx(land[0], land[1]);
+  assert.strictEqual(s.waterCap, 0); assert.strictEqual(s.maps.water[ti], 0); assert.ok(s.watered.every((v) => v === 0));
+  const shore = spotsFor(s, 'pump')[0];
+  assert.ok(shore && placeBuilding(s, 'pump', shore[0], shore[1]).ok);
+  refresh(s);
+  assert.ok(s.maps.water[ti] > 0, 'Turm verteilt mit Pumpwerk');
+  assert.strictEqual(s.waterCap, BUILD.pump.cap);
+  assert.strictEqual(s.watered[ti], 1, 'Turmkachel ist versorgt (Kapazität reicht)');
+});
+
+test('Wasser: Speichern erhält die Versorgung nach dem Laden (abgeleitet, Standardwerte bei alten Ständen)', () => {
+  const s = fresh(4); buildCity(s); for (let t = 0; t < 30; t++) tick(s);
+  const t = deserialize(serialize(s));
+  assert.strictEqual(t.waterCap, s.waterCap); assert.strictEqual(t.waterLoad, s.waterLoad);
+  assert.deepStrictEqual(Array.from(t.watered), Array.from(s.watered));
 });
 
 console.log(`${n} Tests ok`);

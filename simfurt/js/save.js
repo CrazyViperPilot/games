@@ -3,7 +3,7 @@
 // Optional im Hintergrund: Webspace (PHP, simfurt/api.php im Repo vipervocs) – blockiert nie das lokale Speichern.
 // Außerdem Export/Import als Datei (.simfurt = gzip-JSON, ohne CompressionStream reines JSON).
 import { N } from './data.js';
-import { newCity, refresh } from './sim.js';
+import { newCity, refresh, say } from './sim.js';
 
 export const REMOTE_URL = 'https://phpexpert.de/vocs/simfurt/api.php';
 export const SLOTS = [1, 2, 3];
@@ -39,6 +39,7 @@ export function deserialize(text) {
   s.occ.fill(0);
   for (const b of s.bld) for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) s.occ[y * size + x] = b.id;
   refresh(s);
+  if (o.budget === undefined && s.bld.length) say(s, 'Neu in Simfurt: Wasserversorgung, Budget und Verordnungen. Baue ein Pumpwerk am Ufer, sonst sinken Gebäude ab Stufe 2 langsam ab.', 'info');
   return s;
 }
 

@@ -381,7 +381,7 @@ function councilHtml() {
   const st = S.stats, f = S.fin, p = f.parts;
   const cl = (v) => (v >= 0 ? 'pos' : 'neg');
   const rate = (k, label) => `<div class="sl"><span>${label}</span><input type="range" min="0" max="20" value="${S.rates[k]}" data-r="${k}"><b id="rv${k}">${S.rates[k]} %</b></div>`;
-  const names = { tax: 'Steuern', crime: 'Kriminalität', pol: 'Umwelt', traffic: 'Verkehr', health: 'Gesundheit', edu: 'Bildung', police: 'Polizei', fire: 'Feuerwehr', park: 'Grünflächen', landmark: 'Wahrzeichen', jobs: 'Arbeitslosigkeit', power: 'Strom', ords: 'Verordnungen' };
+  const names = { tax: 'Steuern', crime: 'Kriminalität', pol: 'Umwelt', traffic: 'Verkehr', health: 'Gesundheit', edu: 'Bildung', police: 'Polizei', fire: 'Feuerwehr', park: 'Grünflächen', landmark: 'Wahrzeichen', jobs: 'Arbeitslosigkeit', power: 'Strom', water: 'Wasser', ords: 'Verordnungen' };
   // Monatlicher Unterhalt je Ressort (schon mit Budget); Straßen über den Straßenunterhalt
   const resCost = { police: p.upPolice || 0, fire: p.upFire || 0, health: p.upHealth || 0, edu: p.upEdu || 0, roads: p.roads || 0 };
   const budgetRow = (k) => { const v = budgetPct(S, k); return `<div class="sl wide"><span>${BUDGET_NAMES[k]}</span><input type="range" min="${BUDGET_MIN}" max="${BUDGET_MAX}" step="${BUDGET_STEP}" value="${v}" data-b="${k}"><b id="bv${k}">${v} %</b></div>`; };
@@ -416,7 +416,7 @@ function councilHtml() {
     ${histHtml()}
     <h3 class="sec">Stadt</h3>
     <div class="kv"><span>Einwohner</span><span>${fmt(st.pop)}</span><span>Arbeitsplätze</span><span>${fmt(st.jobs)} (davon Banken ${fmt(st.jobsB)})</span><span>Arbeitslosigkeit</span><span>${Math.round(st.unemp * 100)} %</span>
-    <span>Strom</span><span>${fmt(S.powerCap)} / ${fmt(S.powerLoad)}</span><span>Grundwert Ø</span><span>${Math.round(st.value)}</span><span>Stau</span><span>${Math.round(st.cong * 100)} %</span></div>
+    <span>Strom</span><span>${fmt(S.powerCap)} / ${fmt(S.powerLoad)}</span><span>Wasser cap / load</span><span>${fmt(S.waterCap)} / ${fmt(S.waterLoad)}</span><span>Grundwert Ø</span><span>${Math.round(st.value)}</span><span>Stau</span><span>${Math.round(st.cong * 100)} %</span></div>
     <h3 class="sec">Nachrichten</h3>${S.msgs.slice(-14).reverse().map((m) => `<div class="msg ${m.kind}"><small>${MONTHS[m.m]} ${m.y}</small>${m.text}</div>`).join('')}`;
 }
 $('bCouncil').onclick = () => {
@@ -496,7 +496,7 @@ async function openMenu(first) {
     <h3 class="sec">Spielstände</h3>${rows}
     <div class="chk"><input type="checkbox" id="mDis" ${S ? (S.disasters ? 'checked' : '') : 'checked'}><label for="mDis">Katastrophen (Feuer, Hochwasser)</label></div>
     <div class="chk"><input type="checkbox" id="mSnd" ${sound.on ? 'checked' : ''}><label for="mSnd">Ton</label></div>
-    <details class="slot"><summary><b>So geht's</b></summary><p style="margin-top:8px">1. <b>Straße</b> ziehen · 2. <b>Zonen</b> (Wohnen, Gewerbe, Industrie) als Rechteck neben die Straße · 3. <b>Gaskraftwerk</b> bauen · 4. Zeit läuft: die Stadt wächst nach Nachfrage (Balken oben). Später Polizei, Feuerwehr, Schulen, Parks, U-Bahn und Wahrzeichen. Banken und Skyline gibt es ab 3.000 Einwohnern. Steuern und Kredit im <b>Rat</b>.</p></details>
+    <details class="slot"><summary><b>So geht's</b></summary><p style="margin-top:8px">1. <b>Straße</b> ziehen · 2. <b>Zonen</b> (Wohnen, Gewerbe, Industrie) als Rechteck neben die Straße · 3. <b>Gaskraftwerk</b> bauen · 4. <b>Pumpwerk am Ufer</b> (Kategorie Wasser) setzen, damit die Zonen Wasser bekommen · 5. Zeit läuft: die Stadt wächst nach Nachfrage (Balken oben). Später Polizei, Feuerwehr, Schulen, Parks, U-Bahn und Wahrzeichen. Banken und Skyline gibt es ab 3.000 Einwohnern. Steuern und Kredit im <b>Rat</b>.</p></details>
     <p style="color:var(--muted);font-size:12px">Speicher: ${storageInfo().local} · Webspace: ${storageInfo().remote}${lastSaveAt ? ' · zuletzt ' + new Date(lastSaveAt).toLocaleTimeString('de-DE', { timeStyle: 'short' }) : ''}. Autospeichern alle 3 Spielmonate, jede Minute und beim Verlassen. Sicherung: 📤 exportieren, 📂 importieren. Tipp: Zwei Finger = Karte verschieben/zoomen, Maus: rechte Taste ziehen, Rad = Zoom.</p>`;
   sheet(first ? 'Willkommen' : 'Menü', base('<p style="color:var(--muted)">Lade …</p>'));
   bindMenu();

@@ -32,7 +32,11 @@ export const BUILD = {
   park:   { name: 'Park', cat: 'service', w: 1, h: 1, cost: 70, up: 2, kind: 'park', r: 5, icon: '🌳', color: '#3fa04a', unlock: 0, desc: 'Grün macht glücklich und wertet auf.' },
   apple:  { name: 'Äppelwoi-Wirtschaft', cat: 'service', w: 1, h: 1, cost: 450, up: 25, kind: 'park', r: 7, tour: 40, icon: '🍺', color: '#a8452e', unlock: 500, desc: 'Gemütlich in Sachsenhausen. Ebbelwei hebt die Stimmung.' },
   metro:  { name: 'U-Bahn-Station', cat: 'transport', w: 1, h: 1, cost: 700, up: 45, kind: 'metro', r: 8, icon: 'U', color: '#1f6a43', unlock: 1500, desc: 'Entlastet Straßen im Umkreis.' },
-  dike:   { name: 'Deich', cat: 'transport', w: 1, h: 1, cost: 150, up: 2, kind: 'dike', r: 4, icon: '🧱', color: '#6f8f4e', unlock: 0, desc: 'Am Ufer bauen: schützt den Umkreis vor Hochwasser.' },
+  dike:   { name: 'Deich', cat: 'water', w: 1, h: 1, cost: 150, up: 2, kind: 'dike', r: 4, icon: '🧱', color: '#6f8f4e', unlock: 0, shore: 'Nur am Wasser', desc: 'Am Ufer bauen: schützt den Umkreis vor Hochwasser.' },
+  // Wasser (ohne Leitungen, wie Strom per Radius + Kapazität)
+  pump:   { name: 'Pumpwerk', cat: 'water', w: 2, h: 2, cost: 2500, up: 80, kind: 'pump', cap: 260, r: 14, icon: '💧', color: '#2f6fa8', unlock: 0, shore: 'Nur am Ufer', desc: 'Am Ufer bauen: pumpt Wasser in den Umkreis. Braucht Kapazität für alle Zonen.' },
+  tower:  { name: 'Wasserturm', cat: 'water', w: 1, h: 1, cost: 1200, up: 30, kind: 'tower', cap: 0, r: 9, icon: '🚰', color: '#c5ccd2', unlock: 0, desc: 'Verteilt Wasser im Umkreis. Wirkt nur mit mindestens einem Pumpwerk.' },
+  treat:  { name: 'Kläranlage', cat: 'water', w: 2, h: 2, cost: 6000, up: 160, kind: 'treat', r: 10, polCut: 0.4, icon: '♻', color: '#3a9a8a', unlock: 3000, desc: 'Senkt Verschmutzung im Umkreis und erhöht die Wasser-Kapazität aller Pumpwerke.' },
 
   // Wahrzeichen: je einmal baubar
   roemer: { name: 'Römer', cat: 'land', w: 2, h: 2, cost: 5000, up: 80, kind: 'happy', r: 9, happy: 3, tour: 120, unique: 1, icon: '🏛', color: '#d9c7a0', unlock: 2000, desc: 'Rathaus am Römerberg. Staatstragend schön.' },
@@ -48,6 +52,12 @@ export const BUILD = {
   ctower: { name: 'Commerzbank Tower', cat: 'land', w: 1, h: 1, cost: 46000, up: 260, kind: 'happy', r: 9, happy: 2, tour: 800, unique: 1, icon: '△', color: '#e5ecee', unlock: 40000, desc: 'Der höchste Turm mit Antenne.' },
   fraport:{ name: 'Flughafen Fraport', cat: 'land', w: 5, h: 3, cost: 90000, up: 1400, kind: 'happy', r: 14, happy: -2, tour: 3000, unique: 1, icon: '✈', color: '#c3c9cf', unlock: 50000, desc: 'Drehkreuz Europas. Lärm, aber Milliarden.' },
 };
+
+// ---------------------------------------------------------------- Wasser (Runde 2)
+/** Kläranlagen erhöhen die Kapazität aller Pumpwerke um 25 % je Anlage, höchstens ×1,5. */
+export const WATER_TREAT_CAP = 0.25, WATER_TREAT_CAP_MAX = 1.5;
+/** Zufriedenheit: −WATER_HAPPY × Anteil besiedelter Parzellen ohne Wasser (nur wenn Stufe ≥ 2 existiert). */
+export const WATER_HAPPY = 20;
 
 // ---------------------------------------------------------------- Budget je Ressort (Prozent, Regler 0–120 in 10er-Schritten)
 /** Ressorts mit Regler. police/fire/health/edu wirken über die Gebäude-kind gleichen Namens, roads auf Straßen. */
@@ -82,6 +92,7 @@ export const CATS = [
   { id: 'road', name: 'Straße', icon: '🛣' },
   { id: 'zone', name: 'Zonen', icon: '🏘' },
   { id: 'energy', name: 'Strom', icon: '⚡' },
+  { id: 'water', name: 'Wasser', icon: '💧' },
   { id: 'service', name: 'Dienste', icon: '🚒' },
   { id: 'transport', name: 'Verkehr', icon: '🚇' },
   { id: 'land', name: 'Wahrzeichen', icon: '🏛' },
@@ -107,6 +118,7 @@ export const CITY_NAMES = ['Simfurt', 'Neu-Frankfurt', 'Mainhattan', 'Bornheim',
 export const OVERLAYS = [
   { id: 'none', name: 'Normal' },
   { id: 'power', name: 'Strom' },
+  { id: 'water', name: 'Wasser' },
   { id: 'traffic', name: 'Verkehr' },
   { id: 'crime', name: 'Kriminalität' },
   { id: 'pollution', name: 'Verschmutzung' },
