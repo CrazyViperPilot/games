@@ -1,0 +1,9 @@
+# Nur api.php ist zum Aufrufen gedacht; Regeln und Tests bleiben privat.
+<FilesMatch "^(config\.php|engine\.php|test\.php)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Deny from all
+  </IfModule>
+</FilesMatch>

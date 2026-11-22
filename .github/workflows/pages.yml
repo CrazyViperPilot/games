@@ -48,7 +48,7 @@ jobs:
         run: |
           rsync -a --exclude '.git' --exclude '.github' --exclude '.claude' --exclude '.agent' --exclude '_site' --exclude 'cat-queens/' \
             --exclude 'test/' --exclude 'package.json' --exclude 'package-lock.json' --exclude 'node_modules/' \
-            --exclude 'server/' --exclude '*.php' --exclude '.htaccess' --exclude 'fruhno/data/' --exclude 'simfurt/data/' ./ _site/
+            --exclude 'server/' --exclude '*.php' --exclude '.htaccess' --exclude 'fruhno/data/' --exclude 'simfurt/data/' --exclude 'schiffe-versenken/data/' ./ _site/
           mkdir -p _site/cat-queens && cp -r cat-queens/dist/. _site/cat-queens/
           touch _site/.nojekyll
       - name: Upload artifact

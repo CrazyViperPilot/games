@@ -3,6 +3,7 @@
 #   .htaccess          ← server/.htaccess (DirectoryIndex für alle Spiele-Ordner)
 #   fruhno/            ← api.php, engine.php, .htaccess, data/.htaccess, config.php (aus FRUHNO_KEY)
 #   simfurt/           ← api.php, data/.htaccess
+#   schiffe-versenken/ ← api.php, engine.php, .htaccess, data/.htaccess (ohne Schlüssel, jeder darf spielen)
 # Frankfurtopoly hat ein eigenes Repo und lädt selbst nach /games/frankfurtopoly/ hoch.
 #
 # Repository-Secrets (Settings → Secrets and variables → Actions → Secrets), dieselben Werte wie im Repo frankfurtopoly:
@@ -24,6 +25,9 @@ on:
       - "fruhno/data/.htaccess"
       - "simfurt/api.php"
       - "simfurt/data/.htaccess"
+      - "schiffe-versenken/*.php"
+      - "schiffe-versenken/.htaccess"
+      - "schiffe-versenken/data/.htaccess"
       - "server/**"
       - ".github/workflows/deploy-backend.yml"
   workflow_dispatch:
@@ -38,8 +42,9 @@ jobs:
 
       - name: Test Fruhno rules engine
         run: |
-          for f in fruhno/*.php simfurt/api.php; do php -l "$f"; done
+          for f in fruhno/*.php simfurt/api.php schiffe-versenken/*.php; do php -l "$f"; done
           php fruhno/test.php
+          php schiffe-versenken/test.php
 
       - name: Check secrets
         id: check
@@ -58,7 +63,7 @@ jobs:
           FRUHNO_KEY: ${{ secrets.FRUHNO_KEY }}
         run: |
           if [ -z "$FRUHNO_KEY" ]; then echo "::error::Secret FRUHNO_KEY fehlt."; exit 1; fi
-          mkdir -p site/fruhno/data site/simfurt/data
+          mkdir -p site/fruhno/data site/simfurt/data site/schiffe-versenken/data
           cp server/.htaccess site/.htaccess
           cp fruhno/api.php fruhno/engine.php fruhno/.htaccess site/fruhno/
           cp fruhno/data/.htaccess site/fruhno/data/
@@ -66,6 +71,8 @@ jobs:
           printf "<?php\nreturn ['key_sha256' => '%s'];\n" "$hash" > site/fruhno/config.php
           cp simfurt/api.php site/simfurt/
           cp simfurt/data/.htaccess site/simfurt/data/
+          cp schiffe-versenken/api.php schiffe-versenken/engine.php schiffe-versenken/.htaccess site/schiffe-versenken/
+          cp schiffe-versenken/data/.htaccess site/schiffe-versenken/data/
           find site -type f | sort
 
       # lftp statt einer Node-FTP-Action: kommt mit FTPS-Servern klar, die TLS-Session-Reuse
@@ -95,7 +102,7 @@ jobs:
           bye
           EOF
 
-      # Kurzer Check nach dem Upload: fruhno ohne Schlüssel 401, simfurt-Ping 200, Frankfurtopoly-Startseite 200.
+      # Kurzer Check nach dem Upload: fruhno ohne Schlüssel 401, simfurt-Ping 200, Schiffe-versenken-Liste 200, Frankfurtopoly-Startseite 200.
       - name: Check live URLs
         if: steps.check.outputs.ready == 'true'
         run: |
@@ -107,5 +114,6 @@ jobs:
           }
           check https://phpexpert.de/games/fruhno/api.php 401
           check "https://phpexpert.de/games/simfurt/api.php?ping=1" 200
+          check "https://phpexpert.de/games/schiffe-versenken/api.php?list=1" 200
           check https://phpexpert.de/games/frankfurtopoly/ 200
           exit $fail

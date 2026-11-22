@@ -3,3 +3,4 @@ fruhno/config.php
 fruhno/data/*.json
 simfurt/data/*
 !simfurt/data/.htaccess
+schiffe-versenken/data/*.json

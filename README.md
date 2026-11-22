@@ -11,6 +11,7 @@ Live: https://crazyviperpilot.github.io/games/
 | **Go** | [`go/`](go/) | Go gegen den Computer (9×9, 13×13). [README](go/README.md) | `CACHE_NAME` in `go/sw.js`, `go/package.json` |
 | **Sudoku** | [`sudoku/`](sudoku/) | Sudoku, ursprünglich gebaut, um Google Antigravity kennenzulernen | `CACHE_NAME` in `sudoku/sw.js` |
 | **Fruhno** | [`fruhno/`](fruhno/) | UNO mit Frühstücksthema für Daniel, Lea und Kira (online, Chat, Bot). Backend: PHP in `fruhno/*.php`, Deploy per `deploy-backend.yml` nach `phpexpert.de/games/fruhno/`. [PRD](fruhno/PRD.md) | `CACHE_VERSION` in `fruhno/sw.js` |
+| **Schiffe versenken** | [`schiffe-versenken/`](schiffe-versenken/) | Seeschlacht online für 2 Spieler (hosten/beitreten, freie Namen, ohne Passwort, Chat), Hochformat. Backend: PHP in `schiffe-versenken/*.php`, Deploy per `deploy-backend.yml` nach `phpexpert.de/games/schiffe-versenken/`. [README](schiffe-versenken/README.md) | `CACHE_VERSION` in `schiffe-versenken/sw.js` |
 | **Frankfurtopoly** | extern: [phpexpert.de/games/frankfurtopoly](https://phpexpert.de/games/frankfurtopoly/) | Monopoly mit Frankfurter Straßen für Daniel, Lea und Kira (online, Chat, Computergegner). Code, PHP-Backend und Deploy im Repo [frankfurtopoly](https://github.com/CrazyViperPilot/frankfurtopoly) | `CACHE_VERSION` in `frankfurtopoly/sw.js` dort |
 | **CrazyViperMahjong** | [`crazyviper-mahjong/`](crazyviper-mahjong/) | Mahjong Solitaire mit 36 Kampfjet-Typen statt Schriftzeichen, 4 Layouts. [PRD](crazyviper-mahjong/PRD.md) | `CACHE_NAME` in `crazyviper-mahjong/sw.js` |
 | **Catsweeper** | [`catsweeper/`](catsweeper/) | Minesweeper mit Katzen und Fisch-Markierung, 3 Stufen. [PRD](catsweeper/PRD.md) | `CACHE_NAME` in `catsweeper/sw.js` |
@@ -26,7 +27,7 @@ Die Spiele teilen sich nur das Repo und die Domain – sonst nichts.
 - **Code:** Jedes Spiel liegt vollständig in seinem Ordner. Keine gemeinsamen Dateien, keine Imports über Ordnergrenzen
   (auch nicht aus der Startseite). Ein Spiel lässt sich jederzeit herauslösen, indem man seinen Ordner kopiert.
 - **Offline / Installation:** Jedes Spiel hat ein eigenes `manifest.json` (Scope = sein Ordner) und einen eigenen
-  Service Worker mit eigenem Cache-Präfix (`gatesquad-`, `vibesquadron-`, `go-game-`, `sudoku-`, `fruhno-`, `crazyvipermahjong-`, `catsweeper-`, `catqueens-`, `neonstack-`, `simfurt-`). Ein Service Worker löscht beim
+  Service Worker mit eigenem Cache-Präfix (`gatesquad-`, `vibesquadron-`, `go-game-`, `sudoku-`, `fruhno-`, `crazyvipermahjong-`, `catsweeper-`, `catqueens-`, `neonstack-`, `simfurt-`, `schiffeversenken-`). Ein Service Worker löscht beim
   Aktualisieren **nur Caches mit seinem eigenen Präfix** – sonst würde er die Offline-Daten der anderen Spiele zerstören.
 - **Speicherstände:** Jedes Spiel nutzt eigene `localStorage`-Schlüssel.
 - **Lebenszyklus:** Änderungen an einem Spiel betreffen nur seinen Ordner. Ein Release = Änderung + Cache-Version

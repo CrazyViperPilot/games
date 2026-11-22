@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="sea" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#14608c"/><stop offset="1" stop-color="#062440"/></linearGradient>
+    <linearGradient id="hull" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d0d8df"/><stop offset=".5" stop-color="#8a98a5"/><stop offset="1" stop-color="#4f5c69"/></linearGradient>
+    <radialGradient id="fire"><stop offset="0" stop-color="#fff6c2"/><stop offset=".45" stop-color="#ffb02e"/><stop offset="1" stop-color="#e63c14" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="110" fill="url(#sea)"/>
+  <g stroke="#bfe8ff" stroke-opacity=".14" stroke-width="4" fill="none">
+    <path d="M0 120 Q64 104 128 120 T256 120 T384 120 T512 120"/><path d="M0 410 Q64 394 128 410 T256 410 T384 410 T512 410"/>
+    <path d="M0 460 Q64 444 128 460 T256 460 T384 460 T512 460"/>
+  </g>
+  <path d="M60 296 L90 330 L380 330 Q440 326 470 296 Q440 266 380 262 L90 262 Z" fill="#000" opacity=".3" transform="translate(8 12)"/>
+  <path d="M60 296 L90 330 L380 330 Q440 326 470 296 Q440 266 380 262 L90 262 Z" fill="url(#hull)" stroke="#141c23" stroke-width="8"/>
+  <rect x="190" y="248" width="90" height="70" rx="12" fill="#e6edf2" stroke="#141c23" stroke-width="7"/>
+  <rect x="262" y="258" width="10" height="50" fill="#22303c"/>
+  <ellipse cx="160" cy="296" rx="18" ry="16" fill="#2a323a" stroke="#c0392b" stroke-width="6"/>
+  <g fill="#56636f" stroke="#1b232b" stroke-width="6">
+    <rect x="340" y="284" width="70" height="9"/><rect x="340" y="299" width="70" height="9"/><circle cx="338" cy="296" r="22"/>
+    <rect x="44" y="288" width="60" height="9"/><circle cx="108" cy="296" r="19"/>
+  </g>
+  <circle cx="376" cy="190" r="34" fill="none" stroke="#ff5a4a" stroke-width="12"/>
+  <path d="M376 130 V166 M376 214 V250 M316 190 H352 M400 190 H436" stroke="#ff5a4a" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="240" cy="300" r="60" fill="url(#fire)"/>
+  <g fill="#3a3a40"><circle cx="262" cy="214" r="22" opacity=".55"/><circle cx="286" cy="170" r="30" opacity=".35"/></g>
+</svg>
