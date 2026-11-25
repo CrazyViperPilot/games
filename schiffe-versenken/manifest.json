@@ -1,7 +1,7 @@
 {
   "name": "Schiffe versenken",
   "short_name": "Schiffe",
-  "description": "Schiffe versenken online für 2 Spieler mit Chat. Spielen braucht Internet.",
+  "description": "Schiffe versenken online für 2 Spieler mit Chat (Deutsch, English, Polski). Spielen braucht Internet.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

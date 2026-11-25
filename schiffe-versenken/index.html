@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#061a2c">
   <title>Schiffe versenken</title>
-  <meta name="description" content="Schiffe versenken online für 2 Spieler: einer hostet, einer tritt bei. Mit Chat.">
+  <meta name="description" content="Schiffe versenken online für 2 Spieler: einer hostet, einer tritt bei. Mit Chat. Deutsch, English, Polski.">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -14,21 +14,22 @@
 <body>
   <div id="app">
     <header id="bar">
-      <a class="logo" href="./" aria-label="Schiffe versenken">⚓ <span>Schiffe versenken</span></a>
+      <a class="logo" href="./" data-i18n-aria="title">⚓ <span data-i18n="title">Schiffe versenken</span></a>
       <span id="status"></span>
       <span class="spacer"></span>
-      <button id="btn-chat" class="icon" aria-label="Chat" hidden>💬<i id="chat-badge" hidden></i></button>
-      <button id="btn-menu" class="icon" aria-label="Menü">☰</button>
+      <button id="btn-chat" class="icon" data-i18n-aria="chat" aria-label="Chat" hidden>💬<i id="chat-badge" hidden></i></button>
+      <button id="btn-menu" class="icon" data-i18n-aria="menu" aria-label="Menü">☰</button>
     </header>
     <main id="screen"></main>
     <aside id="chat" aria-label="Chat">
-      <div class="chat-head"><b>Funkverkehr</b><button id="chat-close" class="icon" type="button" aria-label="Chat schließen">✕</button></div>
+      <div class="chat-head"><b data-i18n="chatHead">Funkverkehr</b><button id="chat-close" class="icon" type="button" data-i18n-aria="chatClose" aria-label="Chat schließen">✕</button></div>
       <div id="chat-log"></div>
-      <form id="chat-form"><input id="chat-input" maxlength="200" autocomplete="off" placeholder="Nachricht…" enterkeyhint="send"><button aria-label="Senden">➤</button></form>
+      <form id="chat-form"><input id="chat-input" maxlength="200" autocomplete="off" data-i18n-ph="chatPh" placeholder="Nachricht…" enterkeyhint="send"><button data-i18n-aria="send" aria-label="Senden">➤</button></form>
     </aside>
     <div id="modal" hidden></div>
     <div id="toast" hidden></div>
   </div>
+  <script src="js/i18n.js"></script>
   <script src="js/draw.js"></script>
   <script src="js/api.js"></script>
   <script src="js/main.js"></script>

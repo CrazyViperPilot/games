@@ -26,9 +26,10 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
-function fail($code, $message) {
+/** Fehler mit Code (siehe SV_ERRORS); 'error' bleibt der deutsche Text für ältere Clients, 'err' ist der Code. */
+function fail($code, $err) {
     http_response_code($code);
-    echo json_encode(['error' => $message], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['error' => sv_error_text($err), 'err' => $err], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -44,10 +45,14 @@ function clean_name($n) {
     return mb_substr($n, 0, 16);
 }
 function last_seen($room) { $m = 0; foreach ($room['players'] as $p) $m = max($m, $p['seen']); return $m; }
-function add_chat(&$room, $name, $text, $kind = 'msg') {
+/** $extra: ['key' => …, 'p' => [...], 'ship' => …] – damit übersetzt der Client Systemzeilen; 'text' ist der deutsche Text. */
+function add_chat(&$room, $name, $text, $kind = 'msg', $extra = []) {
     $n = count($room['chat']) ? $room['chat'][count($room['chat']) - 1]['n'] + 1 : 1;
-    $room['chat'][] = ['n' => $n, 'name' => $name, 'text' => $text, 't' => time(), 'kind' => $kind];
+    $room['chat'][] = array_merge(['n' => $n, 'name' => $name, 'text' => $text, 't' => time(), 'kind' => $kind], $extra);
     $room['chat'] = array_slice($room['chat'], -80);
+}
+function sys_chat(&$room, $key, $p, $text, $kind = 'sys', $extra = []) {
+    add_chat($room, '', $text, $kind, array_merge(['key' => $key, 'p' => $p], $extra));
 }
 function reset_round(&$room) {
     foreach ($room['players'] as &$p) { $p['ships'] = null; $p['ready'] = false; $p['grid'] = array_fill(0, SV_SIZE * SV_SIZE, 0); $p['shots'] = 0; $p['hits'] = 0; }
@@ -93,8 +98,8 @@ $issued = null;
 
 if ($action === 'host') {
     $name = clean_name(isset($body['name']) ? $body['name'] : '');
-    if ($name === '') fail(400, 'Bitte einen Namen eingeben');
-    if (count(glob($dataDir . '/room-*.json') ?: []) >= SV_MAX_ROOMS) fail(503, 'Gerade sind zu viele Spiele offen');
+    if ($name === '') fail(400, 'name');
+    if (count(glob($dataDir . '/room-*.json') ?: []) >= SV_MAX_ROOMS) fail(503, 'busy');
     $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     for ($try = 0; $try < 20; $try++) {
         $id = '';
@@ -108,17 +113,17 @@ if ($action === 'host') {
     $issued = $p['token'];
     $room = ['id' => $id, 'created' => $now, 'version' => 1, 'phase' => 'lobby', 'round' => 0, 'players' => [$p],
              'turn' => null, 'winner' => null, 'last' => null, 'seq' => 0, 'chat' => []];
-    add_chat($room, '', "$name hat das Spiel eröffnet", 'sys');
+    sys_chat($room, 'opened', [$name], "$name hat das Spiel eröffnet");
     $me = 0;
     $error = null;
 } else {
     $id = isset($body['room']) ? $body['room'] : (isset($_GET['room']) ? $_GET['room'] : '');
     if (!valid_room_id($id)) fail(400, 'Ungültiger Raum');
     $fp = @fopen(room_file($id), 'r+');
-    if (!$fp) fail(404, 'Das Spiel gibt es nicht mehr');
+    if (!$fp) fail(404, 'gone');
     flock($fp, LOCK_EX);
     $room = json_decode(stream_get_contents($fp), true);
-    if (!is_array($room) || !isset($room['phase'])) { flock($fp, LOCK_UN); fclose($fp); fail(404, 'Das Spiel gibt es nicht mehr'); }
+    if (!is_array($room) || !isset($room['phase'])) { flock($fp, LOCK_UN); fclose($fp); fail(404, 'gone'); }
 
     $me = -1;
     if ($token !== '') foreach ($room['players'] as $i => $p) if (hash_equals($p['token'], $token)) $me = $i;
@@ -131,8 +136,8 @@ if ($action === 'host') {
             case 'join':
                 if ($me >= 0) break; // schon drin
                 $name = clean_name(isset($body['name']) ? $body['name'] : '');
-                if ($name === '') { $error = 'Bitte einen Namen eingeben'; break; }
-                if ($room['phase'] !== 'lobby' || count($room['players']) >= 2) { $error = 'Das Spiel ist schon voll'; break; }
+                if ($name === '') { $error = 'name'; break; }
+                if ($room['phase'] !== 'lobby' || count($room['players']) >= 2) { $error = 'full'; break; }
                 if (mb_strtolower($room['players'][0]['name']) === mb_strtolower($name)) $name = mb_substr($name, 0, 14) . ' 2';
                 $p = new_player($name, $now);
                 $issued = $p['token'];
@@ -141,11 +146,11 @@ if ($action === 'host') {
                 $room['phase'] = 'placing';
                 $room['round']++;
                 reset_round($room);
-                add_chat($room, '', "$name ist an Bord – Schiffe aufstellen!", 'sys');
+                sys_chat($room, 'joined', [$name], "$name ist an Bord – Schiffe aufstellen!");
                 break;
             case 'place':
-                if ($me < 0) { $error = 'Du spielst hier nicht mit'; break; }
-                if ($room['phase'] !== 'placing') { $error = 'Gerade wird nicht aufgestellt'; break; }
+                if ($me < 0) { $error = 'notin'; break; }
+                if ($room['phase'] !== 'placing') { $error = 'noplace'; break; }
                 [$ships, $err] = sv_validate_fleet(isset($body['ships']) ? $body['ships'] : null);
                 if ($err) { $error = $err; break; }
                 $room['players'][$me]['ships'] = $ships;
@@ -154,17 +159,18 @@ if ($action === 'host') {
                     $room['phase'] = 'playing';
                     // Runde 1 beginnt der Gast, danach immer der Verlierer der letzten Runde.
                     if ($room['turn'] === null) $room['turn'] = isset($room['starter']) ? $room['starter'] : 1;
-                    add_chat($room, '', 'Alle Flotten bereit. ' . $room['players'][$room['turn']]['name'] . ' eröffnet das Feuer!', 'sys');
+                    $starter = $room['players'][$room['turn']]['name'];
+                    sys_chat($room, 'start', [$starter], "Alle Flotten bereit. $starter eröffnet das Feuer!");
                 }
                 break;
             case 'unready':
-                if ($me < 0 || $room['phase'] !== 'placing') { $error = 'Geht gerade nicht'; break; }
+                if ($me < 0 || $room['phase'] !== 'placing') { $error = 'cant'; break; }
                 $room['players'][$me]['ready'] = false;
                 break;
             case 'shoot':
-                if ($me < 0) { $error = 'Du spielst hier nicht mit'; break; }
-                if ($room['phase'] !== 'playing') { $error = 'Das Gefecht läuft nicht'; break; }
-                if ($room['turn'] !== $me) { $error = 'Du bist nicht dran'; break; }
+                if ($me < 0) { $error = 'notin'; break; }
+                if ($room['phase'] !== 'playing') { $error = 'nofight'; break; }
+                if ($room['turn'] !== $me) { $error = 'noturn'; break; }
                 $x = isset($body['x']) ? $body['x'] : -1; $y = isset($body['y']) ? $body['y'] : -1;
                 $target = &$room['players'][$other];
                 $r = sv_shoot($target['ships'], $target['grid'], is_int($x) ? $x : -1, is_int($y) ? $y : -1);
@@ -175,27 +181,31 @@ if ($action === 'host') {
                 $room['last'] = ['seq' => $room['seq'], 'by' => $me, 'x' => $x, 'y' => $y, 'res' => $r['res'], 'ship' => $r['ship']];
                 $who = $room['players'][$me]['name'];
                 $at = sv_coord($x, $y);
-                if ($r['res'] === 'miss') { $room['turn'] = $other; add_chat($room, '', "$who: $at – Wasser", 'act'); }
-                elseif ($r['res'] === 'hit') add_chat($room, '', "$who: $at – Treffer!", 'act');
-                else add_chat($room, '', "$who versenkt " . ($r['ship'] === 3 ? 'das ' : 'den ') . SV_SHIP_NAMES[$r['ship']] . " ($at)", 'sys');
+                if ($r['res'] === 'miss') { $room['turn'] = $other; sys_chat($room, 'miss', [$who, $at], "$who: $at – Wasser", 'act'); }
+                elseif ($r['res'] === 'hit') sys_chat($room, 'hit', [$who, $at], "$who: $at – Treffer!", 'act');
+                else {
+                    $ship = sv_ship_name($r['ship']);
+                    sys_chat($room, 'sunk', [$who, $at, $ship], "$who versenkt " . ($ship === 'U-Boot' ? 'ein ' : 'einen ') . "$ship ($at)", 'sys', ['ship' => $r['ship']]);
+                }
                 unset($target);
                 if ($r['won']) {
                     $room['phase'] = 'finished';
                     $room['winner'] = $me;
                     $room['starter'] = $other;
                     $room['players'][$me]['score']++;
-                    add_chat($room, '', "🏆 $who gewinnt die Seeschlacht!", 'sys');
+                    sys_chat($room, 'won', [$who], "🏆 $who gewinnt die Seeschlacht!");
                 }
                 break;
             case 'rematch':
-                if ($me < 0 || $room['phase'] !== 'finished' || count($room['players']) < 2) { $error = 'Geht gerade nicht'; break; }
+                if ($me < 0 || $room['phase'] !== 'finished' || count($room['players']) < 2) { $error = 'cant'; break; }
                 $room['phase'] = 'placing';
                 $room['round']++;
                 reset_round($room);
-                add_chat($room, '', $room['players'][$me]['name'] . ' will Revanche – neue Runde, Schiffe aufstellen!', 'sys');
+                $who = $room['players'][$me]['name'];
+                sys_chat($room, 'rematch', [$who], "$who will Revanche – neue Runde, Schiffe aufstellen!");
                 break;
             case 'chat':
-                if ($me < 0) { $error = 'Du spielst hier nicht mit'; break; }
+                if ($me < 0) { $error = 'notin'; break; }
                 $text = trim(preg_replace('/[\x00-\x1F\x7F]/u', '', mb_substr((string)(isset($body['text']) ? $body['text'] : ''), 0, 200)));
                 if ($text !== '') add_chat($room, $room['players'][$me]['name'], $text);
                 break;
@@ -211,7 +221,7 @@ if ($action === 'host') {
                 unset($room['starter']);
                 reset_round($room);
                 $room['created'] = $now;
-                add_chat($room, '', "$who hat das Spiel verlassen. Warte auf neuen Gegner …", 'sys');
+                sys_chat($room, 'left', [$who], "$who hat das Spiel verlassen. Warte auf neuen Gegner …");
                 break;
             default:
                 $error = 'Unbekannte Aktion';
@@ -253,5 +263,5 @@ if ($me >= 0) {
     }
 }
 if ($issued !== null && $error === null) $out['token'] = $issued;
-if ($error !== null) $out['error'] = $error;
+if ($error !== null) { $out['error'] = sv_error_text($error); $out['err'] = $error; }
 echo json_encode($out, JSON_UNESCAPED_UNICODE);

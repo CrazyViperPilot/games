@@ -52,7 +52,7 @@ async function act(body) {
   try {
     const data = await apiCall(body);
     online = true;
-    if (data.error) toast(data.error);
+    if (data.error) toast(errText(data));
     if (body.action === 'leave' || data.status === 404 || data.phase === 'gone') leaveLocal();
     else if (data.room && data.you >= 0) { store.set('room', data.room); S = data; }
     renderKey = '';
@@ -60,7 +60,7 @@ async function act(body) {
     return data;
   } catch (e) {
     online = false;
-    toast('Keine Verbindung zum Server');
+    toast(t('noConn'));
     render();
     return null;
   } finally {
@@ -76,7 +76,7 @@ async function poll() {
         const data = await apiCall(null, '?room=' + encodeURIComponent(store.get('room')));
         online = true;
         if (data.status === 404 || data.phase === 'gone' || (data.room && data.you < 0)) {
-          if (S) toast(data.error || 'Das Spiel ist vorbei');
+          if (S) toast(data.error ? errText(data) : t('gameOver'));
           leaveLocal();
         } else if (data.room) S = data;
       } else {
@@ -89,35 +89,51 @@ async function poll() {
   timer = setTimeout(poll, inRoom() ? POLL_ROOM : POLL_LIST);
 }
 
+/* ---------- Sprache ---------- */
+/** Fehlermeldung vom Server: Code übersetzen, sonst Text des Servers. */
+function errText(d) { return d.err && STRINGS.de['e_' + d.err] ? t('e_' + d.err) : d.error; }
+/** Systemzeile im Chat: der Server schickt Schlüssel + Parameter, ältere Räume nur fertigen Text. */
+function chatText(m) {
+  if (!m.key || !STRINGS.de['c_' + m.key]) return m.text;
+  const p = (m.p || []).slice();
+  if (m.key === 'sunk' && typeof m.ship === 'number' && m.ship >= 0) p[2] = t('shipsAcc')[shipClass(m.ship)];
+  return t('c_' + m.key, ...p);
+}
+function langPicker(after) {
+  return el('div', { class: 'langs', title: t('language') }, ...Object.entries(LANGS).map(([code, label]) =>
+    el('button', { class: code === LANG ? 'on' : '', type: 'button', onclick: () => { setLang(code); renderKey = ''; render(); if (after) after(); } }, label)));
+}
+
 /* ---------- Hafen: hosten / beitreten ---------- */
 function renderHome() {
-  const name = el('input', { id: 'name', value: myName(), maxLength: 16, placeholder: 'Dein Name', autocomplete: 'off', enterKeyHint: 'done' });
+  const name = el('input', { id: 'name', value: myName(), maxLength: 16, placeholder: t('yourName'), autocomplete: 'off', enterKeyHint: 'done' });
   name.addEventListener('input', () => store.set('name', name.value.trim()));
   const needName = () => {
     const n = name.value.trim();
-    if (!n) { toast('Bitte erst einen Namen eingeben'); name.focus(); return null; }
+    if (!n) { toast(t('needName')); name.focus(); return null; }
     store.set('name', n);
     return n;
   };
   const list = el('div', { class: 'rooms' });
-  if (!rooms) list.append(el('div', { class: 'hint' }, online ? 'Suche offene Spiele …' : 'Keine Verbindung zum Server.'));
-  else if (!rooms.rooms || !rooms.rooms.length) list.append(el('div', { class: 'empty' }, '🌊 Gerade wartet niemand. Hoste ein Spiel – wer die Seite öffnet, sieht es hier.'));
+  if (!rooms) list.append(el('div', { class: 'hint' }, online ? t('searching') : t('noConnDot')));
+  else if (!rooms.rooms || !rooms.rooms.length) list.append(el('div', { class: 'empty' }, t('nobody')));
   else for (const r of rooms.rooms) {
     list.append(el('button', { class: 'room', onclick: () => { const n = needName(); if (n) act({ action: 'join', room: r.room, name: n }); } },
       el('span', { class: 'flag' }, '⚓'),
-      el('span', { class: 'rname' }, el('b', {}, r.host), el('small', {}, 'wartet seit ' + ago(r.since))),
-      el('span', { class: 'go' }, 'Beitreten ›')));
+      el('span', { class: 'rname' }, el('b', {}, r.host), el('small', {}, t('waitingSince', ago(r.since)))),
+      el('span', { class: 'go' }, t('join'))));
   }
-  const running = rooms && rooms.running ? el('div', { class: 'hint' }, `⚔️ ${rooms.running} Gefecht${rooms.running > 1 ? 'e' : ''} läuft gerade`) : null;
+  const running = rooms && rooms.running ? el('div', { class: 'hint' }, (rooms.running > 1 ? t('runningN', rooms.running) : t('running1'))) : null;
   $('#screen').replaceChildren(el('div', { class: 'home' },
-    el('div', { class: 'hero' }, heroCanvas, el('h1', {}, el('span', {}, 'Schiffe'), el('span', {}, 'versenken'))),
-    el('label', { class: 'field' }, 'Dein Name', name),
-    el('button', { class: 'primary big', onclick: () => { const n = needName(); if (n) act({ action: 'host', name: n }); } }, '⚓ Spiel hosten'),
-    el('h3', {}, 'Offene Spiele'),
+    el('div', { class: 'hero' }, heroCanvas, el('h1', {}, el('span', {}, t('titleA')), el('span', {}, t('titleB')))),
+    el('label', { class: 'field' }, t('yourName'), name),
+    langPicker(),
+    el('button', { class: 'primary big', onclick: () => { const n = needName(); if (n) act({ action: 'host', name: n }); } }, t('host')),
+    el('h3', {}, t('openGames')),
     list, running));
   sizeHero();
 }
-function ago(s) { return s < 60 ? 'gerade eben' : s < 3600 ? Math.floor(s / 60) + ' min' : Math.floor(s / 3600) + ' h'; }
+function ago(s) { return s < 60 ? t('justNow') : s < 3600 ? Math.floor(s / 60) + ' min' : Math.floor(s / 3600) + ' h'; }
 function sizeHero() {
   const w = Math.min($('#screen').clientWidth - 32, 480);
   const dpr = Math.min(window.devicePixelRatio || 1, 3);
@@ -147,10 +163,10 @@ function renderWaiting() {
   const p = S.players[0];
   $('#screen').replaceChildren(el('div', { class: 'center' },
     el('div', { class: 'radar' }, el('i'), el('b', {}, '⚓')),
-    el('h2', {}, 'Warte auf einen Gegner …'),
-    el('div', { class: 'hint' }, 'Dein Spiel steht jetzt in der Liste „Offene Spiele“. Wer Schiffe versenken öffnet, kann beitreten.'),
-    el('div', { class: 'code' }, 'Kapitän ', el('b', {}, p ? p.name : myName()), p && p.score ? ' · ' + p.score + ' Siege' : ''),
-    el('button', { class: 'danger', onclick: () => act({ action: 'leave', room: S.room }) }, 'Abbrechen')));
+    el('h2', {}, t('waitOpp')),
+    el('div', { class: 'hint' }, t('waitHint')),
+    el('div', { class: 'code' }, t('captain'), el('b', {}, p ? p.name : myName()), p && p.score ? ' · ' + p.score + t('wins') : ''),
+    el('button', { class: 'danger', onclick: () => act({ action: 'leave', room: S.room }) }, t('cancel'))));
 }
 
 /* ---------- Aufstellen ---------- */
@@ -200,7 +216,7 @@ function clampShip(s) {
 function shipIndexAt(ships, x, y) { return ships.findIndex((s) => cellsOf(s).some(([cx, cy]) => cx === x && cy === y)); }
 function rotateSel() {
   const i = place.sel;
-  if (i < 0) { toast('Erst ein Schiff antippen'); return; }
+  if (i < 0) { toast(t('tapShipFirst')); return; }
   const s = place.ships[i];
   const n = clampShip({ ...s, dir: s.dir === 'h' ? 'v' : 'h' });
   const test = place.ships.map((o, k) => (k === i ? n : o));
@@ -211,16 +227,16 @@ function rotateSel() {
       const t2 = place.ships.map((o, k) => (k === i ? m : o));
       if (!validate(t2).has(i)) { place.ships[i] = m; syncPlace(); return; }
     }
-    toast('Kein Platz zum Drehen'); return;
+    toast(t('noRotate')); return;
   }
   place.ships[i] = n;
   syncPlace();
 }
 function syncPlace() {
   const bad = validate(place.ships);
-  placeView.ships = place.ships.map((s, i) => ({ ...s, type: i, sel: i === place.sel, bad: bad.has(i), alpha: place.drag && place.drag.i === i ? 0.85 : 1 }));
+  placeView.ships = place.ships.map((s, i) => ({ ...s, type: artOf(i), seed: i, sel: i === place.sel, bad: bad.has(i), alpha: place.drag && place.drag.i === i ? 0.85 : 1 }));
   placeView.grid = new Array(SIZE * SIZE).fill(0);
-  document.querySelectorAll('.shipbar .sb').forEach((b, i) => b.classList.toggle('sel', i === place.sel));
+  document.querySelectorAll('.shipbar .sb').forEach((b, k) => b.classList.toggle('sel', place.sel >= 0 && shipClass(place.sel) === k));
 }
 function cellFromEvent(view, ev, clamp) {
   const r = view.canvas.getBoundingClientRect();
@@ -239,7 +255,7 @@ placeView.canvas.addEventListener('pointerdown', (ev) => {
     if (place.sel >= 0) { // ausgewähltes Schiff hierher setzen
       const s = clampShip({ ...place.ships[place.sel], x: cell.x, y: cell.y });
       const test = place.ships.map((o, k) => (k === place.sel ? s : o));
-      if (validate(test).has(place.sel)) toast('Dort ist kein Platz'); else { place.ships[place.sel] = s; syncPlace(); }
+      if (validate(test).has(place.sel)) toast(t('noRoom')); else { place.ships[place.sel] = s; syncPlace(); }
     }
     return;
   }
@@ -262,7 +278,7 @@ function endDrag() {
   if (!d) return;
   place.drag = null;
   if (!d.moved) { if (d.wasSel) rotateSel(); else syncPlace(); return; }
-  if (validate(place.ships).has(d.i)) { place.ships[d.i] = d.orig; toast('Schiffe dürfen sich nicht berühren'); }
+  if (validate(place.ships).has(d.i)) { place.ships[d.i] = d.orig; toast(t('noTouch')); }
   syncPlace();
 }
 placeView.canvas.addEventListener('pointerup', endDrag);
@@ -282,22 +298,28 @@ function renderPlacing() {
   const W = boardSize().place;
   placeView.resize(W);
   syncPlace();
-  const bar = el('div', { class: 'shipbar' }, ...FLEET.map((len, i) => el('button', { class: 'sb' + (i === place.sel ? ' sel' : ''), disabled: ready, onclick: () => { place.sel = i; syncPlace(); } },
-    shipIcon(i, 13), el('small', {}, SHIP_NAMES[i]))));
-  const oppLine = opp ? el('div', { class: 'opp-state' + (opp.ready ? ' ok' : '') }, (opp.online ? '' : '⚠ ') + opp.name + (opp.ready ? ' ist bereit ✔' : ' stellt noch auf …')) : null;
+  // Eine Taste pro Schiffsklasse; mehrmals tippen wählt der Reihe nach das nächste Schiff dieser Klasse.
+  const bar = el('div', { class: 'shipbar' }, ...CLASS_LENS.map((len, k) => {
+    const idx = FLEET.map((l, i) => i).filter((i) => shipClass(i) === k);
+    return el('button', { class: 'sb' + (place.sel >= 0 && shipClass(place.sel) === k ? ' sel' : ''), disabled: ready, onclick: () => {
+      const at = idx.indexOf(place.sel);
+      place.sel = idx[(at + 1) % idx.length]; syncPlace();
+    } }, shipIcon(idx[0], 11), el('small', {}, idx.length + '× ' + t('ships')[k]));
+  }));
+  const oppLine = opp ? el('div', { class: 'opp-state' + (opp.ready ? ' ok' : '') }, (opp.online ? '' : '⚠ ') + opp.name + (opp.ready ? t('isReady') : t('stillPlacing'))) : null;
   const actions = ready
-    ? el('div', { class: 'row' }, el('div', { class: 'waiting' }, '⏳ Warte auf ' + (opp ? opp.name : 'Gegner') + ' …'), el('button', { onclick: () => act({ action: 'unready', room: S.room }) }, 'Ändern'))
+    ? el('div', { class: 'row' }, el('div', { class: 'waiting' }, t('waitFor', opp ? opp.name : t('opponent'))), el('button', { onclick: () => act({ action: 'unready', room: S.room }) }, t('change')))
     : el('div', { class: 'row' },
-      el('button', { onclick: () => { place.ships = randomFleet(); place.sel = -1; syncPlace(); } }, '🎲 Zufall'),
-      el('button', { onclick: rotateSel }, '⟳ Drehen'),
+      el('button', { onclick: () => { place.ships = randomFleet(); place.sel = -1; syncPlace(); } }, t('random')),
+      el('button', { onclick: rotateSel }, t('rotate')),
       el('button', { class: 'primary', onclick: () => {
-        if (validate(place.ships).size) { toast('Schiffe dürfen sich nicht berühren'); return; }
+        if (validate(place.ships).size) { toast(t('noTouch')); return; }
         place.sel = -1; syncPlace();
         act({ action: 'place', room: S.room, ships: place.ships.map((s) => ({ x: s.x, y: s.y, dir: s.dir })) });
-      } }, 'Bereit ⚓'));
+      } }, t('ready')));
   $('#screen').replaceChildren(el('div', { class: 'placing' + (ready ? ' is-ready' : '') },
-    el('div', { class: 'title' }, el('h2', {}, 'Flotte aufstellen'), oppLine),
-    el('div', { class: 'hint small' }, ready ? 'Deine Flotte ist gemeldet.' : 'Schiff ziehen zum Verschieben · nochmal antippen zum Drehen'),
+    el('div', { class: 'title' }, el('h2', {}, t('placeTitle')), oppLine),
+    el('div', { class: 'hint small' }, ready ? t('fleetSent') : t('placeHint')),
     el('div', { class: 'boardwrap' }, placeView.canvas),
     bar, actions));
 }
@@ -325,8 +347,8 @@ enemyView.canvas.addEventListener('pointerup', (ev) => {
   const cell = cellFromEvent(enemyView, ev);
   if (!cell) return;
   const k = cell.y * SIZE + cell.x;
-  if (S.enemy.grid[k] !== 0) { toast('Da hast du schon hingeschossen'); return; }
-  if (knownWater().has(k)) { toast('Dort kann kein Schiff liegen'); return; }
+  if (S.enemy.grid[k] !== 0) { toast(t('alreadyShot')); return; }
+  if (knownWater().has(k)) { toast(t('noShipThere')); return; }
   const t = enemyView.target;
   if (t && t.x === cell.x && t.y === cell.y) { fire(); return; }
   enemyView.target = cell;
@@ -335,9 +357,9 @@ enemyView.canvas.addEventListener('pointerup', (ev) => {
 function updateFireBtn() {
   const b = $('#fire');
   if (!b) return;
-  const t = enemyView.target;
-  b.disabled = !(t && S && S.turn === S.you && S.phase === 'playing');
-  b.textContent = t ? '🔥 Feuer auf ' + LETTERS[t.x] + (t.y + 1) : '🔥 Ziel wählen';
+  const tg = enemyView.target;
+  b.disabled = !(tg && S && S.turn === S.you && S.phase === 'playing');
+  b.textContent = tg ? t('fireAt', LETTERS[tg.x] + (tg.y + 1)) : t('pickTarget');
 }
 async function fire() {
   const t = enemyView.target;
@@ -350,9 +372,9 @@ async function fire() {
 
 function syncBattleViews() {
   const meShips = (S.me && S.me.ships) || [];
-  ownView.ships = meShips.map((s, i) => ({ ...s, type: i }));
+  ownView.ships = meShips.map((s, i) => ({ ...s, type: artOf(i), seed: i }));
   ownView.grid = (S.me && S.me.grid) || new Array(SIZE * SIZE).fill(0);
-  enemyView.ships = ((S.enemy && S.enemy.ships) || []).map((s) => ({ ...s, type: s.i, sunk: s.sunk, alpha: s.sunk ? 1 : 0.8 }));
+  enemyView.ships = ((S.enemy && S.enemy.ships) || []).map((s) => ({ ...s, type: artOf(s.i), seed: s.i, sunk: s.sunk, alpha: s.sunk ? 1 : 0.8 }));
   enemyView.grid = (S.enemy && S.enemy.grid) || new Array(SIZE * SIZE).fill(0);
   enemyView.active = S.phase === 'playing' && S.turn === S.you;
   enemyView.dim = S.phase === 'playing';
@@ -375,21 +397,24 @@ function syncBattleViews() {
 }
 
 function bannerText(opp) {
-  if (S.phase === 'finished') return S.winner === S.you ? ['win', '🏆 Sieg! Die feindliche Flotte ist versenkt'] : ['lose', '💥 Deine Flotte wurde versenkt'];
-  if (!opp) return ['wait', 'Gegner fehlt'];
+  if (S.phase === 'finished') return S.winner === S.you ? ['win', t('bWin')] : ['lose', t('bLose')];
+  if (!opp) return ['wait', t('bNoOpp')];
   if (S.turn === S.you) {
     const L = S.last;
-    if (L && L.by === S.you && L.res === 'sunk') return ['mine', '💥 Versenkt! Feuer frei'];
-    if (L && L.by === S.you && L.res === 'hit') return ['mine', '🔥 Treffer! Nochmal feuern'];
-    return ['mine', '🎯 Dein Zug – wähle ein Ziel'];
+    if (L && L.by === S.you && L.res === 'sunk') return ['mine', t('bSunk')];
+    if (L && L.by === S.you && L.res === 'hit') return ['mine', t('bHit')];
+    return ['mine', t('bMine')];
   }
-  return ['theirs', `⏳ ${opp.name} zielt auf deine Flotte${opp.online ? ' …' : ' (offline)'}`];
+  return ['theirs', t('bTheirs', opp.name) + (opp.online ? ' …' : t('offlineP'))];
 }
 
 /** Gegnerflotte: versenkte Schiffe sind markiert. */
 function fleetStatus(ships) {
   const sunk = new Set((ships || []).filter((s) => s.sunk).map((s) => s.i));
-  return el('div', { class: 'fleet' }, ...FLEET.map((len, i) => el('div', { class: 'fl' + (sunk.has(i) ? ' sunk' : ''), title: SHIP_NAMES[i] }, shipIcon(i, 12, sunk.has(i)))));
+  // eine Zeile pro Klasse: 1×5, 2×4, 3×3, 4×2
+  return el('div', { class: 'fleet' }, ...CLASS_LENS.map((len, k) => el('div', { class: 'fl-row' },
+    ...FLEET.map((l, i) => i).filter((i) => shipClass(i) === k)
+      .map((i) => el('div', { class: 'fl' + (sunk.has(i) ? ' sunk' : ''), title: shipName(i) }, shipIcon(i, 9, sunk.has(i)))))));
 }
 
 function renderBattle() {
@@ -400,22 +425,22 @@ function renderBattle() {
   syncBattleViews();
   const [cls, text] = bannerText(opp);
   const score = el('div', { class: 'scorebar' },
-    el('div', { class: 'cap me' + (S.turn === S.you && S.phase === 'playing' ? ' turn' : '') }, el('b', {}, me.name), el('small', {}, `${me.hits}/${me.shots} Treffer`)),
-    el('div', { class: 'vs' }, el('b', {}, `${me.score} : ${opp ? opp.score : 0}`), el('small', {}, 'Runde ' + S.round)),
-    el('div', { class: 'cap them' + (opp && S.turn !== S.you && S.phase === 'playing' ? ' turn' : '') + (opp && !opp.online ? ' off' : '') }, el('b', {}, opp ? opp.name : '–'), el('small', {}, opp ? `${opp.hits}/${opp.shots} Treffer` : '')));
+    el('div', { class: 'cap me' + (S.turn === S.you && S.phase === 'playing' ? ' turn' : '') }, el('b', {}, me.name), el('small', {}, t('hits', me.hits, me.shots))),
+    el('div', { class: 'vs' }, el('b', {}, `${me.score} : ${opp ? opp.score : 0}`), el('small', {}, t('round', S.round))),
+    el('div', { class: 'cap them' + (opp && S.turn !== S.you && S.phase === 'playing' ? ' turn' : '') + (opp && !opp.online ? ' off' : '') }, el('b', {}, opp ? opp.name : '–'), el('small', {}, opp ? t('hits', opp.hits, opp.shots) : '')));
   const fireBtn = el('button', { id: 'fire', class: 'fire', onclick: fire });
   const side = el('div', { class: 'side' },
-    el('div', { class: 'label' }, 'Feindflotte'),
+    el('div', { class: 'label' }, t('enemyFleet')),
     fleetStatus(S.enemy && S.enemy.ships),
     S.phase === 'playing' ? fireBtn : el('div', { class: 'row col' },
-      el('button', { class: 'primary', onclick: () => act({ action: 'rematch', room: S.room }) }, '⟳ Revanche'),
-      el('button', { onclick: confirmLeave }, 'Verlassen')));
+      el('button', { class: 'primary', onclick: () => act({ action: 'rematch', room: S.room }) }, t('rematch')),
+      el('button', { onclick: confirmLeave }, t('leave'))));
   $('#screen').replaceChildren(el('div', { class: 'battle' + (size.wide ? ' wide' : '') },
     score,
     el('div', { class: 'banner ' + cls }, text),
-    el('div', { class: 'enemy-board' }, el('div', { class: 'label' }, 'Feindgewässer'), enemyView.canvas),
+    el('div', { class: 'enemy-board' }, el('div', { class: 'label' }, t('enemyWaters')), enemyView.canvas),
     el('div', { class: 'bottom' },
-      el('div', { class: 'own-board' }, el('div', { class: 'label' }, 'Deine Flotte'), ownView.canvas),
+      el('div', { class: 'own-board' }, el('div', { class: 'label' }, t('yourFleet')), ownView.canvas),
       side)));
   updateFireBtn();
   if (S.phase === 'finished' && showResult.round !== S.round) { showResult.round = S.round; setTimeout(showResult, 1400); }
@@ -430,23 +455,23 @@ function showResult() {
   $('#modal').dataset.keep = '1';
   showModal([
     el('div', { class: 'big-emoji' }, won ? '🏆' : '⚓'),
-    el('h2', {}, won ? 'Sieg auf hoher See!' : 'Versenkt …'),
-    el('div', { class: 'hint' }, won ? `Du hast die Flotte von ${opp.name} versenkt.` : `${opp.name} hat deine Flotte versenkt.`),
+    el('h2', {}, won ? t('winTitle') : t('loseTitle')),
+    el('div', { class: 'hint' }, won ? t('winText', opp.name) : t('loseText', opp.name)),
     el('table', { class: 'stats' },
       el('tr', {}, el('th', {}), el('th', {}, me.name), el('th', {}, opp.name)),
-      el('tr', {}, el('td', {}, 'Siege'), el('td', {}, me.score), el('td', {}, opp.score)),
-      el('tr', {}, el('td', {}, 'Schüsse'), el('td', {}, me.shots), el('td', {}, opp.shots)),
-      el('tr', {}, el('td', {}, 'Trefferquote'), el('td', {}, rate(me)), el('td', {}, rate(opp)))),
+      el('tr', {}, el('td', {}, t('sWins')), el('td', {}, me.score), el('td', {}, opp.score)),
+      el('tr', {}, el('td', {}, t('sShots')), el('td', {}, me.shots), el('td', {}, opp.shots)),
+      el('tr', {}, el('td', {}, t('sRate')), el('td', {}, rate(me)), el('td', {}, rate(opp)))),
     el('div', { class: 'row' },
-      el('button', { class: 'primary', onclick: () => { hideModal(); act({ action: 'rematch', room: S.room }); } }, '⟳ Revanche'),
-      el('button', { onclick: () => hideModal() }, 'Bretter ansehen')),
+      el('button', { class: 'primary', onclick: () => { hideModal(); act({ action: 'rematch', room: S.room }); } }, t('rematch')),
+      el('button', { onclick: () => hideModal() }, t('viewBoards'))),
   ], won ? 'win' : 'lose');
 }
 function confirmLeave() {
   $('#modal').dataset.keep = '1';
-  showModal([el('b', {}, 'Spiel verlassen?'), el('div', { class: 'hint' }, 'Dein Gegner kann dann auf einen neuen Mitspieler warten.'), el('div', { class: 'row' },
-    el('button', { class: 'danger', onclick: () => { hideModal(); const r = S && S.room; act({ action: 'leave', room: r }); } }, 'Verlassen'),
-    el('button', { onclick: hideModal }, 'Bleiben'))]);
+  showModal([el('b', {}, t('leaveQ')), el('div', { class: 'hint' }, t('leaveHint')), el('div', { class: 'row' },
+    el('button', { class: 'danger', onclick: () => { hideModal(); const r = S && S.room; act({ action: 'leave', room: r }); } }, t('leave')),
+    el('button', { onclick: hideModal }, t('stay')))]);
 }
 
 /* ---------- Chat (auf- und zuklappbar wie bei Fruhno) ---------- */
@@ -475,8 +500,8 @@ function renderChat() {
   chatPrimed = true;
   const log = $('#chat-log');
   const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 30;
-  log.replaceChildren(...S.chat.map((m) => m.kind === 'act' ? el('p', { class: 'act' }, m.text)
-    : m.kind === 'sys' ? el('p', { class: 'sys' }, m.text)
+  log.replaceChildren(...S.chat.map((m) => m.kind === 'act' ? el('p', { class: 'act' }, chatText(m))
+    : m.kind === 'sys' ? el('p', { class: 'sys' }, chatText(m))
       : el('p', { class: m.name === me ? 'mine' : '' }, el('b', {}, m.name), el('span', {}, m.text))));
   const newest = S.chat.length ? S.chat[S.chat.length - 1].n : 0;
   if (chatOpen()) { lastChatSeen = newest; store.set(key, String(newest)); if (atBottom || renderChat.n !== newest) log.scrollTop = log.scrollHeight; }
@@ -486,7 +511,7 @@ function renderChat() {
 
 /* ---------- Hauptrender ---------- */
 function render() {
-  $('#status').textContent = online ? '' : '⚠ offline';
+  $('#status').textContent = online ? '' : t('offline');
   let key;
   if (!inRoom() || !S) key = 'home|' + JSON.stringify(rooms) + online + (inRoom() ? 'connecting' : '');
   else key = [S.version, S.phase, S.you, S.players.map((p) => p.online + ':' + p.ready).join(), online, window.innerWidth, window.innerHeight].join('|');
@@ -494,8 +519,8 @@ function render() {
     renderKey = key;
     // Beim Tippen im Namensfeld nicht neu aufbauen
     if (!(document.activeElement && document.activeElement.id === 'name' && (!inRoom() || !S))) {
-      if (inRoom() && !S) $('#screen').replaceChildren(el('div', { class: 'center' }, el('div', { class: 'hint' }, online ? 'Verbinde …' : 'Keine Verbindung zum Server.'),
-        el('button', { onclick: () => { leaveLocal(); render(); poll(); } }, 'Zurück zum Hafen')));
+      if (inRoom() && !S) $('#screen').replaceChildren(el('div', { class: 'center' }, el('div', { class: 'hint' }, online ? t('connecting') : t('noConnDot')),
+        el('button', { onclick: () => { leaveLocal(); render(); poll(); } }, t('backHome'))));
       else if (!S) renderHome();
       else if (S.phase === 'lobby') renderWaiting();
       else if (S.phase === 'placing') renderPlacing();
@@ -529,18 +554,19 @@ $('#chat-form').addEventListener('submit', (ev) => {
 });
 $('#btn-menu').addEventListener('click', () => {
   $('#modal').dataset.keep = '1';
-  const items = [el('h2', {}, 'Menü'),
-    el('button', { onclick: () => { Sound.on = !Sound.on; store.set('sound', Sound.on ? '1' : '0'); Sound.unlock(); hideModal(); toast(Sound.on ? '🔊 Ton an' : '🔇 Ton aus'); } }, Sound.on ? '🔇 Ton aus' : '🔊 Ton an')];
-  if (S) items.push(el('button', { class: 'danger', onclick: () => { hideModal(); confirmLeave(); } }, 'Spiel verlassen'));
-  if (S && S.phase === 'finished') items.push(el('button', { onclick: () => { hideModal(); showResult(); } }, 'Ergebnis zeigen'));
-  items.push(el('a', { class: 'btn', href: '../' }, '← Zur Spieleübersicht'));
-  items.push(el('button', { onclick: hideModal }, 'Schließen'));
+  const items = [el('h2', {}, t('menu')), langPicker(() => hideModal()),
+    el('button', { onclick: () => { Sound.on = !Sound.on; store.set('sound', Sound.on ? '1' : '0'); Sound.unlock(); hideModal(); toast(Sound.on ? t('soundOn') : t('soundOff')); } }, Sound.on ? t('soundOff') : t('soundOn'))];
+  if (S) items.push(el('button', { class: 'danger', onclick: () => { hideModal(); confirmLeave(); } }, t('leaveGame')));
+  if (S && S.phase === 'finished') items.push(el('button', { onclick: () => { hideModal(); showResult(); } }, t('showResult')));
+  items.push(el('a', { class: 'btn', href: '../' }, t('toOverview')));
+  items.push(el('button', { onclick: hideModal }, t('close')));
   showModal(items, 'menu');
 });
 $('#modal').addEventListener('click', (ev) => { if (ev.target === $('#modal') && $('#modal').querySelector('.menu')) hideModal(); });
 window.addEventListener('resize', () => { renderKey = ''; render(); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+applyStaticTexts();
 render();
 poll();
 requestAnimationFrame(frame);

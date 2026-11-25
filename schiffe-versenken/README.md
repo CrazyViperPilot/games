@@ -3,7 +3,8 @@
 Seeschlacht online für 2 Spieler, gebaut fürs Smartphone im Hochformat.
 
 - **Hosten / Beitreten:** Name frei wählbar, kein Passwort. Wer hostet, erscheint auf der Startseite unter „Offene Spiele“; wer dort tippt, tritt bei.
-- **Aufstellen:** Flotte aus Flugzeugträger (5), Schlachtschiff (4), Kreuzer (3), U-Boot (3) und Zerstörer (2). Schiffe ziehen zum Verschieben, nochmal antippen zum Drehen, 🎲 für Zufall. Schiffe dürfen sich nicht berühren (auch nicht über Eck).
+- **Sprachen:** Deutsch, English, Polski – Auswahl auf der Startseite und im Menü (☰), Standard nach Browsersprache. Texte in `js/i18n.js`; der Server schickt Chat-Systemzeilen und Fehler als Schlüssel/Code, jeder Client zeigt sie in seiner Sprache.
+- **Aufstellen:** Flotte nach der klassischen Papier-Regel: 1 Schlachtschiff (5), 2 Kreuzer (4), 3 Zerstörer (3), 4 U-Boote (2) – 10 Schiffe, 30 Felder. Schiffe ziehen zum Verschieben, nochmal antippen zum Drehen, 🎲 für Zufall; die Klassentasten unter dem Brett wählen der Reihe nach die Schiffe einer Klasse. Schiffe dürfen sich nicht berühren (auch nicht über Eck).
 - **Gefecht:** Feld antippen = zielen, nochmal antippen oder „Feuer“ = schießen. Treffer → nochmal schießen. Felder rund um versenkte Schiffe werden als Wasser markiert. Revanche: Der Verlierer beginnt.
 - **Chat:** 💬 oben rechts, klappt bei neuen Nachrichten kurz auf und wieder zu.
 - **Grafik:** Meer, Schiffe, Feuer und Einschläge werden auf Canvas aus einfachen Formen gezeichnet (`js/draw.js`), Töne werden synthetisch erzeugt.
@@ -15,7 +16,8 @@ Seeschlacht online für 2 Spieler, gebaut fürs Smartphone im Hochformat.
 | `api.php` | Multiplayer-API, ein JSON-File pro Raum in `data/` (Token pro Spieler, Räume räumen sich selbst auf) |
 | `engine.php` | Regeln: Flotte prüfen, Schuss auswerten |
 | `test.php` | `php schiffe-versenken/test.php` |
-| `js/draw.js` | Meer, Schiffe, Effekte, `BoardView` |
+| `js/i18n.js` | Texte DE/EN/PL, `t()`, `setLang()` |
+| `js/draw.js` | Meer, Schiffe, Effekte, `BoardView`, Flotte (`FLEET`) |
 | `js/api.js` | API-Client, Sound |
 | `js/main.js` | Bildschirme, Polling, Chat |
 

@@ -1,8 +1,8 @@
 // Schiffe-versenken Service Worker: network-first for the app shell, cache only as offline fallback.
 // API calls are never cached. Bump CACHE_VERSION when files change.
-const CACHE_VERSION = 'schiffeversenken-v1';
+const CACHE_VERSION = 'schiffeversenken-v2';
 const CACHE_PREFIX = 'schiffeversenken-';
-const ASSETS = ['./', './index.html', './manifest.json', './css/style.css', './js/draw.js', './js/api.js', './js/main.js',
+const ASSETS = ['./', './index.html', './manifest.json', './css/style.css', './js/i18n.js', './js/draw.js', './js/api.js', './js/main.js',
   './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {

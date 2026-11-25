@@ -1,7 +1,13 @@
 // Zeichnet Meer, Schiffe, Treffer und Effekte auf Canvas – alles aus einfachen Formen, keine Bilder.
 const SIZE = 10;
-const FLEET = [5, 4, 3, 3, 2];
-const SHIP_NAMES = ['Flugzeugträger', 'Schlachtschiff', 'Kreuzer', 'U-Boot', 'Zerstörer'];
+// Klassische Papier-Regel: 1 Schlachtschiff (5), 2 Kreuzer (4), 3 Zerstörer (3), 4 U-Boote (2).
+const FLEET = [5, 4, 4, 3, 3, 3, 2, 2, 2, 2];
+const CLASS_LENS = [5, 4, 3, 2];
+/** Klasse (0 Schlachtschiff, 1 Kreuzer, 2 Zerstörer, 3 U-Boot) des Schiffs Nr. i. */
+const shipClass = (i) => CLASS_LENS.indexOf(FLEET[i]);
+/** Zeichenstil (Typ für drawShip) des Schiffs Nr. i. */
+const artOf = (i) => [1, 2, 4, 3][shipClass(i)];
+const shipName = (i) => t('ships')[shipClass(i)];
 const LETTERS = 'ABCDEFGHIJ';
 
 function cellsOf(s) {
@@ -386,7 +392,7 @@ class BoardView {
       }
     }
     // Schiffe
-    for (const s of this.ships) drawShip(ctx, s.type, s.len, s.dir, o + s.x * c, o + s.y * c, c, t + s.type, { sunk: s.sunk, wake: !s.sunk, sel: s.sel, bad: s.bad, alpha: s.alpha });
+    for (const s of this.ships) drawShip(ctx, s.type, s.len, s.dir, o + s.x * c, o + s.y * c, c, t + (s.seed ?? s.type), { sunk: s.sunk, wake: !s.sunk, sel: s.sel, bad: s.bad, alpha: s.alpha });
     // Treffer / Wasser
     const sunkCells = new Set();
     for (const s of this.ships) if (s.sunk) for (const [x, y] of cellsOf(s)) sunkCells.add(y * SIZE + x);
@@ -470,14 +476,14 @@ class BoardView {
 }
 
 /** Kleine Silhouette eines Schiffs (Flottenübersicht). */
-function shipIcon(type, cell, sunk) {
-  const len = FLEET[type];
+function shipIcon(i, cell, sunk) {
+  const len = FLEET[i];
   const cv = document.createElement('canvas');
   const dpr = Math.min(window.devicePixelRatio || 1, 3);
   cv.width = len * cell * dpr; cv.height = cell * dpr;
   cv.style.width = len * cell + 'px'; cv.style.height = cell + 'px';
   const ctx = cv.getContext('2d');
   ctx.scale(dpr, dpr);
-  drawShip(ctx, type, len, 'h', 0, 0, cell, 0.3, { sunk });
+  drawShip(ctx, artOf(i), len, 'h', 0, 0, cell, 0.3, { sunk });
   return cv;
 }
