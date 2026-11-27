@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b2a26">
+  <meta name="description" content="Leas Adventskalender: jeden Tag ein Türchen mit Rätseln, Witzen, Quiz und Aufträgen.">
+  <title>Leas Adventskalender</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="../icons/lea.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="../icons/lea-192.png">
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body class="thema-winter" data-kind="lea">
+  <canvas id="schnee" aria-hidden="true"></canvas>
+  <header>
+    <a class="knopf-klein" href="../../" aria-label="Zurück zu den Spielen">‹ Games</a>
+    <h1>Leas Adventskalender</h1>
+    <button id="ton" class="knopf-klein" aria-label="Ton an oder aus">🔔</button>
+    <span class="sterne" title="Gesammelte Sterne">⭐ <span id="sterne">0</span></span>
+  </header>
+  <p id="hinweis"></p>
+  <main id="kalender" aria-label="Türchen"></main>
+  <footer>Jeden Tag darf ein neues Türchen geöffnet werden. Frohe Adventszeit! 🎄</footer>
+  <dialog id="tuer-dialog" aria-label="Türchen"></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="../art.js"></script>
+  <script src="../logic.js"></script>
+  <script src="../content.js"></script>
+  <script src="../app.js"></script>
+</body>
+</html>

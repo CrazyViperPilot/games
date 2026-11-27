@@ -1,0 +1,23 @@
+# Tests für den Adventskalender – läuft nur, wenn sich etwas in adventskalender/ ändert.
+name: Test Adventskalender
+
+on:
+  push:
+    branches: ["main"]
+    paths: ["adventskalender/**", ".github/workflows/test-adventskalender.yml"]
+  pull_request:
+    paths: ["adventskalender/**", ".github/workflows/test-adventskalender.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - run: node adventskalender/test/logic.test.js

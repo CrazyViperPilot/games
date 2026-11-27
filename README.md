@@ -19,6 +19,7 @@ Live: https://crazyviperpilot.github.io/games/
 | **Katzen-Queens** | [`cat-queens/`](cat-queens/) | Logikrätsel (Queens / Star Battle) mit Katzen: Tagesrätsel, 3 Stufen, Hinweise. TypeScript + Vite, wird in `pages.yml` gebaut. [PRD](cat-queens/PRD.md) | Hash aller Dateien, automatisch in `cat-queens/dist/sw.js` |
 | **Neon Stack** | [`neon-stack/`](neon-stack/) | Tetris im Cyberpunk-Look (Hochformat), Klassik und optionaler Neon-Modus. [PRD](neon-stack/PRD.md) | `CACHE_NAME` in `neon-stack/sw.js` |
 | **Simfurt** | [`simfurt/`](simfurt/) | Frankfurt-Städtebauspiel (isometrisch, Hochformat, Touch + Maus), Speicherstand lokal und auf dem Webspace. [PRD](simfurt/PRD.md) | `CACHE_NAME` in `simfurt/sw.js` |
+| **Adventskalender** | [`adventskalender/`](adventskalender/) | Je ein Kalender für Kira ([`kira/`](adventskalender/kira/)) und Lea ([`lea/`](adventskalender/lea/)): 24 Türchen mit Quiz, Rätseln, Witzen und Aufträgen, öffnen erst am jeweiligen Tag. Texte in `content.js`, selbst gezeichnete Bilder in `art.js`. Zum Ausprobieren: `?heute=2026-12-24` an die Adresse hängen. | `CACHE_NAME` in `adventskalender/sw.js` |
 | **Mario Craft** | [`mario-craft/`](mario-craft/) | Jump'n Run im Pixel-Stil: 5 Welten mit Bossen, Deutsch und Polnisch. [README](mario-craft/README.md) | `CACHE_VERSION` in `mario-craft/sw.js` |
 
 ## Aufbau: jedes Spiel ist eigenständig
@@ -28,7 +29,7 @@ Die Spiele teilen sich nur das Repo und die Domain – sonst nichts.
 - **Code:** Jedes Spiel liegt vollständig in seinem Ordner. Keine gemeinsamen Dateien, keine Imports über Ordnergrenzen
   (auch nicht aus der Startseite). Ein Spiel lässt sich jederzeit herauslösen, indem man seinen Ordner kopiert.
 - **Offline / Installation:** Jedes Spiel hat ein eigenes `manifest.json` (Scope = sein Ordner) und einen eigenen
-  Service Worker mit eigenem Cache-Präfix (`gatesquad-`, `vibesquadron-`, `go-game-`, `sudoku-`, `fruhno-`, `crazyvipermahjong-`, `catsweeper-`, `catqueens-`, `neonstack-`, `simfurt-`, `schiffeversenken-`). Ein Service Worker löscht beim
+  Service Worker mit eigenem Cache-Präfix (`gatesquad-`, `vibesquadron-`, `go-game-`, `sudoku-`, `fruhno-`, `crazyvipermahjong-`, `catsweeper-`, `catqueens-`, `neonstack-`, `simfurt-`, `schiffeversenken-`, `adventskalender-`). Ein Service Worker löscht beim
   Aktualisieren **nur Caches mit seinem eigenen Präfix** – sonst würde er die Offline-Daten der anderen Spiele zerstören.
 - **Speicherstände:** Jedes Spiel nutzt eigene `localStorage`-Schlüssel.
 - **Lebenszyklus:** Änderungen an einem Spiel betreffen nur seinen Ordner. Ein Release = Änderung + Cache-Version

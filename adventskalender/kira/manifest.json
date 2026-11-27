@@ -1,0 +1,17 @@
+{
+  "name": "Kiras Adventskalender",
+  "short_name": "Kiras Advent",
+  "description": "Kiras Adventskalender: jeden Tag ein Türchen mit Rätseln, Witzen, Quiz und Aufträgen.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#10163a",
+  "theme_color": "#10163a",
+  "lang": "de",
+  "icons": [
+    { "src": "../icons/kira.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "../icons/kira-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "../icons/kira-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

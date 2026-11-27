@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#121512">
   <title>Games</title>
-  <meta name="description" content="Spielesammlung: Gate Squad, Vibe Squadron, Go, Sudoku, CrazyViperMahjong, Catsweeper, Katzen-Queens, Neon Stack, Simfurt und Schiffe versenken">
+  <meta name="description" content="Spielesammlung: Gate Squad, Vibe Squadron, Go, Sudoku, CrazyViperMahjong, Catsweeper, Katzen-Queens, Neon Stack, Simfurt, Schiffe versenken und Adventskalender für Kira und Lea">
   <link rel="icon" href="gate-squad/icons/icon.svg" type="image/svg+xml">
   <style>
     :root {
@@ -125,6 +125,9 @@
     .mario h2 { letter-spacing: .04em; font-weight: 800; text-transform: uppercase; }
     .vibe { --accent: #00e5ff; }
     .vibe h2 { text-transform: uppercase; letter-spacing: .05em; font-weight: 800; }
+    .advent-kira { --accent: #ffd34a; }
+    .advent-lea { --accent: #ff8a6b; }
+    .advent-kira h2, .advent-lea h2 { font-family: Georgia, "Times New Roman", serif; font-style: italic; font-weight: 700; }
     .go { --accent: #d9c7a0; }
     .go h2 { font-family: Georgia, "Times New Roman", serif; font-weight: 700; }
     .sudoku h2 { font-family: Georgia, "Times New Roman", serif; font-weight: 700; }
@@ -136,6 +139,28 @@
   <p class="sub">Wähle ein Spiel</p>
 
   <main class="columns">
+  <section class="group">
+    <h3>Adventskalender</h3>
+    <p class="hint">Jeden Tag im Dezember ein neues Türchen</p>
+  <div class="games">
+    <a class="game advent-kira" href="adventskalender/kira/">
+      <img src="adventskalender/icons/kira-192.png" alt="" width="72" height="72">
+      <div>
+        <h2>Kiras Adventskalender</h2>
+        <p>24 Türchen mit Zauber-Quiz, Reporter-Aufträgen, Rätseln und Witzen.</p>
+      </div>
+      <span class="arrow" aria-hidden="true">›</span>
+    </a>
+    <a class="game advent-lea" href="adventskalender/lea/">
+      <img src="adventskalender/icons/lea-192.png" alt="" width="72" height="72">
+      <div>
+        <h2>Leas Adventskalender</h2>
+        <p>24 Türchen mit Spielzeug-Quiz, Zaubersprüchen, Bastel-Aufträgen und Witzen.</p>
+      </div>
+      <span class="arrow" aria-hidden="true">›</span>
+    </a>
+  </div>
+  </section>
   <section class="group">
     <h3>Offline spielbar</h3>
     <p class="hint">Als App installiert, ohne Internet</p>

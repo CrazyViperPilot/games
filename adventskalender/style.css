@@ -1,0 +1,211 @@
+/* Adventskalender – gemeinsamer Stil, Farben je Thema (body.thema-zauber / body.thema-winter). */
+:root {
+  --text: #fff8ea;
+  --muted: #d9d1e8;
+  --gold: #ffd34a;
+  --karte: #fff8ea;
+  --karte-text: #2a2240;
+  --gruen: #2fae63;
+  --rot: #d8434a;
+  --radius: 16px;
+}
+body.thema-zauber {
+  --bg1: #10163a; --bg2: #2a1b56; --glow: #6d4cd655;
+  --akzent: #ffd34a;
+}
+body.thema-winter {
+  --bg1: #0b2a26; --bg2: #1d4a3c; --glow: #ffb35c44;
+  --akzent: #ffcf6b;
+  --muted: #cfe3d8;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  color: var(--text);
+  background: radial-gradient(900px 500px at 50% -5%, var(--glow), transparent 70%), linear-gradient(180deg, var(--bg1), var(--bg2));
+  background-color: var(--bg1);
+  background-attachment: fixed;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  min-height: 100vh;
+  padding: calc(env(safe-area-inset-top) + 12px) 14px calc(env(safe-area-inset-bottom) + 28px);
+  -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden;
+}
+#schnee { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+header, #hinweis, #kalender, footer { position: relative; z-index: 1; }
+
+header {
+  display: flex; align-items: center; gap: 10px;
+  max-width: 980px; margin: 0 auto 6px;
+}
+.knopf-klein {
+  color: var(--text); text-decoration: none; background: #ffffff14; border: 1px solid #ffffff22;
+  border-radius: 999px; padding: 7px 12px; font-size: .95rem; cursor: pointer; font-family: inherit;
+  white-space: nowrap;
+}
+.knopf-klein:hover { background: #ffffff24; }
+h1 {
+  flex: 1; margin: 0; text-align: center;
+  font-family: Georgia, "Times New Roman", serif; font-style: italic; font-weight: 700;
+  font-size: clamp(1.35rem, 5.4vw, 2.4rem); line-height: 1.1;
+  color: var(--akzent); text-shadow: 0 2px 0 #0006, 0 0 24px #ffd34a55;
+}
+.sterne { font-weight: 800; font-size: 1.05rem; }
+
+#hinweis {
+  text-align: center; margin: 4px auto 16px; max-width: 600px; color: var(--muted); font-size: 1rem; line-height: 1.4;
+  min-height: 1.4em;
+}
+#hinweis b { color: var(--akzent); }
+
+/* --- Kalender-Raster --- */
+#kalender {
+  display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-flow: dense; gap: 10px;
+  max-width: 980px; margin: 0 auto;
+}
+@media (min-width: 760px) { #kalender { grid-template-columns: repeat(7, 1fr); gap: 14px; } }
+
+.tuer {
+  position: relative; aspect-ratio: 1; border: 0; padding: 0; margin: 0; background: none; cursor: pointer;
+  perspective: 700px; font: inherit; color: inherit;
+}
+.tuer.gross { grid-column: span 2; grid-row: span 2; }
+.tuer.breit { grid-column: span 2; aspect-ratio: auto; }
+.tuer:focus-visible { outline: 3px solid var(--akzent); outline-offset: 3px; border-radius: 12px; }
+
+.tuer .innen {
+  position: absolute; inset: 0; border-radius: 12px; overflow: hidden;
+  background: #fff3dc; box-shadow: inset 0 0 0 3px #00000033, inset 0 6px 14px #0004;
+  display: grid; place-items: center;
+}
+.tuer .innen svg { width: 86%; height: 86%; }
+.tuer.breit .innen svg { width: auto; height: 86%; }
+.tuer .innen .mini-zahl {
+  position: absolute; left: 6px; top: 4px; font: 700 .8rem Georgia, serif; color: #7a5a3a;
+}
+
+.tuer .fluegel {
+  position: absolute; inset: 0; border-radius: 12px;
+  background:
+    radial-gradient(circle at 20% 25%, #ffffff1c 0 2px, transparent 3px) 0 0 / 22px 22px,
+    radial-gradient(circle at 70% 70%, #ffffff12 0 1.5px, transparent 2.5px) 0 0 / 30px 30px,
+    linear-gradient(160deg, #ffffff22, transparent 50%),
+    var(--farbe);
+  box-shadow: 0 4px 0 #0005, 0 8px 18px #0005, inset 0 0 0 2px #ffffff26, inset 0 0 0 5px #00000022;
+  display: grid; place-items: center;
+  transform-origin: left center;
+  transition: transform .9s cubic-bezier(.3, 1.4, .5, 1), box-shadow .3s;
+  backface-visibility: hidden;
+}
+.tuer .fluegel::before {
+  /* gestrichelter Rahmen wie zum Aufreißen */
+  content: ""; position: absolute; inset: 7px; border-radius: 8px; border: 2px dashed #ffffff40;
+}
+.tuer .fluegel::after {
+  content: attr(data-deko); position: absolute; right: 8px; bottom: 4px; font-size: 1rem; opacity: .45;
+}
+.tuer .zahl {
+  font: italic 700 clamp(1.5rem, 7vw, 2.6rem) Georgia, "Times New Roman", serif;
+  color: #fff; text-shadow: 0 2px 0 #0007, 0 0 12px #ffd34a66;
+}
+.tuer.gross .zahl { font-size: clamp(3rem, 15vw, 5.2rem); color: var(--akzent); }
+.tuer .knauf {
+  position: absolute; right: 9px; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%;
+  background: var(--akzent); box-shadow: 0 1px 0 #0006;
+}
+.tuer.offen .fluegel { transform: rotateY(-112deg); box-shadow: 0 4px 10px #0003; }
+.tuer.heute:not(.offen) .fluegel { animation: leuchten 1.6s ease-in-out infinite; }
+@keyframes leuchten {
+  0%, 100% { box-shadow: 0 4px 0 #0005, 0 0 0 0 #ffd34a00, inset 0 0 0 2px #ffffff26; }
+  50% { box-shadow: 0 4px 0 #0005, 0 0 22px 6px #ffd34acc, inset 0 0 0 2px #ffe27a; }
+}
+.tuer.wackeln .fluegel { animation: wackeln .5s; }
+@keyframes wackeln {
+  20% { transform: rotate(-4deg); } 40% { transform: rotate(4deg); } 60% { transform: rotate(-3deg); } 80% { transform: rotate(2deg); }
+}
+.tuer.zu .fluegel::after { content: "🔒"; opacity: .55; }
+
+/* --- Türchen-Dialog --- */
+dialog {
+  border: 0; padding: 0; background: transparent; color: var(--karte-text);
+  width: min(94vw, 520px); max-height: 92vh; overflow: visible;
+}
+dialog::backdrop { background: #05061acc; backdrop-filter: blur(3px); }
+dialog[open] .karte { animation: aufklappen .45s cubic-bezier(.3, 1.5, .5, 1); }
+@keyframes aufklappen { from { transform: scale(.6) rotate(-4deg); opacity: 0; } to { transform: none; opacity: 1; } }
+.karte {
+  position: relative; background: var(--karte); border-radius: 22px; padding: 18px 20px 22px;
+  max-height: 92vh; overflow-y: auto;
+  box-shadow: 0 0 0 4px var(--akzent), 0 20px 60px #000a;
+}
+.karte .schliessen {
+  position: absolute; right: 10px; top: 10px; width: 38px; height: 38px; border-radius: 50%; border: 0;
+  background: #0000000f; font-size: 1.3rem; cursor: pointer; color: var(--karte-text);
+}
+.karte .datum { margin: 0; font: 700 .85rem system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #9a7a4a; }
+.karte h2 { margin: 2px 40px 8px 0; font: italic 700 1.6rem Georgia, serif; color: #3a2a6a; }
+body.thema-winter .karte h2 { color: #8f2d2a; }
+.karte .bild { display: block; width: min(56vw, 210px); margin: 0 auto 6px; cursor: pointer; position: relative; }
+.karte .bild svg { width: 100%; height: auto; display: block; transition: transform .2s; }
+.karte .bild:active svg { transform: scale(.94) rotate(-3deg); }
+.karte .art-schild {
+  display: inline-block; font: 700 .75rem system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase;
+  padding: 3px 9px; border-radius: 999px; background: #3a2a6a; color: #fff; margin-bottom: 8px;
+}
+body.thema-winter .karte .art-schild { background: #8f2d2a; }
+.karte .text { white-space: pre-line; font-size: 1.08rem; line-height: 1.5; margin: 0 0 12px; }
+.karte .aufloesung {
+  white-space: pre-line; font-size: 1.15rem; font-weight: 700; background: #fff0c2; border-radius: 12px; padding: 12px 14px;
+  margin: 10px 0; animation: aufklappen .35s;
+}
+.knopf {
+  display: inline-block; font: 700 1.02rem system-ui, sans-serif; border: 0; border-radius: 999px; padding: 11px 18px;
+  background: #3a2a6a; color: #fff; cursor: pointer; margin: 4px 6px 4px 0; box-shadow: 0 3px 0 #0003;
+}
+body.thema-winter .knopf { background: #8f2d2a; }
+.knopf:active { transform: translateY(2px); box-shadow: 0 1px 0 #0003; }
+.knopf.hell { background: #00000012; color: var(--karte-text); box-shadow: none; }
+.knopf.fertig { background: var(--gruen) !important; }
+.optionen { display: grid; gap: 8px; margin: 8px 0 4px; }
+.optionen button {
+  font: 600 1.02rem system-ui, sans-serif; text-align: left; padding: 12px 14px; border-radius: 12px; cursor: pointer;
+  border: 2px solid #00000018; background: #fff; color: var(--karte-text);
+}
+.optionen button.richtig { background: #d6f5df; border-color: var(--gruen); }
+.optionen button.falsch { background: #fbe0e0; border-color: var(--rot); animation: wackeln-x .4s; opacity: .7; }
+@keyframes wackeln-x { 25% { transform: translateX(-6px); } 50% { transform: translateX(6px); } 75% { transform: translateX(-3px); } }
+.stern-info { font-weight: 800; color: #a87a12; margin: 8px 0 0; }
+
+.karte.finale { background: linear-gradient(180deg, #fffaf0, #fff0d0); }
+.karte.finale .text { font-family: Georgia, serif; font-size: 1.15rem; }
+
+/* --- Effekte --- */
+.funke {
+  position: fixed; pointer-events: none; z-index: 1000; font-size: 22px; will-change: transform, opacity;
+  animation: funke var(--dauer, 1s) ease-out forwards;
+}
+@keyframes funke {
+  from { transform: translate(-50%, -50%) scale(.4); opacity: 1; }
+  to { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.1) rotate(var(--rot)); opacity: 0; }
+}
+.konfetti {
+  position: fixed; top: -20px; pointer-events: none; z-index: 1000; width: 10px; height: 14px; border-radius: 2px;
+  animation: fallen var(--dauer, 3s) linear forwards;
+}
+@keyframes fallen { to { transform: translate(var(--dx), 110vh) rotate(var(--rot)); } }
+
+#toast {
+  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 22px); transform: translate(-50%, 30px);
+  background: #fff8ea; color: var(--karte-text); padding: 12px 18px; border-radius: 999px; font-weight: 700;
+  box-shadow: 0 8px 30px #0008; opacity: 0; transition: opacity .25s, transform .25s; z-index: 50; text-align: center;
+  max-width: calc(100vw - 32px); pointer-events: none;
+}
+#toast.zeigen { opacity: 1; transform: translate(-50%, 0); }
+
+footer { text-align: center; color: var(--muted); font-size: .8rem; margin-top: 26px; opacity: .8; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tuer .fluegel { transition-duration: .01s; }
+  .tuer.heute:not(.offen) .fluegel, dialog[open] .karte { animation: none; }
+}

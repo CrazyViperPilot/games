@@ -1,0 +1,17 @@
+{
+  "name": "Leas Adventskalender",
+  "short_name": "Leas Advent",
+  "description": "Leas Adventskalender: jeden Tag ein Türchen mit Rätseln, Witzen, Quiz und Aufträgen.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b2a26",
+  "theme_color": "#0b2a26",
+  "lang": "de",
+  "icons": [
+    { "src": "../icons/lea.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "../icons/lea-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "../icons/lea-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

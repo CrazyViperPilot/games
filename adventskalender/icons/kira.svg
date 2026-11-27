@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#1b1f52"/>
+  <circle cx="256" cy="200" r="230" fill="#2f2370"/>
+  <g fill="#fff" opacity=".85"><circle cx="90" cy="110" r="6"/><circle cx="420" cy="90" r="5"/><circle cx="440" cy="300" r="4"/><circle cx="70" cy="330" r="5"/><circle cx="380" cy="420" r="4"/><circle cx="130" cy="430" r="4"/></g>
+  <rect x="136" y="116" width="240" height="290" rx="22" fill="#fff3dc" stroke="#2a1f1a" stroke-width="10"/>
+  <path d="M150 128 L292 150 L292 380 L150 394 Z" fill="#5b3c9e" stroke="#2a1f1a" stroke-width="10" stroke-linejoin="round"/>
+  <circle cx="276" cy="268" r="10" fill="#ffd34a"/>
+  <text x="218" y="306" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-weight="700" font-size="140" fill="#ffd34a">K</text>
+  <polygon points="334,190 343,214 368,214 348,229 356,253 334,238 312,253 320,229 300,214 325,214" fill="#ffd34a"/>
+  <text x="334" y="330" text-anchor="middle" font-size="44" fill="#ffd34a">★</text>
+</svg>
